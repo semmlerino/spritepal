@@ -42,24 +42,26 @@ uv run ruff check spritepal --fix
 # Type checking (on core modules only)
 uv run basedpyright spritepal/core spritepal/ui spritepal/utils
 
-# Tests
+# Tests (from exhal-master/, tests/ is at spritepal/tests/)
 uv run pytest spritepal/tests -v
 uv run pytest -m "headless and not slow"  # Fast tests
-uv run pytest -m "gui" --xvfb              # GUI tests
+uv run pytest -m "gui" --xvfb              # GUI tests (requires pytest-xvfb plugin)
 ```
 
 ## Qt Testing Best Practices
 
 ### Real Component Testing (Preferred)
 
-SpritePal uses real components over mocks. Target mock density: **0.032 or lower**.
+SpritePal uses real components over mocks. **Prefer real components; mock only at true system boundaries** (HAL subprocess, file I/O, clipboard, network).
 
 ```python
-from tests.infrastructure.real_component_factory import RealComponentFactory
+from spritepal.tests.infrastructure.real_component_factory import RealComponentFactory
+from spritepal.core.extraction_params import ExtractionParams
 
 def test_extraction_workflow():
     with RealComponentFactory() as factory:
         manager = factory.create_extraction_manager(with_test_data=True)
+        params = ExtractionParams(offset=0x1000, width=16, height=16)
         result = manager.validate_extraction_params(params)
         assert isinstance(result, bool)  # Real behavior
 ```
@@ -87,16 +89,19 @@ class MockDialog(QDialog):  # Don't do this!
 
 ### Signal Testing
 ```python
-def test_async_operation(qtbot):
-    with qtbot.waitSignal(worker.finished, timeout=5000) as blocker:
-        blocker.connect(worker.failed)
+def test_async_operation(qtbot, worker):
+    worker.start()
+    qtbot.waitSignal(worker.finished, timeout=5000)
+
+# For multiple signals (finished OR failed):
+def test_async_with_failure_case(qtbot, worker):
+    with qtbot.waitSignals([worker.finished, worker.failed], timeout=5000):
         worker.start()
-    assert blocker.signal_triggered
 ```
 
 ### Test Markers
-- `@pytest.mark.gui` - Real Qt tests (requires display/xvfb)
-- `@pytest.mark.headless` - Mock/unit tests (fast, always work)
+- `@pytest.mark.gui` - Requires display or xvfb (real Qt widgets rendered)
+- `@pytest.mark.headless` - No display required (can use real components if no rendering)
 - `@pytest.mark.serial` - No parallel execution
 
 ### Test Fixture Selection Guide
@@ -117,7 +122,7 @@ def test_async_operation(qtbot):
 | `session_managers` | Session | NO | Fast tests OK with shared state; state persists across ALL tests |
 | `isolated_managers` | Function | YES (full cleanup) | Tests that modify manager state or need clean slate |
 | `setup_managers` | Function | YES | Default fixture with conditional setup |
-| `fast_managers` | References session | NO | Performance-focused tests (alias for session_managers) |
+| `fast_managers` | Function (backed by session) | NO | Performance-focused tests (alias for session_managers) |
 
 **IMPORTANT**: `session_managers` is NOT reset between tests - manager state (caches, settings, active operations) persists across the entire test session. Use `isolated_managers` when:
 - Your test modifies ManagerRegistry state
@@ -133,7 +138,7 @@ The `isolated_managers` fixture has an explicit guard that fails if ManagerRegis
 - Inheriting `QDialog` in mocks - causes metaclass crashes
 - Missing singleton cleanup - use `cleanup_singleton` fixture
 
-**Environment Variables:**
+**Environment Variables** (implemented in `spritepal/tests/conftest.py`):
 - `PYTEST_TIMEOUT_MULTIPLIER=2.0` - Scale all timeouts (useful for slow CI)
 - `PYTEST_DEBUG_FIXTURES=1` - Enable fixture performance monitoring
 
@@ -163,7 +168,7 @@ spritepal/
 ```python
 def open_detached_gallery(self):
     # Local import to avoid circular dependency
-    from ui.windows.detached_gallery_window import DetachedGalleryWindow
+    from spritepal.ui.windows.detached_gallery_window import DetachedGalleryWindow
     self.detached_window = DetachedGalleryWindow(self)
 ```
 
@@ -189,7 +194,7 @@ def _rom_context(self):
 
 ### Thread Safety
 - Use `QMutex/QMutexLocker` for shared state
-- Use `QThread.currentThread().msleep()` not `QThread.msleep()`
+- Prefer signal-based waiting; avoid sleeps except for narrowly scoped throttling
 - Test with `qtbot.waitSignal()` for async operations
 
 ### Dialog Initialization (DialogBase pattern)

@@ -2,14 +2,35 @@
 *The single source of truth for testing SpritePal with Qt and pytest*
 
 ## Table of Contents
-1. [Core Principles](#core-principles)
-2. [When to Mock](#when-to-mock)
-3. [Signal Testing](#signal-testing)
-4. [Essential Test Doubles](#essential-test-doubles)
-5. [Qt-Specific Patterns](#qt-specific-patterns)
-6. [Qt Threading Safety](#qt-threading-safety)
-7. [Critical Pitfalls](#critical-pitfalls)
-8. [Quick Reference](#quick-reference)
+1. [Supported Stack](#supported-stack)
+2. [Core Principles](#core-principles) (includes System Boundaries, Deterministic Time)
+3. [When to Mock](#when-to-mock)
+4. [Signal Testing](#signal-testing) (includes TestSignal vs QSignalSpy guidance)
+5. [Essential Test Doubles](#essential-test-doubles)
+6. [Parametrized Tests](#parametrized-tests)
+7. [Error Path Testing Strategy](#error-path-testing-strategy)
+8. [Qt-Specific Patterns](#qt-specific-patterns)
+9. [Qt Threading Safety](#qt-threading-safety)
+10. [Critical Pitfalls](#critical-pitfalls)
+11. [Quick Reference](#quick-reference)
+
+---
+
+## Supported Stack
+
+| Component | Version/Library |
+|-----------|-----------------|
+| **Qt Binding** | PySide6 (not PyQt6) |
+| **Qt Version** | 6.x |
+| **Python** | 3.11+ |
+| **Testing** | pytest, pytest-qt, pytest-mock, pytest-timeout |
+| **Package Manager** | uv |
+
+**Important**: All examples use PySide6 imports (`Signal` not `pyqtSignal`). If you're copy-pasting examples, ensure your imports match:
+```python
+from PySide6.QtCore import Signal, QObject
+from PySide6.QtWidgets import QWidget, QDialog
+```
 
 ---
 
@@ -41,10 +62,47 @@ controller = Controller(
 ```
 
 ### 3. Mock Only at System Boundaries
-- External APIs, Network calls
-- Subprocess calls to external systems
-- File I/O (only when testing logic, not I/O itself)
-- System time
+
+**SpritePal system boundaries** (mock these, test everything else real):
+
+| Boundary | Example | Why Mock |
+|----------|---------|----------|
+| **HAL compressor subprocess** | `subprocess.run(["inhal", ...])` | External binary, slow, non-deterministic timing |
+| **File-backed ROM cache** | `ROMCache.load()` with disk I/O | Use `tmp_path` for real I/O, mock only for error simulation |
+| **OS-level clipboard** | `QClipboard.text()` | Platform-dependent, pollutes system state |
+| **System time** | `time.time()`, `datetime.now()` | Non-deterministic, timing-sensitive tests |
+| **Network** | HTTP calls (if any) | External service availability |
+
+**Deterministic time guidance:**
+```python
+# ✅ monkeypatch time functions directly
+def test_time_dependent_cache(monkeypatch):
+    fake_time = 1000.0
+    monkeypatch.setattr("time.time", lambda: fake_time)
+
+    cache.store("key", data)
+    assert cache.get_timestamp("key") == 1000.0
+
+    # Advance time
+    fake_time = 2000.0
+    monkeypatch.setattr("time.time", lambda: fake_time)
+    assert cache.is_expired("key", max_age=500)  # Expired
+
+# ✅ For datetime, monkeypatch the module import location
+def test_datetime_dependent(monkeypatch):
+    from datetime import datetime
+    fake_now = datetime(2025, 1, 15, 12, 0, 0)
+    monkeypatch.setattr("mymodule.datetime",
+                        Mock(now=Mock(return_value=fake_now)))
+```
+
+**File I/O Guidance:**
+- **Prefer real I/O with `tmp_path`** - gives confidence tests work with real filesystem
+- **Mock filesystem only for:**
+  - Rare error branches (permission denied, disk full, network drive failures)
+  - Non-portable system paths that can't be reproduced
+  - Performance isolation when file I/O dominates test runtime
+- **Don't mock** routine file reads/writes - use `tmp_path` fixture instead
 
 ---
 
@@ -52,9 +110,11 @@ controller = Controller(
 
 | Test Type | Mock | Use Real |
 |-----------|------|----------|
-| **Unit** | External services, Network, Subprocess | Class under test, Value objects, Internal methods |
-| **Integration** | External APIs only | Components being integrated, Signals, Cache |
-| **E2E** | Nothing | Everything |
+| **Unit** | Boundaries: network, subprocess, slow/nondeterministic deps | Class under test, value objects, internal methods |
+| **Integration** | Truly external systems you can't control | Components being integrated, signals, cache |
+| **E2E** | Third-party services when reliability > realism | Everything within your control |
+
+> **Note**: "Mock nothing in E2E" is an ideal, not a rule. In real pipelines, stub external services, licensing APIs, or nondeterministic dependencies when CI reliability matters more than perfect realism.
 
 ### Practical Example
 ```python
@@ -84,6 +144,10 @@ def test_sprite_extraction_workflow():
 | Test double signals | `TestSignal` | Non-Qt or mocked components |
 | Async Qt operations | `qtbot.waitSignal()` | Waiting for real Qt signals |
 | Mock object callbacks | `.assert_called()` | Pure Python mocks |
+
+**Rule of thumb:**
+- If the **code under test expects a Qt Signal**, use real `QObject`-based test doubles with actual signals.
+- If the **code is pure Python** (no Qt dependency), prefer `TestSignal` or simple callbacks.
 
 ### QSignalSpy for Real Qt Signals
 ```python
@@ -146,7 +210,7 @@ def test_async_operation(qtbot):
 
 ## Essential Test Doubles
 
-### TestProcessPoolManager
+### MockHALCompressor
 ```python
 class MockHALCompressor:
     """Replace HAL compression calls with predictable behavior"""
@@ -173,21 +237,24 @@ class MockHALCompressor:
 
 ### MockMainWindow (Real Qt Signals, Mock Behavior)
 ```python
+from PySide6.QtCore import QObject, Signal
+from unittest.mock import Mock
+
 class MockMainWindow(QObject):
     """Real Qt object with signals, mocked behavior"""
-    
-    # Real Qt signals
-    extraction_started = pyqtSignal()
-    rom_loaded = pyqtSignal(str)
-    sprite_found = pyqtSignal(int, object)
-    
+
+    # Real Qt signals (PySide6 uses Signal, not pyqtSignal)
+    extraction_started = Signal()
+    rom_loaded = Signal(str)
+    sprite_found = Signal(int, object)
+
     def __init__(self):
         super().__init__()
         # Mock attributes
         self.status_bar = Mock()
         self.rom_path = None
         self.rom_size = 0x400000
-    
+
     def get_extraction_params(self):
         return {
             "rom_path": "/test/rom.sfc",
@@ -215,6 +282,134 @@ def real_rom_cache(tmp_path):
     """Real ROM cache with temp storage"""
     return ROMCache(cache_dir=tmp_path / "rom_cache")
 ```
+
+### Parametrized Tests
+
+Use `@pytest.mark.parametrize` to reduce duplicate test code and make coverage explicit:
+
+```python
+import pytest
+
+# ✅ ROM offsets - test multiple extraction points
+@pytest.mark.parametrize("offset,expected_size", [
+    (0x200000, 0x800),   # Standard sprite bank
+    (0x280000, 0x1000),  # Large sprite bank
+    (0x000000, 0),       # Header area (no sprites)
+    (0x3FFFFF, 0),       # Past end of ROM
+])
+def test_extract_sprite_at_offset(extraction_manager, offset, expected_size):
+    result = extraction_manager.extract_at(offset)
+    assert len(result.data) == expected_size
+
+
+# ✅ Format variations
+@pytest.mark.parametrize("format_id,bpp", [
+    ("3bpp", 3),
+    ("4bpp", 4),
+    ("2bpp", 2),
+])
+def test_sprite_format_detection(sprite_validator, format_id, bpp):
+    sprite = make_test_sprite(format=format_id)
+    assert sprite_validator.detect_bpp(sprite) == bpp
+
+
+# ✅ Error cases - explicit coverage of failure modes
+@pytest.mark.parametrize("invalid_input,expected_error", [
+    (None, TypeError),
+    (b"", ValueError),
+    (b"\x00" * 3, ValueError),  # Too short
+    ("not bytes", TypeError),
+])
+def test_validation_rejects_invalid(sprite_validator, invalid_input, expected_error):
+    with pytest.raises(expected_error):
+        sprite_validator.validate(invalid_input)
+
+
+# ✅ Combine with fixtures for complex scenarios
+@pytest.mark.parametrize("width", [8, 16, 32])
+@pytest.mark.parametrize("height", [8, 16, 32])
+def test_sprite_dimensions(make_sprite_data, width, height):
+    sprite = make_sprite_data(width=width, height=height)
+    assert sprite.width == width
+    assert sprite.height == height
+```
+
+**When to parametrize:**
+- Multiple offsets, formats, or sizes that should behave similarly
+- Known edge cases and boundary values
+- Error conditions with expected exception types
+- Combinations of independent parameters (use multiple decorators)
+
+### Error Path Testing Strategy
+
+Structure tests to cover success, invalid input, and external failure scenarios:
+
+```python
+class TestSpriteExtraction:
+    """Example: structured coverage of success and error paths."""
+
+    # ── Success Cases ──────────────────────────────────────────────
+    def test_extract_valid_sprite(self, extraction_manager, valid_rom):
+        """Happy path: valid ROM, valid offset."""
+        result = extraction_manager.extract(valid_rom, offset=0x200000)
+        assert result.success
+        assert result.data is not None
+
+    def test_extract_multiple_sprites(self, extraction_manager, valid_rom):
+        """Happy path: batch extraction."""
+        results = extraction_manager.extract_range(valid_rom, 0x200000, 0x210000)
+        assert len(results) > 0
+        assert all(r.success for r in results)
+
+    # ── Invalid Input Cases ────────────────────────────────────────
+    def test_extract_none_rom_raises(self, extraction_manager):
+        """Invalid input: None ROM."""
+        with pytest.raises(TypeError, match="ROM cannot be None"):
+            extraction_manager.extract(None, offset=0x200000)
+
+    def test_extract_negative_offset_raises(self, extraction_manager, valid_rom):
+        """Invalid input: negative offset."""
+        with pytest.raises(ValueError, match="offset must be non-negative"):
+            extraction_manager.extract(valid_rom, offset=-1)
+
+    def test_extract_offset_past_eof_returns_empty(self, extraction_manager, valid_rom):
+        """Edge case: offset beyond ROM size."""
+        result = extraction_manager.extract(valid_rom, offset=0xFFFFFFFF)
+        assert not result.success
+        assert result.error_code == "OFFSET_OUT_OF_RANGE"
+
+    # ── External Failure Simulation ────────────────────────────────
+    def test_extract_hal_subprocess_failure(self, extraction_manager, valid_rom, monkeypatch):
+        """External failure: HAL decompressor crashes."""
+        def mock_hal_crash(*args, **kwargs):
+            raise subprocess.CalledProcessError(1, "inhal", stderr=b"Segfault")
+
+        monkeypatch.setattr(extraction_manager._hal, "decompress", mock_hal_crash)
+
+        result = extraction_manager.extract(valid_rom, offset=0x200000)
+        assert not result.success
+        assert "decompression failed" in result.error_message.lower()
+
+    def test_extract_disk_full_on_cache_write(self, extraction_manager, valid_rom, monkeypatch):
+        """External failure: disk full when caching result."""
+        def mock_disk_full(*args, **kwargs):
+            raise OSError(28, "No space left on device")
+
+        monkeypatch.setattr(extraction_manager._cache, "store", mock_disk_full)
+
+        # Extraction succeeds but cache fails gracefully
+        result = extraction_manager.extract(valid_rom, offset=0x200000)
+        assert result.success  # Core operation worked
+        assert result.cached is False  # But caching failed
+```
+
+**Error path checklist:**
+- [ ] Success with valid input (happy path)
+- [ ] `TypeError` for wrong types (`None`, wrong class)
+- [ ] `ValueError` for invalid values (negative, out of range)
+- [ ] Edge cases (empty, boundary values, max size)
+- [ ] External failures (subprocess crash, I/O error, network timeout)
+- [ ] Graceful degradation (partial success, fallback behavior)
 
 ---
 
@@ -261,19 +456,39 @@ def test_dialog(qtbot, monkeypatch):
 ```
 
 ### Worker Thread Testing
+
+**Prefer `waitSignal` over `waitUntil`** - signals are clearer and less flaky for QThread-like objects:
+
 ```python
-def test_worker(qtbot):
+def test_worker_preferred(qtbot):
+    """Preferred pattern: wait on signals directly."""
     worker = DataWorker()
-    spy = QSignalSpy(worker.finished)
-    
-    worker.start()
-    
-    # Wait for completion
-    qtbot.waitUntil(lambda: not worker.isRunning(), timeout=5000)
-    
-    assert len(spy) == 1
+    qtbot.addWidget(worker)  # If worker is a QObject
+
+    # ✅ PREFERRED - Wait on the finished signal directly
+    with qtbot.waitSignal(worker.finished, timeout=5000) as blocker:
+        worker.start()
+
+    assert blocker.signal_triggered
     assert worker.result is not None
-    
+
+    # Cleanup
+    if worker.isRunning():
+        worker.quit()
+        worker.wait(1000)
+
+
+def test_worker_alternative(qtbot):
+    """Alternative when signals aren't available or suitable."""
+    worker = DataWorker()
+
+    worker.start()
+
+    # ⚠️ FALLBACK - Use waitUntil only when signal-based waiting isn't possible
+    qtbot.waitUntil(lambda: not worker.isRunning(), timeout=5000)
+
+    assert worker.result is not None
+
     # Cleanup
     if worker.isRunning():
         worker.quit()
@@ -323,19 +538,25 @@ Worker Thread (Background):     Main Thread (GUI):
 
 ### Thread-Safe Test Doubles
 
+> **SpritePal-specific pattern**: This is a recommended project-specific pattern, not an industry standard. The concept applies broadly to Qt threading, but the implementation is tailored to SpritePal's needs. Qt API details may vary across binding versions (PySide6 vs PyQt6) and Qt versions.
+
 Create thread-safe alternatives for Qt objects in tests:
 
 ```python
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QColor, QImage
+
+
 class ThreadSafeTestImage:
     """Thread-safe test double for QPixmap using QImage internally.
-    
+
     QPixmap is not thread-safe and can only be used in the main GUI thread.
     QImage is thread-safe and can be used in any thread. This class provides
     a QPixmap-like interface while using QImage internally for thread safety.
-    
+
     Based on Qt's canonical threading pattern for image operations.
     """
-    
+
     def __init__(self, width: int = 100, height: int = 100):
         """Create a thread-safe test image."""
         # Use QImage which is thread-safe, unlike QPixmap
@@ -343,21 +564,21 @@ class ThreadSafeTestImage:
         self._width = width
         self._height = height
         self._image.fill(QColor(255, 255, 255))  # Fill with white by default
-        
-    def fill(self, color: QColor = None) -> None:
+
+    def fill(self, color: QColor | None = None) -> None:
         """Fill the image with a color."""
         if color is None:
             color = QColor(255, 255, 255)
         self._image.fill(color)
-        
+
     def isNull(self) -> bool:
         """Check if the image is null."""
         return self._image.isNull()
-        
+
     def sizeInBytes(self) -> int:
         """Return the size of the image in bytes."""
         return self._image.sizeInBytes()
-        
+
     def size(self) -> QSize:
         """Return the size of the image."""
         return QSize(self._width, self._height)
@@ -502,16 +723,16 @@ def test_worker():
 
 ### ⚠️ Qt Container Truthiness
 ```python
-# ❌ DANGEROUS - Qt containers are falsy when empty!
-if self.layout:  # False for empty QVBoxLayout!
+# ❌ DANGEROUS - Some Qt containers may evaluate falsy when empty!
+if self.layout:  # May be False for empty QVBoxLayout in some bindings!
     self.layout.addWidget(widget)
 
 # ✅ SAFE - Explicit None check
 if self.layout is not None:
     self.layout.addWidget(widget)
-
-# Affected: QVBoxLayout, QHBoxLayout, QListWidget, QTreeWidget
 ```
+
+> **Binding-dependent behavior**: Layout truthiness behavior varies between PySide6 and PyQt6, and across Qt versions. We've observed issues with `QVBoxLayout` and `QHBoxLayout` in PySide6. Prefer explicit `is not None` checks for all Qt objects to be safe.
 
 ### ⚠️ QSignalSpy Only Works with Real Signals
 ```python
@@ -548,8 +769,8 @@ class Worker(QThread):
 
 # ✅ CORRECT
 class Worker(QThread):
-    show_dialog = pyqtSignal(str)
-    
+    show_dialog = Signal(str)  # PySide6 Signal
+
     def run(self):
         self.show_dialog.emit("message")  # Main thread shows
 ```
@@ -712,11 +933,11 @@ xvfb-run -a pytest tests/
 
 **GUI Prevention**: Mock dialog exec() methods, use timeouts, avoid actual window display.
 
-**Key Metrics** (SpritePal-specific):
-- Test speed: 60% faster (no HAL subprocess overhead)
-- Bug discovery: 200% increase (real integration)
-- Maintenance: 75% less (fewer mock updates)
-- Memory safety: 100% (ThreadSafeTestImage prevents crashes)
+**Observed Improvements** (SpritePal-specific, anecdotal):
+- Test speed: Noticeably faster without HAL subprocess overhead
+- Bug discovery: More issues caught with real integration vs excessive mocking
+- Maintenance: Fewer mock updates needed when internal implementations change
+- Memory safety: ThreadSafeTestImage eliminated Qt threading crashes
 
 **SpritePal Testing Focus Areas**:
 - ROM extraction/injection workflows
@@ -728,6 +949,6 @@ xvfb-run -a pytest tests/
 - Cache consistency
 
 ---
-*Last Updated: 2025-08-18 | SpritePal Testing Reference - DO NOT DELETE*
+*Last Updated: 2025-12-07 | SpritePal Testing Reference - DO NOT DELETE*
 
 **Critical**: ThreadSafeTestImage implementation required to prevent Qt threading violations that cause "Fatal Python error: Aborted" crashes in worker tests.
