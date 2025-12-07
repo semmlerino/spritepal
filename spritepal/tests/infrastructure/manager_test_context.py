@@ -20,6 +20,7 @@ from core.managers.session_manager import SessionManager
 from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QApplication
 
+from .qt_application_factory import ApplicationFactory
 from .real_component_factory import RealComponentFactory
 from .test_data_repository import get_test_data_repository
 
@@ -49,14 +50,11 @@ class ManagerTestContext:
         self._data_repo = get_test_data_repository()
         self._lock = threading.RLock()
 
-        # Ensure QApplication for Qt components
+        # Ensure QApplication for Qt components using ApplicationFactory for consistency
+        # (ApplicationFactory handles offscreen args, config, and lifecycle)
         if ensure_qt_app:
-            if QApplication.instance() is None:
-                self._app = QApplication([])
-                self._created_app = True
-            else:
-                self._app = cast(QApplication, QApplication.instance())
-                self._created_app = False
+            self._app = ApplicationFactory.get_application()
+            self._created_app = False  # Factory manages lifecycle
         else:
             self._app = None
             self._created_app = False

@@ -69,36 +69,37 @@ class SignalHolder(QObject):
 
 def create_signal_holder(**signals):
     """
-    Create a SignalHolder with dynamic signals.
+    Get a CommonSignalHolder with pre-defined signals.
+
+    NOTE: The **signals argument is accepted for API compatibility but is IGNORED
+    in Qt environments. Qt signals must be class attributes defined at class
+    definition time, so dynamic signal creation is not supported.
+
+    Instead, CommonSignalHolder has all common signals pre-defined. The signals
+    argument is only used in non-Qt fallback environments (for testing without Qt).
 
     Args:
-        **signals: Keyword arguments where key is signal name and value is signal type
-                   e.g., extract_requested=Signal(), progress=Signal(int)
+        **signals: Ignored in Qt environments. In non-Qt fallback, creates mock
+                   signals for the specified names.
 
     Returns:
-        SignalHolder instance with the specified signals
+        CommonSignalHolder instance with pre-defined common signals
     """
     if not QT_AVAILABLE:
-        # Fallback for non-Qt environments
+        # Fallback for non-Qt environments - here we CAN create dynamic signals
         holder = Mock()
         for name in signals:
             setattr(holder, name, MockSignal())
         return holder
 
-    # For Qt environments, ensure QApplication exists before creating signal holder
+    # For Qt environments, ensure QApplication exists via ApplicationFactory
     from PySide6.QtCore import QCoreApplication
     if QCoreApplication.instance() is None:
-        # Create QApplication if not exists
-        import os
-        os.environ["QT_QPA_PLATFORM"] = "offscreen"
-        from PySide6.QtWidgets import QApplication
-        QApplication([])
+        from .qt_application_factory import ApplicationFactory
+        ApplicationFactory.get_application()
 
-    # Now create the pre-defined signal holder
-    holder = CommonSignalHolder()
-
-    # Return the holder - it has all common signals pre-defined
-    return holder
+    # Return pre-defined signal holder - has all common signals at class level
+    return CommonSignalHolder()
 
 class CommonSignalHolder(QObject):
     """
@@ -177,7 +178,7 @@ class CommonSignalHolder(QObject):
     started = Signal()
     finished = Signal()
 
-class TestMainWindowPure:
+class PureMockMainWindow:
     """
     Pure Python test double for MainWindow.
 
@@ -307,7 +308,7 @@ class RealTestMainWindow(QObject):
         # Add get_output_path method (needed by injection tests)
         self.get_output_path = Mock(return_value="/test/output")
 
-class TestExtractionPanelPure:
+class PureMockExtractionPanel:
     """
     Pure Python test double for ExtractionPanel.
 
@@ -385,7 +386,7 @@ class RealTestExtractionPanel(QObject):
         self.get_vram_offset = Mock(return_value=0xC000)
         self.set_vram_offset = Mock()
 
-class TestROMExtractionPanelPure:
+class PureMockROMExtractionPanel:
     """
     Pure Python test double for ROMExtractionPanel.
 
@@ -651,7 +652,7 @@ def create_test_main_window(**kwargs):
     Returns pure Python TestMainWindowPure by default.
     For integration tests requiring real Qt signals, use create_real_test_main_window().
     """
-    return TestMainWindowPure(**kwargs)
+    return PureMockMainWindow(**kwargs)
 
 def create_real_test_main_window(**kwargs):
     """
@@ -673,12 +674,12 @@ def create_mock_main_window(**kwargs):
         factory = RealComponentFactory()
         return factory.create_main_window(**kwargs)
     except ImportError:
-        return TestMainWindowPure(**kwargs)
+        return PureMockMainWindow(**kwargs)
 
 # Backward compatibility aliases - point to pure Python versions by default
-TestMainWindow = TestMainWindowPure
-TestExtractionPanel = TestExtractionPanelPure
-TestROMExtractionPanel = TestROMExtractionPanelPure
+TestMainWindow = PureMockMainWindow
+TestExtractionPanel = PureMockExtractionPanel
+TestROMExtractionPanel = PureMockROMExtractionPanel
 
 # For integration tests that specifically need Qt inheritance, use Real* versions:
 # RealTestMainWindow, RealTestExtractionPanel, RealTestROMExtractionPanel

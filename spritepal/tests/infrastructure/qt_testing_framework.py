@@ -16,7 +16,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QDialog, QWidget
 
-from .qt_application_factory import TestApplicationFactory
+from .qt_application_factory import ApplicationFactory
 
 
 class QtTestingFramework:
@@ -38,8 +38,10 @@ class QtTestingFramework:
         Args:
             qt_app: Qt application instance (creates one if None)
         """
-        self.qt_app = qt_app or TestApplicationFactory.get_application()
-        self._created_widgets: list[QWidget] = []
+        self.qt_app = qt_app or ApplicationFactory.get_application()
+        # Hidden root widget for parenting test widgets (QApplication cannot be a parent)
+        self._root_widget = QWidget()
+        self._created_widgets: list[QWidget] = [self._root_widget]
         self._signal_spies: list[QSignalSpy] = []
         self._timers: list[QTimer] = []
 
@@ -141,7 +143,7 @@ class QtTestingFramework:
 
     def process_events(self, timeout_ms: int = 100) -> None:
         """Process Qt events."""
-        TestApplicationFactory.process_events(timeout_ms)
+        ApplicationFactory.process_events(timeout_ms)
 
     def create_timer_context(self, interval_ms: int, callback: Callable) -> TimerTestContext:
         """
@@ -201,11 +203,12 @@ class WidgetTestContext:
         # Create widget with proper Qt parent
         self.widget = self.widget_class(*self.args, **self.kwargs)
 
-        # Set Qt application as parent if no parent specified
+        # Set hidden root widget as parent if no parent specified
         # Note: QMainWindow should not have a parent (it's a top-level window)
+        # Note: QApplication cannot be a widget parent - use _root_widget instead
         from PySide6.QtWidgets import QMainWindow
         if self.widget.parent() is None and not isinstance(self.widget, QMainWindow):
-            self.widget.setParent(self.framework.qt_app)
+            self.widget.setParent(self.framework._root_widget)
 
         self.framework._created_widgets.append(self.widget)
         return self.widget
@@ -306,9 +309,10 @@ class WorkerTestContext:
         # Create worker with proper Qt parent
         self.worker = self.worker_class(*self.args, **self.kwargs)
 
-        # Set Qt application as parent if no parent specified
+        # Set hidden root widget as parent if no parent specified
+        # Note: QApplication cannot be a QObject parent - use _root_widget instead
         if hasattr(self.worker, "parent") and self.worker.parent() is None:
-            self.worker.setParent(self.framework.qt_app)
+            self.worker.setParent(self.framework._root_widget)
 
         return self.worker
 
@@ -318,6 +322,10 @@ class WorkerTestContext:
             try:
                 # Stop worker if it's running
                 if hasattr(self.worker, "isRunning") and self.worker.isRunning():
+                    # Request interruption first (works for threads without event loop)
+                    if hasattr(self.worker, "requestInterruption"):
+                        self.worker.requestInterruption()
+                    # Then try quit (for threads with event loop)
                     self.worker.quit()
                     self.worker.wait(1000)  # Wait up to 1 second
 

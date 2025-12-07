@@ -34,7 +34,7 @@ class TypedWorkerBase(QThread, Generic[M, P, R]):
     started_signal = Signal()
     progress_signal = Signal(int)
     result_signal = Signal(object)  # Will contain R type
-    error_signal = Signal(str, Exception)
+    error_signal = Signal(str, object)  # Use 'object' for safer Qt meta-type handling
     finished_signal = Signal()
 
     def __init__(self, manager: M, params: P, parent: QObject | None = None):
@@ -379,7 +379,7 @@ class TypedWorkerValidator:
 
 # Example concrete implementations for testing
 
-class TestExtractionWorker(ExtractionWorkerBase["ExtractionManager", dict[str, Any], list[Any]]):
+class TypedExtractionWorker(ExtractionWorkerBase["ExtractionManager", dict[str, Any], list[Any]]):
     """
     Example extraction worker for testing.
     """
@@ -403,7 +403,7 @@ class TestExtractionWorker(ExtractionWorkerBase["ExtractionManager", dict[str, A
 
         return results
 
-class TestInjectionWorker(InjectionWorkerBase["InjectionManager", dict[str, Any], bool]):
+class TypedInjectionWorker(InjectionWorkerBase["InjectionManager", dict[str, Any], bool]):
     """
     Example injection worker for testing.
     """
@@ -431,14 +431,14 @@ try:
     @pytest.fixture
     def extraction_worker_helper():
         """Pytest fixture for extraction worker testing."""
-        helper = WorkerTestHelper(TestExtractionWorker)
+        helper = WorkerTestHelper(TypedExtractionWorker)
         yield helper
         helper.cleanup()
 
     @pytest.fixture
     def injection_worker_helper():
         """Pytest fixture for injection worker testing."""
-        helper = WorkerTestHelper(TestInjectionWorker)
+        helper = WorkerTestHelper(TypedInjectionWorker)
         yield helper
         helper.cleanup()
 

@@ -1,5 +1,5 @@
 """
-TestApplicationFactory: Standardized Qt application setup for testing.
+ApplicationFactory: Standardized Qt application setup for testing.
 
 This factory provides consistent Qt application lifecycle management for tests,
 ensuring proper parent/child relationships and avoiding Qt lifecycle bugs.
@@ -16,7 +16,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 
 
-class TestApplicationFactory:
+class ApplicationFactory:
     """
     Factory for creating and managing Qt applications in tests.
 
@@ -118,17 +118,18 @@ class TestApplicationFactory:
     @classmethod
     def process_events(cls, timeout_ms: int = 100) -> None:
         """
-        Process Qt events to ensure UI updates complete.
+        Process Qt events and wait for the specified duration.
 
         Args:
-            timeout_ms: Maximum time to spend processing events
+            timeout_ms: Time to wait while processing events (default 100ms)
         """
         if cls._application_instance:
             cls._application_instance.processEvents()
-            # Also process events with timeout for thorough processing
-            cls._application_instance.processEvents()
+            # Use QTest.qWait to respect the timeout while processing events
+            from PySide6.QtTest import QTest
+            QTest.qWait(timeout_ms)
 
-class TestQtContext:
+class QtTestContext:
     """
     Context manager for Qt testing that ensures proper setup and cleanup.
 
@@ -150,30 +151,30 @@ class TestQtContext:
         self.process_events_on_exit = process_events_on_exit
         self.application: QApplication | None = None
 
-    def __enter__(self) -> TestQtContext:
+    def __enter__(self) -> QtTestContext:
         """Enter the Qt test context."""
-        self.application = TestApplicationFactory.get_application(self.force_offscreen)
+        self.application = ApplicationFactory.get_application(self.force_offscreen)
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit the Qt test context with proper cleanup."""
         if self.process_events_on_exit and self.application:
             # Process any remaining events to ensure clean state
-            TestApplicationFactory.process_events()
+            ApplicationFactory.process_events()
 
     def process_events(self, timeout_ms: int = 100) -> None:
         """Process Qt events within the context."""
-        TestApplicationFactory.process_events(timeout_ms)
+        ApplicationFactory.process_events(timeout_ms)
 
 # Convenience functions for common testing patterns
 def get_test_application(force_offscreen: bool = True) -> QApplication:
     """Get a QApplication instance configured for testing."""
-    return TestApplicationFactory.get_application(force_offscreen)
+    return ApplicationFactory.get_application(force_offscreen)
 
 @contextmanager
 def qt_test_context(force_offscreen: bool = True):
     """Context manager for Qt testing."""
-    with TestQtContext(force_offscreen) as context:
+    with QtTestContext(force_offscreen) as context:
         yield context.application
 
 def ensure_qt_application() -> QApplication:
@@ -183,11 +184,11 @@ def ensure_qt_application() -> QApplication:
     This is a convenience function for tests that need to ensure
     Qt is available but don't need specific configuration.
     """
-    return TestApplicationFactory.get_application()
+    return ApplicationFactory.get_application()
 
 def process_qt_events(timeout_ms: int = 100) -> None:
     """Process Qt events for the current application."""
-    TestApplicationFactory.process_events(timeout_ms)
+    ApplicationFactory.process_events(timeout_ms)
 
 # Test validation functions
 def validate_qt_application_state() -> dict[str, Any]:

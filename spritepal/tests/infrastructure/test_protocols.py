@@ -28,20 +28,9 @@ import pytest
 
 from .qt_mocks import MockSignal
 
-# Systematic pytest markers applied based on test content analysis
-pytestmark = [
-    pytest.mark.dialog,
-    pytest.mark.headless,
-    pytest.mark.mock_dialogs,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
-    pytest.mark.rom_data,
-    pytest.mark.unit,
-    pytest.mark.widget,
-    pytest.mark.ci_safe,
-    pytest.mark.qt_mock,
-]
+# This file defines Protocol type interfaces only - no actual tests
+# Markers removed to avoid distorting -m selection and test reporting
+pytestmark = []
 
 @runtime_checkable
 class MockMainWindowProtocol(Protocol):
