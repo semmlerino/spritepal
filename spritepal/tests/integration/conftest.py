@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 
 # Add spritepal to path
+# __file__ = tests/integration/conftest.py → parent.parent.parent = spritepal/
+# Note: Main conftest.py and pytest.ini pythonpath also handle this
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # NOTE: qt_app fixture is provided by root conftest.py (session-scoped)
@@ -63,7 +65,8 @@ def test_rom_with_sprites(temp_dir, test_rom_data):
     rom_path = temp_dir / "test_rom.sfc"
 
     # Use the real Kirby ROM if available, otherwise create test ROM
-    real_rom = Path("Kirby Super Star (USA).sfc")
+    # ROM is in parent directory (exhal-master/)
+    real_rom = Path("../Kirby Super Star (USA).sfc")
     if real_rom.exists():
         # Use real ROM for testing
         rom_data = real_rom.read_bytes()
@@ -97,7 +100,8 @@ def test_rom_with_sprites(temp_dir, test_rom_data):
 @pytest.fixture
 def real_kirby_rom():
     """Provide path to real Kirby ROM if available for integration testing."""
-    rom_path = Path("Kirby Super Star (USA).sfc")
+    # ROM is in parent directory (exhal-master/)
+    rom_path = Path("../Kirby Super Star (USA).sfc")
     if rom_path.exists():
         return rom_path
     return None
@@ -113,11 +117,45 @@ def rom_extraction_panel(qtbot, managers_initialized):
 
 @pytest.fixture
 def manual_offset_dialog(qtbot, managers_initialized):
-    """Create a real manual offset dialog for testing."""
-    from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
+    """Create a real manual offset dialog for testing.
+
+    Note: Uses importlib to bypass the global sys.modules patching in conftest_dialog_patch.py
+    that mocks dialogs for headless testing. Integration tests need real dialogs.
+
+    Important: We don't use qtbot.addWidget() because the dialog may be destroyed by
+    managers_initialized cleanup before pytest-qt teardown runs, causing
+    "Internal C++ object already deleted" errors.
+    """
+    import importlib.util
+    from pathlib import Path
+    import shiboken6
+
+    # Get the real module source file path
+    module_path = Path(__file__).parent.parent.parent / "ui" / "dialogs" / "manual_offset_unified_integrated.py"
+
+    # Load the module directly from the file
+    spec = importlib.util.spec_from_file_location(
+        "ui.dialogs.manual_offset_unified_integrated_real",
+        module_path
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    # Get the real dialog class
+    UnifiedManualOffsetDialog = module.UnifiedManualOffsetDialog
     dialog = UnifiedManualOffsetDialog()
-    qtbot.addWidget(dialog)
-    return dialog
+    # Don't use qtbot.addWidget() - we manage cleanup ourselves to avoid
+    # double-delete when managers_initialized cleanup runs first
+
+    yield dialog
+
+    # Explicitly close dialog if still valid (may already be deleted by manager cleanup)
+    try:
+        if shiboken6.isValid(dialog):
+            dialog.close()
+            dialog.deleteLater()
+    except RuntimeError:
+        pass  # Already deleted, that's fine
 
 @pytest.fixture
 def loaded_rom_panel(rom_extraction_panel, test_rom_with_sprites, qtbot):
@@ -125,8 +163,8 @@ def loaded_rom_panel(rom_extraction_panel, test_rom_with_sprites, qtbot):
     rom_info = test_rom_with_sprites
     rom_path = str(rom_info['path'])
 
-    # Load the ROM
-    rom_extraction_panel.load_rom(rom_path)
+    # Load the ROM (method is _load_rom_file, not load_rom)
+    rom_extraction_panel._load_rom_file(rom_path)
 
     # Wait for loading to complete
     qtbot.wait(100)

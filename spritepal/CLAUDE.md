@@ -5,7 +5,7 @@
 - **Qt Framework**: PySide6 (not PyQt6)
 - **Python Version**: 3.11+
 - **Package Manager**: uv
-- **Config Source of Truth**: `pyproject.toml` (ruff, basedpyright, pytest all configured there)
+- **Config Source of Truth**: `pyproject.toml` (ruff, basedpyright, pytest)
 
 ## Documentation Structure
 
@@ -29,23 +29,23 @@ spritepal/
 
 ## Development Tools
 
-All tools are run via `uv` from the project root (`exhal-master/`):
+All tools use the parent venv from the `spritepal/` directory:
 
 ```bash
-# Sync dependencies
+# Sync dependencies (from exhal-master/)
 uv sync --extra dev
 
-# Linting
-uv run ruff check spritepal
-uv run ruff check spritepal --fix
+# Linting (from spritepal/)
+../.venv/bin/ruff check .
+../.venv/bin/ruff check . --fix
 
-# Type checking (on core modules only)
-uv run basedpyright spritepal/core spritepal/ui spritepal/utils
+# Type checking (from spritepal/)
+../.venv/bin/basedpyright core ui utils
 
-# Tests (from exhal-master/, tests/ is at spritepal/tests/)
-uv run pytest spritepal/tests -v
-uv run pytest -m "headless and not slow"  # Fast tests
-uv run pytest -m "gui" --xvfb              # GUI tests (requires pytest-xvfb plugin)
+# Tests (from spritepal/)
+../.venv/bin/pytest tests -v
+../.venv/bin/pytest tests -m "headless and not slow"  # Fast tests
+../.venv/bin/pytest tests -m "gui" --xvfb             # GUI tests
 ```
 
 ## Qt Testing Best Practices

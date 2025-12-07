@@ -1,0 +1,385 @@
+# SpritePal Local Configuration
+# Single source of truth for all tool configuration when running from spritepal/
+#
+# Usage:
+#   cd spritepal
+#   ../.venv/bin/pytest tests -v          # Tests
+#   ../.venv/bin/ruff check .             # Linting
+#   ../.venv/bin/basedpyright core ui utils  # Type checking
+
+# ============================================================================
+# Ruff Configuration
+# ============================================================================
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+    "venv",
+    "archive*",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "RUF",    # Ruff-specific rules
+    "N",      # pep8-naming
+    "S",      # flake8-bandit (security)
+    "A",      # flake8-builtins
+    "PT",     # flake8-pytest-style
+    "RSE",    # flake8-raise
+    "RET",    # flake8-return
+    "PIE",    # flake8-pie
+    "PL",     # pylint
+    "TRY",    # tryceratops (exception handling)
+    "PERF",   # perflint (performance)
+    "FURB",   # refurb (modern Python)
+    "LOG",    # flake8-logging
+    "EM",     # flake8-errmsg
+    "G",      # flake8-logging-format
+    "INP",    # flake8-no-pep420 (require __init__.py)
+    "TC",     # flake8-type-checking
+    "ARG",    # flake8-unused-arguments
+    "ERA",    # eradicate (commented-out code)
+    "FBT",    # flake8-boolean-trap
+    "ICN",    # flake8-import-conventions
+    "PYI",    # flake8-pyi (type stub rules)
+]
+
+ignore = [
+    # Formatting (handled by formatter)
+    "E501",     # line length (120 is fine)
+    "W291",     # trailing-whitespace
+    "W293",     # blank-line-with-whitespace
+
+    # Import ordering (Qt apps need delayed imports)
+    "E402",     # module level import not at top
+    "PLC0415",  # import-outside-top-level
+
+    # Complexity (Qt widgets can be complex)
+    "PLR0912",  # too-many-branches
+    "PLR0915",  # too-many-statements
+    "PLR0911",  # too-many-return-statements
+    "PLR0913",  # too-many-arguments
+    "PLR2004",  # magic-value-comparison
+    "PLR0904",  # too-many-public-methods
+
+    # Style preferences
+    "SIM102",   # collapsible-if
+    "SIM108",   # if-else-block-instead-of-if-exp
+    "SIM117",   # multiple-with-statements
+    "SIM115",   # open-file-with-context-handler
+
+    # Qt-specific patterns
+    "RUF012",   # mutable class default (Qt signals)
+    "RUF059",   # unused-unpacked-variable
+    "ARG001",   # unused-function-argument
+    "ARG002",   # unused-method-argument
+    "ARG003",   # unused-class-method-argument
+    "ARG004",   # unused-static-method-argument
+    "ARG005",   # unused-lambda-argument
+    "B007",     # unused-loop-control-variable
+    "B023",     # function-uses-loop-variable
+
+    # Security (desktop app, user controls input)
+    "S101",     # assert-used
+    "S108",     # hardcoded temp file
+    "S110",     # try-except-pass
+    "S112",     # try-except-continue
+    "S301",     # suspicious-pickle-usage
+    "S311",     # pseudo-random-generator
+    "S324",     # insecure-hash-function
+    "S603",     # subprocess-without-shell-equals-true
+    "S607",     # start-process-with-partial-path
+
+    # Exceptions
+    "TRY002",   # raise-vanilla-class
+    "TRY003",   # raise-vanilla-args
+    "TRY300",   # consider-else-block
+    "TRY301",   # raise-within-except
+    "TRY400",   # logging-error-instead-of-exception
+    "TRY401",   # verbose-log-message
+    "EM101",    # raw-string-in-exception
+    "EM102",    # f-string-in-exception
+
+    # Boolean trap (Qt APIs use bool params)
+    "FBT001",   # boolean-positional-arg-in-function-definition
+    "FBT002",   # boolean-default-value-positional-argument
+    "FBT003",   # boolean-positional-value-in-function-call
+
+    # Type checking imports
+    "TC001",    # typing-only-first-party-import
+    "TC002",    # typing-only-third-party-import
+    "TC003",    # typing-only-standard-library-import
+    "TC006",    # typing-cast-quotes
+
+    # Naming (Qt uses camelCase)
+    "N802",     # invalid-function-name
+    "N803",     # invalid-argument-name
+    "N806",     # non-lowercase-variable-in-function
+    "N812",     # lowercase-imported-as-non-lowercase
+    "N813",     # camelcase-imported-as-lowercase
+    "N815",     # mixed-case-variable-in-class-scope
+    "N818",     # error-suffix-on-exception-name
+
+    # Other pragmatic ignores
+    "INP001",   # implicit-namespace-package
+    "RET504",   # unnecessary-assign
+    "RET505",   # superfluous-else-return
+    "RET506",   # superfluous-else-raise
+    "PIE790",   # unnecessary-pass
+    "PERF203",  # try-except-in-loop
+    "PERF401",  # manual-list-comprehension
+    "PERF402",  # manual-list-copy
+    "PLW1510",  # subprocess-run-without-check
+    "PLW1641",  # eq-without-hash
+    "PLW2901",  # redefined-loop-name
+    "PLW0603",  # global-statement
+    "PLR1704",  # redefining-argument-with-local-name
+    "G004",     # logging-f-string
+    "G003",     # logging-plus-concat
+    "G201",     # logging-exc-info
+    "PYI024",   # collections-named-tuple
+    "PYI034",   # non-self-return-type
+    "PYI036",   # bad-exit-annotation
+    "PYI041",   # redundant-numeric-union
+    "PYI056",   # unsupported-method-call-on-typevar
+    "E712",     # true-false-comparison
+    "SIM103",   # needless-bool
+    "SIM105",   # suppressible-exception
+    "ERA001",   # commented-out-code
+    "ICN001",   # unconventional-import-alias
+    "RUF034",   # useless-if-else
+    "PIE810",   # call-single-arg-startswith-endswith
+    "LOG015",   # root-logger-call
+    "PT013",    # incorrect-pytest-import
+    "A001",     # shadowing-builtin-variable
+    "A002",     # shadowing-builtin
+    "TRY004",   # type-check-without-type-error
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "E402"]
+"tests/**/*.py" = [
+    "S",        # security (test code)
+    "PLR2004",  # magic values
+    "B017",     # assert raises
+    "B018",     # useless expression
+    "RUF",      # ruff rules
+    "F401",     # unused imports (fixtures)
+    "ARG",      # unused arguments (fixtures)
+    "PT",       # pytest style
+    "ERA001",   # commented code
+    "N",        # naming
+]
+"**/conftest.py" = ["ARG", "PT", "F401"]
+"mesen2_integration/*.py" = ["E722", "B904", "T201", "S"]
+"scripts/*.py" = ["E722", "B904", "F401", "T201", "INP001", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "ui", "utils"]
+force-single-line = false
+combine-as-imports = true
+split-on-trailing-comma = true
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "double"
+
+[tool.ruff.lint.flake8-import-conventions.extend-aliases]
+"numpy" = "np"
+"PIL.Image" = "PILImage"
+
+[tool.ruff.lint.pylint]
+max-args = 10
+max-branches = 15
+max-returns = 8
+max-statements = 60
+
+# ============================================================================
+# Basedpyright Configuration (STRICT)
+# ============================================================================
+[tool.basedpyright]
+include = ["core", "ui", "utils"]
+exclude = [
+    "**/__pycache__",
+    "**/.*",
+    "build",
+    "dist",
+    "tests",
+    "mesen2_integration",
+    "scripts",
+]
+pythonVersion = "3.11"
+pythonPlatform = "All"
+
+# STRICT MODE
+typeCheckingMode = "strict"
+
+# Core type safety (all enabled)
+reportMissingImports = true
+reportInvalidTypeForm = true
+reportDuplicateImport = true
+reportIncompatibleMethodOverride = true
+reportIncompatibleVariableOverride = true
+reportInconsistentConstructor = true
+reportUnnecessaryIsInstance = true
+reportUnnecessaryCast = true
+reportUnnecessaryComparison = true
+reportAssertAlwaysTrue = true
+reportSelfClsParameterName = true
+reportInvalidStubStatement = true
+reportIncompleteStub = true
+reportUndefinedVariable = true
+reportUnboundVariable = true
+reportInvalidStringEscapeSequence = true
+reportMatchNotExhaustive = true
+
+# Now errors instead of warnings
+reportUnusedImport = true
+reportUnusedClass = true
+reportUnusedFunction = true
+reportUnusedVariable = true
+reportMissingTypeArgument = true
+reportUnreachable = true
+
+# Stricter checks
+reportMissingParameterType = true
+reportCallInDefaultInitializer = true
+reportImplicitStringConcatenation = false
+reportPrivateImportUsage = true
+reportConstantRedefinition = false
+reportImplicitOverride = true
+reportPropertyTypeMismatch = true
+reportTypeCommentUsage = true
+
+# Qt-specific relaxations
+reportMissingTypeStubs = false
+reportUnknownParameterType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportUnnecessaryTypeIgnoreComment = false
+reportUnusedCallResult = false
+reportAny = false
+reportExplicitAny = false
+reportPrivateUsage = false
+reportUntypedFunctionDecorator = false
+reportUntypedClassDecorator = false
+reportUntypedBaseClass = false
+reportUntypedNamedTuple = false
+
+# ============================================================================
+# Pytest Configuration
+# ============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+pythonpath = ["."]
+
+# Show extra test summary info
+addopts = "-v --tb=short --strict-markers"
+
+# Qt-specific settings for pytest-qt
+qt_api = "pyside6"
+
+# Test collection settings
+norecursedirs = [".git", "__pycache__", "*.egg-info", ".pytest_cache", "venv", ".venv"]
+
+# pytest-timeout settings
+timeout = 30
+timeout_method = "thread"
+
+filterwarnings = [
+    "ignore::DeprecationWarning:PySide6",
+    "ignore::RuntimeWarning:PySide6",
+    "ignore:.*QApplication.*:RuntimeWarning",
+    "ignore:.*QThread.*:RuntimeWarning",
+]
+
+# Markers used in the test suite
+markers = [
+    # Primary execution environment markers
+    "gui: GUI tests requiring display/X11 environment",
+    "headless: Tests that can run without display",
+    "mock_only: Tests using only mocked components",
+
+    # Test type markers
+    "unit: Unit tests (fast, isolated, no external dependencies)",
+    "integration: Integration tests (may require files, databases, services)",
+    "benchmark: Performance benchmarking tests",
+    "performance: Performance tests",
+    "stress: Stress/load testing",
+    "slow: Slow tests (>1s execution time)",
+
+    # Qt component markers
+    "qt_real: Tests using real Qt components",
+    "qt_mock: Tests using mocked Qt components",
+    "qt_app: Tests requiring QApplication instance",
+    "qt_application: Tests that require a QApplication instance",
+    "no_qt: Tests with no Qt dependencies",
+    "qt_no_exception_capture: Disable Qt exception capture",
+    "qt_threading: Tests that use Qt threading and need QPixmap guard",
+    "qt_integration: Qt integration tests",
+
+    # Manager markers
+    "no_manager_setup: Tests that skip manager initialization",
+    "isolated_managers: Tests requiring fresh manager instances",
+
+    # Data and resource markers
+    "real_hal: Tests using real HAL components",
+    "requires_rom: Tests that require ROM file data",
+    "rom_data: Tests involving ROM data processing",
+    "cache: Tests that interact with the cache",
+    "file_io: Tests involving file I/O operations",
+    "memory: Tests that check for memory leaks",
+
+    # UI markers
+    "mock_gui: Tests using mocked GUI components",
+    "mock_dialogs: Tests that mock dialog exec() methods",
+    "no_gui: Tests that should not use GUI components",
+    "dialog: Tests involving dialog components",
+    "widget: Tests involving Qt widgets",
+    "singleton: Tests that test singleton patterns",
+    "signals_slots: Tests involving Qt signals and slots",
+
+    # Stability markers
+    "stability: Stability/regression tests",
+    "thread_safety: Thread safety tests",
+
+    # Execution control markers
+    "timeout: Set custom timeout for test",
+    "ci_safe: Tests safe for CI environments",
+    "serial: Tests that must run serially (no parallelization)",
+    "parallel_safe: Tests that can be run in parallel safely",
+    "process_pool: Tests using process pools",
+    "worker_threads: Tests using worker threads",
+    "segfault_prone: Tests prone to segfaults (handle carefully)",
+    "mock: Tests using mock objects",
+
+    # Platform markers
+    "asyncio: Tests using asyncio functionality",
+    "requires_display: Tests requiring display environment",
+
+    # Legacy/compatibility markers
+    "phase1_fixes: Tests related to phase 1 stability fixes",
+    "fixture_test: Tests that verify fixtures",
+    "infrastructure: Infrastructure validation tests",
+    "validation: Validation tests",
+]
