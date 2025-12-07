@@ -73,6 +73,26 @@ class InjectionManager(BaseManager):
             WorkerManager.cleanup_worker(self._current_worker, timeout=5000)
         self._current_worker = None
 
+    def reset_state(self, full_reset: bool = False) -> None:
+        """Reset internal state for test isolation.
+
+        This method resets mutable state without fully re-initializing the manager.
+        Use this for test isolation when you need to clear caches and counters
+        but don't want the overhead of full manager re-initialization.
+
+        Args:
+            full_reset: If True, also reset initialization state, requiring
+                       re-initialization before the manager can be used again.
+        """
+        # Stop any active worker
+        if self._current_worker:
+            self._logger.debug("Stopping active worker during reset_state")
+            WorkerManager.cleanup_worker(self._current_worker, timeout=1000)
+            self._current_worker = None
+
+        if full_reset:
+            self._is_initialized = False
+
     def _get_session_manager(self) -> SessionManager:
         """Get session manager via dependency injection container"""
         from core.di_container import inject

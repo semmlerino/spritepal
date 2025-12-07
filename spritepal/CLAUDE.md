@@ -104,6 +104,19 @@ def test_async_with_failure_case(qtbot, worker):
 - `@pytest.mark.headless` - No display required (can use real components if no rendering)
 - `@pytest.mark.serial` - No parallel execution
 
+### Modular Fixture Architecture
+
+Test fixtures are organized into modular files for maintainability:
+
+```
+tests/
+├── conftest.py                  # Coordinator - imports from modular files
+└── fixtures/
+    ├── qt_fixtures.py           # Qt app, main window, qtbot
+    ├── core_fixtures.py         # Manager fixtures, DI fixtures, state management
+    └── hal_fixtures.py          # HAL compression mock/real fixtures
+```
+
 ### Test Fixture Selection Guide
 
 | Need | Use | NOT |
@@ -114,6 +127,8 @@ def test_async_with_failure_case(qtbot, worker):
 | Qt images in worker thread | `ThreadSafeTestImage` | `QPixmap` |
 | Singleton dialog cleanup | `cleanup_singleton` | Own cleanup fixture |
 | Signal waiting | `qtbot.waitSignal()` | `time.sleep()` |
+| HAL with mocks (fast) | `hal_pool` (default) | Real HAL |
+| HAL with real impl | `@pytest.mark.real_hal` | Mock HAL |
 
 **Manager Fixture Isolation Levels:**
 
@@ -123,6 +138,24 @@ def test_async_with_failure_case(qtbot, worker):
 | `isolated_managers` | Function | YES (full cleanup) | Tests that modify manager state or need clean slate |
 | `setup_managers` | Function | YES | Default fixture with conditional setup |
 | `fast_managers` | Function (backed by session) | NO | Performance-focused tests (alias for session_managers) |
+| `reset_manager_state` | Function | YES (caches only) | Need clean counters without full isolation |
+
+**HAL Fixtures:**
+
+| Fixture | Default Behavior | With `--use-real-hal` or `@pytest.mark.real_hal` |
+|---------|------------------|--------------------------------------------------|
+| `hal_pool` | MockHALProcessPool (fast) | Real HALProcessPool |
+| `hal_compressor` | MockHALCompressor (fast) | Real HALCompressor |
+| `mock_hal` | Explicit mock (patches imports) | N/A (always mock) |
+| `hal_test_data` | Standard test data patterns | N/A |
+
+**Escape Hatch Markers:**
+
+| Marker | Effect |
+|--------|--------|
+| `@pytest.mark.allows_registry_state` | Skip pollution detection for this test |
+| `@pytest.mark.no_manager_setup` | Skip setup_managers fixture |
+| `@pytest.mark.real_hal` | Use real HAL implementation |
 
 **IMPORTANT**: `session_managers` is NOT reset between tests - manager state (caches, settings, active operations) persists across the entire test session. Use `isolated_managers` when:
 - Your test modifies ManagerRegistry state

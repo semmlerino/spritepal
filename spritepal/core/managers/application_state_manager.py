@@ -132,6 +132,31 @@ class ApplicationStateManager(BaseManager):
 
         self._logger.info("ApplicationStateManager cleaned up")
 
+    def reset_state(self, full_reset: bool = False) -> None:
+        """Reset internal state for test isolation.
+
+        This method resets mutable state without fully re-initializing the manager.
+        Use this for test isolation when you need to clear runtime state, snapshots,
+        and history but don't want the overhead of full manager re-initialization.
+
+        Args:
+            full_reset: If True, also reset settings to defaults and clear the
+                       session dirty flag. Does NOT reset initialization state
+                       since this manager requires settings to function.
+        """
+        with self._state_lock:
+            # Clear runtime state (always reset)
+            self._runtime_state.clear()
+            self._state_snapshots.clear()
+            self._sprite_history.clear()
+            self._session_dirty = False
+
+            if full_reset:
+                # Reset settings to defaults
+                self._settings = self._get_default_settings()
+
+        self._logger.debug("ApplicationStateManager state reset (full_reset=%s)", full_reset)
+
     # ========== Settings Management (Persistent) ==========
 
     def get_setting(self, category: str, key: str, default: Any = None) -> Any:
