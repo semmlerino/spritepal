@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import pytest
 from PIL import Image
+
 from ui.components import BaseDialog, SplitterDialog, TabbedDialog
 from ui.dialogs.user_error_dialog import UserErrorDialog
 from ui.grid_arrangement_dialog import GridArrangementDialog
@@ -35,6 +36,15 @@ pytestmark = [
 
 class TestComprehensiveDialogMigrations:
     """Test all migrated dialogs work together correctly"""
+
+    @pytest.fixture(autouse=True)
+    def setup_managers(self) -> Generator[None, None, None]:
+        """Setup managers for all tests in this class"""
+        from core.managers.registry import cleanup_managers, initialize_managers
+
+        initialize_managers("TestApp")
+        yield
+        cleanup_managers()
 
     @pytest.fixture
     def test_sprite_image(self) -> Generator[str, None, None]:
@@ -418,6 +428,29 @@ class TestComprehensiveDialogMigrations:
 # Manager Context Integration Tests
 class TestManagerContextIntegration:
     """Test manager context integration with dialog migrations."""
+
+    @pytest.fixture(autouse=True)
+    def setup_managers(self) -> Generator[None, None, None]:
+        """Setup managers for all tests in this class"""
+        from core.managers.registry import cleanup_managers, initialize_managers
+
+        initialize_managers("TestApp")
+        yield
+        cleanup_managers()
+
+    @pytest.fixture
+    def test_sprite_image(self) -> Generator[str, None, None]:
+        """Create a test sprite image for dialog testing"""
+        test_image = Image.new("L", (128, 128), 0)
+        temp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        test_image.save(temp_file.name)
+        temp_file.close()
+
+        yield temp_file.name
+
+        import os
+        with contextlib.suppress(Exception):
+            os.unlink(temp_file.name)
 
     def test_injection_dialog_manager_access(self, safe_qtbot, manager_context_factory):
         """Test that InjectionDialog can access managers through context."""

@@ -13,6 +13,7 @@ import pytest
 
 if TYPE_CHECKING:
     from pytest import FixtureRequest
+
     from tests.infrastructure.test_protocols import (
         MockMainWindowProtocol,
         MockQtBotProtocol,
@@ -41,6 +42,18 @@ from tests.infrastructure.safe_fixtures import (
 _environment_info = get_environment_info()
 IS_HEADLESS = _environment_info.is_headless
 
+# Thread baseline captured at module load time (before any tests run)
+# This avoids race conditions where tests capture baseline after prior tests left threads running
+_SESSION_THREAD_BASELINE: int | None = None
+
+
+def _get_session_thread_baseline() -> int:
+    """Get the session thread baseline, capturing it if not yet set."""
+    global _SESSION_THREAD_BASELINE
+    if _SESSION_THREAD_BASELINE is None:
+        _SESSION_THREAD_BASELINE = threading.active_count()
+    return _SESSION_THREAD_BASELINE
+
 
 # Global timeout configuration - increased for CI/headless environments
 # Use PYTEST_TIMEOUT_MULTIPLIER environment variable to scale all timeouts (e.g., 2.0 for slow CI)
@@ -57,6 +70,19 @@ _is_ci_or_headless = bool(os.environ.get("CI") or IS_HEADLESS)
 DEFAULT_SIGNAL_TIMEOUT = int((10000 if _is_ci_or_headless else 5000) * _timeout_multiplier)
 DEFAULT_WAIT_TIMEOUT = int((5000 if _is_ci_or_headless else 2000) * _timeout_multiplier)
 DEFAULT_WORKER_TIMEOUT = int((15000 if _is_ci_or_headless else 7500) * _timeout_multiplier)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def capture_thread_baseline() -> Iterator[None]:
+    """Capture thread baseline at session start before any tests run.
+
+    This fixture runs first (autouse, session scope) to capture the baseline
+    thread count before any test spawns threads. Individual tests use this
+    baseline to detect thread leaks more reliably.
+    """
+    # Capture baseline early in session
+    _ = _get_session_thread_baseline()
+    yield
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -180,6 +206,18 @@ def enhanced_safe_qtbot(request: FixtureRequest) -> SafeQtBotProtocol:
 
 
 @pytest.fixture
+def safe_qtbot(request: FixtureRequest) -> SafeQtBotProtocol:
+    """
+    Alias for enhanced_safe_qtbot for backwards compatibility.
+
+    Some test files use `safe_qtbot` as the fixture name. This provides
+    the same functionality as `enhanced_safe_qtbot`.
+    """
+    qtbot = create_safe_qtbot(request, allow_mock=False)
+    yield qtbot
+
+
+@pytest.fixture
 def mock_qtbot(request: FixtureRequest) -> SafeQtBotProtocol:
     """
     Explicit mock qtbot fixture for tests that don't need real Qt.
@@ -265,6 +303,16 @@ def enhanced_qtbot(request: FixtureRequest) -> SafeQtBotProtocol:
     return request.getfixturevalue('enhanced_safe_qtbot')
 
 
+@pytest.fixture
+def qtbot(enhanced_safe_qtbot: SafeQtBotProtocol) -> SafeQtBotProtocol:
+    """Override standard qtbot with safe version.
+    
+    This ensures that tests requesting 'qtbot' automatically get the safe wrapper
+    that correctly handles mock widgets in headless environments.
+    """
+    return enhanced_safe_qtbot
+
+
 @pytest.fixture(scope="session")
 def enhanced_qapp() -> SafeQApplicationProtocol:
     """Override pytest-qt qapp with enhanced safe version."""
@@ -318,7 +366,7 @@ def real_qtbot(request: FixtureRequest):
 
     try:
         # Import and use pytest-qt directly
-        pytest.importorskip("pytest_qt")
+        pytest.importorskip("pytestqt")
         return request.getfixturevalue('qtbot')  # Get real qtbot from pytest-qt
     except Exception as e:
         pytest.skip(f"Real qtbot not available: {e}")
@@ -372,6 +420,9 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     This fixture only runs cleanup for tests marked with @pytest.mark.worker_threads.
     This avoids the 50-500ms overhead for tests that don't spawn workers.
 
+    Uses session-level thread baseline to avoid race conditions where per-test
+    baseline captures lingering threads from prior tests.
+
     Usage:
         @pytest.mark.worker_threads
         def test_extraction_worker():
@@ -394,15 +445,17 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         yield
         return
 
-    # Capture baseline thread count BEFORE test runs
-    baseline_thread_count = threading.active_count()
+    # Use session-level baseline (captured before any tests ran)
+    # This avoids race conditions with lingering threads from prior tests
+    baseline_thread_count = _get_session_thread_baseline()
 
     yield
 
     # Import here to avoid circular imports
-    from ui.common.worker_manager import WorkerManager
     from PySide6.QtCore import QCoreApplication, QThread
     from PySide6.QtWidgets import QApplication
+
+    from ui.common.worker_manager import WorkerManager
 
     # Clean up any remaining workers
     try:
@@ -489,42 +542,75 @@ def timeout_config() -> dict[str, int]:
 
 
 @pytest.fixture
-def cleanup_singleton() -> Generator[None, None, None]:
+def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
     """Centralized ManualOffsetDialog singleton cleanup fixture.
 
     This fixture ensures the ManualOffsetDialogSingleton is properly cleaned up
-    before and after each test. Use this instead of defining your own
-    setup_singleton_cleanup fixture in test files.
+    before and after each test with explicit ordering to prevent segfaults:
+    1. Process pending events (ensure Qt is in stable state)
+    2. Request dialog close (triggers Qt cleanup chain)
+    3. Wait for dialog to be hidden (confirm close completed)
+    4. Schedule deferred deletion (let Qt handle memory)
+    5. Process events again (flush deferred deletions)
+    6. Reset singleton reference
 
     Usage:
         def test_something(cleanup_singleton):
             # Singleton is already reset before test
             dialog = ManualOffsetDialogSingleton.get_dialog(panel)
             # ... test code ...
-            # Singleton will be reset after test
+            # Singleton will be reset after test with proper ordering
     """
+    from PySide6.QtWidgets import QApplication
+
     from ui.rom_extraction_panel import ManualOffsetDialogSingleton
 
+    def _safe_cleanup_singleton():
+        """Cleanup with explicit ordering to prevent segfaults."""
+        app = QApplication.instance()
+
+        # Step 1: Process pending events first
+        if app:
+            app.processEvents()
+
+        instance = ManualOffsetDialogSingleton._instance
+        if instance is not None:
+            try:
+                # Step 2: Request close
+                instance.close()
+
+                # Step 3: Process events to complete close
+                if app:
+                    app.processEvents()
+
+                # Step 4: Check if hidden (close completed)
+                if hasattr(instance, 'isHidden') and not instance.isHidden():
+                    # Force hide if close didn't work
+                    instance.hide()
+                    if app:
+                        app.processEvents()
+
+                # Step 5: Schedule deferred deletion
+                instance.deleteLater()
+
+                # Step 6: Process deferred deletions
+                if app:
+                    app.processEvents()
+            except (RuntimeError, AttributeError):
+                # Widget may already be deleted, ignore
+                pass
+
+        # Step 7: Reset singleton reference
+        ManualOffsetDialogSingleton.reset()
+
+        # Final event processing
+        if app:
+            app.processEvents()
+
     # Clean before test
-    try:
-        if ManualOffsetDialogSingleton._instance is not None:
-            ManualOffsetDialogSingleton._instance.close()
-    except Exception:
-        pass
-    ManualOffsetDialogSingleton.reset()
+    _safe_cleanup_singleton()
 
     yield
 
-    # Clean after test
-    try:
-        if ManualOffsetDialogSingleton._instance is not None:
-            ManualOffsetDialogSingleton._instance.close()
-    except Exception:
-        pass
-    ManualOffsetDialogSingleton.reset()
-
-    # Process events to ensure cleanup completes
-    if not IS_HEADLESS:
-        from PySide6.QtWidgets import QApplication
-        if app := QApplication.instance():
-            app.processEvents()
+    # Clean after test with same careful ordering
+    _safe_cleanup_singleton()
