@@ -3,6 +3,8 @@ Test sprite preview widget functionality
 
 This is a real Qt widget test that requires a GUI environment and tests
 actual widget rendering, pixmap handling, and Qt-specific behavior.
+
+Uses shared class_managers fixture from core_fixtures.py instead of local setup.
 """
 from __future__ import annotations
 
@@ -10,9 +12,9 @@ import os
 import tempfile
 
 import pytest
-from core.managers import cleanup_managers, initialize_managers
 from PIL import Image
 from PySide6.QtWidgets import QApplication
+
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 
 # Skip in headless environments - this tests real Qt widget functionality
@@ -31,15 +33,15 @@ pytestmark = [
     pytest.mark.rom_data,
 ]
 
-@pytest.fixture(autouse=True)
-def setup_managers():
-    """Setup managers for all tests"""
-    initialize_managers("TestApp")
-    yield
-    cleanup_managers()
+# Note: Uses shared class_managers fixture - no local setup_managers needed
 
+
+@pytest.mark.usefixtures("class_managers")
 class TestSpritePreviewWidget:
-    """Test the sprite preview widget"""
+    """Test the sprite preview widget.
+
+    Uses shared class_managers fixture - no local setup_managers needed.
+    """
 
     @pytest.fixture(scope="class")
     def qapp(self):

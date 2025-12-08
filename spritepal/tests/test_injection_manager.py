@@ -12,6 +12,8 @@ Benefits of real component testing vs mocking:
 - Validates file I/O and threading behavior
 - Ensures proper signal/slot connections
 - Performance and resource management validation
+
+Uses shared class_managers fixture from core_fixtures.py instead of local setup.
 """
 from __future__ import annotations
 
@@ -20,18 +22,17 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from core.managers import cleanup_managers, initialize_managers
+from PIL import Image
+
 from core.managers.exceptions import ValidationError
 from core.managers.injection_manager import InjectionManager
-from PIL import Image
 
 # Real Component Testing Infrastructure (using available components)
 from tests.fixtures.test_managers import create_injection_manager_fixture
-from tests.fixtures.test_worker_helper import TestWorkerHelper
+from tests.fixtures.test_worker_helper import WorkerHelper
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-
     pytest.mark.serial,
     pytest.mark.thread_safety,
     pytest.mark.ci_safe,
@@ -46,12 +47,7 @@ pytestmark = [
     pytest.mark.worker_threads,
 ]
 
-@pytest.fixture(autouse=True)
-def setup_managers():
-    """Setup managers for all tests"""
-    initialize_managers("TestApp")
-    yield
-    cleanup_managers()
+# Note: Uses shared class_managers fixture - no local setup_managers needed
 
 @pytest.fixture
 def injection_manager_real():
@@ -105,13 +101,16 @@ def temp_files_with_real_content(tmp_path):
         "output_dir": str(tmp_path)
     }
 
+@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerInitialization:
     """TDD tests for InjectionManager initialization and lifecycle.
-    
+
     These tests follow TDD methodology:
     1. RED: Write failing test specifying expected behavior
     2. GREEN: Implement minimal code to pass the test
     3. REFACTOR: Improve implementation while keeping tests green
+
+    Uses shared class_managers fixture - no local setup_managers needed.
     """
 
     def test_manager_initialization_with_real_components_tdd(self, injection_manager_real):
@@ -154,7 +153,7 @@ class TestInjectionManagerInitialization:
         Tests actual worker lifecycle management, not mocked behavior.
         """
         manager = injection_manager_real
-        worker_helper = TestWorkerHelper(str(tmp_path))
+        worker_helper = WorkerHelper(str(tmp_path))
 
         try:
             # Create a real worker (but don't start it to avoid threading complexity)
@@ -174,11 +173,14 @@ class TestInjectionManagerInitialization:
         finally:
             worker_helper.cleanup()
 
+@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerParameterValidation:
     """TDD tests for parameter validation with real file I/O.
-    
+
     These tests replace FileValidator mocking with real file operations
     to test actual validation logic and edge cases.
+
+    Uses shared class_managers fixture - no local setup_managers needed.
     """
 
     def test_validate_vram_injection_params_valid_real_files(self, temp_files_with_real_content):
@@ -408,8 +410,12 @@ class TestInjectionManagerParameterValidation:
         # Metadata file should not exist
         assert not Path(params["metadata_path"]).exists()
 
+@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerWorkflows:
-    """Test injection workflow methods"""
+    """Test injection workflow methods.
+
+    Uses shared class_managers fixture - no local setup_managers needed.
+    """
 
     def test_start_vram_injection_success(self, tmp_path):
         """Test starting VRAM injection parameter validation with real fixture"""
@@ -531,7 +537,7 @@ class TestInjectionManagerWorkflows:
     def test_is_injection_active(self, tmp_path):
         """Test injection active status checking with real worker"""
         manager = InjectionManager()
-        worker_helper = TestWorkerHelper(str(tmp_path))
+        worker_helper = WorkerHelper(str(tmp_path))
 
         try:
             # No worker - not active
@@ -548,8 +554,12 @@ class TestInjectionManagerWorkflows:
         finally:
             worker_helper.cleanup()
 
+@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerSignalHandling:
-    """Test worker signal handling"""
+    """Test worker signal handling.
+
+    Uses shared class_managers fixture - no local setup_managers needed.
+    """
 
     def test_connect_worker_signals_no_worker(self):
         """Test signal connection when no worker exists"""
@@ -561,7 +571,7 @@ class TestInjectionManagerSignalHandling:
     def test_connect_worker_signals_basic_worker(self, tmp_path):
         """Test signal connection for real VRAM injection worker"""
         manager = InjectionManager()
-        worker_helper = TestWorkerHelper(str(tmp_path))
+        worker_helper = WorkerHelper(str(tmp_path))
 
         try:
             # Real VRAM injection worker has basic signals
@@ -583,7 +593,7 @@ class TestInjectionManagerSignalHandling:
     def test_connect_worker_signals_rom_worker(self, tmp_path):
         """Test signal connection for real ROM injection worker"""
         manager = InjectionManager()
-        worker_helper = TestWorkerHelper(str(tmp_path))
+        worker_helper = WorkerHelper(str(tmp_path))
 
         try:
             # Real ROM injection worker has additional signals
@@ -636,8 +646,12 @@ class TestInjectionManagerSignalHandling:
             manager._on_worker_finished(False, "Error message")
             mock_signal.emit.assert_called_once_with(False, "Error message")
 
+@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerVRAMSuggestion:
-    """Test smart VRAM suggestion functionality"""
+    """Test smart VRAM suggestion functionality.
+
+    Uses shared class_managers fixture - no local setup_managers needed.
+    """
 
     def test_get_smart_vram_suggestion_no_strategies_work(self, tmp_path):
         """Test VRAM suggestion when no strategies find a file"""

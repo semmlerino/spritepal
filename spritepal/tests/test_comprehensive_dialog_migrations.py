@@ -3,6 +3,8 @@ Comprehensive Dialog Migration Testing
 
 This test suite verifies that all migrated dialogs work correctly together
 and maintain full functionality after migration to the new component architecture.
+
+Uses shared class_managers fixture from core_fixtures.py instead of local setup.
 """
 from __future__ import annotations
 
@@ -34,17 +36,13 @@ pytestmark = [
     pytest.mark.ci_safe,
 ]
 
+
+@pytest.mark.usefixtures("class_managers")
 class TestComprehensiveDialogMigrations:
-    """Test all migrated dialogs work together correctly"""
+    """Test all migrated dialogs work together correctly.
 
-    @pytest.fixture(autouse=True)
-    def setup_managers(self) -> Generator[None, None, None]:
-        """Setup managers for all tests in this class"""
-        from core.managers.registry import cleanup_managers, initialize_managers
-
-        initialize_managers("TestApp")
-        yield
-        cleanup_managers()
+    Uses shared class_managers fixture - no local setup_managers needed.
+    """
 
     @pytest.fixture
     def test_sprite_image(self) -> Generator[str, None, None]:
@@ -426,17 +424,12 @@ class TestComprehensiveDialogMigrations:
                     pass
 
 # Manager Context Integration Tests
+@pytest.mark.usefixtures("class_managers")
 class TestManagerContextIntegration:
-    """Test manager context integration with dialog migrations."""
+    """Test manager context integration with dialog migrations.
 
-    @pytest.fixture(autouse=True)
-    def setup_managers(self) -> Generator[None, None, None]:
-        """Setup managers for all tests in this class"""
-        from core.managers.registry import cleanup_managers, initialize_managers
-
-        initialize_managers("TestApp")
-        yield
-        cleanup_managers()
+    Uses shared class_managers fixture - no local setup_managers needed.
+    """
 
     @pytest.fixture
     def test_sprite_image(self) -> Generator[str, None, None]:
