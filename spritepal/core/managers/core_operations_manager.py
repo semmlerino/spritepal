@@ -16,9 +16,6 @@ from typing_extensions import override
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.rom_extractor import ROMExtractor
-from ui.common import WorkerManager
-from ui.workers.injection_worker import InjectionWorker
-from ui.workers.rom_injection_worker import ROMInjectionWorker
 from utils.constants import (
     DEFAULT_PREVIEW_HEIGHT,
     DEFAULT_PREVIEW_WIDTH,
@@ -119,6 +116,8 @@ class CoreOperationsManager(BaseManager):
 
         # Stop any active workers
         if self._current_worker:
+            from ui.common import WorkerManager  # Local import to avoid circular dependency
+
             self._logger.info("Stopping active worker")
             WorkerManager.cleanup_worker(self._current_worker, timeout=5000)
             self._current_worker = None
@@ -283,6 +282,8 @@ class CoreOperationsManager(BaseManager):
 
     def _start_vram_injection(self, params: dict[str, Any]) -> bool:
         """Start VRAM injection."""
+        from ui.workers.injection_worker import InjectionWorker  # Local import to avoid circular dependency
+
         self._validate_required(params, ["input_vram", "output_vram", "offset"])
 
         # Create and start worker
@@ -307,6 +308,8 @@ class CoreOperationsManager(BaseManager):
 
     def _start_rom_injection(self, params: dict[str, Any]) -> bool:
         """Start ROM injection."""
+        from ui.workers.rom_injection_worker import ROMInjectionWorker  # Local import to avoid circular dependency
+
         self._validate_required(params, ["input_rom", "output_rom", "offset"])
 
         # Create and start worker
@@ -538,4 +541,6 @@ class InjectionAdapter(InjectionManager):
     def cancel_injection(self) -> None:
         """Cancel current injection operation."""
         if self._core._current_worker:
+            from ui.common import WorkerManager  # Local import to avoid circular dependency
+
             WorkerManager.cleanup_worker(self._core._current_worker, timeout=2000)

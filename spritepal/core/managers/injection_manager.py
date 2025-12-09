@@ -17,14 +17,8 @@ except ImportError:
 from PySide6.QtCore import QObject, QThread, Signal
 
 if TYPE_CHECKING:
-    from ui.workers.injection_worker import InjectionWorker
-    from ui.workers.rom_injection_worker import ROMInjectionWorker
-
     from .session_manager import SessionManager
 
-from ui.common import WorkerManager
-from ui.workers.injection_worker import InjectionWorker
-from ui.workers.rom_injection_worker import ROMInjectionWorker
 from utils.constants import (
     SETTINGS_KEY_FAST_COMPRESSION,
     SETTINGS_KEY_LAST_CUSTOM_OFFSET,
@@ -69,6 +63,8 @@ class InjectionManager(BaseManager):
     def cleanup(self) -> None:
         """Cleanup injection resources"""
         if self._current_worker:
+            from ui.common import WorkerManager  # Local import to avoid circular dependency
+
             self._logger.info("Stopping active injection worker")
             WorkerManager.cleanup_worker(self._current_worker, timeout=5000)
         self._current_worker = None
@@ -86,6 +82,8 @@ class InjectionManager(BaseManager):
         """
         # Stop any active worker
         if self._current_worker:
+            from ui.common import WorkerManager  # Local import to avoid circular dependency
+
             self._logger.debug("Stopping active worker during reset_state")
             WorkerManager.cleanup_worker(self._current_worker, timeout=1000)
             self._current_worker = None
@@ -129,6 +127,11 @@ class InjectionManager(BaseManager):
                 raise ValidationError(f"Invalid injection mode: {mode}")
 
         try:
+            # Local imports to avoid circular dependency
+            from ui.common import WorkerManager
+            from ui.workers.injection_worker import InjectionWorker
+            from ui.workers.rom_injection_worker import ROMInjectionWorker
+
             # Validate parameters
             self.validate_injection_params(params)
 

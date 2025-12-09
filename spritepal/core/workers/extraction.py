@@ -22,7 +22,8 @@ if TYPE_CHECKING:
     from core.managers import ExtractionManager
     from core.managers.factory import ManagerFactory
 
-from core.managers import ExtractionManager, get_extraction_manager
+from core.managers.extraction_manager import ExtractionManager
+from core.managers.registry import get_extraction_manager
 from utils.logging_config import get_logger
 
 from .base import handle_worker_errors
