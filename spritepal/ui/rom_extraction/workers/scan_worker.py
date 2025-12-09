@@ -8,10 +8,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
-from core.parallel_sprite_finder import ParallelSpriteFinder
-from core.workers.base import BaseWorker, handle_worker_errors
+    from core.protocols.manager_protocols import ROMCacheProtocol
+
 from PySide6.QtCore import Signal
 from typing_extensions import override
+
+from core.parallel_sprite_finder import ParallelSpriteFinder
+from core.workers.base import BaseWorker, handle_worker_errors
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -29,7 +32,8 @@ class SpriteScanWorker(BaseWorker):
     progress_detailed = Signal(int, int)  # current, total
 
     def __init__(self, rom_path: str, extractor: Any, use_cache: bool = True,
-                 start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None):
+                 start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None,
+                 rom_cache: ROMCacheProtocol | None = None):
         super().__init__(parent)
         self.rom_path = rom_path
         self.extractor = extractor
@@ -43,6 +47,14 @@ class SpriteScanWorker(BaseWorker):
             chunk_size=0x40000,  # 256KB chunks
             step_size=0x100      # 256-byte alignment
         )
+
+        # Inject rom_cache or use fallback
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        else:
+            self.rom_cache = rom_cache
 
     @handle_worker_errors("sprite scanning", handle_interruption=True)
     def run(self):
@@ -81,10 +93,7 @@ class SpriteScanWorker(BaseWorker):
         rom_cache = None
         original_start_offset = start_offset  # Save for progress calculations
         if self.use_cache:
-            from utils.rom_cache import (
-                get_rom_cache,  # Delayed import to avoid circular dependency
-            )
-            rom_cache = get_rom_cache()
+            rom_cache = self.rom_cache
             self.cache_status.emit("Checking cache...")
             logger.debug(f"Checking cache with params: {scan_params}")
             partial_cache = rom_cache.get_partial_scan_results(self.rom_path, scan_params)

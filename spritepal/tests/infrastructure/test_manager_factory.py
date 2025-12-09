@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
+
 from core.managers.context import ManagerContext
 from core.managers.extraction_manager import ExtractionManager
 
@@ -26,7 +27,7 @@ pytestmark = [
     pytest.mark.ci_safe,
 ]
 
-class TestManagerFactory:
+class ManagerFactory:
     """
     Factory for creating properly configured test manager instances.
     
@@ -187,9 +188,9 @@ class TestManagerFactory:
             ManagerContext with all test managers configured
         """
         managers = {
-            "extraction": TestManagerFactory.create_test_extraction_manager(),
-            "injection": TestManagerFactory.create_test_injection_manager(),
-            "session": TestManagerFactory.create_test_session_manager(),
+            "extraction": ManagerFactory.create_test_extraction_manager(),
+            "injection": ManagerFactory.create_test_injection_manager(),
+            "session": ManagerFactory.create_test_session_manager(),
         }
 
         return ManagerContext(managers, name=name)
@@ -215,13 +216,13 @@ class TestManagerFactory:
         context_managers = {}
 
         if "extraction" in managers:
-            context_managers["extraction"] = TestManagerFactory.create_test_extraction_manager()
+            context_managers["extraction"] = ManagerFactory.create_test_extraction_manager()
 
         if "injection" in managers:
-            context_managers["injection"] = TestManagerFactory.create_test_injection_manager()
+            context_managers["injection"] = ManagerFactory.create_test_injection_manager()
 
         if "session" in managers:
-            context_managers["session"] = TestManagerFactory.create_test_session_manager()
+            context_managers["session"] = ManagerFactory.create_test_session_manager()
 
         return ManagerContext(context_managers, name=name)
 
@@ -307,7 +308,7 @@ class TestManagerFactory:
         Returns:
             Mock InjectionManager with custom behavior
         """
-        mock = TestManagerFactory.create_test_injection_manager()
+        mock = ManagerFactory.create_test_injection_manager()
 
         # Override specific behaviors
         if inject_to_vram_result is not None:

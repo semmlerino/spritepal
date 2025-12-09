@@ -4,6 +4,7 @@ Integration tests for sprite finder functionality using real components.
 from __future__ import annotations
 
 import pytest
+
 from core.hal_compression import HALCompressor
 from core.rom_extractor import ROMExtractor
 from core.sprite_finder import SpriteFinder

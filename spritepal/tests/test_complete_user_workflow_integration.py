@@ -41,7 +41,7 @@ from core.managers.registry import (
     initialize_managers as initialize_managers_registry,
 )
 from core.workers import VRAMExtractionWorker
-from tests.fixtures.test_main_window_helper_simple import TestMainWindowHelperSimple
+from tests.fixtures.test_main_window_helper_simple import MainWindowHelperSimple
 from utils.constants import (
     BYTES_PER_TILE,
     COLORS_PER_PALETTE,
@@ -49,7 +49,6 @@ from utils.constants import (
     SPRITE_PALETTE_START,
     VRAM_SPRITE_OFFSET,
 )
-
 
 # ============================================================================
 # Module-level consolidated fixtures - Reduce mock density

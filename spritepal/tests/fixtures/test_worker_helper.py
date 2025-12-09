@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 
 # Test characteristics: Thread safety concerns
@@ -22,7 +23,7 @@ pytestmark = [
     pytest.mark.signals_slots,
 ]
 
-class TestExtractionWorker(VRAMExtractionWorker):
+class SyncExtractionWorker(VRAMExtractionWorker):
     """Test-specific ExtractionWorker that runs synchronously"""
 
     def start(self) -> None:
@@ -41,7 +42,7 @@ class TestExtractionWorker(VRAMExtractionWorker):
         """Override for test compatibility"""
         return True
 
-class TestROMExtractionWorker(ROMExtractionWorker):
+class SyncROMExtractionWorker(ROMExtractionWorker):
     """Test-specific ROMExtractionWorker that runs synchronously"""
 
     def start(self) -> None:
@@ -60,13 +61,13 @@ class TestROMExtractionWorker(ROMExtractionWorker):
         """Override for test compatibility"""
         return True
 
-class TestExtractionController:
+class SyncExtractionController:
     """Test-specific controller that uses synchronous workers"""
 
     def __init__(self, main_window: Any) -> None:
         self.main_window = main_window
-        self.worker: TestExtractionWorker | None = None
-        self.rom_worker: TestROMExtractionWorker | None = None
+        self.worker: SyncExtractionWorker | None = None
+        self.rom_worker: SyncROMExtractionWorker | None = None
 
         # Get managers
         from core.managers import (
@@ -91,7 +92,7 @@ class TestExtractionController:
             return
 
         # Create test worker (synchronous)
-        self.worker = TestExtractionWorker(params)
+        self.worker = SyncExtractionWorker(params)
         self.worker.progress.connect(self._on_progress)
         self.worker.preview_ready.connect(self._on_preview_ready)
         self.worker.preview_image_ready.connect(self._on_preview_image_ready)
@@ -139,7 +140,7 @@ class TestExtractionController:
         """Cleanup worker (simplified for test)"""
         self.worker = None
 
-class TestWorkerHelper:
+class WorkerHelper:
     """Helper for creating test injection workers and scenarios"""
 
     def __init__(self, temp_dir: str) -> None:

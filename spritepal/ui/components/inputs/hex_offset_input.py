@@ -13,6 +13,7 @@ from collections.abc import Callable
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QWidget
 from typing_extensions import override
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

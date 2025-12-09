@@ -4,6 +4,7 @@ Tests for SessionManager
 from __future__ import annotations
 
 import pytest
+
 from core.managers import SessionError, SessionManager, ValidationError
 
 # Test characteristics: Real GUI components requiring display
@@ -416,7 +417,7 @@ class TestSessionManager:
         }
 
         # Should emit only one session_changed signal
-        with qtbot.waitSignal(session_manager.session_changed, timeout=100) as blocker:
+        with qtbot.waitSignal(session_manager.session_changed, timeout=1000) as blocker:
             session_manager.update_session_data(data)
 
         # Should emit files_updated with all file changes

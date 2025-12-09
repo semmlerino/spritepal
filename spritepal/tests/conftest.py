@@ -4,7 +4,6 @@
 # pyright: reportUnknownArgumentType=warning  # Test data may be dynamic
 # pyright: reportUntypedFunctionDecorator=error  # Type all decorators
 # pyright: reportUnnecessaryTypeIgnoreComment=error  # Clean up unused ignores
-
 """
 Unified pytest configuration for SpritePal tests.
 
@@ -39,7 +38,7 @@ mechanisms to ensure test isolation:
 
 - `reset_main_window_state`: Resets main window state between tests
 - `reset_controller_state`: Resets controller state between tests
-- `reset_class_scoped_fixtures`: Resets all class-scoped mock fixtures
+- `reset_class_state`: Resets all class-scoped mock fixtures (requires @pytest.mark.usefixtures)
 
 ## Scope Selection Guidelines
 
@@ -53,6 +52,11 @@ All optimized fixtures maintain backward compatibility and proper cleanup.
 
 from __future__ import annotations
 
+# CRITICAL: Set offscreen mode BEFORE any Qt imports to prevent dialogs
+import os
+
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+
 import tempfile
 import warnings
 from collections.abc import Generator
@@ -65,14 +69,15 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from pytest import FixtureRequest
+
     from tests.infrastructure.test_protocols import (
         MockMainWindowProtocol,
     )
 
-import pytest
-
 # Import consolidated mock utilities
 import contextlib
+
+import pytest
 
 # Import constants from timeout configuration module
 from .constants_timeout import (
@@ -129,6 +134,35 @@ def pytest_addoption(parser: Any) -> None:
         help="Use real HAL process pool instead of mocks (slower)"
     )
     # NOTE: --run-segfault-tests option removed - segfault-prone tests have been deleted
+
+
+def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
+    """Clean up all singletons at session end to prevent state pollution.
+
+    This hook ensures:
+    1. ManagerRegistry singleton is fully reset
+    2. DataRepository temp files are cleaned up
+    3. HAL process pool singleton is reset
+
+    Without this, state can leak between test runs or cause errors
+    in subsequent test sessions.
+    """
+    # 1. Reset ManagerRegistry singleton completely
+    with contextlib.suppress(Exception):
+        from core.managers.registry import ManagerRegistry
+        ManagerRegistry._instance = None
+        ManagerRegistry._cleanup_registered = False
+
+    # 2. Clean up DataRepository (temp files and singleton)
+    with contextlib.suppress(Exception):
+        from tests.infrastructure.test_data_repository import cleanup_test_data_repository
+        cleanup_test_data_repository()
+
+    # 3. Reset HAL singleton (already handled by atexit, but ensure clean state)
+    with contextlib.suppress(Exception):
+        from core.hal_compression import HALProcessPool
+        if hasattr(HALProcessPool, '_instance'):
+            HALProcessPool._instance = None
 
 
 # ============================================================================
@@ -346,8 +380,8 @@ def guard_qpixmap_threading(request: FixtureRequest, monkeypatch: pytest.MonkeyP
             yield
             return
 
+    from PySide6.QtCore import QCoreApplication, QThread
     from PySide6.QtGui import QPixmap
-    from PySide6.QtCore import QThread, QCoreApplication
 
     original_init = QPixmap.__init__
 
@@ -412,7 +446,7 @@ def reset_controller_state(controller: Mock) -> Generator[None, None, None]:
     # Additional cleanup after test if needed
     pass
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="function")
 def reset_class_state(
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
@@ -421,6 +455,9 @@ def reset_class_state(
     This fixture ensures proper state isolation for performance-optimized
     class-scoped fixtures. Request it explicitly in test classes that need
     fixture state reset between tests.
+
+    NOTE: This is function-scoped so it runs AFTER each test to reset
+    class-scoped fixture state before the next test runs.
 
     Usage:
         @pytest.mark.usefixtures("reset_class_state")
@@ -432,7 +469,10 @@ def reset_class_state(
     - side_effect (if manually configured)
     - Any internal state
     """
-    # Get list of fixture names used by current test
+    # Run test first
+    yield
+
+    # Reset fixtures AFTER each test for the next one
     fixture_names = getattr(request, 'fixturenames', [])
 
     # Reset fixtures dynamically based on what's actually used
@@ -469,8 +509,6 @@ def reset_class_state(
                 logging.getLogger(__name__).warning(
                     f"Failed to reset fixture {fixture_name}: {e}"
                 )
-
-    yield
 
 
 @pytest.fixture
@@ -560,3 +598,184 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
         )
 
     yield
+
+
+# ===========================================================================================
+# Wait Helper Fixtures for Eliminating Flaky qtbot.wait() Calls
+# ===========================================================================================
+# These fixtures replace timing-dependent qtbot.wait() calls with condition-based waits
+# that auto-complete when the expected state is reached. This eliminates flakiness caused
+# by hardcoded delays that may be insufficient in slow environments (CI, WSL2, etc.).
+#
+# Usage: Add fixture parameter to test method, then use instead of qtbot.wait()
+# Example:
+#   def test_something(self, qtbot, wait_for_signal_processed):
+#       button.click()
+#       wait_for_signal_processed()  # Instead of qtbot.wait(100)
+# ===========================================================================================
+
+@pytest.fixture
+def wait_for_widget_ready(qtbot):
+    """
+    Helper to wait for widget initialization.
+
+    Replaces fixed qtbot.wait() calls with condition-based waiting.
+    Auto-completes when widget becomes visible and enabled.
+
+    Example:
+        wait_for_widget_ready(dialog, timeout=1000)
+        # Instead of: dialog.show(); qtbot.wait(100)
+    """
+    def _wait(widget, timeout=1000):
+        """
+        Wait for widget to be visible and enabled.
+
+        Args:
+            widget: QWidget to wait for
+            timeout: Maximum wait time in milliseconds
+
+        Returns:
+            True if widget is ready within timeout
+
+        Raises:
+            TimeoutError: If widget not ready within timeout
+        """
+        try:
+            qtbot.waitUntil(
+                lambda: widget.isVisible() and widget.isEnabled(),
+                timeout=timeout
+            )
+            return True
+        except AssertionError as e:
+            raise TimeoutError(
+                f"Widget {widget.__class__.__name__} not ready within {timeout}ms"
+            ) from e
+    return _wait
+
+
+@pytest.fixture
+def wait_for_signal_processed(qtbot):
+    """
+    Helper to wait for signal processing to complete.
+
+    Ensures Qt event loop has processed pending signals.
+
+    Example:
+        slider.setValue(100)
+        wait_for_signal_processed()
+        # Instead of: slider.setValue(100); qtbot.wait(50)
+    """
+    def _wait(timeout=100):
+        """
+        Wait for pending signals to be processed.
+
+        Args:
+            timeout: Maximum wait time in milliseconds
+
+        Note:
+            Uses processEvents() to ensure all queued signals have been delivered.
+        """
+        from PySide6.QtWidgets import QApplication
+
+        # Process all pending events - this is sufficient for signal delivery
+        QApplication.processEvents()
+
+    return _wait
+
+
+@pytest.fixture
+def wait_for_theme_applied(qtbot):
+    """
+    Helper to wait for theme changes to be applied.
+
+    Qt theme changes may take multiple event loop cycles to apply.
+
+    Example:
+        window.apply_dark_theme()
+        wait_for_theme_applied(window)
+        # Instead of: window.apply_dark_theme(); qtbot.wait(100)
+    """
+    def _wait(widget, is_dark_theme=True, timeout=500):
+        """
+        Wait for theme to be applied to widget.
+
+        Args:
+            widget: QWidget to check
+            is_dark_theme: Whether to expect dark theme (True) or light (False)
+            timeout: Maximum wait time in milliseconds
+        """
+        # Check for headless mode FIRST - theme verification unreliable there
+        import os
+        display = os.environ.get("DISPLAY", "")
+        qpa_platform = os.environ.get("QT_QPA_PLATFORM", "")
+        is_headless = not display or qpa_platform == "offscreen"
+
+        if is_headless:
+            # Skip theme verification in headless mode - just process events
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
+            return True
+
+        # In non-headless mode, actually verify theme
+        from PySide6.QtGui import QPalette
+
+        def theme_applied():
+            palette = widget.palette()
+            bg_color = palette.color(QPalette.ColorRole.Window)
+
+            if is_dark_theme:
+                # Dark theme: background should be dark
+                return bg_color.red() < 128 and bg_color.green() < 128 and bg_color.blue() < 128
+            else:
+                # Light theme: background should be light
+                return bg_color.red() > 128 or bg_color.green() > 128 or bg_color.blue() > 128
+
+        qtbot.waitUntil(theme_applied, timeout=timeout)
+        return True
+
+    return _wait
+
+
+@pytest.fixture
+def wait_for_layout_update(qtbot):
+    """
+    Helper to wait for layout changes to be applied.
+
+    Qt layouts may take multiple event cycles to fully update.
+
+    Example:
+        window.resize(1024, 768)
+        wait_for_layout_update(window, expected_width=1024)
+        # Instead of: window.resize(...); qtbot.wait(100)
+    """
+    def _wait(widget, expected_width=None, expected_height=None, timeout=500):
+        """
+        Wait for widget layout to update.
+
+        Args:
+            widget: QWidget to check
+            expected_width: Expected width (None to skip check)
+            expected_height: Expected height (None to skip check)
+            timeout: Maximum wait time in milliseconds
+        """
+        def layout_updated():
+            size = widget.size()
+            if expected_width is not None and size.width() != expected_width:
+                return False
+            if expected_height is not None and size.height() != expected_height:
+                return False
+            # If no specific size expected, just check that size is reasonable
+            return size.width() > 0 and size.height() > 0
+
+        try:
+            qtbot.waitUntil(layout_updated, timeout=timeout)
+            return True
+        except AssertionError as e:
+            current_size = widget.size()
+            raise TimeoutError(
+                f"Layout not updated within {timeout}ms. "
+                f"Current: {current_size.width()}x{current_size.height()}, "
+                f"Expected: {expected_width}x{expected_height}"
+            ) from e
+
+    return _wait

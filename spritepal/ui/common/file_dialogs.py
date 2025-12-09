@@ -1,15 +1,11 @@
-"""
-File dialog utilities for standardized file selection patterns
-
-Provides helper functions and classes for consistent file dialog usage
-throughout the SpritePal application.
-"""
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QWidget
-from utils.settings_manager import get_settings_manager
+
+from core.di_container import inject
+from core.protocols.manager_protocols import SettingsManagerProtocol
 
 
 class FileDialogHelper:
@@ -41,7 +37,7 @@ class FileDialogHelper:
         Returns:
             Selected directory path, or empty string if cancelled
         """
-        settings = get_settings_manager()
+        settings = inject(SettingsManagerProtocol)
 
         # Determine initial directory
         if initial_dir and Path(initial_dir).exists():
@@ -79,20 +75,10 @@ class FileDialogHelper:
         settings_namespace: str = "file_dialogs"
     ) -> str:
         """
-        Browse for file to open with standardized behavior
-
-        Args:
-            parent: Parent widget for the dialog
-            title: Dialog title
-            file_filter: File filter string
-            initial_path: Initial file/directory path
-            settings_key: Settings key to save/restore last location
-            settings_namespace: Settings namespace for the key
-
         Returns:
             Selected file path, or empty string if cancelled
         """
-        settings = get_settings_manager()
+        settings = inject(SettingsManagerProtocol)
 
         # Determine initial directory
         if initial_path and Path(initial_path).exists():
@@ -146,7 +132,7 @@ class FileDialogHelper:
         Returns:
             Selected file path, or empty string if cancelled
         """
-        settings = get_settings_manager()
+        settings = inject(SettingsManagerProtocol)
 
         # Determine initial path
         if initial_path:
@@ -194,7 +180,7 @@ class FileDialogHelper:
         Returns:
             Best initial directory to use
         """
-        settings = get_settings_manager()
+        settings = inject(SettingsManagerProtocol)
 
         # Check current path first
         if current_path:

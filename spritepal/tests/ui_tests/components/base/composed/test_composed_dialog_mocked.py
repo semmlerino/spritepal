@@ -9,6 +9,7 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 import pytest
+
 from ui.components.base.composed.button_box_manager import ButtonBoxManager
 from ui.components.base.composed.composed_dialog import ComposedDialog
 from ui.components.base.composed.message_dialog_manager import MessageDialogManager

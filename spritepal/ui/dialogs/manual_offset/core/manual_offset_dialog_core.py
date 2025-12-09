@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QWidget
 from typing_extensions import override
+
 from ui.components.base.composed.migration_adapter import DialogBaseMigrationAdapter
 from ui.dialogs.manual_offset.components import (
     LayoutManagerComponent,

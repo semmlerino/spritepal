@@ -7,6 +7,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+
 from core.parallel_sprite_finder import ParallelSpriteFinder
 from core.rom_extractor import ROMExtractor
 

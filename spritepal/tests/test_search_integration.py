@@ -13,9 +13,10 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from PIL import Image
+
 from core.parallel_sprite_finder import AdaptiveSpriteFinder, ParallelSpriteFinder
 from core.visual_similarity_search import SpriteGroupFinder, VisualSimilarityEngine
-from PIL import Image
 from ui.dialogs.advanced_search_dialog import AdvancedSearchDialog
 from ui.rom_extraction.workers.search_worker import SpriteSearchWorker
 

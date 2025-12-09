@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

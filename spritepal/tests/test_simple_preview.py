@@ -28,9 +28,10 @@ logging.basicConfig(
     stream=sys.stdout  # Force stdout to see everything
 )
 
-from core.managers.registry import get_extraction_manager, initialize_managers
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
+
+from core.managers.registry import get_extraction_manager, initialize_managers
 from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
 
 

@@ -7,6 +7,7 @@ import threading
 from typing import Any
 
 from PySide6.QtWidgets import QApplication
+
 from utils.logging_config import get_logger
 from utils.safe_logging import (
     safe_debug,
@@ -32,7 +33,7 @@ class ManagerRegistry:
     """Singleton registry for manager instances with memory leak prevention"""
 
     _instance: ManagerRegistry | None = None
-    _lock: threading.Lock = threading.Lock()
+    _lock: threading.RLock = threading.RLock()  # RLock for reentrant locking
     _cleanup_registered: bool = False
 
     def __new__(cls) -> ManagerRegistry:
@@ -45,18 +46,20 @@ class ManagerRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry"""
-        # Only initialize once
-        if hasattr(self, "_initialized"):
-            return
+        # Thread-safe initialization check to prevent race between __new__ and __init__
+        with self._lock:
+            # Only initialize once
+            if hasattr(self, "_initialized"):
+                return
 
-        self._logger = get_logger("ManagerRegistry")
-        self._managers: dict[str, Any] = {}
-        self._initialized = True
+            self._logger = get_logger("ManagerRegistry")
+            self._managers: dict[str, Any] = {}
+            self._initialized = True
 
-        # Register cleanup with QApplication if available
-        self._register_cleanup_hooks()
+            # Register cleanup with QApplication if available
+            self._register_cleanup_hooks()
 
-        self._logger.info("ManagerRegistry initialized")
+            self._logger.info("ManagerRegistry initialized")
 
     def _register_cleanup_hooks(self) -> None:
         """Register cleanup hooks with Qt application - delayed until Qt is available"""
@@ -65,7 +68,10 @@ class ManagerRegistry:
 
     def _try_register_cleanup_hooks(self) -> None:
         """Actually register cleanup hooks when Qt is available"""
-        if not ManagerRegistry._cleanup_registered:
+        # Thread-safe check-then-act to prevent duplicate cleanup registration
+        with ManagerRegistry._lock:
+            if ManagerRegistry._cleanup_registered:
+                return
             try:
                 app = QApplication.instance()
                 if app is not None:
@@ -95,6 +101,10 @@ class ManagerRegistry:
                 return
 
             self._logger.info(f"Initializing managers (consolidated={use_consolidated})...")
+
+            # Configure the DI container first to register all protocols
+            from core.di_container import configure_container
+            configure_container(use_consolidated=use_consolidated)
 
             # Get Qt application instance for proper parent management
             app = QApplication.instance()

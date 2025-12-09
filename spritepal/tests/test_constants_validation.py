@@ -9,6 +9,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+
 from ui.common import spacing_constants
 from utils import constants
 

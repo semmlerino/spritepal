@@ -226,6 +226,10 @@ exclude = [
 pythonVersion = "3.11"
 pythonPlatform = "All"
 
+# Point to the venv so basedpyright can find PySide6 stubs
+venvPath = ".."
+venv = ".venv"
+
 # STRICT MODE
 typeCheckingMode = "strict"
 

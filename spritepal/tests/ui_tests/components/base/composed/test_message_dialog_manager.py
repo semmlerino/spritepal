@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QDialog, QMessageBox
+
 from ui.components.base.composed.message_dialog_manager import MessageDialogManager
 
 pytestmark = [

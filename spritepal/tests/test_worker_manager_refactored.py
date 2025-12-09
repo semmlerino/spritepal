@@ -13,6 +13,7 @@ import time
 import pytest
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtTest import QSignalSpy
+
 from ui.common import WorkerManager
 from ui.common.timing_constants import (
     # Test characteristics: Real GUI components requiring display, Thread safety concerns
@@ -341,7 +342,7 @@ class TestWorkerManagerReal:
         # Start and let it run briefly
         worker.start()
         qtbot.waitUntil(worker.isRunning, timeout=TEST_TIMEOUT_MEDIUM)
-        qtbot.wait(100)  # Let it do some work
+        qtbot.waitUntil(lambda: worker._work_cycles > 0, timeout=500)  # Wait for worker to do some work
 
         # Interrupt
         worker.stop()

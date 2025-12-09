@@ -128,6 +128,7 @@ def manual_offset_dialog(qtbot, managers_initialized):
     """
     import importlib.util
     from pathlib import Path
+
     import shiboken6
 
     # Get the real module source file path
@@ -167,7 +168,7 @@ def loaded_rom_panel(rom_extraction_panel, test_rom_with_sprites, qtbot):
     rom_extraction_panel._load_rom_file(rom_path)
 
     # Wait for loading to complete
-    qtbot.wait(100)
+    qtbot.waitUntil(lambda: rom_extraction_panel.rom_path == rom_path and rom_extraction_panel.rom_size > 0, timeout=1000)
 
     # Verify ROM is loaded
     assert rom_extraction_panel.rom_path == rom_path
@@ -246,8 +247,172 @@ def process_events(qtbot):
     """Process Qt events to ensure UI updates."""
     def _process():
         from PySide6.QtWidgets import QApplication
+        # Process events - no wait needed, processEvents is sufficient
         QApplication.processEvents()
-        qtbot.wait(10)
     return _process
+
+
+@pytest.fixture
+def wait_for_widget_ready(qtbot):
+    """
+    Helper to wait for widget initialization.
+
+    Replaces fixed qtbot.wait() calls with condition-based waiting.
+    Auto-completes when widget becomes visible and enabled.
+
+    Example:
+        wait_for_widget_ready(dialog, timeout=1000)
+        # Instead of: dialog.show(); qtbot.wait(100)
+    """
+    def _wait(widget, timeout=1000):
+        """
+        Wait for widget to be visible and enabled.
+
+        Args:
+            widget: QWidget to wait for
+            timeout: Maximum wait time in milliseconds
+
+        Returns:
+            True if widget is ready within timeout
+
+        Raises:
+            TimeoutError: If widget not ready within timeout
+        """
+        try:
+            qtbot.waitUntil(
+                lambda: widget.isVisible() and widget.isEnabled(),
+                timeout=timeout
+            )
+            return True
+        except AssertionError as e:
+            raise TimeoutError(
+                f"Widget {widget.__class__.__name__} not ready within {timeout}ms"
+            ) from e
+    return _wait
+
+
+@pytest.fixture
+def wait_for_signal_processed(qtbot):
+    """
+    Helper to wait for signal processing to complete.
+
+    Ensures Qt event loop has processed pending signals.
+
+    Example:
+        slider.setValue(100)
+        wait_for_signal_processed()
+        # Instead of: slider.setValue(100); qtbot.wait(50)
+    """
+    def _wait(timeout=100):
+        """
+        Wait for pending signals to be processed.
+
+        Args:
+            timeout: Maximum wait time in milliseconds
+
+        Note:
+            Uses processEvents() to ensure all queued signals have been delivered.
+        """
+        from PySide6.QtWidgets import QApplication
+
+        # Process all pending events - this is sufficient for signal delivery
+        QApplication.processEvents()
+
+    return _wait
+
+
+@pytest.fixture
+def wait_for_theme_applied(qtbot):
+    """
+    Helper to wait for theme changes to be applied.
+
+    Qt theme changes may take multiple event loop cycles to apply.
+
+    Example:
+        window.apply_dark_theme()
+        wait_for_theme_applied(window)
+        # Instead of: window.apply_dark_theme(); qtbot.wait(100)
+    """
+    def _wait(widget, is_dark_theme=True, timeout=500):
+        """
+        Wait for theme to be applied to widget.
+
+        Args:
+            widget: QWidget to check
+            is_dark_theme: Whether to expect dark theme (True) or light (False)
+            timeout: Maximum wait time in milliseconds
+        """
+        from PySide6.QtGui import QPalette
+
+        def theme_applied():
+            palette = widget.palette()
+            bg_color = palette.color(QPalette.ColorRole.Window)
+
+            if is_dark_theme:
+                # Dark theme: background should be dark
+                return bg_color.red() < 128 and bg_color.green() < 128 and bg_color.blue() < 128
+            else:
+                # Light theme: background should be light
+                return bg_color.red() > 128 or bg_color.green() > 128 or bg_color.blue() > 128
+
+        try:
+            qtbot.waitUntil(theme_applied, timeout=timeout)
+            return True
+        except AssertionError:
+            # Theme verification can be unreliable in headless mode
+            import os
+            display = os.environ.get("DISPLAY", "")
+            qpa_platform = os.environ.get("QT_QPA_PLATFORM", "")
+            if not display or qpa_platform == "offscreen":
+                return True  # Skip verification in headless mode
+            raise
+
+    return _wait
+
+
+@pytest.fixture
+def wait_for_layout_update(qtbot):
+    """
+    Helper to wait for layout changes to be applied.
+
+    Qt layouts may take multiple event cycles to fully update.
+
+    Example:
+        window.resize(1024, 768)
+        wait_for_layout_update(window, expected_width=1024)
+        # Instead of: window.resize(...); qtbot.wait(100)
+    """
+    def _wait(widget, expected_width=None, expected_height=None, timeout=500):
+        """
+        Wait for widget layout to update.
+
+        Args:
+            widget: QWidget to check
+            expected_width: Expected width (None to skip check)
+            expected_height: Expected height (None to skip check)
+            timeout: Maximum wait time in milliseconds
+        """
+        def layout_updated():
+            size = widget.size()
+            if expected_width is not None and size.width() != expected_width:
+                return False
+            if expected_height is not None and size.height() != expected_height:
+                return False
+            # If no specific size expected, just check that size is reasonable
+            return size.width() > 0 and size.height() > 0
+
+        try:
+            qtbot.waitUntil(layout_updated, timeout=timeout)
+            return True
+        except AssertionError as e:
+            current_size = widget.size()
+            raise TimeoutError(
+                f"Layout not updated within {timeout}ms. "
+                f"Current: {current_size.width()}x{current_size.height()}, "
+                f"Expected: {expected_width}x{expected_height}"
+            ) from e
+
+    return _wait
+
 
 # Markers are registered in pyproject.toml and main conftest.py

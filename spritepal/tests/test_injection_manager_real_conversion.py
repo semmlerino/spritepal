@@ -12,16 +12,17 @@ import tempfile
 from unittest.mock import Mock, patch
 
 import pytest
+
 from core.controller import ExtractionController
 from core.managers import (
     cleanup_managers,
     get_injection_manager,
     initialize_managers,
 )
-from tests.fixtures.test_main_window_helper_simple import TestMainWindowHelperSimple
+from tests.fixtures.test_main_window_helper_simple import MainWindowHelperSimple
 from tests.infrastructure import (
     # Systematic pytest markers applied based on test content analysis
-    TestApplicationFactory,
+    ApplicationFactory,
 )
 
 pytestmark = [
@@ -42,7 +43,7 @@ class TestInjectionManagerRealConversion:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self):
         """Set up testing infrastructure."""
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
         initialize_managers(app_name="SpritePal-Test")
 
         yield
@@ -96,7 +97,7 @@ class TestInjectionManagerRealConversion:
                 }
                 mock_dialog.return_value = mock_dialog_instance
 
-                window_helper = TestMainWindowHelperSimple()
+                window_helper = MainWindowHelperSimple()
                 controller = ExtractionController(window_helper)
 
                 # Set up main window state
@@ -155,7 +156,7 @@ class TestInjectionManagerRealConversion:
         """Test real injection_manager error handling vs mocked error scenarios"""
         initialize_managers(app_name="SpritePal-Test")
 
-        window_helper = TestMainWindowHelperSimple()
+        window_helper = MainWindowHelperSimple()
         controller = ExtractionController(window_helper)
 
         # Test with invalid file paths - real manager should handle gracefully

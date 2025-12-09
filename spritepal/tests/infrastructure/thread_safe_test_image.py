@@ -230,7 +230,7 @@ class ThreadSafeTestImage:
         return (f"ThreadSafeTestImage(width={self._width}, height={self._height}, "
                 f"format={self._image.format()}, bytes={self.sizeInBytes()})")
 
-class TestImagePool:
+class ImagePool:
     """Reuse ThreadSafeTestImage instances for performance.
 
     This pool pattern reduces object creation overhead in performance-sensitive
@@ -248,9 +248,10 @@ class TestImagePool:
     """
 
     def __init__(self):
-        """Initialize an empty image pool."""
+        """Initialize an empty image pool with thread-safe access."""
         self._pool: list[ThreadSafeTestImage] = []
         self._thread_id = threading.get_ident()
+        self._lock = threading.RLock()  # Protect pool access from race conditions
 
     def get_test_image(self, width: int = DEFAULT_WIDTH, height: int = DEFAULT_HEIGHT) -> ThreadSafeTestImage:
         """Get a test image from the pool or create a new one.
@@ -264,16 +265,18 @@ class TestImagePool:
 
         Note:
             Images are reset to white when retrieved from the pool.
+            Thread-safe: uses lock to prevent race conditions.
         """
-        # Try to reuse an existing image with matching dimensions
-        for i, image in enumerate(self._pool):
-            if image.width() == width and image.height() == height:
-                # Remove from pool and reset
-                image = self._pool.pop(i)
-                image.fill()  # Reset to white
-                return image
+        with self._lock:
+            # Try to reuse an existing image with matching dimensions
+            for i, image in enumerate(self._pool):
+                if image.width() == width and image.height() == height:
+                    # Remove from pool and reset
+                    image = self._pool.pop(i)
+                    image.fill()  # Reset to white
+                    return image
 
-        # Create new image if no suitable one found
+        # Create new image if no suitable one found (outside lock for performance)
         return ThreadSafeTestImage(width, height)
 
     def return_image(self, image: ThreadSafeTestImage) -> None:
@@ -285,22 +288,28 @@ class TestImagePool:
         Note:
             Images are not immediately reset to save CPU cycles.
             They are reset when retrieved from the pool.
+            Thread-safe: uses lock to prevent race conditions.
         """
-        if len(self._pool) < 10:  # Limit pool size to prevent memory bloat
-            self._pool.append(image)
+        with self._lock:
+            if len(self._pool) < 10:  # Limit pool size to prevent memory bloat
+                self._pool.append(image)
 
     def clear(self) -> None:
         """Clear all images from the pool.
 
         Note:
             Useful for cleanup in test teardown methods.
+            Thread-safe: uses lock to prevent race conditions.
         """
-        self._pool.clear()
+        with self._lock:
+            self._pool.clear()
 
     def size(self) -> int:
         """Return the current pool size.
 
         Returns:
             Number of images currently in the pool.
+            Thread-safe: uses lock to prevent race conditions.
         """
-        return len(self._pool)
+        with self._lock:
+            return len(self._pool)

@@ -10,6 +10,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from core.managers.exceptions import (
     # Systematic pytest markers applied based on test content analysis
     ExtractionError,

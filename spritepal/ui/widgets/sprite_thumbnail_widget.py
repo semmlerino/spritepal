@@ -10,6 +10,7 @@ from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QEnterEvent, QFont, QMouseEvent, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from typing_extensions import override
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

@@ -8,28 +8,30 @@ source of truth for testing this complex UI component.
 from __future__ import annotations
 
 import os
+
+# Add parent directories to path for module imports
+import sys
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtWidgets import QApplication, QSlider
 
-# Add parent directories to path for module imports
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 # Import necessary modules
+# from ui.rom_extraction_panel import ManualOffsetDialogSingleton # Removed
+from tests.infrastructure.qt_real_testing import QtTestCase
 from ui.dialogs.manual_offset_unified_integrated import (
     SimpleBrowseTab,
     SimpleHistoryTab,
     SimpleSmartTab,
     UnifiedManualOffsetDialog,
 )
-from ui.rom_extraction_panel import ManualOffsetDialogSingleton
-from tests.infrastructure.qt_real_testing import QtTestCase
+
 
 # Define if in a headless environment for skipping tests
 def is_headless_environment() -> bool:
@@ -46,16 +48,20 @@ def is_headless_environment() -> bool:
             temp_app = QApplication([])
             try:
                 primary_screen = temp_app.primaryScreen()
-                if not primary_screen: return True
+                if not primary_screen:
+                    return True
                 screen_geometry = primary_screen.geometry()
-                if screen_geometry.width() <= 0 or screen_geometry.height() <= 0: return True
+                if screen_geometry.width() <= 0 or screen_geometry.height() <= 0:
+                    return True
             finally:
                 temp_app.quit()
         else:
             primary_screen = app.primaryScreen()
-            if not primary_screen: return True
+            if not primary_screen:
+                return True
             screen_geometry = primary_screen.geometry()
-            if screen_geometry.width() <= 0 or screen_geometry.height() <= 0: return True
+            if screen_geometry.width() <= 0 or screen_geometry.height() <= 0:
+                return True
         return False
     except Exception:
         return True
@@ -76,91 +82,6 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.serial, # Some tests manipulate singletons or global Qt state
 ]
-
-
-@pytest.mark.unit
-@pytest.mark.no_manager_setup
-class TestManualOffsetDialogSingleton:
-    """Unit tests for singleton pattern implementation."""
-
-    @pytest.fixture(autouse=True)
-    def setup_singleton_cleanup(self, cleanup_singleton):
-        """Delegate to centralized cleanup_singleton fixture from conftest.py."""
-        yield
-
-    @pytest.fixture
-    def mock_dialog_class(self):
-        """Mock the UnifiedManualOffsetDialog class."""
-        with patch('ui.rom_extraction_panel.UnifiedManualOffsetDialog') as mock_class:
-            instance_counter = {'count': 0}
-            def create_mock_instance(*args, **kwargs):
-                instance_counter['count'] += 1
-                mock_instance = MagicMock()
-                mock_instance._debug_id = f"test_dialog_{instance_counter['count']}"
-                mock_instance.isVisible.return_value = True
-                mock_instance.windowTitle.return_value = "Manual Offset"
-                mock_instance.finished = MagicMock()
-                mock_instance.rejected = MagicMock()
-                mock_instance.destroyed = MagicMock()
-                return mock_instance
-            mock_class.side_effect = create_mock_instance
-            yield mock_class
-
-    def test_singleton_creates_instance_on_first_call(self, mock_dialog_class):
-        """Test that singleton creates an instance on first call."""
-        mock_panel = MagicMock()
-        dialog1 = ManualOffsetDialogSingleton.get_dialog(mock_panel)
-        assert dialog1 is not None
-        assert mock_dialog_class.called
-        assert ManualOffsetDialogSingleton._instance is not None
-
-    def test_singleton_reuses_same_instance(self, mock_dialog_class):
-        """Test that singleton reuses the same instance on subsequent calls."""
-        mock_panel = MagicMock()
-        dialog1 = ManualOffsetDialogSingleton.get_dialog(mock_panel)
-        dialog2 = ManualOffsetDialogSingleton.get_dialog(mock_panel)
-        assert dialog1 is dialog2
-        assert mock_dialog_class.call_count == 1
-
-    @pytest.mark.skip(reason="Signal connection now deferred - dialog.finished.connect.call_args is None")
-    def test_singleton_cleanup_on_close(self, mock_dialog_class):
-        """Test that singleton properly cleans up when dialog is closed."""
-        mock_panel = MagicMock()
-        dialog = ManualOffsetDialogSingleton.get_dialog(mock_panel)
-        assert ManualOffsetDialogSingleton._instance is not None
-        close_callback = dialog.finished.connect.call_args[0][0]
-        close_callback()
-        assert ManualOffsetDialogSingleton._instance is None
-
-    @pytest.mark.skip(reason="Signal connection now deferred - dialog.finished.connect.call_args is None")
-    def test_singleton_recreates_after_cleanup(self, mock_dialog_class):
-        """Test that singleton can create new instance after cleanup."""
-        mock_panel = MagicMock()
-        dialog1 = ManualOffsetDialogSingleton.get_dialog(mock_panel)
-        close_callback = dialog1.finished.connect.call_args[0][0]
-        close_callback()
-        dialog2 = ManualOffsetDialogSingleton.get_dialog(mock_panel)
-        assert dialog1 is not dialog2
-        assert mock_dialog_class.call_count == 2
-
-    def test_get_current_dialog_returns_none_when_no_instance(self):
-        """Test get_current_dialog returns None when no instance exists."""
-        assert ManualOffsetDialogSingleton.get_current_dialog() is None
-
-    def test_get_current_dialog_returns_instance_when_exists(self, mock_dialog_class):
-        """Test get_current_dialog returns existing instance."""
-        mock_panel = MagicMock()
-        dialog = ManualOffsetDialogSingleton.get_dialog(mock_panel)
-        current = ManualOffsetDialogSingleton.get_current_dialog()
-        assert current is dialog
-
-    def test_reset_clears_instance(self, mock_dialog_class):
-        """Test reset() properly clears the singleton instance."""
-        mock_panel = MagicMock()
-        ManualOffsetDialogSingleton.get_dialog(mock_panel)
-        assert ManualOffsetDialogSingleton._instance is not None
-        ManualOffsetDialogSingleton.reset()
-        assert ManualOffsetDialogSingleton._instance is None
 
 
 @pytest.mark.unit
@@ -199,7 +120,8 @@ class TestUnifiedManualOffsetDialogMethods:
     def test_offset_clamping_logic(self):
         """Test real offset clamping logic."""
         def clamp_offset(offset: int, rom_size: int) -> int:
-            if rom_size <= 0: return 0
+            if rom_size <= 0:
+                return 0
             return max(0, min(offset, rom_size - 1))
         rom_size = 1024
         assert clamp_offset(-100, rom_size) == 0
@@ -222,9 +144,12 @@ class TestUnifiedManualOffsetDialogMethods:
 
 def is_valid_rom_data(data: Any) -> bool:
     """Helper function to validate ROM data."""
-    if data is None: return False
-    if not isinstance(data, (bytes, bytearray)): return False
-    if len(data) < 0x8000: return False # Minimum 32KB
+    if data is None:
+        return False
+    if not isinstance(data, (bytes, bytearray)):
+        return False
+    if len(data) < 0x8000:
+        return False  # Minimum 32KB
     return True
 
 
@@ -303,8 +228,8 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         panel.extraction_manager = MagicMock()
         return panel
 
-    def test_dialog_components_real_initialization(self, qtbot, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_dialog_components_real_initialization(self, qtbot, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         assert dialog.windowTitle() == "Manual Offset Browser"
@@ -320,8 +245,8 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         assert hasattr(dialog.browse_tab, 'get_current_offset')
         assert hasattr(dialog.browse_tab, 'set_offset')
 
-    def test_user_adjusts_slider_real_behavior(self, qtbot, wait_timeout, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_user_adjusts_slider_real_behavior(self, qtbot, wait_timeout, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         extraction_manager = MagicMock()
@@ -335,14 +260,14 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         initial_offset = browse_tab.get_current_offset()
         new_slider_value = position_slider.value() + 100
         position_slider.setValue(new_slider_value)
-        qtbot.wait(wait_timeout // 20)
+        qtbot.waitUntil(lambda: browse_tab.get_current_offset() == new_slider_value, timeout=500)
 
         new_offset = browse_tab.get_current_offset()
         assert new_offset != initial_offset
         assert new_offset == new_slider_value
 
-    def test_dialog_close_and_cleanup_behavior(self, qtbot, wait_timeout, safe_widget_factory_fixture):
-        dialog1 = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_dialog_close_and_cleanup_behavior(self, qtbot, wait_timeout, setup_managers):
+        dialog1 = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog1)
 
         dialog1.show()
@@ -350,17 +275,17 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         assert dialog1.isVisible()
 
         dialog1.close()
-        qtbot.wait(wait_timeout // 15)
+        qtbot.waitUntil(lambda: not dialog1.isVisible(), timeout=500)
         assert not dialog1.isVisible()
 
-        dialog2 = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+        dialog2 = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog2)
 
         assert id(dialog1) != id(dialog2)
         assert isinstance(dialog2, UnifiedManualOffsetDialog)
 
-    def test_sprite_history_real_functionality(self, qtbot, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_sprite_history_real_functionality(self, qtbot, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         extraction_manager = MagicMock()
@@ -385,8 +310,8 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
             assert current_count > initial_count
             initial_count = current_count
 
-    def test_dialog_error_recovery_real(self, qtbot, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_dialog_error_recovery_real(self, qtbot, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         extraction_manager = MagicMock()
@@ -402,10 +327,10 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         dialog.set_offset(0x250000)
         assert dialog.get_current_offset() == 0x250000
 
-    def test_multiple_dialogs_independent_behavior(self, qtbot, safe_widget_factory_fixture):
-        dialog1 = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
-        dialog2 = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
-        dialog3 = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_multiple_dialogs_independent_behavior(self, qtbot, setup_managers):
+        dialog1 = UnifiedManualOffsetDialog()
+        dialog2 = UnifiedManualOffsetDialog()
+        dialog3 = UnifiedManualOffsetDialog()
 
         qtbot.addWidget(dialog1)
         qtbot.addWidget(dialog2)
@@ -432,8 +357,8 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         assert dialog2.get_current_offset() == 0x150000
         assert dialog3.get_current_offset() == 0x200000
 
-    def test_ui_elements_real_qt_objects(self, qtbot, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_ui_elements_real_qt_objects(self, qtbot, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         browse_tab = dialog.browse_tab
@@ -458,8 +383,8 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         assert preview_widget is preview_widget2
         assert history_tab is history_tab2
 
-    def test_dialog_visibility_state_real(self, qtbot, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_dialog_visibility_state_real(self, qtbot, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         assert not dialog.isVisible()
@@ -476,8 +401,8 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         qtbot.waitUntil(lambda: dialog.isVisible(), timeout=1000)
         assert dialog.isVisible()
 
-    def test_rom_data_persistence_real(self, qtbot, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_rom_data_persistence_real(self, qtbot, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         rom_path = "/test/rom.sfc"
@@ -498,8 +423,8 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         assert browse_tab._rom_path == new_rom_path
         assert browse_tab._rom_size == new_rom_size
 
-    def test_real_signal_connections(self, qtbot, signal_timeout, wait_timeout, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_real_signal_connections(self, qtbot, signal_timeout, wait_timeout, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         extraction_manager = MagicMock()
@@ -515,12 +440,12 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         dialog.offset_changed.connect(lambda offset: received_offsets.append(offset))
 
         dialog.set_offset(0x300000)
-        qtbot.wait(wait_timeout // 30)
+        qtbot.waitUntil(lambda: 0x300000 in received_offsets, timeout=500)
 
         assert 0x300000 in received_offsets
 
-    def test_dialog_thread_affinity_real(self, qtbot, wait_timeout, safe_widget_factory_fixture):
-        dialog = safe_widget_factory_fixture(UnifiedManualOffsetDialog)
+    def test_dialog_thread_affinity_real(self, qtbot, wait_timeout, setup_managers):
+        dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)
 
         from PySide6.QtCore import QThread
@@ -537,6 +462,6 @@ class TestManualOffsetDialogIntegrationReal(QtTestCase):
         for i in range(10):
             offset = 0x200000 + (i * 0x1000)
             dialog.set_offset(offset)
-            qtbot.wait(wait_timeout // 200)
+            qtbot.waitUntil(lambda o=offset: dialog.get_current_offset() == o, timeout=500)
             current_offset = dialog.get_current_offset()
             assert current_offset == offset

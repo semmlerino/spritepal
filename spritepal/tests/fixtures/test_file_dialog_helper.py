@@ -29,7 +29,7 @@ pytestmark = [
     pytest.mark.ci_safe,
 ]
 
-class TestFileDialogHelper:
+class FileDialogHelper:
     """
     Helper for testing file dialogs with real QFileDialog components.
 
@@ -138,7 +138,7 @@ class TestFileDialogHelper:
             else:
                 raise AssertionError(f"Dialog {dialog_type}: Expected {key} not found in dialog config")
 
-class TestFileHelper:
+class FileHelper:
     """
     Helper for creating temporary test files for file dialog testing.
 
@@ -206,13 +206,13 @@ class TestFileHelper:
         self.cleanup()
 
 # Convenience functions for easy test usage
-def create_file_dialog_helper() -> TestFileDialogHelper:
+def create_file_dialog_helper() -> FileDialogHelper:
     """Create a new TestFileDialogHelper instance"""
-    return TestFileDialogHelper()
+    return FileDialogHelper()
 
-def create_file_helper() -> TestFileHelper:
+def create_file_helper() -> FileHelper:
     """Create a new TestFileHelper instance"""
-    return TestFileHelper()
+    return FileHelper()
 
 @contextmanager
 def file_dialog_responses(**responses):
@@ -223,7 +223,7 @@ def file_dialog_responses(**responses):
         with file_dialog_responses(open_file="/test/file.txt", save_file="/test/output.txt"):
             # Test code that triggers file dialogs
     """
-    helper = TestFileDialogHelper()
+    helper = FileDialogHelper()
 
     if "open_file" in responses:
         helper.set_open_file_response(responses["open_file"])

@@ -13,7 +13,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from core.monitoring import get_monitoring_manager
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
@@ -35,6 +34,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from typing_extensions import override
+
+from core.monitoring import get_monitoring_manager
 from utils.logging_config import get_logger
 
 

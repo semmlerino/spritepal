@@ -195,7 +195,10 @@ def configure_container(use_consolidated: bool = True) -> None:
         InjectionManagerProtocol,
         NavigationManagerProtocol,
         SessionManagerProtocol,
+        SettingsManagerProtocol,
     )
+    from utils.settings_manager import SettingsManager
+    # Register SessionManager, ExtractionManager, InjectionManager first
 
     if use_consolidated:
         # Register consolidated managers with adapters
@@ -229,6 +232,46 @@ def configure_container(use_consolidated: bool = True) -> None:
             InjectionManagerProtocol,
             lambda: _get_or_create_injection_manager()
         )
+
+    # Register SettingsManager
+    register_factory(
+        SettingsManagerProtocol,
+        lambda: SettingsManager(app_name="SpritePal", session_manager=inject(SessionManagerProtocol))
+    )
+
+    # Import ROMCache and its Protocol
+    from core.protocols.manager_protocols import ROMCacheProtocol
+    from utils.rom_cache import ROMCache
+
+    # Register ROMCache
+    register_factory(
+        ROMCacheProtocol,
+        lambda: ROMCache(settings_manager=inject(SettingsManagerProtocol))
+    )
+
+    # Import ROMExtractor and its Protocol
+    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
+
+    # Register ROMExtractor
+    register_factory(
+        ROMExtractorProtocol,
+        lambda: ROMExtractor(rom_cache=inject(ROMCacheProtocol))
+    )
+
+    # Import ManualOffsetDialogFactory
+    from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
+
+    # Register ManualOffsetDialogFactory
+    register_factory(
+        ManualOffsetDialogFactory,
+        lambda: ManualOffsetDialogFactory(
+            rom_cache=inject(ROMCacheProtocol),
+            settings_manager=inject(SettingsManagerProtocol),
+            extraction_manager=inject(ExtractionManagerProtocol),
+            rom_extractor=inject(ROMExtractorProtocol)
+        )
+    )
 
     # Navigation manager is always from core operations (if available)
     register_factory(

@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from core.hal_compression import HALCompressionError, HALCompressor
 from core.rom_injector import ROMHeader, ROMInjector
 

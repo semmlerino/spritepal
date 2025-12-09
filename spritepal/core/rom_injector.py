@@ -170,6 +170,12 @@ class ROMInjector(SpriteInjector):
         """
         logger.debug(f"Finding and decompressing sprite at offset 0x{offset:X}")
 
+        # Validate offset before any operations
+        if offset < 0:
+            raise ValueError(f"Invalid negative offset: {offset}")
+        if offset >= len(rom_data):
+            raise ValueError(f"Offset 0x{offset:X} exceeds ROM data size 0x{len(rom_data):X}")
+
         # Default size limit to prevent oversized decompression
         default_max_sprite_size = 32768  # 32KB - reasonable max for SNES sprites
 

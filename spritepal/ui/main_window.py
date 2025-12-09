@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 if TYPE_CHECKING:
     from core.controller import ExtractionController
     from core.managers.session_manager import SessionManager
+    from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 
 from PySide6.QtCore import Qt, Signal
 from typing_extensions import override
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent, QKeyEvent
 else:
     from PySide6.QtGui import QCloseEvent, QKeyEvent
-from core.managers import get_session_manager
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -30,6 +30,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from core.managers import get_session_manager
 from ui.dialogs import SettingsDialog, UserErrorDialog
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
@@ -78,7 +80,11 @@ class MainWindow(QMainWindow):
     extraction_completed = Signal(list)  # list of extracted files
     extraction_error_occurred = Signal(str)     # error message
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        settings_manager: SettingsManagerProtocol | None = None,
+        rom_cache: ROMCacheProtocol | None = None,
+    ) -> None:
         super().__init__()
         # Declare instance variables with type hints
         self._output_path: str
@@ -91,6 +97,16 @@ class MainWindow(QMainWindow):
         self.extraction_panel: ExtractionPanel
         self.sprite_preview: PreviewPanel
         self.palette_preview: PalettePreviewWidget
+
+        # Injected dependencies (with fallback to globals for backwards compatibility)
+        if settings_manager is None:
+            from utils.settings_manager import get_settings_manager
+            settings_manager = get_settings_manager()
+        if rom_cache is None:
+            from utils.rom_cache import get_rom_cache
+            rom_cache = get_rom_cache()
+        self.settings_manager = settings_manager
+        self.rom_cache = rom_cache
 
         # Manager instances
         self.menu_bar_manager: MenuBarManager
@@ -105,7 +121,7 @@ class MainWindow(QMainWindow):
         self._output_path = ""
         self._extracted_files = []
         self._controller = None  # Lazy initialization to break circular dependency
-        self.session_manager = get_session_manager()
+        self.session_manager = get_session_manager() # This still needs to be handled via DI
 
         self._setup_ui()
         self._setup_managers()  # This creates all UI widgets via managers
@@ -177,11 +193,11 @@ class MainWindow(QMainWindow):
         self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
         # ROM extraction tab (first tab, selected by default)
-        self.rom_extraction_panel = ROMExtractionPanel()
+        self.rom_extraction_panel = ROMExtractionPanel(parent=self)
         self.extraction_tabs.addTab(self.rom_extraction_panel, "ROM Extraction")
 
         # VRAM extraction tab
-        self.extraction_panel = ExtractionPanel()
+        self.extraction_panel = ExtractionPanel(settings_manager=self.settings_manager)
         self.extraction_tabs.addTab(self.extraction_panel, "VRAM Extraction")
 
         # Add tab navigation shortcuts
@@ -199,7 +215,7 @@ class MainWindow(QMainWindow):
         """Set up all UI managers"""
         # Create managers in dependency order
         self.menu_bar_manager = MenuBarManager(self, self)
-        self.status_bar_manager = StatusBarManager(self.status_bar)
+        self.status_bar_manager = StatusBarManager(self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         self.output_settings_manager = OutputSettingsManager(self, self)
         self.toolbar_manager = ToolbarManager(self, self)
         self.preview_coordinator = PreviewCoordinator(self.sprite_preview, self.palette_preview)
@@ -207,7 +223,7 @@ class MainWindow(QMainWindow):
         # Backward compatibility: expose preview_info for existing code/tests
         self.preview_info = self.preview_coordinator.preview_info
 
-        self.session_coordinator = SessionCoordinator(self, self.extraction_panel, self.output_settings_manager)
+        self.session_coordinator = SessionCoordinator(self, self.extraction_panel, self.output_settings_manager, settings_manager=self.settings_manager)
 
         # Tab coordinator needs several managers
         self.tab_coordinator = TabCoordinator(
@@ -290,14 +306,14 @@ class MainWindow(QMainWindow):
 
     def show_settings(self) -> None:
         """Show the settings dialog"""
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(self, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         dialog.settings_changed.connect(self._on_settings_changed)
         dialog.cache_cleared.connect(self._on_cache_cleared)
         dialog.exec()
 
     def show_cache_manager(self) -> None:
         """Show the cache manager dialog"""
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(self, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         if dialog.tab_widget:
             dialog.tab_widget.setCurrentIndex(1)  # Switch to cache tab
         dialog.settings_changed.connect(self._on_settings_changed)
@@ -306,42 +322,29 @@ class MainWindow(QMainWindow):
 
     def clear_all_caches(self) -> None:
         """Clear all ROM caches with confirmation"""
-        # Delayed import to minimize startup dependencies
-        from utils.rom_cache import get_rom_cache
+        rom_cache = self.rom_cache
+        try:
+            removed_count = rom_cache.clear_cache()
 
-        reply = QMessageBox.question(
-            self,
-            "Clear All Caches",
-            "Are you sure you want to clear all ROM caches?\n\n"
-            "This will remove all cached scan results and sprite locations.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
+            self.status_bar_manager.show_message(f"Cleared {removed_count} cache files")
 
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                rom_cache = get_rom_cache()
-                removed_count = rom_cache.clear_cache()
-
-                self.status_bar_manager.show_message(f"Cleared {removed_count} cache files")
-
-                QMessageBox.information(
-                    self,
-                    "Cache Cleared",
-                    f"Successfully removed {removed_count} cache files."
-                )
-            except (OSError, PermissionError) as e:
-                QMessageBox.critical(
-                    self,
-                    "File Error",
-                    f"Cannot access cache files: {e}"
-                )
-            except Exception as e:
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    f"Failed to clear cache: {e!s}"
-                )
+            QMessageBox.information(
+                self,
+                "Cache Cleared",
+                f"Successfully removed {removed_count} cache files."
+            )
+        except (OSError, PermissionError) as e:
+            QMessageBox.critical(
+                self,
+                "File Error",
+                f"Cannot access cache files: {e}"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to clear cache: {e!s}"
+            )
 
     # ToolbarActionsProtocol
     def on_extract_clicked(self) -> None:
@@ -583,16 +586,12 @@ class MainWindow(QMainWindow):
     def _on_settings_changed(self) -> None:
         """Handle settings change from settings dialog"""
         # Reload any settings that affect the main window
-        # Delayed imports to minimize main window startup dependencies
-        from utils.rom_cache import get_rom_cache
-        from utils.settings_manager import get_settings_manager
-
-        settings_manager = get_settings_manager()
+        settings_manager = self.settings_manager
         cache_enabled = settings_manager.get_cache_enabled()
         show_indicators = settings_manager.get("cache", "show_indicators", True)
 
         # Refresh ROM cache settings
-        rom_cache = get_rom_cache()
+        rom_cache = self.rom_cache
         rom_cache.refresh_settings()
 
         # Update or hide cache status indicators through manager
@@ -773,7 +772,7 @@ class MainWindow(QMainWindow):
             # Import here to avoid circular dependency at module level
             from core.controller import ExtractionController
             # MainWindow implements MainWindowProtocol interface
-            self._controller = ExtractionController(self)  # type: ignore[arg-type]
+            self._controller = ExtractionController(self, settings_manager=self.settings_manager)  # type: ignore[arg-type]
         return self._controller
 
     @controller.setter

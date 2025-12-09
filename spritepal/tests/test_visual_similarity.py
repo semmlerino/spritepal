@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from core.visual_similarity_search import SimilarityMatch, SpriteHash, VisualSimilarityEngine
 from PIL import Image
+
+from core.visual_similarity_search import SimilarityMatch, SpriteHash, VisualSimilarityEngine
 
 
 class TestVisualSimilarityEngine:

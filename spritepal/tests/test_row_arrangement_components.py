@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from PIL import Image
+
 from ui.row_arrangement import (
     # Systematic pytest markers applied based on test content analysis
     ArrangementManager,

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.styles.components import (
     get_button_style,
     get_dark_preview_style,

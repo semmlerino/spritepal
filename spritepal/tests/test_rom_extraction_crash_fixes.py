@@ -9,6 +9,7 @@ import tempfile
 from unittest.mock import Mock, patch
 
 import pytest
+
 from ui.injection_dialog import InjectionDialog
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 

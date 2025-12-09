@@ -52,10 +52,10 @@ sys.path.insert(0, str(current_dir))
 # Import real testing infrastructure
 from core.managers.registry import cleanup_managers, initialize_managers
 from tests.infrastructure import (
+    ApplicationFactory,
+    DataRepository,
     QtTestingFramework,
     RealManagerFixtureFactory,
-    TestApplicationFactory,
-    TestDataRepository,
     qt_widget_test,
     validate_qt_object_lifecycle,
 )
@@ -76,13 +76,13 @@ class TestRealMainWindowStateIntegration:
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
 
         # Initialize real manager factory
         self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
 
         # Initialize test data repository
-        self.test_data = TestDataRepository()
+        self.test_data = DataRepository()
 
         # Initialize Qt testing framework
         self.qt_framework = QtTestingFramework()
@@ -378,9 +378,9 @@ class TestRealMainWindowWorkflowIntegration:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
-        self.test_data = TestDataRepository()
+        self.test_data = DataRepository()
         initialize_managers(app_name="SpritePal-Test")
 
         yield
@@ -486,9 +486,9 @@ class TestBugDiscoveryRealVsMocked:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
-        self.test_data = TestDataRepository()
+        self.test_data = DataRepository()
         initialize_managers(app_name="SpritePal-Test")
 
         yield

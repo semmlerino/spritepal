@@ -29,7 +29,7 @@ from progressive_test_runner import ProgressiveTestRunner
 from regression_detector import RegressionDetector
 
 # Import our monitoring modules
-from test_health_dashboard import TestHealthMonitor, TestSuiteMetrics
+from test_health_dashboard import HealthMonitor, SuiteMetrics
 
 
 @dataclass
@@ -104,7 +104,7 @@ class FixVerificationOrchestrator:
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize monitoring components
-        self.health_monitor = TestHealthMonitor(test_dir)
+        self.health_monitor = HealthMonitor(test_dir)
         self.progressive_runner = ProgressiveTestRunner(self.project_root)
         self.regression_detector = RegressionDetector(self.scripts_dir / "history")
 
@@ -256,7 +256,7 @@ class FixVerificationOrchestrator:
         return report_file
 
     def _generate_final_report(self, session: FixVerificationSession,
-                              final_metrics: TestSuiteMetrics,
+                              final_metrics: SuiteMetrics,
                               final_file: Path) -> str:
         """Generate comprehensive final verification report."""
 
@@ -480,7 +480,7 @@ class FixVerificationOrchestrator:
         return "\n".join(lines)
 
     def _generate_context_recommendations(self, session: FixVerificationSession,
-                                        metrics: TestSuiteMetrics) -> list[str]:
+                                        metrics: SuiteMetrics) -> list[str]:
         """Generate context-aware recommendations based on fix category and results."""
 
         recommendations = []
@@ -530,7 +530,7 @@ class FixVerificationOrchestrator:
         return recommendations
 
     def _calculate_progress_metrics(self, session: FixVerificationSession,
-                                  current_metrics: TestSuiteMetrics) -> dict[str, Any]:
+                                  current_metrics: SuiteMetrics) -> dict[str, Any]:
         """Calculate detailed progress metrics for the session."""
 
         progress = {
@@ -566,7 +566,7 @@ class FixVerificationOrchestrator:
         return progress
 
     def _generate_fix_recommendations(self, session: FixVerificationSession,
-                                    baseline_metrics: TestSuiteMetrics) -> None:
+                                    baseline_metrics: SuiteMetrics) -> None:
         """Generate initial fix recommendations based on baseline metrics."""
 
         print("💡 Initial Fix Recommendations")

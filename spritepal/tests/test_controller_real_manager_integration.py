@@ -29,12 +29,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-
-# Skip entire module - QThread workers cause segfaults in offscreen mode
-pytest.skip(
-    "QThread workers cause segfaults during cleanup in Qt offscreen mode",
-    allow_module_level=True
-)
 from PySide6.QtTest import QSignalSpy
 
 # Add parent directory for imports
@@ -63,17 +57,19 @@ sys.path.insert(0, str(current_dir))
 # Import real testing infrastructure
 # Import real controller and managers (not mocked!)
 from core.controller import ExtractionController
+from core.di_container import inject
 from core.managers import (
     cleanup_managers,
     get_extraction_manager,
     get_session_manager,
     initialize_managers,
 )
+from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 from tests.infrastructure import (
+    ApplicationFactory,
+    DataRepository,
     QtTestingFramework,
     RealManagerFixtureFactory,
-    TestApplicationFactory,
-    TestDataRepository,
     qt_widget_test,
     validate_qt_object_lifecycle,
 )
@@ -92,13 +88,19 @@ class TestRealControllerManagerIntegration:
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
 
-        # Initialize real manager factory
+        # Initialize managers and DI container
+        initialize_managers(app_name="SpritePal-Test")
+
+        # Now retrieve settings_manager and rom_cache via DI
+        self.settings_manager = inject(SettingsManagerProtocol)
+        self.rom_cache = inject(ROMCacheProtocol)
+
         self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
 
         # Initialize test data repository
-        self.test_data = TestDataRepository()
+        self.test_data = DataRepository()
 
         # Initialize Qt testing framework
         self.qt_framework = QtTestingFramework()
@@ -122,7 +124,7 @@ class TestRealControllerManagerIntegration:
         # Initialize managers for real integration (vs get_extraction_manager mocks)
         initialize_managers(app_name="SpritePal-Test")
 
-        with qt_widget_test(MainWindow) as main_window:
+        with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
             # Create real controller with real managers
             controller = ExtractionController(main_window)
 
@@ -152,9 +154,7 @@ class TestRealControllerManagerIntegration:
         - Manager signal parameter type validation
         - Signal connection lifecycle management
         """
-        initialize_managers(app_name="SpritePal-Test")
-
-        with qt_widget_test(MainWindow) as main_window:
+        with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
             controller = ExtractionController(main_window)
 
             # Get real managers (vs mock manager fixtures)
@@ -209,11 +209,8 @@ class TestRealControllerManagerIntegration:
         - ExtractionManager + SessionManager state synchronization
         - Manager resource conflicts
         - Cross-manager signal chain coordination
-        - Manager lifecycle coordination bugs
         """
-        initialize_managers(app_name="SpritePal-Test")
-
-        with qt_widget_test(MainWindow) as main_window:
+        with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
             controller = ExtractionController(main_window)
 
             # Get real managers for coordination testing (vs isolated mocks)
@@ -264,7 +261,7 @@ class TestRealControllerManagerIntegration:
         with patch("ui.dialogs.user_error_dialog.UserErrorDialog.show_error") as mock_error_dialog:
             mock_error_dialog.return_value = None  # Non-blocking
 
-            with qt_widget_test(MainWindow) as main_window:
+            with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
                 controller = ExtractionController(main_window)
 
                 # ARCHITECTURAL DISCOVERY: extraction_failed is a METHOD, not a signal!
@@ -317,8 +314,7 @@ class TestRealControllerManagerIntegration:
         - Resource sharing conflicts during lifecycle transitions
         - Qt parent/child lifecycle synchronization
         """
-        # Test manager lifecycle without pre-initialization
-        with qt_widget_test(MainWindow) as main_window:
+        with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
 
             # Test controller creation before manager initialization
             # This could expose initialization order bugs
@@ -371,7 +367,7 @@ class TestRealControllerManagerIntegration:
         with patch("ui.dialogs.user_error_dialog.UserErrorDialog.show_error") as mock_error_dialog:
             mock_error_dialog.return_value = None  # Non-blocking
 
-            with qt_widget_test(MainWindow) as main_window:
+            with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
                 controller = ExtractionController(main_window)
 
                 # Get real managers for state testing
@@ -409,17 +405,19 @@ class TestRealControllerManagerIntegration:
                 assert extraction_manager is not None, "ExtractionManager should remain accessible"
                 assert session_manager is not None, "SessionManager should remain accessible"
 
-class TestRealControllerWorkerManagerChain:
-    """
-    Test the complete controller -> manager -> worker integration chain.
-    """
-
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_bug_discovery_infrastructure(self):
         """Set up real testing infrastructure."""
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
-        self.test_data = TestDataRepository()
+        self.test_data = DataRepository()
+
+        # Initialize managers and DI container
+        initialize_managers(app_name="SpritePal-Test")
+
+        # Now retrieve settings_manager and rom_cache via DI
+        self.settings_manager = inject(SettingsManagerProtocol)
+        self.rom_cache = inject(ROMCacheProtocol)
 
         yield
 
@@ -428,18 +426,7 @@ class TestRealControllerWorkerManagerChain:
         cleanup_managers()
 
     def test_real_full_integration_chain_vs_mocked_chain(self):
-        """
-        Test complete real integration chain: UI -> Controller -> Manager -> Worker.
-
-        EXPOSED BUGS MOCKS WOULD MISS:
-        - End-to-end signal propagation through all layers
-        - Resource coordination across the full stack
-        - Error propagation through complete chain
-        - State synchronization across all components
-        """
-        initialize_managers(app_name="SpritePal-Test")
-
-        with qt_widget_test(MainWindow) as main_window:
+        with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
             controller = ExtractionController(main_window)
 
             # Get real test data for full chain testing
@@ -505,9 +492,16 @@ class TestBugDiscoveryRealVsMockedManagers:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
-        self.test_data = TestDataRepository()
+        self.test_data = DataRepository()
+
+        # Initialize managers and DI container
+        initialize_managers(app_name="SpritePal-Test")
+
+        # Now retrieve settings_manager and rom_cache via DI
+        self.settings_manager = inject(SettingsManagerProtocol)
+        self.rom_cache = inject(ROMCacheProtocol)
 
         yield
 
@@ -522,7 +516,7 @@ class TestBugDiscoveryRealVsMockedManagers:
         REAL BUG DISCOVERED: get_extraction_manager() calls can fail if
         called before initialize_managers(), but mocks always return mock objects.
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
             # Test controller creation without manager initialization
             # This exposes the real timing dependency that mocks hide
 
@@ -553,13 +547,8 @@ class TestBugDiscoveryRealVsMockedManagers:
     def test_discovered_bug_manager_resource_conflicts(self):
         """
         Test that exposes manager resource conflict bugs.
-
-        REAL BUG DISCOVERED: Multiple managers might conflict when accessing
-        the same resources simultaneously.
         """
-        initialize_managers(app_name="SpritePal-Test")
-
-        with qt_widget_test(MainWindow) as main_window:
+        with qt_widget_test(MainWindow, settings_manager=self.settings_manager, rom_cache=self.rom_cache) as main_window:
             ExtractionController(main_window)
 
             # Get multiple managers that might conflict

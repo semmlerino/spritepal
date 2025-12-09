@@ -6,11 +6,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import QThread, Signal
+from typing_extensions import override
+
 from core.rom_injector import ROMInjector
 from core.rom_validator import ROMValidator
 from core.sprite_validator import SpriteValidator
-from PySide6.QtCore import QThread, Signal
-from typing_extensions import override
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

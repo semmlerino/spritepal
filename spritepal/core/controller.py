@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         InjectionManagerProtocol,
         MainWindowProtocol,
         SessionManagerProtocol,
+        SettingsManagerProtocol,
     )
 
 from core.console_error_handler import ConsoleErrorHandler
@@ -44,7 +45,8 @@ from utils.file_validator import FileValidator
 from utils.image_utils import pil_to_qpixmap
 from utils.logging_config import get_logger
 from utils.preview_generator import create_vram_preview_request, get_preview_generator
-from utils.settings_manager import get_settings_manager
+
+# from utils.settings_manager import get_settings_manager # Removed due to DI
 
 
 # Type definitions
@@ -111,6 +113,7 @@ class ExtractionController(QObject):
         extraction_manager: ExtractionManagerProtocol | None = None,
         session_manager: SessionManagerProtocol | None = None,
         injection_manager: InjectionManagerProtocol | None = None,
+        settings_manager: SettingsManagerProtocol | None = None,
     ) -> None:
         super().__init__()
         self.main_window: MainWindowProtocol = main_window
@@ -120,6 +123,14 @@ class ExtractionController(QObject):
         self.session_manager = session_manager or get_session_manager()
         self.extraction_manager = extraction_manager or get_extraction_manager()
         self.injection_manager = injection_manager or get_injection_manager()
+
+        # Inject settings manager or use fallback
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
 
         # Workers still managed locally (thin wrappers)
         self.worker: VRAMExtractionWorker | None = None
@@ -627,7 +638,7 @@ class ExtractionController(QObject):
 
     def _on_cache_operation_started(self, operation: str, cache_type: str) -> None:
         """Handle cache operation started notification"""
-        settings_manager = get_settings_manager()
+        settings_manager = self.settings_manager
 
         # Only show if indicators are enabled
         if settings_manager.get("cache", "show_indicators", True):
@@ -637,7 +648,7 @@ class ExtractionController(QObject):
 
     def _on_cache_hit(self, cache_type: str, time_saved: float) -> None:
         """Handle cache hit notification"""
-        settings_manager = get_settings_manager()
+        settings_manager = self.settings_manager
 
         # Hide cache operation badge since operation is complete
         self.main_window.hide_cache_operation_badge()
@@ -659,7 +670,7 @@ class ExtractionController(QObject):
 
     def _on_cache_saved(self, cache_type: str, count: int) -> None:
         """Handle cache saved notification"""
-        settings_manager = get_settings_manager()
+        settings_manager = self.settings_manager
 
         # Hide cache operation badge since operation is complete
         self.main_window.hide_cache_operation_badge()

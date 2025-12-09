@@ -51,13 +51,6 @@ sys.modules['ui.dialogs.user_error_dialog'] = MagicMock(
     UserErrorDialog=MockUserErrorDialog
 )
 
-# Also patch the unified dialog components
-sys.modules['ui.dialogs'] = MagicMock(
-    manual_offset_unified_integrated=sys.modules['ui.dialogs.manual_offset_unified_integrated'],
-    settings_dialog=sys.modules['ui.dialogs.settings_dialog'],
-    grid_arrangement_dialog=sys.modules['ui.dialogs.grid_arrangement_dialog'],
-    row_arrangement_dialog=sys.modules['ui.dialogs.row_arrangement_dialog'],
-    advanced_search_dialog=sys.modules['ui.dialogs.advanced_search_dialog'],
-    resume_scan_dialog=sys.modules['ui.dialogs.resume_scan_dialog'],
-    user_error_dialog=sys.modules['ui.dialogs.user_error_dialog'],
-)
+# Note: We no longer patch ui.dialogs itself as a MagicMock since that breaks
+# imports of other dialogs like monitoring_dashboard. Individual module patches
+# above are sufficient for the tests that need them.

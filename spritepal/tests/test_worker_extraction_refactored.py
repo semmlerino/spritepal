@@ -16,9 +16,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from core.workers.extraction import ROMExtractionWorker, VRAMExtractionWorker
 from PIL import Image
 from PySide6.QtTest import QSignalSpy
+
+from core.workers.extraction import ROMExtractionWorker, VRAMExtractionWorker
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: QApplication management, Real Qt components

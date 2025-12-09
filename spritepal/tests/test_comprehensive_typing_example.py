@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from PySide6.QtWidgets import QApplication
+
     from tests.infrastructure.test_protocols import (
         MockExtractionManagerProtocol,
         MockMainWindowProtocol,

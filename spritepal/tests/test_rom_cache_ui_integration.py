@@ -11,12 +11,12 @@ import time
 from unittest.mock import patch
 
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel
 
 # Managers are handled by conftest.py
 from core.rom_extractor import ROMExtractor
 from core.rom_injector import SpritePointer
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel
 from ui.dialogs.resume_scan_dialog import ResumeScanDialog
 from ui.rom_extraction.widgets.rom_file_widget import ROMFileWidget
 from ui.rom_extraction.widgets.sprite_selector_widget import (
@@ -300,9 +300,7 @@ class TestSpriteScanWorkerCacheIntegration:
 
         # Wait up to 20 seconds for completion
         start_time = time.time()
-        while not finished and (time.time() - start_time) < 20:
-            qtbot.wait(100)
-
+        qtbot.waitUntil(lambda: finished, timeout=20000)
         elapsed = time.time() - start_time
         print(f"Elapsed time: {elapsed:.1f}s, finished: {finished}, last_progress: {last_progress}%")
 
@@ -357,9 +355,7 @@ class TestSpriteScanWorkerCacheIntegration:
             worker.start()
 
             # Wait up to 30 seconds
-            start_time = time.time()
-            while not finished and (time.time() - start_time) < 30:
-                qtbot.wait(500)
+            qtbot.waitUntil(lambda: finished, timeout=30000)
 
             assert finished, f"Worker did not finish. Cache messages: {cache_msgs}"
             assert any("Resuming from" in msg for msg in cache_msgs)
@@ -406,9 +402,7 @@ class TestSpriteScanWorkerCacheIntegration:
             worker.start()
 
             # Wait up to 30 seconds
-            start_time = time.time()
-            while not finished and (time.time() - start_time) < 30:
-                qtbot.wait(500)
+            qtbot.waitUntil(lambda: finished, timeout=30000)
 
             assert finished, f"Worker did not finish. Last message: {last_msg}"
 
@@ -458,13 +452,9 @@ class TestSpriteScanWorkerCacheIntegration:
 
         worker.finished.connect(on_finished)
 
-        start_time = time.time()
-        while not finished and (time.time() - start_time) < 10:
-            qtbot.wait(100)
-            # If we've seen enough progress saves, that's sufficient for this test
-            # Reduced expectation since synthetic test ROM has mostly invalid data
-            if len(save_messages) >= 2:  # At least 20% progress is sufficient
-                break
+        # Wait for either finished OR enough save messages (at least 20% progress)
+        # Reduced expectation since synthetic test ROM has mostly invalid data
+        qtbot.waitUntil(lambda: finished or len(save_messages) >= 2, timeout=10000)
 
         if not finished and len(save_messages) < 2:
             print(f"Worker timed out. Save messages: {save_messages}")

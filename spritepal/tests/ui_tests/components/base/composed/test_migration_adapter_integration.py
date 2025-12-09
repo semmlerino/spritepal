@@ -63,6 +63,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.components.base.composed.migration_adapter import (
     DialogBaseMigrationAdapter as ComposedDialogBase,
 )
@@ -91,7 +92,7 @@ TEST_BUTTON_TEXT = "Test Button"
 PERFORMANCE_THRESHOLD_MS = 100
 MEMORY_THRESHOLD_MB = 10
 
-class TestDialogBase:
+class DialogBaseTestHelper:
     """Base class for dialog subclasses used in testing."""
 
     def __init__(self, dialog_class: type, **kwargs):

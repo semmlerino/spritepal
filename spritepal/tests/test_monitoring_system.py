@@ -5,7 +5,7 @@ Tests all components of the continuous monitoring system including:
 - Performance monitoring and metrics collection
 - Error tracking and categorization  
 - Usage analytics and workflow tracking
-- Health monitoring and system metrics
+- Health monitoring (system resources, cache effectiveness)
 - Settings integration and configuration
 - Dashboard functionality
 - Export and reporting capabilities
@@ -13,31 +13,42 @@ Tests all components of the continuous monitoring system including:
 
 import json
 import os
-import pytest
+
+# Test imports
+import sys
 import tempfile
 import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
+import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
-# Test imports
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.managers.monitoring_manager import (
-    MonitoringManager, PerformanceCollector, ErrorTracker, 
-    UsageAnalytics, HealthMonitor, PerformanceMetric, 
-    ErrorEvent, UsageEvent, HealthMetric
-)
-from core.monitoring import (
-    monitor_operation, monitor_performance, track_feature_usage,
-    WorkflowTracker, MonitoringMixin, get_monitoring_manager
+    ErrorEvent,
+    ErrorTracker,
+    HealthMetric,
+    HealthMonitor,
+    MonitoringManager,
+    PerformanceCollector,
+    PerformanceMetric,
+    UsageAnalytics,
+    UsageEvent,
 )
 from core.managers.monitoring_settings import MonitoringSettings
+from core.monitoring import (
+    MonitoringMixin,
+    WorkflowTracker,
+    get_monitoring_manager,
+    monitor_operation,
+    monitor_performance,
+    track_feature_usage,
+)
 from ui.dialogs.monitoring_dashboard import MonitoringDashboard
 
 
@@ -237,7 +248,7 @@ class TestHealthMonitor:
         assert metric.value == 25.5
         assert metric.unit == "%"
     
-    @patch('psutil.Process')
+    @patch('core.managers.monitoring_manager.psutil.Process')
     def test_current_health(self, mock_process):
         """Test current health status."""
         # Mock psutil process
@@ -246,11 +257,15 @@ class TestHealthMonitor:
         mock_proc.memory_info.return_value = Mock(rss=100 * 1024 * 1024)  # 100MB
         mock_proc.memory_percent.return_value = 5.0
         mock_proc.num_threads.return_value = 10
+        mock_proc.num_fds.return_value = 100  # Fix comparison failure
         mock_process.return_value = mock_proc
         
         monitor = HealthMonitor()
         health = monitor.get_current_health()
         
+        if "error" in health:
+            pytest.fail(f"HealthMonitor returned error: {health['error']}")
+
         assert health["cpu_percent"] == 15.0
         assert health["memory_mb"] == 100.0
         assert health["thread_count"] == 10
@@ -273,10 +288,19 @@ class TestMonitoringManager:
     """Test the main monitoring manager."""
     
     @pytest.fixture
-    def monitoring_manager(self, qtbot):
+    def mock_settings_manager(self):
+        """Create a mock settings manager."""
+        mock = Mock()
+        # Default settings
+        mock.get.side_effect = lambda cat, key, default: default
+        return mock
+
+    @pytest.fixture
+    def monitoring_manager(self, qtbot, mock_settings_manager):
         """Create a monitoring manager for testing."""
-        manager = MonitoringManager()
-        qtbot.addWidget(manager)  # For Qt cleanup
+        # Inject settings manager explicitly to avoid dependency injection issues
+        manager = MonitoringManager(settings_manager=mock_settings_manager)
+        # qtbot.addWidget(manager)  # MonitoringManager is not a QWidget
         yield manager
         manager.cleanup()
     
@@ -361,6 +385,12 @@ class TestMonitoringDecorators:
     def test_monitor_operation_decorator(self, mock_get_manager):
         """Test the @monitor_operation decorator."""
         mock_manager = Mock()
+        # Make monitor_operation a context manager
+        mock_context = MagicMock()
+        mock_context.__enter__.return_value = None
+        mock_context.__exit__.return_value = None
+        mock_manager.monitor_operation.return_value = mock_context
+        
         mock_get_manager.return_value = mock_manager
         
         @monitor_operation("test_operation")
@@ -409,7 +439,16 @@ class TestMonitoringDecorators:
             def __init__(self):
                 self.init_monitoring("test_widget")
         
-        with patch('core.monitoring.get_monitoring_manager'):
+        with patch('core.monitoring.get_monitoring_manager') as mock_get_manager:
+            mock_manager = Mock()
+            # Make monitor_operation a context manager
+            mock_context = MagicMock()
+            mock_context.__enter__.return_value = None
+            mock_context.__exit__.return_value = None
+            mock_manager.monitor_operation.return_value = mock_context
+            
+            mock_get_manager.return_value = mock_manager
+
             widget = TestWidget()
             assert widget._component_name == "test_widget"
             
@@ -516,19 +555,18 @@ class TestIntegrationScenarios:
     @pytest.fixture
     def integrated_system(self, qtbot):
         """Set up an integrated monitoring system."""
-        # Mock settings manager
-        with patch('core.managers.monitoring_manager.get_settings_manager') as mock_settings:
-            mock_settings_manager = Mock()
-            mock_settings_manager.get.side_effect = lambda cat, key, default: default
-            mock_settings.return_value = mock_settings_manager
-            
-            # Create monitoring manager
-            manager = MonitoringManager()
-            qtbot.addWidget(manager)
-            
+        # Create mock settings manager
+        mock_settings_manager = Mock()
+        mock_settings_manager.get.side_effect = lambda cat, key, default: default
+        
+        # Create monitoring manager with injected settings
+        manager = MonitoringManager(settings_manager=mock_settings_manager)
+        
+        # Patch global get_monitoring_manager to return our test instance
+        with patch('core.monitoring.get_monitoring_manager', return_value=manager):
             yield manager, mock_settings_manager
-            
-            manager.cleanup()
+        
+        manager.cleanup()
     
     def test_rom_loading_scenario(self, integrated_system):
         """Test complete ROM loading monitoring scenario."""
@@ -557,7 +595,7 @@ class TestIntegrationScenarios:
             
         except Exception as e:
             workflow.fail(str(e))
-            manager.track_error("ROMLoadingError", str(e), "rom_loading")
+            # manager.track_error("ROMLoadingError", str(e), "rom_loading") # Redundant
         
         # Verify monitoring data was collected
         rom_stats = manager.get_performance_stats("load_rom_data")
@@ -581,8 +619,8 @@ class TestIntegrationScenarios:
                         # Succeed on third attempt
                         time.sleep(0.001)
                         
-            except ValueError as e:
-                manager.track_error("ExtractionError", str(e), f"extraction_attempt_{attempt}")
+            except ValueError:
+                pass # manager.track_error("ExtractionError", str(e), f"extraction_attempt_{attempt}") # Redundant, monitor_operation catches it
         
         # Track successful recovery
         manager.track_feature_usage("extraction", "recovery_success", True, context={"attempts": 3})

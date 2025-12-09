@@ -8,6 +8,7 @@ import os
 import tempfile
 
 import pytest
+
 from core.rom_palette_extractor import ROMPaletteExtractor
 
 # Systematic pytest markers applied based on test content analysis

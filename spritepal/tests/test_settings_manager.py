@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from utils.settings_manager import SettingsManager, get_settings_manager
 
 # Systematic pytest markers applied based on test content analysis

@@ -55,6 +55,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -206,9 +207,14 @@ class FullscreenSpriteViewer(QWidget):
         self.cursor_timer = QTimer(self)  # Parent ensures cleanup
         self.cursor_timer.setSingleShot(True)
         weak_self = weakref.ref(self)
-        self.cursor_timer.timeout.connect(
-            lambda: weak_self() and weak_self().setCursor(Qt.CursorShape.BlankCursor)
-        )
+
+        def hide_cursor() -> None:
+            """Hide cursor if viewer still exists."""
+            viewer = weak_self()
+            if viewer is not None:
+                viewer.setCursor(Qt.CursorShape.BlankCursor)
+
+        self.cursor_timer.timeout.connect(hide_cursor)
         self.cursor_timer.start(3000)
 
     def set_sprite_data(self, sprites_data: list[dict[str, Any]], current_offset: int,

@@ -9,10 +9,11 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 import pytest
-from core.managers.base_manager import BaseManager
-from core.workers.extraction import ROMExtractionWorker, VRAMExtractionWorker
 from PIL import Image
 from PySide6.QtTest import QSignalSpy
+
+from core.managers.base_manager import BaseManager
+from core.workers.extraction import ROMExtractionWorker, VRAMExtractionWorker
 
 # Serial execution required: QApplication management
 pytestmark = [

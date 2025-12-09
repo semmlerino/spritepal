@@ -16,7 +16,7 @@ from unittest.mock import patch
 from PySide6.QtGui import QColor
 
 # Only import ThreadSafeTestImage, never QPixmap in worker threads
-from thread_safe_test_image import TestImagePool, ThreadSafeTestImage
+from thread_safe_test_image import ImagePool, ThreadSafeTestImage
 
 
 def demonstrate_thread_safe_image_creation():
@@ -75,7 +75,7 @@ def demonstrate_image_pool_performance():
     no_pool_time = time.time() - start_time
 
     # Test with pool
-    pool = TestImagePool()
+    pool = ImagePool()
     start_time = time.time()
     for i in range(20):
         image = pool.get_test_image(100, 100)

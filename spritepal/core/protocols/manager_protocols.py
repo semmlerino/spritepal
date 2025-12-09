@@ -17,32 +17,24 @@ class ExtractionManagerProtocol(Protocol):
 
     def extract_from_rom(
         self,
-        rom_path: Path,
+        rom_path: str,
         offset: int,
-        size: int | None = None
-    ) -> list[Any]:
+        output_base: str,
+        sprite_name: str,
+        cgram_path: str | None = None
+    ) -> list[str]:
         """
         Extract sprites from ROM at given offset.
 
         Args:
             rom_path: Path to ROM file
             offset: Starting offset in ROM
-            size: Optional size to extract
+            output_base: Base name for output files
+            sprite_name: Name of the sprite being extracted
+            cgram_path: Optional path to CGRAM palette file
 
         Returns:
-            List of extracted sprite data
-        """
-        ...
-
-    def get_rom_header(self, rom_path: Path) -> dict[str, Any]:
-        """
-        Get ROM header information.
-
-        Args:
-            rom_path: Path to ROM file
-
-        Returns:
-            Dictionary with header information
+            List of output file paths
         """
         ...
 
@@ -70,27 +62,32 @@ class ExtractionManagerProtocol(Protocol):
         """
         ...
 
-    def validate_rom(self, rom_path: Path) -> bool:
-        """
-        Validate if file is a valid ROM.
-
-        Args:
-            rom_path: Path to ROM file
-
-        Returns:
-            True if valid ROM
-        """
-        ...
-
-    def validate_extraction_params(self, params: dict[str, Any]) -> None:
+    def validate_extraction_params(self, params: dict[str, Any]) -> bool:
         """
         Validate extraction parameters.
 
         Args:
             params: Dictionary of extraction parameters
 
+        Returns:
+            True if parameters are valid
+
         Raises:
             ValueError: If parameters are invalid
+        """
+        ...
+
+    def get_rom_extractor(self) -> Any:
+        """
+        Get the ROM extractor instance for advanced operations.
+
+        Returns:
+            ROMExtractor instance
+
+        Note:
+            This method provides access to the underlying ROM extractor
+            for UI components that need direct access to ROM operations.
+            Consider using the manager methods when possible.
         """
         ...
 
@@ -262,6 +259,15 @@ class SessionManagerProtocol(Protocol):
         """Clear current session data."""
         ...
 
+    def update_session_data(self, data: dict[str, Any]) -> None:
+        """
+        Update multiple session values at once.
+
+        Args:
+            data: Dictionary of session data to update
+        """
+        ...
+
     def get(self, category: str, key: str, default: Any = None) -> Any:
         """
         Get a setting value.
@@ -368,52 +374,187 @@ class RegistryManagerProtocol(Protocol):
         """
         ...
 
-class CacheManagerProtocol(Protocol):
-    """Protocol for cache manager."""
+class SettingsManagerProtocol(Protocol):
+    """Protocol for the Settings Manager."""
 
-    def get(self, key: str) -> Any | None:
-        """
-        Get cached value.
+    app_name: str
 
-        Args:
-            key: Cache key
-
-        Returns:
-            Cached value or None
-        """
+    def save_settings(self) -> None:
+        """Save settings to file."""
         ...
 
-    def put(self, key: str, value: Any, ttl: int | None = None) -> None:
-        """
-        Store value in cache.
-
-        Args:
-            key: Cache key
-            value: Value to cache
-            ttl: Optional time-to-live in seconds
-        """
+    def save(self) -> None:
+        """Save settings to file (alias for save_settings)."""
         ...
 
-    def invalidate(self, key: str) -> None:
-        """
-        Invalidate cache entry.
-
-        Args:
-            key: Cache key
-        """
+    def get(self, category: str, key: str, default: Any = None) -> Any:
+        """Get a setting value."""
         ...
 
-    def clear(self) -> None:
-        """Clear all cache entries."""
+    def get_value(self, category: str, key: str, default: Any = None) -> Any:
+        """Get a setting value (alias for get method)."""
         ...
 
-    def get_stats(self) -> dict[str, Any]:
-        """
-        Get cache statistics.
+    def set(self, category: str, key: str, value: Any) -> None:
+        """Set a setting value."""
+        ...
 
-        Returns:
-            Dictionary with cache stats
-        """
+    def set_value(self, category: str, key: str, value: Any) -> None:
+        """Set a setting value (alias for set method)."""
+        ...
+
+    def get_session_data(self) -> dict[str, Any]:
+        """Get all session data."""
+        ...
+
+    def save_session_data(self, session_data: dict[str, Any]) -> None:
+        """Save session data."""
+        ...
+
+    def get_ui_data(self) -> dict[str, Any]:
+        """Get UI settings."""
+        ...
+
+    def save_ui_data(self, ui_data: dict[str, Any]) -> None:
+        """Save UI settings."""
+        ...
+
+    def validate_file_paths(self) -> dict[str, str]:
+        """Validate and return existing file paths from session."""
+        ...
+
+    def has_valid_session(self) -> bool:
+        """Check if there's a valid session to restore."""
+        ...
+
+    def clear_session(self) -> None:
+        """Clear session data."""
+        ...
+
+    def get_default_directory(self) -> str:
+        """Get the default directory for file operations."""
+        ...
+
+    def set_last_used_directory(self, directory: str) -> None:
+        """Set the last used directory."""
+        ...
+
+    def get_cache_settings(self) -> dict[str, Any]:
+        """Get all cache settings."""
+        ...
+
+    def set_cache_enabled(self, enabled: bool) -> None:
+        """Enable or disable caching."""
+        ...
+
+    def get_cache_enabled(self) -> bool:
+        """Check if caching is enabled."""
+        ...
+
+    def set_cache_location(self, location: str) -> None:
+        """Set custom cache location."""
+        ...
+
+    def get_cache_location(self) -> str:
+        """Get custom cache location (empty string means default)."""
+        ...
+
+    def get_cache_max_size_mb(self) -> int:
+        """Get maximum cache size in MB."""
+        ...
+
+    def set_cache_max_size_mb(self, size_mb: int) -> None:
+        """Set maximum cache size in MB."""
+        ...
+
+    def get_cache_expiration_days(self) -> int:
+        """Get cache expiration in days."""
+        ...
+
+    def set_cache_expiration_days(self, days: int) -> None:
+        """Set cache expiration in days."""
+        ...
+
+
+class ROMExtractorProtocol(Protocol):
+    """Protocol for the ROM extractor."""
+
+    rom_injector: Any  # ROMInjector instance for compression/decompression operations
+
+
+class ROMCacheProtocol(Protocol):
+    """Protocol for the ROM cache."""
+
+    @property
+    def cache_enabled(self) -> bool:
+        """Get whether caching is enabled."""
+        ...
+
+    def save_partial_scan_results(self, rom_path: str, scan_params: dict[str, int],
+                                 found_sprites: list[dict[str, Any]],
+                                 current_offset: int, completed: bool = False) -> bool:
+        """Save partial scan results for incremental progress."""
+        ...
+
+    def get_partial_scan_results(self, rom_path: str, scan_params: dict[str, int]) -> dict[str, Any] | None:
+        """Get partial scan results for resuming."""
+        ...
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Get cache statistics with error handling."""
+        ...
+
+    def clear_cache(self, older_than_days: int | None = None) -> int:
+        """Clear cache files and hash cache with error handling."""
+        ...
+
+    def get_sprite_locations(self, rom_path: str) -> dict[str, Any] | None:
+        """Get cached sprite locations for ROM."""
+        ...
+
+    def save_sprite_locations(self, rom_path: str, sprite_locations: dict[str, Any],
+                            rom_header: dict[str, Any] | None = None) -> bool:
+        """Save sprite locations to cache."""
+        ...
+
+    def get_rom_info(self, rom_path: str) -> dict[str, Any] | None:
+        """Get cached ROM information (header, etc.)."""
+        ...
+
+    def save_rom_info(self, rom_path: str, rom_info: dict[str, Any]) -> bool:
+        """Save ROM information to cache."""
+        ...
+
+    def clear_scan_progress_cache(self, rom_path: str | None = None,
+                                 scan_params: dict[str, int] | None = None) -> int:
+        """Clear scan progress caches."""
+        ...
+
+    def clear_preview_cache(self, rom_path: str | None = None) -> int:
+        """Clear preview data caches."""
+        ...
+
+    def save_preview_data(self, rom_path: str, offset: int, tile_data: bytes,
+                         width: int, height: int, params: dict[str, Any] | None = None) -> bool:
+        """Save preview tile data to cache with compression."""
+        ...
+
+    def get_preview_data(self, rom_path: str, offset: int,
+                        params: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        """Get cached preview data for ROM and offset."""
+        ...
+
+    def save_preview_batch(self, rom_path: str, preview_data_dict: dict[int, dict[str, Any]]) -> bool:
+        """Save multiple preview data entries in batch for efficiency."""
+        ...
+
+    def get_offset_suggestions(self, rom_path: str, current_offset: int | None = None,
+                              limit: int = 10) -> list[dict[str, Any]]:
+        """Get offset suggestions based on cached scan results and preview data."""
+        ...
+
+    def refresh_settings(self) -> None:
+        """Refresh cache settings from settings manager."""
         ...
 
 

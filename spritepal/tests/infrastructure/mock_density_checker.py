@@ -296,7 +296,7 @@ def main() -> int:
         print(f"Mock operations: {stats['total_mock_operations']}")
         print(f"Real operations: {stats['total_real_operations']}")
         print(f"Overall density: {stats['overall_density']:.4f}")
-        print(f"Target density: 0.032")
+        print("Target density: 0.032")
         return 0
 
     success = check_and_report(args.directory, args.threshold)

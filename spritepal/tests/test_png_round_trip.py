@@ -8,9 +8,10 @@ import os
 import tempfile
 
 import pytest
+from PIL import Image
+
 from core.injector import SpriteInjector, encode_4bpp_tile
 from core.rom_extractor import ROMExtractor
-from PIL import Image
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [

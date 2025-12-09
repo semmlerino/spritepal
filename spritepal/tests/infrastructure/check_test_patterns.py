@@ -139,7 +139,7 @@ def main() -> int:
             print(f"File not found: {file_path}", file=sys.stderr)
             continue
 
-        if not file_path.suffix == '.py':
+        if file_path.suffix != '.py':
             continue
 
         issues = check_file(file_path)

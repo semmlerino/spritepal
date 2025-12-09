@@ -20,7 +20,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytest
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QColor, QImage
-from tests.infrastructure.thread_safe_test_image import TestImagePool, ThreadSafeTestImage
+
+from tests.infrastructure.thread_safe_test_image import ImagePool, ThreadSafeTestImage
 
 pytestmark = [
     pytest.mark.headless,
@@ -220,7 +221,7 @@ class TestTestImagePool:
 
     def test_pool_get_and_return(self):
         """Test basic pool get and return operations."""
-        pool = TestImagePool()
+        pool = ImagePool()
 
         # Get image from empty pool (creates new)
         image1 = pool.get_test_image(100, 100)
@@ -239,7 +240,7 @@ class TestTestImagePool:
 
     def test_pool_size_matching(self):
         """Test pool returns matching size images."""
-        pool = TestImagePool()
+        pool = ImagePool()
 
         # Create images of different sizes
         image1 = pool.get_test_image(100, 100)
@@ -256,7 +257,7 @@ class TestTestImagePool:
 
     def test_pool_creates_new_when_no_match(self):
         """Test pool creates new image when no size match."""
-        pool = TestImagePool()
+        pool = ImagePool()
 
         # Add 100x100 image to pool
         image1 = pool.get_test_image(100, 100)
@@ -270,7 +271,7 @@ class TestTestImagePool:
 
     def test_pool_size_limit(self):
         """Test pool respects size limit."""
-        pool = TestImagePool()
+        pool = ImagePool()
 
         # Add many images (more than limit of 10)
         images = []
@@ -287,7 +288,7 @@ class TestTestImagePool:
 
     def test_pool_clear(self):
         """Test pool clear functionality."""
-        pool = TestImagePool()
+        pool = ImagePool()
 
         # Add some images with different dimensions to prevent reuse
         images = []
@@ -307,7 +308,7 @@ class TestTestImagePool:
 
     def test_pool_reset_on_retrieval(self):
         """Test that images are reset when retrieved from pool."""
-        pool = TestImagePool()
+        pool = ImagePool()
 
         # Create image and fill with color
         image = pool.get_test_image(50, 50)
@@ -444,7 +445,7 @@ class TestPerformance:
         no_pool_time = time.time() - start_time
 
         # Test with pool
-        pool = TestImagePool()
+        pool = ImagePool()
         start_time = time.time()
         for _ in range(50):
             image = pool.get_test_image(100, 100)

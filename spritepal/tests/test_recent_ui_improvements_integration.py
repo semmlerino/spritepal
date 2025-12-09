@@ -19,9 +19,6 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
-
-# Import SpritePal components
-from launch_spritepal import SpritePalApp
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtTest import QSignalSpy
@@ -30,6 +27,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QWidget,
 )
+
+# Import SpritePal components
+from launch_spritepal import SpritePalApp
 from ui.main_window import MainWindow
 from ui.styles.components import get_button_style, get_dark_preview_style
 from ui.styles.theme import COLORS, get_theme_style
@@ -217,7 +217,7 @@ class TestManualOffsetDialogSignalIntegration:
                     dialog.browse_tab.set_offset(test_offset)
 
                     # Wait for signal emission
-                    qtbot.wait(100)  # Allow signal processing
+                    qtbot.waitUntil(lambda: len(spy) > 0, timeout=500)
 
                     # Test that signal was emitted
                     assert len(spy) > 0, "offset_changed signal should have been emitted"
@@ -253,7 +253,7 @@ class TestManualOffsetDialogSignalIntegration:
                 dialog.sprite_found.emit(test_offset, test_sprite_name)
 
                 # Wait for signal processing
-                qtbot.wait(50)
+                qtbot.waitUntil(lambda: len(spy) > 0, timeout=500)
 
                 # Test that signal was emitted
                 assert len(spy) > 0, "sprite_found signal should have been emitted"
@@ -440,7 +440,8 @@ class TestButtonStylingWithGradients:
 
             # Test hover simulation (enter/leave events)
             button.enterEvent(None)
-            qtbot.wait(50)  # Allow hover state processing
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()  # Allow hover state processing
             button.leaveEvent(None)
 
     @pytest.mark.gui
@@ -461,11 +462,12 @@ class TestButtonStylingWithGradients:
 
         # Simulate mouse enter (hover start)
         button.enterEvent(None)
-        qtbot.wait(100)  # Allow visual state change
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()  # Allow visual state change
 
         # Simulate mouse leave (hover end)
         button.leaveEvent(None)
-        qtbot.wait(100)
+        QApplication.processEvents()
 
         # Test that button maintains consistent size
         final_size = button.size()
@@ -511,7 +513,7 @@ class TestCompleteUserWorkflowIntegration:
                 dialog.browse_tab.set_offset(test_offset)
 
                 # Step 7: Wait for signal emission
-                qtbot.wait(200)
+                qtbot.waitUntil(lambda: offset_spy.count() > 0, timeout=1000)
 
                 # Step 8: Verify workflow completed successfully
                 assert offset_spy.count() > 0, "Offset change should emit signal"
@@ -583,7 +585,7 @@ class TestCompleteUserWorkflowIntegration:
 
             # Test resize behavior
             main_window.resize(1200, 800)
-            qtbot.wait(100)
+            qtbot.waitUntil(lambda: main_window.size().width() >= 1200, timeout=1000)
 
             new_size = main_window.size()
             assert new_size.width() >= 1000, "Width should remain at least 1000 after resize"

@@ -7,6 +7,7 @@ Only basic worker start functionality is tested here.
 
 import pytest
 from PySide6.QtCore import QThread, Signal
+
 from ui.common import WorkerManager
 from ui.common.timing_constants import (
     SLEEP_MEDIUM,

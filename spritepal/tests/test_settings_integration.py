@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from core.controller import ExtractionController
 from core.managers import cleanup_managers, initialize_managers
 from utils.settings_manager import SettingsManager, get_settings_manager

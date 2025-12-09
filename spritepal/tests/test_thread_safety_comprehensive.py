@@ -34,6 +34,7 @@ from unittest.mock import Mock, patch
 import pytest
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Signal
 from PySide6.QtGui import QImage
+
 from ui.workers.batch_thumbnail_worker import (
     BatchThumbnailWorker,
     LRUCache,

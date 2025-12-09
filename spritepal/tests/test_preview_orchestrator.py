@@ -16,6 +16,8 @@ import time
 from unittest.mock import Mock, patch
 
 import pytest
+from PySide6.QtCore import QObject, QTimer
+
 from core.preview_orchestrator import (
     ErrorType,
     PreviewData,
@@ -27,7 +29,6 @@ from core.preview_orchestrator import (
     PreviewRequest,
     Priority,
 )
-from PySide6.QtCore import QObject, QTimer
 
 pytestmark = [
 

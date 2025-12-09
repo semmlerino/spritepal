@@ -13,6 +13,11 @@ CRASH PREVENTION:
 - Uses @skip_if_wsl to prevent timeout/crash issues in WSL environments
 - Automatically configures Qt platform (offscreen) for headless environments
 - Falls back to headless logic tests when GUI tests can't run
+
+REAL COMPONENT TESTING:
+- Uses RealComponentFactory for TileRenderer and ROMExtractor
+- MockHALProcessPool provides fast but realistic HAL responses
+- Error injection tests still use Mock() for controlled failure scenarios
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from PySide6.QtCore import QThread
+
 from tests.infrastructure.environment_detection import (
     configure_qt_for_environment,
     requires_real_qt,
@@ -35,6 +41,7 @@ from tests.infrastructure.qt_real_testing import (
     QtTestCase,
     ThreadSafetyHelper,
 )
+from tests.infrastructure.real_component_factory import RealComponentFactory
 from ui.workers.batch_thumbnail_worker import BatchThumbnailWorker
 
 # Configure Qt for the detected environment to prevent crashes
@@ -133,8 +140,27 @@ def test_rom_file(tmp_path) -> str:
     return str(rom_path)
 
 @pytest.fixture
+def real_component_factory(tmp_path):
+    """Create RealComponentFactory for integration tests."""
+    with RealComponentFactory() as factory:
+        yield factory
+
+
+@pytest.fixture
+def real_rom_extractor(real_component_factory):
+    """Create real ROM extractor using MockHALProcessPool for speed."""
+    return real_component_factory.create_rom_extractor(use_mock_hal=True)
+
+
+@pytest.fixture
+def real_tile_renderer(real_component_factory):
+    """Create real TileRenderer for integration tests."""
+    return real_component_factory.create_tile_renderer()
+
+
+@pytest.fixture
 def mock_rom_extractor():
-    """Create mock ROM extractor."""
+    """Create mock ROM extractor (for error injection tests only)."""
     extractor = Mock()
     extractor.rom_injector = Mock()
 
@@ -146,9 +172,10 @@ def mock_rom_extractor():
     extractor.rom_injector.find_compressed_sprite = mock_find_compressed_sprite
     return extractor
 
+
 @pytest.fixture
 def mock_tile_renderer():
-    """Create mock tile renderer."""
+    """Create mock tile renderer (for error injection tests only)."""
     renderer = Mock()
 
     # Mock render_tiles to return a simple image
@@ -185,14 +212,14 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         self.workers.append(worker)
         return worker
 
-    def test_worker_initialization_and_cleanup(self, test_rom_file, mock_rom_extractor):
-        """Test worker initialization and proper cleanup."""
+    def test_worker_initialization_and_cleanup(self, test_rom_file, real_rom_extractor):
+        """Test worker initialization and proper cleanup with real components."""
         with MemoryHelper.assert_no_leak(BatchThumbnailWorker, max_increase=1):
-            worker = self.create_worker(test_rom_file, mock_rom_extractor)
+            worker = self.create_worker(test_rom_file, real_rom_extractor)
 
             # Worker should be initialized properly
             assert worker.rom_path == test_rom_file
-            assert worker.rom_extractor is mock_rom_extractor
+            assert worker.rom_extractor is real_rom_extractor
             assert not worker.isRunning()  # Now works with wrapper
             assert worker._pending_count == 0
             assert worker._completed_count == 0
@@ -300,37 +327,36 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         # Should have processed requested thumbnails
         assert len(thumbnails_received) >= len(offsets)
 
-    def test_memory_cleanup_after_processing(self, test_rom_file, mock_rom_extractor):
-        """Test that worker properly cleans up memory after processing."""
+    def test_memory_cleanup_after_processing(self, test_rom_file, real_rom_extractor):
+        """Test that worker properly cleans up memory after processing with real components."""
         initial_rom_data_count = len([
             obj for obj in gc.get_objects()
             if isinstance(obj, bytes) and len(obj) > 100000  # Large byte objects (ROM data)
         ])
 
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
-            worker = self.create_worker(test_rom_file, mock_rom_extractor)
+        worker = self.create_worker(test_rom_file, real_rom_extractor)
 
-            # Queue some work
-            worker.queue_thumbnail(0x10000, 128)
-            worker.queue_thumbnail(0x20000, 128)
+        # Queue some work
+        worker.queue_thumbnail(0x10000, 128)
+        worker.queue_thumbnail(0x20000, 128)
 
-            # Process thumbnails
-            worker.start()
-            worker.wait(5000)
+        # Process thumbnails
+        worker.start()
+        worker.wait(5000)
 
-            # Worker should clean up automatically
-            gc.collect()
-            EventLoopHelper.process_events(100)
-            gc.collect()
+        # Worker should clean up automatically
+        gc.collect()
+        EventLoopHelper.process_events(100)
+        gc.collect()
 
-            final_rom_data_count = len([
-                obj for obj in gc.get_objects()
-                if isinstance(obj, bytes) and len(obj) > 100000
-            ])
+        final_rom_data_count = len([
+            obj for obj in gc.get_objects()
+            if isinstance(obj, bytes) and len(obj) > 100000
+        ])
 
-            # Should not leak large byte objects
-            leaked_objects = final_rom_data_count - initial_rom_data_count
-            assert leaked_objects <= 1, f"Leaked {leaked_objects} large byte objects"
+        # Should not leak large byte objects
+        leaked_objects = final_rom_data_count - initial_rom_data_count
+        assert leaked_objects <= 1, f"Leaked {leaked_objects} large byte objects"
 
     @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
     def test_concurrent_queue_operations(
@@ -367,74 +393,71 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         worker.wait(10000)
         assert not worker.isRunning()
 
-    def test_stop_request_interrupts_processing(self, test_rom_file, mock_rom_extractor):
-        """Test that stop request properly interrupts processing."""
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
-            worker = self.create_worker(test_rom_file, mock_rom_extractor)
+    def test_stop_request_interrupts_processing(self, test_rom_file, real_rom_extractor):
+        """Test that stop request properly interrupts processing with real components."""
+        worker = self.create_worker(test_rom_file, real_rom_extractor)
 
-            # Queue many thumbnails
-            for i in range(100):
-                worker.queue_thumbnail(0x10000 + i * 0x1000, 128)
+        # Queue many thumbnails
+        for i in range(100):
+            worker.queue_thumbnail(0x10000 + i * 0x1000, 128)
 
-            worker.start()
+        worker.start()
 
-            # Wait a bit for processing to begin
-            EventLoopHelper.process_events(100)
+        # Wait a bit for processing to begin
+        EventLoopHelper.process_events(100)
 
-            # Request stop
-            worker.stop()
+        # Request stop
+        worker.stop()
 
-            # Should stop quickly
-            start_time = time.time()
-            result = worker.wait(3000)  # 3 second timeout
-            stop_time = time.time() - start_time
+        # Should stop quickly
+        start_time = time.time()
+        result = worker.wait(3000)  # 3 second timeout
+        stop_time = time.time() - start_time
 
-            assert result, "Worker did not stop within timeout"
-            assert stop_time < 2.0, f"Worker took {stop_time:.2f}s to stop"
-            assert not worker.isRunning()
+        assert result, "Worker did not stop within timeout"
+        assert stop_time < 2.0, f"Worker took {stop_time:.2f}s to stop"
+        assert not worker.isRunning()
 
-    def test_cache_functionality_and_limits(self, test_rom_file, mock_rom_extractor):
-        """Test thumbnail caching functionality and size limits."""
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
-            worker = self.create_worker(test_rom_file, mock_rom_extractor)
-            worker._cache_size_limit = 5  # Small cache for testing
+    def test_cache_functionality_and_limits(self, test_rom_file, real_rom_extractor):
+        """Test thumbnail caching functionality and size limits with real components."""
+        worker = self.create_worker(test_rom_file, real_rom_extractor)
+        worker._cache_size_limit = 5  # Small cache for testing
 
-            thumbnails_received = []
-            worker.thumbnail_ready.connect(
-                lambda offset, pixmap: thumbnails_received.append((offset, pixmap))
-            )
+        thumbnails_received = []
+        worker.thumbnail_ready.connect(
+            lambda offset, pixmap: thumbnails_received.append((offset, pixmap))
+        )
 
-            # Queue same thumbnail multiple times
-            for _ in range(3):
-                worker.queue_thumbnail(0x10000, 128)
-
-            worker.start()
-            worker.wait(5000)
-
-            # Should use cache for repeated requests
-            assert len(thumbnails_received) >= 3
-
-            # Cache should not exceed limit
-            assert worker.get_cache_size() <= worker._cache_size_limit
-
-    def test_cleanup_method_comprehensive(self, test_rom_file, mock_rom_extractor):
-        """Test comprehensive cleanup functionality."""
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
-            worker = self.create_worker(test_rom_file, mock_rom_extractor)
-
-            # Add some items to cache
+        # Queue same thumbnail multiple times
+        for _ in range(3):
             worker.queue_thumbnail(0x10000, 128)
-            worker.start()
-            EventLoopHelper.process_events(500)  # Let some processing happen
 
-            # Call cleanup
-            worker.cleanup()
+        worker.start()
+        worker.wait(5000)
 
-            # Should be stopped
-            assert not worker.isRunning()
+        # Should use cache for repeated requests
+        assert len(thumbnails_received) >= 3
 
-            # Cache should be cleared
-            assert worker.get_cache_size() == 0
+        # Cache should not exceed limit
+        assert worker.get_cache_size() <= worker._cache_size_limit
+
+    def test_cleanup_method_comprehensive(self, test_rom_file, real_rom_extractor):
+        """Test comprehensive cleanup functionality with real components."""
+        worker = self.create_worker(test_rom_file, real_rom_extractor)
+
+        # Add some items to cache
+        worker.queue_thumbnail(0x10000, 128)
+        worker.start()
+        EventLoopHelper.process_events(500)  # Let some processing happen
+
+        # Call cleanup
+        worker.cleanup()
+
+        # Should be stopped
+        assert not worker.isRunning()
+
+        # Cache should be cleared
+        assert worker.get_cache_size() == 0
 
     @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
     def test_error_handling_during_processing(
@@ -554,68 +577,66 @@ class TestBatchThumbnailWorkerPerformance(QtTestCase):
 class TestBatchThumbnailWorkerThreadSafety(QtTestCase):
     """Thread safety tests for batch thumbnail worker."""
 
-    def test_thread_safety_with_multiple_workers(self, test_rom_file, mock_rom_extractor):
-        """Test thread safety with multiple concurrent workers."""
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
-            workers = []
+    def test_thread_safety_with_multiple_workers(self, test_rom_file, real_rom_extractor):
+        """Test thread safety with multiple concurrent workers using real components."""
+        workers = []
 
-            try:
-                # Create multiple workers with proper threading
-                for i in range(3):
-                    base_worker = BatchThumbnailWorker(test_rom_file, mock_rom_extractor)
-                    worker = WorkerThreadWrapper(base_worker)
-                    workers.append(worker)
+        try:
+            # Create multiple workers with proper threading
+            for i in range(3):
+                base_worker = BatchThumbnailWorker(test_rom_file, real_rom_extractor)
+                worker = WorkerThreadWrapper(base_worker)
+                workers.append(worker)
 
-                    # Queue different offsets for each worker
-                    for j in range(10):
-                        offset = 0x10000 + (i * 10 + j) * 0x1000
-                        worker.queue_thumbnail(offset, 128)
+                # Queue different offsets for each worker
+                for j in range(10):
+                    offset = 0x10000 + (i * 10 + j) * 0x1000
+                    worker.queue_thumbnail(offset, 128)
 
-                # Start all workers
-                for worker in workers:
-                    worker.start()
+            # Start all workers
+            for worker in workers:
+                worker.start()
 
-                # Wait for all to complete
-                for worker in workers:
-                    assert worker.wait(10000), "Worker did not complete within timeout"
+            # Wait for all to complete
+            for worker in workers:
+                assert worker.wait(10000), "Worker did not complete within timeout"
 
-                # All should have stopped
-                for worker in workers:
-                    assert not worker.isRunning()
+            # All should have stopped
+            for worker in workers:
+                assert not worker.isRunning()
 
-            finally:
-                # Clean up all workers
-                for worker in workers:
-                    worker.cleanup()
+        finally:
+            # Clean up all workers
+            for worker in workers:
+                worker.cleanup()
 
-    def test_signal_thread_safety(self, test_rom_file, mock_rom_extractor):
-        """Test that signals are emitted from correct thread."""
+    def test_signal_thread_safety(self, test_rom_file, real_rom_extractor):
+        """Test that signals are emitted from correct thread using real components."""
         ThreadSafetyHelper.assert_main_thread()
 
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
-            # Use WorkerThreadWrapper for proper threading
-            base_worker = BatchThumbnailWorker(test_rom_file, mock_rom_extractor)
-            worker = WorkerThreadWrapper(base_worker)
+        # Use WorkerThreadWrapper for proper threading
+        base_worker = BatchThumbnailWorker(test_rom_file, real_rom_extractor)
+        worker = WorkerThreadWrapper(base_worker)
 
-            signal_thread_ids = []
+        signal_thread_ids = []
 
-            def on_thumbnail_ready(offset, pixmap):
-                # Signal should be received in main thread
-                current_thread = threading.current_thread()
-                signal_thread_ids.append(current_thread.ident)
+        def on_thumbnail_ready(offset, pixmap):
+            # Signal should be received in main thread
+            current_thread = threading.current_thread()
+            signal_thread_ids.append(current_thread.ident)
 
-            worker.thumbnail_ready.connect(on_thumbnail_ready)
+        worker.thumbnail_ready.connect(on_thumbnail_ready)
 
-            worker.queue_thumbnail(0x10000, 128)
-            worker.start()
-            worker.wait(5000)
+        worker.queue_thumbnail(0x10000, 128)
+        worker.start()
+        worker.wait(5000)
 
-            # Signals should have been received in main thread
-            main_thread_id = threading.current_thread().ident
-            for thread_id in signal_thread_ids:
-                assert thread_id == main_thread_id, "Signal not received in main thread"
+        # Signals should have been received in main thread
+        main_thread_id = threading.current_thread().ident
+        for thread_id in signal_thread_ids:
+            assert thread_id == main_thread_id, "Signal not received in main thread"
 
-            worker.cleanup()
+        worker.cleanup()
 
 @pytest.mark.headless
 @pytest.mark.integration

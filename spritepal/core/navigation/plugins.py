@@ -14,6 +14,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
+
 from utils.logging_config import get_logger
 
 from .data_structures import (

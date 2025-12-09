@@ -17,10 +17,10 @@ from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock, Mock
 
-from .mock_dialogs_base import CallbackSignal, TestDialogBase
+from .mock_dialogs_base import CallbackSignal, MockDialogBase
 
 
-class TestDialog(TestDialogBase):
+class MockDialog(MockDialogBase):
     """
     Pure Python test dialog that provides callback-based signals without Qt dependencies.
 
@@ -101,7 +101,7 @@ class TestDialog(TestDialogBase):
         """Mock isModal() method."""
         return self.modal
 
-class TestUnifiedManualOffsetDialog(TestDialog):
+class MockUnifiedOffsetDialog(MockDialog):
     """
     Mock implementation of UnifiedManualOffsetDialog.
 
@@ -109,8 +109,19 @@ class TestUnifiedManualOffsetDialog(TestDialog):
     the DialogBase metaclass initialization issues.
     """
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(
+        self,
+        parent: Any | None = None,
+        rom_cache: Any | None = None,
+        settings_manager: Any | None = None,
+        extraction_manager: Any | None = None,
+        rom_extractor: Any | None = None,
+    ) -> None:
         super().__init__(parent)
+
+        # Store injected dependencies for potential inspection in tests
+        self._rom_cache = rom_cache
+        self._settings_manager = settings_manager
 
         # External signal callbacks for ROM extraction panel integration
         self.offset_changed_callbacks: list[Callable[[int], None]] = []
@@ -154,14 +165,17 @@ class TestUnifiedManualOffsetDialog(TestDialog):
         self.rom_path = ""
         self.rom_size = 0x400000
 
-        # Mock manager references
-        self.extraction_manager = None
-        self.rom_extractor = None
+        # Mock manager references (use injected or create mocks)
+        self.extraction_manager = extraction_manager if extraction_manager else None
+        self.rom_extractor = rom_extractor if rom_extractor else None
         self._manager_mutex = Mock()
 
-        # Mock ROM cache
-        self.rom_cache = Mock()
-        self.rom_cache.get_cache_stats.return_value = {"hits": 0, "misses": 0}
+        # Mock ROM cache (use injected or create mock)
+        if rom_cache:
+            self.rom_cache = rom_cache
+        else:
+            self.rom_cache = Mock()
+            self.rom_cache.get_cache_stats.return_value = {"hits": 0, "misses": 0}
         self._cache_stats = {"hits": 0, "misses": 0, "total_requests": 0}
         self._adjacent_offsets_cache = set()
 
@@ -172,10 +186,12 @@ class TestUnifiedManualOffsetDialog(TestDialog):
         # Mock preview coordinator
         self.smart_preview_coordinator = Mock()
 
-    def set_rom_data(self, rom_path: str, rom_size: int) -> None:
+    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: Any = None) -> None:
         """Mock method to set ROM data."""
         self.rom_path = rom_path
         self.rom_size = rom_size
+        if extraction_manager is not None:
+            self.extraction_manager = extraction_manager
 
     def set_managers(self, extraction_manager: Any, rom_extractor: Any) -> None:
         """Mock method to set managers."""
@@ -187,6 +203,20 @@ class TestUnifiedManualOffsetDialog(TestDialog):
         for callback in self.offset_changed_callbacks:
             with contextlib.suppress(Exception):
                 callback(offset)
+
+    def set_offset(self, offset: int) -> bool:
+        """Mock method to set offset (called by tests)."""
+        # Store the offset
+        self._current_offset = offset
+        # Trigger callbacks
+        for callback in self.offset_changed_callbacks:
+            with contextlib.suppress(Exception):
+                callback(offset)
+        return True
+
+    def get_current_offset(self) -> int:
+        """Mock method to get current offset."""
+        return getattr(self, '_current_offset', 0)
 
     def cleanup(self) -> None:
         """Mock cleanup method."""
@@ -208,7 +238,7 @@ class TestUnifiedManualOffsetDialog(TestDialog):
         """Validation failed signal interface."""
         return CallbackSignal(self.validation_failed_callbacks)
 
-class TestSettingsDialog(TestDialog):
+class MockSettingsDialogImpl(MockDialog):
     """Test implementation of SettingsDialog."""
 
     def __init__(self, parent: Any | None = None):
@@ -289,7 +319,7 @@ class TestSettingsDialog(TestDialog):
         """Settings changed signal interface."""
         return CallbackSignal(self.settings_changed_callbacks)
 
-class TestGridArrangementDialog(TestDialog):
+class MockGridArrangementDialogImpl(MockDialog):
     """Test implementation of GridArrangementDialog."""
 
     def __init__(self, parent: Any | None = None):
@@ -319,7 +349,7 @@ class TestGridArrangementDialog(TestDialog):
         """Arrangement changed signal interface."""
         return CallbackSignal(self.arrangement_changed_callbacks)
 
-class TestRowArrangementDialog(TestDialog):
+class MockRowArrangementDialogImpl(MockDialog):
     """Test implementation of RowArrangementDialog."""
 
     def __init__(self, parent: Any | None = None):
@@ -351,7 +381,7 @@ class TestRowArrangementDialog(TestDialog):
         """Arrangement updated signal interface."""
         return CallbackSignal(self.arrangement_updated_callbacks)
 
-class TestAdvancedSearchDialog(TestDialog):
+class MockAdvancedSearchDialogImpl(MockDialog):
     """Test implementation of AdvancedSearchDialog."""
 
     def __init__(self, parent: Any | None = None):
@@ -383,7 +413,7 @@ class TestAdvancedSearchDialog(TestDialog):
         """Result selected signal interface."""
         return CallbackSignal(self.result_selected_callbacks)
 
-class TestResumeScanDialog(TestDialog):
+class MockResumeScanDialogImpl(MockDialog):
     """Test implementation of ResumeScanDialog."""
 
     # Dialog result constants
@@ -505,7 +535,7 @@ class TestResumeScanDialog(TestDialog):
         dialog.exec()
         return dialog.get_user_choice()
 
-class TestUserErrorDialog(TestDialog):
+class MockUserErrorDialogImpl(MockDialog):
     """Test implementation of UserErrorDialog."""
 
     def __init__(self, error_message: str, technical_details: str = "", parent: Any | None = None):
@@ -518,7 +548,7 @@ class TestUserErrorDialog(TestDialog):
         """Set error details."""
         self.details = details
 
-class TestDialogSingleton:
+class MockDialogSingleton:
     """
     Test implementation of dialog singleton pattern.
 
@@ -546,7 +576,7 @@ class TestDialogSingleton:
     @classmethod
     def _create_instance(cls, parent=None):
         """Create a new dialog instance."""
-        return TestUnifiedManualOffsetDialog(parent)
+        return MockUnifiedOffsetDialog(parent)
 
     @classmethod
     def is_dialog_open(cls):
@@ -578,7 +608,7 @@ class TestDialogSingleton:
         cls._instance = None
         cls._destroyed = True
 
-def create_test_dialog(dialog_class_name: str, parent: Any | None = None) -> TestDialog:
+def create_test_dialog(dialog_class_name: str, parent: Any | None = None) -> MockDialog:
     """
     Factory function to create mock dialogs by class name.
 
@@ -590,16 +620,16 @@ def create_test_dialog(dialog_class_name: str, parent: Any | None = None) -> Tes
         Mock dialog instance
     """
     dialog_map = {
-        "UnifiedManualOffsetDialog": TestUnifiedManualOffsetDialog,
-        "SettingsDialog": TestSettingsDialog,
-        "GridArrangementDialog": TestGridArrangementDialog,
-        "RowArrangementDialog": TestRowArrangementDialog,
-        "AdvancedSearchDialog": TestAdvancedSearchDialog,
-        "ResumeScanDialog": TestResumeScanDialog,
-        "UserErrorDialog": TestUserErrorDialog,
+        "UnifiedManualOffsetDialog": MockUnifiedOffsetDialog,
+        "SettingsDialog": MockSettingsDialogImpl,
+        "GridArrangementDialog": MockGridArrangementDialogImpl,
+        "RowArrangementDialog": MockRowArrangementDialogImpl,
+        "AdvancedSearchDialog": MockAdvancedSearchDialogImpl,
+        "ResumeScanDialog": MockResumeScanDialogImpl,
+        "UserErrorDialog": MockUserErrorDialogImpl,
     }
 
-    dialog_class = dialog_map.get(dialog_class_name, TestDialog)
+    dialog_class = dialog_map.get(dialog_class_name, MockDialog)
     return dialog_class(parent)
 
 def patch_dialog_imports():
@@ -614,33 +644,29 @@ def patch_dialog_imports():
     # Create test modules for all dialog imports
     test_modules = {
         'ui.dialogs.manual_offset_unified_integrated': MagicMock(
-            UnifiedManualOffsetDialog=TestUnifiedManualOffsetDialog
+            UnifiedManualOffsetDialog=MockUnifiedOffsetDialog
         ),
         'ui.dialogs.settings_dialog': MagicMock(
-            SettingsDialog=TestSettingsDialog
+            SettingsDialog=MockSettingsDialogImpl
         ),
         'ui.dialogs.grid_arrangement_dialog': MagicMock(
-            GridArrangementDialog=TestGridArrangementDialog
+            GridArrangementDialog=MockGridArrangementDialogImpl
         ),
         'ui.dialogs.row_arrangement_dialog': MagicMock(
-            RowArrangementDialog=TestRowArrangementDialog
+            RowArrangementDialog=MockRowArrangementDialogImpl
         ),
         'ui.dialogs.advanced_search_dialog': MagicMock(
-            AdvancedSearchDialog=TestAdvancedSearchDialog
+            AdvancedSearchDialog=MockAdvancedSearchDialogImpl
         ),
         'ui.dialogs.resume_scan_dialog': MagicMock(
-            ResumeScanDialog=TestResumeScanDialog
+            ResumeScanDialog=MockResumeScanDialogImpl
         ),
         'ui.dialogs.user_error_dialog': MagicMock(
-            UserErrorDialog=TestUserErrorDialog
+            UserErrorDialog=MockUserErrorDialogImpl
         ),
-        # Also patch the ui.dialogs module itself for alias imports
-        'ui.dialogs': MagicMock(
-            UnifiedManualOffsetDialog=TestUnifiedManualOffsetDialog,
-            SettingsDialog=TestSettingsDialog,
-            ResumeScanDialog=TestResumeScanDialog,
-            UserErrorDialog=TestUserErrorDialog,
-        ),
+        # NOTE: We no longer patch 'ui.dialogs' itself as a MagicMock since that
+        # breaks imports of other dialogs like monitoring_dashboard. Individual
+        # submodule patches above are sufficient.
     }
 
     # Patch sys.modules
@@ -650,13 +676,12 @@ def patch_dialog_imports():
     return test_modules
 
 # Backward compatibility aliases
-MockQDialog = TestDialog
-MockUnifiedManualOffsetDialog = TestUnifiedManualOffsetDialog
-MockSettingsDialog = TestSettingsDialog
-MockGridArrangementDialog = TestGridArrangementDialog
-MockRowArrangementDialog = TestRowArrangementDialog
-MockAdvancedSearchDialog = TestAdvancedSearchDialog
-MockResumeScanDialog = TestResumeScanDialog
-MockUserErrorDialog = TestUserErrorDialog
-MockDialogSingleton = TestDialogSingleton
+MockQDialog = MockDialog
+MockUnifiedManualOffsetDialog = MockUnifiedOffsetDialog
+MockSettingsDialog = MockSettingsDialogImpl
+MockGridArrangementDialog = MockGridArrangementDialogImpl
+MockRowArrangementDialog = MockRowArrangementDialogImpl
+MockAdvancedSearchDialog = MockAdvancedSearchDialogImpl
+MockResumeScanDialog = MockResumeScanDialogImpl
+MockUserErrorDialog = MockUserErrorDialogImpl
 create_mock_dialog = create_test_dialog

@@ -15,11 +15,12 @@ if TYPE_CHECKING:
     from core.palette_manager import PaletteManager
     from core.rom_extractor import ROMExtractor
 
+from PIL import Image
+from PySide6.QtCore import QObject, Signal
+
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.rom_extractor import ROMExtractor
-from PIL import Image
-from PySide6.QtCore import QObject, Signal
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_PREVIEW_HEIGHT,
@@ -544,17 +545,16 @@ class ExtractionManager(BaseManager):
 
             # Create grayscale image
             img = sprite_extractor.create_grayscale_image(tiles)
+            return img, num_tiles
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "preview_generation", "generating preview")
-            # Handler always raises, this is unreachable
+            raise  # Unreachable but satisfies type checker
         except (ValueError, TypeError) as e:
             self._handle_data_format_error(e, "preview_generation", "generating preview")
-            # Handler always raises, this is unreachable
+            raise  # Unreachable but satisfies type checker
         except Exception as e:
             self._handle_operation_error(e, "preview_generation", ExtractionError, "generating preview")
-            # Handler always raises, this is unreachable
-        else:
-            return img, num_tiles
+            raise  # Unreachable but satisfies type checker
 
     def get_rom_extractor(self) -> ROMExtractor:
         """

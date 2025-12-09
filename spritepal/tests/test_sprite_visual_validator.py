@@ -5,11 +5,12 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import core.sprite_visual_validator as validator_module
 import numpy as np
 import pytest
-from core.sprite_visual_validator import SpriteVisualValidator
 from PIL import Image
+
+import core.sprite_visual_validator as validator_module
+from core.sprite_visual_validator import SpriteVisualValidator
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [

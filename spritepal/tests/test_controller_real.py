@@ -19,9 +19,10 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
-from core.controller import ExtractionController
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtTest import QSignalSpy
+
+from core.controller import ExtractionController
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: Real Qt components

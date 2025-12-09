@@ -27,8 +27,9 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 
 if TYPE_CHECKING:
-    from core.async_rom_cache import AsyncROMCache
     from PySide6.QtGui import QPixmap
+
+    from core.async_rom_cache import AsyncROMCache
     from ui.common.preview_worker_pool import PreviewWorkerPool
     from utils.rom_cache import ROMCache
 
@@ -445,7 +446,8 @@ class PreviewOrchestrator(QObject):
             self._async_cache = None
 
         # Clear caches
-        self._memory_cache.clear()
+        if self._memory_cache is not None:
+            self._memory_cache.clear()
         self._active_requests.clear()
 
         logger.debug("PreviewOrchestrator cleanup complete")

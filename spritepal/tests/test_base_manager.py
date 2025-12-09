@@ -4,8 +4,9 @@ Tests for BaseManager abstract class
 from __future__ import annotations
 
 import pytest
-from core.managers import BaseManager, ValidationError
 from PySide6.QtCore import QTimer
+
+from core.managers import BaseManager, ValidationError
 
 # Test characteristics: Real GUI components requiring display, Timer usage
 pytestmark = [

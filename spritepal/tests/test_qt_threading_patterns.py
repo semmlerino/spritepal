@@ -13,19 +13,10 @@ These tests require a real display.
 """
 from __future__ import annotations
 
-import pytest
-
-# Skip entire module - QThread event loops hang in offscreen mode
-pytest.skip(
-    "QThread event loop tests hang in Qt offscreen mode",
-    allow_module_level=True
-)
-
 import threading
 import time
 
 import pytest
-from core.workers.base import BaseWorker, handle_worker_errors
 from PySide6.QtCore import (
     # Serial execution required: QApplication management, Thread safety concerns
     QEventLoop,
@@ -37,6 +28,8 @@ from PySide6.QtCore import (
     Signal,
 )
 from PySide6.QtWidgets import QApplication
+
+from core.workers.base import BaseWorker, handle_worker_errors
 from ui.common.worker_manager import WorkerManager
 
 pytestmark = [

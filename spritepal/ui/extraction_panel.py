@@ -23,6 +23,8 @@ if TYPE_CHECKING:
         QPaintEvent,
         QPen,
     )
+
+    from core.protocols.manager_protocols import SettingsManagerProtocol
 else:
     from PySide6.QtGui import (
         QColor,
@@ -46,6 +48,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.common.spacing_constants import (
     BORDER_THICK,
     BROWSE_BUTTON_MAX_WIDTH,
@@ -69,7 +72,6 @@ from ui.styles import (
 )
 from utils.constants import VRAM_SPRITE_OFFSET
 from utils.logging_config import get_logger
-from utils.settings_manager import get_settings_manager
 
 logger = get_logger(__name__)
 
@@ -78,7 +80,7 @@ class DropZone(QWidget):
 
     file_dropped = Signal(str)
 
-    def __init__(self, file_type: str, parent: Any | None = None) -> None:
+    def __init__(self, file_type: str, parent: Any | None = None, settings_manager: SettingsManagerProtocol | None = None) -> None:
         super().__init__(parent)
         self.file_type = file_type
         self.file_path = ""
@@ -93,6 +95,14 @@ class DropZone(QWidget):
             }
         """
         )
+
+        if settings_manager is None:
+            # Fallback for environments where DI might not be fully configured
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
 
         # Layout
         layout = QVBoxLayout(self)
@@ -183,7 +193,7 @@ class DropZone(QWidget):
 
     def _browse_file(self):
         """Browse for file"""
-        settings = get_settings_manager()
+        settings = self.settings_manager
         default_dir = settings.get_default_directory()
 
         file_filter = f"{self.file_type} Files (*.dmp);;All Files (*)"
@@ -238,21 +248,27 @@ class DropZone(QWidget):
         return self.file_path
 
 class ExtractionPanel(QGroupBox):
-    """Panel for managing extraction inputs"""
+    """
+    Panel for managing VRAM extraction inputs.
+    Now accepts `SettingsManagerProtocol` via dependency injection.
+    """
 
     files_changed = Signal()
     extraction_ready = Signal(bool)
     offset_changed = Signal(int)  # Emitted when VRAM offset changes
     mode_changed = Signal(int)  # Emitted when extraction mode changes
 
-    def __init__(self):
-        super().__init__("Input Files")
+    def __init__(self, settings_manager: SettingsManagerProtocol, parent: Any | None = None):
+        super().__init__("Input Files", parent)
         # Timer for debouncing offset changes
         self._offset_timer = QTimer(self)  # Parent this timer to prevent crashes
         self._offset_timer.setInterval(REFRESH_RATE_60FPS)  # 16ms delay for ~60fps updates
         self._offset_timer.setSingleShot(True)
         self._pending_offset: int | None = None
         self._slider_changing = False  # Track if change is from slider
+
+        # Injected dependencies
+        self.settings_manager = settings_manager
 
         self._setup_ui()
         self._connect_signals()
@@ -391,15 +407,15 @@ class ExtractionPanel(QGroupBox):
         layout.addLayout(mode_layout)
 
         # Drop zones
-        self.vram_drop = DropZone("VRAM")
+        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager)
         self.vram_drop.setToolTip("Contains sprite graphics data (required for any extraction)")
         layout.addWidget(self.vram_drop)
 
-        self.cgram_drop = DropZone("CGRAM")
+        self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager)
         self.cgram_drop.setToolTip("Contains color palette data (optional - without it, only grayscale extraction is possible)")
         layout.addWidget(self.cgram_drop)
 
-        self.oam_drop = DropZone("OAM ()")
+        self.oam_drop = DropZone("OAM ()", settings_manager=self.settings_manager)
         self.oam_drop.setToolTip("Shows active sprites and palettes (optional - improves palette selection)")
         layout.addWidget(self.oam_drop)
 
@@ -502,7 +518,7 @@ class ExtractionPanel(QGroupBox):
 
     def _auto_detect_files(self) -> None:
         """Auto-detect dump files in default directory (Mesen2 Debugger first, then current directory)"""
-        settings = get_settings_manager()
+        settings = self.settings_manager
 
         # Define file type configurations
         file_configs = [

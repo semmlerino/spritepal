@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -19,7 +20,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from typing_extensions import override
-from utils.settings_manager import get_settings_manager
+
+# from utils.settings_manager import get_settings_manager # Removed due to DI
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import SettingsManagerProtocol
 
 
 class FileSelector(QWidget):
@@ -54,7 +59,8 @@ class FileSelector(QWidget):
         initial_path: str = "",
         selection_callback: Callable[[str], None] | None = None,
         settings_key: str | None = None,
-        settings_namespace: str | None = None
+        settings_namespace: str | None = None,
+        settings_manager: SettingsManagerProtocol | None = None
     ):
         super().__init__(parent)
 
@@ -64,6 +70,14 @@ class FileSelector(QWidget):
         self._selection_callback = selection_callback
         self._settings_key = settings_key
         self._settings_namespace = settings_namespace
+
+        # Inject settings manager or use fallback
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
 
         # Create UI components
         self._layout = QHBoxLayout(self)
@@ -96,7 +110,7 @@ class FileSelector(QWidget):
 
         Exactly replicates the file browsing logic from InjectionDialog.
         """
-        settings = get_settings_manager()
+        settings = self.settings_manager
 
         # Determine initial directory
         current_path = self.path_edit.text()

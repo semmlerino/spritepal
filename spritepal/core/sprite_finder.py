@@ -10,10 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
+
 from core.region_analyzer import EmptyRegionConfig, EmptyRegionDetector
 from core.rom_extractor import ROMExtractor
 from core.sprite_visual_validator import SpriteVisualValidator
-from PIL import Image
 from utils.constants import (
     BYTES_PER_TILE,
     ROM_SCAN_STEP_DEFAULT,
@@ -198,8 +199,8 @@ class SpriteFinder:
                             preview_path = Path(self.output_dir) / preview_name
 
                             # Copy temp image to preview
-                            img = Image.open(temp_image_path)
-                            img.save(str(preview_path))
+                            with Image.open(temp_image_path) as img:
+                                img.save(str(preview_path))
                             logger.debug(f"Saved preview: {preview_path}")
 
                         candidate = SpriteCandidate(

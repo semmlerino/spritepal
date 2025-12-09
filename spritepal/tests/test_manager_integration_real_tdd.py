@@ -26,8 +26,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from core.managers.exceptions import ValidationError
 from PIL import Image
+
+from core.managers.exceptions import ValidationError
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
     manager_context,
@@ -35,7 +36,7 @@ from tests.infrastructure.manager_test_context import (
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.test_data_repository import (
-    TestDataRepository,
+    DataRepository,
     get_test_data_repository,
 )
 
@@ -59,7 +60,7 @@ class TestManagerIntegrationTDD:
     """TDD tests for cross-manager integration with real components."""
 
     @pytest.fixture
-    def test_data_repo(self) -> TestDataRepository:
+    def test_data_repo(self) -> DataRepository:
         """Provide test data repository for integration tests."""
         return get_test_data_repository()
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
+
 from ui.dialogs import UnifiedManualOffsetDialog as ManualOffsetDialog
 
 # Test characteristics: Real GUI components requiring display

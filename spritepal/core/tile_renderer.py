@@ -4,8 +4,9 @@ Tile renderer for converting 4bpp SNES tile data to images.
 from __future__ import annotations
 
 import numpy as np
-from core.default_palette_loader import DefaultPaletteLoader
 from PIL import Image
+
+from core.default_palette_loader import DefaultPaletteLoader
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

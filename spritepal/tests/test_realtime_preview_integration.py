@@ -31,10 +31,10 @@ pytestmark = [
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from tests.fixtures.test_preview_helper import (
-    TestControllerHelper,
-    TestExtractionPanelHelper,
-    TestPreviewPanelHelper,
-    TestStatusBarHelper,
+    ControllerHelper,
+    ExtractionPanelHelper,
+    PreviewPanelHelper,
+    StatusBarHelper,
     create_large_vram_file,
     create_sample_vram_file,
     ensure_headless_qt,
@@ -71,10 +71,10 @@ class TestVRAMOffsetPreviewUpdates:
         ensure_headless_qt()
 
         # Create real components
-        extraction_panel = TestExtractionPanelHelper(sample_vram_file, temp_dir)
-        preview_panel = TestPreviewPanelHelper(temp_dir)
-        controller = TestControllerHelper(extraction_panel, preview_panel)
-        status_bar = TestStatusBarHelper()
+        extraction_panel = ExtractionPanelHelper(sample_vram_file, temp_dir)
+        preview_panel = PreviewPanelHelper(temp_dir)
+        controller = ControllerHelper(extraction_panel, preview_panel)
+        status_bar = StatusBarHelper()
 
         return {
             "extraction_panel": extraction_panel,
@@ -147,9 +147,9 @@ class TestVRAMOffsetPreviewUpdates:
         """Test offset updates when no VRAM file is loaded"""
         # Create components with non-existent VRAM file
         fake_vram_path = str(Path(temp_dir) / "nonexistent.dmp")
-        extraction_panel = TestExtractionPanelHelper(fake_vram_path, temp_dir)
-        preview_panel = TestPreviewPanelHelper(temp_dir)
-        controller = TestControllerHelper(extraction_panel, preview_panel)
+        extraction_panel = ExtractionPanelHelper(fake_vram_path, temp_dir)
+        preview_panel = PreviewPanelHelper(temp_dir)
+        controller = ControllerHelper(extraction_panel, preview_panel)
 
         # Verify VRAM file doesn't exist
         assert not extraction_panel.has_vram()
@@ -182,7 +182,7 @@ class TestPaletteSwitchingPreviewUpdates:
         """Create real preview panel with palette functionality"""
         ensure_headless_qt()
 
-        preview_panel = TestPreviewPanelHelper(temp_dir)
+        preview_panel = PreviewPanelHelper(temp_dir)
 
         # Set up initial grayscale image for palette testing
         mock_grayscale_image = f"test_grayscale_image_{temp_dir}"
@@ -262,7 +262,7 @@ class TestPaletteSwitchingPreviewUpdates:
         ensure_headless_qt()
 
         # Create preview panel without grayscale image
-        preview_panel = TestPreviewPanelHelper(temp_dir)
+        preview_panel = PreviewPanelHelper(temp_dir)
 
         # Clear any initial tracking
         preview_panel.clear_signal_tracking()
@@ -299,7 +299,7 @@ class TestZoomPanStatePreservation:
         """Create real preview panel with zoom/pan functionality"""
         ensure_headless_qt()
 
-        return TestPreviewPanelHelper(temp_dir)
+        return PreviewPanelHelper(temp_dir)
 
     @pytest.mark.integration
     def test_zoom_pan_state_preservation(self, preview_panel_with_zoom):
@@ -388,9 +388,9 @@ class TestPreviewPerformanceIntegration:
         """Create real components for performance testing"""
         ensure_headless_qt()
 
-        extraction_panel = TestExtractionPanelHelper(large_vram_file, temp_dir)
-        preview_panel = TestPreviewPanelHelper(temp_dir)
-        controller = TestControllerHelper(extraction_panel, preview_panel)
+        extraction_panel = ExtractionPanelHelper(large_vram_file, temp_dir)
+        preview_panel = PreviewPanelHelper(temp_dir)
+        controller = ControllerHelper(extraction_panel, preview_panel)
 
         return {
             "extraction_panel": extraction_panel,
@@ -466,10 +466,10 @@ class TestPreviewErrorHandling:
 
         # Create with valid VRAM file for error testing
         vram_path = create_sample_vram_file(temp_dir)
-        extraction_panel = TestExtractionPanelHelper(vram_path, temp_dir)
-        preview_panel = TestPreviewPanelHelper(temp_dir)
-        controller = TestControllerHelper(extraction_panel, preview_panel)
-        status_bar = TestStatusBarHelper()
+        extraction_panel = ExtractionPanelHelper(vram_path, temp_dir)
+        preview_panel = PreviewPanelHelper(temp_dir)
+        controller = ControllerHelper(extraction_panel, preview_panel)
+        status_bar = StatusBarHelper()
 
         return {
             "extraction_panel": extraction_panel,
@@ -554,9 +554,9 @@ class TestPreviewSignalIntegration:
         ensure_headless_qt()
 
         vram_path = create_sample_vram_file(temp_dir)
-        extraction_panel = TestExtractionPanelHelper(vram_path, temp_dir)
-        preview_panel = TestPreviewPanelHelper(temp_dir)
-        controller = TestControllerHelper(extraction_panel, preview_panel)
+        extraction_panel = ExtractionPanelHelper(vram_path, temp_dir)
+        preview_panel = PreviewPanelHelper(temp_dir)
+        controller = ControllerHelper(extraction_panel, preview_panel)
 
         return {
             "extraction_panel": extraction_panel,

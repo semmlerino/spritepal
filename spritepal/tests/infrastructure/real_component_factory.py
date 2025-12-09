@@ -32,7 +32,7 @@ BENEFITS:
 - Real components with actual behavior
 - Type checker can verify all operations
 - Better integration testing
-- Consistent test data from TestDataRepository
+- Consistent test data from DataRepository
 
 AUTOMATED MIGRATION:
 Run: python -m tests.infrastructure.migration_helpers report
@@ -45,13 +45,14 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from PySide6.QtCore import QObject, QThread
+from PySide6.QtWidgets import QApplication, QWidget
+
 from core.managers.base_manager import BaseManager
 from core.managers.extraction_manager import ExtractionManager
 from core.managers.injection_manager import InjectionManager
 from core.managers.registry import ManagerRegistry
 from core.managers.session_manager import SessionManager
-from PySide6.QtCore import QObject, QThread
-from PySide6.QtWidgets import QApplication, QWidget
 from ui.common.error_handler import ErrorHandler
 from ui.common.worker_manager import WorkerManager
 from ui.main_window import MainWindow
@@ -70,9 +71,11 @@ import contextlib
 
 from utils.rom_cache import ROMCache
 
-from .test_data_repository import TestDataRepository, get_test_data_repository
+from .test_data_repository import DataRepository, get_test_data_repository
 
 if TYPE_CHECKING:
+    from core.rom_extractor import ROMExtractor
+    from core.tile_renderer import TileRenderer
     from core.workers import (
         ROMExtractionWorker,
         ROMInjectionWorker,
@@ -92,12 +95,12 @@ class RealComponentFactory:
     - Real managers with test data injection
     - Type-safe component creation
     - Proper lifecycle management
-    - Integration with TestDataRepository
+    - Integration with DataRepository
     """
 
     def __init__(
         self,
-        data_repository: TestDataRepository | None = None,
+        data_repository: DataRepository | None = None,
         settings_dir: Path | None = None,
     ):
         """
@@ -385,13 +388,13 @@ class RealComponentFactory:
             cache_dir = Path(tempfile.mkdtemp(prefix="spritepal_cache_"))
             self._temp_dirs.append(cache_dir)
 
-        cache = ROMCache(str(cache_dir))
+        # Create mock settings manager that returns appropriate values
+        from unittest.mock import MagicMock
+        mock_settings = MagicMock()
+        mock_settings.get_cache_enabled.return_value = True
+        mock_settings.get_cache_location.return_value = str(cache_dir)
 
-        # Pre-populate with test data if needed
-        rom_data = self._data_repo.get_rom_extraction_data("small")
-        if rom_data["rom_path"] and Path(rom_data["rom_path"]).exists():
-            # Cache can be pre-warmed with test ROM
-            pass
+        cache = ROMCache(settings_manager=mock_settings, cache_dir=str(cache_dir))
 
         return cache
 
@@ -542,6 +545,59 @@ class RealComponentFactory:
             # Try to find a setter method
             elif hasattr(component, f"set_{key}"):
                 getattr(component, f"set_{key}")(value)
+
+    def create_tile_renderer(self) -> TileRenderer:
+        """
+        Create a real TileRenderer for testing.
+
+        Returns:
+            Real TileRenderer instance with default palettes
+        """
+        from core.tile_renderer import TileRenderer
+
+        renderer = TileRenderer()
+        return renderer
+
+    def create_rom_extractor(
+        self,
+        rom_cache: Any | None = None,
+        use_mock_hal: bool = True,
+    ) -> ROMExtractor:
+        """
+        Create a real ROMExtractor for testing.
+
+        Args:
+            rom_cache: Optional ROMCache instance (creates one if not provided)
+            use_mock_hal: If True, patches HAL to use MockHALProcessPool for speed
+
+        Returns:
+            Real ROMExtractor instance
+
+        Note:
+            By default uses MockHALProcessPool for fast integration tests.
+            Use @pytest.mark.real_hal and use_mock_hal=False for full HAL testing.
+        """
+        from core.rom_extractor import ROMExtractor
+
+        if rom_cache is None:
+            rom_cache = self.create_rom_cache()
+
+        if use_mock_hal:
+            # Use mock HAL for fast tests
+            from tests.infrastructure.mock_hal import MockHALProcessPool
+
+            # Create extractor
+            extractor = ROMExtractor(rom_cache=rom_cache)
+
+            # Replace HAL with mock for speed
+            mock_hal = MockHALProcessPool()
+            mock_hal.initialize("mock_exhal", "mock_inhal")
+            extractor.hal_compressor._process_pool = mock_hal
+        else:
+            # Use real HAL
+            extractor = ROMExtractor(rom_cache=rom_cache)
+
+        return extractor
 
     def cleanup(self) -> None:
         """Clean up all created components and temporary files."""

@@ -10,7 +10,9 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, cast
 
+from PySide6.QtCore import QMutex, QMutexLocker
 from PySide6.QtGui import QPixmap
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -33,6 +35,7 @@ class ThumbnailCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Memory cache (O(1) LRU using OrderedDict)
+        self._memory_cache_mutex = QMutex()
         self.memory_cache: OrderedDict[str, QPixmap] = OrderedDict()
         self.memory_cache_limit = 200  # Max items in memory
 
@@ -103,12 +106,13 @@ class ThumbnailCache:
         """
         cache_key = self._get_cache_key(rom_hash, offset, size, palette_index)
 
-        # Check memory cache first
-        if cache_key in self.memory_cache:
-            # Move to end (most recently used) - O(1) operation
-            self.memory_cache.move_to_end(cache_key)
-            logger.debug(f"Thumbnail cache hit (memory): {cache_key}")
-            return self.memory_cache[cache_key]
+        # Check memory cache first (thread-safe)
+        with QMutexLocker(self._memory_cache_mutex):
+            if cache_key in self.memory_cache:
+                # Move to end (most recently used) - O(1) operation
+                self.memory_cache.move_to_end(cache_key)
+                logger.debug(f"Thumbnail cache hit (memory): {cache_key}")
+                return self.memory_cache[cache_key]
 
         # Check disk cache
         cache_file = self.cache_dir / f"{cache_key}.png"
@@ -174,18 +178,20 @@ class ThumbnailCache:
             logger.error(f"Failed to cache thumbnail: {e}")
 
     def _add_to_memory_cache(self, key: str, pixmap: QPixmap):
-        """Add an item to the memory cache with LRU eviction."""
-        # Remove oldest if at limit - O(1) operation with OrderedDict
-        if len(self.memory_cache) >= self.memory_cache_limit:
-            self.memory_cache.popitem(last=False)
+        """Add an item to the memory cache with LRU eviction (thread-safe)."""
+        with QMutexLocker(self._memory_cache_mutex):
+            # Remove oldest if at limit - O(1) operation with OrderedDict
+            if len(self.memory_cache) >= self.memory_cache_limit:
+                self.memory_cache.popitem(last=False)
 
-        # Add new item (automatically at end of OrderedDict)
-        self.memory_cache[key] = pixmap
+            # Add new item (automatically at end of OrderedDict)
+            self.memory_cache[key] = pixmap
 
     def clear_cache(self):
         """Clear all cached thumbnails."""
-        # Clear memory cache
-        self.memory_cache.clear()
+        # Clear memory cache (thread-safe)
+        with QMutexLocker(self._memory_cache_mutex):
+            self.memory_cache.clear()
 
         # Clear disk cache
         for cache_file in self.cache_dir.glob("*.png"):
@@ -205,8 +211,11 @@ class ThumbnailCache:
         disk_files = list(self.cache_dir.glob("*.png"))
         disk_size = sum(f.stat().st_size for f in disk_files)
 
+        with QMutexLocker(self._memory_cache_mutex):
+            memory_items = len(self.memory_cache)
+
         return {
-            "memory_items": len(self.memory_cache),
+            "memory_items": memory_items,
             "memory_limit": self.memory_cache_limit,
             "disk_items": len(disk_files),
             "disk_size_mb": disk_size / (1024 * 1024),

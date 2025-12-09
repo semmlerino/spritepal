@@ -14,6 +14,11 @@ import os
 import tempfile
 
 import pytest
+from PIL import Image
+from PySide6.QtCore import QCoreApplication
+from PySide6.QtTest import QSignalSpy
+from PySide6.QtWidgets import QApplication
+
 from core.managers.factory import StandardManagerFactory
 from core.workers.injection import (
     ROMInjectionParams,
@@ -22,10 +27,6 @@ from core.workers.injection import (
     WorkerOwnedROMInjectionWorker,
     WorkerOwnedVRAMInjectionWorker,
 )
-from PIL import Image
-from PySide6.QtCore import QCoreApplication
-from PySide6.QtTest import QSignalSpy
-from PySide6.QtWidgets import QApplication
 
 pytestmark = [
 

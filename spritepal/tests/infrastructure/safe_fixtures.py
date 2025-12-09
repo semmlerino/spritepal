@@ -101,7 +101,11 @@ class SafeQtBotProtocol(Protocol):
 
     def wait(self, timeout: int = 1000) -> None: ...
     def waitSignal(self, signal: Any, timeout: int = 5000, **kwargs: Any) -> Any: ...
+    def wait_signal(self, signal: Any, timeout: int = 5000, **kwargs: Any) -> Any: ...
+    def waitSignals(self, signals: list[Any], timeout: int = 5000, **kwargs: Any) -> Any: ...
+    def wait_signals(self, signals: list[Any], timeout: int = 5000, **kwargs: Any) -> Any: ...
     def waitUntil(self, callback: Callable[[], bool], timeout: int = 5000) -> None: ...
+    def wait_until(self, callback: Callable[[], bool], timeout: int = 5000) -> None: ...
     def addWidget(self, widget: Any) -> None: ...
     def screenshot(self, widget: Any | None = None) -> str | None: ...
     def keyPress(self, widget: Any, key: Any, modifier: Any = None) -> None: ...
@@ -150,11 +154,22 @@ class SafeQtBot:
             logger.debug("Creating real qtbot wrapper for GUI environment")
 
     def wait(self, timeout: int = 1000) -> None:
-        """Wait for specified timeout."""
-        if self._headless:
-            # Mock wait - just return immediately
-            import time
-            time.sleep(min(0.01, timeout / 1000))  # Brief pause for realism
+        """Wait for specified timeout.
+
+        NOTE: Always uses time.sleep in offscreen mode to avoid Qt event loop
+        segfaults. The qtbot.wait() method calls QEventLoop.exec() which
+        segfaults in offscreen mode on WSL2.
+        """
+        import os
+        import time
+
+        # In offscreen mode, ALWAYS use time.sleep to avoid segfaults
+        # regardless of whether we have a real qtbot
+        is_offscreen = os.environ.get('QT_QPA_PLATFORM') == 'offscreen'
+
+        if self._headless or is_offscreen:
+            # Safe wait - use time.sleep
+            time.sleep(min(0.1, timeout / 1000))  # Brief pause (max 100ms)
         elif self._real_qtbot:
             self._real_qtbot.wait(timeout)
 
@@ -171,8 +186,31 @@ class SafeQtBot:
             self._signals_waiting.append(mock_blocker)
             return mock_blocker
         if self._real_qtbot:
-            return self._real_qtbot.waitSignal(signal, timeout, **kwargs)
+            return self._real_qtbot.waitSignal(signal, timeout=timeout, **kwargs)
         raise HeadlessModeError("waitSignal requires real qtbot")
+
+    # Snake case alias for pytest-qt compatibility
+    wait_signal = waitSignal
+
+    def waitSignals(self, signals: list[Any], timeout: int = 5000, **kwargs: Any) -> Any:
+        """Wait for multiple signals emission with timeout."""
+        if self._headless:
+            # Mock signals waiting - return immediately with mock blocker
+            mock_blocker = Mock()
+            mock_blocker.args = []
+            mock_blocker.all_signals_and_args = []
+            mock_blocker.connect = Mock()
+            mock_blocker.disconnect = Mock()
+            mock_blocker.wait = Mock()
+            # Store reference for cleanup
+            self._signals_waiting.append(mock_blocker)
+            return mock_blocker
+        if self._real_qtbot:
+            return self._real_qtbot.waitSignals(signals, timeout=timeout, **kwargs)
+        raise HeadlessModeError("waitSignals requires real qtbot")
+
+    # Snake case alias for pytest-qt compatibility
+    wait_signals = waitSignals
 
     def waitUntil(self, callback: Callable[[], bool], timeout: int = 5000) -> None:
         """Wait until callback returns True."""
@@ -184,11 +222,45 @@ class SafeQtBot:
             except Exception:
                 pass  # Ignore callback errors in mock mode
         elif self._real_qtbot:
-            self._real_qtbot.waitUntil(callback, timeout)
+            # pytest-qt's waitUntil requires timeout as keyword argument
+            self._real_qtbot.waitUntil(callback, timeout=timeout)
+
+    # Snake case alias for pytest-qt compatibility
+    wait_until = waitUntil
+
+    def waitForWindowShown(self, widget: Any, timeout: int = 5000) -> None:
+        """Wait for window to be shown."""
+        if self._headless:
+            # Mock waitForWindowShown - brief pause then return
+            import time
+            time.sleep(0.01)
+            return
+        # Check if widget is a mock - handle gracefully without calling Qt functions
+        is_mock = (
+            isinstance(widget, MockQWidget) or
+            (hasattr(widget, '__class__') and widget.__class__.__name__.startswith('Mock'))
+        )
+        if is_mock:
+            # Mock widget - no wait needed, just return
+            return
+        if self._real_qtbot:
+            # pytest-qt renamed waitForWindowShown to waitExposed in newer versions
+            # Note: These methods accept timeout as positional argument only
+            if hasattr(self._real_qtbot, 'waitForWindowShown'):
+                self._real_qtbot.waitForWindowShown(widget)
+            elif hasattr(self._real_qtbot, 'waitExposed'):
+                self._real_qtbot.waitExposed(widget)
+            else:
+                # Fallback: process events to allow widget to show
+                from PySide6.QtWidgets import QApplication
+                QApplication.processEvents()
 
     def addWidget(self, widget: Any) -> None:
         """Add widget for management and cleanup."""
-        if self._headless:
+        # Check if widget is a mock to avoid passing to real qtbot
+        is_mock = isinstance(widget, MockQWidget) or (hasattr(widget, '__class__') and widget.__class__.__name__.startswith('Mock'))
+
+        if self._headless or is_mock:
             # Just store reference for mock cleanup
             self._widgets.append(widget)
         else:
@@ -397,10 +469,16 @@ class SafeWidgetFactory:
             # Check if it's a known Qt widget name that we should support
             known_qt_widgets = {'QWidget', 'QDialog', 'QThread', 'QMainWindow',
                                'QPushButton', 'QLabel', 'QLineEdit', 'QTextEdit'}
-            if widget_name not in known_qt_widgets and not widget_name.startswith('Q'):
-                raise WidgetCreationError(f"Unknown widget type: {widget_name}")
-            # For known Qt widgets not in mapping, default to MockQWidget
-            mock_class = MockQWidget
+            
+            if widget_name in known_qt_widgets or widget_name.startswith('Q'):
+                mock_class = MockQWidget
+            elif 'Dialog' in widget_name:
+                # Assume it's a dialog if the name implies it
+                mock_class = MockQDialog
+            else:
+                # Fallback to generic widget mock for custom widgets
+                logger.debug(f"Unknown widget type '{widget_name}', defaulting to MockQWidget")
+                mock_class = MockQWidget
         else:
             mock_class = widget_mapping[widget_name]
 
@@ -622,10 +700,65 @@ class SafeFixtureManager:
         """Register custom cleanup function."""
         self._cleanup_functions.append(cleanup_func)
 
+    def _stop_all_qthreads(self) -> None:
+        """Stop all running QThreads to prevent crashes during cleanup.
+
+        This is critical for safe cleanup - running threads that access Qt objects
+        will cause fatal aborts if those objects are deleted during cleanup.
+        """
+        try:
+            from PySide6.QtCore import QThread
+        except ImportError:
+            return  # No Qt available
+
+        # Find all active QThread instances
+        import gc
+
+        threads_to_stop = []
+        for obj in gc.get_objects():
+            try:
+                if isinstance(obj, QThread) and obj.isRunning():
+                    threads_to_stop.append(obj)
+            except (RuntimeError, TypeError):
+                # Object might be deleted or invalid
+                continue
+
+        if not threads_to_stop:
+            return
+
+        logger.debug(f"Stopping {len(threads_to_stop)} running QThread(s) before cleanup")
+
+        # Request all threads to stop
+        for thread in threads_to_stop:
+            with suppress(RuntimeError):
+                # Try to stop gracefully if the thread has a stop method
+                if hasattr(thread, 'stop'):
+                    thread.stop()
+                elif hasattr(thread, 'requestInterruption'):
+                    thread.requestInterruption()
+
+        # Wait for threads to finish (with timeout)
+        for thread in threads_to_stop:
+            with suppress(RuntimeError):
+                if thread.isRunning():
+                    thread.wait(500)  # 500ms timeout per thread
+
+        # Process events to let threads clean up
+        try:
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app:
+                app.processEvents()
+        except (ImportError, RuntimeError):
+            pass
+
     def cleanup_all(self) -> None:
         """Cleanup all managed fixtures."""
         with _fixture_cleanup_lock:
-            # Custom cleanup functions first
+            # FIRST: Stop all running QThreads to prevent crashes
+            self._stop_all_qthreads()
+
+            # Custom cleanup functions
             for cleanup_func in self._cleanup_functions:
                 with suppress(Exception):
                     cleanup_func()
@@ -689,7 +822,7 @@ def create_safe_qtbot(
 
     # Try to create real qtbot with offscreen rendering
     try:
-        import pytest_qt  # noqa: F401
+        import pytestqt  # noqa: F401
 
         # Get real qtbot from pytest-qt if available
         real_qtbot = None

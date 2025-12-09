@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QLabel, QVBoxLayout
+
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 
 # Systematic pytest markers applied based on test content analysis

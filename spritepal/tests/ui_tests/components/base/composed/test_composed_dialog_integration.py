@@ -38,7 +38,7 @@ from ui.components.base.composed.message_dialog_manager import MessageDialogMana
 from ui.components.base.composed.status_bar_manager import StatusBarManager
 
 
-class TestDialog(ComposedDialog):
+class SampleDialog(ComposedDialog):
     """Test dialog implementation for integration testing with realistic UI."""
 
     def __init__(self, parent: Any = None, **config: Any) -> None:
@@ -137,7 +137,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_basic_dialog_creation_with_defaults(self) -> None:
         """Test dialog can be created with default configuration."""
-        dialog = self.create_widget(TestDialog)
+        dialog = self.create_widget(SampleDialog)
 
         # Verify dialog was created successfully
         assert dialog is not None
@@ -169,7 +169,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_dialog_creation_with_status_bar(self, qtbot: Any) -> None:
         """Test dialog creation with status bar enabled."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Verify all components are created
@@ -184,7 +184,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_dialog_creation_without_button_box(self, qtbot: Any) -> None:
         """Test dialog creation with button box disabled."""
-        dialog = TestDialog(with_button_box=False)
+        dialog = SampleDialog(with_button_box=False)
         qtbot.addWidget(dialog)
 
         # Verify message dialog is still created
@@ -200,7 +200,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_dialog_creation_with_all_components(self, qtbot: Any) -> None:
         """Test dialog creation with all components enabled."""
-        dialog = TestDialog(with_status_bar=True, with_button_box=True)
+        dialog = SampleDialog(with_status_bar=True, with_button_box=True)
         qtbot.addWidget(dialog)
 
         # Verify all components are created
@@ -220,7 +220,7 @@ class TestComposedDialogIntegration(QtTestCase):
     @patch('PySide6.QtWidgets.QMessageBox.information')
     def test_message_dialog_manager_integration(self, mock_info: Mock, qtbot: Any) -> None:
         """Test MessageDialogManager integration with ComposedDialog."""
-        dialog = TestDialog()
+        dialog = SampleDialog()
         qtbot.addWidget(dialog)
 
         message_manager = dialog.get_component("message_dialog")
@@ -247,7 +247,7 @@ class TestComposedDialogIntegration(QtTestCase):
     @patch('PySide6.QtWidgets.QMessageBox.critical')
     def test_message_dialog_error_handling(self, mock_critical: Mock, qtbot: Any) -> None:
         """Test error message handling in MessageDialogManager."""
-        dialog = TestDialog()
+        dialog = SampleDialog()
         qtbot.addWidget(dialog)
 
         message_manager = dialog.get_component("message_dialog")
@@ -277,7 +277,7 @@ class TestComposedDialogIntegration(QtTestCase):
         from PySide6.QtWidgets import QMessageBox
         mock_question.return_value = QMessageBox.StandardButton.Yes
 
-        dialog = TestDialog()
+        dialog = SampleDialog()
         qtbot.addWidget(dialog)
 
         message_manager = dialog.get_component("message_dialog")
@@ -305,7 +305,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_button_box_manager_integration(self, qtbot: Any) -> None:
         """Test ButtonBoxManager integration with ComposedDialog."""
-        dialog = TestDialog()
+        dialog = SampleDialog()
         qtbot.addWidget(dialog)
 
         button_manager = dialog.get_component("button_box")
@@ -344,7 +344,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_button_box_custom_buttons(self, qtbot: Any) -> None:
         """Test custom button functionality in ButtonBoxManager."""
-        dialog = TestDialog()
+        dialog = SampleDialog()
         qtbot.addWidget(dialog)
 
         button_manager = dialog.get_component("button_box")
@@ -376,7 +376,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_status_bar_manager_integration(self, qtbot: Any) -> None:
         """Test StatusBarManager integration with ComposedDialog."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         status_manager = dialog.get_component("status_bar")
@@ -416,7 +416,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_component_access_via_get_component(self, qtbot: Any) -> None:
         """Test component access through get_component method."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Test accessing existing components
@@ -439,7 +439,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_dialog_context_component_registration(self, qtbot: Any) -> None:
         """Test DialogContext component registration functionality."""
-        dialog = TestDialog()
+        dialog = SampleDialog()
         qtbot.addWidget(dialog)
 
         context = dialog.context
@@ -460,7 +460,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_cleanup_on_close_event(self, qtbot: Any) -> None:
         """Test that cleanup is called on all components during closeEvent."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Get all components and mock their cleanup methods
@@ -494,7 +494,7 @@ class TestComposedDialogIntegration(QtTestCase):
             QDialogButtonBox.StandardButton.Cancel
         )
 
-        dialog = TestDialog(
+        dialog = SampleDialog(
             buttons=custom_buttons,
             with_status_bar=True,
             custom_config_value="test_value"
@@ -518,7 +518,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_component_lifecycle_management(self, qtbot: Any) -> None:
         """Test that components are properly managed throughout dialog lifecycle."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Verify all components are in the components list
@@ -562,7 +562,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_button_manager_dialog_connection(self, qtbot: Any) -> None:
         """Test that ButtonBoxManager properly connects to dialog accept/reject."""
-        dialog = TestDialog()
+        dialog = SampleDialog()
         qtbot.addWidget(dialog)
 
         button_manager = dialog.get_component("button_box")
@@ -606,7 +606,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_complex_dialog_workflow(self, qtbot: Any) -> None:
         """Test a complex workflow involving multiple components."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Get all components
@@ -677,7 +677,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_realistic_form_validation_workflow(self, qtbot: Any) -> None:
         """Test realistic form validation using the enhanced TestDialog."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Verify form elements were created
@@ -718,7 +718,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_progress_and_status_integration(self, qtbot: Any) -> None:
         """Test progress bar and status bar integration."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Get status manager
@@ -758,7 +758,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_component_state_consistency(self, qtbot: Any) -> None:
         """Test that all components maintain consistent state."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Get all components
@@ -790,7 +790,7 @@ class TestComposedDialogIntegration(QtTestCase):
 
     def test_real_widget_properties_and_behavior(self, qtbot: Any) -> None:
         """Test real Qt widget properties and behavior."""
-        dialog = TestDialog(with_status_bar=True)
+        dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
 
         # Test dialog properties
@@ -832,7 +832,7 @@ class TestComposedDialogIntegration(QtTestCase):
     @patch('PySide6.QtWidgets.QMessageBox.warning')
     def test_all_message_types_integration(self, mock_warning: Mock, qtbot: Any) -> None:
         """Test all message dialog types work properly."""
-        dialog = TestDialog()
+        dialog = SampleDialog()
         qtbot.addWidget(dialog)
 
         message_manager = dialog.get_component("message_dialog")

@@ -13,8 +13,6 @@ from pathlib import Path
 from queue import PriorityQueue
 from typing import Any
 
-from core.rom_extractor import ROMExtractor
-from core.tile_renderer import TileRenderer
 from PIL import Image
 from PySide6.QtCore import (
     QMutex,
@@ -27,6 +25,9 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QImage, QPixmap
 from typing_extensions import override
+
+from core.rom_extractor import ROMExtractor
+from core.tile_renderer import TileRenderer
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

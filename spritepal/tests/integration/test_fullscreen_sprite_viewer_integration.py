@@ -18,6 +18,7 @@ from unittest.mock import Mock, patch
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeyEvent, QPixmap
+
 from tests.infrastructure.qt_real_testing import (
     EventLoopHelper,
     MemoryHelper,
@@ -526,7 +527,7 @@ class TestFullscreenViewerCleanupIntegration(QtTestCase):
 
         # At least some viewers should be cleaned up (Qt timing can vary)
         # If none are cleaned up, there's likely a memory leak
-        assert cleaned_up >= 1, f"No viewers were cleaned up (expected at least 1 of 3)"
+        assert cleaned_up >= 1, "No viewers were cleaned up (expected at least 1 of 3)"
 
     def test_no_signal_leaks_after_close(self, sample_sprites_data, mock_parent_gallery, mock_rom_extractor):
         """Test that closing viewer emits proper signals and cleanup works.

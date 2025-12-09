@@ -34,6 +34,8 @@ from .base_manager import BaseManager
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
+    from core.protocols.manager_protocols import SettingsManagerProtocol
+
 
 @dataclass
 class PerformanceMetric:
@@ -490,13 +492,22 @@ class HealthMonitor:
 class MonitoringManager(BaseManager):
     """Main monitoring and observability manager for SpritePal."""
 
-    def __init__(self, parent: QObject | None = None):
+    def __init__(self, parent: QObject | None = None,
+                 settings_manager: SettingsManagerProtocol | None = None):
         self._performance_collector = PerformanceCollector()
         self._error_tracker = ErrorTracker()
         self._usage_analytics = UsageAnalytics()
         self._health_monitor = HealthMonitor()
         self._health_timer = None
         self._monitored_managers = WeakSet()
+
+        # Inject settings manager or use fallback
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
 
         super().__init__("MonitoringManager", parent)
 
@@ -507,8 +518,7 @@ class MonitoringManager(BaseManager):
 
         # Check if monitoring is enabled
         try:
-            from utils.settings_manager import get_settings_manager
-            settings = get_settings_manager()
+            settings = self.settings_manager
             self._enabled = settings.get("monitoring", "enabled", True)
             self._health_check_interval = settings.get("monitoring", "health_check_interval_ms", 60000)  # 1 minute
             self._export_format = settings.get("monitoring", "export_format", "json")

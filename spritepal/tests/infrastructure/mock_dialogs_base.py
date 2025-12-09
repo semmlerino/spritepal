@@ -40,7 +40,7 @@ def _invoke_callback_safe(callback: Callable, *args: Any) -> None:
         )
 
 
-class TestDialogBase:
+class MockDialogBase:
     """
     Pure Python base class for all mock dialogs.
 
@@ -66,6 +66,7 @@ class TestDialogBase:
         self.accepted_callbacks: list[Callable[[], None]] = []
         self.rejected_callbacks: list[Callable[[], None]] = []
         self.finished_callbacks: list[Callable[[int], None]] = []
+        self.destroyed_callbacks: list[Callable[[], None]] = []
 
     def exec(self) -> int:
         """Non-blocking exec replacement."""
@@ -123,6 +124,11 @@ class TestDialogBase:
         """Finished signal interface."""
         return CallbackSignal(self.finished_callbacks)
 
+    @property
+    def destroyed(self):
+        """Destroyed signal interface (QObject standard signal)."""
+        return CallbackSignal(self.destroyed_callbacks)
+
 class CallbackSignal:
     """Signal-like interface for callbacks."""
 
@@ -146,7 +152,7 @@ class CallbackSignal:
         for callback in self.callbacks:
             _invoke_callback_safe(callback, *args)
 
-class TestMessageBox(TestDialogBase):
+class MockMessageBox(MockDialogBase):
     """Test QMessageBox for testing."""
 
     def __init__(self, parent: Any | None = None):
@@ -160,25 +166,25 @@ class TestMessageBox(TestDialogBase):
     @staticmethod
     def information(parent: Any, title: str, text: str) -> int:
         """Mock information dialog."""
-        return TestDialogBase.DialogCode.Accepted
+        return MockDialogBase.DialogCode.Accepted
 
     @staticmethod
     def warning(parent: Any, title: str, text: str) -> int:
         """Mock warning dialog."""
-        return TestDialogBase.DialogCode.Accepted
+        return MockDialogBase.DialogCode.Accepted
 
     @staticmethod
     def critical(parent: Any, title: str, text: str) -> int:
         """Mock critical dialog."""
-        return TestDialogBase.DialogCode.Accepted
+        return MockDialogBase.DialogCode.Accepted
 
     @staticmethod
     def question(parent: Any, title: str, text: str,
                  buttons: Any = None, defaultButton: Any = None) -> int:
         """Mock question dialog."""
-        return TestDialogBase.DialogCode.Accepted
+        return MockDialogBase.DialogCode.Accepted
 
-class TestFileDialog(TestDialogBase):
+class MockFileDialog(MockDialogBase):
     """Test QFileDialog for testing."""
 
     def __init__(self, parent: Any | None = None):
@@ -204,7 +210,7 @@ class TestFileDialog(TestDialogBase):
         """Mock directory selection dialog."""
         return "/test/directory"
 
-class TestInputDialog(TestDialogBase):
+class MockInputDialog(MockDialogBase):
     """Test QInputDialog for testing."""
 
     @staticmethod
@@ -227,7 +233,7 @@ class TestInputDialog(TestDialogBase):
         """Mock double input dialog."""
         return 3.14, True
 
-class TestProgressDialog(TestDialogBase):
+class MockProgressDialog(MockDialogBase):
     """Test QProgressDialog for testing."""
 
     def __init__(self, parent: Any | None = None):
@@ -264,7 +270,7 @@ class TestProgressDialog(TestDialogBase):
         """Canceled signal interface."""
         return CallbackSignal(self.canceled_callbacks)
 
-def create_mock_dialog(dialog_type: str, **kwargs) -> TestDialogBase:
+def create_mock_dialog(dialog_type: str, **kwargs) -> MockDialogBase:
     """
     Factory function to create mock dialogs.
 
@@ -276,13 +282,13 @@ def create_mock_dialog(dialog_type: str, **kwargs) -> TestDialogBase:
         Mock dialog instance
     """
     dialog_map = {
-        'message': TestMessageBox,
-        'file': TestFileDialog,
-        'input': TestInputDialog,
-        'progress': TestProgressDialog,
+        'message': MockMessageBox,
+        'file': MockFileDialog,
+        'input': MockInputDialog,
+        'progress': MockProgressDialog,
     }
 
-    dialog_class = dialog_map.get(dialog_type, TestDialogBase)
+    dialog_class = dialog_map.get(dialog_type, MockDialogBase)
     return dialog_class(**kwargs)
 
 # Convenience function for patching
@@ -298,7 +304,7 @@ def patch_all_dialogs(monkeypatch):
     except ImportError:
         return  # Skip patching if Qt not available
 
-    monkeypatch.setattr(widgets, 'QMessageBox', TestMessageBox)
-    monkeypatch.setattr(widgets, 'QFileDialog', TestFileDialog)
-    monkeypatch.setattr(widgets, 'QInputDialog', TestInputDialog)
-    monkeypatch.setattr(widgets, 'QProgressDialog', TestProgressDialog)
+    monkeypatch.setattr(widgets, 'QMessageBox', MockMessageBox)
+    monkeypatch.setattr(widgets, 'QFileDialog', MockFileDialog)
+    monkeypatch.setattr(widgets, 'QInputDialog', MockInputDialog)
+    monkeypatch.setattr(widgets, 'QProgressDialog', MockProgressDialog)

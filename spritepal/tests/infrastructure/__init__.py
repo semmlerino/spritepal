@@ -4,9 +4,9 @@ Testing Infrastructure for SpritePal
 This module provides comprehensive testing infrastructure to support
 real Qt testing and reduce over-mocking patterns. It includes:
 
-- TestApplicationFactory: Standardized Qt application setup (Qt-dependent)
+- ApplicationFactory: Standardized Qt application setup (Qt-dependent)
 - RealManagerFixtureFactory: Real manager instances with proper Qt parents (Qt-dependent)
-- TestDataRepository: Centralized test data management (Qt-independent)
+- DataRepository: Centralized test data management (Qt-independent)
 - QtTestingFramework: Standardized patterns for Qt component testing (Qt-dependent)
 
 The infrastructure is designed to:
@@ -22,18 +22,25 @@ HeadlessModeError with helpful messages, while Qt-independent features remain av
 from __future__ import annotations
 
 from .environment_detection import get_environment_info, is_pyside6_available
-from .test_data_repository import TestDataRepository
+from .test_data_repository import DataRepository
+from .test_signal import TestSignal, TestSignalBlocker
 
 # Always available (Qt-independent)
-__all__ = ["TestDataRepository", "get_environment_info", "is_pyside6_available"]
+__all__ = [
+    "DataRepository",
+    "get_environment_info",
+    "is_pyside6_available",
+    "TestSignal",
+    "TestSignalBlocker",
+]
 
 # Conditional imports based on Qt availability
 if is_pyside6_available():
     try:
         from .manager_fixture_factory import RealManagerFixtureFactory
         from .qt_application_factory import (
-            TestApplicationFactory,
-            TestQtContext,
+            ApplicationFactory,
+            QtTestContext,
             qt_test_context,
         )
         from .qt_testing_framework import (
@@ -48,8 +55,8 @@ if is_pyside6_available():
         __all__.extend([
             "QtTestingFramework",
             "RealManagerFixtureFactory",
-            "TestApplicationFactory",
-            "TestQtContext",
+            "ApplicationFactory",
+            "QtTestContext",
             "qt_dialog_test",
             "qt_test_context",
             "qt_widget_test",
@@ -74,10 +81,10 @@ if is_pyside6_available():
 # Provide fallback implementations for headless environments
 if not is_pyside6_available():
     from .headless_fallbacks import (
+        HeadlessApplicationFactory as ApplicationFactory,
+        HeadlessQtTestContext as QtTestContext,
         HeadlessQtTestingFramework as QtTestingFramework,
         HeadlessRealManagerFixtureFactory as RealManagerFixtureFactory,
-        HeadlessTestApplicationFactory as TestApplicationFactory,
-        HeadlessTestQtContext as TestQtContext,
         headless_qt_dialog_test as qt_dialog_test,
         headless_qt_test_context as qt_test_context,
         headless_qt_widget_test as qt_widget_test,
@@ -89,8 +96,8 @@ if not is_pyside6_available():
     __all__.extend([
         "QtTestingFramework",
         "RealManagerFixtureFactory",
-        "TestApplicationFactory",
-        "TestQtContext",
+        "ApplicationFactory",
+        "QtTestContext",
         "qt_dialog_test",
         "qt_test_context",
         "qt_widget_test",

@@ -15,10 +15,12 @@ sys.path.insert(0, str(parent_dir))
 sys.path.insert(0, str(current_dir))
 
 import pytest
+
+from core.managers.exceptions import ValidationError
 from tests.infrastructure import (
+    DataRepository,
     RealManagerFixtureFactory,
     TestApplicationFactory,
-    TestDataRepository,
 )
 
 
@@ -35,7 +37,7 @@ class TestSimpleRealIntegration:
         self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
 
         # Initialize test data repository
-        self.test_data = TestDataRepository()
+        self.test_data = DataRepository()
 
         yield
 
@@ -58,7 +60,7 @@ class TestSimpleRealIntegration:
         }
 
         # This tests our bug fix - validation should raise ValidationError, not return None
-        with pytest.raises(Exception):  # Should raise ValidationError
+        with pytest.raises(ValidationError):
             extraction_manager.validate_extraction_params(invalid_params)
 
     def test_real_manager_validation_success(self):

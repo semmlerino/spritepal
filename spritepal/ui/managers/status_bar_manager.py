@@ -4,24 +4,37 @@ Status bar management for MainWindow
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QStatusBar, QWidget
+
 from ui.styles import get_muted_text_style
-from utils.rom_cache import get_rom_cache
-from utils.settings_manager import get_settings_manager
+
+# from utils.rom_cache import get_rom_cache # Removed due to DI
+# from utils.settings_manager import get_settings_manager # Removed due to DI
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+
 
 logger = logging.getLogger(__name__)
 
 class StatusBarManager:
     """Manages status bar and cache indicators for MainWindow"""
 
-    def __init__(self, status_bar: QStatusBar) -> None:
+    def __init__(self, status_bar: QStatusBar,
+                 settings_manager: SettingsManagerProtocol,
+                 rom_cache: ROMCacheProtocol) -> None:
         """Initialize status bar manager
 
         Args:
             status_bar: The status bar widget to manage
+            settings_manager: Injected SettingsManagerProtocol instance
+            rom_cache: Injected ROMCacheProtocol instance
         """
         self.status_bar = status_bar
+        self.settings_manager = settings_manager
+        self.rom_cache = rom_cache
 
         # Cache status widgets (initialized by setup if enabled)
         self.cache_status_widget: QWidget | None = None
@@ -32,7 +45,7 @@ class StatusBarManager:
     def setup_status_bar_indicators(self) -> None:
         """Set up permanent status bar indicators"""
 
-        settings_manager = get_settings_manager()
+        settings_manager = self.settings_manager
 
         # Only show indicators if enabled in settings
         if not settings_manager.get("cache", "show_indicators", True):
@@ -76,7 +89,7 @@ class StatusBarManager:
     def update_cache_status(self) -> None:
         """Update cache status indicator"""
 
-        settings_manager = get_settings_manager()
+        settings_manager = self.settings_manager
 
         # Check if indicators are enabled and created
         if (not self.cache_status_widget or
@@ -89,7 +102,7 @@ class StatusBarManager:
         if cache_enabled:
             # Get cache stats
             try:
-                rom_cache = get_rom_cache()
+                rom_cache = self.rom_cache
                 stats = rom_cache.get_cache_stats()
 
                 # Update icon (✓ for enabled, ✗ for disabled)

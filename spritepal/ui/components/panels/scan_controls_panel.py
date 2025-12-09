@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from core.managers.extraction_manager import ExtractionManager
+    from core.protocols.manager_protocols import ROMCacheProtocol
     from core.rom_extractor import ROMExtractor
 
 from PySide6.QtCore import QMutex, QMutexLocker, Signal
@@ -24,13 +25,15 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.common import WorkerManager
 from ui.components.dialogs import RangeScanDialog
 from ui.components.visualization import ROMMapWidget
 from ui.rom_extraction.workers import RangeScanWorker
 from ui.styles import get_panel_style
 from utils.logging_config import get_logger
-from utils.rom_cache import get_rom_cache
+
+# from utils.rom_cache import get_rom_cache # Removed due to DI
 
 logger = get_logger(__name__)
 
@@ -46,7 +49,7 @@ class ScanControlsPanel(QWidget):
     partial_scan_detected = Signal(dict)  # cache info for resume dialog
     sprites_detected = Signal(list)  # List of (offset, quality) tuples for region detection
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None, rom_cache: ROMCacheProtocol | None = None):
         # Step 1: Declare all instance variables with type hints
         # State
         self.rom_path: str = ""
@@ -68,6 +71,14 @@ class ScanControlsPanel(QWidget):
 
         # Cache status UI
         self.cache_status_label: QLabel | None = None
+
+        # Inject rom_cache or use fallback
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        else:
+            self.rom_cache = rom_cache
 
         # Step 2: Initialize parent
         super().__init__(parent)
@@ -530,7 +541,7 @@ class ScanControlsPanel(QWidget):
             return
 
         try:
-            rom_cache = get_rom_cache()
+            rom_cache = self.rom_cache
             if not rom_cache.cache_enabled:
                 return
 
@@ -666,7 +677,7 @@ class ScanControlsPanel(QWidget):
         from ui.dialogs import ResumeScanDialog
 
         try:
-            rom_cache = get_rom_cache()
+            rom_cache = self.rom_cache
             if not rom_cache.cache_enabled:
                 return False  # No cache, proceed with fresh scan
 

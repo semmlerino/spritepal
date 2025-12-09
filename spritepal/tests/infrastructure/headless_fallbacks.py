@@ -11,29 +11,29 @@ from typing import Any
 from .environment_detection import HeadlessModeError
 
 
-class HeadlessTestApplicationFactory:
-    """Fallback for TestApplicationFactory in headless environments."""
+class HeadlessApplicationFactory:
+    """Fallback for ApplicationFactory in headless environments."""
 
     @classmethod
     def get_application(cls, force_offscreen: bool = True) -> None:
-        raise HeadlessModeError("TestApplicationFactory")
+        raise HeadlessModeError("ApplicationFactory")
 
     @classmethod
     def reset_application(cls) -> None:
-        raise HeadlessModeError("TestApplicationFactory.reset_application")
+        raise HeadlessModeError("ApplicationFactory.reset_application")
 
     @classmethod
     def process_events(cls, timeout_ms: int = 100) -> None:
-        raise HeadlessModeError("TestApplicationFactory.process_events")
+        raise HeadlessModeError("ApplicationFactory.process_events")
 
-class HeadlessTestQtContext:
-    """Fallback for TestQtContext in headless environments."""
+class HeadlessQtTestContext:
+    """Fallback for QtTestContext in headless environments."""
 
     def __init__(self, force_offscreen: bool = True, process_events_on_exit: bool = True):
         pass
 
-    def __enter__(self) -> HeadlessTestQtContext:
-        raise HeadlessModeError("TestQtContext")
+    def __enter__(self) -> HeadlessQtTestContext:
+        raise HeadlessModeError("QtTestContext")
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         pass

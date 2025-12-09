@@ -15,8 +15,9 @@ except ImportError:
     from typing_extensions import override
 
 if TYPE_CHECKING:
-    from core.managers.factory import ManagerFactory
     from PySide6.QtCore import QObject
+
+    from core.managers.factory import ManagerFactory
 
 from core.managers import InjectionManager, get_injection_manager
 from utils.logging_config import get_logger

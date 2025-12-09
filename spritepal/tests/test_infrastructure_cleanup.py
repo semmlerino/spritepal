@@ -35,7 +35,7 @@ pytestmark = [
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-class TestInfrastructureAnalyzer:
+class InfrastructureAnalyzer:
     """Analyzes and reports on test infrastructure issues."""
 
     def __init__(self, test_dir: Path):
@@ -256,7 +256,7 @@ class TestInfrastructureAnalyzer:
 
 def generate_cleanup_report(test_dir: Path) -> str:
     """Generate a comprehensive cleanup report."""
-    analyzer = TestInfrastructureAnalyzer(test_dir)
+    analyzer = InfrastructureAnalyzer(test_dir)
     results = analyzer.analyze_all_tests()
 
     report = []

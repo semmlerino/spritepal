@@ -12,8 +12,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from core.rom_extractor import ROMExtractor
-from core.sprite_finder import SpriteFinder
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
@@ -29,6 +27,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from core.rom_extractor import ROMExtractor
+from core.sprite_finder import SpriteFinder
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 from utils.logging_config import get_logger

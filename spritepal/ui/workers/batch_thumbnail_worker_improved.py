@@ -9,8 +9,6 @@ from pathlib import Path
 from queue import PriorityQueue
 from typing import Any
 
-from core.rom_extractor import ROMExtractor
-from core.tile_renderer import TileRenderer
 from PySide6.QtCore import (
     QMutex,
     QMutexLocker,
@@ -22,6 +20,9 @@ from PySide6.QtCore import (
     Slot,
 )
 from PySide6.QtGui import QImage
+
+from core.rom_extractor import ROMExtractor
+from core.tile_renderer import TileRenderer
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

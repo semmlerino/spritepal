@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 import pytest
 from PIL import Image
 from PySide6.QtGui import QPixmap
+
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 from utils.preview_generator import (
     # Test characteristics: Timer usage
@@ -407,7 +408,8 @@ class TestPreviewGenerator:
                 generator.generate_preview_async(request, use_debounce=True)
 
             # Wait for debounce to settle
-            qtbot.wait(50)  # Wait longer than debounce delay
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()  # Allow debounce timer to fire
 
             # Only the last request should be processed
             assert preview_mock_extraction_manager.generate_preview.call_count <= 1
@@ -520,12 +522,12 @@ def test_preview_generation_performance():
 def test_cache_performance(qapp):
     """Test cache performance with many items.
 
-    Requires qapp fixture to ensure QApplication exists before creating QPixmap.
+    Requires qapp fixture to ensure QApplication exists.
     """
     cache = LRUCache(max_size=100)
 
-    # Pre-fill cache
-    pixmap = QPixmap(64, 64)
+    # Pre-fill cache - use ThreadSafeTestImage for consistency
+    pixmap = ThreadSafeTestImage(64, 64)
     pil_image = Image.new("RGB", (64, 64))
     for i in range(50):
         result = PreviewResult(pixmap, pil_image, 16, f"sprite_{i}", 0.1)

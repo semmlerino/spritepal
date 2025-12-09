@@ -8,9 +8,10 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from PIL import Image
+
 from core.hal_compression import HALCompressionError
 from core.rom_extractor import ROMExtractor
-from PIL import Image
 from utils.constants import BYTES_PER_TILE, TILE_HEIGHT, TILE_WIDTH
 
 # Systematic pytest markers applied based on test content analysis

@@ -7,6 +7,7 @@ focusing on WCAG 2.1 AA contrast requirements and visual accessibility.
 from __future__ import annotations
 
 import pytest
+
 from ui.styles.theme import COLORS
 
 

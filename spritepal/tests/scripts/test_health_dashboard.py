@@ -48,7 +48,7 @@ FailureCategory = str
 TestMetrics = dict[str, int | float]
 
 @dataclass
-class TestFailure:
+class FailureRecord:
     """Represents a single test failure with categorization."""
     test_name: str
     test_file: str
@@ -64,7 +64,7 @@ class TestFailure:
     is_qt_related: bool = False
 
 @dataclass
-class TestSuiteMetrics:
+class SuiteMetrics:
     """Comprehensive test suite metrics."""
     timestamp: datetime
     total_tests: int
@@ -194,7 +194,7 @@ class FailureCategorizer:
 
         return 'uncategorized'
 
-    def analyze_failure_trends(self, failures: list[TestFailure]) -> dict[str, any]:
+    def analyze_failure_trends(self, failures: list[FailureRecord]) -> dict[str, any]:
         """Analyze failure trends and patterns."""
         category_counts = Counter(f.category for f in failures)
         file_counts = Counter(f.test_file for f in failures)
@@ -220,14 +220,14 @@ class FailureCategorizer:
             'affected_files': len(file_counts),
         }
 
-class TestRunner:
+class HealthTestRunner:
     """Handles test execution with different strategies."""
 
     def __init__(self, test_dir: Path):
         self.test_dir = test_dir
         self.project_root = test_dir.parent
 
-    def run_progressive_tests(self) -> dict[str, TestSuiteMetrics]:
+    def run_progressive_tests(self) -> dict[str, SuiteMetrics]:
         """Run tests in progressive stages to quickly identify issues."""
         stages = [
             ("smoke_tests", [
@@ -259,7 +259,7 @@ class TestRunner:
 
         return results
 
-    def _run_test_stage(self, stage_name: str, test_args: list[str]) -> TestSuiteMetrics:
+    def _run_test_stage(self, stage_name: str, test_args: list[str]) -> SuiteMetrics:
         """Run a single stage of tests and collect metrics."""
         start_time = time.time()
 
@@ -289,7 +289,7 @@ class TestRunner:
             return self._parse_test_results(stage_name, result, total_duration)  # type: ignore[attr-defined]
 
         except subprocess.TimeoutExpired:
-            return TestSuiteMetrics(
+            return SuiteMetrics(
                 timestamp=datetime.now(),
                 total_tests=0,
                 passed_tests=0,
@@ -302,9 +302,9 @@ class TestRunner:
                 timeout_failures=1
             )
 
-    def _parse_test_results(self, stage_name: str, result: subprocess.CompletedProcess, duration: float) -> TestSuiteMetrics:  # type: ignore[attr-defined]
+    def _parse_test_results(self, stage_name: str, result: subprocess.CompletedProcess, duration: float) -> SuiteMetrics:  # type: ignore[attr-defined]
         """Parse test results from pytest output and XML."""
-        metrics = TestSuiteMetrics(
+        metrics = SuiteMetrics(
             timestamp=datetime.now(),
             total_tests=0,
             passed_tests=0,
@@ -357,7 +357,7 @@ class TestRunner:
 
         return metrics
 
-    def _parse_junit_xml(self, xml_path: Path, metrics: TestSuiteMetrics) -> None:
+    def _parse_junit_xml(self, xml_path: Path, metrics: SuiteMetrics) -> None:
         """Parse JUnit XML for detailed test information."""
         try:
             tree = ET.parse(xml_path)
@@ -389,7 +389,7 @@ class TestRunner:
 
                     category = categorizer.categorize_failure(failure_info)
 
-                    test_failure = TestFailure(
+                    test_failure = FailureRecord(
                         test_name=name,
                         test_file=file,
                         failure_type=element.tag,
@@ -434,7 +434,7 @@ class TestRunner:
         except Exception as e:
             print(f"Warning: Could not parse XML results: {e}")
 
-class TestHealthMonitor:
+class HealthMonitor:
     """Main class for monitoring test suite health."""
 
     def __init__(self, test_dir: str | Path):
@@ -443,10 +443,10 @@ class TestHealthMonitor:
         self.history_dir = self.test_dir / "scripts" / "history"
         self.history_dir.mkdir(parents=True, exist_ok=True)
 
-        self.runner = TestRunner(self.test_dir)
+        self.runner = HealthTestRunner(self.test_dir)
         self.categorizer = FailureCategorizer()
 
-    def run_health_check(self, mode: str = "full") -> TestSuiteMetrics:
+    def run_health_check(self, mode: str = "full") -> SuiteMetrics:
         """Run comprehensive health check."""
         print(f"Running test health check in '{mode}' mode...")
 
@@ -464,7 +464,7 @@ class TestHealthMonitor:
             # Run complete test suite
             return self.runner._run_test_stage("full_suite", ["tests/"])
 
-    def save_metrics(self, metrics: TestSuiteMetrics) -> Path:
+    def save_metrics(self, metrics: SuiteMetrics) -> Path:
         """Save metrics to historical record."""
         timestamp = metrics.timestamp.strftime("%Y%m%d_%H%M%S")
         filename = f"test_health_{timestamp}.json"
@@ -500,7 +500,7 @@ class TestHealthMonitor:
 
         return filepath
 
-    def load_historical_metrics(self, days_back: int = 7) -> list[TestSuiteMetrics]:
+    def load_historical_metrics(self, days_back: int = 7) -> list[SuiteMetrics]:
         """Load historical metrics from the last N days."""
         cutoff_date = datetime.now() - timedelta(days=days_back)
         metrics_list = []
@@ -513,7 +513,7 @@ class TestHealthMonitor:
                 timestamp = datetime.fromisoformat(data["timestamp"])
                 if timestamp >= cutoff_date:
                     # Reconstruct metrics object
-                    metrics = TestSuiteMetrics(
+                    metrics = SuiteMetrics(
                         timestamp=timestamp,
                         total_tests=data["total_tests"],
                         passed_tests=data["passed_tests"],
@@ -543,7 +543,7 @@ class TestHealthMonitor:
 
         return sorted(metrics_list, key=lambda m: m.timestamp)
 
-    def generate_health_report(self, metrics: TestSuiteMetrics, historical: list[TestSuiteMetrics] | None = None) -> str:
+    def generate_health_report(self, metrics: SuiteMetrics, historical: list[SuiteMetrics] | None = None) -> str:
         """Generate comprehensive health report."""
         report = []
         report.append("=" * 80)
@@ -670,7 +670,7 @@ class TestHealthMonitor:
 
         return "\n".join(report)
 
-    def generate_prioritized_fix_list(self, metrics: TestSuiteMetrics) -> dict[str, list[str]]:
+    def generate_prioritized_fix_list(self, metrics: SuiteMetrics) -> dict[str, list[str]]:
         """Generate prioritized list of fixes based on failure analysis."""
         fixes = {
             "critical": [],
@@ -743,7 +743,7 @@ def main():
     # Initialize monitor
     script_dir = Path(__file__).parent
     test_dir = script_dir.parent
-    monitor = TestHealthMonitor(test_dir)
+    monitor = HealthMonitor(test_dir)
 
     metrics = None
 

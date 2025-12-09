@@ -16,6 +16,9 @@ from typing import cast
 from unittest.mock import Mock
 
 import pytest
+from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtWidgets import QApplication
+
 from core.controller import ExtractionController
 from core.managers import (
     # Serial execution required: QApplication management, Thread safety concerns, Real Qt components
@@ -27,8 +30,6 @@ from core.protocols.manager_protocols import (
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
 )
-from PySide6.QtCore import QObject, QThread, Signal
-from PySide6.QtWidgets import QApplication
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 pytestmark = [

@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.utils.safe_animation import SafeAnimation, is_headless_environment
 
 from .spacing_constants import (

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from PIL import Image
+
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -33,9 +34,10 @@ class SpriteVisualValidator:
             Tuple of (is_valid, confidence_score, metrics_dict)
         """
         try:
-            # Load image
-            img = Image.open(image_path).convert("L")  # Convert to grayscale
-            img_array = np.array(img)
+            # Load image with context manager to prevent resource leak
+            with Image.open(image_path) as img:
+                img_gray = img.convert("L")  # Convert to grayscale
+                img_array = np.array(img_gray)
 
             # Calculate various metrics
             metrics = {}

@@ -7,7 +7,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from core.managers import get_extraction_manager
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
@@ -26,19 +25,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from typing_extensions import override
+
+from core.di_container import inject
+from core.managers import get_extraction_manager
+from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 from ui.common import WorkerManager
 from ui.dialogs import UserErrorDialog
 from ui.rom_extraction.workers import SpriteScanWorker
 from ui.widgets.fullscreen_sprite_viewer import FullscreenSpriteViewer
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
-from utils.constants import (
-    SETTINGS_KEY_LAST_INPUT_ROM,
-    SETTINGS_NS_ROM_INJECTION,
-)
+from utils.constants import SETTINGS_KEY_LAST_INPUT_ROM, SETTINGS_NS_ROM_INJECTION
 from utils.logging_config import get_logger
-from utils.rom_cache import get_rom_cache
-from utils.settings_manager import get_settings_manager
 
 logger = get_logger(__name__)
 
@@ -75,6 +73,8 @@ class DetachedGalleryWindow(QMainWindow):
         # Core managers
         self.extraction_manager = get_extraction_manager()
         self.rom_extractor = self.extraction_manager.get_rom_extractor()
+        self.settings_manager: SettingsManagerProtocol = inject(SettingsManagerProtocol)
+        self.rom_cache: ROMCacheProtocol = inject(ROMCacheProtocol)
 
         # UI Components (initialized in _setup_ui)
         self.gallery_widget: SpriteGalleryWidget | None = None
@@ -517,7 +517,7 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _load_rom(self):
         """Load a ROM file."""
-        settings = get_settings_manager()
+        settings = self.settings_manager
         default_dir = settings.get_default_directory()
 
         filename, _ = QFileDialog.getOpenFileName(
@@ -535,7 +535,7 @@ class DetachedGalleryWindow(QMainWindow):
     def _load_last_rom(self):
         """Load the last selected ROM if available."""
         try:
-            settings = get_settings_manager()
+            settings = self.settings_manager
             last_rom = settings.get_value(
                 SETTINGS_NS_ROM_INJECTION,
                 SETTINGS_KEY_LAST_INPUT_ROM,
@@ -560,7 +560,7 @@ class DetachedGalleryWindow(QMainWindow):
     def _save_last_rom(self, rom_path: str):
         """Save the ROM path as the last used ROM."""
         try:
-            settings = get_settings_manager()
+            settings = self.settings_manager
             settings.set_value(
                 SETTINGS_NS_ROM_INJECTION,
                 SETTINGS_KEY_LAST_INPUT_ROM,
@@ -579,7 +579,7 @@ class DetachedGalleryWindow(QMainWindow):
     def _add_to_recent_roms(self, rom_path: str):
         """Add a ROM to the recent ROMs list."""
         try:
-            settings = get_settings_manager()
+            settings = self.settings_manager
 
             # Get current recent ROMs list
             recent_roms = settings.get_value("gallery", "recent_roms", [])
@@ -612,7 +612,7 @@ class DetachedGalleryWindow(QMainWindow):
             self.recent_roms_menu.clear()
 
         try:
-            settings = get_settings_manager()
+            settings = self.settings_manager
             recent_roms = settings.get_value("gallery", "recent_roms", [])
 
             # Filter out non-existent files
@@ -690,9 +690,6 @@ class DetachedGalleryWindow(QMainWindow):
             return
 
         try:
-            # Check cache for known sprites
-            get_rom_cache()
-
             # Get known sprite locations from config
             locations = self.extraction_manager.get_known_sprite_locations(self.rom_path)
 
@@ -856,8 +853,8 @@ class DetachedGalleryWindow(QMainWindow):
         # Convert to the format expected by gallery
         sprite = {
             'offset': sprite_info['offset'],
-            'decompressed_size': sprite_info.get('decompressed_size', 0),
-            'tile_count': sprite_info.get('tile_count', 0),
+            'decompressed_size': 0,  # Will be determined during thumbnail generation
+            'tile_count': 0,
             'compressed': False,  # Will be determined later
             'name': f"Sprite_0x{sprite_info['offset']:06X}",
             'quality': sprite_info.get('quality', 1.0)
@@ -1435,3 +1432,4 @@ class DetachedGalleryWindow(QMainWindow):
         # Force layout update when window is shown
         if self.gallery_widget:
             self.gallery_widget.force_layout_update()
+

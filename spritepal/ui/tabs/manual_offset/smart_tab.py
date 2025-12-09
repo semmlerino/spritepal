@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.common.spacing_constants import (
     COMPACT_BUTTON_HEIGHT,
     GROUP_PADDING,

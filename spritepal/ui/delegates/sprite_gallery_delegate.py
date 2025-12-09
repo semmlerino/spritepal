@@ -16,6 +16,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 from typing_extensions import override
+
 from ui.models.sprite_gallery_model import SpriteGalleryModel
 from utils.logging_config import get_logger
 

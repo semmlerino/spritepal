@@ -25,7 +25,6 @@ pytestmark = [
     pytest.mark.no_qt,
     pytest.mark.performance,
     pytest.mark.rom_data,
-    pytest.mark.cache,
     pytest.mark.unit,
 ]
 
@@ -90,8 +89,8 @@ class TestIntegrationExamples:
         extraction_manager = managers.get_extraction_manager()
 
         # Test manager has expected methods
-        assert hasattr(extraction_manager, 'extract_sprites')
-        assert hasattr(extraction_manager, 'validate_files')
+        assert hasattr(extraction_manager, 'extract_from_vram')
+        assert hasattr(extraction_manager, 'validate_extraction_params')
 
     def test_cross_manager_workflow(self, managers):
         """Test workflow that uses multiple managers."""
@@ -117,13 +116,13 @@ class TestIsolatedManagerExamples:
 
         # This test modifies state that could affect other tests
         # So it needs isolated managers
-        session_manager.get_setting("some_setting", "default")
+        session_manager.get("session", "some_setting", "default")
 
         # Modify state
-        session_manager.set_setting("some_setting", "modified_value")
+        session_manager.set("session", "some_setting", "modified_value")
 
         # Verify modification
-        assert session_manager.get_setting("some_setting", "default") == "modified_value"
+        assert session_manager.get("session", "some_setting", "default") == "modified_value"
 
         # This change won't affect other tests due to isolation
 

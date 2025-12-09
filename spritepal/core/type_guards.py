@@ -13,10 +13,10 @@ if TYPE_CHECKING:
     from pathlib import Path
     from typing import TypedDict
 
-    from core.managers.base_manager import BaseManager
-
     # from core.protocols.manager_protocols import ExtractionParams  # TODO: Define this protocol
     from PySide6.QtCore import QObject
+
+    from core.managers.base_manager import BaseManager
 
     # Temporary stub until ExtractionParams is properly defined
     class ExtractionParams(TypedDict):

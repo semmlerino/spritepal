@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 
 import pytest
+
 from ui.styles.components import (
     get_bold_text_style,
     get_borderless_preview_style,

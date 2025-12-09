@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from core.managers import ExtractionManager
+    from core.protocols.manager_protocols import ROMCacheProtocol
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QKeyEvent, QPixmap
@@ -29,6 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from typing_extensions import override
+
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.components.navigation.region_jump_widget import RegionJumpWidget
@@ -36,7 +38,8 @@ from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.rom_extraction.workers import SpritePreviewWorker
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 from utils.logging_config import get_logger
-from utils.rom_cache import get_rom_cache
+
+# from utils.rom_cache import get_rom_cache # Removed due to DI
 from utils.sprite_regions import SpriteRegion, SpriteRegionDetector
 
 logger = get_logger(__name__)
@@ -157,7 +160,7 @@ class SpriteNavigator(QWidget):
     Enhanced sprite navigation widget providing intuitive ROM exploration.
 
     Features:
-    - Visual ROM map with sprite density
+    - Visual ROM map with sprite density heatmap
     - Smart navigation between sprites
     - Region-based jumping
     - Thumbnail previews of nearby sprites
@@ -170,7 +173,7 @@ class SpriteNavigator(QWidget):
     region_changed = Signal(int)  # Emitted when region selection changes
     navigation_mode_changed = Signal(str)  # "manual" or "smart"
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None, rom_cache: ROMCacheProtocol | None = None):
         super().__init__(parent)
 
         # State
@@ -183,7 +186,12 @@ class SpriteNavigator(QWidget):
         self.navigation_mode = "manual"  # "manual" or "smart"
 
         # Cache and performance
-        self.rom_cache = get_rom_cache()
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        else:
+            self.rom_cache = rom_cache
         self.thumbnail_cache: dict[int, QPixmap] = {}
         self._last_thumbnail_update = 0
 

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 # Type variable for widget factory
 WidgetT = TypeVar('WidgetT', bound=QWidget)
 
-class TestParentWidget(QWidget):
+class ParentWidget(QWidget):
     """
     A proper QWidget subclass for use as a parent in tests.
 
@@ -51,7 +51,7 @@ class TestParentWidget(QWidget):
         event.accept()
 
 @pytest.fixture
-def parent_widget(qapp: QApplication) -> Iterator[TestParentWidget]:
+def parent_widget(qapp: QApplication) -> Iterator[ParentWidget]:
     """
     Fixture providing a proper QWidget parent for tests.
 
@@ -64,7 +64,7 @@ def parent_widget(qapp: QApplication) -> Iterator[TestParentWidget]:
     Yields:
         TestParentWidget: A proper parent widget for testing
     """
-    widget = TestParentWidget()
+    widget = ParentWidget()
     yield widget
     # Ensure proper cleanup
     widget.close()
@@ -102,7 +102,7 @@ def widget_factory(qapp: QApplication) -> Iterator[Callable[..., WidgetT]]:
         """
         # Create a parent if not provided
         if "parent" not in kwargs or kwargs["parent"] is None:
-            parent = TestParentWidget()
+            parent = ParentWidget()
             created_widgets.append(parent)
             kwargs["parent"] = parent
 
@@ -135,7 +135,7 @@ def ensure_qt_app() -> QApplication:
         return app
     return QApplication.instance()
 
-class MockableParentWidget(TestParentWidget):
+class MockableParentWidget(ParentWidget):
     """
     A parent widget that can have some methods mocked while maintaining Qt functionality.
 

@@ -10,8 +10,9 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Any, Generic, TypeVar, cast
 
-from core.managers.base_manager import BaseManager
 from PySide6.QtCore import QObject, QThread, Signal
+
+from core.managers.base_manager import BaseManager
 from ui.common.worker_manager import WorkerManager
 
 # Type variables for generic typing
@@ -425,6 +426,7 @@ class TypedInjectionWorker(InjectionWorkerBase["InjectionManager", dict[str, Any
 # Pytest fixtures (if pytest is available)
 try:
     import pytest
+
     from core.managers.extraction_manager import ExtractionManager  # noqa: F401
     from core.managers.injection_manager import InjectionManager  # noqa: F401
 

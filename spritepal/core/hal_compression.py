@@ -16,6 +16,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -331,29 +332,32 @@ class HALProcessPool:
 
     def _register_cleanup_hooks(self) -> None:
         """Register cleanup hooks to prevent memory leaks"""
-        if not HALProcessPool._cleanup_registered:
-            # Register atexit handler with suppress_logging_errors to prevent I/O errors during shutdown
-            @suppress_logging_errors
-            def cleanup_at_exit() -> None:
-                try:
-                    self.shutdown()
-                except Exception:
-                    pass  # Ignore errors during shutdown
-
-            atexit.register(cleanup_at_exit)
-
-            # Register with Qt if available
-            if QT_AVAILABLE and QApplication is not None:
-                try:
-                    app = QApplication.instance()
-                    if app is not None:
-                        # Use suppressed version for Qt cleanup too
-                        app.aboutToQuit.connect(cleanup_at_exit)
-                        logger.debug("Registered HAL pool cleanup with QApplication.aboutToQuit")
-                except Exception as e:
-                    logger.debug(f"Could not register Qt cleanup: {e}")
-
+        # Thread-safe check-then-act to prevent duplicate cleanup registration
+        with HALProcessPool._lock:
+            if HALProcessPool._cleanup_registered:
+                return
             HALProcessPool._cleanup_registered = True
+
+        # Register atexit handler with suppress_logging_errors to prevent I/O errors during shutdown
+        @suppress_logging_errors
+        def cleanup_at_exit() -> None:
+            try:
+                self.shutdown()
+            except Exception:
+                pass  # Ignore errors during shutdown
+
+        atexit.register(cleanup_at_exit)
+
+        # Register with Qt if available
+        if QT_AVAILABLE and QApplication is not None:
+            try:
+                app = QApplication.instance()
+                if app is not None:
+                    # Use suppressed version for Qt cleanup too
+                    app.aboutToQuit.connect(cleanup_at_exit)
+                    logger.debug("Registered HAL pool cleanup with QApplication.aboutToQuit")
+            except Exception as e:
+                logger.debug(f"Could not register Qt cleanup: {e}")
 
     def initialize(self, exhal_path: str, inhal_path: str, pool_size: int = HAL_POOL_SIZE_DEFAULT) -> bool:
         """Initialize the process pool with HAL tool paths.
@@ -578,7 +582,9 @@ class HALProcessPool:
                     safe_debug(logger, f"Error sending shutdown signals: {e}")
 
             # Wait for processes to finish gracefully with shorter timeouts
-            for p in self._processes:
+            # Create defensive copy to avoid issues if list is modified during iteration
+            processes_snapshot = list(self._processes)
+            for p in processes_snapshot:
                 try:
                     # Give process a short time to exit cleanly
                     p.join(timeout=0.5)
@@ -787,9 +793,13 @@ class HALProcessPool:
                 try:
                     cls._instance.force_reset()
                 except Exception as e:
-                    safe_debug(logger, f"Error during singleton reset: {e}")
+                    # Only log if not during interpreter shutdown
+                    if not sys.is_finalizing():
+                        safe_debug(logger, f"Error during singleton reset: {e}")
                 cls._instance = None
-                logger.debug("HAL process pool singleton reset")
+                # Only log if not during interpreter shutdown
+                if not sys.is_finalizing():
+                    logger.debug("HAL process pool singleton reset")
 
 class HALCompressor:
     """Handles HAL compression/decompression for ROM injection"""
@@ -909,6 +919,13 @@ class HALCompressor:
             Decompressed data as bytes
         """
         logger.info(f"Decompressing from ROM: {rom_path} at offset 0x{offset:X}")
+
+        # Validate offset before subprocess/pool operations
+        if offset < 0:
+            raise ValueError(f"Invalid negative offset: {offset}")
+        rom_size = Path(rom_path).stat().st_size
+        if offset >= rom_size:
+            raise ValueError(f"Offset 0x{offset:X} exceeds ROM size 0x{rom_size:X}")
 
         # Try to use pool if available
         if self._pool and self._pool.is_initialized:

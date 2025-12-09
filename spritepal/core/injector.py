@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from PIL import Image
+
 from utils.constants import (
     IMAGE_DIMENSION_MULTIPLE,
     PIXEL_MASK_4BIT,
@@ -81,83 +82,85 @@ class SpriteInjector:
         """Validate sprite file format and dimensions"""
         logger.debug(f"Validating sprite: {sprite_path}")
         try:
-            img = Image.open(sprite_path)
-            logger.debug(f"Sprite info: {img.size} pixels, mode={img.mode}")
+            with Image.open(sprite_path) as img:
+                logger.debug(f"Sprite info: {img.size} pixels, mode={img.mode}")
 
-            # Check if indexed or grayscale mode
-            if img.mode not in ["P", "L"]:
-                logger.error(f"Invalid image mode: {img.mode}, expected P (indexed) or L (grayscale)")
-                return (
-                    False,
-                    f"Image must be in indexed (P) or grayscale (L) mode (found {img.mode})",
-                )
+                # Check if indexed or grayscale mode
+                if img.mode not in ["P", "L"]:
+                    logger.error(f"Invalid image mode: {img.mode}, expected P (indexed) or L (grayscale)")
+                    return (
+                        False,
+                        f"Image must be in indexed (P) or grayscale (L) mode (found {img.mode})",
+                    )
 
-            # Check dimensions are multiples of 8
-            width, height = img.size
-            if width % IMAGE_DIMENSION_MULTIPLE != 0 or height % IMAGE_DIMENSION_MULTIPLE != 0:
-                logger.error(f"Invalid dimensions: {width}x{height} (not multiples of 8)")
-                return (
-                    False,
-                    f"Image dimensions must be multiples of {IMAGE_DIMENSION_MULTIPLE} (found {width}x{height})",
-                )
+                # Check dimensions are multiples of 8
+                width, height = img.size
+                if width % IMAGE_DIMENSION_MULTIPLE != 0 or height % IMAGE_DIMENSION_MULTIPLE != 0:
+                    logger.error(f"Invalid dimensions: {width}x{height} (not multiples of 8)")
+                    return (
+                        False,
+                        f"Image dimensions must be multiples of {IMAGE_DIMENSION_MULTIPLE} (found {width}x{height})",
+                    )
 
-            # Check color count based on mode
-            if img.mode == "P":
-                # Indexed mode - count actual unique colors used
-                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                unique_colors = len(set(cast(Any, img.getdata())))
-                logger.debug(f"Indexed mode with {unique_colors} unique colors")
-                if unique_colors > 16:
-                    logger.error(f"Too many colors: {unique_colors} (max 16)")
-                    return False, f"Image has too many colors ({unique_colors}, max 16)"
-                logger.debug(f"Palette validation passed: {unique_colors} colors <= 16")
-            elif img.mode == "L":
-                # Grayscale mode - verify values are valid (0-255)
-                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                pixels = list(cast(Any, img.getdata()))
-                max_val = max(pixels) if pixels else 0
-                if max_val > 255:
-                    logger.error(f"Invalid grayscale value: {max_val}")
-                    return False, f"Invalid grayscale values (max: {max_val})"
-                logger.debug(f"Grayscale validation passed: max value {max_val} <= 255")
+                # Check color count based on mode
+                img_mode = img.mode  # Capture before context exits
+                if img.mode == "P":
+                    # Indexed mode - count actual unique colors used
+                    # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
+                    unique_colors = len(set(cast(Any, img.getdata())))
+                    logger.debug(f"Indexed mode with {unique_colors} unique colors")
+                    if unique_colors > 16:
+                        logger.error(f"Too many colors: {unique_colors} (max 16)")
+                        return False, f"Image has too many colors ({unique_colors}, max 16)"
+                    logger.debug(f"Palette validation passed: {unique_colors} colors <= 16")
+                elif img.mode == "L":
+                    # Grayscale mode - verify values are valid (0-255)
+                    # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
+                    pixels = list(cast(Any, img.getdata()))
+                    max_val = max(pixels) if pixels else 0
+                    if max_val > 255:
+                        logger.error(f"Invalid grayscale value: {max_val}")
+                        return False, f"Invalid grayscale values (max: {max_val})"
+                    logger.debug(f"Grayscale validation passed: max value {max_val} <= 255")
+
+                self.sprite_path = sprite_path
+                logger.info(f"Sprite validation successful: {width}x{height}, mode={img_mode}")
+                return True, "Sprite validation successful"
 
         except Exception as e:
             logger.exception("Sprite validation failed")
             return False, f"Error validating sprite: {e!s}"
-        else:
-            self.sprite_path = sprite_path
-            logger.info(f"Sprite validation successful: {width}x{height}, mode={img.mode}")
-            return True, "Sprite validation successful"
 
     def convert_png_to_4bpp(self, png_path: str) -> bytes:
         """Convert PNG to SNES 4bpp tile data"""
         logger.info(f"Converting PNG to 4bpp: {png_path}")
-        img = Image.open(png_path)
 
-        # Handle different image modes
-        if img.mode == "L":
-            # Grayscale mode - likely from ROM extraction
-            # Convert grayscale values back to palette indices
-            # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-            pixels = list(cast(Any, img.getdata()))
-            original_max = max(pixels) if pixels else 0
-            # Divide by 17 to get original 4-bit indices (0-15)
-            pixels = [min(15, p // 17) for p in pixels]
-            logger.debug(f"Converting grayscale to palette indices: max grayscale={original_max}, max index={max(pixels) if pixels else 0}")
-        elif img.mode == "P":
-            # Already indexed - use as-is
-            # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-            pixels = list(cast(Any, img.getdata()))
-            max_index = max(pixels) if pixels else 0
-            logger.debug(f"Using indexed palette directly: max index={max_index}")
-        else:
-            # Convert to indexed mode
-            logger.warning(f"Converting {img.mode} to indexed mode - may lose color information")
-            img = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=16)  # type: ignore[attr-defined]
-            # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-            pixels = list(cast(Any, img.getdata()))
+        # Extract all needed data from image within context manager
+        with Image.open(png_path) as img:
+            # Handle different image modes
+            if img.mode == "L":
+                # Grayscale mode - likely from ROM extraction
+                # Convert grayscale values back to palette indices
+                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
+                pixels = list(cast(Any, img.getdata()))
+                original_max = max(pixels) if pixels else 0
+                # Divide by 17 to get original 4-bit indices (0-15)
+                pixels = [min(15, p // 17) for p in pixels]
+                logger.debug(f"Converting grayscale to palette indices: max grayscale={original_max}, max index={max(pixels) if pixels else 0}")
+            elif img.mode == "P":
+                # Already indexed - use as-is
+                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
+                pixels = list(cast(Any, img.getdata()))
+                max_index = max(pixels) if pixels else 0
+                logger.debug(f"Using indexed palette directly: max index={max_index}")
+            else:
+                # Convert to indexed mode
+                logger.warning(f"Converting {img.mode} to indexed mode - may lose color information")
+                converted = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=16)  # type: ignore[attr-defined]
+                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
+                pixels = list(cast(Any, converted.getdata()))
 
-        width, height = img.size
+            width, height = img.size
         tiles_x = width // TILE_WIDTH
         tiles_y = height // TILE_HEIGHT
         total_tiles = tiles_x * tiles_y

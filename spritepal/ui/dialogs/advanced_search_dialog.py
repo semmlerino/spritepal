@@ -14,9 +14,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
-from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngine
-from core.workers.base import handle_worker_errors
 from PySide6.QtCore import QMutex, Qt, QThread, QWaitCondition, Signal
 from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
@@ -42,6 +39,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from typing_extensions import override
+
+from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
+from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngine
+from core.workers.base import handle_worker_errors
 from ui.common.worker_manager import WorkerManager
 from ui.dialogs.similarity_results_dialog import show_similarity_results
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE

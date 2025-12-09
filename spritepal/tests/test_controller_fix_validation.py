@@ -46,7 +46,7 @@ from core.managers import (
     initialize_managers,
 )
 from tests.infrastructure import (
-    TestApplicationFactory,
+    ApplicationFactory,
     qt_widget_test,
 )
 from tests.infrastructure.test_data_repository import get_test_data_repository
@@ -59,7 +59,7 @@ class TestControllerDefensiveValidationFix:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self):
         """Set up testing infrastructure."""
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
 
         yield
 
@@ -153,7 +153,7 @@ class TestControllerDefensiveValidationFix:
 
             main_window.extraction_failed = track_extraction_failed
 
-            # Create a realistic VRAM file using TestDataRepository
+            # Create a realistic VRAM file using DataRepository
             repo = get_test_data_repository()
             test_data = repo.get_vram_extraction_data("medium")  # Creates 64KB VRAM file
             vram_path = test_data["vram_path"]
@@ -219,7 +219,7 @@ class TestControllerDefensiveValidationFix:
 
             main_window.extraction_failed = track_extraction_failed
 
-            # Create a realistic VRAM file using TestDataRepository
+            # Create a realistic VRAM file using DataRepository
             repo = get_test_data_repository()
             test_data = repo.get_vram_extraction_data("medium")  # Creates 64KB VRAM file
             vram_path = test_data["vram_path"]

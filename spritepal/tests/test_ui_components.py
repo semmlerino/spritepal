@@ -1,5 +1,7 @@
 """
 Unit tests for refactored UI components
+
+Uses shared class_managers fixture from core_fixtures.py instead of local setup.
 """
 from __future__ import annotations
 
@@ -7,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 
 # Add parent directories to path
@@ -28,18 +31,15 @@ pytestmark = [
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.managers import cleanup_managers, initialize_managers
+# Note: initialize_managers and cleanup_managers are no longer needed here
+# as we use the shared class_managers fixture
 
 
+@pytest.mark.usefixtures("class_managers")
 class TestROMMapWidget:
     """Test ROMMapWidget functionality"""
 
-    @pytest.fixture(autouse=True)
-    def setup_managers(self):
-        """Setup managers for all tests"""
-        initialize_managers("TestApp")
-        yield
-        cleanup_managers()
+    # Uses shared class_managers fixture - no local setup_managers needed
 
     # Using parent_widget fixture from qt_test_helpers instead of mock_parent
 
@@ -64,6 +64,7 @@ class TestROMMapWidget:
     def test_add_sprite_data(self, qtbot):
         """Test adding sprite data to ROM map"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.visualization.rom_map_widget import ROMMapWidget
 
         parent_widget = QWidget()
@@ -85,6 +86,7 @@ class TestROMMapWidget:
     def test_sprite_count_limits(self, qtbot):
         """Test sprite count limits prevent memory leaks"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.visualization.rom_map_widget import (
             SPRITE_CLEANUP_TARGET,
             SPRITE_CLEANUP_THRESHOLD,
@@ -109,6 +111,7 @@ class TestROMMapWidget:
     def test_cleanup_method(self, qtbot):
         """Test cleanup method clears resources"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.visualization.rom_map_widget import ROMMapWidget
 
         parent_widget = QWidget()
@@ -128,21 +131,18 @@ class TestROMMapWidget:
         # Verify resources cleared
         assert len(widget.found_sprites) == 0
 
+@pytest.mark.usefixtures("class_managers")
 class TestScanControlsPanel:
     """Test ScanControlsPanel functionality"""
 
-    @pytest.fixture(autouse=True)
-    def setup_managers(self):
-        """Setup managers for all tests"""
-        initialize_managers("TestApp")
-        yield
-        cleanup_managers()
+    # Uses shared class_managers fixture - no local setup_managers needed
 
     # Using parent_widget fixture from qt_test_helpers instead of mock_parent
 
     def test_scan_controls_creation(self, qtbot):
         """Test ScanControlsPanel creation"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.panels.scan_controls_panel import ScanControlsPanel
 
         parent_widget = QWidget()
@@ -161,6 +161,7 @@ class TestScanControlsPanel:
     def test_scan_parameters_validation(self, qtbot):
         """Test scan parameter validation"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.panels.scan_controls_panel import ScanControlsPanel
 
         parent_widget = QWidget()
@@ -179,21 +180,18 @@ class TestScanControlsPanel:
         assert is_valid is True, "Valid scan parameters should pass validation"
         assert end_offset > start_offset, "End offset should be greater than start offset"
 
+@pytest.mark.usefixtures("class_managers")
 class TestImportExportPanel:
     """Test ImportExportPanel functionality"""
 
-    @pytest.fixture(autouse=True)
-    def setup_managers(self):
-        """Setup managers for all tests"""
-        initialize_managers("TestApp")
-        yield
-        cleanup_managers()
+    # Uses shared class_managers fixture - no local setup_managers needed
 
     # Using parent_widget fixture from qt_test_helpers instead of mock_parent
 
     def test_import_export_creation(self, qtbot):
         """Test ImportExportPanel creation"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.panels.import_export_panel import ImportExportPanel
 
         parent_widget = QWidget()
@@ -209,6 +207,7 @@ class TestImportExportPanel:
     def test_file_operations(self, qtbot):
         """Test file import/export operations"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.panels.import_export_panel import ImportExportPanel
 
         parent_widget = QWidget()
@@ -232,21 +231,18 @@ class TestImportExportPanel:
         panel.set_found_sprites(test_sprites)
         assert panel.found_sprites == test_sprites
 
+@pytest.mark.usefixtures("class_managers")
 class TestStatusPanel:
     """Test StatusPanel functionality"""
 
-    @pytest.fixture(autouse=True)
-    def setup_managers(self):
-        """Setup managers for all tests"""
-        initialize_managers("TestApp")
-        yield
-        cleanup_managers()
+    # Uses shared class_managers fixture - no local setup_managers needed
 
     # Using parent_widget fixture from qt_test_helpers instead of mock_parent
 
     def test_status_panel_creation(self, qtbot):
         """Test StatusPanel creation"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.panels.status_panel import StatusPanel
 
         parent_widget = QWidget()
@@ -263,6 +259,7 @@ class TestStatusPanel:
     def test_status_updates(self, qtbot):
         """Test status message updates"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.panels.status_panel import StatusPanel
 
         parent_widget = QWidget()
@@ -311,21 +308,18 @@ class TestStatusPanel:
         assert hasattr(panel, "hide_progress")
         assert hasattr(panel, "update_progress")
 
+@pytest.mark.usefixtures("class_managers")
 class TestRangeScanDialog:
     """Test RangeScanDialog functionality"""
 
-    @pytest.fixture(autouse=True)
-    def setup_managers(self):
-        """Setup managers for all tests"""
-        initialize_managers("TestApp")
-        yield
-        cleanup_managers()
+    # Uses shared class_managers fixture - no local setup_managers needed
 
     # Using parent_widget fixture from qt_test_helpers instead of mock_parent
 
     def test_range_scan_dialog_creation(self, qtbot):
         """Test RangeScanDialog creation"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.dialogs.range_scan_dialog import RangeScanDialog
 
         parent_widget = QWidget()
@@ -347,6 +341,7 @@ class TestRangeScanDialog:
     def test_scan_parameters(self, qtbot):
         """Test scan parameter collection"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.dialogs.range_scan_dialog import RangeScanDialog
 
         parent_widget = QWidget()
@@ -368,6 +363,7 @@ class TestRangeScanDialog:
     def test_validation_with_large_range(self, qtbot):
         """Test dialog can handle large range selection"""
         from PySide6.QtWidgets import QWidget
+
         from ui.components.dialogs.range_scan_dialog import RangeScanDialog
 
         parent_widget = QWidget()

@@ -5,14 +5,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from core.rom_extractor import ROMExtractor
     from PySide6.QtCore import QObject
 
-from core.workers.base import BaseWorker, handle_worker_errors
+    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.rom_extractor import ROMExtractor
+
 from PySide6.QtCore import Signal
+
+from core.workers.base import BaseWorker, handle_worker_errors
 from utils.constants import MAX_ROM_SIZE
 from utils.logging_config import get_logger
-from utils.rom_cache import get_rom_cache
+
+# from utils.rom_cache import get_rom_cache # Removed due to DI
 
 logger = get_logger(__name__)
 
@@ -30,7 +34,8 @@ class RangeScanWorker(BaseWorker):
     cache_progress_saved = Signal(int, int, int)  # current_offset, total_sprites_found, progress_percentage
 
     def __init__(self, rom_path: str, start_offset: int, end_offset: int,
-                 step_size: int, extractor: ROMExtractor, parent: QObject | None = None):
+                 step_size: int, extractor: ROMExtractor, parent: QObject | None = None,
+                 rom_cache: ROMCacheProtocol | None = None):
         """
         Initialize range scan worker
 
@@ -40,6 +45,7 @@ class RangeScanWorker(BaseWorker):
             end_offset: Ending offset for scan (inclusive)
             step_size: Step size between offsets to check
             extractor: ROM extractor instance
+            rom_cache: Injected ROMCacheProtocol instance
         """
         super().__init__(parent)
         self.rom_path = rom_path
@@ -58,7 +64,13 @@ class RangeScanWorker(BaseWorker):
         self._should_stop = False
 
         # Cache integration
-        self.rom_cache = get_rom_cache()
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        else:
+            self.rom_cache = rom_cache
+
         self.found_sprites: list[dict[str, Any]] = []
         self.current_offset = start_offset
         self.scan_params: dict[str, Any] = {}

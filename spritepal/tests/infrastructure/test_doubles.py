@@ -41,6 +41,7 @@ class MockROMFile:
         self.path = "/mock/rom/path.sfc"
         self._data = data if data is not None else self._generate_mock_data()
         self._is_open = False
+        self._position = 0  # Track file position for seek/read operations
 
     def _generate_mock_data(self) -> bytes:
         """Generate deterministic mock ROM data."""
@@ -62,8 +63,9 @@ class MockROMFile:
         return bytes(data)
 
     def open(self, mode: str = 'rb'):
-        """Mock file open."""
+        """Mock file open, resets position to start."""
         self._is_open = True
+        self._position = 0  # Reset position on open
         return self
 
     def close(self):
@@ -71,25 +73,51 @@ class MockROMFile:
         self._is_open = False
 
     def read(self, size: int = -1) -> bytes:
-        """Mock file read."""
+        """Mock file read from current position.
+        
+        Args:
+            size: Number of bytes to read, -1 for all remaining data.
+            
+        Returns:
+            Bytes read from current position.
+        """
         if not self._is_open:
             raise ValueError("I/O operation on closed file")
         if size == -1:
-            return self._data
-        return self._data[:size]
+            result = self._data[self._position:]
+            self._position = len(self._data)
+        else:
+            result = self._data[self._position:self._position + size]
+            self._position += len(result)
+        return result
 
-    def seek(self, position: int):
-        """Mock file seek."""
+    def seek(self, position: int, whence: int = 0) -> int:
+        """Mock file seek to position.
+        
+        Args:
+            position: Offset to seek to.
+            whence: Reference point (0=start, 1=current, 2=end).
+            
+        Returns:
+            New absolute position.
+        """
         if not self._is_open:
             raise ValueError("I/O operation on closed file")
-        # In real implementation would change file position
-        pass
+        if whence == 0:  # SEEK_SET
+            self._position = position
+        elif whence == 1:  # SEEK_CUR
+            self._position += position
+        elif whence == 2:  # SEEK_END
+            self._position = len(self._data) + position
+        # Clamp to valid range
+        self._position = max(0, min(self._position, len(self._data)))
+        return self._position
 
     def tell(self) -> int:
-        """Mock file tell."""
+        """Return current file position."""
         if not self._is_open:
             raise ValueError("I/O operation on closed file")
-        return 0  # Simplified for testing
+        return self._position  # Simplified for testing
 
     def __enter__(self):
         return self
@@ -336,7 +364,7 @@ class MockCacheManager:
             self._cache_data.clear()
             self.call_log.append("clear_cache(all)")
 
-class TestDoubleFactory:
+class DoubleFactory:
     """
     Factory for creating configured test doubles.
     
@@ -427,17 +455,17 @@ class TestDoubleFactory:
 # Convenience functions for common test double setups
 def setup_hal_mocking(manager_instance, deterministic: bool = True):
     """Set up HAL mocking on a manager instance."""
-    manager_instance._hal_compressor = TestDoubleFactory.create_hal_compressor(deterministic)
+    manager_instance._hal_compressor = DoubleFactory.create_hal_compressor(deterministic)
 
 
 def setup_rom_mocking(manager_instance, rom_type: str = "standard"):
     """Set up ROM file mocking on a manager instance."""
-    manager_instance._rom_file = TestDoubleFactory.create_rom_file(rom_type)
+    manager_instance._rom_file = DoubleFactory.create_rom_file(rom_type)
 
 
 def setup_ui_mocking(instance, components: list[str]):
     """Set up UI component mocking on an instance."""
-    factory = TestDoubleFactory()
+    factory = DoubleFactory()
 
     for component in components:
         if component == "progress_dialog":

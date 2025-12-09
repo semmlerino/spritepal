@@ -14,6 +14,7 @@ real implementations instead of mocks.
 """
 
 import pytest
+
 from tests.fixtures.test_managers import (
     # Systematic pytest markers applied based on test content analysis
     create_colorizer_fixture,

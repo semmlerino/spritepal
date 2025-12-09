@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from core.managers import cleanup_managers, initialize_managers
 from core.rom_injector import SpritePointer
 from ui.components.panels.status_panel import StatusPanel

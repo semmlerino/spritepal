@@ -9,6 +9,8 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 import pytest
+from PySide6.QtTest import QSignalSpy
+
 from core.managers.base_manager import BaseManager
 from core.workers.specialized import (
     ExtractionWorkerBase,
@@ -16,7 +18,6 @@ from core.workers.specialized import (
     PreviewWorkerBase,
     ScanWorkerBase,
 )
-from PySide6.QtTest import QSignalSpy
 
 # Serial execution required: QApplication management, Thread safety concerns
 pytestmark = [

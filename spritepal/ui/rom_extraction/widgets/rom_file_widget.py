@@ -1,14 +1,18 @@
 """ROM file selector widget for ROM extraction"""
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
-from utils.logging_config import get_logger
-from utils.rom_cache import get_rom_cache
 
+from utils.logging_config import get_logger
+
+# from utils.rom_cache import get_rom_cache # Removed due to DI
 from .base_widget import BaseExtractionWidget
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMCacheProtocol
 
 logger = get_logger(__name__)
 
@@ -30,11 +34,19 @@ class ROMFileWidget(BaseExtractionWidget):
     cache_status_changed = Signal(dict)  # Emitted when cache status changes
     partial_scan_detected = Signal(dict)  # Emitted when partial scan cache found
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: Any | None = None, rom_cache: ROMCacheProtocol | None = None):
         super().__init__(parent)
         self._rom_path = ""
         self._cache_status = {"has_cache": False, "cache_type": None}
-        self._rom_cache = get_rom_cache()
+
+        # Inject rom_cache or use fallback
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self._rom_cache = inject(ROMCacheProtocol)
+        else:
+            self._rom_cache = rom_cache
+
         self._setup_ui()
 
     def _setup_ui(self):
@@ -117,7 +129,7 @@ class ROMFileWidget(BaseExtractionWidget):
 
     def _check_cache_status(self):
         """Check cache status for the current ROM"""
-        if not self._rom_path or not self._rom_cache._cache_enabled:
+        if not self._rom_path or not self._rom_cache.cache_enabled:
             self._cache_status = {"has_cache": False, "cache_type": None}
             return
 

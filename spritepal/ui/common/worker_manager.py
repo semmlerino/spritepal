@@ -14,6 +14,7 @@ import contextlib
 from typing import Any
 
 from PySide6.QtCore import QThread
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

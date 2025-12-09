@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from core.rom_extractor import ROMExtractor
     from PySide6.QtCore import QObject
 
-from core.workers.base import BaseWorker, handle_worker_errors
+    from core.protocols.manager_protocols import ROMExtractorProtocol
+
 from PySide6.QtCore import Signal
+
+from core.workers.base import BaseWorker, handle_worker_errors
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -26,7 +28,7 @@ class SpritePreviewWorker(BaseWorker):
     )  # tile_data, width, height, sprite_name
     preview_error = Signal(str)  # error message
 
-    def __init__(self, rom_path: str, offset: int, sprite_name: str, extractor: ROMExtractor, sprite_config: Any = None, parent: QObject | None = None):
+    def __init__(self, rom_path: str, offset: int, sprite_name: str, extractor: ROMExtractorProtocol, sprite_config: Any = None, parent: QObject | None = None):
         super().__init__(parent)
         self.rom_path = rom_path
         self.offset = offset

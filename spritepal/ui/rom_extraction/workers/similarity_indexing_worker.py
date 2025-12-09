@@ -3,6 +3,7 @@ Background indexing worker for visual similarity search.
 
 Automatically indexes sprites as they're found during ROM scanning,
 building a searchable index for visual similarity queries.
+Now accepts `SettingsManagerProtocol` via dependency injection.
 """
 from __future__ import annotations
 
@@ -12,15 +13,18 @@ import json
 import pickle
 import threading
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from PIL import Image
+from PySide6.QtCore import QObject, Signal, Slot
 
 from core.managers import ExtractionManager, get_extraction_manager
 from core.visual_similarity_search import VisualSimilarityEngine
 from core.workers.base import BaseWorker, handle_worker_errors
-from PIL import Image
-from PySide6.QtCore import QObject, Signal, Slot
 from utils.logging_config import get_logger
-from utils.settings_manager import get_settings_manager
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import SettingsManagerProtocol
 
 logger = get_logger(__name__)
 
@@ -37,17 +41,27 @@ class SimilarityIndexingWorker(BaseWorker):
     index_saved = Signal(str)  # path where index was saved
     index_loaded = Signal(int)  # number of sprites loaded from index
 
-    def __init__(self, rom_path: str, parent: QObject | None = None):
+    def __init__(self, rom_path: str, parent: QObject | None = None,
+                 settings_manager: SettingsManagerProtocol | None = None):
         """
         Initialize similarity indexing worker.
 
         Args:
             rom_path: Path to the ROM file being scanned
             parent: Parent QObject
+            settings_manager: Injected SettingsManagerProtocol instance.
         """
         super().__init__(parent)
         self.rom_path = rom_path
         self.rom_hash = self._calculate_rom_hash(rom_path)
+
+        # Inject settings manager or use fallback
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
 
         # Initialize similarity engine
         self.similarity_engine = VisualSimilarityEngine()
@@ -86,12 +100,14 @@ class SimilarityIndexingWorker(BaseWorker):
     def _get_cache_directory(self) -> Path:
         """Get the cache directory for similarity indices."""
         try:
-            settings_manager = get_settings_manager()
+            settings_manager = self.settings_manager
             # Try to get custom cache directory from settings
             # TODO: Implement get_cache_directory method on SettingsManager
-            cache_root = settings_manager.get_cache_directory()  # type: ignore[attr-defined]
-            if not cache_root:
+            cache_root_str = settings_manager.get_cache_location() # Call the correct method
+            if not cache_root_str:
                 cache_root = Path.home() / ".spritepal"
+            else:
+                cache_root = Path(cache_root_str)
         except Exception:
             # Fallback to default location
             cache_root = Path.home() / ".spritepal"

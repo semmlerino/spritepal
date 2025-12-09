@@ -11,10 +11,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from core.sprite_finder import SpriteCandidate, SpriteFinder
 from PIL import Image
+
+from core.sprite_finder import SpriteCandidate, SpriteFinder
 from tests.infrastructure.test_doubles import (
-    TestDoubleFactory,
+    DoubleFactory,
 )
 
 pytestmark = [
@@ -82,7 +83,7 @@ class TestSpriteFinderWithRealComponents:
     def test_rom_with_sprites(self, tmp_path):
         """Create a test ROM file with known sprite patterns."""
         # Use test double factory to create ROM with sprite data
-        rom_file = TestDoubleFactory.create_rom_file(rom_type="standard")
+        rom_file = DoubleFactory.create_rom_file(rom_type="standard")
 
         # Write to actual file for testing
         rom_path = tmp_path / "test.sfc"
@@ -314,7 +315,7 @@ class TestSpriteFinderIntegration:
         """Test complete sprite finding workflow with real components."""
         # Setup: Create test ROM with known content
         rom_path = tmp_path / "test.sfc"
-        rom_data = TestDoubleFactory.create_rom_file()._data
+        rom_data = DoubleFactory.create_rom_file()._data
         rom_path.write_bytes(rom_data)
 
         output_dir = tmp_path / "output"
@@ -346,7 +347,7 @@ class TestSpriteFinderIntegration:
         """Test sprite finder with real visual validation."""
         # Setup: Create test environment
         rom_path = tmp_path / "test.sfc"
-        rom_data = TestDoubleFactory.create_rom_file()._data
+        rom_data = DoubleFactory.create_rom_file()._data
         rom_path.write_bytes(rom_data)
 
         output_dir = tmp_path / "output"

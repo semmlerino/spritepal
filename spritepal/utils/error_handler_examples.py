@@ -12,9 +12,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from core.managers.exceptions import ExtractionError, ValidationError
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication, QWidget
+
+from core.managers.exceptions import ExtractionError, ValidationError
 from utils.error_integration import (
     ErrorHandlerMixin,
     enhanced_handle_worker_errors,

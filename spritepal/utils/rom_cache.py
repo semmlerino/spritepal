@@ -1,6 +1,3 @@
-"""ROM scan results caching system for SpritePal (Fixed version)
-Caches expensive ROM scanning operations to improve performance with proper error handling.
-"""
 from __future__ import annotations
 
 import hashlib
@@ -12,7 +9,7 @@ import time
 import uuid
 import zlib
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 try:
     from utils.logging_config import get_logger
@@ -22,24 +19,8 @@ except ImportError:
     def get_logger(module_name: str) -> logging.Logger:
         return logging.getLogger(module_name)
 
-# Delayed import to avoid circular dependency
-def get_settings_manager():
-    """Get settings manager with delayed import to avoid circular dependency.
-
-    This function uses a delayed import to break the circular dependency:
-    rom_cache -> settings_manager -> session_manager -> managers -> rom_cache
-
-    The import is done at runtime rather than module level to prevent
-    the circular import from causing initialization failures.
-    """
-    try:
-        # REQUIRED DELAYED IMPORT: Prevents circular dependency:
-        # rom_cache -> settings_manager -> session_manager -> managers -> rom_cache
-        from utils.settings_manager import get_settings_manager as _gsm
-        return _gsm()
-    except ImportError:
-        logger.warning("Could not import settings manager")
-        return None
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 
 logger = get_logger(__name__)
 
@@ -49,24 +30,17 @@ class ROMCache:
     CACHE_VERSION = "1.0"
     CACHE_DIR_NAME = ".spritepal_rom_cache"
 
-    def __init__(self, cache_dir: str | None = None) -> None:
+    def __init__(self, settings_manager: SettingsManagerProtocol | None = None, cache_dir: str | None = None) -> None:
         """Initialize ROM cache with robust error handling.
 
         Args:
-            cache_dir: Optional custom cache directory. If None, uses settings or default
-
+            settings_manager: Optional injected SettingsManagerProtocol instance.
+            cache_dir: Optional custom cache directory. If None, uses settings or default.
         """
-        # Initialize hash cache for performance optimization
         self._hash_cache: dict[str, str] = {}
         self._hash_cache_lock = threading.Lock()
 
-        # Get settings manager (might be None if managers not initialized yet)
-        try:
-            self.settings_manager = get_settings_manager()
-        except (ImportError, AttributeError, RuntimeError, Exception) as e:
-            # Catch all exceptions including ManagerError from uninitialized managers
-            logger.warning(f"Could not get settings manager during ROM cache initialization: {e}")
-            self.settings_manager = None
+        self.settings_manager = settings_manager
 
         # Check if caching is enabled in settings
         if self.settings_manager:
@@ -1172,15 +1146,8 @@ class ROMCache:
 
     def refresh_settings(self) -> None:
         """Refresh cache settings from settings manager."""
-        # Try to get settings manager if we don't have one
         if not self.settings_manager:
-            try:
-                self.settings_manager = get_settings_manager()
-            except (ImportError, AttributeError, RuntimeError) as e:
-                logger.warning(f"Could not get settings manager for cache refresh: {e}")
-                return
-
-        if not self.settings_manager:
+            logger.warning("No settings manager available for cache refresh.")
             return
 
         # Update cache enabled state
@@ -1202,25 +1169,43 @@ class ROMCache:
                     self.cache_dir = new_dir
                     self._cache_enabled = self._setup_cache_directory()
 
-class _ROMCacheSingleton:
-    """Thread-safe singleton holder for ROMCache."""
-    _instance: ROMCache | None = None
-    _lock = threading.Lock()
 
-    @classmethod
-    def get(cls) -> ROMCache:
-        """Get the global ROM cache instance (thread-safe)."""
-        # Fast path - check without lock
-        if cls._instance is not None:
-            return cls._instance
+# Global instance for backward compatibility
+_global_rom_cache: ROMCacheProtocol | None = None
 
-        # Slow path - create with lock
-        with cls._lock:
-            # Double-check locking pattern
-            if cls._instance is None:
-                cls._instance = ROMCache()
-        return cls._instance
+def get_rom_cache() -> ROMCacheProtocol:
+    """
+    Get the global ROMCache instance.
+    
+    DEPRECATED: This function is maintained for backward compatibility.
+    New code should use dependency injection via core.di_container.
+    """
+    global _global_rom_cache
+    
+    # Return existing instance
+    if _global_rom_cache is not None:
+        return _global_rom_cache
 
-def get_rom_cache() -> ROMCache:
-    """Get the global ROM cache instance (thread-safe)."""
-    return _ROMCacheSingleton.get()
+    # Try DI first
+    try:
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        _global_rom_cache = inject(ROMCacheProtocol)
+        return _global_rom_cache
+    except (ImportError, ValueError, Exception):
+        pass
+        
+    # Create new instance as fallback
+    if _global_rom_cache is None:
+        # Try to get settings manager for init
+        try:
+            from utils.settings_manager import get_settings_manager
+            settings = get_settings_manager()
+        except ImportError:
+            settings = None
+            
+        _global_rom_cache = ROMCache(settings_manager=settings)
+        
+    return _global_rom_cache
+
+

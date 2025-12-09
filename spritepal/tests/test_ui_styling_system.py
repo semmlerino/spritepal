@@ -12,6 +12,7 @@ from ui.styles import get_button_style, get_input_style, get_muted_text_style, g
 from __future__ import annotations
 
 import pytest
+
 from ui.styles import (
     # Systematic pytest markers applied based on test content analysis
     COLORS,

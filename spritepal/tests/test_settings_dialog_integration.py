@@ -12,9 +12,10 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from core.managers import cleanup_managers, initialize_managers
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
+
+from core.managers import cleanup_managers, initialize_managers
 from ui.dialogs.settings_dialog import SettingsDialog
 from utils.rom_cache import ROMCache
 from utils.settings_manager import SettingsManager

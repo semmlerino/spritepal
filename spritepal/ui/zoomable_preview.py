@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.common.spacing_constants import (
     BORDER_THIN,
     MAX_ZOOM,

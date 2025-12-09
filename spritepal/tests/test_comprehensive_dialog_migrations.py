@@ -432,7 +432,7 @@ class TestManagerContextIntegration:
     """
 
     @pytest.fixture
-    def test_sprite_image(self) -> Generator[str, None, None]:
+    def test_sprite_image_shared(self) -> Generator[str, None, None]:
         """Create a test sprite image for dialog testing"""
         test_image = Image.new("L", (128, 128), 0)
         temp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
@@ -461,7 +461,7 @@ class TestManagerContextIntegration:
             # Clean up
             injection_dialog.close()
 
-    def test_dialog_context_isolation(self, safe_qtbot, test_sprite_image, manager_context_factory):
+    def test_dialog_context_isolation(self, safe_qtbot, test_sprite_image_shared, manager_context_factory):
         """Test that dialogs are properly isolated with their own contexts."""
         # First context
         with manager_context_factory(name="context1") as ctx1:
@@ -509,17 +509,3 @@ class TestManagerContextIntegration:
             assert same_manager.test_value == "test_state"
 
             dialog2.close()
-
-    @pytest.fixture
-    def test_sprite_image(self):
-        """Create a test sprite image for dialog testing"""
-        test_image = Image.new("L", (128, 128), 0)
-        temp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        test_image.save(temp_file.name)
-        temp_file.close()
-
-        yield temp_file.name
-
-        import os
-        with contextlib.suppress(Exception):
-            os.unlink(temp_file.name)

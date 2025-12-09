@@ -10,17 +10,21 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from PySide6.QtCore import QObject, Signal
+from typing_extensions import override
 
 from core.managers.base_manager import BaseManager
 from core.managers.exceptions import NavigationError
-from PySide6.QtCore import QObject, Signal
-from typing_extensions import override
 from utils.logging_config import get_logger
 
 from .data_structures import NavigationContext, NavigationHint, SpriteLocation
 from .region_map import SpriteRegionMap
 from .strategies import get_strategy_registry
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import SettingsManagerProtocol
 
 logger = get_logger(__name__)
 
@@ -30,6 +34,7 @@ class NavigationManager(BaseManager):
 
     Provides high-level interface for smart sprite discovery, integrating
     pattern learning, similarity analysis, and predictive algorithms.
+    Now accepts `SettingsManagerProtocol` via dependency injection.
     """
 
     # Navigation-specific signals
@@ -38,7 +43,8 @@ class NavigationManager(BaseManager):
     pattern_learned = Signal(str, dict)   # Strategy name, pattern data
     similarity_found = Signal(int, list)  # Offset, list of similar sprites
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(self, parent: QObject | None = None,
+                 settings_manager: SettingsManagerProtocol | None = None) -> None:
         """Initialize navigation manager."""
         # Initialize all attributes BEFORE calling super().__init__()
         # Core data structures
@@ -66,6 +72,14 @@ class NavigationManager(BaseManager):
             "cache_misses": 0,
             "average_hint_time": 0.0
         }
+
+        # Inject settings manager or use fallback
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
 
         # Now call super().__init__() which triggers _initialize()
         super().__init__("NavigationManager", parent)
@@ -427,9 +441,7 @@ class NavigationManager(BaseManager):
     def _setup_cache_directory(self) -> None:
         """Set up cache directory for region maps."""
         try:
-            # Try to get cache directory from settings
-            from utils.settings_manager import get_settings_manager
-            settings = get_settings_manager()
+            settings = self.settings_manager
             if settings:
                 cache_location = settings.get_cache_location()
                 if cache_location:

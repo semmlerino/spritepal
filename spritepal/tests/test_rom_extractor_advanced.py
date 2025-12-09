@@ -7,6 +7,7 @@ import random
 from unittest.mock import Mock
 
 import pytest
+
 from core.rom_extractor import ROMExtractor
 from utils.constants import BYTES_PER_TILE
 

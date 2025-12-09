@@ -9,6 +9,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from PySide6.QtCore import QThread, Signal
+from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
+
 from core.monitoring import (
     MonitoringMixin,
     WorkflowTracker,
@@ -19,8 +22,6 @@ from core.monitoring import (
     monitor_ui_interaction,
     track_feature_usage,
 )
-from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
 
 # Example 1: Using decorators on existing functions
@@ -319,6 +320,7 @@ def analyze_extraction_performance():
 def show_monitoring_dashboard():
     """Show the monitoring dashboard."""
     from PySide6.QtWidgets import QApplication
+
     from ui.dialogs.monitoring_dashboard import MonitoringDashboard
 
     app = QApplication.instance()

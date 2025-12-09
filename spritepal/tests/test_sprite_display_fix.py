@@ -18,6 +18,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from PySide6.QtCore import Qt
+
 from tests.infrastructure.qt_testing_framework import QtTestingFramework
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 
@@ -135,8 +136,8 @@ class TestSpritePreviewWidgetDisplayFix:
         # Timer should be active after update
         assert self.widget._update_timer.isActive()
 
-        # Wait for timer to complete
-        qtbot.wait(200)
+        # Wait for timer to complete and pixmap to be set
+        qtbot.waitUntil(lambda: self.widget.preview_label.pixmap() is not None, timeout=500)
 
         # Timer should stop after completing update (but may restart for another update)
         # Timer behavior is implementation detail, focus on functional outcome

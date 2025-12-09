@@ -11,6 +11,7 @@ import time
 from unittest.mock import Mock, patch
 
 import pytest
+
 from core.managers import get_extraction_manager, get_injection_manager, get_session_manager
 from core.managers.context import (
     ContextValidator,

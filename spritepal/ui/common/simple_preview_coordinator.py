@@ -15,9 +15,10 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import override
 
 if TYPE_CHECKING:
-    from utils.rom_cache import ROMCache
+    from core.protocols.manager_protocols import ROMCacheProtocol
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -115,7 +116,7 @@ class SimplePreviewCoordinator(QObject):
     preview_cached = Signal(bytes, int, int, str)  # For compatibility
     preview_error = Signal(str)
 
-    def __init__(self, parent: QObject | None = None, rom_cache: ROMCache | None = None):
+    def __init__(self, parent: QObject | None = None, rom_cache: ROMCacheProtocol | None = None):
         super().__init__(parent)
 
         # Current state

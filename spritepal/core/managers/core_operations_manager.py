@@ -10,11 +10,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from PySide6.QtCore import QObject, Signal
+from typing_extensions import override
+
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.rom_extractor import ROMExtractor
-from PySide6.QtCore import QObject, Signal
-from typing_extensions import override
 from ui.common import WorkerManager
 from ui.workers.injection_worker import InjectionWorker
 from ui.workers.rom_injection_worker import ROMInjectionWorker
@@ -131,6 +132,17 @@ class CoreOperationsManager(BaseManager):
             self._navigation_manager = None
 
         self._logger.info("CoreOperationsManager cleaned up")
+
+    def reset_state(self, full_reset: bool = False) -> None:
+        """Reset internal state for test isolation."""
+        with self._lock:
+            self._active_operations.clear()
+            self._current_worker = None
+            # Reset sub-managers if needed
+            if self._sprite_extractor and hasattr(self._sprite_extractor, 'reset_state'):
+                self._sprite_extractor.reset_state()  # type: ignore
+            if self._rom_extractor and hasattr(self._rom_extractor, 'reset_state'):
+                self._rom_extractor.reset_state()  # type: ignore
 
     # ========== Extraction Operations ==========
 
@@ -445,6 +457,11 @@ class ExtractionAdapter(ExtractionManager):
     def cleanup(self) -> None:
         """No-op, cleanup handled by core manager."""
         pass
+
+    @override
+    def reset_state(self, full_reset: bool = False) -> None:
+        """Delegate reset to core manager."""
+        self._core.reset_state(full_reset)
 
     def extract_from_vram(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore[override]  # Wrapper changes return type
         """Delegate to core manager."""

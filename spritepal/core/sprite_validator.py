@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from PIL import Image
+
 from utils.constants import BYTES_PER_TILE
 from utils.logging_config import get_logger
 
@@ -40,31 +41,30 @@ class SpriteValidator:
             return False, errors, warnings
 
         try:
-            # Load image
-            img = Image.open(sprite_path)
+            # Load image with context manager to prevent resource leak
+            with Image.open(sprite_path) as img:
+                # Validate format
+                format_errors, format_warnings = SpriteValidator._validate_format(img)
+                errors.extend(format_errors)
+                warnings.extend(format_warnings)
 
-            # Validate format
-            format_errors, format_warnings = SpriteValidator._validate_format(img)
-            errors.extend(format_errors)
-            warnings.extend(format_warnings)
+                # Validate dimensions
+                dim_errors, dim_warnings = SpriteValidator._validate_dimensions(img)
+                errors.extend(dim_errors)
+                warnings.extend(dim_warnings)
 
-            # Validate dimensions
-            dim_errors, dim_warnings = SpriteValidator._validate_dimensions(img)
-            errors.extend(dim_errors)
-            warnings.extend(dim_warnings)
+                # Validate colors
+                color_errors, color_warnings = SpriteValidator._validate_colors(img)
+                errors.extend(color_errors)
+                warnings.extend(color_warnings)
 
-            # Validate colors
-            color_errors, color_warnings = SpriteValidator._validate_colors(img)
-            errors.extend(color_errors)
-            warnings.extend(color_warnings)
-
-            # Validate against metadata if provided
-            if metadata_path and Path(metadata_path).exists():
-                meta_errors, meta_warnings = SpriteValidator._validate_against_metadata(
-                    img, metadata_path
-                )
-                errors.extend(meta_errors)
-                warnings.extend(meta_warnings)
+                # Validate against metadata if provided
+                if metadata_path and Path(metadata_path).exists():
+                    meta_errors, meta_warnings = SpriteValidator._validate_against_metadata(
+                        img, metadata_path
+                    )
+                    errors.extend(meta_errors)
+                    warnings.extend(meta_warnings)
 
         except Exception as e:
             errors.append(f"Failed to load sprite: {e}")
@@ -216,35 +216,35 @@ class SpriteValidator:
             Tuple of (uncompressed_size, estimated_compressed_size)
         """
         try:
-            img = Image.open(sprite_path)
-            width, height = img.size
+            with Image.open(sprite_path) as img:
+                width, height = img.size
 
-            # Calculate uncompressed size
-            num_tiles = (width // 8) * (height // 8)
-            uncompressed_size = num_tiles * BYTES_PER_TILE
+                # Calculate uncompressed size
+                num_tiles = (width // 8) * (height // 8)
+                uncompressed_size = num_tiles * BYTES_PER_TILE
 
-            # Estimate compressed size (very rough estimate)
-            # HAL compression typically achieves 40-60% compression
-            # But it varies greatly based on sprite complexity
-            # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-            pixels = list(cast(Any, img.getdata()))
-            unique_colors = len(set(pixels))
+                # Estimate compressed size (very rough estimate)
+                # HAL compression typically achieves 40-60% compression
+                # But it varies greatly based on sprite complexity
+                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
+                pixels = list(cast(Any, img.getdata()))
+                unique_colors = len(set(pixels))
 
-            # More colors = less compression typically
-            if unique_colors <= 4:
-                compression_ratio = 0.3  # 70% compression
-            elif unique_colors <= 8:
-                compression_ratio = 0.5  # 50% compression
-            else:
-                compression_ratio = 0.7  # 30% compression
+                # More colors = less compression typically
+                if unique_colors <= 4:
+                    compression_ratio = 0.3  # 70% compression
+                elif unique_colors <= 8:
+                    compression_ratio = 0.5  # 50% compression
+                else:
+                    compression_ratio = 0.7  # 30% compression
 
-            estimated_compressed = int(uncompressed_size * compression_ratio)
+                estimated_compressed = int(uncompressed_size * compression_ratio)
+
+            return uncompressed_size, estimated_compressed
 
         except Exception:
             logger.exception("Failed to estimate size")
             return 0, 0
-        else:
-            return uncompressed_size, estimated_compressed
 
     @staticmethod
     def check_sprite_compatibility(
@@ -259,23 +259,21 @@ class SpriteValidator:
         reasons = []
 
         try:
-            img1 = Image.open(sprite1_path)
-            img2 = Image.open(sprite2_path)
+            with Image.open(sprite1_path) as img1, Image.open(sprite2_path) as img2:
+                # Check dimensions
+                if img1.size != img2.size:
+                    reasons.append(f"Different dimensions: {img1.size} vs {img2.size}")
 
-            # Check dimensions
-            if img1.size != img2.size:
-                reasons.append(f"Different dimensions: {img1.size} vs {img2.size}")
+                # Check mode
+                if img1.mode != img2.mode:
+                    reasons.append(f"Different modes: {img1.mode} vs {img2.mode}")
 
-            # Check mode
-            if img1.mode != img2.mode:
-                reasons.append(f"Different modes: {img1.mode} vs {img2.mode}")
+                # Check tile count
+                tiles1 = (img1.width // 8) * (img1.height // 8)
+                tiles2 = (img2.width // 8) * (img2.height // 8)
 
-            # Check tile count
-            tiles1 = (img1.width // 8) * (img1.height // 8)
-            tiles2 = (img2.width // 8) * (img2.height // 8)
-
-            if tiles1 != tiles2:
-                reasons.append(f"Different tile counts: {tiles1} vs {tiles2}")
+                if tiles1 != tiles2:
+                    reasons.append(f"Different tile counts: {tiles1} vs {tiles2}")
 
         except Exception as e:
             reasons.append(f"Failed to compare sprites: {e}")

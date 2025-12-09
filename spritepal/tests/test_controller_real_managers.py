@@ -9,6 +9,7 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 import pytest
+
 from core.controller import ExtractionController
 from core.managers import ExtractionManager, InjectionManager, SessionManager
 from tests.infrastructure.real_component_factory import RealComponentFactory

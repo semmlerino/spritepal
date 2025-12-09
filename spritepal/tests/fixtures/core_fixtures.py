@@ -7,12 +7,22 @@ This module provides fixtures for manager initialization, state management,
 and dependency injection testing.
 
 Key fixtures:
-    - session_managers: Session-scoped shared managers (fastest)
+    - session_managers: Session-scoped shared managers (fastest, state persists)
+    - class_managers: Class-scoped managers (shared within test class)
     - isolated_managers: Function-scoped isolated managers (full isolation)
     - fast_managers: Convenience alias for session_managers
     - reset_manager_state: Reset caches without re-initialization
     - detect_manager_pollution: Autouse fixture for state leak detection
-    - setup_managers: Legacy per-test manager initialization
+    - setup_managers: Per-test manager initialization
+
+Fixture Selection Guide:
+    | Need                        | Use                | NOT              |
+    |-----------------------------|--------------------| -----------------|
+    | Fast tests, shared state OK | session_managers   | isolated_managers|
+    | Tests in same class share   | class_managers     | setup_managers   |
+    | Full isolation between tests| isolated_managers  | session_managers |
+    | Performance-focused         | fast_managers      | setup_managers   |
+    | Clean caches only           | reset_manager_state| isolated_managers|
 
 Escape hatches:
     - @pytest.mark.allows_registry_state: Skip pollution detection
@@ -36,10 +46,11 @@ import pytest
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 if TYPE_CHECKING:
+    from pytest import FixtureRequest, TempPathFactory
+
     from core.managers.extraction_manager import ExtractionManager
     from core.managers.injection_manager import InjectionManager
     from core.managers.session_manager import SessionManager
-    from pytest import FixtureRequest, TempPathFactory
     from tests.infrastructure.test_protocols import MockMainWindowProtocol
     from utils.rom_cache import ROMCache
 
@@ -119,11 +130,10 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
             # Managers are already initialized and shared across tests
             pass
     """
-    global _session_state
-
     # Lazy import manager functions
-    from core.managers import cleanup_managers, initialize_managers
     from PySide6.QtWidgets import QApplication
+
+    from core.managers import cleanup_managers, initialize_managers
 
     # Create session-specific settings directory for isolation
     settings_dir = tmp_path_factory.mktemp("session_settings")
@@ -174,9 +184,10 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
             registry = ManagerRegistry()
             # ... test code that modifies manager state ...
     """
+    from PySide6.QtWidgets import QApplication
+
     from core.managers import cleanup_managers, initialize_managers
     from core.managers.registry import ManagerRegistry
-    from PySide6.QtWidgets import QApplication
 
     test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
 
@@ -240,7 +251,7 @@ def detect_manager_pollution(request: FixtureRequest) -> Generator[None, None, N
 
     # Get list of manager-related fixtures this test uses
     fixture_names = getattr(request, 'fixturenames', [])
-    manager_fixtures = {'session_managers', 'isolated_managers', 'fast_managers', 'setup_managers'}
+    manager_fixtures = {'session_managers', 'class_managers', 'isolated_managers', 'fast_managers', 'setup_managers'}
     uses_manager_fixture = bool(manager_fixtures & set(fixture_names))
 
     # Check state before test
@@ -377,8 +388,9 @@ def setup_managers(request: FixtureRequest, tmp_path: Path) -> Iterator[None]:
 
     # Lazy import manager functions to reduce startup overhead
     # Ensure Qt app exists before initializing managers
-    from core.managers import cleanup_managers, initialize_managers
     from PySide6.QtWidgets import QApplication
+
+    from core.managers import cleanup_managers, initialize_managers
 
     app = QApplication.instance()
     if app is None and not IS_HEADLESS:
@@ -401,6 +413,54 @@ def setup_managers(request: FixtureRequest, tmp_path: Path) -> Iterator[None]:
             # Unexpected cleanup error, log but continue
             import logging
             logging.getLogger(__name__).warning(f"Unexpected manager cleanup error: {e}")
+
+
+@pytest.fixture(scope="class")
+def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
+    """
+    Class-scoped managers for test classes with multiple related tests.
+
+    This fixture initializes managers once per test class and cleans them up
+    when the class finishes. Use this when:
+    - Multiple tests in a class need manager access
+    - Tests don't need full isolation between each other
+    - You want faster execution than per-test setup
+
+    Note: State can persist between tests in the same class.
+    For full isolation, use isolated_managers instead.
+
+    Usage:
+        @pytest.mark.usefixtures("class_managers")
+        class TestMyComponent:
+            def test_something(self):
+                # Managers already initialized
+                pass
+
+        # Or explicitly in each test:
+        class TestMyComponent:
+            def test_something(self, class_managers):
+                pass
+    """
+    from PySide6.QtWidgets import QApplication
+
+    from core.managers import cleanup_managers, initialize_managers
+
+    # Create class-specific settings directory for isolation
+    settings_dir = tmp_path_factory.mktemp("class_settings")
+    settings_path = settings_dir / ".test_settings.json"
+
+    # Ensure Qt app exists
+    app = QApplication.instance()
+    if app is None and not IS_HEADLESS:
+        app = QApplication([])
+
+    initialize_managers("TestApp_Class", settings_path=settings_path)
+    yield
+    cleanup_managers()
+
+    # Process events to ensure cleanup completes
+    if app and not IS_HEADLESS:
+        app.processEvents()
 
 
 # ============================================================================
@@ -469,7 +529,7 @@ def rom_cache() -> Generator[ROMCache, None, None]:
     from 48 to ~10 (79% reduction).
 
     Provides a real ROM cache with common caching functionality.
-    Reset between tests via clear_cache() in reset_class_scoped_fixtures.
+    Reset between tests via clear_cache() in reset_class_state fixture.
     """
     factory = RealComponentFactory()
     cache = factory.create_rom_cache()
@@ -604,7 +664,7 @@ def manager_context_factory() -> Callable[[dict[str, Any] | list[str] | None, st
                 # dialog will use mock_injection
     """
     from core.managers.context import manager_context
-    from tests.infrastructure.test_manager_factory import TestManagerFactory
+    from tests.infrastructure.test_manager_factory import ManagerFactory
 
     def _create_context(
         managers: dict[str, Any] | list[str] | None = None,
@@ -623,20 +683,20 @@ def manager_context_factory() -> Callable[[dict[str, Any] | list[str] | None, st
         if managers is None:
             # Create complete test context
             context_managers = {
-                "extraction": TestManagerFactory.create_test_extraction_manager(),
-                "injection": TestManagerFactory.create_test_injection_manager(),
-                "session": TestManagerFactory.create_test_session_manager(),
+                "extraction": ManagerFactory.create_test_extraction_manager(),
+                "injection": ManagerFactory.create_test_injection_manager(),
+                "session": ManagerFactory.create_test_session_manager(),
             }
         elif isinstance(managers, list):
             # Create context with specific managers
             context_managers = {}
             for manager_name in managers:
                 if manager_name == "extraction":
-                    context_managers[manager_name] = TestManagerFactory.create_test_extraction_manager()
+                    context_managers[manager_name] = ManagerFactory.create_test_extraction_manager()
                 elif manager_name == "injection":
-                    context_managers[manager_name] = TestManagerFactory.create_test_injection_manager()
+                    context_managers[manager_name] = ManagerFactory.create_test_injection_manager()
                 elif manager_name == "session":
-                    context_managers[manager_name] = TestManagerFactory.create_test_session_manager()
+                    context_managers[manager_name] = ManagerFactory.create_test_session_manager()
         else:
             # Use provided manager dict
             context_managers = managers
@@ -649,33 +709,33 @@ def manager_context_factory() -> Callable[[dict[str, Any] | list[str] | None, st
 @pytest.fixture
 def test_injection_manager() -> Mock:
     """Provide a test injection manager instance."""
-    from tests.infrastructure.test_manager_factory import TestManagerFactory
-    return TestManagerFactory.create_test_injection_manager()
+    from tests.infrastructure.test_manager_factory import ManagerFactory
+    return ManagerFactory.create_test_injection_manager()
 
 
 @pytest.fixture
 def test_extraction_manager() -> Mock:
     """Provide a test extraction manager instance."""
-    from tests.infrastructure.test_manager_factory import TestManagerFactory
-    return TestManagerFactory.create_test_extraction_manager()
+    from tests.infrastructure.test_manager_factory import ManagerFactory
+    return ManagerFactory.create_test_extraction_manager()
 
 
 @pytest.fixture
 def test_session_manager() -> Mock:
     """Provide a test session manager instance."""
-    from tests.infrastructure.test_manager_factory import TestManagerFactory
-    return TestManagerFactory.create_test_session_manager()
+    from tests.infrastructure.test_manager_factory import ManagerFactory
+    return ManagerFactory.create_test_session_manager()
 
 
 @pytest.fixture
 def complete_test_context() -> Any:
     """Provide a complete test context with all managers configured."""
-    from tests.infrastructure.test_manager_factory import TestManagerFactory
-    return TestManagerFactory.create_complete_test_context()
+    from tests.infrastructure.test_manager_factory import ManagerFactory
+    return ManagerFactory.create_complete_test_context()
 
 
 @pytest.fixture
 def minimal_injection_context() -> Any:
     """Provide a minimal context with just injection manager for dialog tests."""
-    from tests.infrastructure.test_manager_factory import TestManagerFactory
-    return TestManagerFactory.create_minimal_test_context(["injection"], name="dialog_test")
+    from tests.infrastructure.test_manager_factory import ManagerFactory
+    return ManagerFactory.create_minimal_test_context(["injection"], name="dialog_test")

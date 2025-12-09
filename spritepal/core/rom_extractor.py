@@ -10,15 +10,18 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import logging
+
+    from core.protocols.manager_protocols import ROMCacheProtocol
 else:
     pass
+
+from PIL import Image
 
 from core.default_palette_loader import DefaultPaletteLoader
 from core.hal_compression import HALCompressionError, HALCompressor
 from core.rom_injector import ROMInjector, SpritePointer
 from core.rom_palette_extractor import ROMPaletteExtractor
 from core.sprite_config_loader import SpriteConfigLoader
-from PIL import Image
 from utils.constants import (
     BUFFER_SIZE_1KB,
     BUFFER_SIZE_2KB,
@@ -51,7 +54,8 @@ from utils.constants import (
     TYPICAL_SPRITE_MIN,
 )
 from utils.logging_config import get_logger
-from utils.rom_cache import get_rom_cache
+
+# from utils.rom_cache import get_rom_cache # Removed due to DI
 from utils.rom_exceptions import ROMCompressionError
 
 logger: logging.Logger = get_logger(__name__)
@@ -59,7 +63,7 @@ logger: logging.Logger = get_logger(__name__)
 class ROMExtractor:
     """Handles sprite extraction directly from ROM files"""
 
-    def __init__(self) -> None:
+    def __init__(self, rom_cache: ROMCacheProtocol | None = None) -> None:
         """Initialize ROM extractor with required components"""
         logger.debug("Initializing ROMExtractor")
         self.hal_compressor: HALCompressor = HALCompressor()
@@ -67,6 +71,14 @@ class ROMExtractor:
         self.default_palette_loader: DefaultPaletteLoader = DefaultPaletteLoader()
         self.rom_palette_extractor: ROMPaletteExtractor = ROMPaletteExtractor()
         self.sprite_config_loader: SpriteConfigLoader = SpriteConfigLoader()
+
+        # Inject rom_cache or use fallback
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        else:
+            self.rom_cache = rom_cache
         logger.info("ROMExtractor initialized with HAL compression and palette extraction support")
 
     def extract_sprite_data(
@@ -87,6 +99,13 @@ class ROMExtractor:
             HALCompressionError: If decompression fails
         """
         logger.debug(f"Extracting sprite data from ROM: offset=0x{sprite_offset:X}")
+
+        # Validate offset before decompression
+        if sprite_offset < 0:
+            raise ValueError(f"Invalid negative offset: {sprite_offset}")
+        rom_size = Path(rom_path).stat().st_size
+        if sprite_offset >= rom_size:
+            raise ValueError(f"Offset 0x{sprite_offset:X} exceeds ROM size 0x{rom_size:X}")
 
         try:
             # Try to decompress the data at the offset
@@ -527,7 +546,7 @@ class ROMExtractor:
 
         # Initialize scan context
         scan_params = self._create_scan_params(start_offset, end_offset, step)
-        rom_cache = get_rom_cache()
+        rom_cache = self.rom_cache
 
         # Check for cached results
         cached_result = self._load_cached_scan(rom_cache, rom_path, scan_params)
@@ -669,8 +688,15 @@ class ROMExtractor:
         save_progress_interval = PROGRESS_SAVE_INTERVAL
 
         # Use while loop to ensure we scan up to and including the last valid offset
+        # Minimum bytes needed for compressed data header
+        min_compressed_header = 4
         offset = resume_offset
         while offset < end_offset:
+            # Bounds check: ensure enough room for compressed header
+            if offset + min_compressed_header > len(rom_data):
+                logger.debug(f"Stopping scan at 0x{offset:X}: insufficient data for compressed header")
+                break
+
             scan_count += 1
 
             # Log progress periodically
@@ -695,8 +721,8 @@ class ROMExtractor:
 
             offset += step
 
-        # Check the final offset if it's exactly at the end boundary
-        if offset == end_offset and offset < len(rom_data):
+        # Check the final offset if it's exactly at the end boundary and has room for data
+        if offset == end_offset and offset + min_compressed_header <= len(rom_data):
             scan_count += 1
             sprite_info = self._try_extract_sprite_at_offset(rom_data, offset)
             if sprite_info:

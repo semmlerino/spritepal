@@ -19,9 +19,10 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from core.async_rom_cache import AsyncROMCache, CacheWorker
 from PySide6.QtCore import QMutexLocker, QThread
 from PySide6.QtWidgets import QApplication
+
+from core.async_rom_cache import AsyncROMCache, CacheWorker
 
 # Mark tests that create QApplication instances for serial execution
 pytestmark = [
@@ -62,6 +63,9 @@ class TestCacheWorker:
         self.app.processEvents()
     def teardown_method(self):
         """Clean up test fixtures"""
+        if hasattr(self, 'async_cache'):
+            # Explicitly shutdown to stop the worker thread before deleting
+            self.async_cache.shutdown(timeout=2000)
         if hasattr(self, 'worker'):
             self.worker.stop()
         # Clean up temp directory
@@ -222,6 +226,8 @@ class TestAsyncROMCache:
     def teardown_method(self):
         """Clean up test fixtures"""
         if hasattr(self, 'async_cache'):
+            # Explicitly shutdown to stop the worker thread before deleting
+            self.async_cache.shutdown(timeout=2000)
             del self.async_cache
         # Clean up temp directory
         import shutil
@@ -493,6 +499,8 @@ class TestAsyncROMCacheIntegration:
     def teardown_method(self):
         """Clean up integration test environment"""
         if hasattr(self, 'async_cache'):
+            # Explicitly shutdown to stop the worker thread before deleting
+            self.async_cache.shutdown(timeout=2000)
             del self.async_cache
         import shutil
         if self.temp_dir.exists():

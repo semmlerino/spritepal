@@ -10,11 +10,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.rom_extractor import ROMExtractor
     from PySide6.QtCore import QObject
 
-from core.workers.base import BaseWorker, handle_worker_errors
+    from core.protocols.manager_protocols import ROMExtractorProtocol
+
 from PySide6.QtCore import Signal
+
+from core.workers.base import BaseWorker, handle_worker_errors
 from utils.constants import MAX_ROM_SIZE
 from utils.logging_config import get_logger
 
@@ -44,7 +46,7 @@ class SpriteSearchWorker(BaseWorker):
     # We'll override emit_progress to convert our (current, total) to (percent, message)
 
     def __init__(self, rom_path: str, start_offset: int, end_offset: int,
-                 direction: int, rom_extractor: ROMExtractor, parent: QObject | None = None):
+                 direction: int, rom_extractor: ROMExtractorProtocol, parent: QObject | None = None):
         super().__init__(parent)
         self.rom_path = rom_path
         self.start_offset = start_offset

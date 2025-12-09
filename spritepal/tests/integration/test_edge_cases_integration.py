@@ -15,8 +15,9 @@ Uses shared class_managers fixture from core_fixtures.py instead of local setup.
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from pathlib import Path
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest

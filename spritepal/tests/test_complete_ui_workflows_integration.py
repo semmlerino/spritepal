@@ -152,10 +152,10 @@ class TestCompleteUIWorkflowsIntegration:
         return None
 
     @pytest.mark.gui
-    def test_app_startup_dark_theme_rom_loading_workflow(self, qtbot):
+    def test_app_startup_dark_theme_rom_loading_workflow(self, qtbot, wait_for_theme_applied):
         """
         Test Workflow 1: User opens app → dark theme visible → loads ROM → extraction panel updates
-        
+
         Validates:
         - Application starts with dark theme
         - Main window displays correctly
@@ -169,7 +169,8 @@ class TestCompleteUIWorkflowsIntegration:
 
         # Wait for window to be fully rendered
         qtbot.waitForWindowShown(main_window)
-        qtbot.wait(100)  # Allow theme to apply
+        # Use condition-based wait for theme application (reliable, auto-completes)
+        wait_for_theme_applied(main_window, is_dark_theme=True, timeout=500)
 
         # Step 2: Verify dark theme is applied
         assert self._verify_dark_theme_applied(main_window), "Dark theme should be applied to main window"
@@ -217,7 +218,9 @@ class TestCompleteUIWorkflowsIntegration:
 
                     # Simulate button click
                     qtbot.mouseClick(load_button, Qt.MouseButton.LeftButton)
-                    qtbot.wait(100)
+                    # Wait for signal to be emitted (reliable, condition-based)
+                    if hasattr(main_window, 'rom_loaded'):
+                        qtbot.waitUntil(lambda: rom_loaded_spy.count() > 0, timeout=1000)
 
                     # Verify ROM loading signal (if available)
                     if hasattr(main_window, 'rom_loaded') and rom_loaded_spy.count() > 0:
@@ -235,10 +238,10 @@ class TestCompleteUIWorkflowsIntegration:
         assert end_time - start_time < 1.0, "UI should remain responsive"
 
     @pytest.mark.gui
-    def test_manual_offset_dialog_interaction_workflow(self, qtbot):
+    def test_manual_offset_dialog_interaction_workflow(self, qtbot, wait_for_widget_ready, wait_for_signal_processed):
         """
         Test Workflow 2: User clicks manual offset button → dialog opens → slider changes offset → preview updates
-        
+
         Validates:
         - Manual offset button opens dialog
         - Dialog displays with dark theme
@@ -300,7 +303,8 @@ class TestCompleteUIWorkflowsIntegration:
             if manual_offset_button:
                 # Step 4: Click button to open dialog
                 qtbot.mouseClick(manual_offset_button, Qt.MouseButton.LeftButton)
-                qtbot.wait(100)
+                # Process click event (reliable, minimal wait)
+                wait_for_signal_processed()
 
                 # Show our test dialog
                 mock_dialog.show()
@@ -323,7 +327,8 @@ class TestCompleteUIWorkflowsIntegration:
 
                 # Simulate slider drag
                 qtbot.keyClick(slider, Qt.Key.Key_Right)  # Move slider right
-                qtbot.wait(50)
+                # Wait for slider value to update (reliable, condition-based)
+                qtbot.waitUntil(lambda: slider.value() != original_value, timeout=500)
 
                 # Verify slider moved and signal emitted
                 current_value = slider.value()
@@ -332,7 +337,8 @@ class TestCompleteUIWorkflowsIntegration:
                 # Step 7: Test direct value setting
                 test_offset = 75000
                 slider.setValue(test_offset)
-                qtbot.wait(50)
+                # Wait for signal emission (reliable, condition-based)
+                qtbot.waitUntil(lambda: slider.value() == test_offset, timeout=500)
 
                 assert slider.value() == test_offset, "Slider should accept direct value setting"
                 assert offset_changed_spy.count() > 0, "Offset changed signal should be emitted"
@@ -343,10 +349,10 @@ class TestCompleteUIWorkflowsIntegration:
                     assert last_signal_value == test_offset, "Signal should contain correct offset value"
 
     @pytest.mark.gui
-    def test_sprite_found_signal_propagation_workflow(self, qtbot):
+    def test_sprite_found_signal_propagation_workflow(self, qtbot, wait_for_signal_processed):
         """
         Test Workflow 3: User finds sprite → signal emitted → main window receives it → UI updates
-        
+
         Validates:
         - Sprite found signal propagation
         - Main window receives and handles signal
@@ -401,7 +407,7 @@ class TestCompleteUIWorkflowsIntegration:
 
         # Emit sprite found signal
         mock_source.emit_sprite_found(test_sprite_data)
-        qtbot.wait(50)  # Allow signal propagation
+        wait_for_signal_processed()
 
         # Step 5: Verify signal was received by main window
         assert len(sprite_found_signals) == 1, "Sprite found signal should be emitted"
@@ -423,7 +429,7 @@ class TestCompleteUIWorkflowsIntegration:
 
         for sprite in additional_sprites:
             mock_source.emit_sprite_found(sprite)
-            qtbot.wait(25)
+            wait_for_signal_processed()
 
         # Verify all signals were processed
         assert len(sprite_found_signals) == 3, "All sprite found signals should be processed"
@@ -506,13 +512,13 @@ class TestCompleteUIWorkflowsIntegration:
         # Step 4: Test slider functionality on Browse tab
         new_slider_value = initial_slider_value + 5000
         dialog.browse_slider.setValue(new_slider_value)
-        qtbot.wait(50)
+        qtbot.waitUntil(lambda: dialog.browse_slider.value() == new_slider_value, timeout=500)
 
         assert offset_changed_spy.count() > 0, "Offset changed signal should work on Browse tab"
 
         # Step 5: Switch to Smart tab
         dialog.tab_widget.setCurrentIndex(1)
-        qtbot.wait(50)
+        qtbot.waitUntil(lambda: dialog.tab_widget.currentIndex() == 1, timeout=500)
 
         assert dialog.tab_widget.currentIndex() == 1, "Should switch to Smart tab"
         assert tab_changed_spy.count() > 0, "Tab changed signal should be emitted"
@@ -520,7 +526,7 @@ class TestCompleteUIWorkflowsIntegration:
 
         # Step 6: Verify Browse tab state is preserved
         dialog.tab_widget.setCurrentIndex(0)
-        qtbot.wait(50)
+        qtbot.waitUntil(lambda: dialog.tab_widget.currentIndex() == 0, timeout=500)
 
         preserved_slider_value = dialog.browse_slider.value()
         assert preserved_slider_value == new_slider_value, "Browse tab slider value should be preserved"
@@ -531,14 +537,14 @@ class TestCompleteUIWorkflowsIntegration:
 
         final_slider_value = new_slider_value + 3000
         dialog.browse_slider.setValue(final_slider_value)
-        qtbot.wait(50)
+        qtbot.waitUntil(lambda: dialog.browse_slider.value() == final_slider_value, timeout=500)
 
         assert offset_changed_spy.count() > signals_before, "Offset changed signal should still work after tab switching"
         assert offset_changed_spy.at(offset_changed_spy.count() - 1)[0] == final_slider_value, "Signal should contain correct value"
 
         # Step 8: Test Smart tab state preservation
         dialog.tab_widget.setCurrentIndex(1)
-        qtbot.wait(50)
+        qtbot.waitUntil(lambda: dialog.tab_widget.currentIndex() == 1, timeout=500)
 
         dialog.smart_input.text()
         new_text = "0x75000"
@@ -546,14 +552,14 @@ class TestCompleteUIWorkflowsIntegration:
 
         # Switch away and back
         dialog.tab_widget.setCurrentIndex(2)  # History
-        qtbot.wait(50)
+        qtbot.waitUntil(lambda: dialog.tab_widget.currentIndex() == 2, timeout=500)
         dialog.tab_widget.setCurrentIndex(1)  # Back to Smart
-        qtbot.wait(50)
+        qtbot.waitUntil(lambda: dialog.tab_widget.currentIndex() == 1, timeout=500)
 
         assert dialog.smart_input.text() == new_text, "Smart tab input should preserve state"
 
     @pytest.mark.gui
-    def test_window_resize_layout_theme_preservation_workflow(self, qtbot):
+    def test_window_resize_layout_theme_preservation_workflow(self, qtbot, wait_for_signal_processed):
         """
         Test Workflow 5: User resizes window → layout adjusts → dark theme maintained
 
@@ -598,7 +604,7 @@ class TestCompleteUIWorkflowsIntegration:
         # Step 3: Test window shrinking
         small_size = QSize(600, 400)
         main_window.resize(small_size)
-        qtbot.wait(100)  # Allow layout to update
+        wait_for_signal_processed()
 
         # Verify size change (skip in headless mode - no window manager to enforce resize)
         current_size = main_window.size()
@@ -621,7 +627,7 @@ class TestCompleteUIWorkflowsIntegration:
         # Step 4: Test window expanding
         large_size = QSize(1400, 900)
         main_window.resize(large_size)
-        qtbot.wait(100)  # Allow layout to update
+        wait_for_signal_processed()
 
         # Verify size change (skip in headless mode)
         current_size = main_window.size()
@@ -636,7 +642,7 @@ class TestCompleteUIWorkflowsIntegration:
         # Very wide
         wide_size = QSize(1600, 300)
         main_window.resize(wide_size)
-        qtbot.wait(100)
+        wait_for_signal_processed()
 
         assert self._verify_dark_theme_applied(main_window), "Dark theme should handle wide aspect ratio"
 
@@ -649,14 +655,14 @@ class TestCompleteUIWorkflowsIntegration:
         # Very tall
         tall_size = QSize(400, 1000)
         main_window.resize(tall_size)
-        qtbot.wait(100)
+        wait_for_signal_processed()
 
         assert self._verify_dark_theme_applied(main_window), "Dark theme should handle tall aspect ratio"
 
         # Step 6: Test minimum size constraints
         tiny_size = QSize(200, 150)
         main_window.resize(tiny_size)
-        qtbot.wait(100)
+        wait_for_signal_processed()
 
         current_size = main_window.size()
         # Window should respect minimum size constraints (skip in headless mode)
@@ -666,7 +672,7 @@ class TestCompleteUIWorkflowsIntegration:
 
         # Step 7: Return to reasonable size and verify everything still works
         main_window.resize(QSize(1000, 700))
-        qtbot.wait(100)
+        wait_for_signal_processed()
 
         # Final theme verification
         final_theme_valid = self._verify_dark_theme_applied(main_window)
@@ -683,17 +689,17 @@ class TestCompleteUIWorkflowsIntegration:
             # Verify button is still clickable
             test_button.geometry()
             qtbot.mouseClick(test_button, Qt.MouseButton.LeftButton)
-            qtbot.wait(50)
+            wait_for_signal_processed()
 
             # Button should still exist and be properly positioned
             new_rect = test_button.geometry()
             assert new_rect.isValid(), "Button should maintain valid geometry after click"
 
     @pytest.mark.gui
-    def test_ui_responsiveness_during_workflows(self, qtbot):
+    def test_ui_responsiveness_during_workflows(self, qtbot, wait_for_signal_processed):
         """
         Test UI responsiveness during complex workflows.
-        
+
         Validates:
         - UI remains responsive during operations
         - No blocking operations on main thread
@@ -721,7 +727,7 @@ class TestCompleteUIWorkflowsIntegration:
                     response_time = end_time - start_time
                     assert response_time < 0.1, f"Button click should be responsive (was {response_time:.3f}s)"
 
-                    qtbot.wait(10)  # Brief pause between clicks
+                    wait_for_signal_processed()
 
         # Step 3: Test window manipulation responsiveness
         sizes_to_test = [
@@ -734,7 +740,7 @@ class TestCompleteUIWorkflowsIntegration:
         for size in sizes_to_test:
             start_time = time.time()
             main_window.resize(size)
-            qtbot.wait(50)  # Allow resize
+            wait_for_signal_processed()
             end_time = time.time()
 
             resize_time = end_time - start_time
@@ -754,10 +760,10 @@ class TestCompleteUIWorkflowsIntegration:
             assert update_time < 0.5, f"Rapid status updates should not block UI (was {update_time:.3f}s)"
 
     @pytest.mark.gui
-    def test_error_recovery_in_ui_workflows(self, qtbot):
+    def test_error_recovery_in_ui_workflows(self, qtbot, wait_for_signal_processed):
         """
         Test error recovery in UI workflows.
-        
+
         Validates:
         - UI gracefully handles errors
         - Error states don't break the interface
@@ -777,7 +783,7 @@ class TestCompleteUIWorkflowsIntegration:
             load_button = self._find_button_by_text(main_window, "load") or self._find_button_by_text(main_window, "open")
             if load_button:
                 qtbot.mouseClick(load_button, Qt.MouseButton.LeftButton)
-                qtbot.wait(100)  # Allow more time for UI state updates
+                wait_for_signal_processed()
 
                 # UI should remain functional after cancellation
                 assert main_window.isVisible(), "Main window should remain visible after dialog cancellation"
@@ -791,7 +797,7 @@ class TestCompleteUIWorkflowsIntegration:
 
             if load_button:
                 qtbot.mouseClick(load_button, Qt.MouseButton.LeftButton)
-                qtbot.wait(100)
+                wait_for_signal_processed()
 
                 # UI should handle invalid file gracefully
                 assert main_window.isVisible(), "Main window should remain visible after invalid file"
@@ -802,7 +808,7 @@ class TestCompleteUIWorkflowsIntegration:
         original_size = main_window.size()
         new_size = QSize(original_size.width() + 100, original_size.height() + 100)
         main_window.resize(new_size)
-        qtbot.wait(50)
+        wait_for_signal_processed()
 
         current_size = main_window.size()
         assert abs(current_size.width() - new_size.width()) < 50, "Window should still be resizable after errors"
@@ -812,7 +818,7 @@ class TestCompleteUIWorkflowsIntegration:
         if test_buttons:
             test_button = test_buttons[0]
             qtbot.mouseClick(test_button, Qt.MouseButton.LeftButton)
-            qtbot.wait(50)
+            wait_for_signal_processed()
             # Should not crash or freeze
             assert main_window.isVisible(), "UI should remain functional after post-error interactions"
 

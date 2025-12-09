@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QApplication
+
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
 from ui.row_arrangement_dialog import RowArrangementDialog
@@ -34,7 +35,7 @@ def ensure_headless_qt():
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
     os.environ["QT_QUICK_BACKEND"] = "software"
 
-class TestDialogHelper(QObject):
+class DialogHelper(QObject):
     """Helper for dialog integration testing with real dialogs"""
 
     def __init__(self, temp_dir: str | None = None):

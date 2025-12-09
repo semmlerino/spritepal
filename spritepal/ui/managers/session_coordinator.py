@@ -6,12 +6,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from core.managers import get_session_manager
 from PySide6.QtCore import QObject
-from utils.settings_manager import get_settings_manager
+
+from core.managers import get_session_manager
+
+# from utils.settings_manager import get_settings_manager # Removed due to DI
 
 if TYPE_CHECKING:
     from core.managers.session_manager import SessionManager
+    from core.protocols.manager_protocols import SettingsManagerProtocol
     from ui.extraction_panel import ExtractionPanel
     from ui.main_window import MainWindow
     from ui.managers.output_settings_manager import OutputSettingsManager
@@ -23,7 +26,8 @@ class SessionCoordinator(QObject):
         self,
         main_window: MainWindow,
         extraction_panel: ExtractionPanel,
-        output_settings_manager: OutputSettingsManager
+        output_settings_manager: OutputSettingsManager,
+        settings_manager: SettingsManagerProtocol
     ) -> None:
         """Initialize session coordinator
 
@@ -31,11 +35,13 @@ class SessionCoordinator(QObject):
             main_window: Main window for geometry save/restore
             extraction_panel: Extraction panel for file path save/restore
             output_settings_manager: Output settings for save/restore
+            settings_manager: Injected SettingsManagerProtocol instance
         """
         super().__init__()
         self.main_window = main_window
         self.extraction_panel = extraction_panel
         self.output_settings_manager = output_settings_manager
+        self.settings_manager = settings_manager
         self.session_manager: SessionManager = get_session_manager()
 
     def restore_session(self) -> bool:
@@ -73,7 +79,7 @@ class SessionCoordinator(QObject):
     def _restore_window_geometry(self) -> None:
         """Restore window geometry if enabled in settings"""
 
-        settings_manager = get_settings_manager()
+        settings_manager = self.settings_manager
         if settings_manager.get("ui", "restore_position", False):
             window_geometry = self.session_manager.get_window_geometry()
             # Safely get values with defaults for None values

@@ -22,13 +22,13 @@ The test infrastructure has been made Qt-optional to support headless testing en
 ## Features
 
 ### Always Available (Qt-Independent)
-- `TestDataRepository`: Centralized test data management
+- `DataRepository`: Centralized test data management
 - `get_environment_info()`: Environment detection information
 - `is_pyside6_available()`: PySide6 availability check
 
 ### Conditionally Available (Qt-Dependent)
 When PySide6 is available:
-- `TestApplicationFactory`: Qt application management
+- `ApplicationFactory`: Qt application management
 - `QtTestingFramework`: Qt component testing utilities  
 - `RealManagerFixtureFactory`: Real Qt manager instances
 - All Qt testing context managers and helpers
@@ -41,24 +41,24 @@ When PySide6 is not available:
 
 ### Headless Environment
 ```python
-from tests.infrastructure import TestDataRepository, get_environment_info
+from tests.infrastructure import DataRepository, get_environment_info
 
 # This works - Qt-independent
-repo = TestDataRepository()
+repo = DataRepository()
 env_info = get_environment_info()
 
 # This raises HeadlessModeError with helpful message
-from tests.infrastructure import TestApplicationFactory
-TestApplicationFactory.get_application()  # Error with guidance
+from tests.infrastructure import ApplicationFactory
+ApplicationFactory.get_application()  # Error with guidance
 ```
 
 ### Qt Environment  
 ```python
-from tests.infrastructure import TestDataRepository, TestApplicationFactory
+from tests.infrastructure import DataRepository, ApplicationFactory
 
 # Both work when PySide6 is available
-repo = TestDataRepository()
-app = TestApplicationFactory.get_application()
+repo = DataRepository()
+app = ApplicationFactory.get_application()
 ```
 
 ## Error Handling

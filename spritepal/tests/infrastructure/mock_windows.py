@@ -19,7 +19,7 @@ from unittest.mock import Mock
 from .mock_dialogs_base import CallbackSignal
 
 
-class TestMainWindow:
+class MockMainWindowImpl:
     """
     Pure Python test MainWindow that provides callback-based signals without Qt dependencies.
 
@@ -146,7 +146,7 @@ class TestMainWindow:
         """Window closing signal interface."""
         return CallbackSignal(self.window_closing_callbacks)
 
-class TestWorkerBase:
+class MockWorkerBase:
     """
     Pure Python test worker that provides callback-based signals without Qt dependencies.
 
@@ -236,7 +236,7 @@ class TestWorkerBase:
         """Warning signal interface."""
         return CallbackSignal(self.warning_callbacks)
 
-class TestExtractionWorker(TestWorkerBase):
+class MockExtractionWorkerImpl(MockWorkerBase):
     """Test extraction worker for testing."""
 
     def __init__(self, params: dict, parent: Any | None = None):
@@ -261,7 +261,7 @@ class TestExtractionWorker(TestWorkerBase):
         """Extraction completed signal interface."""
         return CallbackSignal(self.extraction_completed_callbacks)
 
-class TestInjectionWorker(TestWorkerBase):
+class MockInjectionWorkerImpl(MockWorkerBase):
     """Test injection worker for testing."""
 
     def __init__(self, params: dict, parent: Any | None = None):
@@ -324,14 +324,14 @@ class MockWorkerManager:
         """Class method for global cleanup."""
         pass  # Mock implementation
 
-def create_test_main_window() -> TestMainWindow:
+def create_test_main_window() -> MockMainWindowImpl:
     """
     Factory function to create a properly configured TestMainWindow.
 
     Returns:
         TestMainWindow instance ready for testing
     """
-    window = TestMainWindow()
+    window = MockMainWindowImpl()
 
     # Set up any additional mocking needed
     window.extraction_manager = Mock()
@@ -349,16 +349,15 @@ def patch_main_window_creation(monkeypatch):
     Args:
         monkeypatch: pytest monkeypatch fixture
     """
-    monkeypatch.setattr('ui.main_window.MainWindow', TestMainWindow)
+    monkeypatch.setattr('ui.main_window.MainWindow', MockMainWindowImpl)
 
     # Also patch any direct imports
     import sys
     if 'ui.main_window' in sys.modules:
-        sys.modules['ui.main_window'].MainWindow = TestMainWindow
+        sys.modules['ui.main_window'].MainWindow = MockMainWindowImpl
 
 # Backward compatibility aliases
-MockMainWindow = TestMainWindow
-MockWorkerBase = TestWorkerBase
-MockExtractionWorker = TestExtractionWorker
-MockInjectionWorker = TestInjectionWorker
+MockMainWindow = MockMainWindowImpl
+MockExtractionWorker = MockExtractionWorkerImpl
+MockInjectionWorker = MockInjectionWorkerImpl
 create_mock_main_window = create_test_main_window

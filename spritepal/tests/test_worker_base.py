@@ -18,9 +18,10 @@ if TYPE_CHECKING:
     from tests.infrastructure.test_protocols import MockQtBotProtocol
 
 import pytest
+from PySide6.QtTest import QSignalSpy
+
 from core.managers.base_manager import BaseManager
 from core.workers.base import BaseWorker, ManagedWorker
-from PySide6.QtTest import QSignalSpy
 
 # Serial execution required: QApplication management
 pytestmark = [

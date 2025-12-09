@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QApplication
+
 from utils.logging_config import get_logger
 
 from .extraction_manager import ExtractionManager

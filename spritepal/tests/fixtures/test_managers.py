@@ -36,7 +36,7 @@ from ui.row_arrangement.palette_colorizer import PaletteColorizer
 from ui.row_arrangement.preview_generator import PreviewGenerator
 
 
-class TestExtractionManagerFixture:
+class ExtractionManagerFixture:
     """Test fixture providing real ExtractionManager with test data"""
 
     def __init__(self, temp_dir: str | None = None):
@@ -129,7 +129,7 @@ class TestExtractionManagerFixture:
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
-class TestInjectionManagerFixture:
+class InjectionManagerFixture:
     """Test fixture providing real InjectionManager with test data"""
 
     def __init__(self, temp_dir: str | None = None):
@@ -193,7 +193,7 @@ class TestInjectionManagerFixture:
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
-class TestGridArrangementManagerFixture:
+class GridArrangementManagerFixture:
     """Test fixture providing real GridArrangementManager with test data"""
 
     def __init__(self, rows: int = 4, cols: int = 4):
@@ -231,7 +231,7 @@ class TestGridArrangementManagerFixture:
             TilePosition(3, 0), TilePosition(3, 1), TilePosition(3, 2), TilePosition(3, 3),
         ]
 
-class TestGridImageProcessorFixture:
+class GridImageProcessorFixture:
     """Test fixture providing real GridImageProcessor with test data"""
 
     def __init__(self, temp_dir: str | None = None):
@@ -283,7 +283,7 @@ class TestGridImageProcessorFixture:
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
-class TestPaletteColorizerFixture:
+class PaletteColorizerFixture:
     """Test fixture providing real PaletteColorizer with test data"""
 
     def __init__(self):
@@ -317,11 +317,11 @@ class TestPaletteColorizerFixture:
         """Get the test palettes dictionary"""
         return self.colorizer.get_palettes()
 
-class TestPreviewGeneratorFixture:
+class PreviewGeneratorFixture:
     """Test fixture providing real PreviewGenerator with test data"""
 
     def __init__(self):
-        self.colorizer_fixture = TestPaletteColorizerFixture()
+        self.colorizer_fixture = PaletteColorizerFixture()
         self.colorizer = self.colorizer_fixture.get_colorizer()
         self.preview_generator = PreviewGenerator(self.colorizer)
         self.grid_preview_generator = GridPreviewGenerator(self.colorizer)
@@ -338,7 +338,7 @@ class TestPreviewGeneratorFixture:
         """Get the colorizer"""
         return self.colorizer
 
-class TestSessionManagerFixture:
+class SessionManagerFixture:
     """Test fixture providing real SessionManager for testing"""
 
     def __init__(self, temp_dir: str | None = None):
@@ -358,30 +358,30 @@ class TestSessionManagerFixture:
             shutil.rmtree(self.temp_dir)
 
 # Convenience functions for creating test fixtures
-def create_extraction_manager_fixture(temp_dir: str | None = None) -> TestExtractionManagerFixture:
+def create_extraction_manager_fixture(temp_dir: str | None = None) -> ExtractionManagerFixture:
     """Create a test extraction manager fixture"""
-    return TestExtractionManagerFixture(temp_dir)
+    return ExtractionManagerFixture(temp_dir)
 
-def create_injection_manager_fixture(temp_dir: str | None = None) -> TestInjectionManagerFixture:
+def create_injection_manager_fixture(temp_dir: str | None = None) -> InjectionManagerFixture:
     """Create a test injection manager fixture"""
-    return TestInjectionManagerFixture(temp_dir)
+    return InjectionManagerFixture(temp_dir)
 
-def create_grid_arrangement_fixture(rows: int = 4, cols: int = 4) -> TestGridArrangementManagerFixture:
+def create_grid_arrangement_fixture(rows: int = 4, cols: int = 4) -> GridArrangementManagerFixture:
     """Create a test grid arrangement manager fixture"""
-    return TestGridArrangementManagerFixture(rows, cols)
+    return GridArrangementManagerFixture(rows, cols)
 
-def create_grid_processor_fixture(temp_dir: str | None = None) -> TestGridImageProcessorFixture:
+def create_grid_processor_fixture(temp_dir: str | None = None) -> GridImageProcessorFixture:
     """Create a test grid image processor fixture"""
-    return TestGridImageProcessorFixture(temp_dir)
+    return GridImageProcessorFixture(temp_dir)
 
-def create_colorizer_fixture() -> TestPaletteColorizerFixture:
+def create_colorizer_fixture() -> PaletteColorizerFixture:
     """Create a test palette colorizer fixture"""
-    return TestPaletteColorizerFixture()
+    return PaletteColorizerFixture()
 
-def create_preview_generator_fixture() -> TestPreviewGeneratorFixture:
+def create_preview_generator_fixture() -> PreviewGeneratorFixture:
     """Create a test preview generator fixture"""
-    return TestPreviewGeneratorFixture()
+    return PreviewGeneratorFixture()
 
-def create_session_manager_fixture(temp_dir: str | None = None) -> TestSessionManagerFixture:
+def create_session_manager_fixture(temp_dir: str | None = None) -> SessionManagerFixture:
     """Create a test session manager fixture"""
-    return TestSessionManagerFixture(temp_dir)
+    return SessionManagerFixture(temp_dir)

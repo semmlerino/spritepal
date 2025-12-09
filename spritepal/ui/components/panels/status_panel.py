@@ -5,16 +5,40 @@ Displays detection status, progress information, scanning progress, and cache st
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QVBoxLayout, QWidget
+
 from ui.styles import get_muted_text_style, get_panel_style
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 
 
 class StatusPanel(QWidget):
     """Panel for displaying status information and progress"""
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None,
+                 settings_manager: SettingsManagerProtocol | None = None,
+                 rom_cache: ROMCacheProtocol | None = None):
         super().__init__(parent)
         self.setStyleSheet(get_panel_style())
+
+        # Inject dependencies or use fallback
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
+
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        else:
+            self.rom_cache = rom_cache
+
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -72,10 +96,7 @@ class StatusPanel(QWidget):
     def _setup_cache_status(self, layout: QVBoxLayout) -> None:
         """Set up cache status indicators"""
         try:
-            from utils.settings_manager import (
-                get_settings_manager,  # Delayed import to avoid circular dependency
-            )
-            settings_manager = get_settings_manager()
+            settings_manager = self.settings_manager
 
             # Only show cache indicators if enabled in settings
             if not settings_manager.get("cache", "show_indicators", True):
@@ -125,19 +146,12 @@ class StatusPanel(QWidget):
         cache_enabled = True
 
         try:
-            from utils.rom_cache import (
-                get_rom_cache,  # Delayed import to avoid circular dependency
-            )
-            from utils.settings_manager import (
-                get_settings_manager,  # Delayed import to avoid circular dependency
-            )
-
-            settings_manager = get_settings_manager()
+            settings_manager = self.settings_manager
             cache_enabled = settings_manager.get_cache_enabled()
 
             if cache_enabled:
                 try:
-                    rom_cache = get_rom_cache()
+                    rom_cache = self.rom_cache
                     stats = rom_cache.get_cache_stats()
 
                     # Update icon

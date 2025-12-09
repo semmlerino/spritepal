@@ -168,18 +168,17 @@ class InjectionManager(BaseManager):
             mode_text = "VRAM" if params["mode"] == "vram" else "ROM"
             self._logger.info(f"Started {mode_text} injection: {params['sprite_path']}")
             self.injection_progress.emit(f"Starting {mode_text} injection...")
+            return True
 
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, operation, "injection startup")
-            # _handle_file_io_error always raises, this is unreachable
+            raise  # Unreachable but satisfies type checker
         except (ValueError, TypeError) as e:
             self._handle_data_format_error(e, operation, "injection startup")
-            # _handle_data_format_error always raises, this is unreachable
+            raise  # Unreachable but satisfies type checker
         except Exception as e:
             self._handle_error(e, operation)
             return False
-        else:
-            return True
 
     def validate_injection_params(self, params: dict[str, Any]) -> None:
         """

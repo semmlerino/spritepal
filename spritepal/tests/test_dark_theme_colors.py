@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 
 import pytest
+
 from ui.styles.theme import (
     COLORS,
     DIMENSIONS,

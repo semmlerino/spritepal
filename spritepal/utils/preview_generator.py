@@ -28,9 +28,10 @@ from PIL import Image
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 
 if TYPE_CHECKING:
+    from PySide6.QtGui import QPixmap
+
     from core.managers.extraction_manager import ExtractionManager
     from core.rom_extractor import ROMExtractor
-    from PySide6.QtGui import QPixmap
 
 from .image_utils import pil_to_qpixmap
 from .logging_config import get_logger

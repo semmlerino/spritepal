@@ -35,6 +35,7 @@ import psutil
 import pytest
 from PySide6.QtCore import QObject
 from PySide6.QtGui import QImage, QPixmap
+
 from ui.workers.batch_thumbnail_worker import (
     BatchThumbnailWorker,
     LRUCache,
@@ -374,8 +375,9 @@ class TestMemoryLeakIntegration:
             offsets = [i * 0x1000 for i in range(50)]
             controller.queue_batch(offsets, 128)
 
-            # Wait a bit for processing
-            qtbot.wait(100)
+            # Allow worker to start processing
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
 
             # Stop and cleanup
             controller.stop_worker()

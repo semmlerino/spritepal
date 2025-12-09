@@ -17,8 +17,10 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-import core.managers.registry
 import pytest
+from PySide6.QtCore import QSettings
+
+import core.managers.registry
 import utils.rom_cache
 import utils.settings_manager
 from core.managers import (
@@ -27,7 +29,6 @@ from core.managers import (
     get_session_manager,
     initialize_managers,
 )
-from PySide6.QtCore import QSettings
 from ui.dialogs.settings_dialog import SettingsDialog
 from ui.main_window import MainWindow
 from utils.rom_cache import get_rom_cache

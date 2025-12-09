@@ -11,12 +11,14 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from core.managers import ExtractionManager, InjectionManager
-    from core.managers.factory import ManagerFactory
     from PIL import Image
 
-from core.managers.base_manager import BaseManager
+    from core.managers import ExtractionManager, InjectionManager
+    from core.managers.factory import ManagerFactory
+
 from PySide6.QtCore import QObject, Signal
+
+from core.managers.base_manager import BaseManager
 from utils.logging_config import get_logger
 
 from .base import BaseWorker, ManagedWorker

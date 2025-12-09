@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 from core.managers.factory import ManagerFactory, StandardManagerFactory
 
-from .qt_application_factory import TestApplicationFactory
+from .qt_application_factory import ApplicationFactory
 
 
 class RealManagerFixtureFactory:
@@ -50,7 +50,7 @@ class RealManagerFixtureFactory:
             manager_factory: Manager factory to use (creates default if None)
         """
         # Ensure Qt application exists
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
 
         # Set up Qt parent
         self.qt_parent = qt_parent or self.qt_app
@@ -236,7 +236,7 @@ class WorkerOwnedManagerFixture:
         Args:
             worker_parent: Parent object that will own the managers
         """
-        self.qt_app = TestApplicationFactory.get_application()
+        self.qt_app = ApplicationFactory.get_application()
         self.worker_parent = worker_parent or self.qt_app
         self.factory = RealManagerFixtureFactory(qt_parent=self.worker_parent)
 

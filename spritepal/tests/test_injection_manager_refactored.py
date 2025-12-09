@@ -14,10 +14,11 @@ import json
 from collections.abc import Generator
 
 import pytest
+from PIL import Image
+
 from core.managers import cleanup_managers, initialize_managers
 from core.managers.exceptions import ValidationError
 from core.managers.injection_manager import InjectionManager
-from PIL import Image
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: Real Qt components

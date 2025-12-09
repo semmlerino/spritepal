@@ -100,6 +100,7 @@ def run_tests():
         # Create simple inline test
         from PySide6.QtCore import Qt
         from PySide6.QtGui import QPixmap
+
         from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
@@ -196,6 +197,7 @@ def run_tests():
         try:
             print("\n📝 Testing layout fixes...")
             from PySide6.QtWidgets import QSizePolicy
+
             from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 
             gallery = SpriteGalleryWidget()

@@ -26,7 +26,7 @@ pytestmark = [
     pytest.mark.signals_slots,
 ]
 
-class TestMainWindowHelperSimple(QObject):
+class MainWindowHelperSimple(QObject):
     """Simplified helper for MainWindow testing without real Qt widgets"""
 
     # Define signals that MainWindow has

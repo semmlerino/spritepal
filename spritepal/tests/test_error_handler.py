@@ -6,6 +6,7 @@ from __future__ import annotations
 import pytest
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QWidget
+
 from ui.common import get_error_handler, reset_error_handler
 
 # Test characteristics: Real GUI components requiring display

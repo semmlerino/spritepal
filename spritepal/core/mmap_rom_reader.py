@@ -71,7 +71,6 @@ class MemoryMappedROMReader:
                 sprite = rom_data[offset:offset+size]
         """
         access_mode = "r+b" if write else "rb"
-        mmap.PROT_READ | mmap.PROT_WRITE if write else mmap.PROT_READ
 
         file_handle = None
         mapped = None

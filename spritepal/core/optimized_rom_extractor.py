@@ -16,10 +16,11 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
-from core.mmap_rom_reader import MemoryMappedROMReader, optimize_rom_operations
-from core.rom_extractor import ROMExtractor
 from PIL import Image
 from typing_extensions import override
+
+from core.mmap_rom_reader import MemoryMappedROMReader, optimize_rom_operations
+from core.rom_extractor import ROMExtractor
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_TILES_PER_ROW,
@@ -162,7 +163,7 @@ class OptimizedROMExtractor(ROMExtractor):
             Decompressed data bytes
         """
         # Use parent class's working decompression via hal_compressor
-        return self.hal_compressor.decompress_from_rom(reader.rom_path, offset)
+        return self.hal_compressor.decompress_from_rom(str(reader.rom_path), offset)
 
     def extract_multiple_sprites(
         self,

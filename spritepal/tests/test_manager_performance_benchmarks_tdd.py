@@ -24,6 +24,7 @@ Benefits of real performance testing vs mocks:
 from __future__ import annotations
 
 import pytest
+
 from core.managers import ValidationError
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
@@ -34,7 +35,7 @@ from tests.infrastructure.manager_test_context import (
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.real_component_factory import RealComponentFactory
 from tests.infrastructure.test_data_repository import (
-    TestDataRepository,
+    DataRepository,
     get_test_data_repository,
 )
 
@@ -56,7 +57,7 @@ class TestManagerPerformanceBenchmarksTDD:
     """TDD performance benchmarks for manager operations."""
 
     @pytest.fixture
-    def test_data_repo(self) -> TestDataRepository:
+    def test_data_repo(self) -> DataRepository:
         """Provide test data repository for performance tests."""
         return get_test_data_repository()
 
@@ -183,8 +184,8 @@ class TestManagerPerformanceBenchmarksTDD:
                     injection_mgr.injection_progress.emit(50 + i, f"Injection {i}")
 
                 # Process Qt events
-                if hasattr(qtbot, 'wait'):
-                    qtbot.wait(10)  # Small delay for signal processing
+                from PySide6.QtWidgets import QApplication
+                QApplication.processEvents()
 
                 return signal_count
 
@@ -420,8 +421,8 @@ class TestManagerMemoryPerformanceTDD:
                     injection_mgr.injection_progress.disconnect(temp_handler)
 
                 # Process any pending Qt events
-                if hasattr(qtbot, 'wait'):
-                    qtbot.wait(10)
+                from PySide6.QtWidgets import QApplication
+                QApplication.processEvents()
 
                 return connections_made
 

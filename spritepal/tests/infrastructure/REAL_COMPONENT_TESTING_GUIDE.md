@@ -15,7 +15,7 @@ The existing MockFactory approach had critical issues:
 
 ## Solution Architecture
 
-### 1. TestDataRepository (`test_data_repository.py`)
+### 1. DataRepository (`test_data_repository.py`)
 Provides consistent test data management:
 - **Predefined test scenarios** with expected outcomes
 - **Real test data files** (VRAM, CGRAM, OAM, ROM)
@@ -218,7 +218,7 @@ def test_with_fixtures(
 - [ ] Remove all `cast()` operations for managers/workers
 - [ ] Replace mock creation with real component creation
 - [ ] Use `manager_context` for lifecycle management
-- [ ] Replace mock data with `TestDataRepository`
+- [ ] Replace mock data with `DataRepository`
 - [ ] Update worker tests to use `TypedWorkerBase`
 - [ ] Add proper cleanup with context managers
 - [ ] Update pytest fixtures to use real components

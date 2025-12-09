@@ -20,6 +20,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+
 from core.managers.session_manager import SessionManager
 from tests.infrastructure.qt_testing_framework import QtTestingFramework
 from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog

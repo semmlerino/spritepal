@@ -19,7 +19,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from PySide6.QtTest import QSignalSpy
@@ -159,6 +159,10 @@ class TestExtractionControllerUnit:
         """Create REAL controller instance with mock managers."""
         extraction_manager, injection_manager, session_manager = standard_mock_managers
 
+        # Create mock settings manager to avoid DI lookup
+        from utils.settings_manager import SettingsManager
+        mock_settings_manager = Mock(spec=SettingsManager)
+
         # Patch get_error_handler to return a mock to avoid QWidget issues
         with patch('core.controller.get_error_handler') as mock_get_error_handler:
             mock_error_handler = Mock()
@@ -168,7 +172,8 @@ class TestExtractionControllerUnit:
                 main_window=main_window,
                 extraction_manager=extraction_manager,
                 injection_manager=injection_manager,
-                session_manager=session_manager
+                session_manager=session_manager,
+                settings_manager=mock_settings_manager,
             )
             controller.mock_error_handler = mock_error_handler # For direct testing if needed
 
@@ -210,8 +215,8 @@ class TestExtractionControllerUnit:
 
         controller.start_extraction()
 
-        main_window.extraction_error_occurred.assert_called_once()
-        error_message = main_window.extraction_error_occurred.call_args[0][0]
+        main_window.extraction_failed.assert_called_once()
+        error_message = main_window.extraction_failed.call_args[0][0]
         assert "VRAM file is required for extraction" in error_message
         assert controller.worker is None
 
@@ -229,8 +234,8 @@ class TestExtractionControllerUnit:
 
         controller.start_extraction()
 
-        main_window.extraction_error_occurred.assert_called_once()
-        error_message = main_window.extraction_error_occurred.call_args[0][0]
+        main_window.extraction_failed.assert_called_once()
+        error_message = main_window.extraction_failed.call_args[0][0]
         assert expected_msg in error_message
         assert controller.worker is None
 
@@ -246,8 +251,8 @@ class TestExtractionControllerUnit:
 
         controller.start_extraction()
 
-        main_window.extraction_error_occurred.assert_called_once()
-        error_message = main_window.extraction_error_occurred.call_args[0][0]
+        main_window.extraction_failed.assert_called_once()
+        error_message = main_window.extraction_failed.call_args[0][0]
         assert "VRAM file is required for extraction" in error_message
         assert controller.worker is None
 
@@ -264,7 +269,15 @@ class TestExtractionControllerUnit:
         main_window.get_extraction_params.return_value = valid_params
         controller.extraction_manager.validate_extraction_params.return_value = None
 
-        with patch('core.controller.VRAMExtractionWorker') as mock_worker_class:
+        # Mock file validation to return valid results (files don't actually exist)
+        mock_validation_result = Mock()
+        mock_validation_result.is_valid = True
+        mock_validation_result.error_message = None
+        mock_validation_result.warnings = []
+
+        with patch('core.controller.VRAMExtractionWorker') as mock_worker_class, \
+             patch('core.controller.FileValidator.validate_vram_file', return_value=mock_validation_result), \
+             patch('core.controller.FileValidator.validate_cgram_file', return_value=mock_validation_result):
             mock_worker = Mock(spec=VRAMExtractionWorker)
             mock_worker_class.return_value = mock_worker
 
@@ -287,35 +300,39 @@ class TestExtractionControllerUnit:
         from PIL import Image
         test_image = Image.new('RGB', (8, 8), color='red')
         tile_count = 42
-        controller._on_preview_ready(test_image, tile_count)
-        main_window.sprite_preview.update_preview.assert_called_once()
-        main_window.preview_coordinator.update_preview.assert_called_once()
+        # Patch pil_to_qpixmap to avoid Qt context requirement
+        with patch('core.controller.pil_to_qpixmap') as mock_pil_to_qpixmap:
+            mock_pil_to_qpixmap.return_value = Mock()  # Return mock QPixmap
+            controller._on_preview_ready(test_image, tile_count)
+        main_window.sprite_preview.set_preview.assert_called_once()
+        main_window.preview_coordinator.update_preview_info.assert_called_once()
 
     def test_on_preview_image_ready_handler(self, controller: ExtractionController, main_window: Any):
         """Test preview image ready handler."""
         from PIL import Image
         test_image = Image.new('L', (8, 8), color=128)
         controller._on_preview_image_ready(test_image)
-        main_window.sprite_preview.set_image.assert_called_once()
+        main_window.sprite_preview.set_grayscale_image.assert_called_once()
 
     def test_on_palettes_ready_handler(self, controller: ExtractionController, main_window: Any):
         """Test palettes ready handler."""
         test_palettes = {8: [[0, 0, 0], [255, 0, 0]]}
         controller._on_palettes_ready(test_palettes)
-        main_window.palette_preview.update_palettes.assert_called_once_with(test_palettes)
+        main_window.palette_preview.set_all_palettes.assert_called_once_with(test_palettes)
+        main_window.sprite_preview.set_palettes.assert_called_once_with(test_palettes)
 
     def test_on_active_palettes_ready_handler(self, controller: ExtractionController, main_window: Any):
         """Test active palettes ready handler."""
         active_palettes = [8, 9]
         controller._on_active_palettes_ready(active_palettes)
-        main_window.palette_preview.set_active_palettes.assert_called_once_with(active_palettes)
+        main_window.palette_preview.highlight_active_palettes.assert_called_once_with(active_palettes)
 
     def test_on_extraction_finished_handler(self, controller: ExtractionController, main_window: Any):
         """Test extraction finished handler."""
         extracted_files = ["sprite.png"]
         controller.worker = DummyWorker() # Simulate worker being active
         controller._on_extraction_finished(extracted_files)
-        main_window.extraction_completed.assert_called_once_with(extracted_files)
+        main_window.extraction_complete.assert_called_once_with(extracted_files)
         assert controller.worker is None
 
     def test_on_extraction_error_handler(self, controller: ExtractionController, main_window: Any):
@@ -323,7 +340,7 @@ class TestExtractionControllerUnit:
         error_message = "Failed to read VRAM file"
         controller.worker = DummyWorker() # Simulate worker being active
         controller._on_extraction_error(error_message)
-        main_window.extraction_error_occurred.assert_called_once_with(error_message)
+        main_window.extraction_failed.assert_called_once_with(error_message)
         assert controller.worker is None
 
     @patch("core.controller.subprocess.Popen")
@@ -383,31 +400,72 @@ class TestExtractionControllerUnit:
 
 @pytest.mark.no_manager_setup
 class TestControllerManagerContextIntegration:
-    """Test controller integration with manager context system."""
+    """Test controller integration with manager context system.
 
-    def test_controller_manager_access(self, standard_mock_main_window: Any, real_extraction_manager: ExtractionManager, real_injection_manager: InjectionManager, real_session_manager: SessionManager):
-        """Test that controller can access managers through real components."""
-        controller = ExtractionController(
-            standard_mock_main_window,
-            extraction_manager=real_extraction_manager,
-            injection_manager=real_injection_manager,
-            session_manager=real_session_manager
-        )
-        assert isinstance(controller.extraction_manager, ExtractionManager)
-        assert isinstance(controller.injection_manager, InjectionManager)
-        assert isinstance(controller.session_manager, SessionManager)
+    Note: These tests use mock managers with proper spec to verify controller
+    initialization and signal connections without requiring full DI setup.
+    """
 
-    def test_controller_manager_state_persistence(self, real_factory):
-        """Test that real managers maintain their state independently."""
-        shared_manager = real_factory.create_extraction_manager()
-        window1 = real_factory.create_main_window(with_managers=True) # Mocked window, not real Qt
-        controller1 = ExtractionController(window1)
-        controller1.extraction_manager = shared_manager
-        controller1.extraction_manager.test_state = "persistent_value" # Mutate mock state
+    def test_controller_manager_access(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock]):
+        """Test that controller can access injected managers."""
+        extraction_manager, injection_manager, session_manager = standard_mock_managers
 
-        window2 = real_factory.create_main_window(with_managers=True) # Mocked window, not real Qt
-        controller2 = ExtractionController(window2)
-        controller2.extraction_manager = shared_manager
+        # Create mock settings manager to avoid DI lookup
+        from utils.settings_manager import SettingsManager
+        mock_settings_manager = Mock(spec=SettingsManager)
+
+        with patch('core.controller.get_error_handler') as mock_get_error_handler:
+            mock_get_error_handler.return_value = Mock()
+            controller = ExtractionController(
+                standard_mock_main_window,
+                extraction_manager=extraction_manager,
+                injection_manager=injection_manager,
+                session_manager=session_manager,
+                settings_manager=mock_settings_manager,
+            )
+        # Verify the exact managers passed are used (not fetched from DI)
+        assert controller.extraction_manager is extraction_manager
+        assert controller.injection_manager is injection_manager
+        assert controller.session_manager is session_manager
+
+    def test_controller_manager_state_persistence(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock]):
+        """Test that managers maintain their state independently."""
+        extraction_manager, injection_manager, session_manager = standard_mock_managers
+
+        # Create mock settings manager to avoid DI lookup
+        from utils.settings_manager import SettingsManager
+        mock_settings_manager = Mock(spec=SettingsManager)
+
+        with patch('core.controller.get_error_handler') as mock_get_error_handler:
+            mock_get_error_handler.return_value = Mock()
+            controller1 = ExtractionController(
+                standard_mock_main_window,
+                extraction_manager=extraction_manager,
+                injection_manager=injection_manager,
+                session_manager=session_manager,
+                settings_manager=mock_settings_manager,
+            )
+            # Set state on the extraction manager
+            extraction_manager.test_state = "persistent_value"
+
+            # Create second window mock with required attributes
+            MainWindow = get_main_window_mock_spec()
+            window2 = Mock(spec=MainWindow)
+            window2.extract_requested = MagicMock()
+            window2.open_in_editor_requested = MagicMock()
+            window2.arrange_rows_requested = MagicMock()
+            window2.arrange_grid_requested = MagicMock()
+            window2.inject_requested = MagicMock()
+            window2.extraction_panel = Mock()
+            window2.extraction_panel.offset_changed = Mock()
+
+            controller2 = ExtractionController(
+                window2,
+                extraction_manager=extraction_manager,
+                injection_manager=injection_manager,
+                session_manager=session_manager,
+                settings_manager=mock_settings_manager,
+            )
 
         assert controller2.extraction_manager is controller1.extraction_manager
         assert controller2.extraction_manager.test_state == "persistent_value"
@@ -435,12 +493,23 @@ class TestPrivateAttributeAccessFix:
         return window
 
     @pytest.fixture
-    def test_controller(self, test_main_window: Any, real_extraction_manager: ExtractionManager, real_injection_manager: InjectionManager, real_session_manager: SessionManager) -> ExtractionController:
+    def test_controller(self, test_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock]) -> ExtractionController:
         """Create controller instance for private attribute access tests."""
-        controller = ExtractionController(test_main_window)
-        controller.extraction_manager = real_extraction_manager
-        controller.injection_manager = real_injection_manager
-        controller.session_manager = real_session_manager
+        extraction_manager, injection_manager, session_manager = standard_mock_managers
+
+        # Create mock settings manager to avoid DI lookup
+        from utils.settings_manager import SettingsManager
+        mock_settings_manager = Mock(spec=SettingsManager)
+
+        with patch('core.controller.get_error_handler') as mock_get_error_handler:
+            mock_get_error_handler.return_value = Mock()
+            controller = ExtractionController(
+                test_main_window,
+                extraction_manager=extraction_manager,
+                injection_manager=injection_manager,
+                session_manager=session_manager,
+                settings_manager=mock_settings_manager,
+            )
         return controller
 
     def test_get_output_path_returns_value(self, test_main_window: Any):

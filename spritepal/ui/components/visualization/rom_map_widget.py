@@ -16,6 +16,7 @@ except ImportError:
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
+
 from utils.logging_config import get_logger
 from utils.sprite_regions import SpriteRegion
 

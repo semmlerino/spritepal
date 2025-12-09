@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.components.visualization import ROMMapWidget
 from ui.styles import get_panel_style
 

@@ -8,9 +8,10 @@ import json
 import time
 from pathlib import Path
 
-from utils.logging_config import get_logger
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

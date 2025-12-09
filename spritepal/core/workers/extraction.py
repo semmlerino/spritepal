@@ -17,9 +17,10 @@ except ImportError:
 from typing_extensions import override
 
 if TYPE_CHECKING:
+    from PySide6.QtCore import QObject
+
     from core.managers import ExtractionManager
     from core.managers.factory import ManagerFactory
-    from PySide6.QtCore import QObject
 
 from core.managers import ExtractionManager, get_extraction_manager
 from utils.logging_config import get_logger

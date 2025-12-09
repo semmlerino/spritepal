@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+
 from core.parallel_sprite_finder import (
     # Serial execution required: Thread safety concerns
     AdaptiveSpriteFinder,

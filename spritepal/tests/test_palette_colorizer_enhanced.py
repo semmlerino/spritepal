@@ -7,6 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 from PIL import Image
+
 from ui.row_arrangement.palette_colorizer import PaletteColorizer
 
 # Systematic pytest markers applied based on test content analysis

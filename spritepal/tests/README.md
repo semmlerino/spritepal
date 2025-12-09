@@ -67,7 +67,7 @@ See `tests/examples/example_minimal_mock_test.py` for proper mock usage patterns
 ### Core Components
 - **RealComponentFactory**: Creates real managers, workers, and UI components with type safety
 - **ManagerTestContext**: Manages real manager lifecycles for integration testing
-- **TestDataRepository**: Provides consistent test data (small/medium/comprehensive sizes)
+- **DataRepository**: Provides consistent test data (small/medium/comprehensive sizes)
 - **Migration Helpers**: Tools for converting mock-based tests to real components
 
 ### Directory Structure
@@ -223,18 +223,19 @@ Real component testing performance (vs mocks):
 - **Small Data**: Quick unit tests (< 1KB test files)
 - **Medium Data**: Integration tests (1-10KB test files)
 - **Comprehensive Data**: Full workflow tests (10KB+ test files)
-- **Consistent Paths**: Use `TestDataRepository` for reliable test data
+- **Consistent Paths**: Use `DataRepository` for reliable test data
 
 ## Documentation
 
 - **[Real Component Testing Guide](../docs/REAL_COMPONENT_TESTING_GUIDE.md)**: Comprehensive patterns and migration guide
+- **[Headless Testing Guide](HEADLESS_TESTING.md)**: CI/CD setup, offscreen mode, and troubleshooting
 - **[Testing Examples](examples/)**: Complete code examples for all patterns
 - **[Infrastructure Guide](infrastructure/REAL_COMPONENT_TESTING_GUIDE.md)**: Technical implementation details
 
 ## Success Metrics
 
 The real component testing migration is **ongoing**:
-- ✅ **Infrastructure complete** - RealComponentFactory, TestDataRepository, migration tools available
+- ✅ **Infrastructure complete** - RealComponentFactory, DataRepository, migration tools available
 - ✅ **New tests use real components** - established patterns in `tests/examples/`
 - ✅ **Type safety for new tests** - eliminated unsafe `cast()` operations in migrated tests
 - ⚠️ **Migration in progress** - 33 test files still have >5 mock patterns

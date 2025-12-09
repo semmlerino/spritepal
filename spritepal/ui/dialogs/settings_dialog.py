@@ -5,7 +5,7 @@ Provides user interface for configuring application preferences
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 # from typing_extensions import override
 from PySide6.QtCore import Signal
@@ -24,10 +24,15 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from ui.components.base import BaseDialog
 from ui.styles import get_button_style, get_muted_text_style
-from utils.rom_cache import get_rom_cache
-from utils.settings_manager import get_settings_manager
+
+# from utils.rom_cache import get_rom_cache # Removed due to DI
+# from utils.settings_manager import get_settings_manager # Removed due to DI
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 
 
 class SettingsDialog(BaseDialog):
@@ -37,7 +42,9 @@ class SettingsDialog(BaseDialog):
     settings_changed = Signal()
     cache_cleared = Signal()
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: Any | None = None,
+                 settings_manager: SettingsManagerProtocol | None = None,
+                 rom_cache: ROMCacheProtocol | None = None):
         # Initialize UI components - declare BEFORE super().__init__() to avoid overwriting
         self.tab_widget: QTabWidget | None = None
         self.restore_window_check: QCheckBox | None = None
@@ -71,8 +78,21 @@ class SettingsDialog(BaseDialog):
             with_button_box=True,
         )
 
-        self.settings_manager = get_settings_manager()
-        self.rom_cache = get_rom_cache()
+        # Inject dependencies or use fallback
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
+
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        else:
+            self.rom_cache = rom_cache
+
         self._load_original_settings()
 
         # Set up the dialog content

@@ -1,17 +1,18 @@
 """
 Integration tests for complete UI → Manager workflows
+
+Uses shared class_managers fixture from core_fixtures.py instead of local setup.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
+
 from core.managers import (
-    cleanup_managers,
     get_extraction_manager,
     get_injection_manager,
     get_session_manager,
-    initialize_managers,
 )
 from core.managers.exceptions import ValidationError
 from tests.fixtures.test_managers import (
@@ -26,14 +27,11 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.no_qt,
     pytest.mark.rom_data,
+    pytest.mark.usefixtures("class_managers"),  # Use shared class-scoped managers
 ]
-@pytest.fixture(autouse=True)
-def setup_managers():
-    """Setup managers for all tests"""
-    initialize_managers("TestApp")
-    yield
-    cleanup_managers()
 
+
+@pytest.mark.usefixtures("class_managers")
 class TestManagerCommunication:
     """Test communication patterns between managers"""
 

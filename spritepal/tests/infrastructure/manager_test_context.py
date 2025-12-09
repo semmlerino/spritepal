@@ -9,16 +9,18 @@ isolation, and cleanup.
 from __future__ import annotations
 
 import contextlib
+import logging
 import threading
 from collections.abc import Iterator
 from typing import Any, TypeVar, cast
+
+from PySide6.QtCore import QThread
+from PySide6.QtWidgets import QApplication
 
 from core.managers.base_manager import BaseManager
 from core.managers.extraction_manager import ExtractionManager
 from core.managers.injection_manager import InjectionManager
 from core.managers.session_manager import SessionManager
-from PySide6.QtCore import QThread
-from PySide6.QtWidgets import QApplication
 
 from .qt_application_factory import ApplicationFactory
 from .real_component_factory import RealComponentFactory
@@ -202,18 +204,22 @@ class ManagerTestContext:
         return worker.wait(timeout)
 
     def cleanup_workers(self) -> None:
-        """Clean up all active workers."""
+        """Clean up all active workers, force-terminating if necessary."""
+        logger = logging.getLogger(__name__)
         for worker in self._workers:
             try:
                 if worker.isRunning():
                     worker.requestInterruption()
                     worker.quit()
                     if not worker.wait(1000):
-                        # Worker didn't stop gracefully
-                        pass  # Log warning but don't terminate
+                        # Worker didn't stop gracefully - force terminate
+                        logger.warning(f"Worker {worker} didn't stop in 1s, terminating")
+                        worker.terminate()
+                        if not worker.wait(500):
+                            logger.error(f"Worker {worker} failed to terminate")
                 worker.deleteLater()
-            except Exception:
-                pass  # Ignore cleanup errors
+            except Exception as e:
+                logger.warning(f"Error cleaning up worker {worker}: {e}")
 
         self._workers.clear()
 

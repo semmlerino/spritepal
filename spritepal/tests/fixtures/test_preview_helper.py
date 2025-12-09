@@ -13,6 +13,7 @@ import pytest
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
+
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 # Ensure headless Qt environment
@@ -37,7 +38,7 @@ def ensure_headless_qt():
         return QApplication([])
     return QApplication.instance()
 
-class TestExtractionPanelHelper(QObject):
+class ExtractionPanelHelper(QObject):
     """Helper for real ExtractionPanel functionality without Qt widgets"""
 
     # Define real signals
@@ -97,7 +98,7 @@ class TestExtractionPanelHelper(QObject):
         for key in self.signal_emissions:
             self.signal_emissions[key].clear()
 
-class TestPreviewPanelHelper(QObject):
+class PreviewPanelHelper(QObject):
     """Helper for real PreviewPanel functionality without Qt widgets"""
 
     # Define real signals
@@ -283,10 +284,10 @@ class TestPreviewPanelHelper(QObject):
         for key in self.signal_emissions:
             self.signal_emissions[key].clear()
 
-class TestControllerHelper(QObject):
+class ControllerHelper(QObject):
     """Helper for real ExtractionController functionality"""
 
-    def __init__(self, extraction_panel: TestExtractionPanelHelper, preview_panel: TestPreviewPanelHelper):
+    def __init__(self, extraction_panel: ExtractionPanelHelper, preview_panel: PreviewPanelHelper):
         super().__init__()
         ensure_headless_qt()
 
@@ -374,7 +375,7 @@ class TestControllerHelper(QObject):
         """Get list of update times for performance analysis"""
         return self.update_times.copy()
 
-class TestStatusBarHelper:
+class StatusBarHelper:
     """Helper for status bar functionality"""
 
     def __init__(self):

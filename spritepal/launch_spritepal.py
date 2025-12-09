@@ -41,14 +41,15 @@ def _configure_composed_dialogs_early():
 # Configure composed dialogs VERY EARLY - before any UI imports
 _configure_composed_dialogs_early()
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QApplication
+
 from core.managers import (
     cleanup_managers,
     initialize_managers,
     validate_manager_dependencies,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QApplication
 from ui.common.error_handler import get_error_handler
 from ui.main_window import MainWindow
 from ui.styles.accessibility import initialize_accessibility

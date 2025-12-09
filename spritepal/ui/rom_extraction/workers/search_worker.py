@@ -6,11 +6,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.rom_extractor import ROMExtractor
+    from core.protocols.manager_protocols import ROMExtractorProtocol
+
+from PySide6.QtCore import QThread, Signal
 
 from core.parallel_sprite_finder import ParallelSpriteFinder
 from core.workers.base import handle_worker_errors
-from PySide6.QtCore import QThread, Signal
 from utils.constants import MAX_ROM_SIZE
 from utils.logging_config import get_logger
 
@@ -25,7 +26,7 @@ class SpriteSearchWorker(QThread):
     progress = Signal(int, int)  # current, total
 
     def __init__(self, rom_path: str, start_offset: int, end_offset: int,
-                 direction: int, extractor: ROMExtractor, parent: QThread | None = None):
+                 direction: int, extractor: ROMExtractorProtocol, parent: QThread | None = None):
         super().__init__(parent)
         self.rom_path = rom_path
         self.start_offset = start_offset

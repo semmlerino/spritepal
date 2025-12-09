@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QWidget,
 )
+
 from utils.logging_config import get_logger
 
 from .composed_dialog import ComposedDialog

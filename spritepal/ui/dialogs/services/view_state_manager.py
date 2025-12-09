@@ -12,13 +12,17 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
+
+    from core.protocols.manager_protocols import SettingsManagerProtocol
 else:
     from PySide6.QtWidgets import QWidget
 
 from PySide6.QtCore import QObject, QRect, Qt, Signal
 from PySide6.QtGui import QGuiApplication
+
 from utils.logging_config import get_logger
-from utils.settings_manager import get_settings_manager
+
+# from utils.settings_manager import get_settings_manager # Removed due to DI
 
 logger = get_logger(__name__)
 
@@ -37,10 +41,19 @@ class ViewStateManager(QObject):
     fullscreen_toggled = Signal(bool)  # is_fullscreen
     title_changed = Signal(str)  # new_title
 
-    def __init__(self, dialog_widget: QWidget, parent: QObject | None = None) -> None:
+    def __init__(self, dialog_widget: QWidget, parent: QObject | None = None,
+                 settings_manager: SettingsManagerProtocol | None = None) -> None:
         super().__init__(parent)
 
         self.dialog_widget = dialog_widget
+
+        # Inject settings manager or use fallback
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
 
         # Fullscreen state
         self._is_fullscreen = False
@@ -165,7 +178,7 @@ class ViewStateManager(QObject):
                 logger.warning(f"Refusing to save invalid window position: {x},{y} {width}x{height}")
                 return
 
-            settings_manager = get_settings_manager()
+            settings_manager = self.settings_manager
             settings_manager.set("manual_offset_dialog", "x", x)
             settings_manager.set("manual_offset_dialog", "y", y)
             settings_manager.set("manual_offset_dialog", "width", width)
@@ -211,7 +224,7 @@ class ViewStateManager(QObject):
             True if position was restored, False otherwise
         """
         try:
-            settings_manager = get_settings_manager()
+            settings_manager = self.settings_manager
 
             # Get saved position values
             x = settings_manager.get("manual_offset_dialog", "x", None)

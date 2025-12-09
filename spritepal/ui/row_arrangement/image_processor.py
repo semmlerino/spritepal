@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from PIL import Image
+
 from utils.exceptions import FileFormatError
 
 

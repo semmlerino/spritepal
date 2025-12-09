@@ -1,5 +1,5 @@
 """
-TestDataRepository: Centralized real test data management.
+DataRepository: Centralized real test data management.
 
 Provides consistent access to real test data files (VRAM, ROM, CGRAM, etc.)
 instead of creating temporary mock data in each test. This improves test
@@ -29,7 +29,7 @@ pytestmark = [
 ]
 
 @dataclass
-class TestDataSet:
+class DataSet:
     """Represents a complete set of test data for extraction/injection testing."""
     name: str
     description: str
@@ -46,7 +46,7 @@ class TestDataSet:
         if self.metadata_files is None:
             self.metadata_files = []
 
-class TestDataRepository:
+class DataRepository:
     """
     Centralized repository for test data management.
 
@@ -91,7 +91,7 @@ class TestDataRepository:
         self._temp_dirs: list[str] = []
 
         # Initialize data sets
-        self._data_sets: dict[str, TestDataSet] = {}
+        self._data_sets: dict[str, DataSet] = {}
         self._initialize_data_sets()
 
     def _initialize_data_sets(self) -> None:
@@ -126,7 +126,7 @@ class TestDataRepository:
         real_rom = self._find_existing_file(rom_candidates)
 
         if real_vram or real_cgram or real_rom:
-            self._data_sets["real_kirby"] = TestDataSet(
+            self._data_sets["real_kirby"] = DataSet(
                 name="real_kirby",
                 description="Real Kirby Super Star data files",
                 vram_path=str(real_vram) if real_vram else None,
@@ -137,24 +137,24 @@ class TestDataRepository:
     def _register_generated_data_sets(self) -> None:
         """Register generated test data sets."""
         # Small test data set
-        self._data_sets["small_test"] = TestDataSet(
+        self._data_sets["small_test"] = DataSet(
             name="small_test",
             description="Small generated test data for unit tests"
         )
 
         # Medium test data set
-        self._data_sets["medium_test"] = TestDataSet(
+        self._data_sets["medium_test"] = DataSet(
             name="medium_test",
             description="Medium generated test data for integration tests"
         )
 
         # Comprehensive test data set
-        self._data_sets["comprehensive_test"] = TestDataSet(
+        self._data_sets["comprehensive_test"] = DataSet(
             name="comprehensive_test",
             description="Comprehensive generated test data for full workflow testing"
         )
 
-    def get_data_set(self, name: str) -> TestDataSet | None:
+    def get_data_set(self, name: str) -> DataSet | None:
         """
         Get a test data set by name.
 
@@ -256,13 +256,13 @@ class TestDataRepository:
             "rom_offset": 0x200000,
         }
 
-    def _ensure_data_set_files(self, data_set: TestDataSet) -> None:
+    def _ensure_data_set_files(self, data_set: DataSet) -> None:
         """Ensure all files in a data set exist, creating them if necessary."""
         if data_set.name.endswith("_test"):
             # Generate files for test data sets
             self._generate_test_files(data_set)
 
-    def _generate_test_files(self, data_set: TestDataSet) -> None:
+    def _generate_test_files(self, data_set: DataSet) -> None:
         """Generate test files for a data set."""
         size_map = {
             "small_test": {"vram_size": 0x10000, "rom_size": 0x100000},  # 64KB VRAM (minimum required), 1MB ROM
@@ -515,15 +515,15 @@ class TestDataRepository:
         self._temp_files.clear()
         self._temp_dirs.clear()
 
-class _TestDataRepositorySingleton:
-    """Singleton holder for TestDataRepository."""
-    _instance: TestDataRepository | None = None
+class _DataRepositorySingleton:
+    """Singleton holder for DataRepository."""
+    _instance: DataRepository | None = None
 
     @classmethod
-    def get(cls) -> TestDataRepository:
+    def get(cls) -> DataRepository:
         """Get the global test data repository instance."""
         if cls._instance is None:
-            cls._instance = TestDataRepository()
+            cls._instance = DataRepository()
         return cls._instance
 
     @classmethod
@@ -533,13 +533,13 @@ class _TestDataRepositorySingleton:
             cls._instance.cleanup()
             cls._instance = None
 
-def get_test_data_repository() -> TestDataRepository:
+def get_test_data_repository() -> DataRepository:
     """Get the global test data repository instance."""
-    return _TestDataRepositorySingleton.get()
+    return _DataRepositorySingleton.get()
 
 def cleanup_test_data_repository() -> None:
     """Clean up the global test data repository."""
-    _TestDataRepositorySingleton.cleanup()
+    _DataRepositorySingleton.cleanup()
 
 # Convenience functions
 def get_vram_test_data(size: str = "medium") -> dict[str, Any]:

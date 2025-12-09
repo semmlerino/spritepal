@@ -17,6 +17,7 @@ from unittest.mock import Mock, patch
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeyEvent, QPixmap
+
 from tests.infrastructure.qt_real_testing import (
     EventLoopHelper,
     MemoryHelper,
@@ -132,7 +133,8 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_scan_worker_class,
         mock_get_manager,
         complete_test_rom,
-        realistic_sprite_data
+        realistic_sprite_data,
+        isolated_managers,  # Required for DI setup (DetachedGalleryWindow uses inject())
     ):
         """Test complete workflow: ROM load -> scan -> thumbnails -> fullscreen view."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow

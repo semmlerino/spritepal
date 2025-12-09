@@ -4,6 +4,7 @@ Tests for manager registry
 from __future__ import annotations
 
 import pytest
+
 from core.managers import (
     # Serial execution required: Thread safety concerns
     ExtractionManager,

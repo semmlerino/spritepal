@@ -4,7 +4,8 @@ Validation tests for TestMainWindowHelper
 from __future__ import annotations
 
 import pytest
-from tests.fixtures.test_main_window_helper_simple import TestMainWindowHelperSimple
+
+from tests.fixtures.test_main_window_helper_simple import MainWindowHelperSimple
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -21,7 +22,7 @@ class TestMainWindowHelperValidation:
 
     def test_helper_initialization(self, tmp_path):
         """Test TestMainWindowHelper initializes correctly"""
-        helper = TestMainWindowHelperSimple(str(tmp_path))
+        helper = MainWindowHelperSimple(str(tmp_path))
 
         try:
             # Verify real UI components are created
@@ -47,7 +48,7 @@ class TestMainWindowHelperValidation:
 
     def test_extraction_params_functionality(self, tmp_path):
         """Test extraction parameter management"""
-        helper = TestMainWindowHelperSimple(str(tmp_path))
+        helper = MainWindowHelperSimple(str(tmp_path))
 
         try:
             # Test default params
@@ -69,7 +70,7 @@ class TestMainWindowHelperValidation:
 
     def test_signal_tracking(self, tmp_path):
         """Test signal emission tracking functionality"""
-        helper = TestMainWindowHelperSimple(str(tmp_path))
+        helper = MainWindowHelperSimple(str(tmp_path))
 
         try:
             # Test signal emission tracking
@@ -98,7 +99,7 @@ class TestMainWindowHelperValidation:
 
     def test_workflow_scenarios(self, tmp_path):
         """Test workflow scenario creation"""
-        helper = TestMainWindowHelperSimple(str(tmp_path))
+        helper = MainWindowHelperSimple(str(tmp_path))
 
         try:
             # Test VRAM extraction scenario
@@ -118,7 +119,7 @@ class TestMainWindowHelperValidation:
 
     def test_extraction_completion_handling(self, tmp_path):
         """Test extraction completion handling"""
-        helper = TestMainWindowHelperSimple(str(tmp_path))
+        helper = MainWindowHelperSimple(str(tmp_path))
 
         try:
             # Test successful completion
@@ -147,7 +148,7 @@ class TestMainWindowHelperValidation:
 
     def test_workflow_summary(self, tmp_path):
         """Test workflow summary functionality"""
-        helper = TestMainWindowHelperSimple(str(tmp_path))
+        helper = MainWindowHelperSimple(str(tmp_path))
 
         try:
             # Initial state

@@ -5,6 +5,7 @@ Debug test to investigate manager lifecycle issues.
 import tempfile
 
 import pytest
+
 from core.managers import (
     # Systematic pytest markers applied based on test content analysis
     are_managers_initialized,

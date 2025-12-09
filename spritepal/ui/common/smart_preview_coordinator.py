@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 from PySide6.QtWidgets import QSlider
+
 from ui.common.preview_cache import PreviewCache
 from ui.common.preview_worker_pool import PreviewWorkerPool
 from ui.common.timing_constants import REFRESH_RATE_60FPS

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.visual_similarity_search import SimilarityMatch
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
@@ -21,6 +20,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from typing_extensions import override
+
+from core.visual_similarity_search import SimilarityMatch
 from ui.components import BaseDialog
 from utils.logging_config import get_logger
 

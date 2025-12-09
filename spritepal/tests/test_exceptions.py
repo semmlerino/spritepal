@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+
 from utils.exceptions import (
     CGRAMError,
     ExtractionError,

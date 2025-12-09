@@ -30,16 +30,21 @@ if "--no-qt" not in sys.argv:
 
 from core.sprite_finder import SpriteFinder
 from tests.infrastructure.test_doubles import (
+    DoubleFactory,
     MockCacheManager,
-    TestDoubleFactory,
 )
 
 
-def create_mock_gallery_tab():
-    """Create a mock SpriteGalleryTab for testing without Qt dependencies."""
+def create_headless_gallery_tab():
+    """Create headless gallery tab for NON-Qt unit tests.
+
+    WARNING: This patches Qt internals and should only be used for
+    testing pure Python logic (caching, validation, etc.). For Qt
+    behavior tests, use @pytest.mark.gui and real widgets with qtbot.
+    """
     from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 
-    # Mock Qt widget initialization
+    # Mock Qt widget initialization (acceptable for headless Python-only tests)
     with patch('ui.tabs.sprite_gallery_tab.QWidget.__init__'), patch.object(SpriteGalleryTab, '_setup_ui'):
         tab = SpriteGalleryTab()
         # Initialize required attributes
@@ -48,7 +53,7 @@ def create_mock_gallery_tab():
         tab.sprites_data = []
 
         # Use test doubles for external dependencies
-        tab.gallery_widget = TestDoubleFactory.create_gallery_widget()
+        tab.gallery_widget = DoubleFactory.create_gallery_widget()
         tab.info_label = Mock()
         tab.toolbar = Mock()
         tab.compare_btn = Mock()
@@ -65,7 +70,7 @@ class TestSpriteGalleryCaching:
 
     def test_get_cache_path_creates_unique_names(self):
         """Test that cache paths are unique per ROM."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Test different ROM paths get different cache files
         path1 = tab._get_cache_path("/path/to/rom1.sfc")
@@ -80,7 +85,7 @@ class TestSpriteGalleryCaching:
 
     def test_save_cache_creates_valid_json(self, tmp_path):
         """Test that cache saving creates valid JSON with metadata."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = str(tmp_path / "test.sfc")
         tab.rom_size = 1024 * 1024  # 1MB
         tab.scan_mode = "thorough"
@@ -122,7 +127,7 @@ class TestSpriteGalleryCaching:
 
     def test_load_cache_validates_rom_path(self, tmp_path):
         """Test that cache loading validates the ROM path matches."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Create a cache file for a different ROM
         cache_file = tmp_path / "test_cache.json"
@@ -150,7 +155,7 @@ class TestSpriteGalleryCaching:
 
     def test_load_cache_checks_version(self, tmp_path):
         """Test that old cache versions are ignored."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Create an old version cache file
         cache_file = tmp_path / "test_cache.json"
@@ -174,7 +179,7 @@ class TestSpriteGalleryCaching:
 
     def test_load_cache_calculates_age(self, tmp_path):
         """Test that cache age is calculated correctly."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Create a cache file with known timestamp
         cache_file = tmp_path / "test_cache.json"
@@ -230,7 +235,7 @@ class TestSpriteGalleryScanning:
 
     def test_scan_ranges_differ_by_mode(self):
         """Test that Quick and Thorough modes use different scan ranges."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Set up for quick scan
         tab.scan_mode = "quick"
@@ -276,7 +281,7 @@ class TestSpriteGalleryScanning:
 
     def test_scan_stops_at_max_sprites(self, mock_rom_data):
         """Test that scanning stops when max sprites limit is reached."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         tab.scan_mode = "thorough"
 
@@ -304,7 +309,7 @@ class TestSpriteGalleryScanning:
 
     def test_scan_updates_progress_with_count(self):
         """Test that scan progress shows sprite count."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         tab.scan_mode = "quick"
 
@@ -334,7 +339,7 @@ class TestSpriteGalleryIntegration:
 
     def test_set_rom_data_loads_cache(self, tmp_path):
         """Test that set_rom_data automatically loads cached results."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Create a cache file
         rom_path = str(tmp_path / "test.sfc")
@@ -368,7 +373,7 @@ class TestSpriteGalleryIntegration:
 
     def test_set_rom_data_clears_old_data_without_cache(self):
         """Test that set_rom_data clears old data when no cache exists."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Set some existing sprite data
         tab.sprites_data = [{"offset": 0x100000}]
@@ -387,7 +392,7 @@ class TestSpriteGalleryIntegration:
     ])
     def test_scan_mode_affects_ranges(self, scan_mode, expected_min_ranges):
         """Test that scan mode affects the number of scan ranges."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.scan_mode = scan_mode
         tab.rom_path = "/test/rom.sfc"
 
@@ -431,7 +436,7 @@ class TestGalleryRobustness:
 
     def test_cache_directory_structure(self):
         """Test that cache path has correct structure."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Test cache path structure
         cache_path = tab._get_cache_path("/test/rom.sfc")
@@ -444,7 +449,7 @@ class TestGalleryRobustness:
 
     def test_cache_handles_corrupted_json(self, tmp_path):
         """Test that corrupted cache files are handled gracefully."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Create a corrupted cache file
         cache_file = tmp_path / "corrupted_cache.json"
@@ -461,7 +466,7 @@ class TestGalleryRobustness:
 
     def test_scan_handles_empty_rom(self):
         """Test that scanning handles empty ROM data."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/empty.sfc"
         tab.scan_mode = "quick"
 
@@ -480,7 +485,7 @@ class TestGalleryRobustness:
 
     def test_scan_handles_no_rom_path(self):
         """Test that scanning handles missing ROM path."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = None
 
         with patch('ui.tabs.sprite_gallery_tab.QMessageBox.warning') as mock_warning:
@@ -567,7 +572,7 @@ class TestBatchThumbnailWorkerIntegration:
 
     def test_thumbnail_worker_creation(self, mock_rom_extractor):
         """Test that thumbnail worker is created correctly."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         tab.rom_extractor = mock_rom_extractor
         tab.sprites_data = [{"offset": 0x200000, "tile_count": 64}]
@@ -587,7 +592,7 @@ class TestBatchThumbnailWorkerIntegration:
 
     def test_thumbnail_worker_queuing(self, mock_rom_extractor):
         """Test that sprites are queued for thumbnail generation."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         tab.rom_extractor = mock_rom_extractor
         tab.sprites_data = [
@@ -617,7 +622,7 @@ class TestBatchThumbnailWorkerIntegration:
 
     def test_thumbnail_ready_callback(self, mock_rom_extractor, mock_pixmap):
         """Test handling of thumbnail ready signal."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         tab.rom_extractor = mock_rom_extractor
         tab.sprites_data = [{"offset": 0x200000, "tile_count": 64}]
@@ -636,7 +641,7 @@ class TestBatchThumbnailWorkerIntegration:
 
     def test_thumbnail_ready_missing_widget(self, mock_pixmap):
         """Test thumbnail ready when widget doesn't exist."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.sprites_data = [{"offset": 0x200000, "tile_count": 64}]
         tab.gallery_widget.thumbnails = {}  # No thumbnails
 
@@ -646,7 +651,7 @@ class TestBatchThumbnailWorkerIntegration:
 
     def test_worker_cleanup_on_tab_cleanup(self, mock_rom_extractor):
         """Test that thumbnail worker is properly cleaned up."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Create mock worker
         mock_worker = Mock()
@@ -665,7 +670,7 @@ class TestSpriteGalleryWidgetIntegration:
 
     def test_set_sprites_updates_gallery(self):
         """Test that setting sprites updates the gallery widget."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         sprites = [
             {"offset": 0x200000, "tile_count": 64},
             {"offset": 0x201000, "tile_count": 32}
@@ -679,7 +684,7 @@ class TestSpriteGalleryWidgetIntegration:
 
     def test_sprite_selection_updates_buttons(self):
         """Test that sprite selection updates button states."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Mock toolbar actions to return an iterable
         tab.toolbar.actions.return_value = []
@@ -701,7 +706,7 @@ class TestSpriteGalleryWidgetIntegration:
 
     def test_sprite_double_click_emits_signal(self):
         """Test that double-clicking sprite emits navigation signal."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Mock the signal
         tab.sprite_selected = Mock()
@@ -711,7 +716,7 @@ class TestSpriteGalleryWidgetIntegration:
 
     def test_toolbar_actions_enabled_by_selection(self):
         """Test that toolbar export actions are enabled by selection."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Mock toolbar actions
         export_action = Mock()
@@ -738,7 +743,7 @@ class TestSpriteGalleryExportFunctionality:
     @pytest.fixture
     def tab_with_selected_sprites(self):
         """Create tab with selected sprites for export testing."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
 
         # Mock selected sprites
@@ -752,7 +757,7 @@ class TestSpriteGalleryExportFunctionality:
 
     def test_export_selected_no_selection_shows_message(self):
         """Test export shows message when no sprites selected."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.gallery_widget.get_selected_sprites.return_value = []
 
         with patch('ui.tabs.sprite_gallery_tab.QMessageBox.information') as mock_info:
@@ -809,7 +814,7 @@ class TestSpriteGalleryExportFunctionality:
 
     def test_compare_sprites_insufficient_selection(self):
         """Test compare sprites shows message with insufficient selection."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.gallery_widget.get_selected_sprites.return_value = [{"offset": 0x200000}]
 
         with patch('ui.tabs.sprite_gallery_tab.QMessageBox.information') as mock_info:
@@ -834,13 +839,13 @@ class TestSpriteGalleryErrorHandling:
     @pytest.fixture
     def tab_with_invalid_data(self):
         """Create tab with invalid sprite data for error testing."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         return tab
 
     def test_refresh_thumbnails_no_sprites(self):
         """Test thumbnail refresh with no sprites data."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.sprites_data = []
         tab.rom_path = "/test/rom.sfc"
 
@@ -852,7 +857,7 @@ class TestSpriteGalleryErrorHandling:
 
     def test_refresh_thumbnails_no_rom_path(self):
         """Test thumbnail refresh with no ROM path."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.sprites_data = [{"offset": 0x200000}]
         tab.rom_path = None
 
@@ -864,7 +869,7 @@ class TestSpriteGalleryErrorHandling:
 
     def test_thumbnail_ready_invalid_offset_type(self):
         """Test thumbnail ready with invalid offset in sprite data."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.sprites_data = [{"offset": "invalid_hex", "tile_count": 64}]
         tab.gallery_widget.thumbnails = {0x200000: Mock()}
 
@@ -881,7 +886,7 @@ class TestSpriteGalleryErrorHandling:
 
     def test_scan_with_file_read_error(self):
         """Test scan handles file read errors gracefully."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/nonexistent/rom.sfc"
         tab.scan_mode = "quick"
 
@@ -909,7 +914,7 @@ class TestSpriteGalleryErrorHandling:
     ])
     def test_export_with_invalid_offsets(self, invalid_offset, expected_behavior, tmp_path):
         """Test export handles various invalid offset types."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         selected_sprites = [{"offset": invalid_offset, "tile_count": 64}]
         tab.gallery_widget.get_selected_sprites.return_value = selected_sprites
 
@@ -932,7 +937,7 @@ class TestSpriteGalleryErrorHandling:
 
     def test_worker_already_running(self):
         """Test thumbnail refresh when worker is already running."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         tab.sprites_data = [{"offset": 0x200000}]
 
@@ -961,7 +966,7 @@ class TestSpriteGalleryParametrizedEdgeCases:
     ])
     def test_scan_with_various_rom_sizes(self, rom_size, expected_scan_behavior):
         """Test scanning behavior with different ROM sizes."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         tab.rom_size = rom_size
         tab.scan_mode = "quick"
@@ -991,7 +996,7 @@ class TestSpriteGalleryParametrizedEdgeCases:
     ])
     def test_cache_age_display_formats(self, cache_age_hours, expected_label_content, tmp_path):
         """Test cache age display formatting."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
 
         # Create cache with specified age
         cache_file = tmp_path / "test_cache.json"
@@ -1032,7 +1037,7 @@ class TestSpriteGalleryParametrizedEdgeCases:
     ])
     def test_scan_mode_configurations(self, scan_mode, max_sprites, expected_ranges):
         """Test scan configurations with different modes and limits."""
-        tab = create_mock_gallery_tab()
+        tab = create_headless_gallery_tab()
         tab.rom_path = "/test/rom.sfc"
         tab.scan_mode = scan_mode
 

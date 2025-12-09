@@ -1,37 +1,33 @@
-"""
-Settings manager for SpritePal application
-
-This manager now delegates to SessionManager for actual storage to avoid
-conflicts when both managers save to the same file.
-"""
 from __future__ import annotations
 
-import threading
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from typing_extensions import override
 from utils.constants import (
     CACHE_EXPIRATION_MAX_DAYS,
     CACHE_EXPIRATION_MIN_DAYS,
     CACHE_SIZE_MAX_MB,
     CACHE_SIZE_MIN_MB,
 )
-from utils.thread_safe_singleton import ThreadSafeSingleton
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import SessionManagerProtocol, SettingsManagerProtocol
 
 
 class SettingsManager:
     """Manages application settings and session persistence"""
 
-    def __init__(self, app_name: str = "SpritePal") -> None:
+    def __init__(self, app_name: str = "SpritePal", session_manager: SessionManagerProtocol | None = None) -> None:
         self.app_name: str = app_name
-        # Use SessionManager for all storage operations
-        # REQUIRED DELAYED IMPORT: Prevents circular dependency:
-        # settings_manager -> session_manager -> managers -> settings_manager
-        from core.managers import get_session_manager
-        self._session_manager = get_session_manager()
+        if session_manager is None:
+            # Fallback for environments where DI might not be fully configured, e.g., some CLI tools
+            from core.managers import get_session_manager
+            self._session_manager = get_session_manager()
+        else:
+            self._session_manager = session_manager
         # Initialize default settings if not present
         self._ensure_default_settings()
+
 
     def _ensure_default_settings(self) -> None:
         """Ensure default settings exist in SessionManager"""
@@ -197,17 +193,41 @@ class SettingsManager:
         self.set("cache", "expiration_days", max(CACHE_EXPIRATION_MIN_DAYS, min(CACHE_EXPIRATION_MAX_DAYS, days)))
         self.save_settings()
 
-class _SettingsManagerSingleton(ThreadSafeSingleton[SettingsManager]):
-    """Thread-safe singleton holder for SettingsManager."""
-    _instance: SettingsManager | None = None
-    _lock = threading.Lock()
 
-    @classmethod
-    @override
-    def _create_instance(cls) -> SettingsManager:
-        """Create a new SettingsManager instance."""
-        return SettingsManager()
+# Global instance for backward compatibility
+_global_settings_manager: SettingsManagerProtocol | None = None
 
-def get_settings_manager() -> SettingsManager:
-    """Get the global settings manager instance (thread-safe)"""
-    return _SettingsManagerSingleton.get()
+def get_settings_manager() -> SettingsManagerProtocol:
+    """
+    Get the global SettingsManager instance.
+    
+    DEPRECATED: This function is maintained for backward compatibility.
+    New code should use dependency injection:
+    from core.di_container import inject
+    from core.protocols.manager_protocols import SettingsManagerProtocol
+    settings = inject(SettingsManagerProtocol)
+    """
+    global _global_settings_manager
+    
+    # If we already have a global instance, return it
+    if _global_settings_manager is not None:
+        return _global_settings_manager
+
+    # Try to get from DI container first to ensure we use the app-wide singleton
+    try:
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SettingsManagerProtocol
+        # This will raise ValueError if not registered
+        _global_settings_manager = inject(SettingsManagerProtocol)
+        return _global_settings_manager
+    except (ImportError, ValueError, Exception):
+        # DI not ready or not configured, fall back to local singleton
+        pass
+        
+    # Create new instance if DI failed
+    if _global_settings_manager is None:
+        _global_settings_manager = SettingsManager()
+        
+    return _global_settings_manager
+
+

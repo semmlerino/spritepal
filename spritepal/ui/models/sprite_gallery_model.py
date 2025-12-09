@@ -16,6 +16,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QPixmap
 from typing_extensions import override
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

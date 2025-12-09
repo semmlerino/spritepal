@@ -27,11 +27,11 @@ from tests.infrastructure.real_component_factory import (
     create_extraction_manager_factory,
 )
 from tests.infrastructure.test_data_repository import (
-    TestDataRepository,
+    DataRepository,
     get_test_data_repository,
 )
 from tests.infrastructure.typed_worker_base import (
-    TestExtractionWorker,
+    TypedExtractionWorker,
     TypedWorkerValidator,
     WorkerTestHelper,
 )
@@ -155,7 +155,7 @@ class TestTypedWorkerBase:
             params = get_test_data_repository().get_vram_extraction_data("small")
 
             # Create test worker with typed base
-            worker = TestExtractionWorker(manager, params)
+            worker = TypedExtractionWorker(manager, params)
 
             # Use validator for type-safe access
             validator = TypedWorkerValidator()
@@ -178,11 +178,11 @@ class TestTypedWorkerBase:
             params = get_test_data_repository().get_vram_extraction_data("small")
 
             # Use helper for testing
-            helper = WorkerTestHelper(TestExtractionWorker)
+            helper = WorkerTestHelper(TypedExtractionWorker)
 
             # Create worker through helper
             worker = helper.create_worker(manager, params)
-            assert isinstance(worker, TestExtractionWorker)
+            assert isinstance(worker, TypedExtractionWorker)
 
             # Run and monitor signals
             completed = helper.run_and_wait(timeout=5000)
@@ -199,8 +199,8 @@ class TestTypedWorkerBase:
             # Clean up
             helper.cleanup()
 
-class TestDataRepositoryUsage:
-    """Tests demonstrating TestDataRepository usage."""
+class DataRepositoryUsageExamples:
+    """Tests demonstrating DataRepository usage."""
 
     def test_get_test_scenarios(self):
         """Test getting predefined test scenarios."""
@@ -385,10 +385,10 @@ if __name__ == "__main__":
     print("✓ TypedWorkerBase tests passed")
 
     # Test data repository
-    test = TestDataRepository()
+    test = DataRepository()
     test.test_get_test_scenarios()
     test.test_data_set_validation()
-    print("✓ TestDataRepository tests passed")
+    print("✓ DataRepository tests passed")
 
     print("\nAll real component infrastructure tests passed!")
     print("Ready to migrate from MockFactory to RealComponentFactory")

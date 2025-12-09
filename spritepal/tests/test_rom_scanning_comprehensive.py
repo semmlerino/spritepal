@@ -5,6 +5,7 @@ Tests the scan_for_sprites method and related quality assessment features.
 from __future__ import annotations
 
 import pytest
+
 from core.rom_extractor import ROMExtractor
 from tests.infrastructure.test_doubles import MockHALCompressor
 

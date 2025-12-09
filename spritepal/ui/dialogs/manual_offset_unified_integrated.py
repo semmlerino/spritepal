@@ -24,8 +24,12 @@ with contextlib.suppress(ImportError):
     pass
 
 if TYPE_CHECKING:
-    from core.managers.extraction_manager import ExtractionManager
-    from core.rom_extractor import ROMExtractor
+    from core.protocols.manager_protocols import (
+        ExtractionManagerProtocol,
+        ROMCacheProtocol,
+        ROMExtractorProtocol,
+        SettingsManagerProtocol,
+    )
 
 from PySide6.QtCore import (
     QEventLoop,
@@ -41,7 +45,6 @@ if TYPE_CHECKING:
     from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent
 else:
     from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent
-from core.sprite_finder import SpriteFinder
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -60,6 +63,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from core.sprite_finder import SpriteFinder
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 
@@ -111,7 +116,8 @@ from ui.rom_extraction.workers import SpritePreviewWorker, SpriteSearchWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 from utils.logging_config import get_logger
-from utils.rom_cache import get_rom_cache
+
+# from utils.rom_cache import get_rom_cache # Removed due to DI
 
 logger = get_logger(__name__)
 
@@ -128,13 +134,18 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
 
     This dialog consolidates functionality from the archived simplified dialog while
     providing a clean, working interface with proper signal coordination.
+    Now accepts injected dependencies for ROM cache, settings, and managers.
     """
 
     # Define signals directly on the dialog for compatibility
     offset_changed = Signal(int)  # Emitted when offset changes
     sprite_found = Signal(int, str)  # Emitted when sprite is found (offset, name)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None,
+                 rom_cache: ROMCacheProtocol | None = None,
+                 settings_manager: SettingsManagerProtocol | None = None,
+                 extraction_manager: ExtractionManagerProtocol | None = None,
+                 rom_extractor: ROMExtractorProtocol | None = None) -> None:
         # Debug logging for singleton tracking
         logger.warning("DEBUGGING: UnifiedManualOffsetDialog.__init__ ENTRY - Starting initialization")
         logger.debug(f"Creating UnifiedManualOffsetDialog instance (parent: {parent.__class__.__name__ if parent else 'None'})")
@@ -158,13 +169,37 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         self.rom_size: int = 0x400000
 
         # Manager references with thread safety
-        self.extraction_manager: ExtractionManager | None = None
-        self.rom_extractor: ROMExtractor | None = None
         self._manager_mutex = QMutex()
         self._preview_update_mutex = QMutex()  # Mutex for serializing preview widget updates
 
-        # ROM cache integration
-        self.rom_cache = get_rom_cache()
+        # Inject dependencies or use fallbacks
+        if extraction_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            self.extraction_manager = inject(ExtractionManagerProtocol)
+        else:
+            self.extraction_manager = extraction_manager
+
+        # rom_extractor can be obtained from extraction_manager
+        if rom_extractor is None:
+            self.rom_extractor = self.extraction_manager.get_rom_extractor()
+        else:
+            self.rom_extractor = rom_extractor
+
+        if rom_cache is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        else:
+            self.rom_cache = rom_cache
+
+        if settings_manager is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            self.settings_manager = inject(SettingsManagerProtocol)
+        else:
+            self.settings_manager = settings_manager
+
         self._cache_stats = {"hits": 0, "misses": 0, "total_requests": 0}
         self._adjacent_offsets_cache = set()  # Track preloaded offsets
 
@@ -227,8 +262,8 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
             logger.error(f"DEBUGGING: Full traceback: {traceback.format_exc()}")
             raise
 
-        # Initialize view state manager
-        self.view_state_manager = ViewStateManager(self, self)
+        # Initialize view state manager with injected settings_manager
+        self.view_state_manager = ViewStateManager(self, self, settings_manager=self.settings_manager)
 
         # Note: _setup_ui() is called by DialogBase.__init__() automatically
         self._setup_smart_preview_coordinator()
@@ -767,7 +802,6 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         # Clear references
         self.extraction_manager = None
         self.rom_extractor = None
-        self._manual_offset_dialog = None
 
         # Clear cache references
         if self._adjacent_offsets_cache:
@@ -788,7 +822,7 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
 
     # Public interface methods required by ROM extraction panel
 
-    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: ExtractionManager) -> None:
+    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: ExtractionManagerProtocol) -> None:
         """Set ROM data for the dialog."""
         with QMutexLocker(self._manager_mutex):
             self.rom_path = rom_path

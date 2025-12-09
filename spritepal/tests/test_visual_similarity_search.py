@@ -12,6 +12,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from PIL import Image
+
 from core.visual_similarity_search import (
     # Systematic pytest markers applied based on test content analysis
     SimilarityMatch,
@@ -19,7 +21,6 @@ from core.visual_similarity_search import (
     SpriteHash,
     VisualSimilarityEngine,
 )
-from PIL import Image
 
 logger = logging.getLogger(__name__)
 
