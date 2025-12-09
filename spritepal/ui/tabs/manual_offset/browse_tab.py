@@ -516,7 +516,7 @@ class SimpleBrowseTab(QWidget):
         for clipboard_file in possible_paths:
             if clipboard_file.exists():
                 try:
-                    with open(clipboard_file) as f:
+                    with clipboard_file.open() as f:
                         offset_str = f.read().strip()
 
                     # Parse offset (handles both 0x and $ prefix)

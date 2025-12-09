@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import builtins
 import contextlib
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -208,7 +207,7 @@ class DropZone(QWidget):
 
     def set_file(self, file_path: str):
         """Set the file path"""
-        if os.path.exists(file_path):
+        if Path(file_path).exists():
             self.file_path = file_path
             if self.label:
                 self.label.setText(f"✓ {self.file_type}")
@@ -537,7 +536,7 @@ class ExtractionPanel(QGroupBox):
         ]
 
         for directory_str in directories_to_try:
-            if not directory_str or not os.path.exists(directory_str):
+            if not directory_str or not Path(directory_str).exists():
                 continue
 
             directory = Path(directory_str)
@@ -798,13 +797,13 @@ class ExtractionPanel(QGroupBox):
                 if self.mode_combo:
                     self.mode_combo.setCurrentIndex(mode_index)
 
-        if file_paths.get("vram_path") and os.path.exists(file_paths["vram_path"]):
+        if file_paths.get("vram_path") and Path(file_paths["vram_path"]).exists():
             self.vram_drop.set_file(file_paths["vram_path"])
 
-        if file_paths.get("cgram_path") and os.path.exists(file_paths["cgram_path"]):
+        if file_paths.get("cgram_path") and Path(file_paths["cgram_path"]).exists():
             self.cgram_drop.set_file(file_paths["cgram_path"])
 
-        if file_paths.get("oam_path") and os.path.exists(file_paths["oam_path"]):
+        if file_paths.get("oam_path") and Path(file_paths["oam_path"]).exists():
             self.oam_drop.set_file(file_paths["oam_path"])
 
         self.files_changed.emit()

@@ -21,7 +21,7 @@ import uuid
 from collections import defaultdict, deque
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from weakref import WeakSet
@@ -144,7 +144,7 @@ class PerformanceCollector:
                 duration_ms=duration_ms,
                 memory_before_mb=start_data['start_memory'],
                 memory_after_mb=end_memory,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(UTC),
                 thread_id=start_data['thread_id'],
                 context=start_data['context'],
                 success=success,
@@ -155,7 +155,7 @@ class PerformanceCollector:
 
     def get_operation_stats(self, operation: str, hours: int = 24) -> dict[str, Any]:
         """Get performance statistics for an operation."""
-        cutoff = datetime.now() - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
         with self._lock:
             relevant_metrics = [
@@ -222,17 +222,17 @@ class ErrorTracker:
                     existing_error = error
                     break
 
-            if existing_error and (datetime.now() - existing_error.timestamp) < timedelta(hours=1):
+            if existing_error and (datetime.now(UTC) - existing_error.timestamp) < timedelta(hours=1):
                 # Update existing error count
                 existing_error.count += 1
-                existing_error.timestamp = datetime.now()
+                existing_error.timestamp = datetime.now(UTC)
             else:
                 # Create new error event
                 error_event = ErrorEvent(
                     error_type=error_type,
                     error_message=error_message,
                     operation=operation,
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(UTC),
                     fingerprint=fingerprint,
                     stack_trace=stack_trace,
                     context=context or {},
@@ -244,7 +244,7 @@ class ErrorTracker:
 
     def get_error_summary(self, hours: int = 24) -> dict[str, Any]:
         """Get error statistics for a time period."""
-        cutoff = datetime.now() - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
         with self._lock:
             recent_errors = [e for e in self.errors if e.timestamp >= cutoff]
@@ -299,7 +299,7 @@ class UsageAnalytics:
         event = UsageEvent(
             feature=feature,
             action=action,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
             duration_ms=duration_ms,
             success=success,
             context=context or {},
@@ -321,7 +321,7 @@ class UsageAnalytics:
 
     def get_usage_stats(self, hours: int = 24) -> dict[str, Any]:
         """Get usage statistics for a time period."""
-        cutoff = datetime.now() - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
         with self._lock:
             recent_events = [e for e in self.events if e.timestamp >= cutoff]
@@ -406,7 +406,7 @@ class HealthMonitor:
         metric = HealthMetric(
             metric_name=metric_name,
             value=value,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
             unit=unit,
             threshold_warning=threshold_warning,
             threshold_critical=threshold_critical,
@@ -459,7 +459,7 @@ class HealthMonitor:
 
     def get_health_trends(self, hours: int = 24) -> dict[str, Any]:
         """Get health metric trends over time."""
-        cutoff = datetime.now() - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
         with self._lock:
             recent_metrics = [m for m in self.metrics if m.timestamp >= cutoff]
@@ -689,7 +689,7 @@ class MonitoringManager(BaseManager):
 
     def generate_report(self, hours: int = 24, include_raw_data: bool = False) -> MonitoringReport:
         """Generate a comprehensive monitoring report."""
-        end_time = datetime.now()
+        end_time = datetime.now(UTC)
         start_time = end_time - timedelta(hours=hours)
 
         report = MonitoringReport(
@@ -751,7 +751,7 @@ class MonitoringManager(BaseManager):
         report = self.generate_report(hours, include_raw_data=True)
 
         if output_path is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             filename = f"spritepal_monitoring_{timestamp}.{format}"
             output_path = Path.cwd() / "monitoring_reports" / filename
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -774,7 +774,7 @@ class MonitoringManager(BaseManager):
                 return obj.isoformat()
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
-        with open(output_path, 'w') as f:
+        with output_path.open('w') as f:
             json.dump(asdict(report), f, indent=2, default=serialize_datetime)
 
     def _export_csv(self, report: MonitoringReport, output_path: Path) -> None:
@@ -782,7 +782,7 @@ class MonitoringManager(BaseManager):
         import csv
 
         # Create a simplified CSV with key metrics
-        with open(output_path, 'w', newline='') as f:
+        with output_path.open('w', newline='') as f:
             writer = csv.writer(f)
 
             # Header

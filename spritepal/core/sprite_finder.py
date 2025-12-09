@@ -4,7 +4,6 @@ Comprehensive sprite finder that scans ROMs for actual character sprites
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,7 +66,7 @@ class SpriteFinder:
         self.region_detector = EmptyRegionDetector(region_config)
 
         # Create output directory
-        os.makedirs(output_dir, exist_ok=True)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     def find_sprites_in_rom(
         self,
@@ -381,7 +380,7 @@ class SpriteFinder:
             Sprite info dict if valid sprite found, None otherwise
         """
         try:
-            with open(rom_path, 'rb') as f:
+            with Path(rom_path).open('rb') as f:
                 rom_data = f.read()
             return self.find_sprite_at_offset(rom_data, offset)
         except Exception as e:

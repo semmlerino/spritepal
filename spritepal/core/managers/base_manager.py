@@ -4,9 +4,9 @@ Base manager class providing common functionality for all managers
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, Signal
@@ -229,7 +229,7 @@ class BaseManager(QObject):
         Raises:
             ValidationError: If file doesn't exist
         """
-        if not os.path.exists(path):
+        if not Path(path).exists():
             raise ValidationError(f"{name} does not exist: {path}")
 
     def _validate_range(self, value: int | float, name: str,

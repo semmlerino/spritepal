@@ -6,8 +6,8 @@ styling and behavior throughout the SpritePal application.
 """
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -179,7 +179,7 @@ class WidgetFactory:
                 is_valid = True
                 message = ""
             elif validate_exists:
-                is_valid = os.path.exists(path)
+                is_valid = Path(path).exists()
                 message = f"Path does not exist: {path}" if not is_valid else ""
             else:
                 # Just check if path format is reasonable

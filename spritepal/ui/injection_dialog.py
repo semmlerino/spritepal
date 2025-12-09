@@ -4,7 +4,6 @@ Allows users to configure sprite injection parameters
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -156,7 +155,7 @@ class InjectionDialog(TabbedDialog):
         self._setup_keyboard_shortcuts()
 
         # Load sprite preview and validate if available
-        if self.sprite_path and os.path.exists(self.sprite_path):
+        if self.sprite_path and Path(self.sprite_path).exists():
             self._load_sprite_preview()
             self._validate_sprite()
 
@@ -604,7 +603,7 @@ class InjectionDialog(TabbedDialog):
         """Handle sprite file path changes"""
         logger.debug(f"Sprite path changed to: '{path}'")
         self.sprite_path = path
-        if path and os.path.exists(path):
+        if path and Path(path).exists():
             self._load_sprite_preview()
             self._validate_sprite()
 
@@ -972,7 +971,7 @@ class InjectionDialog(TabbedDialog):
 
     def _load_sprite_preview(self) -> None:
         """Load and display sprite preview"""
-        if not self.sprite_path or not os.path.exists(self.sprite_path):
+        if not self.sprite_path or not Path(self.sprite_path).exists():
             if self.preview_widget:
                 self.preview_widget.clear()
             return
@@ -985,7 +984,7 @@ class InjectionDialog(TabbedDialog):
 
             if not sprite_name:
                 # Extract from filename (e.g., "kirby_normal_sprites.png" -> "kirby_normal")
-                base_name = os.path.splitext(Path(self.sprite_path).name)[0]
+                base_name = Path(self.sprite_path).stem
                 for suffix in ["_sprites_editor", "_sprites", "_editor"]:
                     if base_name.endswith(suffix):
                         sprite_name = base_name[: -len(suffix)]
@@ -1006,7 +1005,7 @@ class InjectionDialog(TabbedDialog):
 
     def _validate_sprite(self) -> None:
         """Validate sprite and show warnings/errors"""
-        if not self.sprite_path or not os.path.exists(self.sprite_path):
+        if not self.sprite_path or not Path(self.sprite_path).exists():
             return
 
         # Perform validation

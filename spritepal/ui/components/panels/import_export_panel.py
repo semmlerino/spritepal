@@ -158,11 +158,11 @@ class ImportExportPanel(QWidget):
                 with Path(temp_file).open("w", encoding="utf-8") as f:
                     json.dump(export_data, f, indent=2, ensure_ascii=False)
                 # Atomic move to final location
-                os.replace(temp_file, file_path)
+                Path(temp_file).replace(file_path)
             except Exception:
                 # Clean up temp file on failure
-                if os.path.exists(temp_file):
-                    os.unlink(temp_file)
+                if Path(temp_file).exists():
+                    Path(temp_file).unlink()
                 raise
 
             # Success message
@@ -219,7 +219,7 @@ class ImportExportPanel(QWidget):
 
         def _validate_import_file_access(file_path: str) -> None:
             """Validate import file accessibility"""
-            if not os.path.exists(file_path):
+            if not Path(file_path).exists():
                 raise FileNotFoundError(f"File not found: {file_path}")
             if not os.access(file_path, os.R_OK):
                 raise PermissionError(f"Cannot read file: {file_path}")

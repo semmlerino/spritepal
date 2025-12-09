@@ -10,6 +10,7 @@ import contextlib
 import os
 import sys
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ def is_headless_environment() -> bool:
     # Check for no display on Linux/WSL
     if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
         # Additional check for WSL
-        if os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop"):
+        if Path("/proc/sys/fs/binfmt_misc/WSLInterop").exists():
             return True
         return True
 

@@ -3,7 +3,7 @@ Grid-based image processing for flexible sprite extraction
 """
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 from PIL import Image
 
@@ -293,7 +293,7 @@ class GridImageProcessor(RowImageProcessor):
             Exception: For other processing errors
         """
         # Validate file exists
-        if not os.path.exists(sprite_path):
+        if not Path(sprite_path).exists():
             raise FileNotFoundError(f"Sprite file not found: {sprite_path}")
 
         try:

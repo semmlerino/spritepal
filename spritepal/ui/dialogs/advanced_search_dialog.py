@@ -10,7 +10,7 @@ import logging
 import mmap
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -1344,7 +1344,7 @@ class AdvancedSearchDialog(QDialog):
 
         # Add to history
         entry = SearchHistoryEntry(
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
             search_type="Parallel",
             query=f"0x{start:X} - {f'0x{end:X}' if end else 'EOF'}",
             filters=filters,
@@ -1409,7 +1409,7 @@ class AdvancedSearchDialog(QDialog):
 
         # Add to history
         entry = SearchHistoryEntry(
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
             search_type="Visual",
             query=f"Similar to 0x{ref_offset:X} (threshold: {similarity_threshold}%)",
             filters=SearchFilter(
@@ -1492,7 +1492,7 @@ class AdvancedSearchDialog(QDialog):
 
         # Add to history
         entry = SearchHistoryEntry(
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
             search_type=f"Pattern ({'Hex' if pattern_type == 'hex' else 'Regex'})",
             query=pattern_text[:50] + ("..." if len(pattern_text) > 50 else ""),
             filters=SearchFilter(

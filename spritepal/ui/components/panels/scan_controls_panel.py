@@ -321,7 +321,7 @@ class ScanControlsPanel(QWidget):
 
         # Validate ROM file accessibility
         try:
-            if not self.rom_path or not os.path.exists(self.rom_path):
+            if not self.rom_path or not Path(self.rom_path).exists():
                 self.scan_status_changed.emit("ROM file not found or inaccessible")
                 self._finish_scan()
                 return

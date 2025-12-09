@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -46,7 +45,7 @@ class SpritePreviewWorker(BaseWorker):
 
         def _validate_rom_path(rom_path: str) -> None:
             """Validate ROM file path exists"""
-            if not rom_path or not os.path.exists(rom_path):
+            if not rom_path or not Path(rom_path).exists():
                 raise FileNotFoundError(f"ROM file not found: {rom_path}")
 
         def _validate_offset(offset: int) -> None:

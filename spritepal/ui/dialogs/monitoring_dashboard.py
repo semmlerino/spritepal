@@ -10,7 +10,7 @@ Provides a comprehensive dashboard for viewing monitoring data including:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from PySide6.QtCore import QTimer
@@ -667,7 +667,7 @@ class MonitoringDashboard(QDialog):
             self.insights_tab.update_data(hours)
 
             # Update status
-            now = datetime.now()
+            now = datetime.now(UTC)
             self.status_label.setText(f"Last updated: {now.strftime('%H:%M:%S')}")
 
         except Exception as e:
