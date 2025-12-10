@@ -490,6 +490,7 @@ class TestMemoryManagement:
     def test_signal_cleanup_on_thread_deletion(self, app):
         """Test that worker thread signals are properly cleaned up"""
         import weakref
+
         from PySide6.QtTest import QTest
 
         class Worker(QThread):

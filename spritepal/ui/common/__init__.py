@@ -3,6 +3,10 @@ Common UI utilities and helpers.
 """
 from __future__ import annotations
 
+# WorkerManager moved to core/services for proper layer boundaries
+# Re-exported here for backward compatibility
+from core.services.worker_lifecycle import WorkerManager
+
 from .collapsible_group_box import CollapsibleGroupBox
 from .error_handler import ErrorHandler, get_error_handler, reset_error_handler
 from .file_dialogs import (
@@ -75,9 +79,6 @@ from .widget_factory import (
     create_checkbox_with_tooltip,
     create_info_label,
 )
-# WorkerManager moved to core/services for proper layer boundaries
-# Re-exported here for backward compatibility
-from core.services.worker_lifecycle import WorkerManager
 
 __all__ = [
     # Spacing and sizing constants

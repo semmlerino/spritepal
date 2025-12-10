@@ -200,7 +200,7 @@ class ExtractionManager(BaseManager):
                     # Log and track palette failure but don't fail sprite extraction
                     palette_extraction_failed = True
                     palette_error_msg = str(e)
-                    self.logger.warning(f"Palette extraction failed: {e}")
+                    self._logger.warning(f"Palette extraction failed: {e}")
 
             self._update_progress(operation, 100, 100)
 
@@ -315,7 +315,7 @@ class ExtractionManager(BaseManager):
                         # Log and track palette failure but don't fail sprite extraction
                         palette_extraction_failed = True
                         palette_error_msg = str(e)
-                        self.logger.warning(f"Palette extraction failed: {e}")
+                        self._logger.warning(f"Palette extraction failed: {e}")
             else:
                 self._raise_extraction_failed("Failed to extract sprite from ROM")
 

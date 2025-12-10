@@ -6,6 +6,9 @@ which can occur when instance variables are assigned after super().__init__().
 """
 from __future__ import annotations
 
+# Create mock versions for missing dialogs
+from unittest.mock import MagicMock
+
 import pytest
 from PySide6.QtWidgets import QApplication
 
@@ -20,9 +23,6 @@ from tests.infrastructure.mock_dialogs import (
     MockUserErrorDialog as UserErrorDialog,
     patch_dialog_imports,
 )
-
-# Create mock versions for missing dialogs
-from unittest.mock import MagicMock
 
 # Setup RangeScanDialog mock
 mock_range_dialog = MagicMock()

@@ -609,7 +609,7 @@ class SessionAdapter(SessionManager):
         # Save updated session (update in place since we got a reference to the dict)
         self._state_mgr._settings["session"] = current_session
         # Mark settings as dirty so they get saved
-        self._state_mgr._settings_dirty = True
+        self._state_mgr._session_dirty = True
 
     def update_file_path(self, file_type: str, path: str) -> None:
         self._state_mgr.update_session_file(file_type, path)

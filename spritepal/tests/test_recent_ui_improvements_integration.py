@@ -279,7 +279,7 @@ class TestManualOffsetDialogSignalIntegration:
                 dialog.show()
                 
                 # Only wait exposed if it's a real widget
-                if not type(dialog).__name__ == "MockUnifiedOffsetDialog":
+                if type(dialog).__name__ != "MockUnifiedOffsetDialog":
                     qtbot.waitExposed(dialog)
 
                     # Test that dialog has dark styling

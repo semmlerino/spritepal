@@ -13,7 +13,6 @@ import pytest
 from PIL import Image
 from PySide6.QtGui import QPixmap
 
-from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 from core.services.preview_generator import (
     # Test characteristics: Timer usage
     LRUCache,
@@ -25,6 +24,7 @@ from core.services.preview_generator import (
     create_vram_preview_request,
     get_preview_generator,
 )
+from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 pytestmark = [
     pytest.mark.benchmark,

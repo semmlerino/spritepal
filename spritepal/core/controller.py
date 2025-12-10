@@ -30,6 +30,7 @@ from core.managers import (
     get_injection_manager,
     get_session_manager,
 )
+from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 from ui.common.error_handler import get_error_handler
 from ui.grid_arrangement_dialog import GridArrangementDialog
@@ -43,7 +44,6 @@ from utils.constants import (
 from utils.file_validator import FileValidator
 from utils.image_utils import pil_to_qpixmap
 from utils.logging_config import get_logger
-from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 
 # from utils.settings_manager import get_settings_manager # Removed due to DI
 
