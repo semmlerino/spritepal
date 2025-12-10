@@ -324,9 +324,7 @@ class InjectionManager(BaseManager):
             if vram_path and Path(vram_path).exists():
                 return vram_path
         except (OSError, ValueError):
-            pass
-        except Exception:
-            pass
+            pass  # Expected: file not found, invalid data
         return ""
 
     def _try_metadata_vram(self, metadata_path: str, sprite_path: str) -> str:
@@ -340,10 +338,8 @@ class InjectionManager(BaseManager):
             vram_path = metadata.get("source_vram", "")
             if vram_path and Path(vram_path).exists():
                 return vram_path
-        except (OSError, ValueError):
-            pass
-        except Exception:
-            pass
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass  # Expected: file not found, invalid format, malformed JSON
         return ""
 
     def _try_basename_vram_patterns(self, sprite_path: str) -> str:
@@ -374,10 +370,8 @@ class InjectionManager(BaseManager):
             recent_vram = session_manager.get_recent_files("vram")
             if recent_vram and Path(recent_vram[0]).exists():
                 return recent_vram[0]
-        except (OSError, ValueError):
-            pass
-        except Exception:
-            pass
+        except (OSError, ValueError, IndexError, TypeError):
+            pass  # Expected: file not found, invalid data, empty list, wrong type
         return ""
 
     def _try_last_injection_vram(self) -> str:
@@ -389,10 +383,8 @@ class InjectionManager(BaseManager):
             )
             if last_injection_vram and Path(last_injection_vram).exists():
                 return last_injection_vram
-        except (OSError, ValueError):
-            pass
-        except Exception:
-            pass
+        except (OSError, ValueError, TypeError):
+            pass  # Expected: file not found, invalid data, wrong type
         return ""
 
     def load_metadata(self, metadata_path: str) -> dict[str, Any] | None:

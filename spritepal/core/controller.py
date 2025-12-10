@@ -14,6 +14,10 @@ from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
+    from core.protocols.dialog_protocols import (
+        DialogFactoryProtocol,
+        InjectionDialogProtocol,
+    )
     from core.protocols.manager_protocols import (
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
@@ -32,10 +36,6 @@ from core.managers import (
 )
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
-from ui.common.error_handler import get_error_handler
-from ui.grid_arrangement_dialog import GridArrangementDialog
-from ui.injection_dialog import InjectionDialog
-from ui.row_arrangement_dialog import RowArrangementDialog
 from utils.constants import (
     DEFAULT_TILES_PER_ROW,
     TILE_WIDTH,
@@ -113,6 +113,7 @@ class ExtractionController(QObject):
         session_manager: SessionManagerProtocol | None = None,
         injection_manager: InjectionManagerProtocol | None = None,
         settings_manager: SettingsManagerProtocol | None = None,
+        dialog_factory: DialogFactoryProtocol | None = None,
     ) -> None:
         super().__init__()
         self.main_window: MainWindowProtocol = main_window
@@ -131,27 +132,23 @@ class ExtractionController(QObject):
         else:
             self.settings_manager = settings_manager
 
+        # Inject dialog factory or use fallback
+        if dialog_factory is None:
+            from ui.dialogs.controller_dialog_factory import get_controller_dialog_factory
+            self.dialog_factory = get_controller_dialog_factory()
+        else:
+            self.dialog_factory = dialog_factory
+
         # Workers still managed locally (thin wrappers)
         self.worker: VRAMExtractionWorker | None = None
         self.rom_worker: ROMExtractionWorker | None = None
 
         # Store current injection dialog reference (not in session - not serializable)
-        self._current_injection_dialog: InjectionDialog | None = None
+        self._current_injection_dialog: InjectionDialogProtocol | None = None
 
-        # Initialize error handler with fallback to console handler
-        try:
-            # Check if main_window is a QWidget for error handler compatibility
-            if isinstance(self.main_window, QWidget):
-                self.error_handler = get_error_handler(self.main_window)
-            else:
-                # Use console error handler for non-QWidget protocols (e.g., in tests)
-                logger.debug("MainWindowProtocol is not a QWidget, using console error handler")
-                self.error_handler = ConsoleErrorHandler()
-        except (TypeError, AttributeError):
-            # Fallback to console error handler for test scenarios or when UI is unavailable
-            # This ensures errors are properly logged instead of being silently ignored
-            logger.warning("UI error handler unavailable, using console error handler")
-            self.error_handler = ConsoleErrorHandler()
+        # Initialize error handler - always use console error handler for core layer
+        # This removes the UI dependency while still properly logging errors
+        self.error_handler: ErrorHandlerProtocol = ConsoleErrorHandler()
 
         # Connect UI signals
         _ = self.main_window.extract_requested.connect(self.start_extraction)
@@ -462,10 +459,12 @@ class ExtractionController(QObject):
             # Try to get tiles_per_row from sprite preview or use default
             tiles_per_row = self._get_tiles_per_row_from_sprite(sprite_file)
 
-            # Open row arrangement dialog
+            # Open row arrangement dialog using factory
             # Use main_window as parent only if it's a QWidget (for test compatibility)
             parent = self.main_window if isinstance(self.main_window, QWidget) else None
-            dialog = RowArrangementDialog(sprite_file, tiles_per_row, parent)
+            dialog = self.dialog_factory.create_row_arrangement_dialog(
+                sprite_file, tiles_per_row, parent
+            )
 
             # Pass palette data from the main window's sprite preview if available
             if (
@@ -507,8 +506,11 @@ class ExtractionController(QObject):
         # Try to get tiles_per_row from sprite preview or use default
         tiles_per_row = self._get_tiles_per_row_from_sprite(sprite_file)
 
-        # Open grid arrangement dialog
-        dialog = GridArrangementDialog(sprite_file, tiles_per_row, cast(QWidget, self.main_window))
+        # Open grid arrangement dialog using factory
+        parent = self.main_window if isinstance(self.main_window, QWidget) else None
+        dialog = self.dialog_factory.create_grid_arrangement_dialog(
+            sprite_file, tiles_per_row, parent
+        )
 
         # Pass palette data from the main window's sprite preview if available
         if (
@@ -596,11 +598,11 @@ class ExtractionController(QObject):
             sprite_path, metadata_path if Path(metadata_path).exists() else ""
         )
 
-        # Show injection dialog
+        # Show injection dialog using factory
         # Use main_window as parent only if it's a QWidget (for test compatibility)
         parent = self.main_window if isinstance(self.main_window, QWidget) else None
-        dialog = InjectionDialog(
-            parent,
+        dialog = self.dialog_factory.create_injection_dialog(
+            parent=parent,
             sprite_path=sprite_path,
             metadata_path=metadata_path if Path(metadata_path).exists() else "",
             input_vram=suggested_input_vram,

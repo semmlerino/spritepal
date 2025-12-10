@@ -6,6 +6,11 @@ enabling dependency injection and better testability.
 """
 from __future__ import annotations
 
+from .dialog_protocols import (
+    ArrangementDialogProtocol,
+    DialogFactoryProtocol,
+    InjectionDialogProtocol,
+)
 from .manager_protocols import (
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
@@ -15,7 +20,10 @@ from .manager_protocols import (
 from .worker_protocol import WorkerManagerProtocol
 
 __all__ = [
+    "ArrangementDialogProtocol",
+    "DialogFactoryProtocol",
     "ExtractionManagerProtocol",
+    "InjectionDialogProtocol",
     "InjectionManagerProtocol",
     "MainWindowProtocol",
     "SessionManagerProtocol",

@@ -84,8 +84,8 @@ class TestInjectionManagerRealConversion:
                     }
                 }, f)
 
-            # Mock only UI components, use real injection_manager methods
-            with patch("core.controller.InjectionDialog") as mock_dialog:
+            # Mock only UI components (patched at factory import location)
+            with patch("ui.injection_dialog.InjectionDialog") as mock_dialog:
                 mock_dialog_instance = Mock()
                 mock_dialog_instance.exec.return_value = 1  # Accepted
                 mock_dialog_instance.get_parameters.return_value = {

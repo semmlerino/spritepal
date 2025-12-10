@@ -105,8 +105,8 @@ class TestControllerWithRealManagers:
             with patch("core.controller.FileValidator") as mock_validator:
                 mock_validator.validate_file_existence.return_value.is_valid = True
 
-                # Mock dialog
-                with patch("core.controller.InjectionDialog") as mock_dialog:
+                # Mock dialog (patched at factory import location)
+                with patch("ui.injection_dialog.InjectionDialog") as mock_dialog:
                     mock_dialog_instance = Mock()
                     mock_dialog_instance.exec.return_value = True
                     mock_dialog_instance.get_parameters.return_value = {

@@ -45,7 +45,7 @@
     "theme": "dark"
   },
   "paths": {
-    "last_used_dir": "/tmp/spritepal_integration_0xy_9obl",
+    "last_used_dir": "/tmp/spritepal_integration_c2bp_14u",
     "default_dumps_dir": "C:\\Users\\gabri\\Documents\\Mesen2\\Debugger",
     "last_export_dir": "",
     "last_import_dir": ""
@@ -58,7 +58,7 @@
     "adapter_key": "adapter_value"
   },
   "rom_injection": {
-    "last_input_rom": "/tmp/spritepal_integration_0xy_9obl/test_rom.sfc",
+    "last_input_rom": "/tmp/spritepal_integration_c2bp_14u/test_rom.sfc",
     "last_sprite_location": "Kirby Sprite (0x123456)",
     "last_custom_offset": "0x123456",
     "fast_compression": true,

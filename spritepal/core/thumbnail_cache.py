@@ -65,6 +65,7 @@ class ThumbnailCache:
         self.max_cache_mb = max_cache_mb
         self.auto_prune = auto_prune
         self._save_count = 0
+        self._access_count = 0  # For debounced metadata saves on cache hits
 
         logger.info(f"Thumbnail cache initialized at: {self.cache_dir}")
 
@@ -73,11 +74,31 @@ class ThumbnailCache:
             self._maybe_prune()
 
     def _load_metadata(self) -> dict[str, Any]:
-        """Load cache metadata from disk."""
+        """Load cache metadata from disk, migrating entries if needed."""
         if self.metadata_file.exists():
             try:
                 with Path(self.metadata_file).open() as f:
-                    return json.load(f)
+                    metadata = json.load(f)
+
+                # Migrate entries that lack last_access timestamp
+                entries = metadata.get("entries", {})
+                current_time = time.time()
+                needs_save = False
+
+                for cache_key, entry in entries.items():
+                    if "last_access" not in entry:
+                        # Use file mtime as fallback for existing entries
+                        cache_file = self.cache_dir / f"{cache_key}.png"
+                        if cache_file.exists():
+                            entry["last_access"] = cache_file.stat().st_mtime
+                        else:
+                            entry["last_access"] = current_time
+                        needs_save = True
+
+                if needs_save:
+                    logger.info("Migrated cache metadata to include access timestamps")
+
+                return metadata
             except Exception as e:
                 logger.error(f"Failed to load cache metadata: {e}")
         return {"version": "1.0", "entries": {}}
@@ -149,6 +170,16 @@ class ThumbnailCache:
                 if not pixmap.isNull():
                     # Add to memory cache
                     self._add_to_memory_cache(cache_key, pixmap)
+
+                    # Update access time in metadata (debounced to reduce I/O)
+                    entries = cast(dict[str, Any], self.metadata.get("entries", {}))
+                    if cache_key in entries:
+                        entries[cache_key]["last_access"] = time.time()
+                        self._access_count += 1
+                        # Save metadata every 50 accesses to reduce disk writes
+                        if self._access_count % 50 == 0:
+                            self._save_metadata()
+
                     logger.debug(f"Thumbnail cache hit (disk): {cache_key}")
                     return pixmap
             except Exception as e:
@@ -185,14 +216,15 @@ class ThumbnailCache:
         try:
             pixmap.save(str(cache_file), "PNG")
 
-            # Update metadata
+            # Update metadata with access timestamp for LRU eviction
             entries = cast(dict[str, Any], self.metadata["entries"])
             entries[cache_key] = {
                 "rom_hash": rom_hash,
                 "offset": offset,
                 "size": size,
                 "palette": palette_index,
-                "file": cache_file.name
+                "file": cache_file.name,
+                "last_access": time.time(),
             }
             self._save_metadata()
 
@@ -243,7 +275,7 @@ class ThumbnailCache:
         return total / (1024 * 1024)
 
     def _maybe_prune(self) -> None:
-        """Prune cache if it exceeds size limit."""
+        """Prune cache if it exceeds size limit using tiered strategy."""
         try:
             current_size_mb = self._get_cache_size_mb()
             if current_size_mb > self.max_cache_mb:
@@ -251,9 +283,81 @@ class ThumbnailCache:
                     f"Cache size {current_size_mb:.1f}MB exceeds limit "
                     f"{self.max_cache_mb:.1f}MB, pruning..."
                 )
+
+                # Stage 1: Age-based pruning (primary strategy)
                 self.prune_cache(max_age_days=7)
+
+                # Stage 2: If still over limit, use LRU eviction (fallback)
+                current_size_mb = self._get_cache_size_mb()
+                if current_size_mb > self.max_cache_mb:
+                    logger.info(
+                        f"Age-based pruning insufficient ({current_size_mb:.1f}MB), "
+                        "applying LRU eviction..."
+                    )
+                    self._prune_by_size()
         except Exception as e:
             logger.warning(f"Error during cache prune check: {e}")
+
+    def _prune_by_size(self, target_mb: float | None = None) -> int:
+        """
+        Remove least-recently-used files until cache is under target size.
+
+        Args:
+            target_mb: Target size in MB (default: 80% of max_cache_mb)
+
+        Returns:
+            Number of files removed
+        """
+        if target_mb is None:
+            target_mb = self.max_cache_mb * 0.8  # Target 80% to avoid thrashing
+
+        target_bytes = target_mb * 1024 * 1024
+
+        # Get all cache files with their access times and sizes
+        entries = cast(dict[str, Any], self.metadata.get("entries", {}))
+        file_info: list[tuple[str, float, int]] = []  # (cache_key, last_access, size)
+
+        for cache_file in self.cache_dir.glob("*.png"):
+            cache_key = cache_file.stem
+            try:
+                size = cache_file.stat().st_size
+                # Get access time from metadata, fallback to file mtime
+                if cache_key in entries and "last_access" in entries[cache_key]:
+                    last_access = entries[cache_key]["last_access"]
+                else:
+                    last_access = cache_file.stat().st_mtime
+                file_info.append((cache_key, last_access, size))
+            except OSError:
+                continue
+
+        # Sort by access time (oldest first = LRU)
+        file_info.sort(key=lambda x: x[1])
+
+        # Calculate current size
+        current_bytes = sum(info[2] for info in file_info)
+
+        removed_count = 0
+        for cache_key, _, size in file_info:
+            if current_bytes <= target_bytes:
+                break
+
+            cache_file = self.cache_dir / f"{cache_key}.png"
+            try:
+                cache_file.unlink()
+                current_bytes -= size
+                removed_count += 1
+
+                # Remove from metadata
+                if cache_key in entries:
+                    del entries[cache_key]
+            except Exception as e:
+                logger.error(f"Failed to remove cache file {cache_file}: {e}")
+
+        if removed_count > 0:
+            self._save_metadata()
+            logger.info(f"LRU eviction removed {removed_count} files")
+
+        return removed_count
 
     def clear_cache(self):
         """Clear all cached thumbnails."""

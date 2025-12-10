@@ -163,19 +163,14 @@ class TestExtractionControllerUnit:
         from utils.settings_manager import SettingsManager
         mock_settings_manager = Mock(spec=SettingsManager)
 
-        # Patch get_error_handler to return a mock to avoid QWidget issues
-        with patch('core.controller.get_error_handler') as mock_get_error_handler:
-            mock_error_handler = Mock()
-            mock_get_error_handler.return_value = mock_error_handler
-
-            controller = ExtractionController(
-                main_window=main_window,
-                extraction_manager=extraction_manager,
-                injection_manager=injection_manager,
-                session_manager=session_manager,
-                settings_manager=mock_settings_manager,
-            )
-            controller.mock_error_handler = mock_error_handler # For direct testing if needed
+        # Controller now uses ConsoleErrorHandler directly (no UI import)
+        controller = ExtractionController(
+            main_window=main_window,
+            extraction_manager=extraction_manager,
+            injection_manager=injection_manager,
+            session_manager=session_manager,
+            settings_manager=mock_settings_manager,
+        )
 
         return controller
 
@@ -414,15 +409,14 @@ class TestControllerManagerContextIntegration:
         from utils.settings_manager import SettingsManager
         mock_settings_manager = Mock(spec=SettingsManager)
 
-        with patch('core.controller.get_error_handler') as mock_get_error_handler:
-            mock_get_error_handler.return_value = Mock()
-            controller = ExtractionController(
-                standard_mock_main_window,
-                extraction_manager=extraction_manager,
-                injection_manager=injection_manager,
-                session_manager=session_manager,
-                settings_manager=mock_settings_manager,
-            )
+        # Controller now uses ConsoleErrorHandler directly (no UI import)
+        controller = ExtractionController(
+            standard_mock_main_window,
+            extraction_manager=extraction_manager,
+            injection_manager=injection_manager,
+            session_manager=session_manager,
+            settings_manager=mock_settings_manager,
+        )
         # Verify the exact managers passed are used (not fetched from DI)
         assert controller.extraction_manager is extraction_manager
         assert controller.injection_manager is injection_manager
@@ -436,36 +430,35 @@ class TestControllerManagerContextIntegration:
         from utils.settings_manager import SettingsManager
         mock_settings_manager = Mock(spec=SettingsManager)
 
-        with patch('core.controller.get_error_handler') as mock_get_error_handler:
-            mock_get_error_handler.return_value = Mock()
-            controller1 = ExtractionController(
-                standard_mock_main_window,
-                extraction_manager=extraction_manager,
-                injection_manager=injection_manager,
-                session_manager=session_manager,
-                settings_manager=mock_settings_manager,
-            )
-            # Set state on the extraction manager
-            extraction_manager.test_state = "persistent_value"
+        # Controller now uses ConsoleErrorHandler directly (no UI import)
+        controller1 = ExtractionController(
+            standard_mock_main_window,
+            extraction_manager=extraction_manager,
+            injection_manager=injection_manager,
+            session_manager=session_manager,
+            settings_manager=mock_settings_manager,
+        )
+        # Set state on the extraction manager
+        extraction_manager.test_state = "persistent_value"
 
-            # Create second window mock with required attributes
-            MainWindow = get_main_window_mock_spec()
-            window2 = Mock(spec=MainWindow)
-            window2.extract_requested = MagicMock()
-            window2.open_in_editor_requested = MagicMock()
-            window2.arrange_rows_requested = MagicMock()
-            window2.arrange_grid_requested = MagicMock()
-            window2.inject_requested = MagicMock()
-            window2.extraction_panel = Mock()
-            window2.extraction_panel.offset_changed = Mock()
+        # Create second window mock with required attributes
+        MainWindow = get_main_window_mock_spec()
+        window2 = Mock(spec=MainWindow)
+        window2.extract_requested = MagicMock()
+        window2.open_in_editor_requested = MagicMock()
+        window2.arrange_rows_requested = MagicMock()
+        window2.arrange_grid_requested = MagicMock()
+        window2.inject_requested = MagicMock()
+        window2.extraction_panel = Mock()
+        window2.extraction_panel.offset_changed = Mock()
 
-            controller2 = ExtractionController(
-                window2,
-                extraction_manager=extraction_manager,
-                injection_manager=injection_manager,
-                session_manager=session_manager,
-                settings_manager=mock_settings_manager,
-            )
+        controller2 = ExtractionController(
+            window2,
+            extraction_manager=extraction_manager,
+            injection_manager=injection_manager,
+            session_manager=session_manager,
+            settings_manager=mock_settings_manager,
+        )
 
         assert controller2.extraction_manager is controller1.extraction_manager
         assert controller2.extraction_manager.test_state == "persistent_value"
@@ -501,15 +494,14 @@ class TestPrivateAttributeAccessFix:
         from utils.settings_manager import SettingsManager
         mock_settings_manager = Mock(spec=SettingsManager)
 
-        with patch('core.controller.get_error_handler') as mock_get_error_handler:
-            mock_get_error_handler.return_value = Mock()
-            controller = ExtractionController(
-                test_main_window,
-                extraction_manager=extraction_manager,
-                injection_manager=injection_manager,
-                session_manager=session_manager,
-                settings_manager=mock_settings_manager,
-            )
+        # Controller now uses ConsoleErrorHandler directly (no UI import)
+        controller = ExtractionController(
+            test_main_window,
+            extraction_manager=extraction_manager,
+            injection_manager=injection_manager,
+            session_manager=session_manager,
+            settings_manager=mock_settings_manager,
+        )
         return controller
 
     def test_get_output_path_returns_value(self, test_main_window: Any):
