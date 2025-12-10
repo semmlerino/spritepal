@@ -29,7 +29,8 @@ class ThumbnailCache:
         self,
         cache_dir: Path | None = None,
         max_cache_mb: float = DEFAULT_MAX_CACHE_MB,
-        auto_prune: bool = True
+        auto_prune: bool = True,
+        max_memory_cache_mb: float = 100.0,  # Memory cache limit in MB
     ):
         """
         Initialize the thumbnail cache.
@@ -38,6 +39,7 @@ class ThumbnailCache:
             cache_dir: Directory for disk cache (default: temp dir)
             max_cache_mb: Maximum disk cache size in MB (default: 100MB)
             auto_prune: Whether to automatically prune cache (default: True)
+            max_memory_cache_mb: Maximum memory cache size in MB (default: 100MB)
         """
         if cache_dir is None:
             import tempfile
@@ -49,7 +51,11 @@ class ThumbnailCache:
         # Memory cache (O(1) LRU using OrderedDict)
         self._memory_cache_mutex = QMutex()
         self.memory_cache: OrderedDict[str, QPixmap] = OrderedDict()
-        self.memory_cache_limit = 200  # Max items in memory
+        self.memory_cache_limit = 200  # Max items in memory (count-based limit)
+
+        # Memory size tracking for pressure-based eviction
+        self._memory_usage_bytes = 0
+        self.max_memory_cache_bytes = int(max_memory_cache_mb * 1024 * 1024)
 
         # Cache metadata
         self.metadata_file = self.cache_dir / "cache_metadata.json"
@@ -204,14 +210,32 @@ class ThumbnailCache:
             logger.error(f"Failed to cache thumbnail: {e}")
 
     def _add_to_memory_cache(self, key: str, pixmap: QPixmap):
-        """Add an item to the memory cache with LRU eviction (thread-safe)."""
+        """Add an item to the memory cache with LRU eviction (thread-safe).
+
+        Uses both count-based and memory-based eviction to prevent OOM.
+        """
         with QMutexLocker(self._memory_cache_mutex):
-            # Remove oldest if at limit - O(1) operation with OrderedDict
-            if len(self.memory_cache) >= self.memory_cache_limit:
-                self.memory_cache.popitem(last=False)
+            # Calculate pixmap memory size (width * height * 4 bytes for RGBA)
+            pixmap_size = pixmap.width() * pixmap.height() * 4
+
+            # Evict oldest entries until we're under the memory limit
+            while (self._memory_usage_bytes + pixmap_size > self.max_memory_cache_bytes
+                   and self.memory_cache):
+                _, evicted_pixmap = self.memory_cache.popitem(last=False)
+                evicted_size = evicted_pixmap.width() * evicted_pixmap.height() * 4
+                self._memory_usage_bytes -= evicted_size
+                logger.debug(f"Evicted thumbnail from memory cache (memory pressure): {evicted_size} bytes")
+
+            # Also enforce count-based limit - O(1) operation with OrderedDict
+            while len(self.memory_cache) >= self.memory_cache_limit and self.memory_cache:
+                _, evicted_pixmap = self.memory_cache.popitem(last=False)
+                evicted_size = evicted_pixmap.width() * evicted_pixmap.height() * 4
+                self._memory_usage_bytes -= evicted_size
+                logger.debug(f"Evicted thumbnail from memory cache (count limit): {evicted_size} bytes")
 
             # Add new item (automatically at end of OrderedDict)
             self.memory_cache[key] = pixmap
+            self._memory_usage_bytes += pixmap_size
 
     def _get_cache_size_mb(self) -> float:
         """Get total disk cache size in MB."""
@@ -236,6 +260,7 @@ class ThumbnailCache:
         # Clear memory cache (thread-safe)
         with QMutexLocker(self._memory_cache_mutex):
             self.memory_cache.clear()
+            self._memory_usage_bytes = 0
 
         # Clear disk cache
         for cache_file in self.cache_dir.glob("*.png"):
@@ -251,16 +276,19 @@ class ThumbnailCache:
         logger.info("Thumbnail cache cleared")
 
     def get_cache_stats(self) -> dict[str, int | float]:
-        """Get cache statistics."""
+        """Get cache statistics including memory usage."""
         disk_files = list(self.cache_dir.glob("*.png"))
         disk_size = sum(f.stat().st_size for f in disk_files)
 
         with QMutexLocker(self._memory_cache_mutex):
             memory_items = len(self.memory_cache)
+            memory_bytes = self._memory_usage_bytes
 
         return {
             "memory_items": memory_items,
             "memory_limit": self.memory_cache_limit,
+            "memory_size_mb": memory_bytes / (1024 * 1024),
+            "memory_limit_mb": self.max_memory_cache_bytes / (1024 * 1024),
             "disk_items": len(disk_files),
             "disk_size_mb": disk_size / (1024 * 1024),
             "total_items": len(self.metadata.get("entries", {}))

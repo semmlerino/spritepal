@@ -47,6 +47,7 @@ from ui.rom_extraction.workers import SpriteScanWorker
 from ui.rom_extraction.workers.similarity_indexing_worker import (
     SimilarityIndexingWorker,
 )
+from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoaderWorker
 from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
     SETTINGS_NS_ROM_INJECTION,
@@ -278,6 +279,8 @@ class ROMExtractionPanel(QWidget):
         self.search_worker = None
         self.scan_worker = None
         self.similarity_indexing_worker = None
+        self._header_loader: ROMHeaderLoaderWorker | None = None
+        self._sprite_location_loader: ROMInfoLoaderWorker | None = None
 
         # Navigation components
         self.sprite_navigator = None
@@ -570,36 +573,12 @@ class ROMExtractionPanel(QWidget):
             settings.set_last_used_directory(str(Path(filename).parent))
             logger.debug(f"Saved ROM to settings: {filename}")
 
-            # Read ROM header for info display
-            try:
-                header = self.rom_extractor.rom_injector.read_rom_header(filename)
+            # Read ROM header asynchronously to prevent UI freeze
+            self.rom_file_widget.set_info_text('<span style="color: gray;">Loading ROM header...</span>')
+            self._start_header_loading(filename)
 
-                # Get sprite configurations to check match status
-                sprite_configs = self.rom_extractor.sprite_config_loader.get_game_sprites(
-                    header.title, header.checksum
-                )
-
-                # Update ROM info display
-                info_text = f"<b>Title:</b> {header.title}<br>"
-                info_text += f"<b>Checksum:</b> 0x{header.checksum:04X}<br>"
-
-                # Check if this matches known configurations
-                if sprite_configs:
-                    info_text += '<span style="color: green;"><b>Status:</b> Configuration found ✓</span>'
-                else:
-                    info_text += '<span style="color: orange;"><b>Status:</b> Unknown ROM version - use "Find Sprites" to scan</span>'
-
-                self.rom_file_widget.set_info_text(info_text)
-
-            except Exception as e:
-                logger.warning(f"Could not read ROM header: {e}")
-                self.rom_file_widget.set_info_text('<span style="color: red;">Error reading ROM header</span>')
-
-            # Load sprite locations from ROM
-            self._load_rom_sprites()
-
-            # Initialize similarity indexing worker for this ROM
-            self._init_similarity_indexing_worker()
+            # Note: _load_rom_sprites() and _init_similarity_indexing_worker() will be called
+            # from _on_header_loaded callback to ensure proper sequencing
 
             # Notify that files changed
             self.files_changed.emit()
@@ -611,6 +590,73 @@ class ROMExtractionPanel(QWidget):
             # Clear ROM on error
             self.rom_path = ""
             self.rom_file_widget.set_rom_path("")
+
+    def _start_header_loading(self, filename: str) -> None:
+        """Start async ROM header loading.
+
+        Args:
+            filename: Path to ROM file
+        """
+        # Clean up existing header loader
+        if self._header_loader is not None:
+            WorkerManager.cleanup_worker(self._header_loader)
+            self._header_loader = None
+
+        # Create and start background worker
+        self._header_loader = ROMHeaderLoaderWorker(
+            rom_path=filename,
+            rom_injector=self.rom_extractor.rom_injector,
+            sprite_config_loader=self.rom_extractor.sprite_config_loader,
+        )
+
+        # Connect signals
+        self._header_loader.header_loaded.connect(self._on_header_loaded)
+        self._header_loader.error.connect(self._on_header_load_error)
+
+        # Start loading
+        logger.debug(f"Starting async header load for: {filename}")
+        self._header_loader.start()
+
+    def _on_header_loaded(self, result: dict[str, Any]) -> None:
+        """Handle ROM header loaded from background worker.
+
+        Args:
+            result: Dict with 'header' and 'sprite_configs' keys
+        """
+        header = result.get("header")
+        sprite_configs = result.get("sprite_configs")
+
+        if header is None:
+            self.rom_file_widget.set_info_text('<span style="color: red;">Error reading ROM header</span>')
+        else:
+            # Update ROM info display
+            info_text = f"<b>Title:</b> {header.title}<br>"
+            info_text += f"<b>Checksum:</b> 0x{header.checksum:04X}<br>"
+
+            # Check if this matches known configurations
+            if sprite_configs:
+                info_text += '<span style="color: green;"><b>Status:</b> Configuration found ✓</span>'
+            else:
+                info_text += '<span style="color: orange;"><b>Status:</b> Unknown ROM version - use "Find Sprites" to scan</span>'
+
+            self.rom_file_widget.set_info_text(info_text)
+
+        # Now continue with sprite location loading and similarity indexing
+        self._load_rom_sprites()
+        self._init_similarity_indexing_worker()
+
+    def _on_header_load_error(self, message: str, exception: Exception) -> None:
+        """Handle ROM header loading error.
+
+        Args:
+            message: Error message
+            exception: Exception that occurred
+        """
+        logger.warning(f"Could not read ROM header: {message}")
+        self.rom_file_widget.set_info_text('<span style="color: red;">Error reading ROM header</span>')
+        # Still try to load sprite locations even if header fails
+        self._load_rom_sprites()
+        self._init_similarity_indexing_worker()
 
     def _open_manual_offset_dialog(self):
         """Open the manual offset control dialog using singleton pattern"""
@@ -728,66 +774,107 @@ class ROMExtractionPanel(QWidget):
             settings.set_last_used_directory(str(Path(filename).parent))
 
     def _load_rom_sprites(self):
-        """Load known sprite locations from ROM"""
+        """Load known sprite locations from ROM asynchronously."""
         if self.sprite_selector_widget:
             self.sprite_selector_widget.clear()
+            self.sprite_selector_widget.add_sprite("Loading sprite locations...", None)
         self.sprite_locations = {}
 
         if not self.rom_path:
             return
 
+        # Check cache status first (fast operation)
         try:
-            # Check if sprites come from cache
-            from utils.rom_cache import (
-                get_rom_cache,  # Delayed import to avoid circular dependency
-            )
+            from utils.rom_cache import get_rom_cache
             rom_cache = get_rom_cache()
             cached_locations = rom_cache.get_sprite_locations(self.rom_path)
-            is_from_cache = bool(cached_locations)
-
-            # Get known sprite locations
-            locations = self.extraction_manager.get_known_sprite_locations(self.rom_path)
-
-            if locations:
-                # Show count of known sprites to make it clear they're available
-                cache_text = " (cached)" if is_from_cache else ""
-                self.sprite_selector_widget.add_sprite(
-                    f"-- {len(locations)} Known Sprites Available{cache_text} --", None
-                )
-
-                # Add separator for clarity
-                self.sprite_selector_widget.insert_separator(1)
-
-                for name, pointer in locations.items():
-                    display_name = name.replace("_", " ").title()
-                    # Add cache indicator if sprites came from cache
-                    cache_indicator = " 💾" if is_from_cache else ""
-                    self.sprite_selector_widget.add_sprite(
-                        f"{display_name} (0x{pointer.offset:06X}){cache_indicator}",
-                        (name, pointer.offset)
-                    )
-                self.sprite_locations = locations
-                self.sprite_selector_widget.set_enabled(True)
-
-                # Change button text to indicate scanner is optional
-                self.sprite_selector_widget.set_find_button_text("Scan for More Sprites")
-                self.sprite_selector_widget.set_find_button_tooltip(
-                    ": Scan ROM for additional sprites not in the known list"
-                )
-                self.sprite_selector_widget.set_find_button_enabled(True)
-            else:
-                self.sprite_selector_widget.add_sprite("No known sprites - use scanner", None)
-                self.sprite_selector_widget.set_enabled(False)
-
-                # Change button text to indicate scanner is needed
-                self.sprite_selector_widget.set_find_button_text("Find Sprites")
-                self.sprite_selector_widget.set_find_button_tooltip(
-                    "Scan ROM for valid sprite offsets (required for unknown ROMs)"
-                )
-                self.sprite_selector_widget.set_find_button_enabled(True)
-
+            self._is_sprites_from_cache = bool(cached_locations)
         except Exception:
-            logger.exception("Failed to load sprite locations")
+            self._is_sprites_from_cache = False
+
+        # Clean up existing worker
+        if self._sprite_location_loader is not None:
+            WorkerManager.cleanup_worker(self._sprite_location_loader)
+            self._sprite_location_loader = None
+
+        # Start async sprite location loading
+        self._sprite_location_loader = ROMInfoLoaderWorker(
+            rom_path=self.rom_path,
+            injection_manager=None,  # Not needed for sprite locations
+            extraction_manager=self.extraction_manager,
+            load_header=False,  # Header already loaded separately
+            load_sprite_locations=True,
+        )
+
+        # Connect signals
+        self._sprite_location_loader.sprite_locations_loaded.connect(
+            self._on_sprite_locations_loaded
+        )
+        self._sprite_location_loader.error.connect(self._on_sprite_locations_error)
+
+        # Start loading
+        logger.debug(f"Starting async sprite location load for: {self.rom_path}")
+        self._sprite_location_loader.start()
+
+    def _on_sprite_locations_loaded(self, locations: dict[str, Any]) -> None:
+        """Handle sprite locations loaded from background worker.
+
+        Args:
+            locations: Dict of sprite name -> SpritePointer
+        """
+        if self.sprite_selector_widget:
+            self.sprite_selector_widget.clear()
+
+        is_from_cache = getattr(self, '_is_sprites_from_cache', False)
+
+        if locations:
+            # Show count of known sprites to make it clear they're available
+            cache_text = " (cached)" if is_from_cache else ""
+            self.sprite_selector_widget.add_sprite(
+                f"-- {len(locations)} Known Sprites Available{cache_text} --", None
+            )
+
+            # Add separator for clarity
+            self.sprite_selector_widget.insert_separator(1)
+
+            for name, pointer in locations.items():
+                display_name = name.replace("_", " ").title()
+                # Add cache indicator if sprites came from cache
+                cache_indicator = " 💾" if is_from_cache else ""
+                self.sprite_selector_widget.add_sprite(
+                    f"{display_name} (0x{pointer.offset:06X}){cache_indicator}",
+                    (name, pointer.offset)
+                )
+            self.sprite_locations = locations
+            self.sprite_selector_widget.set_enabled(True)
+
+            # Change button text to indicate scanner is optional
+            self.sprite_selector_widget.set_find_button_text("Scan for More Sprites")
+            self.sprite_selector_widget.set_find_button_tooltip(
+                ": Scan ROM for additional sprites not in the known list"
+            )
+            self.sprite_selector_widget.set_find_button_enabled(True)
+        else:
+            self.sprite_selector_widget.add_sprite("No known sprites - use scanner", None)
+            self.sprite_selector_widget.set_enabled(False)
+
+            # Change button text to indicate scanner is needed
+            self.sprite_selector_widget.set_find_button_text("Find Sprites")
+            self.sprite_selector_widget.set_find_button_tooltip(
+                "Scan ROM for valid sprite offsets (required for unknown ROMs)"
+            )
+            self.sprite_selector_widget.set_find_button_enabled(True)
+
+    def _on_sprite_locations_error(self, message: str, exception: Exception) -> None:
+        """Handle sprite locations loading error.
+
+        Args:
+            message: Error message
+            exception: Exception that occurred
+        """
+        logger.exception(f"Failed to load sprite locations: {message}")
+        if self.sprite_selector_widget:
+            self.sprite_selector_widget.clear()
             self.sprite_selector_widget.add_sprite("Error loading ROM", None)
             self.sprite_selector_widget.set_enabled(False)
 

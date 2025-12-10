@@ -21,8 +21,16 @@ import tempfile
 import threading
 import time
 import weakref
+from enum import Enum
 from pathlib import Path
 from typing import Any, NamedTuple
+
+
+class HALResultStatus(Enum):
+    """Status of a HAL operation result for explicit tracking."""
+    COMPLETED = "completed"      # Operation completed successfully or with error
+    TIMED_OUT = "timed_out"      # Operation did not return within timeout
+    PENDING = "pending"          # Operation submitted but no result yet (internal use)
 
 try:
     from PySide6.QtWidgets import QApplication
@@ -66,12 +74,22 @@ class HALRequest(NamedTuple):
     request_id: str | None = None
 
 class HALResult(NamedTuple):
-    """Result structure for HAL process pool operations"""
+    """Result structure for HAL process pool operations.
+
+    Attributes:
+        success: Whether the operation succeeded
+        data: Decompressed data (for decompress operations)
+        size: Compressed/decompressed size
+        error_message: Error description if failed
+        request_id: ID to correlate request with result
+        status: Explicit status tracking (COMPLETED, TIMED_OUT, PENDING)
+    """
     success: bool
     data: bytes | None = None
     size: int | None = None
     error_message: str | None = None
     request_id: str | None = None
+    status: HALResultStatus = HALResultStatus.COMPLETED
 
 def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queue[HALRequest | None], result_queue: mp.Queue[HALResult]) -> None:
     """Worker process function for HAL operations.
@@ -499,17 +517,22 @@ class HALProcessPool:
             requests: List of HAL operation requests
 
         Returns:
-            List of HAL operation results in same order as requests
+            List of HAL operation results in same order as requests.
+            Each result includes explicit status (COMPLETED or TIMED_OUT).
         """
         if not self._pool_initialized or self._shutdown:
             return [
                 HALResult(
                     success=False,
                     error_message="Pool not initialized or shutting down",
-                    request_id=req.request_id
+                    request_id=req.request_id,
+                    status=HALResultStatus.COMPLETED,  # Not a timeout, it's a setup error
                 )
                 for req in requests
             ]
+
+        if not requests:
+            return []
 
         try:
             # Submit all requests
@@ -519,38 +542,76 @@ class HALProcessPool:
                 else:
                     raise HALPoolError("Request queue not initialized")
 
-            # Collect results
-            results = {}
-            timeout = HAL_POOL_TIMEOUT_SECONDS
-            deadline = time.time() + timeout
+            # Collect results with per-request timeout guarantee
+            results: dict[str | None, HALResult] = {}
+            total_timeout = HAL_POOL_TIMEOUT_SECONDS
+            # Minimum 5 seconds per request, but don't exceed total timeout
+            per_request_timeout = max(5.0, total_timeout / len(requests))
+            deadline = time.time() + total_timeout
 
+            received_count = 0
             for _ in requests:
+                # Each request gets at least per_request_timeout, but respect overall deadline
                 remaining = deadline - time.time()
+                wait_time = min(per_request_timeout, max(0.1, remaining))
+
                 if remaining <= 0:
+                    safe_warning(
+                        logger,
+                        f"Batch timeout: received {received_count}/{len(requests)} results"
+                    )
                     break
 
                 try:
                     if self._result_queue is not None:
-                        result = self._result_queue.get(timeout=remaining)
+                        result = self._result_queue.get(timeout=wait_time)
                     else:
                         raise HALPoolError("Result queue not initialized")
                     if result.request_id:
                         results[result.request_id] = result
+                        received_count += 1
                 except queue.Empty:
-                    break
+                    # Individual request timed out, but continue trying for others
+                    # This prevents one slow request from blocking all subsequent results
+                    continue
 
-            # Return results in same order as requests
-            return [
-                results.get(
-                    req.request_id,
-                    HALResult(
-                        success=False,
-                        error_message="No result received",
-                        request_id=req.request_id
+            # Drain any late-arriving results to prevent queue pollution
+            # Use zero timeout to capture anything already in queue
+            if received_count < len(requests):
+                drained_count = 0
+                while True:
+                    try:
+                        if self._result_queue is not None:
+                            late_result = self._result_queue.get(timeout=0.0)
+                            if late_result.request_id:
+                                results[late_result.request_id] = late_result
+                                drained_count += 1
+                        else:
+                            break
+                    except queue.Empty:
+                        break
+                if drained_count > 0:
+                    safe_debug(
+                        logger,
+                        f"Drained {drained_count} late-arriving results from queue"
                     )
-                )
-                for req in requests
-            ]
+
+            # Return results in same order as requests with explicit status
+            final_results = []
+            for req in requests:
+                if req.request_id in results:
+                    final_results.append(results[req.request_id])
+                else:
+                    # Result was not received - mark as TIMED_OUT
+                    final_results.append(
+                        HALResult(
+                            success=False,
+                            error_message=f"Operation timed out after {total_timeout}s",
+                            request_id=req.request_id,
+                            status=HALResultStatus.TIMED_OUT,
+                        )
+                    )
+            return final_results
 
         except Exception as e:
             logger.exception(f"Batch processing error: {e}")
@@ -558,7 +619,8 @@ class HALProcessPool:
                 HALResult(
                     success=False,
                     error_message=f"Batch error: {e!s}",
-                    request_id=req.request_id
+                    request_id=req.request_id,
+                    status=HALResultStatus.COMPLETED,  # Error, not timeout
                 )
                 for req in requests
             ]

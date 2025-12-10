@@ -40,6 +40,7 @@ class ExtractionManager(BaseManager):
 
     # Additional signals specific to extraction
     extraction_progress = Signal(str)  # Progress message
+    extraction_warning = Signal(str)  # Warning message (partial success)
     preview_generated = Signal(object, int)  # PIL Image, tile count
     palettes_extracted = Signal(dict)  # Palette data
     active_palettes_found = Signal(list)  # Active palette indices
@@ -166,6 +167,8 @@ class ExtractionManager(BaseManager):
 
         try:
             extracted_files = []
+            palette_extraction_failed = False
+            palette_error_msg = ""
 
             # Extract sprites
             self._update_progress(operation, 0, 100)
@@ -182,19 +185,34 @@ class ExtractionManager(BaseManager):
             self.extraction_progress.emit("Creating preview...")
             self.preview_generated.emit(img, num_tiles)
 
-            # Extract palettes if requested
+            # Extract palettes if requested - catch errors for partial success
             if not grayscale_mode and cgram_path:
                 self._update_progress(operation, 50, 100)
-                extracted_files.extend(
-                    self._extract_palettes(
-                        cgram_path, output_base, output_file,
-                        oam_path, vram_path, vram_offset,
-                        num_tiles, create_grayscale, create_metadata
+                try:
+                    extracted_files.extend(
+                        self._extract_palettes(
+                            cgram_path, output_base, output_file,
+                            oam_path, vram_path, vram_offset,
+                            num_tiles, create_grayscale, create_metadata
+                        )
                     )
-                )
+                except Exception as e:
+                    # Log and track palette failure but don't fail sprite extraction
+                    palette_extraction_failed = True
+                    palette_error_msg = str(e)
+                    self.logger.warning(f"Palette extraction failed: {e}")
 
             self._update_progress(operation, 100, 100)
-            self.extraction_progress.emit("Extraction complete!")
+
+            # Emit appropriate completion message
+            if palette_extraction_failed:
+                self.extraction_warning.emit(
+                    f"Sprites extracted but palette extraction failed: {palette_error_msg}"
+                )
+                self.extraction_progress.emit("Extraction complete (palettes failed)")
+            else:
+                self.extraction_progress.emit("Extraction complete!")
+
             self.files_created.emit(extracted_files)
 
         except (OSError, PermissionError) as e:
@@ -260,6 +278,8 @@ class ExtractionManager(BaseManager):
 
         try:
             extracted_files = []
+            palette_extraction_failed = False
+            palette_error_msg = ""
 
             # Extract from ROM
             self._update_progress(operation, 0, 100)
@@ -280,22 +300,37 @@ class ExtractionManager(BaseManager):
                 extracted_files.append(output_file)
                 self.preview_generated.emit(img_copy, tile_count)
 
-                # Extract palettes if CGRAM provided
+                # Extract palettes if CGRAM provided - catch errors for partial success
                 if cgram_path:
                     self._update_progress(operation, 50, 100)
-                    extracted_files.extend(
-                        self._extract_palettes(
-                            cgram_path, output_base, output_file,
-                            None, rom_path, offset,
-                            tile_count, True, True
+                    try:
+                        extracted_files.extend(
+                            self._extract_palettes(
+                                cgram_path, output_base, output_file,
+                                None, rom_path, offset,
+                                tile_count, True, True
+                            )
                         )
-                    )
+                    except Exception as e:
+                        # Log and track palette failure but don't fail sprite extraction
+                        palette_extraction_failed = True
+                        palette_error_msg = str(e)
+                        self.logger.warning(f"Palette extraction failed: {e}")
             else:
                 self._raise_extraction_failed("Failed to extract sprite from ROM")
 
             # Only emit success signals if extraction actually succeeded
             self._update_progress(operation, 100, 100)
-            self.extraction_progress.emit("ROM extraction complete!")
+
+            # Emit appropriate completion message
+            if palette_extraction_failed:
+                self.extraction_warning.emit(
+                    f"Sprite extracted but palette extraction failed: {palette_error_msg}"
+                )
+                self.extraction_progress.emit("ROM extraction complete (palettes failed)")
+            else:
+                self.extraction_progress.emit("ROM extraction complete!")
+
             self.files_created.emit(extracted_files)
 
         except (OSError, PermissionError) as e:

@@ -153,6 +153,14 @@ class SpriteInjector:
                 pixels = list(cast(Any, img.getdata()))
                 max_index = max(pixels) if pixels else 0
                 logger.debug(f"Using indexed palette directly: max index={max_index}")
+
+                # Validate palette indices for 4-bit compatibility (Issue 7 fix)
+                if max_index > 15:
+                    raise ValueError(
+                        f"PNG palette has indices up to {max_index}, but SNES sprites "
+                        f"only support 16 colors (indices 0-15). Please reduce the "
+                        f"image palette to 16 colors or use grayscale mode."
+                    )
             else:
                 # Convert to indexed mode
                 logger.warning(f"Converting {img.mode} to indexed mode - may lose color information")

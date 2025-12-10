@@ -27,6 +27,7 @@ from typing_extensions import override
 
 from core.managers import get_injection_manager
 from core.sprite_validator import SpriteValidator
+from ui.common.worker_manager import WorkerManager
 from ui.components import (
     FileSelector,
     FormRow,
@@ -36,6 +37,7 @@ from ui.components import (
 )
 from ui.utils.accessibility import AccessibilityHelper
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
+from ui.workers.rom_info_loader_worker import ROMInfoLoaderWorker
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -78,6 +80,9 @@ class InjectionDialog(TabbedDialog):
         self.rom_offset_input: HexOffsetInput | None = None
         self.sprite_location_combo: QComboBox | None = None
         self.fast_compression_check: QCheckBox | None = None
+
+        # Background workers for async operations
+        self._rom_info_loader: ROMInfoLoaderWorker | None = None
 
         # Get injection manager instance
         self.injection_manager = get_injection_manager()
@@ -633,12 +638,43 @@ class InjectionDialog(TabbedDialog):
         logger.debug(f"Output ROM path changed to: '{path}'")
 
     def _load_rom_info(self, rom_path: str) -> None:
-        """Load ROM information and populate sprite locations"""
+        """Load ROM information asynchronously to prevent UI freezes.
+
+        Uses ROMInfoLoaderWorker to perform file I/O in a background thread.
+        """
         # Clear UI state first in case of errors
         self._clear_rom_ui_state()
 
-        rom_info = self.injection_manager.load_rom_info(rom_path)
+        # Show loading state
+        if self.sprite_location_combo:
+            self.sprite_location_combo.clear()
+            self.sprite_location_combo.addItem("Loading ROM info...", None)
 
+        # Clean up any existing worker
+        if self._rom_info_loader is not None:
+            WorkerManager.cleanup_worker(self._rom_info_loader)
+            self._rom_info_loader = None
+
+        # Create and start background worker
+        self._rom_info_loader = ROMInfoLoaderWorker(
+            rom_path=rom_path,
+            injection_manager=self.injection_manager,
+            extraction_manager=None,  # Injection dialog only needs injection_manager
+            load_header=True,
+            load_sprite_locations=False,  # Sprite locations come from injection_manager.load_rom_info
+        )
+
+        # Connect signals
+        self._rom_info_loader.rom_info_loaded.connect(self._on_rom_info_loaded)
+        self._rom_info_loader.error.connect(self._on_rom_info_error)
+        self._rom_info_loader.operation_finished.connect(self._on_rom_info_finished)
+
+        # Start loading
+        logger.debug(f"Starting async ROM info load for: {rom_path}")
+        self._rom_info_loader.start()
+
+    def _on_rom_info_loaded(self, rom_info: dict[str, Any]) -> None:
+        """Handle ROM info loaded from background worker."""
         if not rom_info:
             return
 
@@ -648,22 +684,22 @@ class InjectionDialog(TabbedDialog):
             error_type = rom_info.get("error_type", "Exception")
 
             if error_type == "FileNotFoundError":
-                logger.exception("ROM file not found")
+                logger.error("ROM file not found")
                 _ = QMessageBox.critical(
                     self, "ROM File Not Found", f"The selected ROM file could not be found:\n\n{error_msg}"
                 )
             elif error_type == "PermissionError":
-                logger.exception("ROM file permission error")
+                logger.error("ROM file permission error")
                 _ = QMessageBox.critical(
                     self, "ROM File Access Error", f"Cannot access the ROM file:\n\n{error_msg}"
                 )
             elif error_type == "ValueError":
-                logger.exception("Invalid ROM file")
+                logger.error("Invalid ROM file")
                 _ = QMessageBox.warning(
                     self, "Invalid ROM File", f"The selected file is not a valid SNES ROM:\n\n{error_msg}"
                 )
             else:
-                logger.exception("Failed to load ROM info")
+                logger.error("Failed to load ROM info")
                 _ = QMessageBox.warning(
                     self, "ROM Load Error", f"Failed to load ROM information:\n\n{error_msg}"
                 )
@@ -708,6 +744,17 @@ class InjectionDialog(TabbedDialog):
                 self.sprite_location_combo.addItem(f"No sprite data available for: {header['title']}", None)
         elif self.sprite_location_combo:
             self.sprite_location_combo.addItem("Error loading sprite locations", None)
+
+    def _on_rom_info_error(self, message: str, exception: Exception) -> None:
+        """Handle ROM info loading error from worker."""
+        logger.error(f"ROM info loading failed: {message}")
+        if self.sprite_location_combo:
+            self.sprite_location_combo.clear()
+            self.sprite_location_combo.addItem("Error loading ROM", None)
+
+    def _on_rom_info_finished(self, success: bool, message: str) -> None:
+        """Handle ROM info worker completion."""
+        logger.debug(f"ROM info loading finished: success={success}, message={message}")
 
     def _clear_rom_ui_state(self) -> None:
         """Clear ROM-related UI state"""
