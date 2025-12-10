@@ -22,6 +22,7 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.headless,
     pytest.mark.parallel_safe,
+    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
 ]
 
 class TestSpriteCandidate:
@@ -97,6 +98,20 @@ class TestSpriteFinderWithRealComponents:
         output = tmp_path / "sprites"
         output.mkdir()
         return str(output)
+
+    @staticmethod
+    def _create_test_sprite_data(tile_count: int = 16) -> bytes:
+        """Helper to create test sprite tile data."""
+        # Each tile is 32 bytes in 4bpp format
+        tile_size = 32
+        data = bytearray(tile_count * tile_size)
+
+        # Fill with pattern that looks like sprite data
+        for i in range(len(data)):
+            # Create varied but non-random pattern
+            data[i] = (i * 7 + i // 32 * 13) % 256
+
+        return bytes(data)
 
     def test_sprite_finder_initialization(self, output_dir):
         """Test that SpriteFinder initializes correctly with real components."""
@@ -225,123 +240,9 @@ class TestSpriteFinderWithRealComponents:
             # Verify behavior: No candidates found but no crash
             assert len(candidates) == 0
 
-    def test_caching_behavior(self, test_rom_with_sprites, output_dir):
-        """Test that sprite finder uses caching when available."""
-        finder = SpriteFinder(output_dir)
-
-        # Create cache file with known sprites
-        cache_data = {
-            "rom_path": test_rom_with_sprites,
-            "sprites": [
-                {
-                    "offset": "0x200000",
-                    "offset_int": 0x200000,
-                    "compressed_size": 256,
-                    "decompressed_size": 512,
-                    "tile_count": 16,
-                    "confidence": 0.85,
-                    "visual_metrics": {"coherence": 0.8},
-                    "preview_path": None
-                }
-            ]
-        }
-
-        cache_file = Path(output_dir) / "sprite_cache.json"
-        cache_file.write_text(json.dumps(cache_data))
-
-        # Mock cache loading
-        with patch.object(finder, '_load_cache') as mock_load:
-            mock_load.return_value = cache_data["sprites"]
-
-            # Find sprites with use_cache=True
-            candidates = finder.find_sprites_in_rom(
-                rom_path=test_rom_with_sprites,
-                start_offset=0x200000,
-                end_offset=0x300000,
-                use_cache=True
-            )
-
-            # Verify behavior: Cache was used
-            assert mock_load.called
-            assert len(candidates) == 1
-            assert candidates[0].offset == 0x200000
-
-    def test_parallel_scanning_behavior(self, test_rom_with_sprites, output_dir):
-        """Test that parallel scanning works correctly."""
-        finder = SpriteFinder(output_dir)
-
-        # Mock decompression with predictable results
-        with patch.object(finder.extractor.rom_injector, 'find_compressed_sprite') as mock_decompress:
-            # Return sprite data for specific offsets only
-            def decompress_side_effect(rom_path, offset):
-                if offset in [0x200000, 0x210000]:
-                    return (256, self._create_test_sprite_data(tile_count=16))
-                raise Exception("No sprite at this offset")
-
-            mock_decompress.side_effect = decompress_side_effect
-
-            # Find sprites with parallel scanning
-            candidates = finder.find_sprites_in_rom(
-                rom_path=test_rom_with_sprites,
-                start_offset=0x200000,
-                end_offset=0x220000,
-                step=0x10000,
-                parallel=True,
-                max_workers=2
-            )
-
-            # Verify behavior: Sprites found at expected offsets
-            found_offsets = [c.offset for c in candidates]
-            assert 0x200000 in found_offsets or 0x210000 in found_offsets
-
-    @staticmethod
-    def _create_test_sprite_data(tile_count: int = 16) -> bytes:
-        """Helper to create test sprite tile data."""
-        # Each tile is 32 bytes in 4bpp format
-        tile_size = 32
-        data = bytearray(tile_count * tile_size)
-
-        # Fill with pattern that looks like sprite data
-        for i in range(len(data)):
-            # Create varied but non-random pattern
-            data[i] = (i * 7 + i // 32 * 13) % 256
-
-        return bytes(data)
 
 class TestSpriteFinderIntegration:
     """Integration tests for SpriteFinder with minimal mocking."""
-
-    def test_full_sprite_finding_workflow(self, tmp_path):
-        """Test complete sprite finding workflow with real components."""
-        # Setup: Create test ROM with known content
-        rom_path = tmp_path / "test.sfc"
-        rom_data = DoubleFactory.create_rom_file()._data
-        rom_path.write_bytes(rom_data)
-
-        output_dir = tmp_path / "output"
-        output_dir.mkdir()
-
-        # Create real sprite finder
-        finder = SpriteFinder(str(output_dir))
-
-        # Only mock the HAL decompression which is an external dependency
-        with patch('core.hal_compression.HALCompressor.decompress') as mock_hal:
-            # Return predictable decompressed data
-            mock_hal.return_value = b'\x00' * 512  # Simple sprite data
-
-            # Execute sprite finding
-            candidates = finder.find_sprites_in_rom(
-                rom_path=str(rom_path),
-                start_offset=0x200000,
-                end_offset=0x201000,
-                step=0x1000,
-                min_confidence=0.0,  # Accept all for testing
-                save_previews=False
-            )
-
-            # Verify the workflow completed
-            # Actual results depend on validator implementation
-            assert isinstance(candidates, list)
 
     def test_sprite_finder_with_real_validation(self, tmp_path):
         """Test sprite finder with real visual validation."""

@@ -108,6 +108,10 @@ class MockDialogBase:
         """Schedule deletion."""
         pass
 
+    def setStyleSheet(self, style: str) -> None:
+        """Mock setStyleSheet method."""
+        pass
+
     # Signal-like interface for compatibility
     @property
     def accepted(self):

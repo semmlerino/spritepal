@@ -316,14 +316,15 @@ class TestWorkerManagerReal:
         """Test worker thread priority management."""
         worker = RealTestWorker()
 
-        # Set high priority
-        worker.setPriority(QThread.Priority.HighPriority)
-
-        # Start worker
+        # Start worker first - Qt6 requires thread to be running before setPriority
         worker.start()
         qtbot.waitUntil(worker.isRunning, timeout=TEST_TIMEOUT_MEDIUM)
 
-        # Verify priority is set
+        # Set high priority (only works on running thread in Qt6)
+        worker.setPriority(QThread.Priority.HighPriority)
+
+        # Verify priority is set (give Qt a moment to apply it)
+        qtbot.wait(50)
         assert worker.priority() == QThread.Priority.HighPriority
 
         # Cleanup

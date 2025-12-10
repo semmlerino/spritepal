@@ -236,6 +236,14 @@ class ManagerRegistry:
 
             self._managers.clear()
 
+            # Clear DI container registrations so managers can't be retrieved after cleanup
+            try:
+                from core.di_container import reset_container
+                reset_container()
+                safe_debug(self._logger, "Cleared DI container registrations")
+            except Exception as e:
+                safe_debug(self._logger, f"Error clearing DI container: {e}")
+
             # Clear context references to break circular dependencies
             try:
                 from .context import _context_manager
@@ -251,7 +259,9 @@ class ManagerRegistry:
 
     def get_session_manager(self) -> SessionManager:
         """
-        Get the session manager instance
+        Get the session manager instance.
+
+        Delegates to DI container for consistent dependency resolution.
 
         Returns:
             SessionManager instance
@@ -259,11 +269,18 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
-        return self._get_manager("session", SessionManager)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SessionManagerProtocol
+        try:
+            return inject(SessionManagerProtocol)  # type: ignore[return-value]
+        except ValueError as e:
+            raise ManagerError("SessionManager not initialized. Call initialize_managers() first.") from e
 
     def get_extraction_manager(self) -> ExtractionManager:
         """
-        Get the extraction manager instance
+        Get the extraction manager instance.
+
+        Delegates to DI container for consistent dependency resolution.
 
         Returns:
             ExtractionManager instance
@@ -271,11 +288,18 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
-        return self._get_manager("extraction", ExtractionManager)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
+        try:
+            return inject(ExtractionManagerProtocol)  # type: ignore[return-value]
+        except ValueError as e:
+            raise ManagerError("ExtractionManager not initialized. Call initialize_managers() first.") from e
 
     def get_injection_manager(self) -> InjectionManager:
         """
-        Get the injection manager instance
+        Get the injection manager instance.
+
+        Delegates to DI container for consistent dependency resolution.
 
         Returns:
             InjectionManager instance
@@ -283,7 +307,12 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
-        return self._get_manager("injection", InjectionManager)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
+        try:
+            return inject(InjectionManagerProtocol)  # type: ignore[return-value]
+        except ValueError as e:
+            raise ManagerError("InjectionManager not initialized. Call initialize_managers() first.") from e
 
     def get_navigation_manager(self):
         """
@@ -623,3 +652,38 @@ def get_monitoring_manager():
         ManagerError: If managers not initialized
     """
     return _ensure_registry().get_monitoring_manager()
+
+def reset_managers() -> None:
+    """
+    Reset managers (mainly for testing).
+
+    Alias for cleanup_managers() for backward compatibility.
+    """
+    cleanup_managers()
+
+def get_container_stats() -> dict[str, Any]:
+    """
+    Get statistics about the DI container for debugging.
+
+    Returns:
+        Dictionary with container statistics
+    """
+    from core.di_container import get_container
+    from core.protocols.manager_protocols import (
+        ExtractionManagerProtocol,
+        InjectionManagerProtocol,
+        NavigationManagerProtocol,
+        SessionManagerProtocol,
+    )
+
+    container = get_container()
+
+    stats = {
+        "initialized": are_managers_initialized(),
+        "session_manager_available": container.has(SessionManagerProtocol),
+        "extraction_manager_available": container.has(ExtractionManagerProtocol),
+        "injection_manager_available": container.has(InjectionManagerProtocol),
+        "navigation_manager_available": container.has(NavigationManagerProtocol),
+    }
+
+    return stats

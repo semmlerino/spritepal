@@ -223,7 +223,7 @@ class TestVRAMExtractionWorker:
         # Verify real error handling
         assert error_spy.count() == 1
         error_message = error_spy.at(0)[0]
-        assert "VRAM extraction failed" in error_message
+        assert "VRAM extraction failed: VRAM file validation failed: file does not exist" in error_message
         assert isinstance(error_spy.at(0)[1], Exception)
 
         # Verify operation finished with failure
@@ -413,7 +413,7 @@ class TestROMExtractionWorker:
         # Verify error handling
         assert error_spy.count() == 1
         error_message = error_spy.at(0)[0]
-        assert "ROM extraction failed" in error_message
+        assert "ROM extraction failed: ROM file validation failed: file does not exist" in error_message
 
         assert operation_spy.count() == 1
         success, message = operation_spy.at(0)

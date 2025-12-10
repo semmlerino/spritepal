@@ -8,6 +8,7 @@ adapter patterns.
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from PySide6.QtCore import QObject, Signal
@@ -116,7 +117,7 @@ class CoreOperationsManager(BaseManager):
 
         # Stop any active workers
         if self._current_worker:
-            from ui.common import WorkerManager  # Local import to avoid circular dependency
+            from core.services.worker_lifecycle import WorkerManager
 
             self._logger.info("Stopping active worker")
             WorkerManager.cleanup_worker(self._current_worker, timeout=5000)
@@ -176,7 +177,7 @@ class CoreOperationsManager(BaseManager):
 
             # Perform extraction
             extractor = self._ensure_sprite_extractor()
-            result = extractor.extract_sprite(  # type: ignore[attr-defined]  # TODO: Add extract_sprite to SpriteExtractor
+            result = extractor.extract_sprite(
                 vram_path, output_base,
                 cgram_path=cgram_path,
                 oam_path=oam_path,
@@ -195,7 +196,7 @@ class CoreOperationsManager(BaseManager):
         except Exception as e:
             self._handle_error(e, operation)
             self.operation_completed.emit(operation, False, str(e))
-            return {"success": False, "error": str(e)}
+            raise ExtractionError(f"VRAM extraction failed: {e!s}") from e
         finally:
             self._finish_operation(operation)
 
@@ -242,7 +243,7 @@ class CoreOperationsManager(BaseManager):
         except Exception as e:
             self._handle_error(e, operation)
             self.operation_completed.emit(operation, False, str(e))
-            return {"success": False, "error": str(e)}
+            raise ExtractionError(f"ROM extraction failed: {e!s}") from e
         finally:
             self._finish_operation(operation)
 
@@ -297,6 +298,7 @@ class CoreOperationsManager(BaseManager):
 
         # Connect signals
         worker.progress.connect(lambda msg: self.injection_progress.emit(msg))
+        worker.finished.connect(self._cleanup_current_worker)  # Ensure cleanup on finish (before emitting completion)
         worker.finished.connect(lambda: self._on_injection_finished(True, "VRAM injection completed"))
         worker.error.connect(lambda msg: self._on_injection_finished(False, msg))  # type: ignore[attr-defined]  # Qt signal
 
@@ -324,6 +326,7 @@ class CoreOperationsManager(BaseManager):
 
         # Connect signals
         worker.progress.connect(lambda msg: self.injection_progress.emit(msg))
+        worker.finished.connect(self._cleanup_current_worker)  # Ensure cleanup on finish (before emitting completion)
         worker.finished.connect(lambda: self._on_injection_finished(True, "ROM injection completed"))
         worker.error.connect(lambda msg: self._on_injection_finished(False, msg))  # type: ignore[attr-defined]  # Qt signal
         worker.compression_info.connect(self.compression_info.emit)
@@ -339,6 +342,12 @@ class CoreOperationsManager(BaseManager):
         self.injection_finished.emit(success, message)
         self.operation_completed.emit("injection", success, message)
         self._finish_operation("injection")
+        # self._current_worker = None  # Moved to _cleanup_current_worker to prevent premature cleanup
+
+    def _cleanup_current_worker(self) -> None:
+        """Clean up current worker reference after thread finishes."""
+        if self._current_worker:
+            self._current_worker.deleteLater()
         self._current_worker = None
 
     # ========== Palette Operations ==========
@@ -440,6 +449,10 @@ class ExtractionAdapter(ExtractionManager):
         # Set up required attributes that parent methods expect
         self._rom_extractor = core_manager._rom_extractor
 
+        # Thread safety attributes required by BaseManager methods
+        self._lock = threading.RLock()
+        self._active_operations: set[str] = set()
+
         # Forward signals
         core_manager.extraction_progress.connect(self.extraction_progress.emit)
         core_manager.preview_generated.connect(self.preview_generated.emit)
@@ -465,31 +478,6 @@ class ExtractionAdapter(ExtractionManager):
     def reset_state(self, full_reset: bool = False) -> None:
         """Delegate reset to core manager."""
         self._core.reset_state(full_reset)
-
-    def extract_from_vram(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore[override]  # Wrapper changes return type
-        """Delegate to core manager."""
-        return self._core.extract_from_vram(*args, **kwargs)
-
-    def extract_from_rom(self, *args, **kwargs):  # type: ignore[override]  # Wrapper changes return type
-        """Delegate to core manager."""
-        return self._core.extract_from_rom(*args, **kwargs)
-
-    def generate_preview(self, *args, **kwargs):  # type: ignore[override]  # Wrapper changes return type
-        """Delegate to core manager."""
-        # This method is in the original ExtractionManager
-        # For now, we'll implement a basic version
-        rom_path = args[0]
-        offset = args[1]
-        result = self._core.extract_from_rom(
-            rom_path, offset, "preview",
-            tile_count=kwargs.get("tile_count"),
-            palette_data=kwargs.get("palette_data"),
-            width=kwargs.get("width", DEFAULT_PREVIEW_WIDTH),
-            height=kwargs.get("height", DEFAULT_PREVIEW_HEIGHT)
-        )
-        if result.get("preview_image"):
-            self._core.preview_generated.emit(result["preview_image"], result.get("tile_count", 0))
-        return result
 
     def extract_active_palettes(self, *args: Any, **kwargs: Any) -> None:
         """Extract active palettes from OAM data."""
@@ -541,6 +529,6 @@ class InjectionAdapter(InjectionManager):
     def cancel_injection(self) -> None:
         """Cancel current injection operation."""
         if self._core._current_worker:
-            from ui.common import WorkerManager  # Local import to avoid circular dependency
+            from core.services.worker_lifecycle import WorkerManager
 
             WorkerManager.cleanup_worker(self._core._current_worker, timeout=2000)

@@ -21,19 +21,14 @@ from .exceptions import (
 from .extraction_manager import ExtractionManager
 from .injection_manager import InjectionManager
 
-# Import additional functions from manager_initializer
-from .manager_initializer import (
-    get_container_stats,
-    reset_managers,
-)
-
-# Import DI-based manager functions (new approach)
+# Import DI-based manager functions
 # Note: We import from registry now which supports both consolidated and original modes
 # Backward compatibility: keep registry import but it will use DI container internally
 from .registry import (
     are_managers_initialized,
     cleanup_managers,
     get_application_state_manager,
+    get_container_stats,
     get_core_operations_manager,
     get_extraction_manager,
     get_injection_manager,
@@ -42,6 +37,7 @@ from .registry import (
     get_session_manager,
     get_ui_coordinator_manager,
     initialize_managers,
+    reset_managers,
     validate_manager_dependencies,
 )
 from .session_manager import SessionManager

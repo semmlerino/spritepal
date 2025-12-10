@@ -197,8 +197,8 @@ class TestExtractionManagerEdgeCases:
         vram_path = tmp_path / "test.vram"
         vram_path.write_bytes(b"\x00" * 64 * 1024)
 
-        params = {"vram_path": str(vram_path), "output_base": ""}
-        with pytest.raises(ValidationError, match="output"):
+        params = {"vram_path": str(vram_path), "output_base": "", "grayscale_mode": True}
+        with pytest.raises(ValidationError, match="(?i)output"):
             manager.validate_extraction_params(params)
 
     def test_validate_rom_with_negative_offset(self, real_factory, tmp_path, test_rom_data):

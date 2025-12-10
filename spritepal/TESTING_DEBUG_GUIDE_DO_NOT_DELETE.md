@@ -163,13 +163,13 @@ def test_full_workflow(qtbot):
 ### 3. Running Tests by Category
 ```bash
 # Fast tests only
-pytest -m "unit and no_manager_setup"
+QT_QPA_PLATFORM=offscreen pytest -m "unit and no_manager_setup"
 
-# GUI tests with proper environment
-xvfb-run -a pytest -m "gui"
+# GUI tests with offscreen backend
+QT_QPA_PLATFORM=offscreen pytest -m "gui"
 
 # Skip slow tests during development
-pytest -m "not slow"
+QT_QPA_PLATFORM=offscreen pytest -m "not slow"
 ```
 
 ## Environment-Specific Issues
@@ -198,17 +198,15 @@ def test_gui_operation(qtbot):
     pass
 ```
 
-### xvfb for CI/Headless Testing
+### Offscreen Backend for CI/Headless Testing
 ```bash
-# Install xvfb
-sudo apt-get install xvfb
+# Use Qt's offscreen platform (recommended - no dependencies)
+QT_QPA_PLATFORM=offscreen pytest tests/
 
-# Run tests with virtual display
-xvfb-run -a pytest tests/
+# Alternative: Set in conftest.py (already configured)
+# os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-# Or with pytest-xvfb plugin
-pip install pytest-xvfb
-pytest --xvfb
+# NOTE: Do NOT use pytest-xvfb - it causes hangs in WSL2/CI environments
 ```
 
 ## Key Metrics and Benchmarks

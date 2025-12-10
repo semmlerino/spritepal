@@ -1,20 +1,10 @@
-
-from __future__ import annotations
-
-import pytest
-
-pytestmark = [
-    pytest.mark.ci_safe,
-    pytest.mark.file_io,
-    pytest.mark.headless,
-    pytest.mark.unit,
-]
 """
 Test suite for HAL compression tool detection robustness.
 
 Tests the fix for intermittent exhal/inhal detection issues that occurred
 when the application was launched from different working directories.
 """
+from __future__ import annotations
 
 import os
 import platform
@@ -23,10 +13,20 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+
 from core.hal_compression import HALCompressionError, HALCompressor
 
 # Mark as no_manager_setup - pure unit tests for HAL compression
-pytestmark = [pytest.mark.no_manager_setup, pytest.mark.unit]
+# Uses mock_hal to prevent crashes from real HAL tool detection
+pytestmark = [
+    pytest.mark.no_manager_setup,
+    pytest.mark.unit,
+    pytest.mark.ci_safe,
+    pytest.mark.file_io,
+    pytest.mark.headless,
+    pytest.mark.usefixtures("mock_hal"),  # HAL mocking
+]
 
 class TestHALToolDetection(unittest.TestCase):
     """Test HAL tool detection from various working directories"""

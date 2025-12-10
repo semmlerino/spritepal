@@ -29,23 +29,28 @@ spritepal/
 
 ## Development Tools
 
-All tools use the parent venv from the `spritepal/` directory:
+All tools run via `uv` from the `spritepal/` directory:
 
 ```bash
 # Sync dependencies (from exhal-master/)
 uv sync --extra dev
 
-# Linting (from spritepal/)
-../.venv/bin/ruff check .
-../.venv/bin/ruff check . --fix
+# Linting
+uv run ruff check .
+uv run ruff check . --fix
 
-# Type checking (from spritepal/)
-../.venv/bin/basedpyright core ui utils
+# Type checking
+uv run basedpyright core ui utils
 
-# Tests (from spritepal/)
-../.venv/bin/pytest tests -v
-../.venv/bin/pytest tests -m "headless and not slow"  # Fast tests
-../.venv/bin/pytest tests -m "gui" --xvfb             # GUI tests
+# Tests - routine run (stop on first failure, short tracebacks)
+QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=1 --tb=short
+
+# Tests - specific subsets
+QT_QPA_PLATFORM=offscreen uv run pytest tests -m "headless and not slow" --maxfail=1  # Fast tests
+QT_QPA_PLATFORM=offscreen uv run pytest tests -m "gui" --maxfail=1                    # GUI tests (offscreen)
+
+# Tests - drill down on failure (verbose, full traceback)
+QT_QPA_PLATFORM=offscreen uv run pytest tests/path/test_file.py::TestClass::test_name -vv --tb=long
 ```
 
 ## Qt Testing Best Practices
@@ -100,9 +105,12 @@ def test_async_with_failure_case(qtbot, worker):
 ```
 
 ### Test Markers
-- `@pytest.mark.gui` - Requires display or xvfb (real Qt widgets rendered)
+- `@pytest.mark.gui` - Uses real Qt widgets (run with `QT_QPA_PLATFORM=offscreen`)
 - `@pytest.mark.headless` - No display required (can use real components if no rendering)
 - `@pytest.mark.serial` - No parallel execution
+
+**IMPORTANT**: Always run tests with `QT_QPA_PLATFORM=offscreen` to avoid display dependencies.
+Do NOT use pytest-xvfb - it causes hangs in WSL2 and some CI environments.
 
 ### Modular Fixture Architecture
 

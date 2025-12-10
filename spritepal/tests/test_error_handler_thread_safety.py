@@ -145,9 +145,9 @@ class TestErrorHandlerThreadSafety:
         # First call creates singleton
         handler1 = get_error_handler()
 
-        # Track lock acquisition by patching the module's lock
-        from ui.common import error_handler
-        original_lock = error_handler._error_handler_lock
+        # Track lock acquisition by patching the singleton's lock
+        from ui.common.error_handler import _ErrorHandlerSingleton
+        original_lock = _ErrorHandlerSingleton._lock
         lock_calls = []
 
         # Create a mock lock that tracks acquisitions
@@ -169,8 +169,8 @@ class TestErrorHandlerThreadSafety:
             def release(self):
                 return self._real_lock.release()
 
-        # Replace the module lock
-        error_handler._error_handler_lock = TrackingLock()
+        # Replace the singleton's lock
+        _ErrorHandlerSingleton._lock = TrackingLock()
 
         try:
             # Subsequent calls should use fast path (no lock)
@@ -184,7 +184,7 @@ class TestErrorHandlerThreadSafety:
 
         finally:
             # Restore original lock
-            error_handler._error_handler_lock = original_lock
+            _ErrorHandlerSingleton._lock = original_lock
 
     def test_parent_update_after_creation(self, qtbot):
         """Test parent widget update after singleton creation"""

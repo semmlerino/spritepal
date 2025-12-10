@@ -136,6 +136,16 @@ class RealComponentFactory:
             assert app_instance is not None, "QApplication instance should exist"
             self._app = app_instance
 
+        # Initialize managers to ensure DI container and protocols are registered
+        # This is necessary because managers like ExtractionManager create ROMExtractor
+        # which uses inject(ROMCacheProtocol) internally, and the DI factories depend
+        # on consolidated managers being initialized
+        from core.managers.registry import ManagerRegistry
+        registry = ManagerRegistry()
+        if not registry.is_initialized():
+            from core.managers import initialize_managers
+            initialize_managers("TestApp", settings_path=self._settings_path)
+
     def create_extraction_manager(self, with_test_data: bool = True) -> ExtractionManager:
         """
         Create a real ExtractionManager for testing.

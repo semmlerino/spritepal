@@ -596,11 +596,20 @@ class SessionAdapter(SessionManager):
 
     @override
     def get_session_data(self) -> dict[str, Any]:
-        return self._state_mgr.get_setting("session", "data", {})
+        """Get all session data (entire session dict, not just the 'data' key)"""
+        return self._state_mgr._settings.get("session", {})
 
     @override
     def update_session_data(self, data: dict[str, Any]) -> None:
-        self._state_mgr.set_setting("session", "data", data)
+        """Update session data (merge into entire session dict, not just 'data' key)"""
+        # Get current session
+        current_session = self._state_mgr._settings.get("session", {})
+        # Merge new data into current session
+        current_session.update(data)
+        # Save updated session (update in place since we got a reference to the dict)
+        self._state_mgr._settings["session"] = current_session
+        # Mark settings as dirty so they get saved
+        self._state_mgr._settings_dirty = True
 
     def update_file_path(self, file_type: str, path: str) -> None:
         self._state_mgr.update_session_file(file_type, path)

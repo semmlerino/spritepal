@@ -224,13 +224,18 @@ class TestSpriteScanDialog:
     @pytest.mark.timeout(120)  # This test does real ROM scanning which is slow
     def test_sprite_scan_with_results(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, mocker, wait_for_signal_processed):
         """Test full sprite scan workflow with results dialog."""
-        from PySide6.QtWidgets import QDialog
+        from PySide6.QtWidgets import QDialog, QMessageBox
 
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
 
         # Mock QDialog.exec to prevent blocking - return Accepted immediately
         mocker.patch.object(QDialog, 'exec', return_value=QDialog.DialogCode.Accepted)
+
+        # Mock QMessageBox static methods to prevent blocking
+        mocker.patch.object(QMessageBox, 'information', return_value=QMessageBox.StandardButton.Ok)
+        mocker.patch.object(QMessageBox, 'warning', return_value=QMessageBox.StandardButton.Ok)
+        mocker.patch.object(QMessageBox, 'critical', return_value=QMessageBox.StandardButton.Ok)
 
         # Set ROM data
         extraction_manager = ExtractionManager()

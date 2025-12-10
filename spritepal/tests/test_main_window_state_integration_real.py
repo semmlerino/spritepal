@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from PySide6.QtCore import Qt
@@ -309,7 +310,8 @@ class TestRealMainWindowStateIntegration:
             assert "create_metadata" in params, "Should have metadata parameter"
             assert params["create_metadata"] is False, "Should have real metadata checkbox state"
 
-    def test_real_error_state_recovery_vs_mocked_error_handling(self):
+    @patch("ui.main_window.UserErrorDialog.show_error")
+    def test_real_error_state_recovery_vs_mocked_error_handling(self, mock_show_error):
         """
         Test real error state recovery vs mocked error simulation.
 
@@ -317,13 +319,14 @@ class TestRealMainWindowStateIntegration:
         - Real Qt widget state during error conditions
         - Error message propagation through real status bar
         - Widget enable/disable state recovery
-        - Real error dialog integration
+        - Real error dialog integration (mocked to prevent blocking in headless mode)
         """
         with qt_widget_test(MainWindow) as main_window:
             # Set up initial state
             QTest.keyClicks(main_window.output_name_edit, "error_test_sprites")
 
             # Simulate extraction error (using real method vs mock method)
+            # Note: Error dialog is mocked to prevent blocking in headless mode
             error_message = "Real test error - file not found"
             main_window.extraction_failed(error_message)
 
@@ -571,7 +574,7 @@ class TestBugDiscoveryRealVsMocked:
                 "REAL BUG: Editor button state should change after extraction"
 
             # Test new extraction resets state properly
-            main_window._new_extraction()
+            main_window.new_extraction()
 
             reset_editor_enabled = main_window.open_editor_button.isEnabled()
             assert reset_editor_enabled == initial_editor_enabled, \

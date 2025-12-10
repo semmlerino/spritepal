@@ -58,8 +58,8 @@ class TestROMInjectionSettingsPersistence:
         # Create a mock session manager with temporary file storage
         real_session_manager = SessionManager(settings_path=Path(temp_settings_file))
 
-        # Override get_session_manager to return our mock
-        with patch("utils.settings_manager.get_session_manager", return_value=real_session_manager):
+        # Override get_session_manager to return our mock (patched at import location in SettingsManager)
+        with patch("core.managers.get_session_manager", return_value=real_session_manager):
             manager = SettingsManager()
 
             # Add _settings property for test compatibility
@@ -89,6 +89,7 @@ class TestROMInjectionSettingsPersistence:
         dialog.input_rom_edit = Mock()
         dialog.output_rom_edit = Mock()
         dialog.sprite_location_combo = Mock()
+        dialog.sprite_location_combo.count.return_value = 0  # No items in combo box
         dialog.rom_offset_hex_edit = Mock()
         dialog.fast_compression_check = Mock()
         dialog.input_vram_edit = Mock()
@@ -231,7 +232,7 @@ class TestROMInjectionSettingsPersistence:
         # Create a real injection manager that uses our test settings_manager
         injection_manager = InjectionManager()
         with (
-            patch("os.path.exists", return_value=True),
+            patch("pathlib.Path.exists", return_value=True),  # Path().exists() not os.path.exists
             patch.object(
                 injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
             ),

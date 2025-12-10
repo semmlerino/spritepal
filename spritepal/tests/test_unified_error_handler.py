@@ -282,7 +282,7 @@ class TestErrorHandlerIntegration:
     def test_backward_compatibility(self, error_handler):
         """Test that new error handler maintains backward compatibility"""
         # Should work with existing ErrorHandler interface
-        assert hasattr(error_handler, "_base_error_handler")
+        assert hasattr(error_handler, "_error_display")
 
         # Should have required methods
         assert hasattr(error_handler, "handle_exception")

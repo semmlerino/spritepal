@@ -175,7 +175,12 @@ class PreviewOrchestrator(QObject):
         self._metrics = PreviewMetrics()
         self._metrics_timer = QTimer(self)
         self._metrics_timer.timeout.connect(self._emit_metrics)
-        self._metrics_timer.start(5000)  # Emit metrics every 5 seconds
+        # Only start timer if we're in a thread with event loop (Qt main thread)
+        # Timers can only be used with threads started with QThread
+        try:
+            self._metrics_timer.start(5000)  # Emit metrics every 5 seconds
+        except RuntimeError:
+            logger.debug("Metrics timer not started - not in Qt thread context")
 
         # Request processing
         self._process_timer = QTimer(self)
@@ -217,8 +222,9 @@ class PreviewOrchestrator(QObject):
             # Check if we have this in L1 cache (last preview)
             if self._last_preview and self._last_preview.offset == offset:
                 logger.debug(f"L1 cache hit for offset {offset:#x}")
+                self._metrics.total_requests += 1
                 self._metrics.cache_hits += 1
-                self._deliver_preview(request.request_id, self._last_preview)
+                self._deliver_preview(request.request_id, self._last_preview, callback)
                 return request.request_id
 
             # Check L2 cache (memory)
@@ -226,14 +232,15 @@ class PreviewOrchestrator(QObject):
                 cache_key = self._generate_cache_key(rom_path, offset)
                 if cached := self._memory_cache.get(cache_key):
                     logger.debug(f"L2 cache hit for offset {offset:#x}")
+                    self._metrics.total_requests += 1
                     self._metrics.cache_hits += 1
-                    self._deliver_preview(request.request_id, cached)
+                    self._deliver_preview(request.request_id, cached, callback)
                     return request.request_id
 
             # Add to queue for async processing
             logger.debug(f"Queuing request {request.request_id} for offset {offset:#x}")
-            self._metrics.cache_misses += 1
             self._metrics.total_requests += 1
+            self._metrics.cache_misses += 1
 
             self._active_requests[request.request_id] = request
             self._request_queue.put(request)
@@ -343,7 +350,12 @@ class PreviewOrchestrator(QObject):
         else:
             logger.error("generate_preview method not found on worker pool")
 
-    def _deliver_preview(self, request_id: str, preview_data: PreviewData) -> None:
+    def _deliver_preview(
+        self,
+        request_id: str,
+        preview_data: PreviewData,
+        callback: Callable[[PreviewData], None] | None = None
+    ) -> None:
         """Deliver preview to requestor"""
         # Update L1 cache
         self._last_preview = preview_data
@@ -359,8 +371,10 @@ class PreviewOrchestrator(QObject):
         # Emit signal
         self.preview_ready.emit(request_id, preview_data)
 
-        # Call callback if provided
-        if request := self._active_requests.get(request_id):
+        # Call callback if provided - check parameter first, then active_requests
+        if callback:
+            callback(preview_data)
+        elif request := self._active_requests.get(request_id):
             if request.callback:
                 request.callback(preview_data)
 

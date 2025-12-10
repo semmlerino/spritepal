@@ -1,0 +1,29 @@
+{
+  "session": {
+    "last_rom_path": "",
+    "last_vram_path": "",
+    "last_output_dir": "",
+    "recent_files": []
+  },
+  "ui": {
+    "window_width": 1200,
+    "window_height": 800,
+    "window_x": null,
+    "window_y": null,
+    "restore_position": true,
+    "theme": "default"
+  },
+  "cache": {
+    "enabled": true,
+    "max_size_mb": 500,
+    "expiration_days": 30,
+    "auto_cleanup": true,
+    "show_indicators": true
+  },
+  "paths": {
+    "default_dumps_dir": "/home/gabrielh/Documents/Mesen2/Debugger",
+    "last_export_dir": "",
+    "last_import_dir": ""
+  },
+  "workflow": {
+    "current_injection_dialog": 

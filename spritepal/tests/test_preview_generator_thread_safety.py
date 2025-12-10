@@ -33,7 +33,7 @@ pytestmark = [
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.preview_generator import (
+from core.services.preview_generator import (
     PreviewGenerator,
     PreviewRequest,
     PreviewResult,

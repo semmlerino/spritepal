@@ -63,11 +63,13 @@ class InjectionManager(BaseManager):
     def cleanup(self) -> None:
         """Cleanup injection resources"""
         if self._current_worker:
-            from ui.common import WorkerManager  # Local import to avoid circular dependency
+            from core.services.worker_lifecycle import WorkerManager
 
             self._logger.info("Stopping active injection worker")
             WorkerManager.cleanup_worker(self._current_worker, timeout=5000)
         self._current_worker = None
+        # Mark injection operation as finished so new injections can start
+        self._finish_operation("injection")
 
     def reset_state(self, full_reset: bool = False) -> None:
         """Reset internal state for test isolation.
@@ -82,7 +84,7 @@ class InjectionManager(BaseManager):
         """
         # Stop any active worker
         if self._current_worker:
-            from ui.common import WorkerManager  # Local import to avoid circular dependency
+            from core.services.worker_lifecycle import WorkerManager
 
             self._logger.debug("Stopping active worker during reset_state")
             WorkerManager.cleanup_worker(self._current_worker, timeout=1000)
@@ -128,7 +130,7 @@ class InjectionManager(BaseManager):
 
         try:
             # Local imports to avoid circular dependency
-            from ui.common import WorkerManager
+            from core.services.worker_lifecycle import WorkerManager
             from ui.workers.injection_worker import InjectionWorker
             from ui.workers.rom_injection_worker import ROMInjectionWorker
 
@@ -681,30 +683,32 @@ class InjectionManager(BaseManager):
             input_rom_path: Input ROM file path
 
         Returns:
-            Suggested output path
+            Suggested output path (in same directory as input)
         """
-        base = Path(input_rom_path).stem
-        ext = Path(input_rom_path).suffix
+        input_path = Path(input_rom_path)
+        parent = input_path.parent
+        base = input_path.stem
+        ext = input_path.suffix
 
         # Check if base already ends with "_modified" to avoid duplication
         base = base.removesuffix("_modified")  # Remove "_modified"
 
         # Try _modified first
-        suggested_path = f"{base}_modified{ext}"
-        if not Path(suggested_path).exists():
-            return suggested_path
+        suggested_path = parent / f"{base}_modified{ext}"
+        if not suggested_path.exists():
+            return str(suggested_path)
 
         # If _modified exists, try _modified2, _modified3, etc.
         counter = 2
         while counter <= 10:  # Reasonable limit
-            suggested_path = f"{base}_modified{counter}{ext}"
-            if not Path(suggested_path).exists():
-                return suggested_path
+            suggested_path = parent / f"{base}_modified{counter}{ext}"
+            if not suggested_path.exists():
+                return str(suggested_path)
             counter += 1
 
         # If all numbered versions exist, just use the base with timestamp
         timestamp = int(time.time())
-        return f"{base}_modified_{timestamp}{ext}"
+        return str(parent / f"{base}_modified_{timestamp}{ext}")
 
     def convert_vram_to_rom_offset(self, vram_offset_str: str | int) -> int | None:
         """

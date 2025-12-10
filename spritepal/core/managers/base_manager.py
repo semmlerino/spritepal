@@ -196,7 +196,7 @@ class BaseManager(QObject):
         Raises:
             ValidationError: If required parameters are missing
         """
-        missing = [key for key in required if key not in params or not params[key]]
+        missing = [key for key in required if key not in params or params[key] is None]
         if missing:
             raise ValidationError(f"Missing required parameters: {', '.join(missing)}")
 

@@ -6,11 +6,11 @@ This document explains the test markers used in SpritePal's test suite and when 
 
 | Need | Markers | Command |
 |------|---------|---------|
-| Fast tests | `headless`, `unit`, `no_qt` | `pytest -m "headless and not slow"` |
-| GUI tests | `gui`, `requires_display` | `pytest -m gui --xvfb` |
-| CI tests | `ci_safe`, `headless` | `pytest -m ci_safe` |
-| Skip managers | `no_manager_setup` | `pytest -m no_manager_setup` |
-| Parallel safe | `parallel_safe` | `pytest -m parallel_safe -n auto` |
+| Fast tests | `headless`, `unit`, `no_qt` | `QT_QPA_PLATFORM=offscreen pytest -m "headless and not slow"` |
+| GUI tests | `gui`, `requires_display` | `QT_QPA_PLATFORM=offscreen pytest -m gui` |
+| CI tests | `ci_safe`, `headless` | `QT_QPA_PLATFORM=offscreen pytest -m ci_safe` |
+| Skip managers | `no_manager_setup` | `QT_QPA_PLATFORM=offscreen pytest -m no_manager_setup` |
+| Parallel safe | `parallel_safe` | `QT_QPA_PLATFORM=offscreen pytest -m parallel_safe -n auto` |
 
 ## Marker Categories
 
@@ -27,7 +27,7 @@ These control WHERE and HOW tests run:
 
 **Examples:**
 ```python
-@pytest.mark.gui  # Needs display or xvfb
+@pytest.mark.gui  # Uses real Qt widgets (run with QT_QPA_PLATFORM=offscreen)
 def test_dialog_renders():
     dialog = MyDialog()
     dialog.show()
@@ -230,19 +230,19 @@ pytestmark = [
 
 ```bash
 # Fast tests only
-pytest -m "headless and not slow"
+QT_QPA_PLATFORM=offscreen pytest -m "headless and not slow"
 
-# GUI tests with xvfb
-pytest -m gui --xvfb
+# GUI tests with offscreen backend
+QT_QPA_PLATFORM=offscreen pytest -m gui
 
 # CI pipeline
-pytest -m ci_safe --tb=short
+QT_QPA_PLATFORM=offscreen pytest -m ci_safe --tb=short
 
 # Parallel execution
-pytest -m parallel_safe -n auto
+QT_QPA_PLATFORM=offscreen pytest -m parallel_safe -n auto
 
 # Skip slow tests
-pytest -m "not slow"
+QT_QPA_PLATFORM=offscreen pytest -m "not slow"
 
 # Unit tests only
 pytest -m unit

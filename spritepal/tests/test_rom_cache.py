@@ -15,7 +15,6 @@ from utils.rom_cache import ROMCache, get_rom_cache
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-
     pytest.mark.serial,
     pytest.mark.thread_safety,
     pytest.mark.cache,
@@ -28,6 +27,7 @@ pytestmark = [
     pytest.mark.signals_slots,
     pytest.mark.slow,
     pytest.mark.worker_threads,
+    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
 ]
 
 class TestROMCacheCore:
@@ -75,10 +75,10 @@ class TestROMCacheCore:
 
     def test_initialization_with_settings_manager(self, temp_cache_dir, mock_settings_manager) -> None:
         """Test cache initialization using settings manager."""
-        with patch("utils.rom_cache.get_settings_manager", return_value=mock_settings_manager):
-            cache = ROMCache()
-            assert cache.cache_dir == Path(temp_cache_dir)
-            assert cache.cache_enabled is True
+        # Pass settings_manager directly via constructor (DI pattern)
+        cache = ROMCache(settings_manager=mock_settings_manager)
+        assert cache.cache_dir == Path(temp_cache_dir)
+        assert cache.cache_enabled is True
 
     def test_initialization_disabled_cache(self, temp_cache_dir) -> None:
         """Test cache initialization when caching is disabled."""
@@ -86,9 +86,9 @@ class TestROMCacheCore:
             def get_cache_enabled(self) -> bool:
                 return False
 
-        with patch("utils.rom_cache.get_settings_manager", return_value=MockDisabledSettings()):
-            cache = ROMCache()
-            assert cache.cache_enabled is False
+        # Pass disabled settings directly via constructor (DI pattern)
+        cache = ROMCache(settings_manager=MockDisabledSettings(), cache_dir=temp_cache_dir)
+        assert cache.cache_enabled is False
 
     def test_rom_hash_generation(self, rom_cache, test_rom_file) -> None:
         """Test ROM hash generation for real files."""
@@ -569,22 +569,21 @@ class TestROMCacheCore:
 
     def test_cache_disabled_operations(self, temp_cache_dir) -> None:
         """Test operations when cache is disabled."""
-        # Create cache with disabled setting
+        # Create cache with disabled setting (DI pattern)
         class MockDisabledSettings:
             def get_cache_enabled(self) -> bool:
                 return False
 
-        with patch("utils.rom_cache.get_settings_manager", return_value=MockDisabledSettings()):
-            cache = ROMCache(cache_dir=temp_cache_dir)
+        cache = ROMCache(settings_manager=MockDisabledSettings(), cache_dir=temp_cache_dir)
 
-            # All operations should return False/None
-            assert cache.save_sprite_locations("/test.rom", {}) is False
-            assert cache.get_sprite_locations("/test.rom") is None
-            assert cache.save_partial_scan_results("/test.rom", {}, [], 0) is False
-            assert cache.get_partial_scan_results("/test.rom", {}) is None
-            assert cache.save_rom_info("/test.rom", {}) is False
-            assert cache.get_rom_info("/test.rom") is None
-            assert cache.clear_cache() == 0
+        # All operations should return False/None
+        assert cache.save_sprite_locations("/test.rom", {}) is False
+        assert cache.get_sprite_locations("/test.rom") is None
+        assert cache.save_partial_scan_results("/test.rom", {}, [], 0) is False
+        assert cache.get_partial_scan_results("/test.rom", {}) is None
+        assert cache.save_rom_info("/test.rom", {}) is False
+        assert cache.get_rom_info("/test.rom") is None
+        assert cache.clear_cache() == 0
 
     def test_refresh_settings(self, rom_cache) -> None:
         """Test refreshing cache settings."""

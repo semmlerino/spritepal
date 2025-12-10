@@ -14,7 +14,7 @@ from PIL import Image
 from PySide6.QtGui import QPixmap
 
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
-from utils.preview_generator import (
+from core.services.preview_generator import (
     # Test characteristics: Timer usage
     LRUCache,
     PaletteData,
@@ -284,7 +284,7 @@ class TestPreviewGenerator:
 
     def test_vram_preview_generation(self, generator, preview_mock_extraction_manager):
         """Test VRAM preview generation."""
-        with patch("utils.preview_generator.pil_to_qpixmap") as mock_pil_to_qpixmap:
+        with patch("core.services.preview_generator.pil_to_qpixmap") as mock_pil_to_qpixmap:
             # Setup mocks
             mock_pixmap = Mock(spec=QPixmap)
             mock_pixmap.size.return_value.width.return_value = 128
@@ -310,7 +310,7 @@ class TestPreviewGenerator:
 
     def test_preview_caching(self, generator, preview_mock_extraction_manager):
         """Test that previews are cached correctly."""
-        with patch("utils.preview_generator.pil_to_qpixmap") as mock_pil_to_qpixmap:
+        with patch("core.services.preview_generator.pil_to_qpixmap") as mock_pil_to_qpixmap:
             mock_pixmap = Mock(spec=QPixmap)
             mock_pixmap.size.return_value.width.return_value = 128
             mock_pixmap.size.return_value.height.return_value = 128
@@ -374,7 +374,7 @@ class TestPreviewGenerator:
 
     def test_async_preview_generation(self, generator, qtbot, preview_mock_extraction_manager):
         """Test asynchronous preview generation."""
-        with patch("utils.preview_generator.pil_to_qpixmap") as mock_pil_to_qpixmap:
+        with patch("core.services.preview_generator.pil_to_qpixmap") as mock_pil_to_qpixmap:
             mock_pixmap = Mock(spec=QPixmap)
             mock_pixmap.size.return_value.width.return_value = 128
             mock_pixmap.size.return_value.height.return_value = 128
@@ -394,7 +394,7 @@ class TestPreviewGenerator:
 
     def test_debounced_requests(self, generator, qtbot, preview_mock_extraction_manager):
         """Test that rapid requests are properly debounced."""
-        with patch("utils.preview_generator.pil_to_qpixmap") as mock_pil_to_qpixmap:
+        with patch("core.services.preview_generator.pil_to_qpixmap") as mock_pil_to_qpixmap:
             mock_pixmap = Mock(spec=QPixmap)
             mock_pixmap.size.return_value.width.return_value = 128
             mock_pixmap.size.return_value.height.return_value = 128
@@ -502,7 +502,7 @@ def test_preview_generation_performance():
 
     request = create_vram_preview_request("/path/to/vram.bin", 0x8000)
 
-    with patch("utils.preview_generator.pil_to_qpixmap") as mock_convert:
+    with patch("core.services.preview_generator.pil_to_qpixmap") as mock_convert:
         mock_pixmap = Mock(spec=QPixmap)
         mock_pixmap.size.return_value.width.return_value = 128
         mock_pixmap.size.return_value.height.return_value = 128

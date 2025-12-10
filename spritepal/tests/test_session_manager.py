@@ -261,8 +261,11 @@ class TestSessionManager:
         assert blocker.args[0] == {"cgram_path": "/new/cgram.dmp"}
 
         # Setting same value shouldn't emit signal
-        with qtbot.assertNotEmitted(session_manager.session_changed):
-            session_manager.set("session", "cgram_path", "/new/cgram.dmp")
+        # Use QSignalSpy to count emissions instead of assertNotEmitted
+        from PySide6.QtTest import QSignalSpy
+        spy = QSignalSpy(session_manager.session_changed)
+        session_manager.set("session", "cgram_path", "/new/cgram.dmp")
+        assert spy.count() == 0, "Setting same value should not emit signal"
 
     def test_cleanup(self, session_manager):
         """Test cleanup saves dirty session"""

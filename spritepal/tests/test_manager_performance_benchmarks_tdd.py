@@ -25,6 +25,9 @@ from __future__ import annotations
 
 import pytest
 
+# Skip entire module if pytest-benchmark is not installed
+pytest.importorskip("pytest_benchmark")
+
 from core.managers import ValidationError
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components

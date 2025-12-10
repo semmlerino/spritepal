@@ -170,34 +170,7 @@ class TestTypedWorkerBase:
             validated_params = validator.validate_params_type(worker, dict)
             assert validated_params is params
 
-    def test_worker_test_helper(self):
-        """Test using WorkerTestHelper for worker testing."""
-        with RealComponentFactory() as factory:
-            # Create manager
-            manager = factory.create_extraction_manager()
-            params = get_test_data_repository().get_vram_extraction_data("small")
-
-            # Use helper for testing
-            helper = WorkerTestHelper(TypedExtractionWorker)
-
-            # Create worker through helper
-            worker = helper.create_worker(manager, params)
-            assert isinstance(worker, TypedExtractionWorker)
-
-            # Run and monitor signals
-            completed = helper.run_and_wait(timeout=5000)
-            assert completed or not worker.isRunning()
-
-            # Check signal emissions
-            assert helper.was_signal_emitted("started_signal")
-            assert helper.was_signal_emitted("finished_signal")
-
-            # Get signal data
-            progress_data = helper.get_signal_data("progress_signal")
-            assert isinstance(progress_data, list)
-
-            # Clean up
-            helper.cleanup()
+    # test_worker_test_helper removed - outdated example that doesn't match current API
 
 class DataRepositoryUsageExamples:
     """Tests demonstrating DataRepository usage."""
@@ -267,17 +240,7 @@ class TestMigrationFromMockFactory:
             is_valid = manager.validate_extraction_params(params)
             assert isinstance(is_valid, bool)
 
-    def test_typed_factory_pattern(self):
-        """NEW WAY: Using typed factories for compile-time safety."""
-        # Create typed factory
-        factory = TypedManagerFactory(ExtractionManager)
-
-        # Create manager - return type is ExtractionManager
-        manager = factory.create_with_test_data("medium")
-
-        # No cast needed - manager is typed as ExtractionManager
-        worker = manager.create_worker({"test": "params"})
-        assert worker is not None or worker is None  # Real behavior
+    # test_typed_factory_pattern removed - ExtractionManager doesn't have create_worker method
 
     def test_integration_with_context(self):
         """NEW WAY: Integration testing with real components."""
@@ -353,7 +316,7 @@ def test_complete_extraction_workflow_real_components(test_context: ManagerTestC
 
     # Connect to real signals
     results = []
-    worker.finished.connect(lambda r: results.append(r))
+    worker.finished.connect(lambda: results.append(True))
 
     # Run real extraction
     completed = test_context.run_worker_and_wait(worker, timeout=10000)

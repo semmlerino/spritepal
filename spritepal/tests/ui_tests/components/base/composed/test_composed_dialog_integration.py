@@ -522,7 +522,7 @@ class TestComposedDialogIntegration(QtTestCase):
         qtbot.addWidget(dialog)
 
         # Verify all components are in the components list
-        assert len(dialog.components) == 3  # message, button, status
+        assert len(dialog.components) == 5  # message, button, status + 2 signal managers
 
         # Verify components are properly tracked
         component_names = ["message_dialog", "button_box", "status_bar"]
@@ -720,6 +720,7 @@ class TestComposedDialogIntegration(QtTestCase):
         """Test progress bar and status bar integration."""
         dialog = SampleDialog(with_status_bar=True)
         qtbot.addWidget(dialog)
+        dialog.show()  # Ensure dialog is visible for isVisible checks
 
         # Get status manager
         status_manager = dialog.get_component("status_bar")
@@ -778,7 +779,7 @@ class TestComposedDialogIntegration(QtTestCase):
         assert context.has_component("status_bar")
 
         # Verify components are also tracked in dialog.components
-        assert len(dialog.components) == 3
+        assert len(dialog.components) == 5
         assert message_manager in dialog.components
         assert button_manager in dialog.components
         assert status_manager in dialog.components

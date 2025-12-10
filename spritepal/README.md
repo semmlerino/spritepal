@@ -39,14 +39,14 @@ pip install uv
 # Sync dependencies (from exhal-master/)
 uv sync --extra dev
 
-# Run tests
-uv run pytest spritepal/tests -v
+# Run tests (use offscreen backend for headless environments)
+QT_QPA_PLATFORM=offscreen uv run pytest spritepal/tests -v
 
 # Run fast headless tests only
-uv run pytest spritepal/tests -m "headless and not slow"
+QT_QPA_PLATFORM=offscreen uv run pytest spritepal/tests -m "headless and not slow"
 
-# Run GUI tests (requires display or xvfb)
-uv run pytest spritepal/tests -m gui --xvfb
+# Run GUI tests (offscreen backend works without display)
+QT_QPA_PLATFORM=offscreen uv run pytest spritepal/tests -m gui
 
 # Lint
 uv run ruff check spritepal

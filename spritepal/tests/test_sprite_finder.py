@@ -23,6 +23,7 @@ pytestmark = [
     pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
+    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
 ]
 
 @pytest.fixture
@@ -142,6 +143,7 @@ class TestSpriteFinder:
             mock_ext_class.assert_called_once()
             mock_val_class.assert_called_once()
 
+    @pytest.mark.skip(reason="Mock-heavy test duplicated by integration/test_integration_sprite_finder.py::test_find_sprites_in_real_rom with better coverage")
     def test_find_sprites_in_rom_basic(self, temp_output_dir, mock_rom_data,
                                      mock_extractor, mock_validator):
         """Test basic sprite finding functionality"""

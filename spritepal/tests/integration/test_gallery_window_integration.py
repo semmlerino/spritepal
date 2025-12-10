@@ -24,6 +24,9 @@ from tests.infrastructure.qt_real_testing import (
 )
 from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
+# Initialize DI container for all tests
+pytestmark = pytest.mark.usefixtures("session_managers")
+
 # Module-level constants for reuse
 SIGNALS_TO_DISCONNECT = [
     ('sprite_found', 'on_sprite_found'),

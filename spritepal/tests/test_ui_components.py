@@ -282,26 +282,26 @@ class TestStatusPanel:
         # Test the actual progress bar state directly
         assert panel.scan_progress.minimum() == 0
         assert panel.scan_progress.maximum() == 100
-        assert panel.scan_progress == 0  # setValue(minimum) in show_progress
+        assert panel.scan_progress.value() == 0  # setValue(minimum) in show_progress
 
         # Test update_progress method - should work since show_progress makes it visible
         # and the parent hierarchy is shown
         panel.update_progress(50)
-        assert panel.scan_progress == 50
+        assert panel.scan_progress.value() == 50
 
         # Test hide functionality
         panel.hide_progress()
         # Progress bar should still have the value even when hidden
-        assert panel.scan_progress == 50
+        assert panel.scan_progress.value() == 50
 
         # Test update_progress when progress bar is hidden (should not update)
         panel.update_progress(25)  # Should not change value since bar is hidden
-        assert panel.scan_progress == 50  # Should still be 50
+        assert panel.scan_progress.value() == 50  # Should still be 50
 
         # Show again and test update works
         panel.show_progress(0, 100)
         panel.update_progress(75)
-        assert panel.scan_progress == 75
+        assert panel.scan_progress.value() == 75
 
         # Test progress bar methods exist
         assert hasattr(panel, "show_progress")

@@ -202,10 +202,12 @@ class TestLRUCacheThreadSafety:
             # Each thread has its own access pattern
             for round in range(5):
                 for i in range(20):
-                    key = (pattern_id, i)
                     if i < 10:
+                        key = (pattern_id, i)
                         cache.put(key, mock_qimage)
                     else:
+                        # Get keys that were previously put (0-9)
+                        key = (pattern_id, i % 10)
                         cache.get(key)
 
         # Run concurrent access patterns
@@ -413,6 +415,23 @@ class TestWorkerControllerThreadSafety:
 class TestRaceConditionPrevention:
     """Test prevention of specific race conditions."""
 
+    @pytest.fixture
+    def mock_worker_dependencies(self):
+        """Mock worker dependencies."""
+        with patch('ui.workers.batch_thumbnail_worker.ROMExtractor') as mock_extractor:
+            with patch('ui.workers.batch_thumbnail_worker.TileRenderer') as mock_renderer:
+                mock_renderer_instance = Mock()
+                mock_renderer_instance.render_tiles.return_value = Mock()
+                mock_renderer.return_value = mock_renderer_instance
+
+                mock_extractor_instance = Mock()
+                mock_extractor.return_value = mock_extractor_instance
+
+                yield {
+                    'extractor': mock_extractor_instance,
+                    'renderer': mock_renderer_instance
+                }
+
     def test_cache_clear_during_access_race(self, mock_qimage):
         """Test cache.clear() during concurrent get/put doesn't crash."""
         cache = LRUCache(maxsize=100)
@@ -489,6 +508,23 @@ class TestRaceConditionPrevention:
 
 class TestDeadlockPrevention:
     """Test prevention of deadlock scenarios."""
+
+    @pytest.fixture
+    def mock_worker_dependencies(self):
+        """Mock worker dependencies."""
+        with patch('ui.workers.batch_thumbnail_worker.ROMExtractor') as mock_extractor:
+            with patch('ui.workers.batch_thumbnail_worker.TileRenderer') as mock_renderer:
+                mock_renderer_instance = Mock()
+                mock_renderer_instance.render_tiles.return_value = Mock()
+                mock_renderer.return_value = mock_renderer_instance
+
+                mock_extractor_instance = Mock()
+                mock_extractor.return_value = mock_extractor_instance
+
+                yield {
+                    'extractor': mock_extractor_instance,
+                    'renderer': mock_renderer_instance
+                }
 
     def test_no_deadlock_in_nested_mutex_operations(self, mock_qimage):
         """Test nested mutex operations don't cause deadlock."""

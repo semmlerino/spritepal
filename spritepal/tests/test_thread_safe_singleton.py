@@ -392,6 +392,7 @@ class TestManualOffsetDialogSingletonIntegration:
             # Should be a controlled error, not a crash
             assert "thread" in result_value.lower()
 
+@pytest.mark.usefixtures("class_managers")
 class TestSettingsManagerSingletonIntegration:
     """Integration tests for the fixed SettingsManagerSingleton."""
 

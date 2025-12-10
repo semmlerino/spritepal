@@ -25,6 +25,11 @@ from tests.infrastructure.qt_real_testing import (
 )
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
+# Required for DI container setup
+pytestmark = [
+    pytest.mark.usefixtures("session_managers"),
+]
+
 
 @pytest.fixture
 def complete_test_rom(tmp_path) -> str:

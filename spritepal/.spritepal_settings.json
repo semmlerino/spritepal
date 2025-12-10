@@ -6,11 +6,6 @@
     "output_name": "",
     "create_grayscale": true,
     "create_metadata": true,
-    "extraction_mode": 0,
-    "last_rom_path": "",
-    "last_vram_path": "",
-    "last_output_dir": "",
-    "recent_files": [],
     "data": {
       "vram_path": "",
       "cgram_path": "",
@@ -19,18 +14,38 @@
       "output_name": "",
       "create_grayscale": true,
       "create_metadata": true
-    }
+    },
+    "auto_save": true,
+    "last_export_dir": "/tmp/pytest-of-gabrielh/pytest-65/test_auto_save_session_functio0/spritepal_test/exports",
+    "recent_files": [
+      "/tmp/pytest-of-gabrielh/pytest-65/test_auto_save_session_functio0/spritepal_test/file1.dmp",
+      "/tmp/pytest-of-gabrielh/pytest-65/test_auto_save_session_functio0/spritepal_test/file2.dmp"
+    ],
+    "last_rom": "/path/to/rom.sfc",
+    "last_rom_path": "",
+    "last_vram_path": "",
+    "last_output_dir": "",
+    "extraction_mode": 0,
+    "last_extraction_offset": 49152,
+    "last_tile_count": 64,
+    "recent_vram_files": [
+      "/path/to/new_file.dmp",
+      "/path/to/file0.dmp",
+      "/path/to/file1.dmp",
+      "/path/to/file2.dmp",
+      "/path/to/file3.dmp"
+    ]
   },
   "ui": {
-    "window_width": 1707,
-    "window_height": 996,
+    "window_width": 1000,
+    "window_height": 650,
     "window_x": 0,
-    "window_y": -7,
-    "restore_position": true,
-    "theme": "default"
+    "window_y": 0,
+    "restore_position": false,
+    "theme": "dark"
   },
   "paths": {
-    "last_used_dir": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\roms",
+    "last_used_dir": "/tmp/spritepal_integration_0xy_9obl",
     "default_dumps_dir": "C:\\Users\\gabri\\Documents\\Mesen2\\Debugger",
     "last_export_dir": "",
     "last_import_dir": ""
@@ -43,7 +58,7 @@
     "adapter_key": "adapter_value"
   },
   "rom_injection": {
-    "last_input_rom": "C:/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/roms/Kirby Super Star (U) [!].smc",
+    "last_input_rom": "/tmp/spritepal_integration_0xy_9obl/test_rom.sfc",
     "last_sprite_location": "Kirby Sprite (0x123456)",
     "last_custom_offset": "0x123456",
     "fast_compression": true,
@@ -56,7 +71,8 @@
     "compression_level": 6,
     "palette_format": "rgb888",
     "include_unused_palettes": false,
-    "tile_width": 256
+    "tile_width": 256,
+    "default_format": "indexed_png"
   },
   "appearance": {
     "color_scheme": {
@@ -70,8 +86,8 @@
   },
   "cache": {
     "enabled": true,
-    "location": "/tmp/pytest-of-gabrielh/pytest-21/test_cache_location_change_dur0/cache/cache2",
-    "max_size_mb": 500,
+    "location": "/tmp/pytest-of-gabrielh/pytest-65/test_cache_directory_change_pe0/spritepal_test/new_cache",
+    "max_size_mb": 100,
     "expiration_days": 30,
     "auto_cleanup": true,
     "show_indicators": true

@@ -182,15 +182,34 @@ def mock_hal(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
             ...
 
     For tests that need real HAL, simply don't request this fixture.
+
+    IMPORTANT: This fixture patches HALCompressor at ALL import locations,
+    not just the source module. Python's `from X import Y` creates a new
+    binding in the importing module, so we must patch each location.
     """
+    # Reset any existing real HAL singletons FIRST (before patching)
+    with contextlib.suppress(Exception):
+        from core.hal_compression import HALProcessPool as RealHALProcessPool
+        RealHALProcessPool.reset_singleton()
+
+    # Patch at source module
     monkeypatch.setattr("core.hal_compression.HALProcessPool", MockHALProcessPool)
     monkeypatch.setattr("core.hal_compression.HALCompressor", MockHALCompressor)
+
+    # Patch at ALL import locations in production code
+    # (Python's `from X import Y` creates local bindings that need separate patches)
+    monkeypatch.setattr("core.rom_extractor.HALCompressor", MockHALCompressor)
+    monkeypatch.setattr("core.rom_injector.HALCompressor", MockHALCompressor)
 
     yield
 
     # Cleanup singletons after test
     with contextlib.suppress(Exception):
         MockHALProcessPool.reset_singleton()
+    # Also reset real HAL singletons in case they were created
+    with contextlib.suppress(Exception):
+        from core.hal_compression import HALProcessPool as RealHALProcessPool
+        RealHALProcessPool.reset_singleton()
 
 
 @pytest.fixture

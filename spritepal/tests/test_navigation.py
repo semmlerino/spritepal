@@ -8,6 +8,7 @@ pytestmark = [
     pytest.mark.gui,
     pytest.mark.requires_display,
     pytest.mark.rom_data,
+    pytest.mark.skip(reason="Manual test script - requires dialog fixture setup"),
 ]
 #!/usr/bin/env python3
 """

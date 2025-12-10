@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mushroom Candidate Sprites</title>
+    <style>
+        body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #4CAF50; }
+        .sprite-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .sprite-card { background: #2a2a2a; border: 1px solid #444; padding: 15px; border-radius: 8px; }
+        .sprite-card img { width: 100%; height: 256px; object-fit: contain; background: #000; 
+                           image-rendering: pixelated; border: 1px solid #555; }
+        .sprite-name { color: #4CAF50; font-weight: bold; margin-bottom: 10px; }
+        .note { background: #333; padding: 10px; margin: 20px 0; border-left: 3px solid #4CAF50; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍄 Mushroom Enemy Sprite Candidates</h1>
+        <div class="note">
+            These sprites were extracted from compressed data found immediately before 
+            the highest concentration of mushroom enemy placements (296 mushrooms in region $0F0000).<br>
+            Small sprites (0x100-0x200 bytes) are most likely to be the mushroom enemy.
+        </div>
+        <div class="sprite-grid">
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_1</div>
+                <img src="small_sprite_1.png" alt="small_sprite_1">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_2</div>
+                <img src="small_sprite_2.png" alt="small_sprite_2">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_3</div>
+                <img src="small_sprite_3.png" alt="small_sprite_3">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_4</div>
+                <img src="small_sprite_4.png" alt="small_sprite_4">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_5</div>
+                <img src="small_sprite_5.png" alt="small_sprite_5">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_6</div>
+                <img src="small_sprite_6.png" alt="small_sprite_6">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_7</div>
+                <img src="small_sprite_7.png" alt="small_sprite_7">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_8</div>
+                <img src="small_sprite_8.png" alt="small_sprite_8">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_9</div>
+                <img src="small_sprite_9.png" alt="small_sprite_9">
+            </div>
+            <div class="sprite-card">
+                <div class="sprite-name">small_sprite_10</div>
+                <img src="small_sprite_10.png" alt="small_sprite_10">
+            </div>
+        </div>
+    </div>
+</body>
+</html>

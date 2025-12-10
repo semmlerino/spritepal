@@ -20,6 +20,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.no_qt,
     pytest.mark.rom_data,
+    pytest.mark.usefixtures("mock_hal"),  # HAL mocking
 ]
 
 class TestPNGRoundTrip:

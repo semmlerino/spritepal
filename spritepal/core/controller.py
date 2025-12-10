@@ -31,7 +31,6 @@ from core.managers import (
     get_session_manager,
 )
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
-from ui.common import WorkerManager
 from ui.common.error_handler import get_error_handler
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
@@ -44,7 +43,7 @@ from utils.constants import (
 from utils.file_validator import FileValidator
 from utils.image_utils import pil_to_qpixmap
 from utils.logging_config import get_logger
-from utils.preview_generator import create_vram_preview_request, get_preview_generator
+from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 
 # from utils.settings_manager import get_settings_manager # Removed due to DI
 
@@ -136,6 +135,9 @@ class ExtractionController(QObject):
         self.worker: VRAMExtractionWorker | None = None
         self.rom_worker: ROMExtractionWorker | None = None
 
+        # Store current injection dialog reference (not in session - not serializable)
+        self._current_injection_dialog: InjectionDialog | None = None
+
         # Initialize error handler with fallback to console handler
         try:
             # Check if main_window is a QWidget for error handler compatibility
@@ -193,8 +195,14 @@ class ExtractionController(QObject):
         try:
             # TypedDict is compatible with dict[str, Any] for validation
             self.extraction_manager.validate_extraction_params(params)
-        except Exception as e:
+        except (ValueError, TypeError) as e:
+            # Expected validation errors - show to user
             self.main_window.extraction_failed(str(e))
+            return
+        except Exception as e:
+            # Unexpected errors - log full traceback and show generic message
+            logger.exception("Unexpected error during extraction parameter validation")
+            self.main_window.extraction_failed(f"Validation error: {e}")
             return
 
         # DEFENSIVE VALIDATION: Only validate files that exist to prevent blocking I/O
@@ -300,6 +308,8 @@ class ExtractionController(QObject):
 
     def _cleanup_worker(self) -> None:
         """Safely cleanup worker thread"""
+        from core.services.worker_lifecycle import WorkerManager
+
         WorkerManager.cleanup_worker(self.worker, timeout=3000)
         self.worker = None
 
@@ -430,10 +440,13 @@ class ExtractionController(QObject):
                 self.main_window.status_bar.showMessage(
                     f"Opened {sprite_file_abs.name} in pixel editor"
                 )
+            except (OSError, subprocess.SubprocessError) as e:
+                # Expected subprocess errors (file not found, permission denied, etc.)
+                self.main_window.status_bar.showMessage(f"Failed to open pixel editor: {e}")
             except Exception as e:
-                self.main_window.status_bar.showMessage(
-                    f"Failed to open pixel editor: {e}"
-                )
+                # Unexpected errors - log for debugging
+                logger.exception("Unexpected error launching pixel editor")
+                self.main_window.status_bar.showMessage(f"Failed to open pixel editor: {e}")
         else:
             self.main_window.status_bar.showMessage("Pixel editor not found")
 
@@ -554,6 +567,8 @@ class ExtractionController(QObject):
                 if calculated_tiles_per_row > 0:
                     return min(calculated_tiles_per_row, DEFAULT_TILES_PER_ROW)
         except Exception:
+            # Intentionally silent: this is a best-effort calculation with a guaranteed fallback.
+            # Any error (file not found, invalid image, etc.) just means we use the default.
             pass
 
         # Ultimate fallback
@@ -594,8 +609,8 @@ class ExtractionController(QObject):
         if dialog.exec():
             params = dialog.get_parameters()
             if params:
-                # Store dialog and parameters in session for saving on success
-                self.session_manager.set("workflow", "current_injection_dialog", dialog)
+                # Store dialog reference for saving on success (instance attr, not session - not serializable)
+                self._current_injection_dialog = dialog
                 self.session_manager.set("workflow", "current_injection_params", params)
 
                 # Start injection using manager
@@ -614,18 +629,17 @@ class ExtractionController(QObject):
 
             # Save injection parameters for future use if it was a ROM injection
             current_injection_params = self.session_manager.get("workflow", "current_injection_params")
-            current_injection_dialog = self.session_manager.get("workflow", "current_injection_dialog")
 
             if (
                 current_injection_params
                 and current_injection_params.get("mode") == "rom"
-                and current_injection_dialog
+                and self._current_injection_dialog
                 and hasattr(
-                    current_injection_dialog, "save_rom_injection_parameters"
+                    self._current_injection_dialog, "save_rom_injection_parameters"
                 )
             ):
                 try:
-                    current_injection_dialog.save_rom_injection_parameters()
+                    self._current_injection_dialog.save_rom_injection_parameters()
                 except Exception as e:
                     # Don't fail the injection if saving parameters fails
                     logger.warning(f"Could not save ROM injection parameters: {e}")
@@ -633,7 +647,7 @@ class ExtractionController(QObject):
             self.main_window.status_bar.showMessage(f"Injection failed: {message}")
 
         # Clean up
-        self.session_manager.set("workflow", "current_injection_dialog", None)
+        self._current_injection_dialog = None
         self.session_manager.set("workflow", "current_injection_params", None)
 
     def _on_cache_operation_started(self, operation: str, cache_type: str) -> None:
@@ -720,6 +734,8 @@ class ExtractionController(QObject):
 
     def _cleanup_rom_worker(self) -> None:
         """Safely cleanup ROM worker thread"""
+        from core.services.worker_lifecycle import WorkerManager
+
         WorkerManager.cleanup_worker(self.rom_worker, timeout=3000)
         self.rom_worker = None
 

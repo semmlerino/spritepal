@@ -24,15 +24,26 @@ class TestComposedDialogEssentialIntegration:
     def test_end_to_end_dialog_creation_workflow(self):
         """Test the complete end-to-end dialog creation workflow."""
 
+        # Setup layout mock with addWidget
+        mock_layout_instance = MagicMock()
+        mock_layout_instance.addWidget = MagicMock()
+        mock_layout_class = MagicMock(return_value=mock_layout_instance)
+
+        # Setup QDialogButtonBox mock
+        mock_button_box_class = MagicMock()
+        mock_button_box_class.StandardButton = MagicMock()
+        mock_button_box_class.StandardButton.Ok = 1
+        mock_button_box_class.StandardButton.Cancel = 2
+
         # Mock all Qt dependencies at the top level
         with patch.multiple(
             'ui.components.base.composed.composed_dialog',
             QDialog=MagicMock,
-            QVBoxLayout=MagicMock,
+            QVBoxLayout=mock_layout_class,
             QWidget=MagicMock
         ), patch.multiple(
             'ui.components.base.composed.button_box_manager',
-            QDialogButtonBox=MagicMock
+            QDialogButtonBox=mock_button_box_class
         ), patch.multiple(
             'ui.components.base.composed.status_bar_manager',
             QStatusBar=MagicMock
@@ -57,7 +68,7 @@ class TestComposedDialogEssentialIntegration:
             assert dialog.config['custom_option'] == "test_value"
 
             # VALIDATION 3: All expected components are created
-            assert len(dialog.components) == 3
+            assert len(dialog.components) == 5
             message_mgr = dialog.get_component("message_dialog")
             button_mgr = dialog.get_component("button_box")
             status_mgr = dialog.get_component("status_bar")
@@ -94,7 +105,7 @@ class TestComposedDialogEssentialIntegration:
                 dialog.closeEvent(mock_close_event)
 
                 # Verify cleanup was called on all components
-                assert len(cleanup_called) == 3
+                assert len(cleanup_called) == 5
                 mock_parent_close.assert_called_once_with(mock_close_event)
 
     def test_selective_component_creation_scenarios(self):
@@ -110,35 +121,50 @@ class TestComposedDialogEssentialIntegration:
             ({"with_button_box": True, "with_status_bar": True}, ["message_dialog", "button_box", "status_bar"])
         ]
 
+        # Setup layout mock with addWidget
+        mock_layout_instance = MagicMock()
+        mock_layout_instance.addWidget = MagicMock()
+        mock_layout_class = MagicMock(return_value=mock_layout_instance)
+
+        # Setup QDialogButtonBox mock
+        mock_button_box_class = MagicMock()
+        mock_button_box_class.StandardButton = MagicMock()
+        mock_button_box_class.StandardButton.Ok = 1
+        mock_button_box_class.StandardButton.Cancel = 2
+
         for config, expected_components in test_scenarios:
             with patch.multiple(
                 'ui.components.base.composed.composed_dialog',
                 QDialog=MagicMock,
-                QVBoxLayout=MagicMock,
+                QVBoxLayout=mock_layout_class,
                 QWidget=MagicMock
             ), patch.multiple(
                 'ui.components.base.composed.button_box_manager',
-                QDialogButtonBox=MagicMock
+                QDialogButtonBox=mock_button_box_class
             ), patch.multiple(
                 'ui.components.base.composed.status_bar_manager',
                 QStatusBar=MagicMock
             ):
                 dialog = ComposedDialog(**config)
 
+                # Add always-present components to expectation
+                full_expected_components = expected_components + ["dialog_signals", "qt_dialog_signals"]
+
                 # Verify expected components exist
-                for component_name in expected_components:
+                for component_name in full_expected_components:
                     component = dialog.get_component(component_name)
                     assert component is not None, f"Expected component '{component_name}' not found"
 
                 # Verify unexpected components don't exist
-                all_possible_components = ["message_dialog", "button_box", "status_bar"]
-                for component_name in all_possible_components:
+                # Only check variable components
+                variable_components = ["button_box", "status_bar"]
+                for component_name in variable_components:
                     if component_name not in expected_components:
                         component = dialog.get_component(component_name)
                         assert component is None, f"Unexpected component '{component_name}' found"
 
                 # Verify component count matches
-                assert len(dialog.components) == len(expected_components)
+                assert len(dialog.components) == len(full_expected_components)
 
     def test_message_dialog_manager_end_to_end(self):
         """Test MessageDialogManager end-to-end functionality."""
@@ -192,19 +218,30 @@ class TestComposedDialogEssentialIntegration:
     def test_component_lifecycle_management(self):
         """Test component lifecycle management throughout dialog lifetime."""
 
+        # Setup layout mock
+        mock_layout_instance = MagicMock()
+        mock_layout_instance.addWidget = MagicMock()
+        mock_layout_class = MagicMock(return_value=mock_layout_instance)
+
+        # Setup QDialogButtonBox mock
+        mock_button_box_class = MagicMock()
+        mock_button_box_class.StandardButton = MagicMock()
+        mock_button_box_class.StandardButton.Ok = 1
+        mock_button_box_class.StandardButton.Cancel = 2
+
         with patch.multiple(
             'ui.components.base.composed.composed_dialog',
             QDialog=MagicMock,
-            QVBoxLayout=MagicMock,
+            QVBoxLayout=mock_layout_class,
             QWidget=MagicMock
         ), patch.multiple(
             'ui.components.base.composed.button_box_manager',
-            QDialogButtonBox=MagicMock
+            QDialogButtonBox=mock_button_box_class
         ):
             dialog = ComposedDialog(with_button_box=True)
 
             # PHASE 1: Initial state after creation
-            assert len(dialog.components) == 2  # message + button
+            assert len(dialog.components) == 4  # message + button + 2 signal managers
 
             list(dialog.components)
             message_mgr = dialog.get_component("message_dialog")
@@ -264,10 +301,15 @@ class TestComposedDialogEssentialIntegration:
                 self.custom_widgets_created.append("custom_label")
                 self.custom_widgets_created.append("custom_button")
 
+        # Setup layout mock
+        mock_layout_instance = MagicMock()
+        mock_layout_instance.addWidget = MagicMock()
+        mock_layout_class = MagicMock(return_value=mock_layout_instance)
+
         with patch.multiple(
             'ui.components.base.composed.composed_dialog',
             QDialog=MagicMock,
-            QVBoxLayout=MagicMock,
+            QVBoxLayout=mock_layout_class,
             QWidget=MagicMock
         ):
             # Create custom dialog
@@ -293,14 +335,25 @@ class TestComposedDialogEssentialIntegration:
     def test_architecture_integration_contract(self):
         """Test that the architecture fulfills its integration contract."""
 
+        # Setup layout mock
+        mock_layout_instance = MagicMock()
+        mock_layout_instance.addWidget = MagicMock()
+        mock_layout_class = MagicMock(return_value=mock_layout_instance)
+
+        # Setup QDialogButtonBox mock
+        mock_button_box_class = MagicMock()
+        mock_button_box_class.StandardButton = MagicMock()
+        mock_button_box_class.StandardButton.Ok = 1
+        mock_button_box_class.StandardButton.Cancel = 2
+
         with patch.multiple(
             'ui.components.base.composed.composed_dialog',
             QDialog=MagicMock,
-            QVBoxLayout=MagicMock,
+            QVBoxLayout=mock_layout_class,
             QWidget=MagicMock
         ), patch.multiple(
             'ui.components.base.composed.button_box_manager',
-            QDialogButtonBox=MagicMock
+            QDialogButtonBox=mock_button_box_class
         ), patch.multiple(
             'ui.components.base.composed.status_bar_manager',
             QStatusBar=MagicMock
@@ -378,11 +431,16 @@ class TestComposedDialogEssentialIntegration:
                 manager.initialize(mock_context)
 
         elif error_condition == "duplicate_component_registration":
+            # Setup layout mock
+            mock_layout_instance = MagicMock()
+            mock_layout_instance.addWidget = MagicMock()
+            mock_layout_class = MagicMock(return_value=mock_layout_instance)
+
             # Test duplicate component registration
             with patch.multiple(
                 'ui.components.base.composed.composed_dialog',
                 QDialog=MagicMock,
-                QVBoxLayout=MagicMock,
+                QVBoxLayout=mock_layout_class,
                 QWidget=MagicMock
             ):
                 dialog = ComposedDialog()

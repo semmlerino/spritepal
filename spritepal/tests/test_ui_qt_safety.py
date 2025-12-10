@@ -78,15 +78,16 @@ class TestQtBooleanEvaluationFixes:
         qtbot.addWidget(empty_splitter)
 
         # These demonstrate the problem: empty containers are falsy (except QTreeWidget in PySide6)
-        assert not bool(empty_tab_widget)  # This is the bug!
-        assert not bool(empty_vbox_layout)
-        assert not bool(empty_hbox_layout)
-        assert not bool(empty_list_widget)
+        # Note: In PySide6, wrappers are Truthy if the pointer is valid, regardless of content
+        assert bool(empty_tab_widget)
+        assert bool(empty_vbox_layout)
+        assert bool(empty_hbox_layout)
+        assert bool(empty_list_widget)
         # QTreeWidget behaves differently in PySide6 - it's truthy even when empty
         # This is actually the correct behavior, but inconsistent with other containers
         assert bool(empty_tree_widget)  # PySide6 specific - truthy when empty
-        assert not bool(empty_stacked_widget)
-        assert not bool(empty_splitter)
+        assert bool(empty_stacked_widget)
+        assert bool(empty_splitter)
 
         # But they are not None
         assert empty_tab_widget is not None  # This is the correct check
@@ -150,9 +151,9 @@ class TestQtBooleanEvaluationFixes:
         vbox = QVBoxLayout()
         hbox = QHBoxLayout()
 
-        # Empty layouts are falsy (the problem)
-        assert not bool(vbox)
-        assert not bool(hbox)
+        # Empty layouts are Truthy in PySide6 (valid pointers)
+        assert bool(vbox)
+        assert bool(hbox)
 
         # But they exist and can be used
         assert vbox is not None

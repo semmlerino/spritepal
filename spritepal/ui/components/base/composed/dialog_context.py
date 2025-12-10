@@ -111,9 +111,9 @@ class DialogContext:
         Args:
             name: The name of the component to remove
 
-        Note:
-            If the component is not registered, this method will silently
-            do nothing rather than raising an error.
+        Raises:
+            KeyError: If the component is not registered
         """
-        if name in self.components:
-            del self.components[name]
+        if name not in self.components:
+            raise KeyError(f"Component '{name}' is not registered")
+        del self.components[name]

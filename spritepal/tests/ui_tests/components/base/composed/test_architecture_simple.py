@@ -51,10 +51,12 @@ def test_dialog_context_basics():
         assert context.has_component("test")
         assert context.get_component("test") == component
 
-        # Test unregistration (should not raise)
+        # Test unregistration
         context.unregister_component("test")
         assert not context.has_component("test")
-        context.unregister_component("nonexistent")  # Should not raise
+        
+        with pytest.raises(KeyError):
+            context.unregister_component("nonexistent")
 
 def test_message_dialog_manager_basics():
     """Test MessageDialogManager basic functionality."""
@@ -164,23 +166,22 @@ def test_composed_dialog_architecture():
         from ui.components.base.composed.composed_dialog import ComposedDialog
 
         # Create dialog with mocked parent
-        with patch.object(mock_qdialog, '__init__', return_value=None):
-            dialog = ComposedDialog(
-                None,
-                with_status_bar=False,
-                with_button_box=False
-            )
+        dialog = ComposedDialog(
+            None,
+            with_status_bar=False,
+            with_button_box=False
+        )
 
-            # Test that context was created
-            assert dialog.context is not None
-            assert dialog.context.dialog is dialog
+        # Test that context was created
+        assert dialog.context is not None
+        assert dialog.context.dialog is dialog
 
-            # Test that message manager is always registered
-            assert dialog.context.has_component("messages")
+        # Test that message manager is always registered
+        assert dialog.context.has_component("message_dialog")
 
-            # Test that optional components are not registered
-            assert not dialog.context.has_component("status_bar")
-            assert not dialog.context.has_component("button_box")
+        # Test that optional components are not registered
+        assert not dialog.context.has_component("status_bar")
+        assert not dialog.context.has_component("button_box")
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

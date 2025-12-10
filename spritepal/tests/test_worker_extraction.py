@@ -226,7 +226,8 @@ class TestVRAMExtractionWorker:
             mock_manager.palettes_extracted = Mock()
             mock_manager.active_palettes_found = Mock()
             mock_manager.preview_generated = Mock()
-            mock_manager.extract_vram_sprites = Mock(return_value=["output1.png", "output2.png"])
+            # The actual method called is extract_from_vram, not extract_vram_sprites
+            mock_manager.extract_from_vram = Mock(return_value=["output1.png", "output2.png"])
 
             # Set up mock returns for signal connections
             mock_connection = Mock()
@@ -251,19 +252,25 @@ class TestVRAMExtractionWorker:
             # Perform operation
             worker.perform_operation()
 
-            # Verify manager method was called
-            mock_manager.extract_vram_sprites.assert_called_once_with(params)
+            # Verify manager method was called with the expected keyword arguments
+            mock_manager.extract_from_vram.assert_called_once()
+            call_kwargs = mock_manager.extract_from_vram.call_args.kwargs
+            assert call_kwargs["vram_path"] == "/test/vram.dmp"
+            assert call_kwargs["output_base"] == "/test/output"
 
             # Verify signals emitted
             assert operation_spy.count() == 1
-            assert operation_spy.at(0) == [True, "VRAM extraction completed successfully"]
+            assert operation_spy.at(0)[0] is True
+            assert "Successfully extracted 2 files" in operation_spy.at(0)[1]
 
             assert extraction_spy.count() == 1
             assert extraction_spy.at(0) == [["output1.png", "output2.png"]]
 
             # Test disconnection
             worker.disconnect_manager_signals()
-            mock_connection.disconnect.assert_called()
+            # Note: The actual disconnect is called via QObject.disconnect(connection),
+            # not connection.disconnect(), so we just verify the connections are cleared
+            assert worker._connections == []
 
 @pytest.mark.no_manager_setup
 class TestROMExtractionWorker:

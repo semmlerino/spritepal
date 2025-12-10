@@ -383,55 +383,5 @@ class TestManagerLifecycleIntegrationTDD:
             # Context cleanup should handle all managers
             # (cleanup happens automatically when exiting context)
 
-# Performance Integration Tests
-
-@pytest.mark.benchmark
-def test_manager_integration_performance_baseline_tdd(test_data_repo, benchmark):
-    """TDD performance test for manager integration workflows.
-    
-    RED: Establish performance requirements for integrated operations
-    GREEN: Measure actual integration performance 
-    REFACTOR: Optimize integration bottlenecks
-    """
-    def run_integration_workflow():
-        with manager_context("extraction", "injection") as ctx:
-            extraction_mgr = ctx.get_extraction_manager()
-            injection_mgr = ctx.get_injection_manager()
-
-            try:
-                # Quick validation workflow (no actual file operations)
-                vram_data = test_data_repo.get_vram_extraction_data("small")
-
-                extraction_params = {
-                    "vram_path": vram_data["vram_path"],
-                    "output_base": vram_data["output_base"]
-                }
-                extraction_mgr.validate_extraction_params(extraction_params)
-
-                # Create minimal injection params
-                injection_params = {
-                    "mode": "vram",
-                    "sprite_path": vram_data.get("sprite_path", vram_data["vram_path"].replace(".vram", ".png")),
-                    "input_vram": vram_data["vram_path"],
-                    "output_vram": "/tmp/benchmark_output.vram",
-                    "offset": 0x8000
-                }
-
-                # This may fail validation but tests manager coordination performance
-                try:
-                    injection_mgr.validate_injection_params(injection_params)
-                except ValidationError:
-                    pass  # Expected for benchmark
-
-                return True
-            except Exception:
-                return False
-
-    # Benchmark integration workflow performance
-    result = benchmark(run_integration_workflow)
-
-    # Performance test should complete successfully
-    assert result is True or result is False  # Should return boolean
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

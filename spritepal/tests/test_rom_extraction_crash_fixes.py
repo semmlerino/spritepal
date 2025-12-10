@@ -26,6 +26,7 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.qt_real,
     pytest.mark.signals_slots,
+    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
 ]
 
 class TestSignalLoopFixes:

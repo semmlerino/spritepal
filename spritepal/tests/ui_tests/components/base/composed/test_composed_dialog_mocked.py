@@ -6,6 +6,7 @@ to avoid Qt application requirements while still testing component interactions.
 """
 from __future__ import annotations
 
+import os
 from unittest.mock import Mock, patch
 
 import pytest
@@ -24,11 +25,14 @@ class TestComposedDialogMockedIntegration:
     @patch('ui.components.base.composed.composed_dialog.QWidget')
     @patch('ui.components.base.composed.composed_dialog.QVBoxLayout')
     @patch('ui.components.base.composed.composed_dialog.QDialog.__init__')
-    def test_dialog_creation_and_component_initialization(self, mock_dialog_init, mock_layout, mock_widget):
+    @patch('ui.components.base.composed.status_bar_manager.QStatusBar')
+    @patch('ui.components.base.composed.button_box_manager.QDialogButtonBox')
+    def test_dialog_creation_and_component_initialization(self, mock_buttonbox, mock_statusbar, mock_dialog_init, mock_layout, mock_widget):
         """Test dialog creation initializes all components correctly."""
         # Setup mocks
         mock_dialog_init.return_value = None
         mock_layout_instance = Mock()
+        mock_layout_instance.addWidget = Mock()
         mock_widget_instance = Mock()
         mock_layout.return_value = mock_layout_instance
         mock_widget.return_value = mock_widget_instance
@@ -40,10 +44,11 @@ class TestComposedDialogMockedIntegration:
         mock_dialog_init.assert_called_once()
         mock_layout.assert_called_once()
         mock_widget.assert_called_once()
-        mock_layout_instance.addWidget.assert_called_once_with(mock_widget_instance)
+        # content widget + button box + status bar = 3 widgets
+        assert mock_layout_instance.addWidget.call_count == 3
 
         # Verify components were created
-        assert len(dialog.components) == 3  # message, button, status
+        assert len(dialog.components) == 5  # message, button, status + 2 signal managers
 
         # Verify component access
         assert dialog.get_component("message_dialog") is not None
@@ -60,9 +65,14 @@ class TestComposedDialogMockedIntegration:
     @patch('ui.components.base.composed.composed_dialog.QWidget')
     @patch('ui.components.base.composed.composed_dialog.QVBoxLayout')
     @patch('ui.components.base.composed.composed_dialog.QDialog.__init__')
-    def test_dialog_selective_component_creation(self, mock_dialog_init, mock_layout, mock_widget):
+    @patch('ui.components.base.composed.status_bar_manager.QStatusBar')
+    @patch('ui.components.base.composed.button_box_manager.QDialogButtonBox')
+    def test_dialog_selective_component_creation(self, mock_buttonbox, mock_statusbar, mock_dialog_init, mock_layout, mock_widget):
         """Test dialog creates only requested components."""
         mock_dialog_init.return_value = None
+        mock_layout_instance = Mock()
+        mock_layout_instance.addWidget = Mock()
+        mock_layout.return_value = mock_layout_instance
 
         # Create dialog without button box
         dialog = ComposedDialog(with_button_box=False, with_status_bar=True)
@@ -71,17 +81,21 @@ class TestComposedDialogMockedIntegration:
         assert dialog.get_component("message_dialog") is not None
         assert dialog.get_component("button_box") is None
         assert dialog.get_component("status_bar") is not None
-        assert len(dialog.components) == 2
+        assert len(dialog.components) == 4  # message, status + 2 signal managers
 
     @patch('ui.components.base.composed.message_dialog_manager.QMessageBox')
     def test_message_dialog_manager_integration(self, mock_messagebox):
         """Test MessageDialogManager integration with mocked QMessageBox."""
         # Create mock dialog
-        mock_dialog = Mock()
+        mock_dialog = Mock(spec=["accept", "reject"])  # Minimal QDialog spec
+        
+        # Create context
+        mock_context = Mock()
+        mock_context.dialog = mock_dialog
 
         # Create and initialize manager
         manager = MessageDialogManager()
-        manager.initialize(mock_dialog)
+        manager.initialize(mock_context)
 
         # Set up signal spy equivalent
         messages_shown = []
@@ -118,14 +132,16 @@ class TestComposedDialogMockedIntegration:
         mock_context.main_layout = Mock()
         mock_context.accept = Mock()
         mock_context.reject = Mock()
+        
+        # Override test detection to force QDialogButtonBox creation
+        with patch.dict(os.environ, {"PYTEST_CURRENT_TEST": "", "TESTING": ""}):
+            # Create mock button box instance
+            mock_box_instance = Mock()
+            mock_buttonbox.return_value = mock_box_instance
 
-        # Create mock button box instance
-        mock_box_instance = Mock()
-        mock_buttonbox.return_value = mock_box_instance
-
-        # Create and initialize manager
-        manager = ButtonBoxManager()
-        manager.initialize(mock_context)
+            # Create and initialize manager
+            manager = ButtonBoxManager()
+            manager.initialize(mock_context)
 
         # Verify button box creation
         mock_buttonbox.assert_called_once()
@@ -162,10 +178,11 @@ class TestComposedDialogMockedIntegration:
         status_changes = []
         manager.status_changed.connect(lambda msg: status_changes.append(msg))
 
-        manager.initialize(mock_context)
+        with patch.dict(os.environ, {"PYTEST_CURRENT_TEST": "", "TESTING": ""}):
+            manager.initialize(mock_context)
 
         # Verify status bar creation
-        mock_statusbar.assert_called_once_with(mock_context)
+        mock_statusbar.assert_called_once_with(mock_context.dialog)
         mock_context.main_layout.addWidget.assert_called_once_with(mock_bar_instance)
 
         # Test showing message
@@ -181,7 +198,9 @@ class TestComposedDialogMockedIntegration:
     @patch('ui.components.base.composed.composed_dialog.QWidget')
     @patch('ui.components.base.composed.composed_dialog.QVBoxLayout')
     @patch('ui.components.base.composed.composed_dialog.QDialog.__init__')
-    def test_dialog_cleanup_on_close_event(self, mock_dialog_init, mock_layout, mock_widget):
+    @patch('ui.components.base.composed.status_bar_manager.QStatusBar')
+    @patch('ui.components.base.composed.button_box_manager.QDialogButtonBox')
+    def test_dialog_cleanup_on_close_event(self, mock_buttonbox, mock_statusbar, mock_dialog_init, mock_layout, mock_widget):
         """Test dialog cleanup is called on all components during close."""
         mock_dialog_init.return_value = None
 
@@ -211,7 +230,9 @@ class TestComposedDialogMockedIntegration:
     @patch('ui.components.base.composed.composed_dialog.QWidget')
     @patch('ui.components.base.composed.composed_dialog.QVBoxLayout')
     @patch('ui.components.base.composed.composed_dialog.QDialog.__init__')
-    def test_dialog_context_component_registration(self, mock_dialog_init, mock_layout, mock_widget):
+    @patch('ui.components.base.composed.status_bar_manager.QStatusBar')
+    @patch('ui.components.base.composed.button_box_manager.QDialogButtonBox')
+    def test_dialog_context_component_registration(self, mock_buttonbox, mock_statusbar, mock_dialog_init, mock_layout, mock_widget):
         """Test DialogContext correctly registers components during initialization."""
         mock_dialog_init.return_value = None
 
@@ -277,7 +298,9 @@ class TestComposedDialogMockedIntegration:
     @patch('ui.components.base.composed.composed_dialog.QWidget')
     @patch('ui.components.base.composed.composed_dialog.QVBoxLayout')
     @patch('ui.components.base.composed.composed_dialog.QDialog.__init__')
-    def test_dialog_configuration_persistence(self, mock_dialog_init, mock_layout, mock_widget):
+    @patch('ui.components.base.composed.status_bar_manager.QStatusBar')
+    @patch('ui.components.base.composed.button_box_manager.QDialogButtonBox')
+    def test_dialog_configuration_persistence(self, mock_buttonbox, mock_statusbar, mock_dialog_init, mock_layout, mock_widget):
         """Test that dialog configuration is properly stored and accessible."""
         mock_dialog_init.return_value = None
 

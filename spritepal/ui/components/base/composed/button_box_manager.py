@@ -45,6 +45,7 @@ class ButtonBoxManager(QObject):
             parent: Optional parent QObject for proper cleanup
         """
         super().__init__(parent)
+        self.context: Any = None
         self._button_box: QDialogButtonBox | None = None
         self._custom_buttons: dict[str, QPushButton] = {}
         self._button_callbacks: dict[str, Callable[..., Any]] = {}
@@ -62,6 +63,7 @@ class ButtonBoxManager(QObject):
         Raises:
             AttributeError: If context doesn't have required attributes
         """
+        self.context = context
         # Check if context has required attributes
         if not hasattr(context, 'config'):
             raise AttributeError("Context must have a 'config' attribute")
@@ -268,6 +270,7 @@ class ButtonBoxManager(QObject):
 
         # Clear button box reference
         self._button_box = None
+        self.context = None
 
     def _on_accepted(self) -> None:
         """Handle accepted signal from button box."""

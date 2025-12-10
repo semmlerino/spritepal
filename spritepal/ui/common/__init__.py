@@ -75,7 +75,9 @@ from .widget_factory import (
     create_checkbox_with_tooltip,
     create_info_label,
 )
-from .worker_manager import WorkerManager
+# WorkerManager moved to core/services for proper layer boundaries
+# Re-exported here for backward compatibility
+from core.services.worker_lifecycle import WorkerManager
 
 __all__ = [
     # Spacing and sizing constants

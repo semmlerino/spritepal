@@ -225,3 +225,8 @@ FILE_READ_HEADER_SIZE = 16         # Bytes to read for file header validation
 TILE_VALIDITY_THRESHOLD = 10       # Minimum valid tiles for sprite detection
 BYTE_FREQUENCY_SAMPLE_SIZE = 256   # Sample size for byte frequency analysis
 MAX_TILE_COUNT_DEFAULT = 8192      # Default maximum tile count validation
+
+# Worker thread timing constants (in seconds)
+# These are used by core/ layer and should not depend on ui/
+SLEEP_WORKER = 0.1                 # 100ms sleep for worker threads
+SLEEP_BATCH = 0.05                 # 50ms sleep for batch processing

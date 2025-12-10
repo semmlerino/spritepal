@@ -408,8 +408,8 @@ class TestPreviewGenerator:
                 "/path/to/sprite.png", test_image, 2
             )
 
-            assert output_path == "/path/to/sprite_arranged.png"
-            mock_save.assert_called_once_with("/path/to/sprite_arranged.png")
+            assert output_path == "sprite_arranged.png"
+            mock_save.assert_called_once_with("sprite_arranged.png")
 
     def test_generate_output_filename(self):
         """Test output filename generation"""
@@ -417,7 +417,7 @@ class TestPreviewGenerator:
 
         assert (
             generator.generate_output_filename("/path/to/sprite.png")
-            == "/path/to/sprite_arranged.png"
+            == "sprite_arranged.png"
         )
 
         assert (

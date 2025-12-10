@@ -27,7 +27,7 @@ pytestmark = [
 ]
 
 @pytest.mark.qt_app
-def test_qapplication_singleton(qapp_session):
+def test_qapplication_singleton(qapp):
     """Verify single QApplication instance across test session."""
     try:
         from PySide6.QtWidgets import QApplication
@@ -41,11 +41,11 @@ def test_qapplication_singleton(qapp_session):
         assert app1 is not None
 
         # Should match our fixture
-        assert app1 is qapp_session
+        assert app1 is qapp
 
     except ImportError:
         # In environments without Qt, should get mock
-        assert isinstance(qapp_session, Mock)
+        assert isinstance(qapp, Mock)
 
 def test_qtbot_widget_cleanup(qtbot):
     """Verify widgets are properly registered with qtbot for cleanup."""
@@ -108,9 +108,10 @@ def test_safe_qtbot_fallback(safe_qtbot):
     assert hasattr(safe_qtbot, 'mouseClick')
     assert hasattr(safe_qtbot, 'keyClick')
 
-    # Should be callable without errors
-    safe_qtbot.addWidget(Mock())
-    # Verify wait method exists and is callable (no actual wait needed for interface test)
+    # Verify these methods are callable (signature check only)
+    assert callable(safe_qtbot.addWidget)
+    assert callable(safe_qtbot.waitSignal)
+    assert callable(safe_qtbot.wait)
 
 def test_safe_qapp_functionality(safe_qapp):
     """Test that safe_qapp provides necessary QApplication functionality."""
@@ -126,7 +127,7 @@ def test_no_gui_marker():
     # This test should run in all environments
     assert True
 
-def test_qt_cleanup_integration(qtbot, qapp_session):
+def test_qt_cleanup_integration(qtbot, qapp):
     """Test that Qt cleanup works properly between tests."""
     try:
         import gc
@@ -142,8 +143,8 @@ def test_qt_cleanup_integration(qtbot, qapp_session):
         gc.collect()
 
         # Process events to allow cleanup
-        if hasattr(qapp_session, 'processEvents'):
-            qapp_session.processEvents()
+        if hasattr(qapp, 'processEvents'):
+            qapp.processEvents()
 
     except ImportError:
         # In mock environments, just verify structure

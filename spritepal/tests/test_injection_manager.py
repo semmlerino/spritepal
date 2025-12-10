@@ -689,7 +689,7 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == str(vram_file)
 
-    @patch("core.managers.get_session_manager")
+    @patch.object(InjectionManager, "_get_session_manager")
     def test_get_smart_vram_suggestion_session_strategy(self, mock_get_session, tmp_path):
         """Test VRAM suggestion using session strategy"""
         manager = InjectionManager()
@@ -754,7 +754,7 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager._try_basename_vram_patterns(str(sprite_file))
         assert result == str(vram_file)
 
-    @patch("core.managers.get_session_manager")
+    @patch.object(InjectionManager, "_get_session_manager")
     def test_try_session_vram_recent_files(self, mock_get_session, tmp_path):
         """Test session VRAM strategy with recent files"""
         manager = InjectionManager()
@@ -771,7 +771,7 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager._try_session_vram()
         assert result == str(vram_file)
 
-    @patch("core.managers.get_session_manager")
+    @patch.object(InjectionManager, "_get_session_manager")
     def test_try_last_injection_vram_settings(self, mock_get_session, tmp_path):
         """Test last injection VRAM strategy"""
         manager = InjectionManager()

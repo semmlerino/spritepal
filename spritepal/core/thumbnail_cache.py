@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, cast
@@ -17,15 +18,26 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Cache size management constants
+DEFAULT_MAX_CACHE_MB = 100  # Maximum disk cache size in MB
+PRUNE_CHECK_INTERVAL = 100  # Check pruning every N saves
+
 class ThumbnailCache:
     """Cache system for sprite thumbnails."""
 
-    def __init__(self, cache_dir: Path | None = None):
+    def __init__(
+        self,
+        cache_dir: Path | None = None,
+        max_cache_mb: float = DEFAULT_MAX_CACHE_MB,
+        auto_prune: bool = True
+    ):
         """
         Initialize the thumbnail cache.
 
         Args:
             cache_dir: Directory for disk cache (default: temp dir)
+            max_cache_mb: Maximum disk cache size in MB (default: 100MB)
+            auto_prune: Whether to automatically prune cache (default: True)
         """
         if cache_dir is None:
             import tempfile
@@ -43,7 +55,16 @@ class ThumbnailCache:
         self.metadata_file = self.cache_dir / "cache_metadata.json"
         self.metadata = self._load_metadata()
 
+        # Auto-pruning configuration
+        self.max_cache_mb = max_cache_mb
+        self.auto_prune = auto_prune
+        self._save_count = 0
+
         logger.info(f"Thumbnail cache initialized at: {self.cache_dir}")
+
+        # Initial prune check on startup
+        if self.auto_prune:
+            self._maybe_prune()
 
     def _load_metadata(self) -> dict[str, Any]:
         """Load cache metadata from disk."""
@@ -174,6 +195,11 @@ class ThumbnailCache:
 
             logger.debug(f"Thumbnail cached: {cache_key}")
 
+            # Check for pruning periodically
+            self._save_count += 1
+            if self.auto_prune and self._save_count % PRUNE_CHECK_INTERVAL == 0:
+                self._maybe_prune()
+
         except Exception as e:
             logger.error(f"Failed to cache thumbnail: {e}")
 
@@ -186,6 +212,24 @@ class ThumbnailCache:
 
             # Add new item (automatically at end of OrderedDict)
             self.memory_cache[key] = pixmap
+
+    def _get_cache_size_mb(self) -> float:
+        """Get total disk cache size in MB."""
+        total = sum(f.stat().st_size for f in self.cache_dir.glob("*.png"))
+        return total / (1024 * 1024)
+
+    def _maybe_prune(self) -> None:
+        """Prune cache if it exceeds size limit."""
+        try:
+            current_size_mb = self._get_cache_size_mb()
+            if current_size_mb > self.max_cache_mb:
+                logger.info(
+                    f"Cache size {current_size_mb:.1f}MB exceeds limit "
+                    f"{self.max_cache_mb:.1f}MB, pruning..."
+                )
+                self.prune_cache(max_age_days=7)
+        except Exception as e:
+            logger.warning(f"Error during cache prune check: {e}")
 
     def clear_cache(self):
         """Clear all cached thumbnails."""
@@ -229,7 +273,6 @@ class ThumbnailCache:
         Args:
             max_age_days: Remove entries older than this many days
         """
-        import time
         current_time = time.time()
         max_age_seconds = max_age_days * 24 * 60 * 60
 

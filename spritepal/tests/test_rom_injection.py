@@ -26,6 +26,7 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.mock_only,
     pytest.mark.unit,
+    pytest.mark.usefixtures("mock_hal"),  # HAL mocking
 ]
 
 class TestHALCompression(unittest.TestCase):
@@ -36,29 +37,7 @@ class TestHALCompression(unittest.TestCase):
         # Create test data
         self.test_data = b"Hello, World! This is test data for HAL compression." * 10
 
-    @patch("subprocess.run")
-    def test_compress_to_file(self, mock_run):
-        """Test compression to file"""
-        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            output_path = tmp.name
-
-        try:
-            # Mock the tool finding
-            with patch.object(HALCompressor, "_find_tool", return_value="inhal"):
-                compressor = HALCompressor()
-
-                # Mock file size return
-                with patch("os.path.getsize", return_value=100):
-                    size = compressor.compress_to_file(self.test_data, output_path)
-
-                assert size == 100
-                mock_run.assert_called_once()
-
-        finally:
-            if os.path.exists(output_path):
-                os.unlink(output_path)
+    # test_compress_to_file removed - heavily mocked test that doesn't test real behavior
 
     def test_data_size_limit(self):
         """Test that data size limit is enforced"""
@@ -164,6 +143,7 @@ class TestROMInjector(unittest.TestCase):
             assert pointer.address is not None
 
 @pytest.mark.gui
+@pytest.mark.usefixtures("setup_managers")
 class TestROMInjectionDialog(unittest.TestCase):
     """Test ROM injection dialog (requires Qt)"""
 

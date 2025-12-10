@@ -38,6 +38,7 @@ class MessageDialogManager(QObject):
             parent: Optional parent QObject for proper cleanup
         """
         super().__init__(parent)
+        self.context: Any = None
         self._dialog: QDialog | None = None
 
     def initialize(self, context: Any) -> None:
@@ -50,6 +51,7 @@ class MessageDialogManager(QObject):
         Args:
             context: The dialog context containing the parent dialog
         """
+        self.context = context
         # Extract dialog from context
         if hasattr(context, 'dialog'):
             dialog = context.dialog
@@ -80,6 +82,7 @@ class MessageDialogManager(QObject):
         to prevent reference cycles.
         """
         self._dialog = None
+        self.context = None
 
     def show_error(self, title: str, message: str) -> None:
         """

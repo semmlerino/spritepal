@@ -16,6 +16,8 @@ from __future__ import annotations
 import pytest
 
 pytestmark = [
+    # NOTE: We don't use session_managers here because these tests provide mock
+    # dependencies directly, avoiding DI container issues in large test suites.
     pytest.mark.cache,
     pytest.mark.file_io,
     pytest.mark.headless,
@@ -129,6 +131,15 @@ def large_rom_file(tmp_path) -> str:
     rom_path.write_bytes(rom_data)
     return str(rom_path)
 
+
+@pytest.fixture
+def mock_rom_extractor() -> Mock:
+    """Create a mock ROMExtractor to avoid DI container dependency."""
+    extractor = Mock()
+    extractor.extract_sprite.return_value = None
+    extractor.decompress.return_value = b'\x00' * 1024
+    return extractor
+
 class TestLRUCacheMemoryManagement:
     """Test memory management in LRU cache."""
 
@@ -179,13 +190,13 @@ class TestLRUCacheMemoryManagement:
 class TestBatchThumbnailWorkerMemoryLeaks:
     """Test memory leak prevention in BatchThumbnailWorker."""
 
-    def test_rom_file_cleanup_on_worker_deletion(self, large_rom_file, memory_monitor):
+    def test_rom_file_cleanup_on_worker_deletion(self, large_rom_file, memory_monitor, mock_rom_extractor):
         """Test ROM file handles are cleaned up when worker is deleted."""
         memory_monitor.start()
 
         # Create and destroy multiple workers
         for _ in range(3):
-            worker = BatchThumbnailWorker(large_rom_file)
+            worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
             # Load ROM data
             worker._load_rom_data()
             assert worker._rom_mmap is not None
@@ -198,11 +209,11 @@ class TestBatchThumbnailWorkerMemoryLeaks:
         # Memory should not accumulate
         memory_monitor.assert_no_leak(max_increase_mb=10)
 
-    def test_context_manager_prevents_file_handle_leak(self, large_rom_file, memory_monitor):
+    def test_context_manager_prevents_file_handle_leak(self, large_rom_file, memory_monitor, mock_rom_extractor):
         """Test context manager prevents file handle leaks."""
         memory_monitor.start()
 
-        worker = BatchThumbnailWorker(large_rom_file)
+        worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
 
         # Use context manager multiple times
         for _ in range(100):
@@ -219,7 +230,7 @@ class TestBatchThumbnailWorkerMemoryLeaks:
         # Memory should be stable
         memory_monitor.assert_no_leak(max_increase_mb=5)
 
-    def test_thumbnail_generation_memory_cleanup(self, large_rom_file, memory_monitor):
+    def test_thumbnail_generation_memory_cleanup(self, large_rom_file, memory_monitor, mock_rom_extractor):
         """Test memory is cleaned up after thumbnail generation."""
         memory_monitor.start()
 
@@ -235,7 +246,7 @@ class TestBatchThumbnailWorkerMemoryLeaks:
 
             mock_renderer.return_value.render_tiles = create_image
 
-            worker = BatchThumbnailWorker(large_rom_file)
+            worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
             worker._load_rom_data()
 
             # Generate many thumbnails
@@ -253,6 +264,7 @@ class TestBatchThumbnailWorkerMemoryLeaks:
         # Memory should not grow significantly
         memory_monitor.assert_no_leak(max_increase_mb=20)
 
+@pytest.mark.usefixtures("qapp")  # QPixmap requires QApplication
 class TestQImageQPixmapMemoryManagement:
     """Test memory management of Qt image objects."""
 
@@ -300,12 +312,12 @@ class TestQImageQPixmapMemoryManagement:
 class TestLargeDataProcessingMemoryLeaks:
     """Test memory leaks when processing large amounts of data."""
 
-    def test_processing_many_sprites_no_leak(self, large_rom_file, memory_monitor):
+    def test_processing_many_sprites_no_leak(self, large_rom_file, memory_monitor, mock_rom_extractor):
         """Test processing many sprites doesn't leak memory."""
         memory_monitor.start()
 
         with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
-            worker = BatchThumbnailWorker(large_rom_file)
+            worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
 
             # Process many sprite offsets
             for batch in range(10):
@@ -329,13 +341,13 @@ class TestLargeDataProcessingMemoryLeaks:
         # Memory should not grow unbounded
         memory_monitor.assert_no_leak(max_increase_mb=25)
 
-    def test_rom_mmap_fallback_memory_management(self, large_rom_file, memory_monitor):
+    def test_rom_mmap_fallback_memory_management(self, large_rom_file, memory_monitor, mock_rom_extractor):
         """Test BytesMMAPWrapper fallback doesn't leak memory."""
         memory_monitor.start()
 
         # Force fallback by mocking mmap to fail
         with patch('mmap.mmap', side_effect=Exception("mmap failed")):
-            worker = BatchThumbnailWorker(large_rom_file)
+            worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
 
             # This should use BytesMMAPWrapper fallback
             worker._load_rom_data()
@@ -360,7 +372,7 @@ class TestLargeDataProcessingMemoryLeaks:
 class TestMemoryLeakIntegration:
     """Integration tests for memory leak detection."""
 
-    def test_full_workflow_no_memory_leak(self, large_rom_file, memory_monitor, qtbot):
+    def test_full_workflow_no_memory_leak(self, large_rom_file, memory_monitor, qtbot, mock_rom_extractor):
         """Test complete workflow doesn't leak memory."""
         memory_monitor.start()
 
@@ -368,8 +380,8 @@ class TestMemoryLeakIntegration:
         for iteration in range(3):
             controller = ThumbnailWorkerController()
 
-            # Start worker
-            controller.start_worker(large_rom_file)
+            # Start worker with mock extractor to avoid DI dependency
+            controller.start_worker(large_rom_file, rom_extractor=mock_rom_extractor)
 
             # Queue many thumbnails
             offsets = [i * 0x1000 for i in range(50)]

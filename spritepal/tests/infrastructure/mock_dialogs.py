@@ -548,6 +548,16 @@ class MockUserErrorDialogImpl(MockDialog):
         """Set error details."""
         self.details = details
 
+    @staticmethod
+    def show_error(
+        parent: Any | None,
+        error_message: str,
+        technical_details: str | None = None
+    ) -> None:
+        """Convenience method to show error dialog (non-blocking in tests)."""
+        # In tests, this is a no-op to avoid blocking modal dialogs
+        pass
+
 class MockDialogSingleton:
     """
     Test implementation of dialog singleton pattern.

@@ -312,9 +312,9 @@ class TestSmartPreviewROMCacheTier:
         coordinator._try_show_cached_preview_dual_tier()
 
         # Should store ROM cache data in memory cache for faster future access
-        # Note: The sprite name gets overridden to ROM_0x{offset:06X} format
+        # Note: The sprite name gets overridden to manual_0x{offset:06X} format
         expected_cache_key = f"{rom_path}:0x{offset:06X}"
-        expected_data = (rom_cache_data[0], rom_cache_data[1], rom_cache_data[2], f"ROM_0x{offset:06X}")
+        expected_data = (rom_cache_data[0], rom_cache_data[1], rom_cache_data[2], f"manual_0x{offset:06X}")
         coordinator._cache.put.assert_called_once_with(expected_cache_key, expected_data)
 
     def test_rom_cache_error_handling(self, coordinator, mock_rom_cache):
@@ -333,7 +333,8 @@ class TestSmartPreviewROMCacheTier:
         mock_rom_cache.get_preview_data.side_effect = Exception("Cache error")
 
         result = coordinator._check_rom_cache(rom_path, offset)
-        assert result is None
+        # On error, returns empty tuple instead of None
+        assert result == (b"", 0, 0, None)
 
     def test_batch_save_failure_handling(self, coordinator, mock_rom_cache):
         """Test handling of batch save failures"""
@@ -444,7 +445,8 @@ class TestSmartPreviewROMCacheTier:
         assert result is False
 
         result = coordinator._check_rom_cache("/test/rom.sfc", 0x8000)
-        assert result is None
+        # When cache is disabled, returns empty tuple instead of None
+        assert result == (b"", 0, 0, None)
 
         # Dual-tier cache should fall back to memory only
         coordinator._cache.get.return_value = None

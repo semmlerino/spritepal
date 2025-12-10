@@ -21,9 +21,6 @@ from tests.infrastructure.mock_dialogs import (
     patch_dialog_imports,
 )
 
-# Apply dialog patching
-patch_dialog_imports()
-
 # Create mock versions for missing dialogs
 from unittest.mock import MagicMock
 
@@ -62,6 +59,15 @@ class TestDialogInitialization:
         if app is None:
             app = QApplication([])
         return app
+
+    @pytest.fixture(scope="class", autouse=True)
+    def patch_dialogs(self):
+        """Patch dialog imports for this test class"""
+        patch_dialog_imports()
+        # Note: We don't undo the patch because sys.modules is global and hard to restore perfectly
+        # without affecting other tests if running in same process. 
+        # But this is a class-scoped fixture so it runs once.
+        yield
 
     @pytest.fixture
     def managers(self, fast_managers):

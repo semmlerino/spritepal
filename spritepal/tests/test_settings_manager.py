@@ -268,42 +268,19 @@ class TestSettingsManager:
 class TestGlobalSettingsInstance:
     """Test the global settings instance"""
 
-    def test_get_settings_manager_singleton(self):
+    def test_get_settings_manager_singleton(self, isolated_managers):
         """Test that get_settings_manager returns singleton"""
-        # Reset global instance
-        import utils.settings_manager
+        # Get instance twice - should return same object
+        manager1 = get_settings_manager()
+        manager2 = get_settings_manager()
 
-        utils.settings_manager._SettingsManagerSingleton._instance = None
+        assert manager1 is manager2
+        assert isinstance(manager1, SettingsManager)
 
-        # Initialize managers for global instance to work
-        from core.managers import cleanup_managers, initialize_managers
-        initialize_managers("TestApp")
-
-        try:
-            # Get instance twice
-            manager1 = get_settings_manager()
-            manager2 = get_settings_manager()
-
-            assert manager1 is manager2
-            assert isinstance(manager1, SettingsManager)
-        finally:
-            cleanup_managers()
-
-    def test_get_settings_manager_preserves_state(self):
+    def test_get_settings_manager_preserves_state(self, isolated_managers):
         """Test that singleton preserves state"""
-        import utils.settings_manager
+        manager1 = get_settings_manager()
+        manager1.set("custom", "key", "value")
 
-        utils.settings_manager._SettingsManagerSingleton._instance = None
-
-        # Initialize managers for global instance to work
-        from core.managers import cleanup_managers, initialize_managers
-        initialize_managers("TestApp")
-
-        try:
-            manager1 = get_settings_manager()
-            manager1.set("custom", "key", "value")
-
-            manager2 = get_settings_manager()
-            assert manager2.get("custom", "key") == "value"
-        finally:
-            cleanup_managers()
+        manager2 = get_settings_manager()
+        assert manager2.get("custom", "key") == "value"

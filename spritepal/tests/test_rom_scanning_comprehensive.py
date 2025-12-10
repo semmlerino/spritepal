@@ -14,11 +14,9 @@ pytestmark = [
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
+    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
 ]
 
 class CustomMockHALCompressor(MockHALCompressor):

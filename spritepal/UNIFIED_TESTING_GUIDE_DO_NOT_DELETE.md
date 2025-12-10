@@ -908,15 +908,13 @@ addopts =
     --timeout-method=thread
 ```
 
-#### 3. Set QT_QPA_PLATFORM=offscreen (Limited effectiveness)
+#### 3. Set QT_QPA_PLATFORM=offscreen (RECOMMENDED)
 ```bash
+# This is the recommended approach for all headless/CI testing
 QT_QPA_PLATFORM=offscreen pytest tests/
 ```
 
-#### 4. Use xvfb for Virtual Display (Linux/CI)
-```bash
-xvfb-run -a pytest tests/
-```
+**NOTE**: Do NOT use pytest-xvfb or xvfb-run - they cause hangs in WSL2 and some CI environments.
 
 ### Important Notes
 - **Monkeypatching Qt base classes doesn't work** - Qt uses C++ bindings

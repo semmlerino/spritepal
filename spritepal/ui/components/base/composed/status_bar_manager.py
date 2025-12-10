@@ -36,6 +36,7 @@ class StatusBarManager(QObject):
             parent: Optional parent QObject for proper cleanup
         """
         super().__init__(parent)
+        self.context: Any = None
         self._status_bar: QStatusBar | None = None
         self._permanent_widgets: dict[str, QWidget] = {}
 
@@ -52,6 +53,7 @@ class StatusBarManager(QObject):
         Raises:
             AttributeError: If context doesn't have required attributes
         """
+        self.context = context
         # Check if status bar is enabled in config
         if not hasattr(context, 'config'):
             raise AttributeError("Context must have a 'config' attribute")
@@ -183,6 +185,7 @@ class StatusBarManager(QObject):
 
         # Clear status bar reference
         self._status_bar = None
+        self.context = None
 
     @property
     def is_available(self) -> bool:

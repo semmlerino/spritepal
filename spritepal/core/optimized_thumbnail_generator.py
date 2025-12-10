@@ -11,6 +11,7 @@ Performance optimizations:
 from __future__ import annotations
 
 import concurrent.futures
+import heapq
 import io
 import logging
 import pickle
@@ -21,6 +22,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 from typing import Any
+
+# Maximum queue size to prevent memory exhaustion during rapid scrolling
+MAX_QUEUE_SIZE = 500
 
 from PIL import Image
 
@@ -297,8 +301,11 @@ class OptimizedThumbnailGenerator:
         )
 
         with self._queue_lock:
-            self._task_queue.append(task)
-            self._task_queue.sort()  # Sort by priority
+            if len(self._task_queue) >= MAX_QUEUE_SIZE:
+                # Discard lowest priority task (highest priority value) when queue is full
+                heapq.heappushpop(self._task_queue, task)
+            else:
+                heapq.heappush(self._task_queue, task)
 
         # Process queue
         self._process_queue()
@@ -384,10 +391,10 @@ class OptimizedThumbnailGenerator:
             if not self._task_queue:
                 return
 
-            # Take a batch of tasks
+            # Take a batch of tasks (highest priority = lowest value first)
             batch = []
             while self._task_queue and len(batch) < self.batch_size:
-                task = self._task_queue.pop(0)
+                task = heapq.heappop(self._task_queue)
 
                 # Skip if already processing
                 with self._futures_lock:

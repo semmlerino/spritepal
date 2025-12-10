@@ -12,10 +12,12 @@ from .manager_protocols import (
     MainWindowProtocol,
     SessionManagerProtocol,
 )
+from .worker_protocol import WorkerManagerProtocol
 
 __all__ = [
     "ExtractionManagerProtocol",
     "InjectionManagerProtocol",
     "MainWindowProtocol",
     "SessionManagerProtocol",
+    "WorkerManagerProtocol",
 ]

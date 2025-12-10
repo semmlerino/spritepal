@@ -22,7 +22,7 @@ This means:
 ### Test Categories
 1. **Tests without Qt dependencies**: Run normally, no special setup needed
 2. **Tests with Qt dependencies**: Work via offscreen mode
-3. **GUI tests (@pytest.mark.gui)**: Skipped in headless, require display/xvfb
+3. **GUI tests (@pytest.mark.gui)**: Run with offscreen backend, no display required
 
 ## Running Tests
 

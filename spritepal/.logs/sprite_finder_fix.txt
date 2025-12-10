@@ -1,0 +1,32 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/bin/python3
+cachedir: .pytest_cache
+PySide6 6.10.1 -- Qt runtime 6.10.1 -- Qt compiled 6.10.1
+rootdir: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+configfile: pyproject.toml
+plugins: cov-7.0.0, mock-3.15.1, qt-4.5.0, timeout-2.4.0
+timeout: 30.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 8 items
+
+tests/integration/test_integration_sprite_finder.py::TestSpriteFinder::test_find_sprites_in_test_rom PASSED [ 12%]
+tests/integration/test_integration_sprite_finder.py::TestSpriteFinder::test_sprite_finder_with_rom_extractor PASSED [ 25%]
+tests/integration/test_integration_sprite_finder.py::TestSpriteFinder::test_find_sprites_in_real_rom PASSED [ 37%]
+tests/integration/test_integration_sprite_finder.py::TestHALCompression::test_compress_decompress_cycle PASSED [ 50%]
+tests/integration/test_integration_sprite_finder.py::TestHALCompression::test_decompress_from_rom_offset PASSED [ 62%]
+tests/integration/test_integration_sprite_finder.py::TestHALCompression::test_parallel_decompression PASSED [ 75%]
+tests/integration/test_integration_sprite_finder.py::TestROMExtractor::test_extract_sprite_from_rom PASSED [ 87%]
+tests/integration/test_integration_sprite_finder.py::TestROMExtractor::test_extract_with_decompression PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/integration/test_integration_sprite_finder.py::TestSpriteFinder::test_find_sprites_in_test_rom
+tests/integration/test_integration_sprite_finder.py::TestSpriteFinder::test_find_sprites_in_test_rom
+tests/integration/test_integration_sprite_finder.py::TestSpriteFinder::test_find_sprites_in_test_rom
+tests/integration/test_integration_sprite_finder.py::TestSpriteFinder::test_find_sprites_in_test_rom
+tests/integration/test_integration_sprite_finder.py::TestSpriteFinder::test_find_sprites_in_test_rom
+  /home/gabrielh/.local/share/uv/python/cpython-3.13.3-linux-x86_64-gnu/lib/python3.13/multiprocessing/popen_fork.py:67: DeprecationWarning: This process (pid=152143) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    self.pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 8 passed, 5 warnings in 5.91s =========================

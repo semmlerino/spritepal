@@ -51,58 +51,33 @@ class ComposedDialog(QDialog):
             parent: Parent widget for the dialog
             **config: Configuration options for component initialization
         """
-        from utils.logging_config import get_logger
-        logger = get_logger(__name__)
+        super().__init__(parent)
 
-        logger.debug("DEBUGGING: Starting ComposedDialog.__init__")
+        # Store configuration
+        self.config = config
 
-        try:
-            super().__init__(parent)
-            logger.debug("DEBUGGING: QDialog.__init__ completed")
+        # Create main layout and content widget
+        self.main_layout = QVBoxLayout(self)
+        self.content_widget = QWidget()
+        self.main_layout.addWidget(self.content_widget)
 
-            # Store configuration
-            self.config = config
-            logger.debug("DEBUGGING: Configuration stored")
+        # Create dialog context for component communication
+        self.context = DialogContext(
+            dialog=self,
+            main_layout=self.main_layout,
+            content_widget=self.content_widget,
+            config=config
+        )
 
-            # Create main layout and content widget
-            self.main_layout = QVBoxLayout(self)
-            self.content_widget = QWidget()
-            self.main_layout.addWidget(self.content_widget)
-            logger.debug("DEBUGGING: Main layout and content widget created")
+        # List to track components for lifecycle management
+        self.components: list[QObject] = []
 
-            # Create dialog context for component communication
-            self.context = DialogContext(
-                dialog=self,
-                main_layout=self.main_layout,
-                content_widget=self.content_widget,
-                config=config
-            )
-            logger.debug("DEBUGGING: Dialog context created")
+        # Initialize components based on configuration
+        self._initialize_components()
 
-            # List to track components for lifecycle management
-            self.components: list[QObject] = []
-            logger.debug("DEBUGGING: Components list initialized")
-
-            # Initialize components based on configuration
-            logger.debug("DEBUGGING: About to initialize components")
-            self._initialize_components()
-            logger.debug("DEBUGGING: Components initialized successfully")
-
-            # Allow subclasses to set up custom UI
-            if hasattr(self, 'setup_ui') and callable(self.setup_ui):
-                logger.debug("DEBUGGING: About to call setup_ui()")
-                self.setup_ui()
-                logger.debug("DEBUGGING: setup_ui() completed successfully")
-            else:
-                logger.debug("DEBUGGING: No setup_ui() method found")
-
-            logger.debug("DEBUGGING: ComposedDialog.__init__ completed successfully")
-
-        except Exception as e:
-            logger.error(f"DEBUGGING: ComposedDialog.__init__ failed: {e}")
-            import traceback
-            logger.error(f"DEBUGGING: Full traceback: {traceback.format_exc()}")
-            raise
+        # Allow subclasses to set up custom UI
+        if hasattr(self, 'setup_ui') and callable(self.setup_ui):
+            self.setup_ui()
 
     def _initialize_components(self) -> None:
         """
@@ -112,48 +87,28 @@ class ComposedDialog(QDialog):
         configuration passed to the constructor. Components are automatically
         registered in the dialog context.
         """
-        from utils.logging_config import get_logger
-        logger = get_logger(__name__)
+        # Always initialize message dialog manager
+        message_manager = MessageDialogManager()
+        message_manager.initialize(self.context)
+        self._register_component("message_dialog", message_manager)
 
-        try:
-            # Always initialize message dialog manager
-            logger.debug("DEBUGGING: Creating MessageDialogManager")
-            message_manager = MessageDialogManager()
-            message_manager.initialize(self.context)
-            self._register_component("message_dialog", message_manager)
-            logger.debug("DEBUGGING: MessageDialogManager initialized successfully")
+        # Initialize button box manager if requested (default: True)
+        if self.config.get("with_button_box", True) is not False:
+            button_manager = ButtonBoxManager()
+            button_manager.initialize(self.context)
+            self._register_component("button_box", button_manager)
 
-            # Initialize button box manager if requested (default: True)
-            if self.config.get("with_button_box", True) is not False:
-                logger.debug("DEBUGGING: Creating ButtonBoxManager")
-                button_manager = ButtonBoxManager()
-                button_manager.initialize(self.context)
-                self._register_component("button_box", button_manager)
-                logger.debug("DEBUGGING: ButtonBoxManager initialized successfully")
-            else:
-                logger.debug("DEBUGGING: Skipping ButtonBoxManager (disabled in config)")
+        # Always initialize dialog signal manager for custom signals
+        from .dialog_signal_manager import DialogSignalManager
+        signal_manager = DialogSignalManager()
+        signal_manager.initialize(self.context)
+        self._register_component("dialog_signals", signal_manager)
 
-            # Always initialize dialog signal manager for custom signals
-            logger.debug("DEBUGGING: Creating DialogSignalManager")
-            from .dialog_signal_manager import DialogSignalManager
-            signal_manager = DialogSignalManager()
-            signal_manager.initialize(self.context)
-            self._register_component("dialog_signals", signal_manager)
-            logger.debug("DEBUGGING: DialogSignalManager initialized successfully")
-
-            # Always initialize Qt dialog signal manager for standard Qt signals
-            logger.debug("DEBUGGING: Creating QtDialogSignalManager")
-            from .qt_dialog_signal_manager import QtDialogSignalManager
-            qt_signal_manager = QtDialogSignalManager()
-            qt_signal_manager.initialize(self.context)
-            self._register_component("qt_dialog_signals", qt_signal_manager)
-            logger.debug("DEBUGGING: QtDialogSignalManager initialized successfully")
-
-        except Exception as e:
-            logger.error(f"DEBUGGING: Component initialization failed: {e}")
-            import traceback
-            logger.error(f"DEBUGGING: Full traceback: {traceback.format_exc()}")
-            raise
+        # Always initialize Qt dialog signal manager for standard Qt signals
+        from .qt_dialog_signal_manager import QtDialogSignalManager
+        qt_signal_manager = QtDialogSignalManager()
+        qt_signal_manager.initialize(self.context)
+        self._register_component("qt_dialog_signals", qt_signal_manager)
 
         # Initialize status bar manager if requested (default: False)
         if self.config.get("with_status_bar", False) is True:

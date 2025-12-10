@@ -19,12 +19,10 @@ pytestmark = [
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
     pytest.mark.slow,
+    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
 ]
 
 class TestROMExtractorInit:
@@ -41,14 +39,16 @@ class TestROMExtractorInit:
         assert extractor.rom_palette_extractor is not None
         assert extractor.sprite_config_loader is not None
 
-        # Verify components are of expected types
+        # Verify components are of expected types (real or mock)
         from core.default_palette_loader import DefaultPaletteLoader
-        from core.hal_compression import HALCompressor
         from core.rom_injector import ROMInjector
         from core.rom_palette_extractor import ROMPaletteExtractor
         from core.sprite_config_loader import SpriteConfigLoader
 
-        assert isinstance(extractor.hal_compressor, HALCompressor)
+        # Accept both real and mock HAL compressor (test runs with mock_hal fixture)
+        # Check by class name to avoid import ordering issues with monkeypatch
+        hal_class_name = type(extractor.hal_compressor).__name__
+        assert hal_class_name in ("HALCompressor", "MockHALCompressor"), f"Unexpected type: {hal_class_name}"
         assert isinstance(extractor.rom_injector, ROMInjector)
         assert isinstance(extractor.default_palette_loader, DefaultPaletteLoader)
         assert isinstance(extractor.rom_palette_extractor, ROMPaletteExtractor)

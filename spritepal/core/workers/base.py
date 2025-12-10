@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from core.managers.factory import ManagerFactory
 
 from core.managers.base_manager import BaseManager
-from ui.common.timing_constants import SLEEP_WORKER
+from utils.constants import SLEEP_WORKER
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

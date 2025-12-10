@@ -258,6 +258,7 @@ class UnifiedErrorHandler(QObject):
         # Error category mappings
         self._exception_category_map = {
             FileOperationError: ErrorCategory.FILE_IO,
+            InterruptedError: ErrorCategory.WORKER_THREAD,  # Check before OSError
             OSError: ErrorCategory.FILE_IO,
             IOError: ErrorCategory.FILE_IO,
             PermissionError: ErrorCategory.FILE_IO,
@@ -270,7 +271,6 @@ class UnifiedErrorHandler(QObject):
             SessionError: ErrorCategory.SESSION,
             PreviewError: ErrorCategory.PREVIEW,
             RuntimeError: ErrorCategory.SYSTEM,
-            InterruptedError: ErrorCategory.WORKER_THREAD,
         }
 
         # Recovery suggestion templates
@@ -390,7 +390,15 @@ class UnifiedErrorHandler(QObject):
             component=worker_name,
             **context_kwargs
         )
-        return self._process_error(error, context, ErrorCategory.WORKER_THREAD)
+        
+        # Determine category from exception
+        category = self._categorize_exception(error)
+        
+        # If it's unknown, fall back to worker thread category
+        if category == ErrorCategory.UNKNOWN:
+            category = ErrorCategory.WORKER_THREAD
+            
+        return self._process_error(error, context, category)
 
     def handle_qt_error(
         self,

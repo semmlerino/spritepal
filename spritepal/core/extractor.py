@@ -4,7 +4,7 @@ Core sprite extraction functionality
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PIL import Image
 
@@ -251,3 +251,63 @@ class SpriteExtractor:
         logger.debug(f"Preview image created: {img.size[0]}x{img.size[1]} pixels")
 
         return img, num_tiles
+
+    def extract_sprite(
+        self,
+        vram_path: str,
+        output_base: str,
+        cgram_path: str | None = None,
+        oam_path: str | None = None,
+        vram_offset: int | None = None,
+        create_grayscale: bool = True,
+        create_metadata: bool = True,
+        create_palette_files: bool = True,
+    ) -> dict[str, Any]:
+        """Extract sprite from VRAM with full metadata.
+
+        Wrapper providing the interface expected by CoreOperationsManager.
+        Delegates to extract_sprites_grayscale for core functionality.
+
+        Args:
+            vram_path: Path to VRAM dump file
+            output_base: Base path for output files (without extension)
+            cgram_path: Path to CGRAM dump file (for palette data)
+            oam_path: Path to OAM dump file (for sprite attributes)
+            vram_offset: Offset in VRAM to start extraction
+            create_grayscale: Whether to create grayscale output
+            create_metadata: Whether to create metadata file
+            create_palette_files: Whether to create palette files
+
+        Returns:
+            Dict with extraction results including image, tile_count, output_path
+        """
+        logger.info(f"extract_sprite called: vram={vram_path}, output_base={output_base}")
+        logger.debug(
+            f"Options: cgram={cgram_path}, oam={oam_path}, "
+            f"offset={vram_offset}, grayscale={create_grayscale}, "
+            f"metadata={create_metadata}, palette_files={create_palette_files}"
+        )
+
+        output_path = f"{output_base}.png"
+        image, tile_count = self.extract_sprites_grayscale(
+            vram_path, output_path, offset=vram_offset
+        )
+
+        result: dict[str, Any] = {
+            "success": True,
+            "image": image,
+            "tile_count": tile_count,
+            "output_path": output_path,
+        }
+
+        # Store optional paths for future use when palette/metadata
+        # features are implemented
+        if cgram_path:
+            result["cgram_path"] = cgram_path
+            logger.debug(f"CGRAM path stored: {cgram_path}")
+        if oam_path:
+            result["oam_path"] = oam_path
+            logger.debug(f"OAM path stored: {oam_path}")
+
+        logger.info(f"extract_sprite completed: {tile_count} tiles extracted")
+        return result
