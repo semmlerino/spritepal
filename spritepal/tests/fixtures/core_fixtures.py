@@ -240,6 +240,9 @@ def detect_manager_pollution(request: FixtureRequest) -> Generator[None, None, N
 
     This helps identify test isolation issues that could cause flaky behavior.
 
+    Note: If session_managers has been used earlier in the session, an initialized
+    registry is expected and won't trigger warnings.
+
     Escape hatch: Use @pytest.mark.allows_registry_state to skip this check.
     """
     from core.managers.registry import ManagerRegistry
@@ -259,8 +262,8 @@ def detect_manager_pollution(request: FixtureRequest) -> Generator[None, None, N
     initialized_before = registry.is_initialized()
 
     # Warn/fail if registry is initialized but test doesn't use manager fixtures
-    # (indicates pollution from a prior test)
-    if initialized_before and not uses_manager_fixture:
+    # EXCEPT if session_managers was used earlier (that's expected behavior)
+    if initialized_before and not uses_manager_fixture and not _session_state.is_initialized:
         test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
         message = (
             f"Test '{test_name}' started with ManagerRegistry already initialized "
@@ -277,7 +280,8 @@ def detect_manager_pollution(request: FixtureRequest) -> Generator[None, None, N
     initialized_after = registry.is_initialized()
 
     # Warn/fail if test left registry initialized but didn't use manager fixtures
-    if initialized_after and not uses_manager_fixture and not initialized_before:
+    # and session_managers wasn't already managing the state
+    if initialized_after and not uses_manager_fixture and not initialized_before and not _session_state.is_initialized:
         test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
         message = (
             f"Test '{test_name}' left ManagerRegistry initialized but didn't use manager fixtures. "
@@ -287,6 +291,42 @@ def detect_manager_pollution(request: FixtureRequest) -> Generator[None, None, N
             pytest.fail(message)  # Fail in CI for stricter enforcement
         else:
             warnings.warn(message, UserWarning, stacklevel=2)
+
+
+@pytest.fixture(autouse=True)
+def restore_session_managers_if_needed(request: FixtureRequest) -> Generator[None, None, None]:
+    """
+    Autouse fixture to restore session managers if they were cleaned up mid-session.
+    
+    This handles the case where a test calls cleanup_managers() directly,
+    breaking the session_managers fixture's assumption that managers persist.
+    
+    If a test uses session_managers but finds the registry uninitialized,
+    this fixture re-initializes it using the session state.
+    """
+    from core.managers import initialize_managers
+    from core.managers.registry import ManagerRegistry
+    
+    # Check if test uses session_managers fixture
+    fixture_names = getattr(request, 'fixturenames', [])
+    uses_session_managers = 'session_managers' in fixture_names or 'fast_managers' in fixture_names
+    
+    if uses_session_managers and _session_state.is_initialized:
+        # Check if managers got cleaned up mid-session
+        registry = ManagerRegistry()
+        if not registry.is_initialized() and _session_state.settings_path:
+            # Re-initialize using session state
+            test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
+            warnings.warn(
+                f"Test '{test_name}': Managers were cleaned up mid-session. "
+                "Re-initializing from session state. "
+                "This indicates a test is calling cleanup_managers() directly.",
+                UserWarning,
+                stacklevel=2
+            )
+            initialize_managers("TestApp", settings_path=_session_state.settings_path)
+    
+    yield
 
 
 @pytest.fixture
