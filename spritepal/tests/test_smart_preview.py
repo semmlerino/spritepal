@@ -355,27 +355,6 @@ class TestSmartPreviewROMCacheTier:
         # Pending saves should still be cleared even on failure
         assert len(coordinator._pending_rom_cache_saves) == 0
 
-    @pytest.mark.skip(reason="Signal.receivers() method not available in test environment")
-    def test_cache_statistics_tracking(self, coordinator, mock_rom_cache):
-        """Test cache statistics tracking for ROM cache tier"""
-        # Setup ROM cache hit
-        mock_rom_cache.get_preview_data.return_value = {
-            "tile_data": b"rom_data",
-            "width": 8,
-            "height": 8,
-            "sprite_name": "rom_sprite"
-        }
-        coordinator._cache.get.return_value = None
-
-        # Initial stats - access the internal _cache_stats directly
-        initial_rom_hits = coordinator._cache_stats.get("rom_hits", 0)
-
-        # Trigger ROM cache hit
-        coordinator._try_show_cached_preview_dual_tier()
-
-        # Check updated stats
-        assert coordinator._cache_stats["rom_hits"] == initial_rom_hits + 1
-
     def test_cleanup_flushes_pending_saves(self, coordinator, mock_rom_cache):
         """Test that cleanup flushes any pending ROM cache saves"""
         rom_path = "/test/rom.sfc"

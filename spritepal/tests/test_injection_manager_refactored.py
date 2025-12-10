@@ -341,29 +341,3 @@ class TestInjectionManagerReal:
             # If error, verify it's about size or VRAM size
             error_msg = str(e).lower()
             assert "size" in error_msg or "large" in error_msg or "vram" in error_msg
-
-    @pytest.mark.skip(reason="Deleting manager with active worker causes Qt crash - unsafe test pattern")
-    def test_worker_cleanup_on_manager_deletion_real(self, test_files):
-        """Test that workers are cleaned up when manager is deleted."""
-        # Create manager in local scope
-        manager = InjectionManager()
-
-        output_vram = test_files["output_dir"] + "/cleanup_output.vram"
-        params = {
-            "mode": "vram",
-            "sprite_path": test_files["sprite_path"],
-            "offset": 0x4000,
-            "input_vram": test_files["vram_path"],
-            "output_vram": output_vram,
-        }
-
-        # Start worker
-        result = manager.start_injection(params)
-        assert result is True
-
-        # Delete manager (should trigger cleanup)
-        del manager
-
-        # Worker should be cleaned up (no longer running)
-        # Note: Can't directly test worker state after manager deletion
-        # This documents that cleanup is handled

@@ -360,49 +360,6 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         # Test smooth scaling toggle (starts True, toggles to False)
         assert not self.fullscreen_viewer.smooth_scaling  # Should be False after toggle
 
-    @pytest.mark.skip(reason="Temporarily disabled - investigating timeout issue")
-    @patch('ui.windows.detached_gallery_window.get_extraction_manager')
-    def test_sprite_extraction_end_to_end(
-        self,
-        mock_get_manager,
-        complete_test_rom,
-        realistic_sprite_data,
-        tmp_path
-    ):
-        """Test complete sprite extraction workflow."""
-        from ui.windows.detached_gallery_window import DetachedGalleryWindow
-
-        mock_manager = Mock()
-        mock_manager.get_rom_extractor.return_value = Mock()
-        mock_manager.get_known_sprite_locations.return_value = {}
-        mock_manager.extract_sprite_to_png.return_value = True
-        mock_get_manager.return_value = mock_manager
-
-        self.gallery_window = self.create_widget(DetachedGalleryWindow)
-        self.gallery_window._set_rom_file(complete_test_rom)
-        self.gallery_window.set_sprites(realistic_sprite_data)
-
-        # Mock gallery selection
-        selected_sprite = realistic_sprite_data[2]  # Enemy Goomba
-        self.gallery_window.gallery_widget.get_selected_sprite_offset = Mock(
-            return_value=selected_sprite['offset']
-        )
-
-        # Test extraction
-        output_file = tmp_path / "extracted_goomba.png"
-        self.gallery_window._perform_extraction(
-            selected_sprite['offset'],
-            str(output_file)
-        )
-
-        # Verify extraction was called correctly
-        mock_manager.extract_sprite_to_png.assert_called_once_with(
-            complete_test_rom,
-            selected_sprite['offset'],
-            str(output_file),
-            None
-        )
-
     @patch('ui.windows.detached_gallery_window.get_extraction_manager')
     @patch('ui.workers.batch_thumbnail_worker.BatchThumbnailWorker')
     def test_large_rom_performance_workflow(

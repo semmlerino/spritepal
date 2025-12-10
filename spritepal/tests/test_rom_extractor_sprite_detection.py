@@ -275,24 +275,6 @@ class TestSpriteDetection:
         assert quality_valid >= quality_low
         assert quality_valid >= quality_random
 
-    @pytest.mark.skip(reason="Embedded sprite detection has specific requirements that need investigation")
-    def test_assess_sprite_quality_embedded_sprite_detection(self, rom_extractor, create_test_sprite_data):
-        """Test detection of embedded sprites within larger data blocks"""
-        # Create large data (> 16384 bytes) with some valid data to get initial score > 0
-        # but < 0.5 to trigger embedded check
-        noise_data = bytes([i % 256 for i in range(512)])  # Some pattern
-        padding = b"\x42" * 512  # Not all zeros
-        valid_sprite = create_test_sprite_data("valid", 256)  # 8192 bytes at offset 1024
-        more_padding = bytes([(i * 3) % 256 for i in range(7000)])  # Varied data
-
-        large_data = noise_data + padding + valid_sprite + more_padding
-
-        # Quality should detect the embedded sprite
-        quality = rom_extractor._assess_sprite_quality(large_data)
-
-        # Should find the embedded sprite and score it well
-        assert quality >= 0.7  # Embedded sprite should score well
-
     def test_calculate_entropy(self, rom_extractor):
         """Test entropy calculation"""
         # Test empty data
