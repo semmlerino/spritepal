@@ -188,50 +188,6 @@ class TestVRAMExtractionWorkerHeadless:
             # Clean up managers
             cleanup_managers()
 
-    @pytest.mark.skip(reason="Worker error signal not being emitted - VRAMExtractionWorker doesn't emit error for invalid files")
-    def test_worker_error_handling_headless(self, mock_qt_imports):
-        """Test error handling without Qt"""
-        # Initialize managers for this test
-        from core.managers import cleanup_managers, initialize_managers
-        initialize_managers("TestApp")
-
-        try:
-            bad_params = {
-                "vram_path": "/nonexistent/file.vram",
-                "cgram_path": "/nonexistent/file.cgram",
-                "output_base": "/invalid/output",
-                "create_grayscale": True,
-                "create_metadata": False,
-                "oam_path": None,
-            }
-
-            worker = VRAMExtractionWorker(bad_params)
-
-            # Mock signals
-            worker.error = Mock()
-            worker.progress = Mock()
-            worker.preview_ready = Mock()
-            worker.preview_image_ready = Mock()
-            worker.palettes_ready = Mock()
-            worker.active_palettes_ready = Mock()
-            worker.finished = Mock()
-
-            # Mock pil_to_qpixmap to avoid Qt dependency
-            with patch("core.controller.pil_to_qpixmap") as mock_pil_to_qpixmap:
-                mock_pil_to_qpixmap.return_value = Mock()
-
-                # Run worker
-                worker.run()
-
-            # Should emit error
-            assert worker.error.emit.called
-            error_msg = worker.error.emit.call_args[0][0]
-            assert any(phrase in error_msg.lower() for phrase in ["no such file", "not found", "does not exist", "vram file"])
-            assert not worker.finished.emit.called
-        finally:
-            # Clean up managers
-            cleanup_managers()
-
 class TestWorkerBusinessLogic:
     """Test worker business logic extracted from Qt dependencies"""
 

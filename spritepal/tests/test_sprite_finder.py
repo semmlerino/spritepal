@@ -143,51 +143,6 @@ class TestSpriteFinder:
             mock_ext_class.assert_called_once()
             mock_val_class.assert_called_once()
 
-    @pytest.mark.skip(reason="Mock-heavy test duplicated by integration/test_integration_sprite_finder.py::test_find_sprites_in_real_rom with better coverage")
-    def test_find_sprites_in_rom_basic(self, temp_output_dir, mock_rom_data,
-                                     mock_extractor, mock_validator):
-        """Test basic sprite finding functionality"""
-        rom_path = str(Path(temp_output_dir) / "test.rom")
-
-        # Write mock ROM data
-        with Path(rom_path).open("wb") as f:
-            f.write(mock_rom_data)
-
-        # Configure mocks
-        # Return valid sprite data for offset 0x100000
-        sprite_data = b"\x01\x02\x03\x04" * 128  # 512 bytes = 16 tiles
-        mock_extractor.rom_injector.find_compressed_sprite.side_effect = [
-            (256, sprite_data),  # First call returns sprite
-            Exception("No sprite"),  # Rest fail
-        ]
-
-        with patch("core.sprite_finder.ROMExtractor", return_value=mock_extractor), \
-             patch("core.sprite_finder.SpriteVisualValidator", return_value=mock_validator), \
-             patch("core.sprite_finder.Image") as mock_image:
-
-            # Mock image operations
-            mock_img = Mock()
-            mock_image.open.return_value = mock_img
-
-            finder = SpriteFinder(temp_output_dir)
-
-            # Find sprites
-            candidates = finder.find_sprites_in_rom(
-                rom_path,
-                start_offset=0x100000,
-                end_offset=0x100100,  # Small range for test
-                step=0x100,
-                min_confidence=0.6,
-                save_previews=True
-            )
-
-            # Should find one candidate
-            assert len(candidates) == 1
-            assert candidates[0].offset == 0x100000
-            assert candidates[0].confidence == 0.8
-            assert candidates[0].tile_count == 16
-            assert candidates[0].compressed_size == 256
-            assert candidates[0].decompressed_size == 512
 
     def test_find_sprites_filters_by_confidence(self, temp_output_dir, mock_rom_data,
                                               mock_extractor, mock_validator):

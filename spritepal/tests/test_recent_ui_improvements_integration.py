@@ -150,27 +150,6 @@ class TestMainWindowIntegration:
         assert size.width() >= 1000, f"Window width should be at least 1000, got {size.width()}"
         assert size.height() >= 650, f"Window height should be at least 650, got {size.height()}"
 
-    @pytest.mark.gui
-    @pytest.mark.skip(
-        reason="Qt stylesheets don't modify QPalette values - visual theme is applied via CSS not palette API"
-    )
-    @pytest.mark.usefixtures("setup_managers")
-    def test_main_window_palette_integration(self, qtbot) -> None:
-        """Test MainWindow palette integration with application theme."""
-        main_window = MainWindow()
-        qtbot.addWidget(main_window)
-
-        # Get current palette (should inherit from app)
-        palette = main_window.palette()
-
-        # Test that palette has dark theme colors
-        window_color = palette.color(QPalette.ColorRole.Window)
-        text_color = palette.color(QPalette.ColorRole.WindowText)
-
-        # Colors should be dark theme appropriate
-        # Note: exact colors may vary due to inheritance, so test general darkness
-        assert window_color.value() < 128, f"Window should be dark, got lightness {window_color.value()}"
-        assert text_color.value() > 200, f"Text should be light, got lightness {text_color.value()}"
 
 class TestManualOffsetDialogSignalIntegration:
     """Test manual offset dialog with new signals (offset_changed, sprite_found)."""
@@ -493,62 +472,6 @@ class TestButtonStylingWithGradients:
 class TestCompleteUserWorkflowIntegration:
     """Test complete user workflows with real Qt interaction."""
 
-    @pytest.mark.gui
-    @pytest.mark.skip(
-        reason="Test expects mocked manager but gets real manager - uses outdated ExtractionAdapter.load_rom_file API"
-    )
-    @pytest.mark.usefixtures("setup_managers")
-    @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
-    def test_load_rom_open_dialog_change_offset_workflow(self, qtbot) -> None:
-        """Test complete workflow: load ROM → open dialog → change offset → emit signal."""
-        # Get the mocked manager from the context manager (it's registered in DI)
-        from core.managers import get_extraction_manager
-        real_extraction_manager = get_extraction_manager()
-
-        # Mock ROM file loading
-        real_extraction_manager.load_rom_file.return_value = True
-        real_extraction_manager.get_rom_data.return_value = b'fake_rom_data'
-
-        # Step 1: Create and show dialog
-        dialog = UnifiedManualOffsetDialog()
-        qtbot.addWidget(dialog)
-
-        is_mock = type(dialog).__name__ == "MockUnifiedOffsetDialog"
-
-        # Step 2: Apply theme styling
-        if hasattr(dialog, 'setStyleSheet'):
-            dialog.setStyleSheet(get_theme_style())
-
-        # Step 3: Show dialog (simulates user opening it)
-        dialog.show()
-        if not is_mock:
-            qtbot.waitExposed(dialog)
-
-        if not is_mock:
-            # Step 4: Set up signal monitoring
-            offset_spy = QSignalSpy(dialog.offset_changed)
-
-        # Step 5: Simulate ROM loading (if dialog supports it)
-        if hasattr(dialog, 'load_rom'):
-            dialog.load_rom("fake_rom.smc")
-
-        # Step 6: Simulate offset change (user interaction)
-        if hasattr(dialog, 'browse_tab') and hasattr(dialog.browse_tab, 'set_offset'):
-            test_offset = 98765
-            dialog.browse_tab.set_offset(test_offset)
-
-            if not is_mock:
-                # Step 7: Wait for signal emission
-                qtbot.waitUntil(lambda: offset_spy.count() > 0, timeout=1000)
-
-                # Step 8: Verify workflow completed successfully
-                assert offset_spy.count() > 0, "Offset change should emit signal"
-
-                final_offset = offset_spy.at(offset_spy.count() - 1)[0] if offset_spy.count() > 0 else None
-                assert final_offset == test_offset, f"Final offset should be {test_offset}"
-
-        # Step 9: Test dialog can be closed properly
-        dialog.accept()
 
     @pytest.mark.gui
     @pytest.mark.usefixtures("setup_managers")

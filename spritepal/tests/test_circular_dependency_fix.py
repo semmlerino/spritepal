@@ -46,41 +46,6 @@ class TestCircularDependencyFix:
         # Verify controller is not created yet (lazy initialization)
         assert window._controller is None, "Controller should not be created during __init__"
 
-    @pytest.mark.skip(
-        reason="Creates real ExtractionController which causes Qt segfaults in test suite. "
-        "Lazy init behavior is verified by test_main_window_creates_without_controller."
-    )
-    def test_controller_created_on_first_access(self, qtbot, app, initialized_managers):
-        """Test that controller is created on first access."""
-        window = MainWindow()
-        qtbot.addWidget(window)  # Ensure proper cleanup
-
-        # Controller should not exist yet
-        assert window._controller is None
-
-        # Access controller property - this should trigger lazy initialization
-        controller = window.controller
-
-        # Verify controller was created
-        assert controller is not None, "Controller should be created on first access"
-        assert isinstance(controller, ExtractionController)
-        assert window._controller is controller, "Controller should be cached"
-
-    @pytest.mark.skip(
-        reason="Creates real ExtractionController which causes Qt segfaults in test suite. "
-        "Caching behavior is verified by test_controller_setter_works."
-    )
-    def test_controller_returns_same_instance(self, qtbot, app, initialized_managers):
-        """Test that controller property returns the same instance on subsequent access."""
-        window = MainWindow()
-        qtbot.addWidget(window)  # Ensure proper cleanup
-
-        # Get controller twice
-        controller1 = window.controller
-        controller2 = window.controller
-
-        # Should be the same instance
-        assert controller1 is controller2, "Controller should return same instance"
 
     def test_controller_setter_works(self, qtbot, app, initialized_managers):
         """Test that controller setter works for testing purposes."""
@@ -97,23 +62,6 @@ class TestCircularDependencyFix:
         assert window.controller is mock_controller, "Controller setter should work"
         assert window._controller is mock_controller, "Internal reference should be updated"
 
-    @pytest.mark.skip(
-        reason="Creates real ExtractionController which causes Qt segfaults in test suite. "
-        "Method dispatch is verified by test_controller_setter_works using mock."
-    )
-    def test_controller_methods_work_after_lazy_init(self, qtbot, app, initialized_managers):
-        """Test that controller methods work correctly after lazy initialization."""
-        window = MainWindow()
-        qtbot.addWidget(window)  # Ensure proper cleanup
-
-        # This should trigger lazy initialization and then call the method
-        with patch.object(ExtractionController, "start_rom_extraction") as mock_method:
-            params = {"test": "params"}
-            window.controller.start_rom_extraction(params)
-            mock_method.assert_called_once_with(params)
-
-        # Verify controller was created
-        assert window._controller is not None
 
     def test_no_circular_import_at_module_level(self):
         """Test that there's no circular import at module level.
@@ -141,20 +89,3 @@ class TestCircularDependencyFix:
         # If we get here, it didn't hang
         assert window is not None
 
-    @pytest.mark.skip(
-        reason="Creates multiple real ExtractionControllers which causes Qt segfaults. "
-        "Independent controllers is an implementation detail - main concern (lazy init) is tested."
-    )
-    def test_multiple_main_windows_independent_controllers(self, qtbot, app, initialized_managers):
-        """Test that multiple MainWindow instances have independent controllers."""
-        window1 = MainWindow()
-        window2 = MainWindow()
-        qtbot.addWidget(window1)  # Ensure proper cleanup
-        qtbot.addWidget(window2)  # Ensure proper cleanup
-
-        # Access controllers to trigger lazy initialization
-        controller1 = window1.controller
-        controller2 = window2.controller
-
-        # Each window should have its own controller instance
-        assert controller1 is not controller2, "Each MainWindow should have its own controller"

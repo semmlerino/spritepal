@@ -119,12 +119,6 @@ class TestSpriteGalleryTab:
 
         assert valid_count == 17, f"Expected 17 valid pixmaps, got {valid_count}"
 
-    @pytest.mark.gui
-    @pytest.mark.skip(reason="Implementation changed - SpriteGalleryWidget no longer uses QScrollArea")
-    def test_gallery_no_stretching_embedded(self, gallery_with_sprites):
-        """Test that embedded gallery doesn't stretch vertically."""
-        # This test assumes QScrollArea-based implementation which has been replaced
-        pass
 
 class TestDetachedGalleryWindow:
     """Test the detached gallery window functionality."""
@@ -150,20 +144,6 @@ class TestDetachedGalleryWindow:
         # Close window
         tab.detached_window.close()
 
-    @pytest.mark.gui
-    @pytest.mark.skip(reason="Thumbnails are not copied in current virtual scrolling implementation")
-    def test_detached_gallery_thumbnails_copied(self, gallery_with_sprites, qtbot, managers_initialized):
-        """Test that thumbnails are copied to detached gallery."""
-        # The current virtual scrolling implementation loads thumbnails on demand
-        # rather than copying pre-loaded thumbnails
-        pass
-
-    @pytest.mark.gui
-    @pytest.mark.skip(reason="Implementation changed - SpriteGalleryWidget no longer uses QScrollArea")
-    def test_detached_gallery_proper_scrolling(self, gallery_with_sprites, qtbot, managers_initialized):
-        """Test that detached gallery has proper scrolling setup."""
-        # This test assumes QScrollArea-based implementation which has been replaced
-        pass
 
     @pytest.mark.gui
     def test_detached_window_signals(self, gallery_with_sprites, qtbot, managers_initialized):
@@ -213,32 +193,6 @@ class TestDetachedGalleryWindow:
 
         # Check cleanup
         assert tab.detached_window is None
-
-@pytest.mark.skip(reason="Implementation changed - gallery now uses virtual scrolling model/view pattern")
-class TestGalleryLayoutFixes:
-    """Test the layout fixes for empty space issues.
-
-    NOTE: These tests are skipped because the gallery widget implementation has
-    changed from a direct widget-based approach to a model/view pattern with
-    virtual scrolling. The old APIs (columns, _update_columns, container_widget,
-    size_slider, compressed_check, etc.) no longer exist in the current implementation.
-    """
-
-    @pytest.mark.gui
-    def test_gallery_columns_update(self, gallery_with_sprites, qtbot):
-        pass
-
-    @pytest.mark.gui
-    def test_gallery_force_layout_update(self, gallery_with_sprites, qtbot):
-        pass
-
-    @pytest.mark.gui
-    def test_thumbnail_size_change(self, gallery_with_sprites, qtbot):
-        pass
-
-    @pytest.mark.gui
-    def test_gallery_filtering(self, gallery_with_sprites, qtbot):
-        pass
 
 class TestGalleryCaching:
     """Test gallery scan result caching."""

@@ -78,58 +78,6 @@ class TestRealCrossDialogIntegration:
         self.manager_factory.cleanup()
         self.test_data.cleanup()
 
-    @pytest.mark.skip(
-        reason="GridArrangementDialog shows blocking QMessageBox.critical() on sprite load error, "
-        "causing test suite to hang. Needs QMessageBox mocking or valid test sprites."
-    )
-    def test_extraction_to_grid_arrangement_workflow_real(self):
-        """
-        Test real workflow: Extract sprites → Arrange in grid.
-
-        This test validates the complete workflow using real implementations,
-        catching integration bugs that mocked tests miss.
-        """
-        # Get real test data
-        extraction_data = self.test_data.get_vram_extraction_data("medium")
-
-        # Create real extraction manager (worker-owned pattern)
-        extraction_manager = self.manager_factory.create_extraction_manager(isolated=True)
-
-        # Validate manager has proper Qt parent
-        assert extraction_manager.parent() is self.qt_app
-
-        # Test extraction with real data
-        extraction_params = {
-            "vram_path": extraction_data["vram_path"],
-            "cgram_path": extraction_data["cgram_path"],
-            "output_base": extraction_data["output_base"],
-            "vram_offset": extraction_data["vram_offset"],
-            "create_metadata": True,
-        }
-
-        # Validate extraction parameters with real manager
-        is_valid = extraction_manager.validate_extraction_params(extraction_params)
-        assert is_valid, "Real extraction parameters should be valid"
-
-        # Test grid arrangement dialog with real extracted data
-        sprite_path = extraction_data["output_base"] + ".png"  # Expected output path
-        with qt_dialog_test(GridArrangementDialog, sprite_path) as dialog:
-            # Validate dialog has proper Qt parent (None is correct - QApplication cannot be widget parent)
-            assert dialog.parent() is None
-
-            # Test dialog initialization with real data
-            dialog.show()
-            QApplication.processEvents()  # Process events to ensure proper rendering
-
-            # Validate dialog state - check that it was created successfully
-            assert dialog.sprite_path == sprite_path
-            assert hasattr(dialog, "arrangement_list")  # Should have arrangement UI
-
-            # Test dialog workflow integration
-            # This catches real Qt lifecycle and signal behavior
-            arranged_path = dialog.get_arranged_path()
-            # Path might be None if no arrangement was done yet, which is normal for a new dialog
-            assert arranged_path is None or isinstance(arranged_path, str)
 
     def test_extraction_to_injection_workflow_real(self):
         """
@@ -251,69 +199,6 @@ class TestRealCrossDialogIntegration:
                 # If controller creation fails with real managers, that's a real bug
                 pytest.fail(f"Controller creation with real managers failed: {e}")
 
-    @pytest.mark.skip(
-        reason="GridArrangementDialog shows blocking QMessageBox.critical() on sprite load error, "
-        "causing test suite to hang. Needs QMessageBox mocking or valid test sprites."
-    )
-    def test_dialog_lifecycle_real_qt_behavior(self):
-        """
-        Test real Qt dialog lifecycle management.
-
-        This validates proper Qt parent/child relationships and lifecycle
-        management that mocked Qt components cannot test.
-        """
-        created_dialogs = []
-
-        try:
-            # Create a temporary sprite file for the dialog
-            import tempfile
-
-            from PIL import Image
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
-                temp_sprite_path = temp_file.name
-                # Create a proper minimal 16x16 PNG file that the dialog can process
-                test_image = Image.new("RGB", (16, 16), color="white")
-                test_image.save(temp_file.name)
-
-            # Create multiple dialogs with real Qt lifecycle
-            with qt_dialog_test(GridArrangementDialog, temp_sprite_path) as grid_dialog:
-                created_dialogs.append(grid_dialog)
-
-                # Test real Qt parent/child relationship (QApplication cannot be widget parent)
-                assert grid_dialog.parent() is None, "Dialog should have no parent when no parent widget provided"
-
-                # Create nested dialog context
-                with qt_dialog_test(SettingsDialog) as settings_dialog:
-                    created_dialogs.append(settings_dialog)
-
-                    # Test multiple dialogs with proper Qt lifecycle
-                    grid_dialog.show()
-                    QApplication.processEvents()
-                    settings_dialog.show()
-                    QApplication.processEvents()
-
-                    # Both dialogs should have proper Qt relationships
-                    for dialog in [grid_dialog, settings_dialog]:
-                        assert dialog.parent() is None
-                        assert dialog.isModal()  # Both dialogs are configured as modal
-
-                    # Test Qt event processing with multiple dialogs
-                    self.qt_framework.process_events(100)
-
-                    # Validate no Qt lifecycle errors occurred
-                    for dialog in created_dialogs:
-                        assert hasattr(dialog, "close"), "Dialog should be valid Qt object"
-
-        except Exception as e:
-            # Real Qt exceptions reveal actual lifecycle issues
-            # This is valuable information that mocked tests hide
-            pytest.fail(f"Real Qt lifecycle error (this reveals actual bugs): {e}")
-        finally:
-            # Clean up temporary file
-            if "temp_sprite_path" in locals():
-                import os
-                with contextlib.suppress(OSError):
-                    os.unlink(temp_sprite_path)
 
     def test_real_integration_catches_architectural_bugs(self):
         """
