@@ -9,10 +9,9 @@ from operator import itemgetter
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
-    QApplication,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -714,14 +713,16 @@ class ROMExtractionPanel(QWidget):
             dialog.show()
             dialog.raise_()  # Also raise to ensure it's on top
             dialog.activateWindow()  # And activate to ensure focus
-            # Process events to ensure the show takes effect immediately
-            QApplication.processEvents()
 
-            # Connect deferred signals now that dialog is fully shown
+            # Connect deferred signals after Qt processes the show event
+            # Using QTimer.singleShot(0) defers execution to next event loop iteration
             if hasattr(dialog, '_deferred_signal_connection'):
-                logger.debug("[DEBUG] Calling deferred signal connection...")
-                dialog._deferred_signal_connection()
-                delattr(dialog, '_deferred_signal_connection')  # Clean up
+                def _do_deferred_connect():
+                    if hasattr(dialog, '_deferred_signal_connection'):
+                        logger.debug("[DEBUG] Calling deferred signal connection...")
+                        dialog._deferred_signal_connection()
+                        delattr(dialog, '_deferred_signal_connection')  # Clean up
+                QTimer.singleShot(0, _do_deferred_connect)
 
             logger.debug("[DEBUG] Showed and raised ManualOffsetDialog singleton")
         else:
@@ -1429,8 +1430,11 @@ class ROMExtractionPanel(QWidget):
     def _save_scan_results_to_cache(self, dialog: ScanDialog, found_offsets: list[Any]) -> None:
         """Save scan results to cache."""
         self._update_cache_status(dialog, "saving", "💾 Saving results to cache...")
-        QApplication.processEvents()
+        # Defer actual save to next event loop iteration to allow UI update
+        QTimer.singleShot(0, lambda: self._do_cache_save(dialog, found_offsets))
 
+    def _do_cache_save(self, dialog: ScanDialog, found_offsets: list[Any]) -> None:
+        """Perform the actual cache save operation."""
         # Convert to cache format
         sprite_locations = {}
         for sprite in found_offsets:

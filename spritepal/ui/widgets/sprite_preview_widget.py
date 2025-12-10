@@ -1093,7 +1093,8 @@ class SpritePreviewWidget(QWidget):
             # Progressive Qt update strategy for guaranteed visibility
             self.preview_label.update()           # Schedule paint event
             self.preview_label.repaint()          # Force immediate repaint
-            QApplication.processEvents()          # Process any pending events
+            # Note: repaint() already forces synchronous paint; processEvents() removed
+            # to prevent reentrancy bugs
 
     def _diagnose_preview_state(self) -> None:
         """Diagnostic method to check preview widget state."""
@@ -1184,8 +1185,8 @@ class SpritePreviewWidget(QWidget):
         # Raise to top
         self.preview_label.raise_()
 
-        # Process events to ensure visibility
-        QApplication.processEvents()
+        # Note: processEvents() removed to prevent reentrancy bugs;
+        # show() already queues necessary paint events
 
         logger.debug("[TRACE] Forced visibility update complete")
 
@@ -1308,10 +1309,9 @@ class SpritePreviewWidget(QWidget):
         if layout is not None:
             layout.update()
 
-        # Stage 4: Process any pending paint events
-        QApplication.processEvents()
-
-        # Stage 5: Delayed verification update (ensures display)
+        # Stage 4: Delayed verification update (ensures display)
+        # Note: processEvents() removed to prevent reentrancy bugs;
+        # the timer-based verification handles deferred updates safely
         if self._update_timer is not None:
             self._update_timer.start(1)  # 1ms delayed update verification
 
@@ -1396,8 +1396,9 @@ class SpritePreviewWidget(QWidget):
         logger.debug(f"[SPRITE_DISPLAY] VERIFICATION SUCCESS: pixmap={pixmap_size.width()}x{pixmap_size.height()}, widget={widget_size.width()}x{widget_size.height()}")
 
         # Force final display update
+        # Note: processEvents() removed to prevent reentrancy bugs;
+        # update() schedules paint event that will be processed by event loop
         self.preview_label.update()
-        QApplication.processEvents()
 
         # Set essential info to show successful display
         if self.essential_info_label is not None:

@@ -239,6 +239,9 @@ class ROMCache:
             # Write to temp file then move to avoid corruption
             with temp_file.open("w") as f:
                 json.dump(cache_data, f, indent=2)
+                # Ensure data reaches disk before rename (prevents data loss on power failure)
+                f.flush()
+                os.fsync(f.fileno())
             temp_file.replace(cache_file)
         except Exception as e:
             # Clean up temp file if it exists

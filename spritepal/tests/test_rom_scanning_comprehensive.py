@@ -16,32 +16,64 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
-    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.usefixtures("isolated_managers", "mock_hal"),  # DI + HAL mocking (isolated to prevent pollution)
 ]
 
 class CustomMockHALCompressor(MockHALCompressor):
-    """Custom HAL compressor for ROM scanning tests with specific size control."""
+    """Custom HAL compressor for ROM scanning tests with specific size control.
+
+    Note: The ROMInjector.find_compressed_sprite() creates a window from the ROM
+    and passes offset=0 to the HAL compressor. This mock identifies sprites by
+    checking the window content's first bytes (the "signature" at the start of
+    each configured offset's window).
+    """
 
     def __init__(self):
         super().__init__()
-        self._sprite_responses = {}  # Map offset to (compressed_size, decompressed_data)
+        self._sprite_responses: dict[bytes, tuple[int, bytes]] = {}  # signature -> (compressed_size, decompressed_data)
+        self._default_response: tuple[int, bytes] | None = None
 
-    def configure_sprite_response(self, offset: int, compressed_size: int, decompressed_data: bytes):
-        """Configure specific response for a ROM offset."""
-        self._sprite_responses[offset] = (compressed_size, decompressed_data)
+    def configure_sprite_response(self, signature: bytes, compressed_size: int, decompressed_data: bytes):
+        """Configure response for data windows starting with given signature."""
+        self._sprite_responses[signature] = (compressed_size, decompressed_data)
+
+    def set_default_response(self, compressed_size: int, decompressed_data: bytes):
+        """Set default response for any decompression request (used for simple tests)."""
+        self._default_response = (compressed_size, decompressed_data)
 
     def decompress_from_rom(self, rom_path: str, offset: int, output_path: str | None = None) -> bytes:
-        """Return configured sprite data or raise exception."""
-        if offset in self._sprite_responses:
-            _, decompressed_data = self._sprite_responses[offset]
+        """Return configured sprite data or raise exception.
+
+        Matches responses by reading the first bytes of the ROM window file
+        and comparing to configured signatures.
+        """
+        from pathlib import Path
+
+        # If we have a default response configured, always return it
+        if self._default_response is not None:
+            _, decompressed_data = self._default_response
             if output_path:
-                from pathlib import Path
                 Path(output_path).parent.mkdir(parents=True, exist_ok=True)
                 Path(output_path).write_bytes(decompressed_data)
             return decompressed_data
-        else:
-            # Default behavior - raise exception for unknown offsets
+
+        # Read signature from the temp ROM window file
+        try:
+            with Path(rom_path).open("rb") as f:
+                file_signature = f.read(4)  # First 4 bytes as signature
+        except OSError:
             raise Exception("No sprite found")
+
+        # Check if signature matches any configured response
+        if file_signature in self._sprite_responses:
+            _, decompressed_data = self._sprite_responses[file_signature]
+            if output_path:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(output_path).write_bytes(decompressed_data)
+            return decompressed_data
+
+        # Default behavior - raise exception for unknown signatures
+        raise Exception("No sprite found")
 
 class TestROMScanning:
     """Test ROM scanning functionality with comprehensive coverage"""
@@ -53,18 +85,24 @@ class TestROMScanning:
 
     @pytest.fixture
     def mock_rom_file(self, tmp_path):
-        """Create a mock ROM file for testing"""
+        """Create a mock ROM file for testing.
+
+        Each sprite offset gets a unique 4-byte signature so the mock HAL
+        can distinguish between different scan positions.
+        """
         rom_path = tmp_path / "test_rom.sfc"
         # Create a 128KB ROM with some test data
         rom_data = bytearray(128 * 1024)
 
-        # Add some compressed sprite-like data at known offsets
-        # These should be detected by the scanner
+        # Add compressed sprite-like data at known offsets with UNIQUE signatures
+        # These signatures are used by CustomMockHALCompressor to match responses
         test_offsets = [0x8000, 0x10000, 0x18000]
-        for i, offset in enumerate(test_offsets):
-            # Add mock compressed data signature
-            rom_data[offset:offset+4] = b"\x01\x02\x03\x04"  # Mock compressed header
-            # Add some tile-like data that should decompress nicely
+        signatures = [b"\x01\x01\x01\x01", b"\x02\x02\x02\x02", b"\x03\x03\x03\x03"]
+
+        for i, (offset, sig) in enumerate(zip(test_offsets, signatures)):
+            # Add unique signature at start of each sprite location
+            rom_data[offset:offset+4] = sig
+            # Add some tile-like data
             for j in range(offset+4, offset+100):
                 rom_data[j] = (i * 16 + j % 16) & 0xFF
 
@@ -76,11 +114,12 @@ class TestROMScanning:
         # Set up custom HAL compressor with specific responses
         mock_hal = CustomMockHALCompressor()
 
-        # Configure responses for test offsets (16 tiles = 512 bytes)
+        # Configure responses using signatures that match mock_rom_file
+        # (16 tiles = 512 bytes)
         sprite_data = b"\x00" * 512
-        mock_hal.configure_sprite_response(0x8000, 64, sprite_data)
-        mock_hal.configure_sprite_response(0x10000, 64, sprite_data)
-        mock_hal.configure_sprite_response(0x18000, 64, sprite_data)
+        mock_hal.configure_sprite_response(b"\x01\x01\x01\x01", 64, sprite_data)
+        mock_hal.configure_sprite_response(b"\x02\x02\x02\x02", 64, sprite_data)
+        mock_hal.configure_sprite_response(b"\x03\x03\x03\x03", 64, sprite_data)
 
         # Replace the HAL compressor
         rom_extractor.rom_injector.hal_compressor = mock_hal
@@ -128,10 +167,11 @@ class TestROMScanning:
         from unittest.mock import patch
 
         # Set up custom HAL compressor with different sprite data
+        # Signatures match mock_rom_file: 0x8000=\x01..., 0x10000=\x02..., 0x18000=\x03...
         mock_hal = CustomMockHALCompressor()
-        mock_hal.configure_sprite_response(0x8000, 32, b"\x00" * 512)  # Good sprite
-        mock_hal.configure_sprite_response(0x10000, 48, b"\x11" * 512)  # Better sprite
-        mock_hal.configure_sprite_response(0x18000, 16, b"\x22" * 512)  # Different sprite
+        mock_hal.configure_sprite_response(b"\x01\x01\x01\x01", 32, b"\x00" * 512)  # Good sprite
+        mock_hal.configure_sprite_response(b"\x02\x02\x02\x02", 48, b"\x11" * 512)  # Better sprite
+        mock_hal.configure_sprite_response(b"\x03\x03\x03\x03", 16, b"\x22" * 512)  # Different sprite
 
         rom_extractor.rom_injector.hal_compressor = mock_hal
 
@@ -166,10 +206,11 @@ class TestROMScanning:
         from unittest.mock import patch
 
         # Set up custom HAL compressor with different alignment scenarios
+        # Signatures match mock_rom_file: 0x8000=\x01..., 0x10000=\x02..., 0x18000=\x03...
         mock_hal = CustomMockHALCompressor()
-        mock_hal.configure_sprite_response(0x8000, 64, b"\x00" * 512)  # Perfect alignment (16 tiles)
-        mock_hal.configure_sprite_response(0x10000, 68, b"\x11" * 520)  # Minor misalignment (16 tiles + 8 extra)
-        mock_hal.configure_sprite_response(0x18000, 16, b"\x22" * 32)   # Too small (1 tile)
+        mock_hal.configure_sprite_response(b"\x01\x01\x01\x01", 64, b"\x00" * 512)  # Perfect alignment (16 tiles)
+        mock_hal.configure_sprite_response(b"\x02\x02\x02\x02", 68, b"\x11" * 520)  # Minor misalignment (16 tiles + 8 extra)
+        mock_hal.configure_sprite_response(b"\x03\x03\x03\x03", 16, b"\x22" * 32)   # Too small (1 tile)
 
         rom_extractor.rom_injector.hal_compressor = mock_hal
 

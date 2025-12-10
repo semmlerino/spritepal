@@ -132,6 +132,10 @@ class SpriteScanWorker(BaseWorker):
 
         # Progress callback to handle results as they come in
         def progress_callback(current_progress: int, total_progress: int) -> None:
+            # Check cancellation before any work to prevent race condition with cache save
+            if self._is_cancelled or (self._cancellation_token and self._cancellation_token.is_set()):
+                return
+
             # Map parallel finder progress to our progress signals
             total_range = end_offset - original_start_offset  # Use original for consistency
 

@@ -38,6 +38,7 @@ class ROMHeader:
     checksum: int
     checksum_complement: int
     header_offset: int
+    rom_type_offset: int  # 0x7FC0 for LoROM, 0xFFC0 for HiROM
 
 @dataclass
 class SpritePointer:
@@ -101,6 +102,7 @@ class ROMInjector(SpriteInjector):
                         checksum=checksum,
                         checksum_complement=checksum_complement,
                         header_offset=header_offset,
+                        rom_type_offset=offset,  # Store which offset was validated
                     )
                     logger.info(f"Found valid ROM header at offset 0x{header_offset + offset:X}")
                     logger.debug(f"ROM Title: {title}")
@@ -139,14 +141,21 @@ class ROMInjector(SpriteInjector):
         # Calculate new checksum
         checksum, complement = self.calculate_checksum(rom_data)
 
-        # Find header location
-        header_base = self.header.header_offset + (
-            ROM_HEADER_OFFSET_LOROM if len(rom_data) <= 0x8000 else ROM_HEADER_OFFSET_HIROM
-        )
+        # Use the validated header offset stored during read_rom_header()
+        header_base = self.header.header_offset + self.header.rom_type_offset
 
         # Update checksum in ROM
         struct.pack_into("<H", rom_data, header_base + 28, complement)
         struct.pack_into("<H", rom_data, header_base + 30, checksum)
+
+        # Verify write was successful
+        written_complement = struct.unpack_from("<H", rom_data, header_base + 28)[0]
+        written_checksum = struct.unpack_from("<H", rom_data, header_base + 30)[0]
+        if written_complement != complement or written_checksum != checksum:
+            raise ValueError(
+                f"Checksum write verification failed: expected {complement:04X}/{checksum:04X}, "
+                f"got {written_complement:04X}/{written_checksum:04X}"
+            )
 
         # Update header
         old_checksum = self.header.checksum
@@ -188,14 +197,21 @@ class ROMInjector(SpriteInjector):
                 f"No expected size provided, using default max limit: {expected_size} bytes"
             )
 
-        # Create temp file for decompression
+        # Create temp file for decompression with only the relevant portion
+        # Extract a window from offset to offset + 128KB (or end of ROM)
+        # This reduces memory/disk usage from 4MB to ~128KB per operation
+        window_size = 0x20000  # 128KB window - sufficient for any SNES sprite
+        window_end = min(len(rom_data), offset + window_size)
+        rom_window = rom_data[offset:window_end]
+        adjusted_offset = 0  # Offset within the window
+
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(rom_data)
+            tmp.write(rom_window)
             tmp_rom = tmp.name
 
         try:
-            # Decompress sprite data
-            decompressed = self.hal_compressor.decompress_from_rom(tmp_rom, offset)
+            # Decompress sprite data from the window
+            decompressed = self.hal_compressor.decompress_from_rom(tmp_rom, adjusted_offset)
 
             # Validate decompressed data
             if len(decompressed) == 0:
@@ -232,7 +248,7 @@ class ROMInjector(SpriteInjector):
 
                     # Try to find valid sprite data within the full decompressed data
                     # Need to use the original full data, not truncated
-                    full_data = self.hal_compressor.decompress_from_rom(tmp_rom, offset)
+                    full_data = self.hal_compressor.decompress_from_rom(tmp_rom, adjusted_offset)
                     sprite_offset = self._find_sprite_in_data(full_data, expected_size)
                     if sprite_offset >= 0:
                         logger.info(
@@ -527,6 +543,12 @@ class ROMInjector(SpriteInjector):
             Path(compressed_path).unlink(missing_ok=True)
 
             # Inject compressed data into ROM
+            # Bounds validation to prevent ROM corruption
+            if sprite_offset + compressed_size > len(self.rom_data):
+                raise ValueError(
+                    f"Sprite data would overflow ROM: offset 0x{sprite_offset:X} + "
+                    f"{compressed_size} bytes exceeds ROM size {len(self.rom_data)}"
+                )
             logger.info(f"Injecting {compressed_size} bytes of compressed data at offset 0x{sprite_offset:X}")
             self.rom_data[sprite_offset : sprite_offset + compressed_size] = (
                 compressed_data

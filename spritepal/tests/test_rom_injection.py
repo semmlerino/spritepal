@@ -96,6 +96,7 @@ class TestROMInjector(unittest.TestCase):
             assert header.rom_size == 8
             assert header.checksum == 4660
             assert header.header_offset == 0
+            assert header.rom_type_offset == 0x7FC0  # Should detect LoROM offset
 
         finally:
             os.unlink(tmp_path)
@@ -111,6 +112,7 @@ class TestROMInjector(unittest.TestCase):
             checksum=0,
             checksum_complement=0,
             header_offset=0,
+            rom_type_offset=0x7FC0,  # LoROM offset
         )
 
         checksum, complement = self.injector.calculate_checksum(self.test_rom)

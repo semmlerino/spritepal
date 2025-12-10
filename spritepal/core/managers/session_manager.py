@@ -10,6 +10,8 @@ from typing import Any, TypeVar
 from PySide6.QtCore import Signal
 from typing_extensions import override
 
+from utils.file_validator import atomic_write
+
 from .base_manager import BaseManager
 from .exceptions import SessionError, ValidationError
 
@@ -185,8 +187,9 @@ class SessionManager(BaseManager):
             return
 
         try:
-            with self._settings_file.open("w") as f:
-                json.dump(self._settings, f, indent=2)
+            # Use atomic write to prevent corruption on crash/power loss
+            data = json.dumps(self._settings, indent=2).encode("utf-8")
+            atomic_write(self._settings_file, data)
 
             self._session_dirty = False
             self.settings_saved.emit()

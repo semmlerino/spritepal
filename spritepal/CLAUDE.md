@@ -45,6 +45,11 @@ uv run basedpyright core ui utils
 # Tests - routine run (stop on first failure, short tracebacks)
 QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=1 --tb=short
 
+# Tests - full suite with log file (PREFERRED for long runs)
+# Prevents hangs from output buffering and allows progress monitoring
+QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=5 --tb=short -q > /tmp/pytest_output.log 2>&1 &
+# Then check progress with: tail -50 /tmp/pytest_output.log
+
 # Tests - specific subsets
 QT_QPA_PLATFORM=offscreen uv run pytest tests -m "headless and not slow" --maxfail=1  # Fast tests
 QT_QPA_PLATFORM=offscreen uv run pytest tests -m "gui" --maxfail=1                    # GUI tests (offscreen)
