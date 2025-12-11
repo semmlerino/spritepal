@@ -984,102 +984,6 @@ class ControllerUIBridgeProtocol(Protocol):
 # ========== Application State Manager Protocols (A.4) ==========
 
 
-class WorkflowStateProtocol(Protocol):
-    """Protocol for workflow state management.
-
-    This protocol defines the interface for managing extraction workflow state,
-    allowing components to check state and request transitions without direct
-    coupling to ApplicationStateManager.
-    """
-
-    @property
-    def current_state(self) -> Any:
-        """Get current workflow state (ExtractionState enum)."""
-        ...
-
-    @property
-    def is_busy(self) -> bool:
-        """Check if a blocking operation is in progress."""
-        ...
-
-    @property
-    def can_extract(self) -> bool:
-        """Check if extraction can be started."""
-        ...
-
-    @property
-    def can_preview(self) -> bool:
-        """Check if preview can be started."""
-        ...
-
-    @property
-    def can_search(self) -> bool:
-        """Check if search can be started."""
-        ...
-
-    @property
-    def can_scan(self) -> bool:
-        """Check if sprite scanning can be started."""
-        ...
-
-    @property
-    def error_message(self) -> str | None:
-        """Get error message if in error state."""
-        ...
-
-    def transition_to(self, new_state: Any, error_message: str | None = None) -> bool:
-        """Attempt to transition to a new workflow state."""
-        ...
-
-    def reset(self) -> None:
-        """Reset workflow to idle state."""
-        ...
-
-
-class CacheStatsProtocol(Protocol):
-    """Protocol for cache statistics tracking.
-
-    This protocol defines the interface for tracking cache hit/miss statistics
-    during a session, independent of the underlying cache implementation.
-    """
-
-    def on_cache_hit(self) -> None:
-        """Record a cache hit."""
-        ...
-
-    def on_cache_miss(self) -> None:
-        """Record a cache miss."""
-        ...
-
-    def get_stats(self) -> dict[str, int]:
-        """Get current statistics as dict with hits, misses, total_requests."""
-        ...
-
-    @property
-    def hits(self) -> int:
-        """Get total cache hits."""
-        ...
-
-    @property
-    def misses(self) -> int:
-        """Get total cache misses."""
-        ...
-
-    @property
-    def total_requests(self) -> int:
-        """Get total requests."""
-        ...
-
-    @property
-    def hit_rate(self) -> float:
-        """Get hit rate as percentage (0.0-100.0)."""
-        ...
-
-    def reset_stats(self) -> None:
-        """Reset all statistics to zero."""
-        ...
-
-
 class ApplicationStateManagerProtocol(Protocol):
     """Protocol for the consolidated application state manager.
 
@@ -1175,13 +1079,4 @@ class ApplicationStateManagerProtocol(Protocol):
 
     def get_current_offset(self) -> int | None:
         """Get the current ROM offset."""
-        ...
-
-    # Adapters for backward compatibility
-    def get_workflow_adapter(self) -> WorkflowStateProtocol:
-        """Get workflow state manager adapter."""
-        ...
-
-    def get_cache_adapter(self) -> CacheStatsProtocol:
-        """Get cache statistics adapter."""
         ...

@@ -30,15 +30,13 @@ from typing_extensions import override
 
 if TYPE_CHECKING:
     from core.managers import ExtractionManager
+    from core.managers.application_state_manager import ApplicationStateManager
 
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
+from core.managers.application_state_manager import ExtractionState
 from ui.common import WorkerManager
 from ui.components.navigation import SpriteNavigator
 from ui.dialogs import ResumeScanDialog, UnifiedManualOffsetDialog, UserErrorDialog
-from ui.rom_extraction.state_manager import (
-    ExtractionState,
-    get_extraction_state_manager,
-)
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
     ModeSelectorWidget,
@@ -291,9 +289,10 @@ class ROMExtractionPanel(QWidget):
         self.rom_size = 0  # Track ROM size for slider limits
         self._manual_offset_mode = True  # Default to manual offset mode
 
-        # State manager for coordinating operations
-        self.state_manager = get_extraction_state_manager()
-        self.state_manager.state_changed.connect(self._on_state_changed)
+        # State manager for coordinating operations (ApplicationStateManager)
+        from core.managers import get_registry
+        self.state_manager: ApplicationStateManager = get_registry().get_application_state_manager()
+        self.state_manager.workflow_state_changed.connect(self._on_state_changed)
 
         # Worker references to track and clean up
         self.search_worker = None

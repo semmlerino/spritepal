@@ -455,4 +455,7 @@ markers = [
     "fixture_test: Tests that verify fixtures",
     "infrastructure: Infrastructure validation tests",
     "validation: Validation tests",
+
+    # Migration markers
+    "di_migration: Tests for dependency injection migration readiness",
 ]

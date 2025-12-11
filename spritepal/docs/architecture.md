@@ -52,24 +52,27 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
        from spritepal.core.controller import Controller
    ```
 
-2. **Dependency Injection**
-   Instead of importing managers directly:
+2. **Pure Dependency Injection (Preferred)**
+   Pass managers as constructor parameters:
    ```python
-   # Bad
-   from spritepal.core.managers import get_extraction_manager
-   
-   # Good
-   def __init__(self, extraction_manager: ExtractionManager):
+   # Required: Pass manager explicitly
+   def __init__(self, extraction_manager: ExtractionManagerProtocol):
        self.extraction_manager = extraction_manager
    ```
 
-3. **Registry Pattern**
-   Use the ManagerRegistry for cross-module access:
+3. **Protocol-Based Injection**
+   Use `inject()` for resolving protocols when constructing objects:
    ```python
-   from spritepal.core.managers import ManagerRegistry
-   
-   extraction_manager = ManagerRegistry.get_extraction_manager()
+   from spritepal.core.di_container import inject
+   from spritepal.core.protocols.manager_protocols import ExtractionManagerProtocol
+
+   # At application entry point or factory
+   extraction_manager = inject(ExtractionManagerProtocol)
+   panel = ROMExtractionPanel(extraction_manager=extraction_manager)
    ```
+
+   **Note:** The legacy `ManagerRegistry.get_*_manager()` methods are deprecated.
+   Module-level `get_*_manager()` convenience functions have been removed.
 
 ### Special Cases
 
@@ -112,8 +115,19 @@ This pattern is acceptable ONLY in `utils/` modules that need to work independen
    ```python
    # Bad - ui/dialogs importing from ui/panels
    from spritepal.ui.panels import SomePanel
-   
+
    # Good - use signals or callbacks instead
+   ```
+
+4. **Service Locator Pattern** (Removed)
+   ```python
+   # Bad - Service locator functions have been removed
+   from spritepal.core.managers import get_extraction_manager  # REMOVED
+   manager = ManagerRegistry.get_extraction_manager()  # DEPRECATED
+
+   # Good - Use inject() or constructor injection
+   from spritepal.core.di_container import inject
+   manager = inject(ExtractionManagerProtocol)
    ```
 
 ### Testing Imports

@@ -183,8 +183,6 @@ class ApplicationStateManager(BaseManager):
         self._settings_adapter: SettingsAdapter | None = None
         self._state_adapter: StateAdapter | None = None
         self._history_adapter: HistoryAdapter | None = None
-        self._workflow_adapter: WorkflowAdapter | None = None
-        self._cache_adapter: CacheStatsAdapter | None = None
 
         super().__init__("ApplicationStateManager", parent)
 
@@ -208,8 +206,6 @@ class ApplicationStateManager(BaseManager):
             self._settings_adapter = SettingsAdapter(self)
             self._state_adapter = StateAdapter(self)
             self._history_adapter = HistoryAdapter(self)
-            self._workflow_adapter = WorkflowAdapter(self)
-            self._cache_adapter = CacheStatsAdapter(self)
 
             self._is_initialized = True
             self._logger.info("ApplicationStateManager initialized successfully")
@@ -819,16 +815,6 @@ class ApplicationStateManager(BaseManager):
         with self._cache_stats_lock:
             self._preloaded_offsets.clear()
 
-    def get_cache_adapter(self) -> CacheStatsAdapter:
-        """Get cache statistics adapter for backward compatibility.
-
-        Returns an adapter that provides the same interface as the legacy
-        dialog-local cache tracking from UnifiedManualOffsetDialog.
-        """
-        if not self._cache_adapter:
-            raise SessionError("Cache adapter not initialized")
-        return self._cache_adapter
-
     # ========== Backward Compatibility Adapters ==========
 
     def get_session_adapter(self) -> SessionManager:
@@ -848,16 +834,6 @@ class ApplicationStateManager(BaseManager):
     def get_history_adapter(self) -> Any:
         """Get history manager adapter for backward compatibility."""
         return self._history_adapter
-
-    def get_workflow_adapter(self) -> WorkflowAdapter:
-        """Get workflow state manager adapter for backward compatibility.
-
-        Returns an adapter that provides the same interface as the legacy
-        ExtractionStateManager from ui/rom_extraction/state_manager.py.
-        """
-        if not self._workflow_adapter:
-            raise SessionError("Workflow adapter not initialized")
-        return self._workflow_adapter
 
     # ========== Unified State Snapshot ==========
 
@@ -1121,187 +1097,3 @@ class HistoryAdapter:
             if sprite["offset"] == offset:
                 return sprite.copy()
         return None
-
-
-class WorkflowAdapter(QObject):
-    """Adapter providing ExtractionStateManager interface for backward compatibility.
-
-    This adapter delegates to ApplicationStateManager's workflow methods, allowing
-    existing code using ExtractionStateManager to work without modification.
-    """
-
-    # Signal matches the legacy ExtractionStateManager
-    state_changed = Signal(object, object)  # old_state, new_state (ExtractionState)
-
-    def __init__(self, state_manager: ApplicationStateManager) -> None:
-        """Initialize workflow adapter.
-
-        Args:
-            state_manager: Parent ApplicationStateManager instance
-        """
-        super().__init__(state_manager)
-        self._state_mgr = state_manager
-
-        # Forward the workflow signal to our local signal
-        state_manager.workflow_state_changed.connect(self.state_changed.emit)
-
-    @property
-    def current_state(self) -> ExtractionState:
-        """Get current workflow state."""
-        return self._state_mgr.workflow_state
-
-    @property
-    def is_busy(self) -> bool:
-        """Check if a blocking operation is in progress."""
-        return self._state_mgr.is_workflow_busy
-
-    @property
-    def can_extract(self) -> bool:
-        """Check if extraction can be started."""
-        return self._state_mgr.can_extract
-
-    @property
-    def can_preview(self) -> bool:
-        """Check if preview can be started."""
-        return self._state_mgr.can_preview
-
-    @property
-    def can_search(self) -> bool:
-        """Check if search can be started."""
-        return self._state_mgr.can_search
-
-    @property
-    def can_scan(self) -> bool:
-        """Check if sprite scanning can be started."""
-        return self._state_mgr.can_scan
-
-    @property
-    def error_message(self) -> str | None:
-        """Get error message if in error state."""
-        return self._state_mgr.workflow_error_message
-
-    def transition_to(
-        self, new_state: ExtractionState, error_message: str | None = None
-    ) -> bool:
-        """Attempt to transition to a new state."""
-        return self._state_mgr.transition_workflow(new_state, error_message)
-
-    def reset(self) -> None:
-        """Reset to idle state."""
-        self._state_mgr.reset_workflow()
-
-    # Convenience methods matching ExtractionStateManager interface
-    def start_loading_rom(self) -> bool:
-        """Start loading ROM operation."""
-        return self._state_mgr.start_loading_rom()
-
-    def finish_loading_rom(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish loading ROM operation."""
-        return self._state_mgr.finish_loading_rom(success, error)
-
-    def start_scanning(self) -> bool:
-        """Start sprite scanning operation."""
-        return self._state_mgr.start_scanning()
-
-    def finish_scanning(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish sprite scanning operation."""
-        return self._state_mgr.finish_scanning(success, error)
-
-    def start_preview(self) -> bool:
-        """Start sprite preview operation."""
-        return self._state_mgr.start_preview()
-
-    def finish_preview(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish sprite preview operation."""
-        return self._state_mgr.finish_preview(success, error)
-
-    def start_search(self) -> bool:
-        """Start sprite search operation."""
-        return self._state_mgr.start_search()
-
-    def finish_search(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish sprite search operation."""
-        return self._state_mgr.finish_search(success, error)
-
-    def start_extraction(self) -> bool:
-        """Start extraction operation."""
-        return self._state_mgr.start_extraction()
-
-    def finish_extraction(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish extraction operation."""
-        return self._state_mgr.finish_extraction(success, error)
-
-
-class CacheStatsAdapter(QObject):
-    """Adapter providing cache statistics interface for backward compatibility.
-
-    This adapter delegates to ApplicationStateManager's cache methods, allowing
-    existing code using dialog-local cache tracking to work without modification.
-    """
-
-    # Signal for cache stats updates
-    cache_stats_updated = Signal(dict)
-
-    def __init__(self, state_manager: ApplicationStateManager) -> None:
-        """Initialize cache stats adapter.
-
-        Args:
-            state_manager: Parent ApplicationStateManager instance
-        """
-        super().__init__(state_manager)
-        self._state_mgr = state_manager
-
-        # Forward the cache stats signal to our local signal
-        state_manager.cache_stats_updated.connect(self.cache_stats_updated.emit)
-
-    def on_cache_hit(self) -> None:
-        """Handle cache hit event (matches dialog's _on_cache_hit signature)."""
-        self._state_mgr.record_cache_hit()
-
-    def on_cache_miss(self) -> None:
-        """Handle cache miss event (matches dialog's _on_cache_miss signature)."""
-        self._state_mgr.record_cache_miss()
-
-    def get_stats(self) -> dict[str, int]:
-        """Get current cache session statistics."""
-        return self._state_mgr.get_cache_session_stats()
-
-    @property
-    def hits(self) -> int:
-        """Get number of cache hits."""
-        return self._state_mgr.get_cache_session_stats()["hits"]
-
-    @property
-    def misses(self) -> int:
-        """Get number of cache misses."""
-        return self._state_mgr.get_cache_session_stats()["misses"]
-
-    @property
-    def total_requests(self) -> int:
-        """Get total number of cache requests."""
-        return self._state_mgr.get_cache_session_stats()["total_requests"]
-
-    @property
-    def hit_rate(self) -> float:
-        """Get cache hit rate as percentage."""
-        return self._state_mgr.cache_hit_rate
-
-    def reset_stats(self) -> None:
-        """Reset cache session statistics."""
-        self._state_mgr.reset_cache_session_stats()
-
-    def add_preloaded_offset(self, offset: int) -> None:
-        """Track a preloaded offset."""
-        self._state_mgr.add_preloaded_offset(offset)
-
-    def is_offset_preloaded(self, offset: int) -> bool:
-        """Check if offset was preloaded."""
-        return self._state_mgr.is_offset_preloaded(offset)
-
-    def get_preloaded_offsets(self) -> set[int]:
-        """Get all preloaded offsets."""
-        return self._state_mgr.get_preloaded_offsets()
-
-    def clear_preloaded_offsets(self) -> None:
-        """Clear preloaded offsets tracking."""
-        self._state_mgr.clear_preloaded_offsets()
