@@ -893,3 +893,89 @@ class ConfigurationServiceProtocol(Protocol):
     def set_settings_manager(self, settings_manager: SettingsManagerProtocol) -> None:
         """Set settings manager for user override resolution."""
         ...
+
+
+class ControllerUIBridgeProtocol(Protocol):
+    """
+    Minimal read-only protocol for controller access to UI state.
+
+    This protocol provides the minimum interface needed by ExtractionController
+    to read UI state without coupling to the full MainWindow interface.
+    Controllers should emit signals for UI updates rather than calling
+    UI methods directly.
+
+    This decouples the controller from the UI layer while still allowing
+    necessary read operations like getting extraction parameters.
+    """
+
+    def get_extraction_params(self) -> dict[str, Any]:
+        """
+        Get extraction parameters from the UI.
+
+        Returns:
+            Dictionary containing extraction parameters:
+            - vram_path: str
+            - cgram_path: str | None
+            - oam_path: str | None
+            - vram_offset: int
+            - output_base: str
+            - create_grayscale: bool
+            - create_metadata: bool
+            - grayscale_mode: bool
+        """
+        ...
+
+    def get_output_path(self) -> str:
+        """
+        Get the current output path for extracted files.
+
+        Returns:
+            Output path string (without extension)
+        """
+        ...
+
+    def get_vram_path(self) -> str | None:
+        """
+        Get the currently loaded VRAM file path.
+
+        Returns:
+            VRAM file path or None if not loaded
+        """
+        ...
+
+    def has_vram_loaded(self) -> bool:
+        """
+        Check if a VRAM file is currently loaded.
+
+        Returns:
+            True if VRAM is loaded, False otherwise
+        """
+        ...
+
+    def get_preview_size(self) -> tuple[int, int]:
+        """
+        Get the size of the preview widget for preview generation.
+
+        Returns:
+            Tuple of (width, height)
+        """
+        ...
+
+    def get_tile_info(self) -> tuple[int, int]:
+        """
+        Get tile information from the current preview.
+
+        Returns:
+            Tuple of (tile_count, tiles_per_row)
+        """
+        ...
+
+    def get_palettes(self) -> dict[str, list[tuple[int, int, int]]] | None:
+        """
+        Get palette data from the current session.
+
+        Returns:
+            Dictionary mapping palette names to RGB color lists,
+            or None if no palettes are available
+        """
+        ...
