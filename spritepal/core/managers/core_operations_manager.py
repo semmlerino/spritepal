@@ -17,6 +17,7 @@ from typing_extensions import override
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.rom_extractor import ROMExtractor
+from core.services import ROMService, VRAMService
 from utils.constants import (
     DEFAULT_PREVIEW_HEIGHT,
     DEFAULT_PREVIEW_WIDTH,
@@ -448,6 +449,21 @@ class ExtractionAdapter(ExtractionManager):
 
         # Set up required attributes that parent methods expect
         self._rom_extractor = core_manager._rom_extractor
+        self._sprite_extractor = core_manager._sprite_extractor
+        self._palette_manager = core_manager._palette_manager
+
+        # Create services with shared components (required for delegated methods)
+        self._rom_service: ROMService | None = ROMService(
+            rom_extractor=self._rom_extractor,
+            palette_manager=self._palette_manager,
+            parent=self,
+        )
+        self._vram_service: VRAMService | None = VRAMService(
+            sprite_extractor=self._sprite_extractor,
+            palette_manager=self._palette_manager,
+            parent=self,
+        )
+        self._connect_service_signals()
 
         # Thread safety attributes required by BaseManager methods
         self._lock = threading.RLock()

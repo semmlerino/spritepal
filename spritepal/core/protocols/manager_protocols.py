@@ -8,8 +8,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from PIL import Image
     from PySide6.QtCore import SignalInstance
     from PySide6.QtWidgets import QStatusBar
+
+    from core.rom_extractor import ROMExtractor
 
 
 class ExtractionManagerProtocol(Protocol):
@@ -624,6 +627,204 @@ class MainWindowProtocol(Protocol):
 
     def hide_cache_operation_badge(self) -> None:
         """Hide cache operation badge."""
+        ...
+
+
+class ROMServiceProtocol(Protocol):
+    """
+    Protocol for ROM extraction service.
+
+    Provides methods for extracting sprites from ROM files,
+    generating previews, and reading ROM metadata.
+    """
+
+    # Signals
+    extraction_progress: SignalInstance
+    extraction_warning: SignalInstance
+    preview_generated: SignalInstance
+    files_created: SignalInstance
+    cache_operation_started: SignalInstance
+    cache_hit: SignalInstance
+    cache_miss: SignalInstance
+    cache_saved: SignalInstance
+    error_occurred: SignalInstance
+
+    def extract_from_rom(
+        self,
+        rom_path: str,
+        offset: int,
+        output_base: str,
+        sprite_name: str,
+        cgram_path: str | None = None,
+    ) -> list[str]:
+        """
+        Extract sprites from ROM at specific offset.
+
+        Args:
+            rom_path: Path to ROM file
+            offset: Offset in ROM to extract from
+            output_base: Base name for output files
+            sprite_name: Name of the sprite being extracted
+            cgram_path: CGRAM dump for palette extraction
+
+        Returns:
+            List of created file paths
+
+        Raises:
+            ExtractionError: If extraction fails
+            ValidationError: If parameters are invalid
+        """
+        ...
+
+    def get_sprite_preview(
+        self, rom_path: str, offset: int, sprite_name: str | None = None
+    ) -> tuple[bytes, int, int]:
+        """
+        Get a preview of sprite data from ROM without saving files.
+
+        Args:
+            rom_path: Path to ROM file
+            offset: Offset in ROM
+            sprite_name: Sprite name for logging
+
+        Returns:
+            Tuple of (tile_data, width, height)
+
+        Raises:
+            ExtractionError: If preview generation fails
+        """
+        ...
+
+    def extract_sprite_to_png(
+        self,
+        rom_path: str,
+        sprite_offset: int,
+        output_path: str,
+        cgram_path: str | None = None,
+    ) -> bool:
+        """
+        Extract a single sprite to PNG file.
+
+        Args:
+            rom_path: Path to ROM file
+            sprite_offset: Offset of sprite in ROM
+            output_path: Full path where PNG should be saved
+            cgram_path: Optional CGRAM file for palette data
+
+        Returns:
+            True if extraction successful, False otherwise
+        """
+        ...
+
+    def get_known_sprite_locations(self, rom_path: str) -> dict[str, Any]:
+        """
+        Get known sprite locations for a ROM with caching.
+
+        Args:
+            rom_path: Path to ROM file
+
+        Returns:
+            Dictionary of known sprite locations
+
+        Raises:
+            ExtractionError: If operation fails
+        """
+        ...
+
+    def read_rom_header(self, rom_path: str) -> dict[str, Any]:
+        """
+        Read ROM header information.
+
+        Args:
+            rom_path: Path to ROM file
+
+        Returns:
+            Dictionary containing ROM header information
+
+        Raises:
+            ExtractionError: If operation fails
+        """
+        ...
+
+    def get_rom_extractor(self) -> ROMExtractor:
+        """
+        Get the ROM extractor instance for advanced operations.
+
+        Returns:
+            ROMExtractor instance
+
+        Note:
+            This method provides access to the underlying ROM extractor
+            for UI components that need direct access to ROM operations.
+            Consider using the manager methods when possible.
+        """
+        ...
+
+
+class VRAMServiceProtocol(Protocol):
+    """
+    Protocol for VRAM extraction service.
+
+    Provides methods for extracting sprites from VRAM dumps
+    and generating previews.
+    """
+
+    # Signals
+    extraction_progress: SignalInstance
+    extraction_warning: SignalInstance
+    preview_generated: SignalInstance
+    palettes_extracted: SignalInstance
+    active_palettes_found: SignalInstance
+    files_created: SignalInstance
+    error_occurred: SignalInstance
+
+    def extract_from_vram(
+        self,
+        vram_path: str,
+        output_base: str,
+        cgram_path: str | None = None,
+        oam_path: str | None = None,
+        vram_offset: int | None = None,
+        create_grayscale: bool = True,
+        create_metadata: bool = True,
+        grayscale_mode: bool = False,
+    ) -> list[str]:
+        """
+        Extract sprites from VRAM dump.
+
+        Args:
+            vram_path: Path to VRAM dump file
+            output_base: Base name for output files (without extension)
+            cgram_path: Path to CGRAM dump for palette extraction
+            oam_path: Path to OAM dump for palette analysis
+            vram_offset: Offset in VRAM (default: 0xC000)
+            create_grayscale: Create grayscale palette files
+            create_metadata: Create metadata JSON file
+            grayscale_mode: Skip palette extraction entirely
+
+        Returns:
+            List of created file paths
+
+        Raises:
+            ExtractionError: If extraction fails
+            ValidationError: If parameters are invalid
+        """
+        ...
+
+    def generate_preview(self, vram_path: str, offset: int) -> tuple[Image.Image, int]:
+        """
+        Generate a preview image from VRAM at the specified offset.
+
+        Args:
+            vram_path: Path to VRAM dump file
+            offset: Offset in VRAM to start extracting from
+
+        Returns:
+            Tuple of (PIL image, tile count)
+
+        Raises:
+            ExtractionError: If preview generation fails
+        """
         ...
 
 

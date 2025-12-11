@@ -274,6 +274,25 @@ def configure_container(
         lambda: ROMExtractor(rom_cache=inject(ROMCacheProtocol))
     )
 
+    # Import and register ROMService and VRAMService
+    from core.protocols.manager_protocols import (
+        ROMServiceProtocol,
+        VRAMServiceProtocol,
+    )
+    from core.services import ROMService, VRAMService
+
+    # Register ROMService (creates its own ROMExtractor if needed)
+    register_factory(
+        ROMServiceProtocol,
+        lambda: ROMService()
+    )
+
+    # Register VRAMService
+    register_factory(
+        VRAMServiceProtocol,
+        lambda: VRAMService()
+    )
+
     # Import ManualOffsetDialogFactory
     from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
 

@@ -181,6 +181,13 @@ class BatchThumbnailWorker(QObject):
         self._use_multithreading = True
         self._thread_pool = None
         self._max_workers = 4  # Optimal for I/O + CPU bound tasks
+        
+        # Cleanup tracking for idempotent cleanup
+        self._cleanup_called = False  # Optimal for I/O + CPU bound tasks
+
+    def __del__(self) -> None:
+        """Ensure cleanup when object is garbage collected."""
+        self.cleanup()
 
     def queue_thumbnail(
         self,
@@ -746,7 +753,11 @@ class BatchThumbnailWorker(QObject):
                 logger.warning(f"Error clearing ROM data: {e}")
 
     def cleanup(self) -> None:
-        """Clean up the worker resources properly."""
+        """Clean up the worker resources properly. Safe to call multiple times."""
+        if self._cleanup_called:
+            return
+        self._cleanup_called = True
+        
         logger.debug("BatchThumbnailWorker cleanup started")
 
         # Request stop
@@ -790,6 +801,11 @@ class ThumbnailWorkerController(QObject):
         super().__init__(parent)
         self.worker: BatchThumbnailWorker | None = None
         self._thread: QThread | None = None
+        self._cleanup_called = False
+
+    def __del__(self) -> None:
+        """Ensure cleanup when object is garbage collected."""
+        self.cleanup()
 
     def start_worker(self, rom_path: str, rom_extractor: ROMExtractor | None = None) -> None:
         """Start worker with proper thread management."""
@@ -845,7 +861,13 @@ class ThumbnailWorkerController(QObject):
                 logger.warning("Thread did not stop within timeout")
 
     def cleanup(self) -> None:
-        """Clean up resources."""
+        """Clean up resources. Safe to call multiple times."""
+        if self._cleanup_called:
+            return
+        self._cleanup_called = True
+        
         self.stop_worker()
         if self.worker:
             self.worker.cleanup()
+            self.worker = None
+        self._thread = None

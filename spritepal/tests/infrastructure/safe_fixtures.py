@@ -721,24 +721,75 @@ class SafeFixtureManager:
         This is critical for safe cleanup - running threads that access Qt objects
         will cause fatal aborts if those objects are deleted during cleanup.
 
-        NOTE: This function is inherently risky as it iterates gc.get_objects()
-        which may contain Qt objects in invalid states. We wrap everything in
-        try/except to avoid segfaults, but some crashes may still occur.
+        Strategy: Run GC to trigger __del__ methods on unreferenced objects,
+        then process events to allow cleanup to complete, then wait for threads.
         """
+        import gc
+        import time
+        import threading
+
         try:
             from PySide6.QtCore import QThread
+            from PySide6.QtWidgets import QApplication
         except ImportError:
             return  # No Qt available
 
-        # Skip gc iteration entirely in cleanup - it's too risky with Qt objects
-        # that may be in invalid states. Instead, just process events to allow
-        # any pending cleanup to complete.
+        # First, run garbage collection to trigger __del__ on unreferenced objects
+        # This should clean up any workers that were created but not explicitly cleaned up
         try:
-            from PySide6.QtWidgets import QApplication
+            gc.collect()
+            gc.collect()  # Run twice to handle cycles
+        except Exception:
+            pass
+
+        # Process Qt events to allow cleanup signals to propagate
+        try:
             app = QApplication.instance()
             if app:
                 app.processEvents()
-        except (ImportError, RuntimeError, AttributeError):
+        except (RuntimeError, AttributeError):
+            pass
+
+        # Wait for threads with exponential backoff
+        # This gives worker threads time to finish cleanup after __del__ is called
+        max_wait_total = 2.0  # Maximum 2 seconds total wait
+        wait_increment = 0.1  # Start with 100ms
+        total_waited = 0.0
+
+        while total_waited < max_wait_total:
+            # Count non-daemon threads (excluding main thread)
+            active_threads = sum(
+                1 for t in threading.enumerate()
+                if t.is_alive() and not t.daemon and t != threading.main_thread()
+                and ('Thread-' in t.name or 'ThreadPoolExecutor' in t.name or 'QThread' in t.name)
+            )
+
+            if active_threads == 0:
+                break
+
+            time.sleep(wait_increment)
+            total_waited += wait_increment
+
+            # Process events during wait
+            try:
+                app = QApplication.instance()
+                if app:
+                    app.processEvents()
+            except (RuntimeError, AttributeError):
+                pass
+
+            # Run GC again to help cleanup
+            try:
+                gc.collect()
+            except Exception:
+                pass
+
+        # Final event processing
+        try:
+            app = QApplication.instance()
+            if app:
+                app.processEvents()
+        except (RuntimeError, AttributeError):
             pass
 
     def cleanup_all(self) -> None:

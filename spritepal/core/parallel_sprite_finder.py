@@ -75,10 +75,23 @@ class ParallelSpriteFinder:
         # Create sprite finders for each worker
         self.sprite_finders = [SpriteFinder() for _ in range(num_workers)]
 
+        self._shutdown = False
         logger.info(
             f"Initialized ParallelSpriteFinder with {num_workers} workers, "
             f"chunk size: 0x{chunk_size:X}, step: 0x{step_size:X}"
         )
+
+    def __del__(self) -> None:
+        """Ensure executor is shut down when object is garbage collected."""
+        self.shutdown()
+
+    def __enter__(self) -> ParallelSpriteFinder:
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object) -> None:
+        """Context manager exit - ensures cleanup."""
+        self.shutdown()
 
     def search_parallel(
         self,
@@ -333,10 +346,16 @@ class ParallelSpriteFinder:
 
         return min(score, 1.0)
 
-    def shutdown(self):
-        """Shutdown the thread pool."""
-        self.executor.shutdown(wait=True)
-        logger.info("ParallelSpriteFinder shutdown complete")
+    def shutdown(self) -> None:
+        """Shutdown the thread pool. Safe to call multiple times."""
+        if self._shutdown:
+            return
+        self._shutdown = True
+        try:
+            self.executor.shutdown(wait=True)
+            logger.info("ParallelSpriteFinder shutdown complete")
+        except Exception as e:
+            logger.warning(f"Error during ParallelSpriteFinder shutdown: {e}")
 
 class AdaptiveSpriteFinder(ParallelSpriteFinder):
     """

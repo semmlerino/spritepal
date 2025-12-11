@@ -234,11 +234,24 @@ class OptimizedThumbnailGenerator:
         # Statistics
         self._generated_count = 0
         self._total_time_ms = 0.0
+        self._shutdown_called = False
 
         logger.info(
             f"Initialized OptimizedThumbnailGenerator "
             f"(workers={max_workers}, cache={cache_size}, batch={batch_size})"
         )
+
+    def __del__(self) -> None:
+        """Ensure executor is shut down when object is garbage collected."""
+        self.shutdown()
+
+    def __enter__(self) -> OptimizedThumbnailGenerator:
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object) -> None:
+        """Context manager exit - ensures cleanup."""
+        self.shutdown()
 
     def set_generator(self, func: Callable[[int, tuple[int, int]], Image.Image]):
         """
@@ -477,12 +490,18 @@ class OptimizedThumbnailGenerator:
         """Clear thumbnail cache."""
         self._cache.clear()
 
-    def shutdown(self):
-        """Shutdown the generator and free resources."""
-        self.cancel_all()
-        self._executor.shutdown(wait=True)
-        self.clear_cache()
-        logger.info("Thumbnail generator shutdown complete")
+    def shutdown(self) -> None:
+        """Shutdown the generator and free resources. Safe to call multiple times."""
+        if self._shutdown_called:
+            return
+        self._shutdown_called = True
+        try:
+            self.cancel_all()
+            self._executor.shutdown(wait=True)
+            self.clear_cache()
+            logger.info("Thumbnail generator shutdown complete")
+        except Exception as e:
+            logger.warning(f"Error during thumbnail generator shutdown: {e}")
 
 def create_optimized_generator(
     rom_extractor: Any,
