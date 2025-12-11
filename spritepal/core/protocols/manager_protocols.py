@@ -625,3 +625,70 @@ class MainWindowProtocol(Protocol):
     def hide_cache_operation_badge(self) -> None:
         """Hide cache operation badge."""
         ...
+
+
+class ConfigurationServiceProtocol(Protocol):
+    """
+    Protocol for centralized application path configuration.
+
+    This protocol defines the interface for the ConfigurationService,
+    which provides a single source of truth for all application paths.
+    """
+
+    @property
+    def app_root(self) -> Path:
+        """Application root directory (where launch_spritepal.py lives)."""
+        ...
+
+    @property
+    def settings_file(self) -> Path:
+        """Path to the settings JSON file."""
+        ...
+
+    @property
+    def log_directory(self) -> Path:
+        """Directory for log files."""
+        ...
+
+    @property
+    def cache_directory(self) -> Path:
+        """Directory for ROM cache files."""
+        ...
+
+    @property
+    def config_directory(self) -> Path:
+        """Directory for configuration files (sprite locations, etc.)."""
+        ...
+
+    @property
+    def default_dumps_directory(self) -> Path:
+        """Default directory for Mesen2 debug dumps."""
+        ...
+
+    @property
+    def sprite_config_file(self) -> Path:
+        """Path to sprite_locations.json configuration file."""
+        ...
+
+    def resolve_path(self, path_key: str) -> Path:
+        """
+        Resolve a path by key (for extensibility).
+
+        Args:
+            path_key: Path identifier
+
+        Returns:
+            Resolved Path
+
+        Raises:
+            KeyError: If path_key is not recognized
+        """
+        ...
+
+    def ensure_directories_exist(self) -> None:
+        """Create required directories if they don't exist."""
+        ...
+
+    def set_settings_manager(self, settings_manager: SettingsManagerProtocol) -> None:
+        """Set settings manager for user override resolution."""
+        ...

@@ -25,15 +25,15 @@ class TestSessionManager:
     """Test SessionManager functionality"""
 
     @pytest.fixture
-    def temp_settings_dir(self, tmp_path, monkeypatch):
+    def temp_settings_dir(self, tmp_path):
         """Create temporary directory for settings"""
-        monkeypatch.chdir(tmp_path)
         return tmp_path
 
     @pytest.fixture
     def session_manager(self, temp_settings_dir):
-        """Create SessionManager instance"""
-        return SessionManager("TestApp")
+        """Create SessionManager instance with isolated settings file"""
+        settings_path = temp_settings_dir / ".testapp_settings.json"
+        return SessionManager("TestApp", settings_path=settings_path)
 
     def test_initialization(self, session_manager):
         """Test SessionManager initialization"""
@@ -170,8 +170,8 @@ class TestSessionManager:
         settings_file = temp_settings_dir / ".testapp_settings.json"
         assert settings_file.exists()
 
-        # Create new manager and verify it loads saved settings
-        new_manager = SessionManager("TestApp")
+        # Create new manager with same settings path and verify it loads saved settings
+        new_manager = SessionManager("TestApp", settings_path=settings_file)
         assert new_manager.get("session", "vram_path") == "/test/vram.dmp"
         assert new_manager.get("ui", "window_width") == 1024
 
@@ -224,8 +224,9 @@ class TestSessionManager:
         session_manager.export_settings(str(export_file))
         assert export_file.exists()
 
-        # Create new manager with defaults
-        new_manager = SessionManager("TestApp2")
+        # Create new manager with isolated settings path and defaults
+        new_settings_path = tmp_path / ".testapp2_settings.json"
+        new_manager = SessionManager("TestApp2", settings_path=new_settings_path)
         assert new_manager.get("session", "vram_path") == ""
 
         # Import settings
@@ -276,8 +277,8 @@ class TestSessionManager:
         # Cleanup should save
         session_manager.cleanup()
 
-        # Create new manager and verify saved
-        new_manager = SessionManager("TestApp")
+        # Create new manager with same settings path and verify saved
+        new_manager = SessionManager("TestApp", settings_path=session_manager._settings_file)
         assert new_manager.get("session", "vram_path") == "/test/path.dmp"
 
     def test_recent_files_limit(self, session_manager, tmp_path):
@@ -344,8 +345,8 @@ class TestSessionManager:
         settings_file = temp_settings_dir / ".testapp_settings.json"
         settings_file.write_text('{"session": {"vram_path": "/test"')  # Incomplete JSON
 
-        # Should load defaults without crashing
-        manager = SessionManager("TestApp")
+        # Should load defaults without crashing when pointing to corrupted file
+        manager = SessionManager("TestApp", settings_path=settings_file)
         assert manager.get("session", "vram_path") == ""  # Default value
 
     def test_large_settings_file(self, session_manager, tmp_path):
@@ -365,7 +366,7 @@ class TestSessionManager:
         session_manager.save_session()
 
         # Should handle large file without issues
-        new_manager = SessionManager("TestApp")
+        new_manager = SessionManager("TestApp", settings_path=session_manager._settings_file)
         assert new_manager.get("large_category", "data") == large_data
 
     def test_special_characters_in_paths(self, session_manager, tmp_path):

@@ -81,8 +81,13 @@ class ManagerRegistry:
             except Exception as e:
                 self._logger.debug(f"Could not register Qt cleanup: {e}")
 
-    def initialize_managers(self, app_name: str = "SpritePal", settings_path: Any = None,
-                          use_consolidated: bool = True) -> None:
+    def initialize_managers(
+        self,
+        app_name: str = "SpritePal",
+        settings_path: Any = None,
+        use_consolidated: bool = True,
+        configuration_service: Any = None,
+    ) -> None:
         """
         Initialize all managers with proper error handling and cleanup
 
@@ -90,6 +95,7 @@ class ManagerRegistry:
             app_name: Application name for settings
             settings_path: Optional custom settings path (for testing)
             use_consolidated: Whether to use consolidated managers (default: True)
+            configuration_service: Optional pre-created ConfigurationService instance
 
         Raises:
             ManagerError: If manager initialization fails
@@ -103,8 +109,12 @@ class ManagerRegistry:
             self._logger.info(f"Initializing managers (consolidated={use_consolidated})...")
 
             # Configure the DI container first to register all protocols
+            # Pass configuration_service so it gets registered in the container
             from core.di_container import configure_container
-            configure_container(use_consolidated=use_consolidated)
+            configure_container(
+                use_consolidated=use_consolidated,
+                configuration_service=configuration_service,
+            )
 
             # Get Qt application instance for proper parent management
             app = QApplication.instance()
@@ -576,8 +586,12 @@ def get_navigation_manager():
     except ValueError as e:
         raise ManagerError("NavigationManager not initialized. Call initialize_managers() first.") from e
 
-def initialize_managers(app_name: str = "SpritePal", settings_path: Any = None,
-                       use_consolidated: bool = True) -> None:
+def initialize_managers(
+    app_name: str = "SpritePal",
+    settings_path: Any = None,
+    use_consolidated: bool = True,
+    configuration_service: Any = None,
+) -> None:
     """
     Initialize all managers
 
@@ -585,8 +599,11 @@ def initialize_managers(app_name: str = "SpritePal", settings_path: Any = None,
         app_name: Application name for settings
         settings_path: Optional custom settings path (for testing)
         use_consolidated: Whether to use consolidated managers (default: True)
+        configuration_service: Optional pre-created ConfigurationService instance
     """
-    _ensure_registry().initialize_managers(app_name, settings_path, use_consolidated)
+    _ensure_registry().initialize_managers(
+        app_name, settings_path, use_consolidated, configuration_service
+    )
 
 def cleanup_managers() -> None:
     """Cleanup all managers"""

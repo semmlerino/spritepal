@@ -44,7 +44,12 @@ class SessionManager(BaseManager):
         if settings_path:
             self._settings_file = settings_path
         else:
-            self._settings_file = Path.cwd() / f".{app_name.lower()}_settings.json"
+            # Use ConfigurationService for consistent path resolution
+            # This ensures settings file location is relative to app root, not CWD
+            from core.configuration_service import get_configuration_service
+
+            config = get_configuration_service()
+            self._settings_file = config.settings_file
         self._settings = {}
         self._session_dirty = False
 

@@ -17,7 +17,13 @@ def _configure_composed_dialogs_early():
     """Configure composed dialogs VERY EARLY - before any UI imports."""
     try:
         import json
-        settings_file = Path(__file__).parent / ".spritepal_settings.json"
+
+        # Use ConfigurationService to resolve settings file path
+        # This ensures consistent path resolution regardless of CWD
+        from core.configuration_service import ConfigurationService
+
+        config_service = ConfigurationService()
+        settings_file = config_service.settings_file
 
         if settings_file.exists():
             with settings_file.open("r") as f:
@@ -439,10 +445,20 @@ class SpritePalApp(QApplication):
 
 def main():
     """Main entry point"""
-    # Initialize logging (will use SPRITEPAL_DEBUG env var if set)
-    logger = setup_logging()
+    # Create ConfigurationService FIRST - single source of truth for paths
+    from core.configuration_service import ConfigurationService
+
+    config_service = ConfigurationService()
+
+    # Ensure required directories exist
+    config_service.ensure_directories_exist()
+
+    # Initialize logging with path from ConfigurationService
+    logger = setup_logging(log_dir=config_service.log_directory)
     logger.info(f"Python version: {sys.version}")
     logger.info(f"Platform: {sys.platform}")
+    logger.info(f"App root: {config_service.app_root}")
+    logger.info(f"Settings file: {config_service.settings_file}")
 
     # Composed dialogs already configured early
 
@@ -453,7 +469,11 @@ def main():
     # Initialize managers with enhanced error handling
     logger.info("Initializing managers...")
     try:
-        initialize_managers("SpritePal")
+        initialize_managers(
+            "SpritePal",
+            settings_path=config_service.settings_file,
+            configuration_service=config_service,
+        )
         logger.info("Managers initialized successfully")
 
         # Validate manager dependencies

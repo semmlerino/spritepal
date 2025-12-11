@@ -179,7 +179,10 @@ def reset_container() -> None:
     """Reset the container (mainly for testing)."""
     _container.clear()
 
-def configure_container(use_consolidated: bool = True) -> None:
+def configure_container(
+    use_consolidated: bool = True,
+    configuration_service: Any = None,
+) -> None:
     """
     Configure the DI container with application dependencies.
 
@@ -188,9 +191,14 @@ def configure_container(use_consolidated: bool = True) -> None:
 
     Args:
         use_consolidated: Whether to use consolidated managers (default: True)
+        configuration_service: Optional pre-created ConfigurationService instance.
+                              If not provided, one will be created automatically.
     """
     # Import protocols
+    # Register ConfigurationService FIRST - it's needed by other managers
+    from core.configuration_service import ConfigurationService
     from core.protocols.manager_protocols import (
+        ConfigurationServiceProtocol,
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
         NavigationManagerProtocol,
@@ -198,7 +206,14 @@ def configure_container(use_consolidated: bool = True) -> None:
         SettingsManagerProtocol,
     )
     from utils.settings_manager import SettingsManager
-    # Register SessionManager, ExtractionManager, InjectionManager first
+
+    if configuration_service is not None:
+        register_singleton(ConfigurationServiceProtocol, configuration_service)
+    else:
+        # Create default ConfigurationService
+        register_singleton(ConfigurationServiceProtocol, ConfigurationService())
+
+    # Register SessionManager, ExtractionManager, InjectionManager
 
     if use_consolidated:
         # Register consolidated managers with adapters
