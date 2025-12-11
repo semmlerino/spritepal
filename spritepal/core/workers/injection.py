@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from core.managers.factory import ManagerFactory
 
-from core.managers import InjectionManager, get_injection_manager
+from core.managers import InjectionManager
 from utils.logging_config import get_logger
 
 from .base import handle_worker_errors
@@ -69,11 +69,13 @@ class VRAMInjectionWorker(InjectionWorkerBase):
         if injection_manager is None:
             warnings.warn(
                 "VRAMInjectionWorker: injection_manager parameter will become required. "
-                "Pass injection_manager explicitly instead of relying on Service Locator.",
+                "Pass injection_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            injection_manager = get_injection_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            injection_manager = inject(InjectionManagerProtocol)
         super().__init__(injection_manager, parent)
         self.params = params
         self._operation_name = "VRAMInjectionWorker"
@@ -84,7 +86,11 @@ class VRAMInjectionWorker(InjectionWorkerBase):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        if not helper.validate_manager_type(get_injection_manager, "VRAM injection"):
+        def _get_expected_manager() -> InjectionManager:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            return inject(InjectionManagerProtocol)  # type: ignore[return-value]
+        if not helper.validate_manager_type(_get_expected_manager, "VRAM injection"):
             return
 
         # Type cast for better type checking
@@ -139,11 +145,13 @@ class ROMInjectionWorker(InjectionWorkerBase):
         if injection_manager is None:
             warnings.warn(
                 "ROMInjectionWorker: injection_manager parameter will become required. "
-                "Pass injection_manager explicitly instead of relying on Service Locator.",
+                "Pass injection_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            injection_manager = get_injection_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            injection_manager = inject(InjectionManagerProtocol)
         super().__init__(injection_manager, parent)
         self.params = params
         self._operation_name = "ROMInjectionWorker"
@@ -154,7 +162,11 @@ class ROMInjectionWorker(InjectionWorkerBase):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        if not helper.validate_manager_type(get_injection_manager, "ROM injection"):
+        def _get_expected_manager() -> InjectionManager:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            return inject(InjectionManagerProtocol)  # type: ignore[return-value]
+        if not helper.validate_manager_type(_get_expected_manager, "ROM injection"):
             return
 
         # Type cast for better type checking
@@ -230,7 +242,11 @@ class WorkerOwnedVRAMInjectionWorker(InjectionWorkerBase, WorkerOwnedManagerMixi
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        if not helper.validate_manager_type(get_injection_manager, "VRAM injection"):
+        def _get_expected_manager() -> InjectionManager:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            return inject(InjectionManagerProtocol)  # type: ignore[return-value]
+        if not helper.validate_manager_type(_get_expected_manager, "VRAM injection"):
             return
 
         # Type cast for better type checking
@@ -305,7 +321,11 @@ class WorkerOwnedROMInjectionWorker(InjectionWorkerBase, WorkerOwnedManagerMixin
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        if not helper.validate_manager_type(get_injection_manager, "ROM injection"):
+        def _get_expected_manager() -> InjectionManager:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            return inject(InjectionManagerProtocol)  # type: ignore[return-value]
+        if not helper.validate_manager_type(_get_expected_manager, "ROM injection"):
             return
 
         # Type cast for better type checking

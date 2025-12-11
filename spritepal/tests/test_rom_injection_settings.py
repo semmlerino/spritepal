@@ -55,29 +55,28 @@ class TestROMInjectionSettingsPersistence:
 
         from core.managers.session_manager import SessionManager
 
-        # Create a mock session manager with temporary file storage
+        # Create a session manager with temporary file storage
         real_session_manager = SessionManager(settings_path=Path(temp_settings_file))
 
-        # Override get_session_manager to return our mock (patched at import location in SettingsManager)
-        with patch("core.managers.get_session_manager", return_value=real_session_manager):
-            manager = SettingsManager()
+        # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
+        manager = SettingsManager(session_manager=real_session_manager)
 
-            # Add _settings property for test compatibility
-            def get_settings():
-                # Load settings from the temp file for test verification
-                try:
-                    with open(temp_settings_file) as f:
-                        return json.load(f)
-                except Exception:
-                    return {}
+        # Add _settings property for test compatibility
+        def get_settings():
+            # Load settings from the temp file for test verification
+            try:
+                with open(temp_settings_file) as f:
+                    return json.load(f)
+            except Exception:
+                return {}
 
-            # Make it accessible as both a property and direct attribute
-            manager._settings = property(get_settings)
-            # Also store direct access for tests
-            manager._get_settings = get_settings
-            manager._mock_session_manager = real_session_manager  # Expose for tests
+        # Make it accessible as both a property and direct attribute
+        manager._settings = property(get_settings)
+        # Also store direct access for tests
+        manager._get_settings = get_settings
+        manager._mock_session_manager = real_session_manager  # Expose for tests
 
-            yield manager
+        yield manager
 
     @pytest.fixture
     def mock_dialog(self):

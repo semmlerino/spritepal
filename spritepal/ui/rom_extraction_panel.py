@@ -31,7 +31,7 @@ from typing_extensions import override
 if TYPE_CHECKING:
     from core.managers import ExtractionManager
 
-from core.managers import get_extraction_manager
+# ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from ui.common import WorkerManager
 from ui.components.navigation import SpriteNavigator
 from ui.dialogs import ResumeScanDialog, UnifiedManualOffsetDialog, UserErrorDialog
@@ -56,7 +56,7 @@ from utils.constants import (
     SETTINGS_NS_ROM_INJECTION,
 )
 from utils.logging_config import get_logger
-from utils.settings_manager import get_settings_manager
+# SettingsManager accessed via DI: inject(SettingsManagerProtocol)
 from utils.thread_safe_singleton import QtThreadSafeSingleton
 
 logger = get_logger(__name__)
@@ -275,11 +275,13 @@ class ROMExtractionPanel(QWidget):
         if extraction_manager is None:
             warnings.warn(
                 "ROMExtractionPanel: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                "Pass extraction_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            extraction_manager = get_extraction_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            extraction_manager = inject(ExtractionManagerProtocol)
 
         self.rom_path = ""
         self.sprite_locations = {}
@@ -508,7 +510,9 @@ class ROMExtractionPanel(QWidget):
 
     def _browse_rom(self):
         """Browse for ROM file"""
-        settings = get_settings_manager()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SettingsManagerProtocol
+        settings = inject(SettingsManagerProtocol)
         default_dir = settings.get_default_directory()
 
         filename, _ = QFileDialog.getOpenFileName(
@@ -543,7 +547,9 @@ class ROMExtractionPanel(QWidget):
     def _load_last_rom(self):
         """Load the last used ROM file from settings"""
         try:
-            settings = get_settings_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            settings = inject(SettingsManagerProtocol)
             last_rom = settings.get_value(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, ""
             )
@@ -586,7 +592,9 @@ class ROMExtractionPanel(QWidget):
                 self.rom_size = 0x400000  # Default 4MB
 
             # Save to settings
-            settings = get_settings_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            settings = inject(SettingsManagerProtocol)
             settings.set_value(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
             settings.set_last_used_directory(str(Path(filename).parent))
             logger.debug(f"Saved ROM to settings: {filename}")
@@ -773,7 +781,9 @@ class ROMExtractionPanel(QWidget):
 
     def _browse_cgram(self):
         """Browse for CGRAM file"""
-        settings = get_settings_manager()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SettingsManagerProtocol
+        settings = inject(SettingsManagerProtocol)
 
         # Try to use ROM directory as default
         default_dir = (
@@ -805,8 +815,9 @@ class ROMExtractionPanel(QWidget):
 
         # Check cache status first (fast operation)
         try:
-            from utils.rom_cache import get_rom_cache
-            rom_cache = get_rom_cache()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            rom_cache = inject(ROMCacheProtocol)
             cached_locations = rom_cache.get_sprite_locations(self.rom_path)
             self._is_sprites_from_cache = bool(cached_locations)
         except Exception:
@@ -1297,8 +1308,9 @@ class ROMExtractionPanel(QWidget):
         Returns:
             True to use cache, False to start fresh, None if cancelled
         """
-        from utils.rom_cache import get_rom_cache  # Delayed import
-        rom_cache = get_rom_cache()
+        from core.di_container import inject  # Delayed import
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        rom_cache = inject(ROMCacheProtocol)
 
         # Define scan parameters (must match SpriteScanWorker)
         scan_params = {

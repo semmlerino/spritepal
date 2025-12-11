@@ -9,12 +9,25 @@ from pathlib import Path
 
 import pytest
 
-from core.managers import (
-    get_extraction_manager,
-    get_injection_manager,
-    get_session_manager,
-)
+from core.managers import get_registry
 from core.managers.exceptions import ValidationError
+
+
+def get_extraction_manager():
+    """Get extraction manager from registry (replaces deprecated function)."""
+    return get_registry().get_extraction_manager()
+
+
+def get_injection_manager():
+    """Get injection manager from registry (replaces deprecated function)."""
+    return get_registry().get_injection_manager()
+
+
+def get_session_manager():
+    """Get session manager from registry (replaces deprecated function)."""
+    return get_registry().get_session_manager()
+
+
 from tests.fixtures.test_managers import (
     # Systematic pytest markers applied based on test content analysis
     create_extraction_manager_fixture,

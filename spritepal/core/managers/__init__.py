@@ -23,18 +23,14 @@ from .injection_manager import InjectionManager
 
 # Import DI-based manager functions
 # Note: We import from registry now which supports both consolidated and original modes
-# Backward compatibility: keep registry import but it will use DI container internally
 from .registry import (
     are_managers_initialized,
     cleanup_managers,
     get_application_state_manager,
     get_container_stats,
     get_core_operations_manager,
-    get_extraction_manager,
-    get_injection_manager,
-    get_navigation_manager,
+    get_monitoring_manager,
     get_registry,
-    get_session_manager,
     get_ui_coordinator_manager,
     initialize_managers,
     reset_managers,
@@ -68,14 +64,9 @@ __all__ = [
     "cleanup_managers",
     "get_application_state_manager",
     "get_container_stats",
-    # New consolidated manager accessors
     "get_core_operations_manager",
-    "get_extraction_manager",
-    "get_injection_manager",
-    "get_navigation_manager",
-    # Backward compatibility
+    "get_monitoring_manager",
     "get_registry",
-    "get_session_manager",
     "get_ui_coordinator_manager",
     "initialize_managers",
     "reset_managers",

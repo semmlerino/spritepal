@@ -10,9 +10,10 @@ from core.managers import (
     # Systematic pytest markers applied based on test content analysis
     are_managers_initialized,
     cleanup_managers,
-    get_extraction_manager,
     initialize_managers,
 )
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 pytestmark = [
     pytest.mark.file_io,
@@ -34,7 +35,7 @@ class TestManagerLifecycle:
         initialize_managers()
 
         # Get manager
-        manager = get_extraction_manager()
+        manager = inject(ExtractionManagerProtocol)
         print(f"DEBUG: Manager created: {manager}")
         print(f"DEBUG: Manager type: {type(manager)}")
         print(f"DEBUG: Manager name: {manager.get_name()}")
@@ -69,7 +70,7 @@ class TestManagerLifecycle:
         initialize_managers()
 
         # Get manager
-        manager = get_extraction_manager()
+        manager = inject(ExtractionManagerProtocol)
         print(f"DEBUG: Manager created for file test: {manager}")
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -105,9 +106,9 @@ class TestManagerLifecycle:
         initialize_managers()
 
         # Get manager multiple times
-        manager1 = get_extraction_manager()
-        manager2 = get_extraction_manager()
-        manager3 = get_extraction_manager()
+        manager1 = inject(ExtractionManagerProtocol)
+        manager2 = inject(ExtractionManagerProtocol)
+        manager3 = inject(ExtractionManagerProtocol)
 
         print(f"DEBUG: Manager1 id: {id(manager1)}")
         print(f"DEBUG: Manager2 id: {id(manager2)}")

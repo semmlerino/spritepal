@@ -104,12 +104,13 @@ class WorkerCoordinatorComponent:
                 from ui.common.simple_preview_coordinator import (
                     SimplePreviewCoordinator,
                 )
-                from utils.rom_cache import get_rom_cache
+                from core.di_container import inject
+                from core.protocols.manager_protocols import ROMCacheProtocol
 
                 if not self._preview_coordinator:
                     self._preview_coordinator = SimplePreviewCoordinator(
                         self.dialog,
-                        rom_cache=get_rom_cache()
+                        rom_cache=inject(ROMCacheProtocol)
                     )
 
                 # Update preview widget if available

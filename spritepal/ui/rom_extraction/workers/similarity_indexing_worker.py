@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 from PIL import Image
 from PySide6.QtCore import QObject, Signal, Slot
 
-from core.managers import ExtractionManager, get_extraction_manager
+from core.managers import ExtractionManager
 from core.visual_similarity_search import VisualSimilarityEngine
 from core.workers.base import BaseWorker, handle_worker_errors
 from utils.logging_config import get_logger
@@ -278,7 +278,9 @@ class SimilarityIndexingWorker(BaseWorker):
     def run(self) -> None:
         """Background indexing of pending sprites."""
         try:
-            extraction_manager = get_extraction_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            extraction_manager = inject(ExtractionManagerProtocol)
             indexed_count = 0
 
             # Process pending sprites

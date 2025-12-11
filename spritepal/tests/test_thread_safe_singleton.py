@@ -399,12 +399,14 @@ class TestSettingsManagerSingletonIntegration:
     @pytest.mark.integration
     def test_settings_manager_thread_safety(self):
         """Test that SettingsManagerSingleton is thread-safe."""
-        from utils.settings_manager import get_settings_manager
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SettingsManagerProtocol
 
         instances = []
 
         def worker_thread(thread_id: int):
-            manager = get_settings_manager()
+            # Use DI injection (replaces deprecated get_settings_manager)
+            manager = inject(SettingsManagerProtocol)
             instances.append((thread_id, manager))
             return manager
 

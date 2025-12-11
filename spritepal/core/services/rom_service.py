@@ -36,7 +36,7 @@ from utils.constants import (
 )
 from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
-from utils.rom_cache import get_rom_cache
+# ROMCache accessed via DI: inject(ROMCacheProtocol)
 
 logger = get_logger(__name__)
 
@@ -346,7 +346,9 @@ class ROMService(QObject):
 
             # Try to load from cache first
             start_time = time.time()
-            rom_cache = get_rom_cache()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            rom_cache = inject(ROMCacheProtocol)
 
             # Signal that cache loading operation is starting
             self.cache_operation_started.emit("Loading", "sprite_locations")

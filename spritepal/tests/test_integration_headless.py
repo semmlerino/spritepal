@@ -104,86 +104,83 @@ class TestVRAMExtractionWorkerHeadless:
         initialize_managers("TestApp")
 
         try:
-            # Mock the extraction manager before creating worker
-            with patch("core.workers.extraction.get_extraction_manager") as mock_get_manager:
-                # Create mock manager
-                mock_manager = Mock()
-                mock_get_manager.return_value = mock_manager
+            # Create mock manager and pass directly to worker (replaces deprecated get_extraction_manager patch)
+            mock_manager = Mock()
 
-                # Create worker with mocked manager
-                worker = VRAMExtractionWorker(worker_params)
+            # Create worker with mocked manager passed directly
+            worker = VRAMExtractionWorker(worker_params, extraction_manager=mock_manager)
 
-                # Create test image
-                Image.new("P", (128, 64), 0)
+            # Create test image
+            Image.new("P", (128, 64), 0)
 
-                # Mock manager signals to return Mock connections
-                mock_connection = Mock()
+            # Mock manager signals to return Mock connections
+            mock_connection = Mock()
 
-                mock_manager.extraction_progress = Mock()
-                mock_manager.extraction_progress.connect = Mock(return_value=mock_connection)
-                mock_manager.palettes_extracted = Mock()
-                mock_manager.palettes_extracted.connect = Mock(return_value=mock_connection)
-                mock_manager.active_palettes_found = Mock()
-                mock_manager.active_palettes_found.connect = Mock(return_value=mock_connection)
-                mock_manager.preview_generated = Mock()
-                mock_manager.preview_generated.connect = Mock(return_value=mock_connection)
+            mock_manager.extraction_progress = Mock()
+            mock_manager.extraction_progress.connect = Mock(return_value=mock_connection)
+            mock_manager.palettes_extracted = Mock()
+            mock_manager.palettes_extracted.connect = Mock(return_value=mock_connection)
+            mock_manager.active_palettes_found = Mock()
+            mock_manager.active_palettes_found.connect = Mock(return_value=mock_connection)
+            mock_manager.preview_generated = Mock()
+            mock_manager.preview_generated.connect = Mock(return_value=mock_connection)
 
-                # Mock the extraction result
-                output_path = worker_params["output_base"] + ".png"
-                mock_manager.extract_from_vram.return_value = [output_path]
+            # Mock the extraction result
+            output_path = worker_params["output_base"] + ".png"
+            mock_manager.extract_from_vram.return_value = [output_path]
 
-                # Create proper mocks for signals
-                progress_mock = Mock()
-                progress_mock.emit = Mock()
-                preview_mock = Mock()
-                preview_mock.emit = Mock()
-                preview_image_mock = Mock()
-                preview_image_mock.emit = Mock()
-                palettes_mock = Mock()
-                palettes_mock.emit = Mock()
-                active_palettes_mock = Mock()
-                active_palettes_mock.emit = Mock()
-                finished_mock = Mock()
-                finished_mock.emit = Mock()
-                error_mock = Mock()
-                error_mock.emit = Mock()
+            # Create proper mocks for signals
+            progress_mock = Mock()
+            progress_mock.emit = Mock()
+            preview_mock = Mock()
+            preview_mock.emit = Mock()
+            preview_image_mock = Mock()
+            preview_image_mock.emit = Mock()
+            palettes_mock = Mock()
+            palettes_mock.emit = Mock()
+            active_palettes_mock = Mock()
+            active_palettes_mock.emit = Mock()
+            finished_mock = Mock()
+            finished_mock.emit = Mock()
+            error_mock = Mock()
+            error_mock.emit = Mock()
 
-                # Replace signals
-                worker.progress = progress_mock
-                worker.preview_ready = preview_mock
-                worker.preview_image_ready = preview_image_mock
-                worker.palettes_ready = palettes_mock
-                worker.active_palettes_ready = active_palettes_mock
-                worker.extraction_finished = finished_mock
-                worker.error = error_mock
+            # Replace signals
+            worker.progress = progress_mock
+            worker.preview_ready = preview_mock
+            worker.preview_image_ready = preview_image_mock
+            worker.palettes_ready = palettes_mock
+            worker.active_palettes_ready = active_palettes_mock
+            worker.extraction_finished = finished_mock
+            worker.error = error_mock
 
-                # Mock pixmap creation to avoid Qt dependency
-                with patch("core.controller.pil_to_qpixmap") as mock_pil_to_qpixmap, \
-                     patch.object(worker, "disconnect_manager_signals") as mock_disconnect:
-                    mock_pil_to_qpixmap.return_value = Mock()
-                    mock_disconnect.return_value = None
+            # Mock pixmap creation to avoid Qt dependency
+            with patch("core.controller.pil_to_qpixmap") as mock_pil_to_qpixmap, \
+                 patch.object(worker, "disconnect_manager_signals") as mock_disconnect:
+                mock_pil_to_qpixmap.return_value = Mock()
+                mock_disconnect.return_value = None
 
-                    # Run the worker logic directly (not as thread)
-                    worker.run()
+                # Run the worker logic directly (not as thread)
+                worker.run()
 
-                # Check if error was emitted
-                if error_mock.emit.called:
-                    error_msg = error_mock.emit.call_args[0][0]
-                    print(f"Error emitted: {error_msg}")
+            # Check if error was emitted
+            if error_mock.emit.called:
+                error_msg = error_mock.emit.call_args[0][0]
+                print(f"Error emitted: {error_msg}")
 
-                # Verify the key behaviors:
-                # 1. Manager was called to extract from VRAM
-                assert mock_manager.extract_from_vram.called
-                call_kwargs = mock_manager.extract_from_vram.call_args[1]
-                assert call_kwargs["vram_path"] == worker_params["vram_path"]
-                assert call_kwargs["output_base"] == worker_params["output_base"]
+            # Verify the key behaviors:
+            # 1. Manager was called to extract from VRAM
+            assert mock_manager.extract_from_vram.called
+            call_kwargs = mock_manager.extract_from_vram.call_args[1]
+            assert call_kwargs["vram_path"] == worker_params["vram_path"]
+            assert call_kwargs["output_base"] == worker_params["output_base"]
 
-                # 2. Finished signal was emitted with the files
-                assert finished_mock.emit.called
-                assert finished_mock.emit.call_args[0][0] == [output_path]
+            # 2. Finished signal was emitted with the files
+            assert finished_mock.emit.called
+            assert finished_mock.emit.call_args[0][0] == [output_path]
 
-                # 3. No error was emitted
-                assert not error_mock.emit.called
+            # 3. No error was emitted
+            assert not error_mock.emit.called
         finally:
             # Clean up managers
             cleanup_managers()

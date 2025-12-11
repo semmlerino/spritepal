@@ -7,7 +7,6 @@ import tempfile
 import threading
 import time
 import uuid
-import warnings
 import zlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -1172,50 +1171,5 @@ class ROMCache:
                     logger.info(f"Cache directory changed from {self.cache_dir} to {new_dir}")
                     self.cache_dir = new_dir
                     self._cache_enabled = self._setup_cache_directory()
-
-
-# Global instance for backward compatibility
-_global_rom_cache: ROMCacheProtocol | None = None
-
-def get_rom_cache() -> ROMCacheProtocol:
-    """
-    Get the global ROMCache instance.
-
-    DEPRECATED: This function is maintained for backward compatibility.
-    New code should use dependency injection via core.di_container.
-    """
-    warnings.warn(
-        "get_rom_cache() is deprecated. Use dependency injection instead: "
-        "from core.di_container import inject; inject(ROMCacheProtocol)",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _global_rom_cache
-
-    # Return existing instance
-    if _global_rom_cache is not None:
-        return _global_rom_cache
-
-    # Try DI first
-    try:
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-        _global_rom_cache = inject(ROMCacheProtocol)
-        return _global_rom_cache
-    except (ImportError, ValueError, Exception):
-        pass
-        
-    # Create new instance as fallback
-    if _global_rom_cache is None:
-        # Try to get settings manager for init
-        try:
-            from utils.settings_manager import get_settings_manager
-            settings = get_settings_manager()
-        except ImportError:
-            settings = None
-            
-        _global_rom_cache = ROMCache(settings_manager=settings)
-        
-    return _global_rom_cache
 
 

@@ -29,7 +29,7 @@ from typing_extensions import override
 if TYPE_CHECKING:
     from core.managers import InjectionManager
 
-from core.managers import get_injection_manager
+# InjectionManager accessed via DI: inject(InjectionManagerProtocol)
 from core.sprite_validator import SpriteValidator
 from ui.common.worker_manager import WorkerManager
 from ui.components import (
@@ -61,11 +61,13 @@ class InjectionDialog(TabbedDialog):
         if injection_manager is None:
             warnings.warn(
                 "InjectionDialog: injection_manager parameter will become required. "
-                "Pass injection_manager explicitly instead of relying on Service Locator.",
+                "Pass injection_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            injection_manager = get_injection_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            injection_manager = inject(InjectionManagerProtocol)
 
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path = sprite_path

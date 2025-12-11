@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from core.managers.factory import ManagerFactory
 
 from core.managers.extraction_manager import ExtractionManager
-from core.managers.registry import get_extraction_manager
 from utils.logging_config import get_logger
 
 from .base import handle_worker_errors
@@ -73,11 +72,13 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
         if extraction_manager is None:
             warnings.warn(
                 "VRAMExtractionWorker: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                "Pass extraction_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            extraction_manager = get_extraction_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            extraction_manager = cast(ExtractionManager, inject(ExtractionManagerProtocol))
         super().__init__(manager=extraction_manager, parent=parent)
         self.params = params
         self._operation_name = "VRAMExtractionWorker"
@@ -88,7 +89,11 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        if not helper.validate_manager_type(get_extraction_manager, "VRAM extraction"):
+        def _get_extraction_manager() -> ExtractionManager:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+        if not helper.validate_manager_type(_get_extraction_manager, "VRAM extraction"):
             return
 
         # Type cast for better type checking - we know this is ExtractionManager from __init__
@@ -152,11 +157,13 @@ class ROMExtractionWorker(ExtractionWorkerBase):
         if extraction_manager is None:
             warnings.warn(
                 "ROMExtractionWorker: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                "Pass extraction_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            extraction_manager = get_extraction_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            extraction_manager = cast(ExtractionManager, inject(ExtractionManagerProtocol))
         super().__init__(manager=extraction_manager, parent=parent)
         self.params = params
         self._operation_name = "ROMExtractionWorker"
@@ -167,7 +174,11 @@ class ROMExtractionWorker(ExtractionWorkerBase):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        if not helper.validate_manager_type(get_extraction_manager, "ROM extraction"):
+        def _get_extraction_manager() -> ExtractionManager:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+        if not helper.validate_manager_type(_get_extraction_manager, "ROM extraction"):
             return
 
         # Connect standard progress signal using helper
@@ -238,13 +249,16 @@ class WorkerOwnedVRAMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMi
         self.params = params
         self._operation_name = "WorkerOwnedVRAMExtractionWorker"
     @override
-
     def connect_manager_signals(self) -> None:
         """Connect extraction manager signals to worker signals."""
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        if not helper.validate_manager_type(get_extraction_manager, "VRAM extraction"):
+        def _get_extraction_manager() -> ExtractionManager:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+        if not helper.validate_manager_type(_get_extraction_manager, "VRAM extraction"):
             return
 
         # Type cast for better type checking - we know this is ExtractionManager from __init__
@@ -328,7 +342,11 @@ class WorkerOwnedROMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMix
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        if not helper.validate_manager_type(get_extraction_manager, "ROM extraction"):
+        def _get_extraction_manager() -> ExtractionManager:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+        if not helper.validate_manager_type(_get_extraction_manager, "ROM extraction"):
             return
 
         # Connect standard progress signal using helper

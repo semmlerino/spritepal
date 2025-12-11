@@ -110,11 +110,12 @@ class TestDialogInstantiation:
     )
     def test_injection_dialog_creation(self, qtbot):
         """Test InjectionDialog can be created."""
-        with patch("ui.injection_dialog.get_injection_manager"), \
-             patch.object(InjectionDialog, "_load_metadata"), \
+        from unittest.mock import Mock
+        mock_injection_manager = Mock()
+        with patch.object(InjectionDialog, "_load_metadata"), \
              patch.object(InjectionDialog, "_set_initial_paths"), \
              patch.object(InjectionDialog, "_load_rom_info"):
-            dialog = InjectionDialog()
+            dialog = InjectionDialog(injection_manager=mock_injection_manager)
             qtbot.addWidget(dialog)
 
             # Test UI components exist

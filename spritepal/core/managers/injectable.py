@@ -18,7 +18,6 @@ from utils.logging_config import get_logger
 from .context import ManagerContext, get_current_context
 from .extraction_manager import ExtractionManager
 from .injection_manager import InjectionManager
-from .registry import get_extraction_manager, get_injection_manager, get_session_manager
 from .session_manager import SessionManager
 
 logger = get_logger(__name__)
@@ -69,9 +68,12 @@ class ContextualManagerProvider:
         if context and context.has_manager("extraction"):
             return context.get_manager("extraction", ExtractionManager)
 
-        # Fallback to global singleton
-        logger.debug("No extraction manager in context, falling back to global")
-        return get_extraction_manager()
+        # Fallback to DI container
+        logger.debug("No extraction manager in context, falling back to DI")
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
+        from typing import cast
+        return cast(ExtractionManager, inject(ExtractionManagerProtocol))
 
     def get_injection_manager(self) -> InjectionManager:
         """Get injection manager with context fallback."""
@@ -80,9 +82,12 @@ class ContextualManagerProvider:
         if context and context.has_manager("injection"):
             return context.get_manager("injection", InjectionManager)
 
-        # Fallback to global singleton
-        logger.debug("No injection manager in context, falling back to global")
-        return get_injection_manager()
+        # Fallback to DI container
+        logger.debug("No injection manager in context, falling back to DI")
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
+        from typing import cast
+        return cast(InjectionManager, inject(InjectionManagerProtocol))
 
     def get_session_manager(self) -> SessionManager:
         """Get session manager with context fallback."""
@@ -91,9 +96,12 @@ class ContextualManagerProvider:
         if context and context.has_manager("session"):
             return context.get_manager("session", SessionManager)
 
-        # Fallback to global singleton
-        logger.debug("No session manager in context, falling back to global")
-        return get_session_manager()
+        # Fallback to DI container
+        logger.debug("No session manager in context, falling back to DI")
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SessionManagerProtocol
+        from typing import cast
+        return cast(SessionManager, inject(SessionManagerProtocol))
 
 class InjectableWidget(QWidget):
     """

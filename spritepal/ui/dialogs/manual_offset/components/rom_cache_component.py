@@ -30,9 +30,10 @@ class ROMCacheComponent:
 
         # Get ROM cache instance
         try:
-            from utils.rom_cache import get_rom_cache
-            self.rom_cache = get_rom_cache()
-        except ImportError:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            self.rom_cache = inject(ROMCacheProtocol)
+        except (ImportError, ValueError):
             logger.warning("ROM cache not available")
 
     def initialize_rom(self, rom_path: str, rom_size: int):

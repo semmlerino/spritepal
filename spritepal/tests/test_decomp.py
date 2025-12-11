@@ -18,7 +18,9 @@ import sys
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from core.managers.registry import get_extraction_manager, initialize_managers
+from core.managers import initialize_managers
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 
 def test_decompression():
@@ -27,7 +29,7 @@ def test_decompression():
     # Initialize managers
     print("Initializing managers...")
     initialize_managers()
-    extraction_manager = get_extraction_manager()
+    extraction_manager = inject(ExtractionManagerProtocol)
     rom_extractor = extraction_manager.get_rom_extractor()
 
     test_rom = "Kirby Super Star (USA).sfc"

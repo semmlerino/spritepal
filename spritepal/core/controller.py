@@ -31,9 +31,6 @@ from core.console_error_handler import ConsoleErrorHandler
 from core.managers import (
     ExtractionManager,
     InjectionManager,
-    get_extraction_manager,
-    get_injection_manager,
-    get_session_manager,
 )
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
@@ -154,31 +151,37 @@ class ExtractionController(QObject):
         if extraction_manager is None:
             warnings.warn(
                 "ExtractionController: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                "Pass extraction_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            extraction_manager = get_extraction_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            extraction_manager = cast(ExtractionManager, inject(ExtractionManagerProtocol))
         self.extraction_manager = extraction_manager
 
         if session_manager is None:
             warnings.warn(
                 "ExtractionController: session_manager parameter will become required. "
-                "Pass session_manager explicitly instead of relying on Service Locator.",
+                "Pass session_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            session_manager = get_session_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SessionManagerProtocol
+            session_manager = inject(SessionManagerProtocol)
         self.session_manager = session_manager
 
         if injection_manager is None:
             warnings.warn(
                 "ExtractionController: injection_manager parameter will become required. "
-                "Pass injection_manager explicitly instead of relying on Service Locator.",
+                "Pass injection_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            injection_manager = get_injection_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            injection_manager = cast(InjectionManager, inject(InjectionManagerProtocol))
         self.injection_manager = injection_manager
 
         if settings_manager is None:

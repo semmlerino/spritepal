@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -21,9 +20,10 @@ class SettingsManager:
     def __init__(self, app_name: str = "SpritePal", session_manager: SessionManagerProtocol | None = None) -> None:
         self.app_name: str = app_name
         if session_manager is None:
-            # Fallback for environments where DI might not be fully configured, e.g., some CLI tools
-            from core.managers import get_session_manager
-            self._session_manager = get_session_manager()
+            # Fallback to DI container
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SessionManagerProtocol
+            self._session_manager = inject(SessionManagerProtocol)
         else:
             self._session_manager = session_manager
         # Initialize default settings if not present
@@ -193,48 +193,5 @@ class SettingsManager:
         """Set cache expiration in days"""
         self.set("cache", "expiration_days", max(CACHE_EXPIRATION_MIN_DAYS, min(CACHE_EXPIRATION_MAX_DAYS, days)))
         self.save_settings()
-
-
-# Global instance for backward compatibility
-_global_settings_manager: SettingsManagerProtocol | None = None
-
-def get_settings_manager() -> SettingsManagerProtocol:
-    """
-    Get the global SettingsManager instance.
-
-    DEPRECATED: This function is maintained for backward compatibility.
-    New code should use dependency injection:
-    from core.di_container import inject
-    from core.protocols.manager_protocols import SettingsManagerProtocol
-    settings = inject(SettingsManagerProtocol)
-    """
-    warnings.warn(
-        "get_settings_manager() is deprecated. Use dependency injection instead: "
-        "from core.di_container import inject; inject(SettingsManagerProtocol)",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _global_settings_manager
-
-    # If we already have a global instance, return it
-    if _global_settings_manager is not None:
-        return _global_settings_manager
-
-    # Try to get from DI container first to ensure we use the app-wide singleton
-    try:
-        from core.di_container import inject
-        from core.protocols.manager_protocols import SettingsManagerProtocol
-        # This will raise ValueError if not registered
-        _global_settings_manager = inject(SettingsManagerProtocol)
-        return _global_settings_manager
-    except (ImportError, ValueError, Exception):
-        # DI not ready or not configured, fall back to local singleton
-        pass
-        
-    # Create new instance if DI failed
-    if _global_settings_manager is None:
-        _global_settings_manager = SettingsManager()
-        
-    return _global_settings_manager
 
 

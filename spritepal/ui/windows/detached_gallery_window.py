@@ -31,8 +31,7 @@ if TYPE_CHECKING:
     from core.managers import ExtractionManager
 
 from core.di_container import inject
-from core.managers import get_extraction_manager
-from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMCacheProtocol, SettingsManagerProtocol
 from ui.common import WorkerManager
 from ui.dialogs import UserErrorDialog
 from ui.rom_extraction.workers import SpriteScanWorker
@@ -70,11 +69,11 @@ class DetachedGalleryWindow(QMainWindow):
         if extraction_manager is None:
             warnings.warn(
                 "DetachedGalleryWindow: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                "Pass extraction_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            extraction_manager = get_extraction_manager()
+            extraction_manager = inject(ExtractionManagerProtocol)
 
         # Window configuration
         self.setWindowTitle("Sprite Gallery")

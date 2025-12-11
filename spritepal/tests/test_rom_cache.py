@@ -11,7 +11,14 @@ from unittest.mock import patch
 import pytest
 
 from core.rom_injector import SpritePointer
-from utils.rom_cache import ROMCache, get_rom_cache
+from utils.rom_cache import ROMCache
+from core.di_container import inject
+from core.protocols.manager_protocols import ROMCacheProtocol
+
+
+def get_rom_cache():
+    """Get ROM cache from DI container (replaces deprecated function)."""
+    return inject(ROMCacheProtocol)
 
 # Serial execution required: Thread safety concerns
 pytestmark = [

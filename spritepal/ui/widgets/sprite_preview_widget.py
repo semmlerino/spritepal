@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from typing_extensions import override
 
 from core.default_palette_loader import DefaultPaletteLoader
-from core.managers import get_extraction_manager
+# ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.visual_similarity_search import VisualSimilarityEngine
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.common.spacing_constants import (
@@ -591,7 +591,9 @@ class SpritePreviewWidget(QWidget):
 
             # Try to get ROM extractor - handle case where it's not available
             try:
-                extraction_manager = get_extraction_manager()
+                from core.di_container import inject
+                from core.protocols.manager_protocols import ExtractionManagerProtocol
+                extraction_manager = inject(ExtractionManagerProtocol)
                 extractor = extraction_manager.get_rom_extractor()
                 logger.debug(f"[SPRITE_DISPLAY] Got extractor: {bool(extractor)}")
             except Exception as e:
@@ -1009,7 +1011,9 @@ class SpritePreviewWidget(QWidget):
 
         try:
             # Get extraction manager for ROM access
-            extraction_manager = get_extraction_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            extraction_manager = inject(ExtractionManagerProtocol)
             if not extraction_manager:
                 progress_dialog.close()
                 QMessageBox.warning(

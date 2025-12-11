@@ -565,25 +565,25 @@ class TestRegressionPrevention:
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
     def test_no_regression_in_manual_offset_signals(self, qtbot) -> None:
         """Test that manual offset dialog signals haven't regressed."""
-        with patch('core.managers.get_extraction_manager') as mock_ext:
-            mock_ext.return_value = Mock()
+        # Pass mock extraction_manager directly (replaces deprecated get_extraction_manager patch)
+        mock_extraction_manager = Mock()
 
-            try:
-                dialog = UnifiedManualOffsetDialog()
+        try:
+            dialog = UnifiedManualOffsetDialog(extraction_manager=mock_extraction_manager)
 
-                # Test that new signals are still present
-                required_signals = ['offset_changed', 'sprite_found']
-                for signal_name in required_signals:
-                    assert hasattr(dialog, signal_name), (
-                        f"Signal regression detected! Manual offset dialog missing {signal_name} signal. "
-                        "These signals were added in recent UI improvements."
-                    )
+            # Test that new signals are still present
+            required_signals = ['offset_changed', 'sprite_found']
+            for signal_name in required_signals:
+                assert hasattr(dialog, signal_name), (
+                    f"Signal regression detected! Manual offset dialog missing {signal_name} signal. "
+                    "These signals were added in recent UI improvements."
+                )
 
-                    signal_obj = getattr(dialog, signal_name)
-                    assert isinstance(signal_obj, Signal), f"{signal_name} should be a Qt Signal"
+                signal_obj = getattr(dialog, signal_name)
+                assert isinstance(signal_obj, Signal), f"{signal_name} should be a Qt Signal"
 
-            except Exception as e:
-                pytest.skip(f"Could not test signal regression: {e}")
+        except Exception as e:
+            pytest.skip(f"Could not test signal regression: {e}")
 
     @pytest.mark.gui
     def test_no_regression_in_button_styling_system(self, qtbot) -> None:
@@ -608,6 +608,7 @@ def mock_manager_dependencies() -> Generator[None, None, None]:
         ExtractionManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
+        SessionManagerProtocol,
         SettingsManagerProtocol,
     )
 
@@ -621,17 +622,17 @@ def mock_manager_dependencies() -> Generator[None, None, None]:
     # Configure mocks
     mock_extraction.get_rom_extractor.return_value = mock_rom_extractor
 
-    # Register in DI container
+    # Register in DI container (replaces deprecated get_*_manager patches)
     register_singleton(ExtractionManagerProtocol, mock_extraction)
     register_singleton(SettingsManagerProtocol, mock_settings)
     register_singleton(ROMCacheProtocol, mock_rom_cache)
     register_singleton(ROMExtractorProtocol, mock_rom_extractor)
+    register_singleton(SessionManagerProtocol, mock_session)
 
     try:
-        with patch('ui.main_window.get_session_manager', return_value=mock_session), \
-             patch('ui.rom_extraction_panel.get_extraction_manager', return_value=mock_extraction), \
-             patch('core.managers.get_extraction_manager', return_value=mock_extraction):
-            yield
+        # DI container is already configured with mocks above
+        # No need to patch deprecated get_*_manager functions - they've been removed
+        yield
     finally:
         # Clean up DI container registrations to prevent test pollution
         container = get_container()
@@ -639,6 +640,7 @@ def mock_manager_dependencies() -> Generator[None, None, None]:
         container.unregister(SettingsManagerProtocol)
         container.unregister(ROMCacheProtocol)
         container.unregister(ROMExtractorProtocol)
+        container.unregister(SessionManagerProtocol)
 
 def create_test_spritepal_app() -> SpritePalApp:
     """Create a test SpritePalApp instance with minimal setup."""

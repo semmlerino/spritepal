@@ -333,18 +333,18 @@ def _get_consolidated_injection_adapter():
 
 def _get_or_create_session_manager():
     """Get or create session manager."""
-    from core.managers import get_session_manager
-    return get_session_manager()
+    from core.managers import get_registry
+    return get_registry().get_session_manager()
 
 def _get_or_create_extraction_manager():
     """Get or create extraction manager."""
-    from core.managers import get_extraction_manager
-    return get_extraction_manager()
+    from core.managers import get_registry
+    return get_registry().get_extraction_manager()
 
 def _get_or_create_injection_manager():
     """Get or create injection manager."""
-    from core.managers import get_injection_manager
-    return get_injection_manager()
+    from core.managers import get_registry
+    return get_registry().get_injection_manager()
 
 def _get_or_create_navigation_manager():
     """Get or create navigation manager."""
@@ -353,9 +353,9 @@ def _get_or_create_navigation_manager():
         core_mgr = get_core_operations_manager()
         return core_mgr._get_navigation_manager()
     except Exception:
-        # Fallback to direct navigation manager if available
-        from core.managers import get_navigation_manager
-        return get_navigation_manager()
+        # Fallback to registry method if available
+        from core.managers import get_registry
+        return get_registry().get_navigation_manager()
 
 # Example usage with protocols
 if __name__ == "__main__":

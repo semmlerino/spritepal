@@ -1,31 +1,15 @@
 {
   "session": {
-    "vram_path": "",
-    "cgram_path": "",
+    "vram_path": "/test/vram.dmp",
+    "cgram_path": "/test/cgram.dmp",
     "oam_path": "",
-    "output_name": "",
+    "output_name": "my_sprite",
     "create_grayscale": true,
     "create_metadata": true,
-    "data": {
-      "vram_path": "",
-      "cgram_path": "",
-      "oam_path": "",
-      "extraction_mode": 0,
-      "output_name": "",
-      "create_grayscale": true,
-      "create_metadata": true
-    },
-    "auto_save": true,
-    "last_export_dir": "/tmp/pytest-of-gabrielh/pytest-65/test_auto_save_session_functio0/spritepal_test/exports",
-    "recent_files": [
-      "/tmp/pytest-of-gabrielh/pytest-65/test_auto_save_session_functio0/spritepal_test/file1.dmp",
-      "/tmp/pytest-of-gabrielh/pytest-65/test_auto_save_session_functio0/spritepal_test/file2.dmp"
-    ],
-    "last_rom": "/path/to/rom.sfc",
     "last_rom_path": "",
     "last_vram_path": "",
     "last_output_dir": "",
-    "extraction_mode": 0,
+    "recent_files": [],
     "last_extraction_offset": 49152,
     "last_tile_count": 64,
     "recent_vram_files": [
@@ -37,15 +21,20 @@
     ]
   },
   "ui": {
-    "window_width": 1000,
-    "window_height": 650,
-    "window_x": 0,
-    "window_y": 0,
+    "window_width": 1200,
+    "window_height": 800,
+    "window_x": 100,
+    "window_y": 200,
     "restore_position": false,
-    "theme": "dark"
+    "theme": "dark",
+    "window_maximized": false,
+    "window_splitter_sizes": [
+      300,
+      900
+    ]
   },
   "paths": {
-    "last_used_dir": "/tmp/spritepal_integration_c2bp_14u",
+    "last_used_dir": "/tmp/spritepal_integration_ziikte1z",
     "default_dumps_dir": "C:\\Users\\gabri\\Documents\\Mesen2\\Debugger",
     "last_export_dir": "",
     "last_import_dir": ""
@@ -55,10 +44,11 @@
     "data": "value",
     "new_data": "new_value",
     "key1": "value1",
-    "adapter_key": "adapter_value"
+    "adapter_key": "adapter_value",
+    "test_key": "test_value"
   },
   "rom_injection": {
-    "last_input_rom": "/tmp/spritepal_integration_c2bp_14u/test_rom.sfc",
+    "last_input_rom": "/tmp/spritepal_integration_ziikte1z/test_rom.sfc",
     "last_sprite_location": "Kirby Sprite (0x123456)",
     "last_custom_offset": "0x123456",
     "fast_compression": true,
@@ -72,7 +62,9 @@
     "palette_format": "rgb888",
     "include_unused_palettes": false,
     "tile_width": 256,
-    "default_format": "indexed_png"
+    "default_format": "indexed_png",
+    "last_vram_path": "/tmp/spritepal_test_k9ll_b53/small_test_vram.dmp",
+    "last_extraction_mode": "vram"
   },
   "appearance": {
     "color_scheme": {
@@ -107,5 +99,17 @@
   },
   "experimental": {
     "use_composed_dialogs": true
+  },
+  "workflow": {
+    "current_injection_params": {
+      "mode": "vram",
+      "sprite_path": "/tmp/tmpauc2qirh/test_sprite.png",
+      "input_vram": "/tmp/tmpauc2qirh/input.dmp",
+      "output_vram": "/tmp/tmpauc2qirh/output.dmp",
+      "offset": 49152
+    }
+  },
+  "custom": {
+    "last_export_dir": "/exports"
   }
 }

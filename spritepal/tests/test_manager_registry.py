@@ -13,12 +13,20 @@ from core.managers import (
     SessionManager,
     are_managers_initialized,
     cleanup_managers,
-    get_extraction_manager,
     get_registry,
-    get_session_manager,
     initialize_managers,
 )
 from core.managers.registry import ManagerRegistry
+
+
+def get_session_manager():
+    """Get session manager from registry (replaces deprecated function)."""
+    return get_registry().get_session_manager()
+
+
+def get_extraction_manager():
+    """Get extraction manager from registry (replaces deprecated function)."""
+    return get_registry().get_extraction_manager()
 
 pytestmark = [
     pytest.mark.serial,

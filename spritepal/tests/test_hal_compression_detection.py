@@ -238,7 +238,9 @@ class TestHALToolDetectionRegression(unittest.TestCase):
 
     def test_manager_initialization_robustness(self):
         """Test that manager initialization works regardless of working directory"""
-        from core.managers import cleanup_managers, get_injection_manager, initialize_managers
+        from core.managers import cleanup_managers, initialize_managers
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
 
         # Test from different directories
         test_dirs = [
@@ -258,8 +260,8 @@ class TestHALToolDetectionRegression(unittest.TestCase):
                 # Initialize managers - this is what we're testing
                 initialize_managers(app_name="SpritePal_Test")
 
-                # Verify initialization succeeded by getting a manager
-                manager = get_injection_manager()
+                # Verify initialization succeeded by getting a manager via DI
+                manager = inject(InjectionManagerProtocol)
                 self.assertIsNotNone(manager)
 
             except Exception as e:

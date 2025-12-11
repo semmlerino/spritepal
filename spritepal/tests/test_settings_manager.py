@@ -4,11 +4,17 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from utils.settings_manager import SettingsManager, get_settings_manager
+from utils.settings_manager import SettingsManager
+from core.di_container import inject
+from core.protocols.manager_protocols import SettingsManagerProtocol
+
+
+def get_settings_manager():
+    """Get settings manager from DI container (replaces deprecated function)."""
+    return inject(SettingsManagerProtocol)
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -40,19 +46,18 @@ class TestSettingsManager:
         settings_file = Path(temp_dir) / ".testapp_settings.json"
 
         # Create a session manager with our temp settings file
-        with patch("core.managers.get_session_manager") as mock_get_sm:
-            session_manager = SessionManager(settings_path=settings_file)
-            mock_get_sm.return_value = session_manager
+        session_manager = SessionManager(settings_path=settings_file)
 
-            manager = SettingsManager("TestApp")
-            # Store session manager reference for tests
-            manager._test_session_manager = session_manager
-            manager._test_settings_file = settings_file
+        # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
+        manager = SettingsManager("TestApp", session_manager=session_manager)
+        # Store session manager reference for tests
+        manager._test_session_manager = session_manager
+        manager._test_settings_file = settings_file
 
-            yield manager
-            # Cleanup
-            if settings_file.exists():
-                settings_file.unlink()
+        yield manager
+        # Cleanup
+        if settings_file.exists():
+            settings_file.unlink()
 
     def test_init_creates_default_settings(self, settings_manager):
         """Test initialization creates default settings"""
@@ -73,15 +78,13 @@ class TestSettingsManager:
 
         settings_file = Path(temp_dir) / ".testapp_settings.json"
 
-        with patch("core.managers.get_session_manager") as mock_get_sm:
-            session_manager = SessionManager(settings_path=settings_file)
-            mock_get_sm.return_value = session_manager
-
-            manager = SettingsManager("TestApp")
-            # Force saving to create the file
-            manager.save_settings()
-            # Verify the file was created
-            assert settings_file.exists()
+        # Pass session_manager directly (replaces deprecated get_session_manager patch)
+        session_manager = SessionManager(settings_path=settings_file)
+        manager = SettingsManager("TestApp", session_manager=session_manager)
+        # Force saving to create the file
+        manager.save_settings()
+        # Verify the file was created
+        assert settings_file.exists()
 
     def test_load_existing_settings(self, temp_dir):
         """Test loading existing settings file"""
@@ -96,12 +99,9 @@ class TestSettingsManager:
         with open(settings_file, "w") as f:
             json.dump(settings_data, f)
 
-        # Load settings
-        with patch("core.managers.get_session_manager") as mock_get_sm:
-            session_manager = SessionManager(settings_path=settings_file)
-            mock_get_sm.return_value = session_manager
-
-            manager = SettingsManager("TestApp")
+        # Load settings - pass session_manager directly (replaces deprecated get_session_manager patch)
+        session_manager = SessionManager(settings_path=settings_file)
+        manager = SettingsManager("TestApp", session_manager=session_manager)
 
         assert manager.get("session", "vram_path") == "/test/vram.dmp"
         assert manager.get("ui", "window_width") == 1000
@@ -115,12 +115,9 @@ class TestSettingsManager:
         with open(settings_file, "w") as f:
             f.write("{ invalid json }")
 
-        # Should return default settings
-        with patch("core.managers.get_session_manager") as mock_get_sm:
-            session_manager = SessionManager(settings_path=settings_file)
-            mock_get_sm.return_value = session_manager
-
-            manager = SettingsManager("TestApp")
+        # Should return default settings - pass session_manager directly (replaces deprecated patch)
+        session_manager = SessionManager(settings_path=settings_file)
+        manager = SettingsManager("TestApp", session_manager=session_manager)
 
         assert manager.get("session", "vram_path") == ""
         assert manager.get("ui", "window_width") == 900

@@ -16,9 +16,10 @@ import pytest
 from core.controller import ExtractionController
 from core.managers import (
     cleanup_managers,
-    get_injection_manager,
     initialize_managers,
 )
+from core.di_container import inject
+from core.protocols.manager_protocols import InjectionManagerProtocol
 from tests.fixtures.test_main_window_helper_simple import MainWindowHelperSimple
 from tests.infrastructure import (
     # Systematic pytest markers applied based on test content analysis
@@ -104,7 +105,7 @@ class TestInjectionManagerRealConversion:
                 window_helper._output_path = os.path.join(temp_dir, "test_sprite")
 
                 # Track real injection_manager method calls
-                injection_manager = get_injection_manager()
+                injection_manager = inject(InjectionManagerProtocol)
                 original_start_injection = injection_manager.start_injection
                 original_get_smart_vram = injection_manager.get_smart_vram_suggestion
 

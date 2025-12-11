@@ -200,20 +200,25 @@ class TestNoFallbackScenario:
             container._singletons.update(original_singletons)
             container._factories.update(original_factories)
 
-    def test_deprecation_warnings_are_emitted(self, session_managers):
-        """Verify deprecated functions emit DeprecationWarning."""
-        import warnings
+    def test_deprecated_functions_were_removed(self, session_managers):
+        """Verify deprecated convenience functions have been removed from module exports."""
+        import core.managers
 
-        from core.managers import get_extraction_manager
+        # These functions should no longer exist at module level
+        # (they were removed as part of the DI migration)
+        assert not hasattr(core.managers, "get_extraction_manager"), \
+            "get_extraction_manager should have been removed"
+        assert not hasattr(core.managers, "get_injection_manager"), \
+            "get_injection_manager should have been removed"
+        assert not hasattr(core.managers, "get_session_manager"), \
+            "get_session_manager should have been removed"
+        assert not hasattr(core.managers, "get_navigation_manager"), \
+            "get_navigation_manager should have been removed"
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            get_extraction_manager()
-
-            # Should have emitted a deprecation warning
-            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warnings) >= 1
-            assert "deprecated" in str(deprecation_warnings[0].message).lower()
+        # These are still available on the registry instance
+        registry = core.managers.get_registry()
+        assert hasattr(registry, "get_extraction_manager"), \
+            "Registry should still have get_extraction_manager method"
 
 
 class TestInjectionManagerDI:
@@ -230,16 +235,14 @@ class TestInjectionManagerDI:
             assert session is not None
 
     def test_injection_manager_rom_cache_access(self, session_managers):
-        """Test InjectionManager can access ROM cache."""
-        from utils.rom_cache import get_rom_cache
+        """Test InjectionManager can access ROM cache via DI."""
+        # Use DI to get ROM cache (replaces deprecated get_rom_cache())
+        cache = inject(ROMCacheProtocol)
+        assert cache is not None
 
-        # This deprecated function is used internally by InjectionManager
-        # Verify it returns valid cache
-        import warnings
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=DeprecationWarning)
-            cache = get_rom_cache()
-            assert cache is not None
+        # Verify the cache has expected methods
+        assert hasattr(cache, "get_cache_stats")
+        assert hasattr(cache, "cache_enabled")
 
 
 if __name__ == "__main__":

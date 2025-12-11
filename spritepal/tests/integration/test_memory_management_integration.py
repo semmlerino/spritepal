@@ -276,23 +276,21 @@ class TestMemoryManagementIntegration(QtTestCase):
 
         initial_widget_count = MemoryHelper.get_widget_count()
 
+        mock_manager = Mock()
+        mock_manager.get_rom_extractor.return_value = Mock()
+        mock_manager.get_known_sprite_locations.return_value = {}
+
         with MemoryHelper.assert_no_leak(DetachedGalleryWindow, max_increase=1):
-            with patch('ui.windows.detached_gallery_window.get_extraction_manager') as mock_get_manager:
-                mock_manager = Mock()
-                mock_manager.get_rom_extractor.return_value = Mock()
-                mock_manager.get_known_sprite_locations.return_value = {}
-                mock_get_manager.return_value = mock_manager
+            window = DetachedGalleryWindow(extraction_manager=mock_manager)
 
-                window = self.create_widget(DetachedGalleryWindow)
+            # Load massive sprite dataset
+            window.set_sprites(massive_sprite_dataset)
 
-                # Load massive sprite dataset
-                window.set_sprites(massive_sprite_dataset)
+            # Process UI updates
+            EventLoopHelper.process_events(100)
 
-                # Process UI updates
-                EventLoopHelper.process_events(100)
-
-                # Close and cleanup
-                window.close()
+            # Close and cleanup
+            window.close()
 
         # Widget count should return to baseline
         final_widget_count = MemoryHelper.get_widget_count()
@@ -388,37 +386,35 @@ class TestMemoryManagementIntegration(QtTestCase):
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
         peak_memory = initial_memory
 
-        with patch('ui.windows.detached_gallery_window.get_extraction_manager') as mock_get_manager:
-            mock_manager = Mock()
-            mock_manager.get_rom_extractor.return_value = Mock()
-            mock_manager.get_known_sprite_locations.return_value = {}
-            mock_get_manager.return_value = mock_manager
+        mock_manager = Mock()
+        mock_manager.get_rom_extractor.return_value = Mock()
+        mock_manager.get_known_sprite_locations.return_value = {}
 
-            # Perform many operations that could leak memory
-            for cycle in range(10):
-                # Create window
-                window = self.create_widget(DetachedGalleryWindow)
-                window._set_rom_file(large_rom_data)
+        # Perform many operations that could leak memory
+        for cycle in range(10):
+            # Create window
+            window = DetachedGalleryWindow(extraction_manager=mock_manager)
+            window._set_rom_file(large_rom_data)
 
-                # Load large sprite set
-                batch_size = 500
-                start_idx = (cycle * batch_size) % len(massive_sprite_dataset)
-                end_idx = start_idx + batch_size
-                sprite_batch = massive_sprite_dataset[start_idx:end_idx]
+            # Load large sprite set
+            batch_size = 500
+            start_idx = (cycle * batch_size) % len(massive_sprite_dataset)
+            end_idx = start_idx + batch_size
+            sprite_batch = massive_sprite_dataset[start_idx:end_idx]
 
-                window.set_sprites(sprite_batch)
-                EventLoopHelper.process_events(50)
+            window.set_sprites(sprite_batch)
+            EventLoopHelper.process_events(50)
 
-                # Check memory
-                current_memory = process.memory_info().rss / 1024 / 1024  # MB
-                peak_memory = max(peak_memory, current_memory)
+            # Check memory
+            current_memory = process.memory_info().rss / 1024 / 1024  # MB
+            peak_memory = max(peak_memory, current_memory)
 
-                # Clean up window
-                window.close()
+            # Clean up window
+            window.close()
 
-                # Force cleanup
-                gc.collect()
-                EventLoopHelper.process_events(50)
+            # Force cleanup
+            gc.collect()
+            EventLoopHelper.process_events(50)
 
         # Final cleanup
         gc.collect()

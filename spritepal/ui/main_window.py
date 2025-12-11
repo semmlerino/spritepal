@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.managers import get_session_manager
+# Session manager accessed via DI: inject(SessionManagerProtocol)
 from ui.dialogs import SettingsDialog, UserErrorDialog
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
@@ -106,33 +106,37 @@ class MainWindow(QMainWindow):
         if settings_manager is None:
             warnings.warn(
                 "MainWindow: settings_manager parameter will become required. "
-                "Pass settings_manager explicitly instead of relying on Service Locator.",
+                "Pass settings_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            from utils.settings_manager import get_settings_manager
-            settings_manager = get_settings_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SettingsManagerProtocol
+            settings_manager = inject(SettingsManagerProtocol)
         self.settings_manager = settings_manager
 
         if rom_cache is None:
             warnings.warn(
                 "MainWindow: rom_cache parameter will become required. "
-                "Pass rom_cache explicitly instead of relying on Service Locator.",
+                "Pass rom_cache explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            from utils.rom_cache import get_rom_cache
-            rom_cache = get_rom_cache()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            rom_cache = inject(ROMCacheProtocol)
         self.rom_cache = rom_cache
 
         if session_manager is None:
             warnings.warn(
                 "MainWindow: session_manager parameter will become required. "
-                "Pass session_manager explicitly instead of relying on Service Locator.",
+                "Pass session_manager explicitly instead of relying on DI.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            session_manager = get_session_manager()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SessionManagerProtocol
+            session_manager = inject(SessionManagerProtocol)
         self.session_manager = session_manager
 
         # Manager instances
@@ -451,9 +455,10 @@ class MainWindow(QMainWindow):
 
             # Validate parameters using extraction manager
             # Delayed import to avoid initialization order issues
-            from core.managers import get_extraction_manager
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
             try:
-                extraction_manager = get_extraction_manager()
+                extraction_manager = inject(ExtractionManagerProtocol)
                 extraction_manager.validate_extraction_params(params)
             except (ValueError, TypeError) as e:
                 QMessageBox.warning(

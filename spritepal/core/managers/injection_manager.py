@@ -29,7 +29,6 @@ from utils.constants import (
     SETTINGS_NS_ROM_INJECTION,
 )
 from utils.file_validator import FileValidator
-from utils.rom_cache import get_rom_cache
 
 from .base_manager import BaseManager
 from .exceptions import ValidationError
@@ -509,7 +508,9 @@ class InjectionManager(BaseManager):
                 return error_result
 
             # Try to load from cache first
-            rom_cache = get_rom_cache()
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+            rom_cache = inject(ROMCacheProtocol)
             cached_info = rom_cache.get_rom_info(rom_path)
 
             if cached_info:
@@ -941,7 +942,9 @@ class InjectionManager(BaseManager):
         Returns:
             Dictionary with cache information
         """
-        rom_cache = get_rom_cache()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        rom_cache = inject(ROMCacheProtocol)
         return rom_cache.get_cache_stats()
 
     def clear_rom_cache(self, older_than_days: int | None = None) -> int:
@@ -954,7 +957,9 @@ class InjectionManager(BaseManager):
         Returns:
             Number of cache files removed
         """
-        rom_cache = get_rom_cache()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        rom_cache = inject(ROMCacheProtocol)
         removed_count = rom_cache.clear_cache(older_than_days)
         self._logger.info(f"ROM cache cleared: {removed_count} files removed")
         return removed_count
@@ -970,7 +975,9 @@ class InjectionManager(BaseManager):
         Returns:
             Dictionary with scan progress or None if not cached
         """
-        rom_cache = get_rom_cache()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        rom_cache = inject(ROMCacheProtocol)
         return rom_cache.get_partial_scan_results(rom_path, scan_params)
 
     def save_scan_progress(self, rom_path: str, scan_params: dict[str, Any],
@@ -989,7 +996,9 @@ class InjectionManager(BaseManager):
         Returns:
             True if saved successfully, False otherwise
         """
-        rom_cache = get_rom_cache()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        rom_cache = inject(ROMCacheProtocol)
         return rom_cache.save_partial_scan_results(
             rom_path, scan_params, found_sprites, current_offset, completed
         )
@@ -1006,7 +1015,9 @@ class InjectionManager(BaseManager):
         Returns:
             Number of files removed
         """
-        rom_cache = get_rom_cache()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        rom_cache = inject(ROMCacheProtocol)
         removed_count = rom_cache.clear_scan_progress_cache(rom_path, scan_params)
         self._logger.info(f"Scan progress cache cleared: {removed_count} files removed")
         return removed_count
