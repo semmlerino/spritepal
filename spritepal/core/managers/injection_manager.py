@@ -289,7 +289,11 @@ class InjectionManager(BaseManager):
         # Common signals for both worker types
         worker = self._current_worker  # Type narrowing for safety
         if hasattr(worker, "progress"):
-            worker.progress.connect(self._on_worker_progress)  # type: ignore[attr-defined]
+            # Handle different worker signal signatures:
+            # - core/workers uses Signal(int, str) for progress
+            # - ui/workers uses Signal(str) for progress
+            # We use a lambda adapter to normalize both to message-only
+            worker.progress.connect(self._on_worker_progress_adapter)  # type: ignore[attr-defined]
         if hasattr(worker, "injection_finished"):
             worker.injection_finished.connect(self._on_worker_finished)  # type: ignore[attr-defined]
         else:
@@ -302,8 +306,31 @@ class InjectionManager(BaseManager):
         if hasattr(worker, "compression_info"):
             worker.compression_info.connect(self.compression_info.emit)  # type: ignore[attr-defined]
 
+    def _on_worker_progress_adapter(self, *args: object) -> None:
+        """Adapter to handle different worker progress signal signatures.
+
+        Different workers emit different signals:
+        - core/workers: Signal(int, str) -> (percent, message)
+        - ui/workers: Signal(str) -> (message,)
+
+        This adapter normalizes both to extract the message.
+        """
+        if len(args) == 1:
+            # Signal(str) - message only
+            message = str(args[0])
+        elif len(args) >= 2:
+            # Signal(int, str) - (percent, message)
+            message = str(args[1])
+        else:
+            message = ""
+        self._on_worker_progress(message)
+
     def _on_worker_progress(self, message: str) -> None:
-        """Handle worker progress updates"""
+        """Handle worker progress updates.
+
+        Args:
+            message: Progress message to relay
+        """
         self.injection_progress.emit(message)
 
     def _on_worker_finished(self, success: bool, message: str) -> None:
