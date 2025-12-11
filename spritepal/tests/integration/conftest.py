@@ -19,13 +19,24 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 # Do not redefine it here to avoid fixture shadowing issues.
 
 @pytest.fixture(scope="function")
-def managers_initialized(qt_app):
-    """Initialize managers for integration tests."""
-    from core.managers.registry import cleanup_managers, initialize_managers
-    try:
+def managers_initialized(qt_app, request):
+    """Initialize managers for integration tests.
+
+    If session_managers is already active, this fixture is a no-op to avoid
+    conflicting cleanup.
+    """
+    from core.managers.registry import ManagerRegistry, cleanup_managers, initialize_managers
+
+    registry = ManagerRegistry()
+    was_already_initialized = registry.is_initialized()
+
+    if not was_already_initialized:
         initialize_managers()
-        yield
-    finally:
+
+    yield
+
+    # Only cleanup if WE initialized (not if session_managers did)
+    if not was_already_initialized:
         cleanup_managers()
 
 @pytest.fixture

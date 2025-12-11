@@ -13,6 +13,7 @@ from __future__ import annotations
 import gc
 import threading
 import time
+import warnings
 import weakref
 
 import pytest
@@ -113,13 +114,16 @@ class WorkerManager:
         worker = self.active_workers[worker_id]
 
         # Disconnect all signals to prevent leaks
-        try:
-            worker.finished_work.disconnect()
-            worker.progress.disconnect()
-            worker.error.disconnect()
-        except (RuntimeError, TypeError):
-            # Signals might already be disconnected
-            pass
+        # Suppress RuntimeWarning when signals have no connections
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=RuntimeWarning)
+            try:
+                worker.finished_work.disconnect()
+                worker.progress.disconnect()
+                worker.error.disconnect()
+            except (RuntimeError, TypeError):
+                # Signals might already be disconnected
+                pass
 
         # Stop and wait for thread
         worker.cleanup()

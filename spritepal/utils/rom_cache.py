@@ -7,6 +7,7 @@ import tempfile
 import threading
 import time
 import uuid
+import warnings
 import zlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -1179,12 +1180,18 @@ _global_rom_cache: ROMCacheProtocol | None = None
 def get_rom_cache() -> ROMCacheProtocol:
     """
     Get the global ROMCache instance.
-    
+
     DEPRECATED: This function is maintained for backward compatibility.
     New code should use dependency injection via core.di_container.
     """
+    warnings.warn(
+        "get_rom_cache() is deprecated. Use dependency injection instead: "
+        "from core.di_container import inject; inject(ROMCacheProtocol)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _global_rom_cache
-    
+
     # Return existing instance
     if _global_rom_cache is not None:
         return _global_rom_cache

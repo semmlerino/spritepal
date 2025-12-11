@@ -7,6 +7,7 @@ to the ExtractionManager while providing consistent threading interfaces.
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, TypedDict, cast
 
 try:
@@ -63,9 +64,21 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
     ExtractionManager, providing progress updates and preview generation.
     """
 
-    def __init__(self, params: VRAMExtractionParams, parent: QObject | None = None) -> None:
-        manager = get_extraction_manager()
-        super().__init__(manager=manager, parent=parent)
+    def __init__(
+        self,
+        params: VRAMExtractionParams,
+        extraction_manager: ExtractionManager | None = None,
+        parent: QObject | None = None,
+    ) -> None:
+        if extraction_manager is None:
+            warnings.warn(
+                "VRAMExtractionWorker: extraction_manager parameter will become required. "
+                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            extraction_manager = get_extraction_manager()
+        super().__init__(manager=extraction_manager, parent=parent)
         self.params = params
         self._operation_name = "VRAMExtractionWorker"
 
@@ -130,9 +143,21 @@ class ROMExtractionWorker(ExtractionWorkerBase):
     providing progress updates during the extraction process.
     """
 
-    def __init__(self, params: ROMExtractionParams, parent: QObject | None = None) -> None:
-        manager = get_extraction_manager()
-        super().__init__(manager=manager, parent=parent)
+    def __init__(
+        self,
+        params: ROMExtractionParams,
+        extraction_manager: ExtractionManager | None = None,
+        parent: QObject | None = None,
+    ) -> None:
+        if extraction_manager is None:
+            warnings.warn(
+                "ROMExtractionWorker: extraction_manager parameter will become required. "
+                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            extraction_manager = get_extraction_manager()
+        super().__init__(manager=extraction_manager, parent=parent)
         self.params = params
         self._operation_name = "ROMExtractionWorker"
 

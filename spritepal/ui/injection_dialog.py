@@ -4,8 +4,9 @@ Allows users to configure sprite injection parameters
 """
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -24,6 +25,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from typing_extensions import override
+
+if TYPE_CHECKING:
+    from core.managers import InjectionManager
 
 from core.managers import get_injection_manager
 from core.sprite_validator import SpriteValidator
@@ -51,7 +55,18 @@ class InjectionDialog(TabbedDialog):
         sprite_path: str = "",
         metadata_path: str = "",
         input_vram: str = "",
+        injection_manager: InjectionManager | None = None,
     ):
+        # B.3 DI Migration: Optional injection_manager with deprecation warning fallback
+        if injection_manager is None:
+            warnings.warn(
+                "InjectionDialog: injection_manager parameter will become required. "
+                "Pass injection_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            injection_manager = get_injection_manager()
+
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path = sprite_path
         self.metadata_path = metadata_path
@@ -59,6 +74,7 @@ class InjectionDialog(TabbedDialog):
         self.metadata = None
         self.extraction_vram_offset = None
         self.rom_extraction_info = None
+        self.injection_manager = injection_manager
 
         # Initialize UI components that will be created in setup methods
         self.extraction_group: QGroupBox | None = None
@@ -83,9 +99,6 @@ class InjectionDialog(TabbedDialog):
 
         # Background workers for async operations
         self._rom_info_loader: ROMInfoLoaderWorker | None = None
-
-        # Get injection manager instance
-        self.injection_manager = get_injection_manager()
 
         # Step 2: Call parent init (this will call _setup_ui)
         super().__init__(

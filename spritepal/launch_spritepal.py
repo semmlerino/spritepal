@@ -9,6 +9,7 @@ Simplifies sprite extraction with automatic palette association
 import os
 import sys
 from pathlib import Path
+from types import TracebackType
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -51,10 +52,16 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
+from core.di_container import inject
 from core.managers import (
     cleanup_managers,
     initialize_managers,
     validate_manager_dependencies,
+)
+from core.protocols.manager_protocols import (
+    ROMCacheProtocol,
+    SessionManagerProtocol,
+    SettingsManagerProtocol,
 )
 from ui.common.error_handler import get_error_handler
 from ui.main_window import MainWindow
@@ -64,7 +71,11 @@ from utils.logging_config import get_logger, setup_logging
 from utils.unified_error_handler import set_global_error_display
 
 
-def handle_exception(exc_type, exc_value, exc_traceback):
+def handle_exception(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_traceback: TracebackType | None,
+) -> None:
     """Global exception handler to log unhandled exceptions"""
     if issubclass(exc_type, KeyboardInterrupt):
         # Allow KeyboardInterrupt to work normally
@@ -88,7 +99,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 class SpritePalApp(QApplication):
     """Main application class for SpritePal"""
 
-    def __init__(self, argv):
+    def __init__(self, argv: list[str]) -> None:
         super().__init__(argv)
 
         # Set application metadata
@@ -102,8 +113,13 @@ class SpritePalApp(QApplication):
         # Initialize accessibility features
         initialize_accessibility()
 
-        # Create main window
-        self.main_window = MainWindow()
+        # B.6: Create main window with explicit DI dependencies
+        # This eliminates deprecation warnings and makes dependencies explicit
+        self.main_window = MainWindow(
+            settings_manager=inject(SettingsManagerProtocol),
+            rom_cache=inject(ROMCacheProtocol),
+            session_manager=inject(SessionManagerProtocol),  # type: ignore[arg-type]  # Protocol vs concrete type mismatch (pre-existing)
+        )
 
     def _apply_dark_theme(self):
         """Apply a modern dark theme to the application"""

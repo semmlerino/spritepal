@@ -856,9 +856,17 @@ class ThumbnailWorkerController(QObject):
         if self.worker:
             self.worker.stop()
         if self._thread:
-            self._thread.quit()
-            if not self._thread.wait(3000):  # Wait up to 3 seconds
-                logger.warning("Thread did not stop within timeout")
+            try:
+                # Check if thread is still valid (not already deleted by deleteLater)
+                # and actually running before trying to quit
+                if self._thread.isRunning():
+                    self._thread.quit()
+                    if not self._thread.wait(3000):  # Wait up to 3 seconds
+                        logger.warning("Thread did not stop within timeout")
+            except RuntimeError:
+                # C++ object already deleted - this is expected when cleanup
+                # is called after the thread has finished and deleteLater executed
+                pass
 
     def cleanup(self) -> None:
         """Clean up resources. Safe to call multiple times."""

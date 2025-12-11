@@ -32,8 +32,7 @@ def test_decompression():
 
     test_rom = "Kirby Super Star (USA).sfc"
     if not os.path.exists(test_rom):
-        print("ERROR: Test ROM not found!")
-        return 1
+        pytest.skip("Test ROM not found - skipping decompression test")
 
     # Read ROM data
     with open(test_rom, "rb") as f:
@@ -49,24 +48,29 @@ def test_decompression():
     print(f"Raw data (first 32 bytes): {raw_data.hex()}")
 
     # Try decompression
-    try:
-        compressed_size, decompressed_data = rom_extractor.rom_injector.find_compressed_sprite(
-            rom_data, test_offset, 8192  # Expected size
-        )
-        print("\nDecompression successful!")
-        print(f"Compressed size: {compressed_size} bytes")
-        print(f"Decompressed size: {len(decompressed_data)} bytes")
-        print(f"First 32 bytes of decompressed: {decompressed_data[:32].hex()}")
+    compressed_size, decompressed_data = rom_extractor.rom_injector.find_compressed_sprite(
+        rom_data, test_offset, 8192  # Expected size
+    )
+    print("\nDecompression successful!")
+    print(f"Compressed size: {compressed_size} bytes")
+    print(f"Decompressed size: {len(decompressed_data)} bytes")
+    print(f"First 32 bytes of decompressed: {decompressed_data[:32].hex()}")
 
-        # Check if it looks like tile data
-        num_tiles = len(decompressed_data) // 32
-        print(f"Number of tiles: {num_tiles}")
+    # Check if it looks like tile data
+    num_tiles = len(decompressed_data) // 32
+    print(f"Number of tiles: {num_tiles}")
 
-    except Exception as e:
-        print(f"\nDecompression failed: {e}")
+    # Assertions
+    assert compressed_size > 0, "Compressed size should be positive"
+    assert len(decompressed_data) > 0, "Decompressed data should not be empty"
+    assert num_tiles > 0, "Should have at least one tile"
 
     print("\nTest complete!")
-    return 0
 
 if __name__ == "__main__":
-    sys.exit(test_decompression())
+    try:
+        test_decompression()
+        sys.exit(0)
+    except Exception as e:
+        print(f"Test failed: {e}")
+        sys.exit(1)

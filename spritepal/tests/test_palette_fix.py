@@ -113,9 +113,13 @@ def test_palette_application():
     print(f"Non-black pixels in first 100: {non_black_np}")
     print(f"First 10 RGB pixels: {rgb_pixels[:10]}")
 
-    return img_rgba, img_rgb
+    # Assertions
+    assert non_black > 0, "Method 1: Should have non-black pixels after palette application"
+    assert non_black_np > 0, "Method 2: Should have non-black pixels after numpy palette mapping"
+
+    print("\nPalette application test complete!")
+    print("Both methods produced non-black pixels, palette application works correctly.")
+
 
 if __name__ == "__main__":
-    img1, img2 = test_palette_application()
-    print("\nPalette application test complete!")
-    print("If non-black pixel counts are > 0, palette application works correctly.")
+    test_palette_application()

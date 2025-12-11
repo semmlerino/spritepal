@@ -4,8 +4,9 @@ Opens in a separate window to avoid parent layout stretch issues.
 """
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QPixmap
@@ -25,6 +26,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from typing_extensions import override
+
+if TYPE_CHECKING:
+    from core.managers import ExtractionManager
 
 from core.di_container import inject
 from core.managers import get_extraction_manager
@@ -48,14 +52,29 @@ class DetachedGalleryWindow(QMainWindow):
     window_closed = Signal()  # Emits when window is closed
     sprite_extracted = Signal(str, int)  # path, offset - for successful extraction
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        extraction_manager: ExtractionManager | None = None,
+    ):
         """
         Initialize the detached gallery window.
 
         Args:
             parent: Parent widget (usually the main window)
+            extraction_manager: Optional injected ExtractionManager instance
         """
         super().__init__(parent)
+
+        # B.3 DI Migration: Optional extraction_manager with deprecation warning fallback
+        if extraction_manager is None:
+            warnings.warn(
+                "DetachedGalleryWindow: extraction_manager parameter will become required. "
+                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            extraction_manager = get_extraction_manager()
 
         # Window configuration
         self.setWindowTitle("Sprite Gallery")
@@ -70,8 +89,8 @@ class DetachedGalleryWindow(QMainWindow):
         self.scanning: bool = False
         self.scan_timeout_timer: QTimer | None = None
 
-        # Core managers
-        self.extraction_manager = get_extraction_manager()
+        # Core managers (B.3: Using injected manager)
+        self.extraction_manager = extraction_manager
         self.rom_extractor = self.extraction_manager.get_rom_extractor()
         self.settings_manager: SettingsManagerProtocol = inject(SettingsManagerProtocol)
         self.rom_cache: ROMCacheProtocol = inject(ROMCacheProtocol)
@@ -1107,7 +1126,10 @@ class DetachedGalleryWindow(QMainWindow):
             try:
                 signal = getattr(self.thumbnail_controller, signal_name, None)
                 if signal is not None:
-                    signal.disconnect()  # Disconnect all connections
+                    # Suppress RuntimeWarning when disconnecting signals with no connections
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings('ignore', category=RuntimeWarning)
+                        signal.disconnect()  # Disconnect all connections
                     logger.debug(f"Disconnected {signal_name} signal")
             except (RuntimeError, TypeError):
                 pass

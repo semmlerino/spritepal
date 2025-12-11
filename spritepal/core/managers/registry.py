@@ -4,6 +4,7 @@ Registry for accessing manager instances
 from __future__ import annotations
 
 import threading
+import warnings
 from typing import Any
 
 from PySide6.QtWidgets import QApplication
@@ -508,12 +509,22 @@ def get_session_manager() -> SessionManager:
 
     Checks current context first, then falls back to global registry.
 
+    .. deprecated::
+        Use dependency injection instead: inject(SessionManagerProtocol)
+        from core.di_container import inject
+
     Returns:
         SessionManager instance
 
     Raises:
         ManagerError: If managers not initialized
     """
+    warnings.warn(
+        "get_session_manager() is deprecated. Use dependency injection instead: "
+        "from core.di_container import inject; inject(SessionManagerProtocol)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Check if we have a current context with this manager
     from .context import get_current_context
 
@@ -530,12 +541,22 @@ def get_extraction_manager() -> ExtractionManager:
 
     Checks current context first, then falls back to global registry.
 
+    .. deprecated::
+        Use dependency injection instead: inject(ExtractionManagerProtocol)
+        from core.di_container import inject
+
     Returns:
         ExtractionManager instance
 
     Raises:
         ManagerError: If managers not initialized
     """
+    warnings.warn(
+        "get_extraction_manager() is deprecated. Use dependency injection instead: "
+        "from core.di_container import inject; inject(ExtractionManagerProtocol)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Check if we have a current context with this manager
     from .context import get_current_context
 
@@ -552,12 +573,22 @@ def get_injection_manager() -> InjectionManager:
 
     Checks current context first, then falls back to global registry.
 
+    .. deprecated::
+        Use dependency injection instead: inject(InjectionManagerProtocol)
+        from core.di_container import inject
+
     Returns:
         InjectionManager instance
 
     Raises:
         ManagerError: If managers not initialized
     """
+    warnings.warn(
+        "get_injection_manager() is deprecated. Use dependency injection instead: "
+        "from core.di_container import inject; inject(InjectionManagerProtocol)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Check if we have a current context with this manager
     from .context import get_current_context
 
@@ -572,12 +603,22 @@ def get_navigation_manager():
     """
     Get the global navigation manager instance
 
+    .. deprecated::
+        Use dependency injection instead: inject(NavigationManagerProtocol)
+        from core.di_container import inject
+
     Returns:
         NavigationManager instance
 
     Raises:
         ManagerError: If managers not initialized
     """
+    warnings.warn(
+        "get_navigation_manager() is deprecated. Use dependency injection instead: "
+        "from core.di_container import inject; inject(NavigationManagerProtocol)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Use DI container directly for better integration
     from core.di_container import inject
     from core.protocols.manager_protocols import NavigationManagerProtocol

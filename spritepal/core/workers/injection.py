@@ -7,6 +7,7 @@ to the InjectionManager while providing consistent threading interfaces.
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, TypedDict, cast
 
 try:
@@ -59,9 +60,21 @@ class VRAMInjectionWorker(InjectionWorkerBase):
     InjectionManager, providing progress updates during the injection process.
     """
 
-    def __init__(self, params: VRAMInjectionParams, parent: QObject | None = None) -> None:
-        manager = get_injection_manager()
-        super().__init__(manager, parent)
+    def __init__(
+        self,
+        params: VRAMInjectionParams,
+        injection_manager: InjectionManager | None = None,
+        parent: QObject | None = None,
+    ) -> None:
+        if injection_manager is None:
+            warnings.warn(
+                "VRAMInjectionWorker: injection_manager parameter will become required. "
+                "Pass injection_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            injection_manager = get_injection_manager()
+        super().__init__(injection_manager, parent)
         self.params = params
         self._operation_name = "VRAMInjectionWorker"
 
@@ -117,9 +130,21 @@ class ROMInjectionWorker(InjectionWorkerBase):
     InjectionManager, providing progress updates and compression info.
     """
 
-    def __init__(self, params: ROMInjectionParams, parent: QObject | None = None) -> None:
-        manager = get_injection_manager()
-        super().__init__(manager, parent)
+    def __init__(
+        self,
+        params: ROMInjectionParams,
+        injection_manager: InjectionManager | None = None,
+        parent: QObject | None = None,
+    ) -> None:
+        if injection_manager is None:
+            warnings.warn(
+                "ROMInjectionWorker: injection_manager parameter will become required. "
+                "Pass injection_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            injection_manager = get_injection_manager()
+        super().__init__(injection_manager, parent)
         self.params = params
         self._operation_name = "ROMInjectionWorker"
 

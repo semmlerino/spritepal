@@ -349,6 +349,41 @@ filterwarnings = [
     "ignore::RuntimeWarning:PySide6",
     "ignore:.*QApplication.*:RuntimeWarning",
     "ignore:.*QThread.*:RuntimeWarning",
+    # pytest-qt deprecation: waitForWindowShown -> waitExposed
+    "ignore:waitForWindowShown is deprecated:DeprecationWarning",
+    # Qt deprecated QMouseEvent constructor
+    "ignore:.*QMouseEvent.*deprecated:DeprecationWarning",
+    # multiprocessing fork warning in multi-threaded process (expected in tests)
+    "ignore:.*multi-threaded.*use of fork.*:DeprecationWarning",
+    # Manager mid-session cleanup - informational, fixture auto-recovers
+    "ignore:.*Managers were cleaned up mid-session.*:UserWarning",
+    # Service locator deprecation warnings (B.1 - transitioning to DI)
+    "ignore:get_session_manager.*is deprecated:DeprecationWarning",
+    "ignore:get_extraction_manager.*is deprecated:DeprecationWarning",
+    "ignore:get_injection_manager.*is deprecated:DeprecationWarning",
+    "ignore:get_navigation_manager.*is deprecated:DeprecationWarning",
+    "ignore:get_settings_manager.*is deprecated:DeprecationWarning",
+    "ignore:get_rom_cache.*is deprecated:DeprecationWarning",
+    # Worker constructor injection deprecation warnings (B.2 - transitioning to DI)
+    "ignore:VRAMExtractionWorker.*extraction_manager parameter will become required:DeprecationWarning",
+    "ignore:ROMExtractionWorker.*extraction_manager parameter will become required:DeprecationWarning",
+    "ignore:VRAMInjectionWorker.*injection_manager parameter will become required:DeprecationWarning",
+    "ignore:ROMInjectionWorker.*injection_manager parameter will become required:DeprecationWarning",
+    # UI component constructor injection deprecation warnings (B.3 - transitioning to DI)
+    "ignore:InjectionDialog.*injection_manager parameter will become required:DeprecationWarning",
+    "ignore:ROMExtractionPanel.*extraction_manager parameter will become required:DeprecationWarning",
+    "ignore:SessionCoordinator.*session_manager parameter will become required:DeprecationWarning",
+    "ignore:DetachedGalleryWindow.*extraction_manager parameter will become required:DeprecationWarning",
+    # ExtractionController constructor injection deprecation warnings (B.4 - transitioning to DI)
+    "ignore:ExtractionController.*extraction_manager parameter will become required:DeprecationWarning",
+    "ignore:ExtractionController.*session_manager parameter will become required:DeprecationWarning",
+    "ignore:ExtractionController.*injection_manager parameter will become required:DeprecationWarning",
+    "ignore:ExtractionController.*settings_manager parameter will become required:DeprecationWarning",
+    "ignore:ExtractionController.*dialog_factory parameter will become required:DeprecationWarning",
+    # MainWindow constructor injection deprecation warnings (B.5 - transitioning to DI)
+    "ignore:MainWindow.*settings_manager parameter will become required:DeprecationWarning",
+    "ignore:MainWindow.*rom_cache parameter will become required:DeprecationWarning",
+    "ignore:MainWindow.*session_manager parameter will become required:DeprecationWarning",
 ]
 
 # Markers used in the test suite

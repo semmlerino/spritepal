@@ -1,27 +1,72 @@
 """
-State management for ROM extraction workflow
-Provides a state machine to manage extraction operations and prevent conflicts
+State management for ROM extraction workflow.
+
+DEPRECATION NOTICE:
+    This module is deprecated. The canonical ExtractionState enum and workflow
+    state machine have been consolidated into ApplicationStateManager.
+
+    For new code, use:
+        from core.managers.application_state_manager import ExtractionState
+        # Or get the workflow adapter from ApplicationStateManager
+
+    For backward compatibility, use:
+        from ui.rom_extraction.state_manager import get_extraction_state_manager
+        state_mgr = get_extraction_state_manager()  # Returns WorkflowAdapter
+
+    Direct instantiation of ExtractionStateManager is deprecated.
 """
 from __future__ import annotations
 
+import warnings
 from enum import Enum, auto
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from PySide6.QtCore import QObject, Signal
 
+if TYPE_CHECKING:
+    from core.managers.application_state_manager import WorkflowAdapter
 
 class ExtractionState(Enum):
-    """States for the extraction workflow"""
-    IDLE = auto()                    # No operation in progress
-    LOADING_ROM = auto()             # Loading ROM file
-    SCANNING_SPRITES = auto()        # Scanning for sprite locations
-    PREVIEWING_SPRITE = auto()       # Loading sprite preview
-    SEARCHING_SPRITE = auto()        # Searching for next/prev sprite
-    EXTRACTING = auto()              # Performing extraction
-    ERROR = auto()                   # Error state
+    """States for the extraction workflow.
+
+    DEPRECATED: Use core.managers.application_state_manager.ExtractionState instead.
+    This enum is kept for backward compatibility only.
+    """
+
+    IDLE = auto()  # No operation in progress
+    LOADING_ROM = auto()  # Loading ROM file
+    SCANNING_SPRITES = auto()  # Scanning for sprite locations
+    PREVIEWING_SPRITE = auto()  # Loading sprite preview
+    SEARCHING_SPRITE = auto()  # Searching for next/prev sprite
+    EXTRACTING = auto()  # Performing extraction
+    ERROR = auto()  # Error state
+
+
+def get_extraction_state_manager() -> WorkflowAdapter:
+    """Get the workflow state manager adapter from ApplicationStateManager.
+
+    This is the recommended way to access workflow state management.
+    Returns an adapter that provides the same interface as ExtractionStateManager.
+
+    Returns:
+        WorkflowAdapter instance from the global ApplicationStateManager
+
+    Raises:
+        RuntimeError: If managers are not initialized
+    """
+    from core.managers import get_registry
+
+    registry = get_registry()
+    app_state_mgr = registry.get_application_state_manager()
+    return app_state_mgr.get_workflow_adapter()
+
 
 class ExtractionStateManager(QObject):
-    """Manages extraction workflow state and transitions"""
+    """Manages extraction workflow state and transitions.
+
+    DEPRECATED: Direct instantiation is deprecated. Use get_extraction_state_manager()
+    to obtain a WorkflowAdapter from ApplicationStateManager instead.
+    """
 
     # Signals
     state_changed = Signal(ExtractionState, ExtractionState)  # old_state, new_state
@@ -70,6 +115,13 @@ class ExtractionStateManager(QObject):
     }
 
     def __init__(self) -> None:
+        warnings.warn(
+            "ExtractionStateManager is deprecated. "
+            "Use get_extraction_state_manager() to obtain a WorkflowAdapter from "
+            "ApplicationStateManager instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__()
         self._current_state = ExtractionState.IDLE
         self._error_message: str | None = None

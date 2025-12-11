@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypedDict, cast
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
@@ -150,26 +150,59 @@ class ExtractionController(QObject):
         super().__init__()
         self.main_window: MainWindowProtocol = main_window
 
-        # Use injected managers or fall back to global registry for backward compatibility
-        # Keep union types for maximum flexibility while ensuring we have the required interface
-        self.session_manager = session_manager or get_session_manager()
-        self.extraction_manager = extraction_manager or get_extraction_manager()
-        self.injection_manager = injection_manager or get_injection_manager()
+        # B.4 DI Migration: Optional managers with deprecation warning fallbacks
+        if extraction_manager is None:
+            warnings.warn(
+                "ExtractionController: extraction_manager parameter will become required. "
+                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            extraction_manager = get_extraction_manager()
+        self.extraction_manager = extraction_manager
 
-        # Inject settings manager or use fallback
+        if session_manager is None:
+            warnings.warn(
+                "ExtractionController: session_manager parameter will become required. "
+                "Pass session_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            session_manager = get_session_manager()
+        self.session_manager = session_manager
+
+        if injection_manager is None:
+            warnings.warn(
+                "ExtractionController: injection_manager parameter will become required. "
+                "Pass injection_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            injection_manager = get_injection_manager()
+        self.injection_manager = injection_manager
+
         if settings_manager is None:
+            warnings.warn(
+                "ExtractionController: settings_manager parameter will become required. "
+                "Pass settings_manager explicitly instead of relying on DI container.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             from core.di_container import inject
             from core.protocols.manager_protocols import SettingsManagerProtocol
-            self.settings_manager = inject(SettingsManagerProtocol)
-        else:
-            self.settings_manager = settings_manager
+            settings_manager = inject(SettingsManagerProtocol)
+        self.settings_manager = settings_manager
 
-        # Inject dialog factory or use fallback
         if dialog_factory is None:
+            warnings.warn(
+                "ExtractionController: dialog_factory parameter will become required. "
+                "Pass dialog_factory explicitly instead of relying on get_controller_dialog_factory().",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             from ui.dialogs.controller_dialog_factory import get_controller_dialog_factory
-            self.dialog_factory = get_controller_dialog_factory()
-        else:
-            self.dialog_factory = dialog_factory
+            dialog_factory = get_controller_dialog_factory()
+        self.dialog_factory = dialog_factory
 
         # Workers still managed locally (thin wrappers)
         self.worker: VRAMExtractionWorker | None = None
@@ -287,7 +320,9 @@ class ExtractionController(QObject):
             "create_metadata": params.get("create_metadata", True),
             "grayscale_mode": params.get("grayscale_mode", False),
         }
-        self.worker = VRAMExtractionWorker(extraction_params)
+        # Pass extraction manager explicitly (B.2: constructor injection)
+        extraction_mgr = cast(ExtractionManager, self.extraction_manager)
+        self.worker = VRAMExtractionWorker(extraction_params, extraction_manager=extraction_mgr)
         _ = self.worker.progress.connect(self._on_progress)
         _ = self.worker.preview_ready.connect(self._on_preview_ready)
         _ = self.worker.preview_image_ready.connect(self._on_preview_image_ready)
@@ -822,8 +857,9 @@ class ExtractionController(QObject):
             "output_base": params["output_base"],
             "cgram_path": params.get("cgram_path"),
         }
-        # Create and start ROM extraction worker
-        self.rom_worker = ROMExtractionWorker(rom_extraction_params)
+        # Create and start ROM extraction worker (B.2: constructor injection)
+        extraction_mgr = cast(ExtractionManager, self.extraction_manager)
+        self.rom_worker = ROMExtractionWorker(rom_extraction_params, extraction_manager=extraction_mgr)
         _ = self.rom_worker.progress.connect(self._on_rom_progress)
         _ = self.rom_worker.extraction_finished.connect(self._on_rom_extraction_finished)
         _ = self.rom_worker.error.connect(self._on_rom_extraction_error)

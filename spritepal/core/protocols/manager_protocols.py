@@ -979,3 +979,209 @@ class ControllerUIBridgeProtocol(Protocol):
             or None if no palettes are available
         """
         ...
+
+
+# ========== Application State Manager Protocols (A.4) ==========
+
+
+class WorkflowStateProtocol(Protocol):
+    """Protocol for workflow state management.
+
+    This protocol defines the interface for managing extraction workflow state,
+    allowing components to check state and request transitions without direct
+    coupling to ApplicationStateManager.
+    """
+
+    @property
+    def current_state(self) -> Any:
+        """Get current workflow state (ExtractionState enum)."""
+        ...
+
+    @property
+    def is_busy(self) -> bool:
+        """Check if a blocking operation is in progress."""
+        ...
+
+    @property
+    def can_extract(self) -> bool:
+        """Check if extraction can be started."""
+        ...
+
+    @property
+    def can_preview(self) -> bool:
+        """Check if preview can be started."""
+        ...
+
+    @property
+    def can_search(self) -> bool:
+        """Check if search can be started."""
+        ...
+
+    @property
+    def can_scan(self) -> bool:
+        """Check if sprite scanning can be started."""
+        ...
+
+    @property
+    def error_message(self) -> str | None:
+        """Get error message if in error state."""
+        ...
+
+    def transition_to(self, new_state: Any, error_message: str | None = None) -> bool:
+        """Attempt to transition to a new workflow state."""
+        ...
+
+    def reset(self) -> None:
+        """Reset workflow to idle state."""
+        ...
+
+
+class CacheStatsProtocol(Protocol):
+    """Protocol for cache statistics tracking.
+
+    This protocol defines the interface for tracking cache hit/miss statistics
+    during a session, independent of the underlying cache implementation.
+    """
+
+    def on_cache_hit(self) -> None:
+        """Record a cache hit."""
+        ...
+
+    def on_cache_miss(self) -> None:
+        """Record a cache miss."""
+        ...
+
+    def get_stats(self) -> dict[str, int]:
+        """Get current statistics as dict with hits, misses, total_requests."""
+        ...
+
+    @property
+    def hits(self) -> int:
+        """Get total cache hits."""
+        ...
+
+    @property
+    def misses(self) -> int:
+        """Get total cache misses."""
+        ...
+
+    @property
+    def total_requests(self) -> int:
+        """Get total requests."""
+        ...
+
+    @property
+    def hit_rate(self) -> float:
+        """Get hit rate as percentage (0.0-100.0)."""
+        ...
+
+    def reset_stats(self) -> None:
+        """Reset all statistics to zero."""
+        ...
+
+
+class ApplicationStateManagerProtocol(Protocol):
+    """Protocol for the consolidated application state manager.
+
+    This protocol defines the full interface for ApplicationStateManager,
+    including settings, runtime state, workflow, and cache statistics.
+    """
+
+    # Signals (accessed via attributes)
+    state_changed: Any  # Signal(str, dict)
+    workflow_state_changed: Any  # Signal(object, object)
+    session_changed: Any  # Signal()
+    cache_stats_updated: Any  # Signal(dict)
+    current_offset_changed: Any  # Signal(int)
+    preview_ready: Any  # Signal(int, QImage)
+    application_state_snapshot: Any  # Signal(dict)
+
+    # Settings management
+    def get_setting(self, category: str, key: str, default: Any = None) -> Any:
+        """Get a persistent setting value."""
+        ...
+
+    def set_setting(self, category: str, key: str, value: Any) -> None:
+        """Set a persistent setting value."""
+        ...
+
+    def save_settings(self) -> bool:
+        """Save settings to disk."""
+        ...
+
+    # Runtime state management
+    def get_state(self, namespace: str, key: str, default: Any = None) -> Any:
+        """Get runtime state value (not persisted)."""
+        ...
+
+    def set_state(
+        self, namespace: str, key: str, value: Any, ttl_seconds: float | None = None
+    ) -> None:
+        """Set runtime state value."""
+        ...
+
+    def clear_state(self, namespace: str | None = None) -> None:
+        """Clear runtime state."""
+        ...
+
+    # Workflow state
+    @property
+    def workflow_state(self) -> Any:
+        """Get current workflow state (ExtractionState)."""
+        ...
+
+    @property
+    def is_workflow_busy(self) -> bool:
+        """Check if a blocking operation is in progress."""
+        ...
+
+    @property
+    def can_extract(self) -> bool:
+        """Check if extraction can be started."""
+        ...
+
+    def transition_workflow(
+        self, new_state: Any, error_message: str | None = None
+    ) -> bool:
+        """Attempt to transition to a new workflow state."""
+        ...
+
+    # Cache statistics
+    def record_cache_hit(self) -> None:
+        """Record a cache hit in session statistics."""
+        ...
+
+    def record_cache_miss(self) -> None:
+        """Record a cache miss in session statistics."""
+        ...
+
+    def get_cache_session_stats(self) -> dict[str, int]:
+        """Get current cache session statistics."""
+        ...
+
+    # Unified state snapshot
+    def get_full_state_snapshot(self) -> dict[str, Any]:
+        """Get a complete snapshot of all application state."""
+        ...
+
+    def emit_state_snapshot(self) -> dict[str, Any]:
+        """Emit a state snapshot signal and return the snapshot."""
+        ...
+
+    # Current offset
+    def set_current_offset(self, offset: int) -> None:
+        """Set the current ROM offset and emit signal."""
+        ...
+
+    def get_current_offset(self) -> int | None:
+        """Get the current ROM offset."""
+        ...
+
+    # Adapters for backward compatibility
+    def get_workflow_adapter(self) -> WorkflowStateProtocol:
+        """Get workflow state manager adapter."""
+        ...
+
+    def get_cache_adapter(self) -> CacheStatsProtocol:
+        """Get cache statistics adapter."""
+        ...

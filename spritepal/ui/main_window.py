@@ -4,13 +4,17 @@ Main window for SpritePal application
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
 if TYPE_CHECKING:
     from core.controller import ExtractionController
     from core.managers.session_manager import SessionManager
-    from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+    from core.protocols.manager_protocols import (
+        ROMCacheProtocol,
+        SettingsManagerProtocol,
+    )
 
 from PySide6.QtCore import Qt, Signal
 from typing_extensions import override
@@ -84,12 +88,12 @@ class MainWindow(QMainWindow):
         self,
         settings_manager: SettingsManagerProtocol | None = None,
         rom_cache: ROMCacheProtocol | None = None,
+        session_manager: SessionManager | None = None,
     ) -> None:
         super().__init__()
         # Declare instance variables with type hints
         self._output_path: str
         self._extracted_files: list[str]
-        self.session_manager: SessionManager
         self._controller: ExtractionController | None
         self.left_panel: QWidget
         self.extraction_tabs: QTabWidget
@@ -98,15 +102,38 @@ class MainWindow(QMainWindow):
         self.sprite_preview: PreviewPanel
         self.palette_preview: PalettePreviewWidget
 
-        # Injected dependencies (with fallback to globals for backwards compatibility)
+        # B.5 DI Migration: Optional dependencies with deprecation warning fallbacks
         if settings_manager is None:
+            warnings.warn(
+                "MainWindow: settings_manager parameter will become required. "
+                "Pass settings_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             from utils.settings_manager import get_settings_manager
             settings_manager = get_settings_manager()
+        self.settings_manager = settings_manager
+
         if rom_cache is None:
+            warnings.warn(
+                "MainWindow: rom_cache parameter will become required. "
+                "Pass rom_cache explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             from utils.rom_cache import get_rom_cache
             rom_cache = get_rom_cache()
-        self.settings_manager = settings_manager
         self.rom_cache = rom_cache
+
+        if session_manager is None:
+            warnings.warn(
+                "MainWindow: session_manager parameter will become required. "
+                "Pass session_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            session_manager = get_session_manager()
+        self.session_manager = session_manager
 
         # Manager instances
         self.menu_bar_manager: MenuBarManager
@@ -121,7 +148,6 @@ class MainWindow(QMainWindow):
         self._output_path = ""
         self._extracted_files = []
         self._controller = None  # Lazy initialization to break circular dependency
-        self.session_manager = get_session_manager() # This still needs to be handled via DI
 
         self._setup_ui()
         self._setup_managers()  # This creates all UI widgets via managers

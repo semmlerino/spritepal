@@ -200,15 +200,23 @@ class TestLRUCacheThreadSafety:
 
         def access_pattern(pattern_id: int):
             # Each thread has its own access pattern
+            # Put 15 keys into a cache of size 10, guaranteeing evictions
             for round in range(5):
-                for i in range(20):
-                    if i < 10:
-                        key = (pattern_id, i)
-                        cache.put(key, mock_qimage)
-                    else:
-                        # Get keys that were previously put (0-9)
-                        key = (pattern_id, i % 10)
-                        cache.get(key)
+                # Put 15 keys (5 more than maxsize=10)
+                # This guarantees keys 0-4 will be evicted when we put keys 10-14
+                for i in range(15):
+                    key = (pattern_id, i)
+                    cache.put(key, mock_qimage)
+
+                # Try to get keys 0-4 (guaranteed evicted) -> misses
+                for i in range(5):
+                    key = (pattern_id, i)
+                    cache.get(key)
+
+                # Try to get keys 10-14 (most recent, still in cache) -> hits
+                for i in range(10, 15):
+                    key = (pattern_id, i)
+                    cache.get(key)
 
         # Run concurrent access patterns
         with ThreadPoolExecutor(max_workers=3) as executor:
@@ -223,6 +231,8 @@ class TestLRUCacheThreadSafety:
         assert cache.size() <= 10
 
         # Should have both hits and misses
+        # Minimum expected: 3 threads × 5 rounds × 5 misses = 75 misses
+        # Minimum expected: 3 threads × 5 rounds × 5 hits = 75 hits (from own keys 10-14)
         stats = cache.get_stats()
         assert stats['hits'] > 0
         assert stats['misses'] > 0

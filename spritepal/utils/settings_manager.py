@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -200,15 +201,21 @@ _global_settings_manager: SettingsManagerProtocol | None = None
 def get_settings_manager() -> SettingsManagerProtocol:
     """
     Get the global SettingsManager instance.
-    
+
     DEPRECATED: This function is maintained for backward compatibility.
     New code should use dependency injection:
     from core.di_container import inject
     from core.protocols.manager_protocols import SettingsManagerProtocol
     settings = inject(SettingsManagerProtocol)
     """
+    warnings.warn(
+        "get_settings_manager() is deprecated. Use dependency injection instead: "
+        "from core.di_container import inject; inject(SettingsManagerProtocol)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _global_settings_manager
-    
+
     # If we already have a global instance, return it
     if _global_settings_manager is not None:
         return _global_settings_manager

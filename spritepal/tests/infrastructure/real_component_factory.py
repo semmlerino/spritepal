@@ -254,7 +254,19 @@ class RealComponentFactory:
             if not registry.is_initialized():
                 registry.initialize_managers("TestApp", settings_path=self._settings_path)
 
-        window = MainWindow()
+        # B.7: Create MainWindow with explicit DI dependencies (matching B.6 pattern)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import (
+            ROMCacheProtocol,
+            SessionManagerProtocol,
+            SettingsManagerProtocol,
+        )
+
+        window = MainWindow(
+            settings_manager=inject(SettingsManagerProtocol),
+            rom_cache=inject(ROMCacheProtocol),
+            session_manager=inject(SessionManagerProtocol),  # type: ignore[arg-type]  # Protocol vs concrete type mismatch
+        )
         self._created_components.append(window)
 
         # Inject test data paths if needed

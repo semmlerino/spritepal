@@ -5,9 +5,10 @@ ROM extraction panel for SpritePal
 from __future__ import annotations
 
 import threading
+import warnings
 from operator import itemgetter
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QCloseEvent
@@ -27,13 +28,16 @@ from PySide6.QtWidgets import (
 )
 from typing_extensions import override
 
+if TYPE_CHECKING:
+    from core.managers import ExtractionManager
+
 from core.managers import get_extraction_manager
 from ui.common import WorkerManager
 from ui.components.navigation import SpriteNavigator
 from ui.dialogs import ResumeScanDialog, UnifiedManualOffsetDialog, UserErrorDialog
 from ui.rom_extraction.state_manager import (
     ExtractionState,
-    ExtractionStateManager,
+    get_extraction_state_manager,
 )
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
@@ -260,18 +264,33 @@ class ROMExtractionPanel(QWidget):
     )  # rom_path, offset, output_base, sprite_name
     output_name_changed = Signal(str)  # Emit when output name changes in ROM panel
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(
+        self,
+        parent: Any | None = None,
+        extraction_manager: ExtractionManager | None = None,
+    ):
         super().__init__(parent)
+
+        # B.3 DI Migration: Optional extraction_manager with deprecation warning fallback
+        if extraction_manager is None:
+            warnings.warn(
+                "ROMExtractionPanel: extraction_manager parameter will become required. "
+                "Pass extraction_manager explicitly instead of relying on Service Locator.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            extraction_manager = get_extraction_manager()
+
         self.rom_path = ""
         self.sprite_locations = {}
-        # Get extraction manager and ROM extractor
-        self.extraction_manager = get_extraction_manager()
+        # Use injected extraction manager
+        self.extraction_manager = extraction_manager
         self.rom_extractor = self.extraction_manager.get_rom_extractor()
         self.rom_size = 0  # Track ROM size for slider limits
         self._manual_offset_mode = True  # Default to manual offset mode
 
         # State manager for coordinating operations
-        self.state_manager = ExtractionStateManager()
+        self.state_manager = get_extraction_state_manager()
         self.state_manager.state_changed.connect(self._on_state_changed)
 
         # Worker references to track and clean up
