@@ -197,30 +197,24 @@ def safe_qapp(qt_app: Any) -> Any:
 
 @pytest.fixture(autouse=True)
 def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, None]:
-    """Clean up worker threads after tests that spawn them.
+    """Clean up worker threads after ALL tests (autouse).
 
-    This fixture only runs cleanup for tests marked with @pytest.mark.worker_threads.
-    This avoids the 50-500ms overhead for tests that don't spawn workers.
+    This fixture runs cleanup by default and FAILS if threads are leaked.
+    Previously this was opt-in with @pytest.mark.worker_threads; now it's
+    opt-out with @pytest.mark.skip_thread_cleanup.
 
     Uses session-level thread baseline to avoid race conditions where per-test
     baseline captures lingering threads from prior tests.
 
-    Usage:
-        @pytest.mark.worker_threads
-        def test_extraction_worker():
-            # Worker cleanup will run after this test
-            pass
+    Opt-out markers:
+        @pytest.mark.skip_thread_cleanup - Skip cleanup (rare, use only if truly needed)
+        @pytest.mark.no_manager_setup - Skip for non-Qt tests
+        @pytest.mark.no_qt - Skip for non-Qt tests
     """
-    # Only run cleanup for tests that explicitly need it
     markers = [m.name for m in request.node.iter_markers()]
-    needs_worker_cleanup = 'worker_threads' in markers
 
-    # Also skip if explicitly marked to not use Qt/managers
-    if 'no_manager_setup' in markers or 'no_qt' in markers:
-        yield
-        return
-
-    if not needs_worker_cleanup:
+    # Opt-OUT: Skip if explicitly marked
+    if 'skip_thread_cleanup' in markers or 'no_manager_setup' in markers or 'no_qt' in markers:
         yield
         return
 
@@ -265,10 +259,17 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 
         elapsed += poll_interval_ms
 
+    # FAIL if threads were not cleaned up (not just log)
     active_threads = threading.active_count()
-    if active_threads > baseline_thread_count:
-        import logging
-        logging.debug(f"Active thread count after cleanup wait: {active_threads}")
+    leaked_threads = active_threads - baseline_thread_count
+    if leaked_threads > 0:
+        test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
+        pytest.fail(
+            f"Test '{test_name}' leaked {leaked_threads} thread(s). "
+            f"Active: {active_threads}, Baseline: {baseline_thread_count}. "
+            "Fix: Ensure all workers are properly stopped and joined. "
+            "Use @pytest.mark.skip_thread_cleanup to opt out if truly needed."
+        )
 
     if IS_HEADLESS:
         import gc

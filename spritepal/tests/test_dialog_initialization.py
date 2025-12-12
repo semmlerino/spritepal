@@ -49,6 +49,7 @@ pytestmark = [
     pytest.mark.headless,
 ]
 @pytest.mark.mock_dialogs
+@pytest.mark.skip_thread_cleanup  # Uses fast_managers which spawns threads; cleanup handled by manager lifecycle
 class TestDialogInitialization:
     """Test that all dialogs can be initialized without errors"""
 
@@ -150,34 +151,34 @@ class TestDialogInitialization:
         dialog.close()
 
     def test_row_arrangement_dialog_initialization(self, qapp, tmp_path, managers):
-        """Test RowArrangementDialog can be created without initialization errors"""
+        """Test RowArrangementDialog can be created without initialization errors.
+
+        Even if sprite loading fails, we shouldn't get InitializationOrderError.
+        Using mock dialogs, this should always succeed.
+        """
         # Create a dummy sprite file
         sprite_file = tmp_path / "test_sprite.png"
         sprite_file.touch()
 
-        try:
-            dialog = RowArrangementDialog(str(sprite_file))
-            # If sprite loading fails, dialog should still be created
-            assert dialog is not None
-            dialog.close()
-        except Exception:
-            # Even if sprite loading fails, we shouldn't get InitializationOrderError
-            pytest.skip("Sprite loading failed, but no initialization error occurred")
+        dialog = RowArrangementDialog(str(sprite_file))
+        # Dialog should always be created (using mock)
+        assert dialog is not None
+        dialog.close()
 
     def test_grid_arrangement_dialog_initialization(self, qapp, tmp_path, managers):
-        """Test GridArrangementDialog can be created without initialization errors"""
+        """Test GridArrangementDialog can be created without initialization errors.
+
+        Even if sprite loading fails, we shouldn't get InitializationOrderError.
+        Using mock dialogs, this should always succeed.
+        """
         # Create a dummy sprite file
         sprite_file = tmp_path / "test_sprite.png"
         sprite_file.touch()
 
-        try:
-            dialog = GridArrangementDialog(str(sprite_file))
-            # If sprite loading fails, dialog should still be created
-            assert dialog is not None
-            dialog.close()
-        except Exception:
-            # Even if sprite loading fails, we shouldn't get InitializationOrderError
-            pytest.skip("Sprite loading failed, but no initialization error occurred")
+        dialog = GridArrangementDialog(str(sprite_file))
+        # Dialog should always be created (using mock)
+        assert dialog is not None
+        dialog.close()
 
     def test_range_scan_dialog_initialization(self, qapp, managers):
         """Test RangeScanDialog can be created without initialization errors"""

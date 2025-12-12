@@ -9,16 +9,23 @@ This module tests the recent UI changes with real Qt components:
 5. Button styling with gradients and hover states
 
 Focus on @pytest.mark.gui tests with real Qt interaction using qtbot.
+
+NOTE: Some tests may fail in Qt offscreen mode. Tests are marked xfail when
+they may legitimately fail due to offscreen limitations.
 """
 
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
+
+# Determine if running in offscreen mode
+_is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtTest import QSignalSpy
@@ -61,9 +68,9 @@ class TestSpritePalAppDarkThemeIntegration:
     """Test SpritePalApp dark theme integration with real Qt components."""
 
     @pytest.mark.gui
+    @pytest.mark.xfail(reason="Cannot instantiate SpritePalApp when QApplication already exists", strict=False)
     def test_spritepal_app_dark_theme_applied(self, qtbot) -> None:
         """Test that SpritePalApp applies dark theme correctly to real application."""
-        pytest.skip("Cannot instantiate SpritePalApp (QApplication) when a QApplication already exists (managed by pytest-qt)")
         # Create SpritePalApp instance
         app_args = ["test_spritepal"]
         spritepal_app = SpritePalApp(app_args)
@@ -85,9 +92,9 @@ class TestSpritePalAppDarkThemeIntegration:
         assert button_color == QColor(55, 55, 58), f"Expected dark button color, got {button_color.name()}"
 
     @pytest.mark.gui
+    @pytest.mark.xfail(reason="Cannot instantiate SpritePalApp when QApplication already exists", strict=False)
     def test_spritepal_app_comprehensive_stylesheet_applied(self, qtbot) -> None:
         """Test that comprehensive dark theme stylesheet is applied."""
-        pytest.skip("Cannot instantiate SpritePalApp (QApplication) when a QApplication already exists (managed by pytest-qt)")
         app_args = ["test_spritepal"]
         spritepal_app = SpritePalApp(app_args)
 
@@ -111,9 +118,9 @@ class TestSpritePalAppDarkThemeIntegration:
             assert widget in stylesheet, f"Stylesheet should include {widget} styling"
 
     @pytest.mark.gui
+    @pytest.mark.xfail(reason="Cannot instantiate SpritePalApp when QApplication already exists", strict=False)
     def test_spritepal_app_with_main_window_size(self, qtbot) -> None:
         """Test that main window has correct size (1000x650)."""
-        pytest.skip("Cannot instantiate SpritePalApp (QApplication) when a QApplication already exists (managed by pytest-qt)")
         app_args = ["test_spritepal"]
         spritepal_app = SpritePalApp(app_args)
 
@@ -166,6 +173,11 @@ class TestMainWindowIntegration:
         assert size.height() >= 650, f"Window height should be at least 650, got {size.height()}"
 
 
+@pytest.mark.xfail(
+    _is_offscreen,
+    reason="Manual offset dialog may fail in Qt offscreen mode",
+    strict=False,
+)
 class TestManualOffsetDialogSignalIntegration:
     """Test manual offset dialog with new signals (offset_changed, sprite_found)."""
 
@@ -175,138 +187,122 @@ class TestManualOffsetDialogSignalIntegration:
         """Test that manual offset dialog has offset_changed and sprite_found signals."""
         # Mock dependencies
         with mock_manager_dependencies():
-            try:
-                dialog = UnifiedManualOffsetDialog()
-                qtbot.addWidget(dialog)
+            dialog = UnifiedManualOffsetDialog()
+            qtbot.addWidget(dialog)
 
-                # Test that required signals exist
-                assert hasattr(dialog, 'offset_changed'), "Dialog should have offset_changed signal"
-                assert hasattr(dialog, 'sprite_found'), "Dialog should have sprite_found signal"
+            # Test that required signals exist
+            assert hasattr(dialog, 'offset_changed'), "Dialog should have offset_changed signal"
+            assert hasattr(dialog, 'sprite_found'), "Dialog should have sprite_found signal"
 
-                # Test signal types
-                # If dialog is mocked, these are CallbackSignal, else Signal
-                # UnifiedManualOffsetDialog is either real or Mock
-                # If Mock, it's MockUnifiedOffsetDialog from infrastructure which uses CallbackSignal
-                # If real, it uses Signal
-                if type(dialog).__name__ == "MockUnifiedOffsetDialog":
-                    # It's a mock, skip type check or check for CallbackSignal
-                    pass 
-                else:
-                    assert isinstance(dialog.offset_changed, Signal), "offset_changed should be a Qt Signal"
-                    assert isinstance(dialog.sprite_found, Signal), "sprite_found should be a Qt Signal"
-
-            except Exception as e:
-                pytest.skip(f"Could not create manual offset dialog: {e}")
+            # Test signal types
+            # If dialog is mocked, these are CallbackSignal, else Signal
+            # UnifiedManualOffsetDialog is either real or Mock
+            # If Mock, it's MockUnifiedOffsetDialog from infrastructure which uses CallbackSignal
+            # If real, it uses Signal
+            if type(dialog).__name__ == "MockUnifiedOffsetDialog":
+                # It's a mock, skip type check or check for CallbackSignal
+                pass
+            else:
+                assert isinstance(dialog.offset_changed, Signal), "offset_changed should be a Qt Signal"
+                assert isinstance(dialog.sprite_found, Signal), "sprite_found should be a Qt Signal"
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
     def test_manual_offset_dialog_offset_changed_signal_emission(self, qtbot) -> None:
         """Test offset_changed signal emission with real Qt signal testing."""
         with mock_manager_dependencies():
-            try:
-                dialog = UnifiedManualOffsetDialog()
-                qtbot.addWidget(dialog)
+            dialog = UnifiedManualOffsetDialog()
+            qtbot.addWidget(dialog)
 
-                # Use QSignalSpy to monitor offset_changed signal
-                # If dialog is mocked, it uses CallbackSignal which is not compatible with QSignalSpy
-                is_mock = type(dialog).__name__ == "MockUnifiedOffsetDialog"
-                
+            # Use QSignalSpy to monitor offset_changed signal
+            # If dialog is mocked, it uses CallbackSignal which is not compatible with QSignalSpy
+            is_mock = type(dialog).__name__ == "MockUnifiedOffsetDialog"
+
+            if not is_mock:
+                spy = QSignalSpy(dialog.offset_changed)
+
+            # If dialog has browse_tab with offset controls, test signal emission
+            if hasattr(dialog, 'browse_tab') and hasattr(dialog.browse_tab, 'set_offset'):
+                # Trigger offset change
+                test_offset = 12345
+                dialog.browse_tab.set_offset(test_offset)
+
                 if not is_mock:
-                    spy = QSignalSpy(dialog.offset_changed)
+                    # Wait for signal emission
+                    qtbot.waitUntil(lambda: len(spy) > 0, timeout=500)
 
-                # If dialog has browse_tab with offset controls, test signal emission
-                if hasattr(dialog, 'browse_tab') and hasattr(dialog.browse_tab, 'set_offset'):
-                    # Trigger offset change
-                    test_offset = 12345
-                    dialog.browse_tab.set_offset(test_offset)
+                    # Test that signal was emitted
+                    assert len(spy) > 0, "offset_changed signal should have been emitted"
 
-                    if not is_mock:
-                        # Wait for signal emission
-                        qtbot.waitUntil(lambda: len(spy) > 0, timeout=500)
-
-                        # Test that signal was emitted
-                        assert len(spy) > 0, "offset_changed signal should have been emitted"
-
-                        # Test signal argument
-                        if len(spy) > 0:
-                            emitted_offset = spy[-1][0]  # Get last emitted offset
-                            assert emitted_offset == test_offset, f"Expected offset {test_offset}, got {emitted_offset}"
-                else:
-                    pytest.skip("Dialog does not have expected browse_tab structure")
-
-            except Exception as e:
-                pytest.skip(f"Could not test offset signal emission: {e}")
+                    # Test signal argument
+                    if len(spy) > 0:
+                        emitted_offset = spy[-1][0]  # Get last emitted offset
+                        assert emitted_offset == test_offset, f"Expected offset {test_offset}, got {emitted_offset}"
+            else:
+                pytest.skip("Dialog does not have expected browse_tab structure")
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
     def test_manual_offset_dialog_sprite_found_signal_emission(self, qtbot) -> None:
         """Test sprite_found signal emission with real Qt signal testing."""
         with mock_manager_dependencies():
-            try:
-                dialog = UnifiedManualOffsetDialog()
-                qtbot.addWidget(dialog)
+            dialog = UnifiedManualOffsetDialog()
+            qtbot.addWidget(dialog)
 
-                is_mock = type(dialog).__name__ == "MockUnifiedOffsetDialog"
-                
-                if not is_mock:
-                    # Use QSignalSpy to monitor sprite_found signal
-                    spy = QSignalSpy(dialog.sprite_found)
+            is_mock = type(dialog).__name__ == "MockUnifiedOffsetDialog"
 
-                # Manually emit sprite_found signal for testing
-                test_offset = 54321
-                test_sprite_name = "TestSprite"
+            if not is_mock:
+                # Use QSignalSpy to monitor sprite_found signal
+                spy = QSignalSpy(dialog.sprite_found)
 
-                dialog.sprite_found.emit(test_offset, test_sprite_name)
+            # Manually emit sprite_found signal for testing
+            test_offset = 54321
+            test_sprite_name = "TestSprite"
 
-                if not is_mock:
-                    # Wait for signal processing
-                    qtbot.waitUntil(lambda: len(spy) > 0, timeout=500)
+            dialog.sprite_found.emit(test_offset, test_sprite_name)
 
-                    # Test that signal was emitted
-                    assert len(spy) > 0, "sprite_found signal should have been emitted"
+            if not is_mock:
+                # Wait for signal processing
+                qtbot.waitUntil(lambda: len(spy) > 0, timeout=500)
 
-                    # Test signal arguments
-                    if len(spy) > 0:
-                        emitted_data = spy[-1]  # Get last emission
-                        assert emitted_data[0] == test_offset, f"Expected offset {test_offset}, got {emitted_data[0]}"
-                        assert emitted_data[1] == test_sprite_name, f"Expected name {test_sprite_name}, got {emitted_data[1]}"
+                # Test that signal was emitted
+                assert len(spy) > 0, "sprite_found signal should have been emitted"
 
-            except Exception as e:
-                pytest.skip(f"Could not test sprite_found signal emission: {e}")
+                # Test signal arguments
+                if len(spy) > 0:
+                    emitted_data = spy[-1]  # Get last emission
+                    assert emitted_data[0] == test_offset, f"Expected offset {test_offset}, got {emitted_data[0]}"
+                    assert emitted_data[1] == test_sprite_name, f"Expected name {test_sprite_name}, got {emitted_data[1]}"
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
     def test_manual_offset_dialog_with_dark_theme(self, qtbot) -> None:
         """Test manual offset dialog with dark theme applied."""
         with mock_manager_dependencies():
-            try:
-                dialog = UnifiedManualOffsetDialog()
-                qtbot.addWidget(dialog)
+            dialog = UnifiedManualOffsetDialog()
+            qtbot.addWidget(dialog)
 
-                # Apply dark theme
-                theme_css = get_theme_style()
-                
-                # Check if it's a mock that supports setStyleSheet
-                if hasattr(dialog, 'setStyleSheet'):
-                    dialog.setStyleSheet(theme_css)
+            # Apply dark theme
+            theme_css = get_theme_style()
 
-                # Show dialog
-                dialog.show()
-                
-                # Only wait exposed if it's a real widget
-                if type(dialog).__name__ != "MockUnifiedOffsetDialog":
-                    qtbot.waitExposed(dialog)
+            # Check if it's a mock that supports setStyleSheet
+            if hasattr(dialog, 'setStyleSheet'):
+                dialog.setStyleSheet(theme_css)
 
-                    # Test that dialog has dark styling
-                    stylesheet = dialog.styleSheet()
-                    assert len(stylesheet) > 0, "Dialog should have stylesheet applied"
+            # Show dialog
+            dialog.show()
 
-                    # Test dialog size is reasonable
-                    size = dialog.size()
-                    assert size.width() > 0 and size.height() > 0, "Dialog should have valid size"
+            # Only wait exposed if it's a real widget
+            if type(dialog).__name__ != "MockUnifiedOffsetDialog":
+                qtbot.waitExposed(dialog)
 
-            except Exception as e:
-                pytest.skip(f"Could not test dialog with dark theme: {e}")
+                # Test that dialog has dark styling
+                stylesheet = dialog.styleSheet()
+                assert len(stylesheet) > 0, "Dialog should have stylesheet applied"
+
+                # Test dialog size is reasonable
+                size = dialog.size()
+                assert size.width() > 0 and size.height() > 0, "Dialog should have valid size"
 
 class TestPreviewWidgetDarkBackgrounds:
     """Test sprite preview widgets with dark backgrounds (#1e1e1e)."""
@@ -578,27 +574,28 @@ class TestRegressionPrevention:
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
+    @pytest.mark.xfail(
+        _is_offscreen,
+        reason="Manual offset dialog may fail in Qt offscreen mode",
+        strict=False,
+    )
     def test_no_regression_in_manual_offset_signals(self, qtbot) -> None:
         """Test that manual offset dialog signals haven't regressed."""
         # Pass mock extraction_manager directly (replaces deprecated get_extraction_manager patch)
         mock_extraction_manager = Mock()
 
-        try:
-            dialog = UnifiedManualOffsetDialog(extraction_manager=mock_extraction_manager)
+        dialog = UnifiedManualOffsetDialog(extraction_manager=mock_extraction_manager)
 
-            # Test that new signals are still present
-            required_signals = ['offset_changed', 'sprite_found']
-            for signal_name in required_signals:
-                assert hasattr(dialog, signal_name), (
-                    f"Signal regression detected! Manual offset dialog missing {signal_name} signal. "
-                    "These signals were added in recent UI improvements."
-                )
+        # Test that new signals are still present
+        required_signals = ['offset_changed', 'sprite_found']
+        for signal_name in required_signals:
+            assert hasattr(dialog, signal_name), (
+                f"Signal regression detected! Manual offset dialog missing {signal_name} signal. "
+                "These signals were added in recent UI improvements."
+            )
 
-                signal_obj = getattr(dialog, signal_name)
-                assert isinstance(signal_obj, Signal), f"{signal_name} should be a Qt Signal"
-
-        except Exception as e:
-            pytest.skip(f"Could not test signal regression: {e}")
+            signal_obj = getattr(dialog, signal_name)
+            assert isinstance(signal_obj, Signal), f"{signal_name} should be a Qt Signal"
 
     @pytest.mark.gui
     def test_no_regression_in_button_styling_system(self, qtbot) -> None:

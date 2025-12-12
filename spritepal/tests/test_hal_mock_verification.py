@@ -64,24 +64,26 @@ def test_hal_is_real_with_marker(tmp_path):
         assert hasattr(compressor, 'inhal_path')
 
 def test_mock_hal_performance():
-    """Test that mock HAL operations are fast."""
+    """Test that mock HAL operations are fast.
+
+    This test only runs when HAL is mocked (has get_statistics method).
+    When real HAL is installed, the test is skipped via skipif.
+    """
     import time
 
     from core.hal_compression import HALCompressor
 
     compressor = HALCompressor()
 
-    # Create dummy ROM data
+    # Check if this is mock HAL - real HAL doesn't have get_statistics
+    if not hasattr(compressor, 'get_statistics'):
+        pytest.skip("Real HAL is installed - mock performance test not applicable")
 
     # Time a decompression (should be instant with mock)
     start = time.perf_counter()
 
-    # Mock doesn't need real ROM file
-    try:
-        data = compressor.decompress_from_rom("dummy.rom", 0x1000)
-    except Exception:
-        # If it fails, it's probably real HAL (needs real file)
-        pytest.skip("Skipping - appears to be real HAL")
+    # Mock doesn't need real ROM file - mock HAL handles this
+    data = compressor.decompress_from_rom("dummy.rom", 0x1000)
 
     elapsed = time.perf_counter() - start
 

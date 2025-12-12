@@ -18,18 +18,12 @@ This replaces mock usage in dialog tests:
 - Mock Qt parent/child relationships (misses real Qt lifecycle issues)
 - Mock signal connections (can't test real cross-dialog communication)
 
-SKIPPED: Uses REAL dialog instantiation which doesn't work in Qt offscreen mode.
-The rom_map widget initialization requires a real display.
+NOTE: Uses REAL dialog instantiation which may fail in Qt offscreen mode.
+The rom_map widget initialization requires a real display. Tests are marked
+xfail for offscreen mode - they will pass if unexpectedly working, fail if
+truly requiring a real display.
 """
 from __future__ import annotations
-
-import pytest
-
-# Skip entire module - uses real dialog instantiation that fails in offscreen mode
-pytest.skip(
-    "Real dialog instantiation fails in Qt offscreen mode",
-    allow_module_level=True
-)
 
 import os
 import sys
@@ -39,8 +33,12 @@ from pathlib import Path
 import pytest
 from PySide6.QtWidgets import QApplication
 
+# Determine if running in offscreen mode
+_is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
+
 # Add parent directory for imports
 # Systematic pytest markers applied based on test content analysis
+# xfail for offscreen mode - real dialogs may not work
 pytestmark = [
     pytest.mark.dialog,
     pytest.mark.file_io,
@@ -57,6 +55,11 @@ pytestmark = [
     pytest.mark.requires_display,
     pytest.mark.signals_slots,
     pytest.mark.slow,
+    pytest.mark.xfail(
+        _is_offscreen,
+        reason="Real dialog instantiation may fail in Qt offscreen mode",
+        strict=False,  # Passes if unexpectedly works
+    ),
 ]
 
 current_dir = Path(__file__).parent

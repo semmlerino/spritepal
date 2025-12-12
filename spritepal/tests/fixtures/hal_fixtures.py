@@ -38,25 +38,26 @@ if TYPE_CHECKING:
     from pytest import FixtureRequest
 
 
-@pytest.fixture
-def reset_hal_singletons() -> Generator[None, None, None]:
+@pytest.fixture(autouse=True)
+def reset_hal_singletons(request: FixtureRequest) -> Generator[None, None, None]:
     """
-    Reset HAL singletons after a test.
+    Reset HAL singletons after EVERY test (autouse).
 
     This prevents HAL state (statistics, mock configuration, failure modes)
-    from leaking between tests. Request this fixture explicitly in tests
-    that use HAL components.
+    from leaking between tests. Previously this was opt-in; now it runs
+    automatically to catch HAL state pollution.
 
-    Usage:
-        def test_hal_extraction(reset_hal_singletons):
-            # HAL singletons will be reset after this test
-            pass
-
-    Or use usefixtures for entire test classes:
-        @pytest.mark.usefixtures("reset_hal_singletons")
-        class TestHALCompression:
-            pass
+    Opt-out markers:
+        @pytest.mark.skip_hal_reset - Skip for tests that manage HAL lifecycle manually
+        @pytest.mark.no_hal - Skip for non-HAL tests
     """
+    markers = [m.name for m in request.node.iter_markers()]
+
+    # Opt-OUT: Skip if explicitly marked
+    if 'skip_hal_reset' in markers or 'no_hal' in markers:
+        yield
+        return
+
     # Let the test run
     yield
 

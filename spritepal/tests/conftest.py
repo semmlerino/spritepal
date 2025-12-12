@@ -121,6 +121,31 @@ def pytest_configure(config):
         "markers",
         "no_manager_setup: Skip setup_managers fixture for this test"
     )
+    # New markers for autouse fixture opt-out
+    config.addinivalue_line(
+        "markers",
+        "skip_thread_cleanup: Skip automatic thread cleanup for tests that manage their own threads"
+    )
+    config.addinivalue_line(
+        "markers",
+        "shared_state_ok: Allow test to inherit session manager state without triggering pollution detection"
+    )
+    config.addinivalue_line(
+        "markers",
+        "skip_qpixmap_guard: Skip QPixmap threading guard for tests with special QPixmap needs"
+    )
+    config.addinivalue_line(
+        "markers",
+        "skip_hal_reset: Skip HAL singleton reset for tests that manage HAL lifecycle manually"
+    )
+    config.addinivalue_line(
+        "markers",
+        "no_qt: Skip all Qt-related fixtures (implies skip_thread_cleanup, skip_qpixmap_guard)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "no_hal: Skip all HAL-related fixtures (implies skip_hal_reset)"
+    )
 
 
 def pytest_addoption(parser: Any) -> None:
@@ -350,36 +375,35 @@ def mock_manager_registry() -> Generator[Mock, None, None]:
 # Qt Threading Safety Fixtures
 # ============================================================================
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def guard_qpixmap_threading(request: FixtureRequest, monkeypatch: pytest.MonkeyPatch):
-    """Prevent QPixmap creation in worker threads during tests.
+    """Prevent QPixmap creation in worker threads during tests (autouse).
 
     This fixture monkeypatches QPixmap.__init__ to raise a RuntimeError
     if it's called from a non-GUI thread, helping to identify critical
     Qt threading violations that cause segfaults.
 
-    Opt-in via marker:
-        @pytest.mark.qt_threading
-        def test_threaded_operation(guard_qpixmap_threading):
-            ...
+    This is now autouse (was previously opt-in). The overhead is minimal
+    and the protection against silent Qt crashes is worth it.
 
-    Or skip for entire test class:
-        @pytest.mark.usefixtures("guard_qpixmap_threading")
-        class TestThreadedWidgets:
-            ...
-
-    Previously autouse=True, but this added overhead to ALL tests including
-    non-Qt tests. Now opt-in for tests that actually need threading safety.
+    Opt-out markers:
+        @pytest.mark.skip_qpixmap_guard - Skip for tests that can't use the guard
+        @pytest.mark.no_qt - Skip for non-Qt tests
     """
-    # Skip if test doesn't have qt_threading marker AND didn't explicitly request fixture
-    if not request.node.get_closest_marker('qt_threading'):
-        # If explicitly requested as a fixture, still run the guard
-        if 'guard_qpixmap_threading' not in request.fixturenames:
-            yield
-            return
+    markers = [m.name for m in request.node.iter_markers()]
 
-    from PySide6.QtCore import QCoreApplication, QThread
-    from PySide6.QtGui import QPixmap
+    # Opt-OUT: Skip if explicitly marked
+    if 'skip_qpixmap_guard' in markers or 'no_qt' in markers:
+        yield
+        return
+
+    try:
+        from PySide6.QtCore import QCoreApplication, QThread
+        from PySide6.QtGui import QPixmap
+    except ImportError:
+        # Qt not available, skip the guard
+        yield
+        return
 
     original_init = QPixmap.__init__
 

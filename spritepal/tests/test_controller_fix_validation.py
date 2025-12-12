@@ -4,25 +4,24 @@ Test the defensive validation fix in controller.start_extraction().
 This validates that the fix eliminates the 2+ minute blocking behavior
 with invalid file paths, ensuring fail-fast behavior.
 
-SKIPPED: Creates real MainWindow which requires a real display.
-These tests use qt_widget_test(MainWindow) which crashes in offscreen mode.
+NOTE: Creates real MainWindow which may crash in Qt offscreen mode.
+These tests use qt_widget_test(MainWindow). Marked xfail for offscreen mode.
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
 
 import pytest
 
-# Skip entire module - creates real MainWindow which crashes in offscreen mode
-pytest.skip(
-    "Creates real MainWindow which crashes in Qt offscreen mode",
-    allow_module_level=True
-)
+# Determine if running in offscreen mode
+_is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 
 # Add parent directory for imports
 # Systematic pytest markers applied based on test content analysis
+# xfail for offscreen mode - real MainWindow may crash
 pytestmark = [
     pytest.mark.dialog,
     pytest.mark.file_io,
@@ -34,6 +33,11 @@ pytestmark = [
     pytest.mark.integration,  # Changed from unit - this is integration testing
     pytest.mark.widget,
     pytest.mark.ci_safe,
+    pytest.mark.xfail(
+        _is_offscreen,
+        reason="Creates real MainWindow which may crash in Qt offscreen mode",
+        strict=False,  # Passes if unexpectedly works
+    ),
 ]
 
 current_dir = Path(__file__).parent

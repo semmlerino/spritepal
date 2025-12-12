@@ -31,6 +31,9 @@ from ui.styles.components import (
 )
 from ui.styles.theme import COLORS, get_theme_style
 
+# Determine if running in offscreen mode
+_is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
+
 # Mock the Qt widget imports to avoid import dependencies during testing
 try:
     from ui.widgets.sprite_preview_widget import SpritePreviewWidget
@@ -136,50 +139,52 @@ class TestPreviewWidgetDarkTheme:
 
     @pytest.mark.gui
     @pytest.mark.skipif(not WIDGETS_AVAILABLE, reason="Preview widgets not available")
+    @pytest.mark.xfail(
+        _is_offscreen,
+        reason="SpritePreviewWidget may fail to initialize in offscreen mode",
+        strict=False,
+    )
     def test_sprite_preview_widget_dark_backgrounds(self, qtbot) -> None:
         """Test that SpritePreviewWidget applies dark backgrounds correctly."""
-        try:
-            preview_widget = SpritePreviewWidget("Test Preview")
-            qtbot.addWidget(preview_widget)
+        preview_widget = SpritePreviewWidget("Test Preview")
+        qtbot.addWidget(preview_widget)
 
-            preview_widget.show()
-            qtbot.waitExposed(preview_widget)
+        preview_widget.show()
+        qtbot.waitExposed(preview_widget)
 
-            # Test that preview widget exists and can be styled
-            assert preview_widget is not None
+        # Test that preview widget exists and can be styled
+        assert preview_widget is not None
 
-            # If the widget has a preview_label, test its styling
-            if hasattr(preview_widget, 'preview_label') and preview_widget.preview_label:
-                style_sheet = preview_widget.preview_label.styleSheet()
+        # If the widget has a preview_label, test its styling
+        if hasattr(preview_widget, 'preview_label') and preview_widget.preview_label:
+            style_sheet = preview_widget.preview_label.styleSheet()
 
-                # Should contain dark background styling
-                assert "background-color:" in style_sheet or len(style_sheet) == 0  # May not be set initially
-
-        except Exception as e:
-            pytest.skip(f"SpritePreviewWidget not available or failed to initialize: {e}")
+            # Should contain dark background styling
+            assert "background-color:" in style_sheet or len(style_sheet) == 0  # May not be set initially
 
     @pytest.mark.gui
     @pytest.mark.skipif(not WIDGETS_AVAILABLE, reason="Preview widgets not available")
+    @pytest.mark.xfail(
+        _is_offscreen,
+        reason="ZoomablePreviewWidget may fail to initialize in offscreen mode",
+        strict=False,
+    )
     def test_zoomable_preview_widget_dark_backgrounds(self, qtbot) -> None:
         """Test that ZoomablePreviewWidget applies dark backgrounds correctly."""
-        try:
-            zoomable_widget = ZoomablePreviewWidget()
-            qtbot.addWidget(zoomable_widget)
+        zoomable_widget = ZoomablePreviewWidget()
+        qtbot.addWidget(zoomable_widget)
 
-            zoomable_widget.show()
-            qtbot.waitExposed(zoomable_widget)
+        zoomable_widget.show()
+        qtbot.waitExposed(zoomable_widget)
 
-            # Test that zoomable widget exists and can be styled
-            assert zoomable_widget is not None
+        # Test that zoomable widget exists and can be styled
+        assert zoomable_widget is not None
 
-            # Test that widget has dark styling applied
-            style_sheet = zoomable_widget.styleSheet()
-            if len(style_sheet) > 0:
-                # Should contain dark background references
-                assert "#1e1e1e" in style_sheet or "background-color:" in style_sheet
-
-        except Exception as e:
-            pytest.skip(f"ZoomablePreviewWidget not available or failed to initialize: {e}")
+        # Test that widget has dark styling applied
+        style_sheet = zoomable_widget.styleSheet()
+        if len(style_sheet) > 0:
+            # Should contain dark background references
+            assert "#1e1e1e" in style_sheet or "background-color:" in style_sheet
 
     @pytest.mark.gui
     def test_preview_label_with_dark_preview_style(self, qtbot) -> None:
