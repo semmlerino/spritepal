@@ -3,6 +3,7 @@ ROM backup utilities for SpritePal
 """
 from __future__ import annotations
 
+import os
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -128,7 +129,10 @@ class ROMBackupManager:
     @classmethod
     def restore_backup(cls, backup_path: str, target_path: str) -> None:
         """
-        Restore a backup to target location.
+        Restore a backup to target location atomically.
+
+        Uses temp-file-then-rename pattern to prevent corruption
+        if restore is interrupted (disk full, power loss, etc).
 
         Args:
             backup_path: Path to backup file
@@ -140,10 +144,22 @@ class ROMBackupManager:
         if not Path(backup_path).exists():
             raise ROMBackupError(f"Backup file not found: {backup_path}")
 
+        target = Path(target_path)
+
+        # Create temp file in same directory (required for atomic rename)
+        temp_path = target.with_suffix(f".restore_tmp_{os.getpid()}")
+
         try:
-            _ = shutil.copy2(backup_path, target_path)
+            # Copy backup to temp file first
+            _ = shutil.copy2(backup_path, str(temp_path))
+
+            # Atomic rename (POSIX) / best-effort (Windows)
+            temp_path.replace(target)
             logger.info(f"Restored backup to: {target_path}")
+
         except Exception as e:
+            # Clean up temp file on any failure
+            temp_path.unlink(missing_ok=True)
             raise ROMBackupError(f"Failed to restore backup: {e}") from e
 
     @classmethod

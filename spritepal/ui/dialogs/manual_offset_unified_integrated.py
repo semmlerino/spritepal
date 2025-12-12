@@ -113,6 +113,7 @@ from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.dialogs.services import ViewStateManager
 from ui.rom_extraction.workers import SpritePreviewWorker, SpriteSearchWorker
+from ui.workers.sprite_scan_worker import SpriteScanWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 from utils.logging_config import get_logger
@@ -205,6 +206,8 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         # Worker references
         self.preview_worker: SpritePreviewWorker | None = None
         self.search_worker: SpriteSearchWorker | None = None
+        self._sprite_scan_worker: SpriteScanWorker | None = None
+        self._scan_progress_dialog: QProgressDialog | None = None
 
         # Preview coordinator handles preview generation (Smart or Simple based on env flag)
         self._smart_preview_coordinator: PreviewCoordinator | None = None
@@ -739,6 +742,13 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         WorkerManager.cleanup_worker(self.search_worker, timeout=2000)
         self.search_worker = None
 
+        WorkerManager.cleanup_worker(self._sprite_scan_worker, timeout=2000)
+        self._sprite_scan_worker = None
+
+        if self._scan_progress_dialog is not None:
+            self._scan_progress_dialog.close()
+            self._scan_progress_dialog = None
+
         if self._preview_timer is not None:
             self._preview_timer.stop()
 
@@ -845,8 +855,8 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         # Load any cached sprites for visualization
         self._load_cached_sprites_for_map()
 
-    def _scan_for_sprites(self):
-        """Scan ROM for HAL-compressed sprites and show results."""
+    def _scan_for_sprites(self) -> None:
+        """Scan ROM for HAL-compressed sprites using a background worker."""
         logger.info(f"_scan_for_sprites called, rom_path={self.rom_path}")
 
         if not self.rom_path:
@@ -856,58 +866,80 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
 
         logger.info(f"Starting sprite scan for ROM: {self.rom_path}")
 
+        # Clean up any existing scan worker
+        if self._sprite_scan_worker is not None:
+            WorkerManager.cleanup_worker(self._sprite_scan_worker)
+            self._sprite_scan_worker = None
+
         # Create progress dialog
-        progress = QProgressDialog("Scanning ROM for sprites...", "Cancel", 0, 100, self)
-        progress.setWindowTitle("Sprite Scanner")
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.setMinimumDuration(0)
-        progress.show()
+        self._scan_progress_dialog = QProgressDialog(
+            "Scanning ROM for sprites...", "Cancel", 0, 100, self
+        )
+        self._scan_progress_dialog.setWindowTitle("Sprite Scanner")
+        self._scan_progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self._scan_progress_dialog.setMinimumDuration(0)
+        self._scan_progress_dialog.canceled.connect(self._cancel_sprite_scan)
+        self._scan_progress_dialog.show()
 
-        try:
-            # Create sprite finder
-            finder = SpriteFinder()
+        # Create and start worker
+        self._sprite_scan_worker = SpriteScanWorker(self.rom_path, step=0x1000)
+        self._sprite_scan_worker.scan_progress.connect(self._on_sprite_scan_progress)
+        self._sprite_scan_worker.sprites_found.connect(self._on_sprite_scan_complete)
+        self._sprite_scan_worker.error.connect(self._on_sprite_scan_error)
+        self._sprite_scan_worker.start()
 
-            # Read ROM data
-            with Path(self.rom_path).open("rb") as f:
-                rom_data = f.read()
+    def _cancel_sprite_scan(self) -> None:
+        """Cancel the sprite scan operation."""
+        logger.info("Sprite scan cancelled by user")
+        if self._sprite_scan_worker is not None:
+            self._sprite_scan_worker.cancel()
+            WorkerManager.cleanup_worker(self._sprite_scan_worker, timeout=1000)
+            self._sprite_scan_worker = None
 
-            # Track found sprites
-            found_sprites = []
+    def _on_sprite_scan_progress(self, current: int, total: int) -> None:
+        """Handle scan progress updates from worker."""
+        if self._scan_progress_dialog is not None and total > 0:
+            percent = int((current / total) * 100)
+            self._scan_progress_dialog.setValue(percent)
 
-            # Scan through ROM in chunks to show progress
-            rom_size = len(rom_data)
-            step = 0x1000  # 4KB steps
+    def _on_sprite_scan_complete(self, found_sprites: list[dict[str, Any]]) -> None:
+        """Handle sprite scan completion."""
+        logger.info(f"Sprite scan complete: found {len(found_sprites)} sprites")
 
-            for offset in range(0, rom_size, step):
-                # Check for cancel
-                if progress.wasCanceled():
-                    break
+        # Close progress dialog
+        if self._scan_progress_dialog is not None:
+            self._scan_progress_dialog.close()
+            self._scan_progress_dialog = None
 
-                # Update progress
-                progress_value = int((offset / rom_size) * 100)
-                progress.setValue(progress_value)
-                # Use ExcludeUserInputEvents to prevent reentrancy issues
-                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+        # Clean up worker
+        if self._sprite_scan_worker is not None:
+            self._sprite_scan_worker.deleteLater()
+            self._sprite_scan_worker = None
 
-                # Try to find sprite at this offset
-                sprite_info = finder.find_sprite_at_offset(rom_data, offset)
-                if sprite_info:
-                    found_sprites.append(sprite_info)
-                    logger.info(f"Found sprite at 0x{offset:X}: {sprite_info['tile_count']} tiles")
+        # Show results
+        if found_sprites:
+            self._show_sprite_scan_results(found_sprites)
+        else:
+            QMessageBox.information(
+                self, "No Sprites Found",
+                "No HAL-compressed sprites were found in the ROM."
+            )
 
-            progress.close()
+    def _on_sprite_scan_error(self, message: str, exception: Exception) -> None:
+        """Handle sprite scan error."""
+        logger.error(f"Sprite scan error: {message}", exc_info=exception)
 
-            # Show results
-            if found_sprites:
-                self._show_sprite_scan_results(found_sprites)
-            else:
-                QMessageBox.information(self, "No Sprites Found",
-                                       "No HAL-compressed sprites were found in the ROM.")
+        # Close progress dialog
+        if self._scan_progress_dialog is not None:
+            self._scan_progress_dialog.close()
+            self._scan_progress_dialog = None
 
-        except Exception as e:
-            progress.close()
-            logger.error(f"Error scanning for sprites: {e}")
-            QMessageBox.critical(self, "Scan Error", f"Error scanning ROM: {e!s}")
+        # Clean up worker
+        if self._sprite_scan_worker is not None:
+            self._sprite_scan_worker.deleteLater()
+            self._sprite_scan_worker = None
+
+        QMessageBox.critical(self, "Scan Error", f"Error scanning ROM: {message}")
 
     def _show_sprite_scan_results(self, sprites: list[dict[str, Any]]) -> None:
         """Show sprite scan results in a dialog."""

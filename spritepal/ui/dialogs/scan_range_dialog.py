@@ -182,12 +182,16 @@ class ScanRangeDialog(QDialog):
 
             # Ensure alignment (optional but recommended)
             if start % 0x100 != 0:
-                QMessageBox.warning(
+                result = QMessageBox.question(
                     self,
                     "Alignment Warning",
                     f"Start offset 0x{start:X} is not aligned to 0x100.\n"
-                    "This may miss some sprites. Continue anyway?"
+                    "This may miss some sprites. Continue anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,  # Default to No
                 )
+                if result != QMessageBox.StandardButton.Yes:
+                    return  # User chose not to continue
 
             self.start_offset = start
             self.end_offset = end
