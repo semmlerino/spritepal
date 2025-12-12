@@ -216,7 +216,8 @@ class TestNoFallbackScenario:
             "get_navigation_manager should have been removed"
 
         # These are still available on the registry instance
-        registry = core.managers.get_registry()
+        from core.managers.registry import ManagerRegistry
+        registry = ManagerRegistry()
         assert hasattr(registry, "get_extraction_manager"), \
             "Registry should still have get_extraction_manager method"
 

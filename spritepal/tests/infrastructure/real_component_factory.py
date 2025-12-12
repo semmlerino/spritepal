@@ -42,6 +42,7 @@ to see migration progress and get assistance.
 from __future__ import annotations
 
 import tempfile
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
@@ -53,8 +54,8 @@ from core.managers.extraction_manager import ExtractionManager
 from core.managers.injection_manager import InjectionManager
 from core.managers.registry import ManagerRegistry
 from core.managers.session_manager import SessionManager
+from ui.common import WorkerManager
 from ui.common.error_handler import ErrorHandler
-from ui.common.worker_manager import WorkerManager
 from ui.main_window import MainWindow
 from ui.rom_extraction_panel import ROMExtractionPanel
 
@@ -293,7 +294,13 @@ class RealComponentFactory:
         Returns:
             Real ROMExtractionPanel instance
         """
-        panel = ROMExtractionPanel(parent)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
+
+        panel = ROMExtractionPanel(
+            parent,
+            extraction_manager=inject(ExtractionManagerProtocol),
+        )
         self._created_components.append(panel)
 
         # Set up with test ROM data
@@ -315,6 +322,8 @@ class RealComponentFactory:
         Returns:
             Real VRAMExtractionWorker or ROMExtractionWorker instance
         """
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
         from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 
         if params is None:
@@ -323,10 +332,12 @@ class RealComponentFactory:
             else:
                 params = self._data_repo.get_rom_extraction_data("small")
 
+        extraction_manager = inject(ExtractionManagerProtocol)
+
         if worker_type == "vram":
-            worker = VRAMExtractionWorker(params)
+            worker = VRAMExtractionWorker(params, extraction_manager=extraction_manager)
         else:
-            worker = ROMExtractionWorker(params)
+            worker = ROMExtractionWorker(params, extraction_manager=extraction_manager)
 
         self._created_components.append(worker)
 
@@ -343,15 +354,19 @@ class RealComponentFactory:
         Returns:
             Real VRAMInjectionWorker or ROMInjectionWorker instance
         """
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
         from core.workers import ROMInjectionWorker, VRAMInjectionWorker
 
         if params is None:
             params = self._data_repo.get_injection_data("small")
 
+        injection_manager = inject(InjectionManagerProtocol)
+
         if worker_type == "vram":
-            worker = VRAMInjectionWorker(params)
+            worker = VRAMInjectionWorker(params, injection_manager=injection_manager)
         else:
-            worker = ROMInjectionWorker(params)
+            worker = ROMInjectionWorker(params, injection_manager=injection_manager)
 
         self._created_components.append(worker)
 
@@ -622,20 +637,36 @@ class RealComponentFactory:
         return extractor
 
     def cleanup(self) -> None:
-        """Clean up all created components and temporary files."""
+        """Clean up all created components and temporary files.
+
+        Note: Logs warnings instead of silently ignoring cleanup failures.
+        This helps identify resource leaks during test development.
+        """
         # Clean up Qt components
         for component in self._created_components:
             try:
                 if isinstance(component, QThread):
                     if component.isRunning():
                         component.quit()
-                        component.wait(1000)
+                        # Increased timeout from 1s to 5s for CI environments
+                        if not component.wait(5000):
+                            warnings.warn(
+                                f"Thread {component} did not terminate within 5 seconds",
+                                ResourceWarning,
+                                stacklevel=2,
+                            )
+                            continue  # Skip deleteLater on still-running thread
                 elif isinstance(component, QWidget):
                     component.close()
 
                 component.deleteLater()
-            except Exception:
-                pass  # Ignore cleanup errors
+            except Exception as e:
+                # Log instead of silently ignoring - helps catch resource leaks
+                warnings.warn(
+                    f"Cleanup failed for {component}: {e}",
+                    ResourceWarning,
+                    stacklevel=2,
+                )
 
         self._created_components.clear()
 

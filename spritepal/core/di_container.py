@@ -318,44 +318,43 @@ def configure_container(
 # Helper functions for lazy manager creation
 def _get_consolidated_session_adapter():
     """Get session adapter from consolidated ApplicationStateManager."""
-    from core.managers import get_application_state_manager
-    return get_application_state_manager().get_session_adapter()
+    from core.managers.registry import ManagerRegistry
+    return ManagerRegistry().get_application_state_manager().get_session_adapter()
 
 def _get_consolidated_extraction_adapter():
     """Get extraction adapter from consolidated CoreOperationsManager."""
-    from core.managers import get_core_operations_manager
-    return get_core_operations_manager().get_extraction_adapter()
+    from core.managers.registry import ManagerRegistry
+    return ManagerRegistry().get_core_operations_manager().get_extraction_adapter()
 
 def _get_consolidated_injection_adapter():
     """Get injection adapter from consolidated CoreOperationsManager."""
-    from core.managers import get_core_operations_manager
-    return get_core_operations_manager().get_injection_adapter()
+    from core.managers.registry import ManagerRegistry
+    return ManagerRegistry().get_core_operations_manager().get_injection_adapter()
 
 def _get_or_create_session_manager():
     """Get or create session manager."""
-    from core.managers import get_registry
-    return get_registry().get_session_manager()
+    from core.managers.registry import ManagerRegistry
+    return ManagerRegistry().get_session_manager()
 
 def _get_or_create_extraction_manager():
     """Get or create extraction manager."""
-    from core.managers import get_registry
-    return get_registry().get_extraction_manager()
+    from core.managers.registry import ManagerRegistry
+    return ManagerRegistry().get_extraction_manager()
 
 def _get_or_create_injection_manager():
     """Get or create injection manager."""
-    from core.managers import get_registry
-    return get_registry().get_injection_manager()
+    from core.managers.registry import ManagerRegistry
+    return ManagerRegistry().get_injection_manager()
 
 def _get_or_create_navigation_manager():
     """Get or create navigation manager."""
+    from core.managers.registry import ManagerRegistry
     try:
-        from core.managers import get_core_operations_manager
-        core_mgr = get_core_operations_manager()
+        core_mgr = ManagerRegistry().get_core_operations_manager()
         return core_mgr._get_navigation_manager()
     except Exception:
         # Fallback to registry method if available
-        from core.managers import get_registry
-        return get_registry().get_navigation_manager()
+        return ManagerRegistry().get_navigation_manager()
 
 # Example usage with protocols
 if __name__ == "__main__":

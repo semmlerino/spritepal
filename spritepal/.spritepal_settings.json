@@ -1,9 +1,9 @@
 {
   "session": {
-    "vram_path": "/test/vram.dmp",
-    "cgram_path": "/test/cgram.dmp",
+    "vram_path": "",
+    "cgram_path": "",
     "oam_path": "",
-    "output_name": "my_sprite",
+    "output_name": "",
     "create_grayscale": true,
     "create_metadata": true,
     "last_rom_path": "",
@@ -18,13 +18,14 @@
       "/path/to/file1.dmp",
       "/path/to/file2.dmp",
       "/path/to/file3.dmp"
-    ]
+    ],
+    "extraction_mode": 0
   },
   "ui": {
-    "window_width": 1200,
-    "window_height": 800,
-    "window_x": 100,
-    "window_y": 200,
+    "window_width": 1100,
+    "window_height": 750,
+    "window_x": 0,
+    "window_y": 0,
     "restore_position": false,
     "theme": "dark",
     "window_maximized": false,
@@ -34,7 +35,7 @@
     ]
   },
   "paths": {
-    "last_used_dir": "/tmp/spritepal_integration_ziikte1z",
+    "last_used_dir": "/tmp/spritepal_integration_t1gya0iq",
     "default_dumps_dir": "C:\\Users\\gabri\\Documents\\Mesen2\\Debugger",
     "last_export_dir": "",
     "last_import_dir": ""
@@ -48,7 +49,7 @@
     "test_key": "test_value"
   },
   "rom_injection": {
-    "last_input_rom": "/tmp/spritepal_integration_ziikte1z/test_rom.sfc",
+    "last_input_rom": "/tmp/spritepal_integration_t1gya0iq/test_rom.sfc",
     "last_sprite_location": "Kirby Sprite (0x123456)",
     "last_custom_offset": "0x123456",
     "fast_compression": true,
@@ -63,7 +64,7 @@
     "include_unused_palettes": false,
     "tile_width": 256,
     "default_format": "indexed_png",
-    "last_vram_path": "/tmp/spritepal_test_k9ll_b53/small_test_vram.dmp",
+    "last_vram_path": "/tmp/spritepal_test_vwmmg5tz/small_test_vram.dmp",
     "last_extraction_mode": "vram"
   },
   "appearance": {
@@ -103,9 +104,9 @@
   "workflow": {
     "current_injection_params": {
       "mode": "vram",
-      "sprite_path": "/tmp/tmpauc2qirh/test_sprite.png",
-      "input_vram": "/tmp/tmpauc2qirh/input.dmp",
-      "output_vram": "/tmp/tmpauc2qirh/output.dmp",
+      "sprite_path": "/tmp/tmpvaxfk4o9/test_sprite.png",
+      "input_vram": "/tmp/tmpvaxfk4o9/input.dmp",
+      "output_vram": "/tmp/tmpvaxfk4o9/output.dmp",
       "offset": 49152
     }
   },

@@ -4,6 +4,7 @@ Allows users to define specific start and end offsets for sprite scanning.
 """
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -30,6 +31,7 @@ class ScanRangeDialog(QDialog):
             parent: Parent widget
         """
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.rom_size = rom_size
         # Default to full ROM scan (matching scan_worker.py defaults)
         # Skip headers/early data, cap at reasonable max

@@ -11,22 +11,25 @@ from core.managers import (
     ExtractionManager,
     ManagerError,
     SessionManager,
-    are_managers_initialized,
     cleanup_managers,
-    get_registry,
     initialize_managers,
 )
 from core.managers.registry import ManagerRegistry
 
 
+def are_managers_initialized() -> bool:
+    """Check if managers are initialized."""
+    return ManagerRegistry().is_initialized()
+
+
 def get_session_manager():
-    """Get session manager from registry (replaces deprecated function)."""
-    return get_registry().get_session_manager()
+    """Get session manager from registry."""
+    return ManagerRegistry().get_session_manager()
 
 
 def get_extraction_manager():
-    """Get extraction manager from registry (replaces deprecated function)."""
-    return get_registry().get_extraction_manager()
+    """Get extraction manager from registry."""
+    return ManagerRegistry().get_extraction_manager()
 
 pytestmark = [
     pytest.mark.serial,
@@ -57,7 +60,7 @@ class TestManagerRegistry:
         """Test that registry is a singleton"""
         registry1 = ManagerRegistry()
         registry2 = ManagerRegistry()
-        registry3 = get_registry()
+        registry3 = ManagerRegistry()
 
         assert registry1 is registry2
         assert registry2 is registry3
@@ -97,7 +100,7 @@ class TestManagerRegistry:
 
     def test_get_all_managers(self):
         """Test getting all managers"""
-        registry = get_registry()
+        registry = ManagerRegistry()
 
         # Initially empty
         assert registry.get_all_managers() == {}

@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from typing_extensions import override
 
 from core.default_palette_loader import DefaultPaletteLoader
+
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.visual_similarity_search import VisualSimilarityEngine
 from ui.common.collapsible_group_box import CollapsibleGroupBox

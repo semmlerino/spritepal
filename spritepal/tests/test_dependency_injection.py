@@ -13,11 +13,6 @@ from unittest.mock import Mock, patch
 import pytest
 
 from core.di_container import inject
-from core.protocols.manager_protocols import (
-    ExtractionManagerProtocol,
-    InjectionManagerProtocol,
-    SessionManagerProtocol,
-)
 from core.managers.context import (
     ContextValidator,
     # Serial execution required: Thread safety concerns
@@ -31,6 +26,11 @@ from core.managers.injectable import (
     InjectableDialog,
     InjectableWidget,
     InjectionMixin,
+)
+from core.protocols.manager_protocols import (
+    ExtractionManagerProtocol,
+    InjectionManagerProtocol,
+    SessionManagerProtocol,
 )
 
 pytestmark = [

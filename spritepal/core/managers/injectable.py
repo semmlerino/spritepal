@@ -70,9 +70,10 @@ class ContextualManagerProvider:
 
         # Fallback to DI container
         logger.debug("No extraction manager in context, falling back to DI")
+        from typing import cast
+
         from core.di_container import inject
         from core.protocols.manager_protocols import ExtractionManagerProtocol
-        from typing import cast
         return cast(ExtractionManager, inject(ExtractionManagerProtocol))
 
     def get_injection_manager(self) -> InjectionManager:
@@ -84,9 +85,10 @@ class ContextualManagerProvider:
 
         # Fallback to DI container
         logger.debug("No injection manager in context, falling back to DI")
+        from typing import cast
+
         from core.di_container import inject
         from core.protocols.manager_protocols import InjectionManagerProtocol
-        from typing import cast
         return cast(InjectionManager, inject(InjectionManagerProtocol))
 
     def get_session_manager(self) -> SessionManager:
@@ -98,9 +100,10 @@ class ContextualManagerProvider:
 
         # Fallback to DI container
         logger.debug("No session manager in context, falling back to DI")
+        from typing import cast
+
         from core.di_container import inject
         from core.protocols.manager_protocols import SessionManagerProtocol
-        from typing import cast
         return cast(SessionManager, inject(SessionManagerProtocol))
 
 class InjectableWidget(QWidget):
@@ -251,21 +254,24 @@ class DirectManagerProvider:
         """Get extraction manager."""
         if self._extraction_manager is None:
             logger.debug("No extraction manager injected, falling back to global")
-            return get_extraction_manager()
+            from core.managers.registry import ManagerRegistry
+            return ManagerRegistry().get_extraction_manager()
         return self._extraction_manager
 
     def get_injection_manager(self) -> InjectionManager:
         """Get injection manager."""
         if self._injection_manager is None:
             logger.debug("No injection manager injected, falling back to global")
-            return get_injection_manager()
+            from core.managers.registry import ManagerRegistry
+            return ManagerRegistry().get_injection_manager()
         return self._injection_manager
 
     def get_session_manager(self) -> SessionManager:
         """Get session manager."""
         if self._session_manager is None:
             logger.debug("No session manager injected, falling back to global")
-            return get_session_manager()
+            from core.managers.registry import ManagerRegistry
+            return ManagerRegistry().get_session_manager()
         return self._session_manager
 
 def create_direct_provider(

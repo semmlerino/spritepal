@@ -6,6 +6,10 @@ from __future__ import annotations
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class PaletteColorizer(QObject):
     """Manages palette application to grayscale images with caching"""
@@ -120,7 +124,7 @@ class PaletteColorizer(QObject):
             # Get image data
             pixels = rgba_image.load()
             if pixels is None:
-                print("Failed to load image pixels")
+                logger.warning("Failed to load image pixels")
                 return None
             width, height = rgba_image.size
 
@@ -161,7 +165,7 @@ class PaletteColorizer(QObject):
                         pixels[x, y] = (0, 0, 0, 255)
 
         except Exception as e:
-            print(f"Error applying palette: {e}")
+            logger.exception("Error applying palette: %s", e)
             return None
         else:
             return rgba_image

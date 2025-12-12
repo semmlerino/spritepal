@@ -5,7 +5,7 @@ This module provides comprehensive testing infrastructure to support
 real Qt testing and reduce over-mocking patterns. It includes:
 
 - ApplicationFactory: Standardized Qt application setup (Qt-dependent)
-- RealManagerFixtureFactory: Real manager instances with proper Qt parents (Qt-dependent)
+- RealComponentFactory: Real manager instances with proper Qt parents (Qt-dependent)
 - DataRepository: Centralized test data management (Qt-independent)
 - QtTestingFramework: Standardized patterns for Qt component testing (Qt-dependent)
 
@@ -37,7 +37,6 @@ __all__ = [
 # Conditional imports based on Qt availability
 if is_pyside6_available():
     try:
-        from .manager_fixture_factory import RealManagerFixtureFactory
         from .qt_application_factory import (
             ApplicationFactory,
             QtTestContext,
@@ -50,11 +49,12 @@ if is_pyside6_available():
             qt_worker_test,
             validate_qt_object_lifecycle,
         )
+        from .real_component_factory import RealComponentFactory
 
         # Add Qt-dependent exports
         __all__.extend([
             "QtTestingFramework",
-            "RealManagerFixtureFactory",
+            "RealComponentFactory",
             "ApplicationFactory",
             "QtTestContext",
             "qt_dialog_test",
@@ -84,7 +84,7 @@ if not is_pyside6_available():
         HeadlessApplicationFactory as ApplicationFactory,
         HeadlessQtTestContext as QtTestContext,
         HeadlessQtTestingFramework as QtTestingFramework,
-        HeadlessRealManagerFixtureFactory as RealManagerFixtureFactory,
+        HeadlessRealComponentFactory as RealComponentFactory,
         headless_qt_dialog_test as qt_dialog_test,
         headless_qt_test_context as qt_test_context,
         headless_qt_widget_test as qt_widget_test,
@@ -95,7 +95,7 @@ if not is_pyside6_available():
     # Add fallback exports (these will raise HeadlessModeError when used)
     __all__.extend([
         "QtTestingFramework",
-        "RealManagerFixtureFactory",
+        "RealComponentFactory",
         "ApplicationFactory",
         "QtTestContext",
         "qt_dialog_test",

@@ -30,7 +30,7 @@ The test infrastructure has been made Qt-optional to support headless testing en
 When PySide6 is available:
 - `ApplicationFactory`: Qt application management
 - `QtTestingFramework`: Qt component testing utilities  
-- `RealManagerFixtureFactory`: Real Qt manager instances
+- `RealComponentFactory`: Real Qt component instances
 - All Qt testing context managers and helpers
 
 When PySide6 is not available:

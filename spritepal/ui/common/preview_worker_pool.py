@@ -18,7 +18,7 @@ import weakref
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
+from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 from typing_extensions import override
 
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
@@ -363,11 +363,18 @@ class PreviewWorkerPool(QObject):
 
             # Connect signals only if not already connected
             # We keep signals connected to avoid race conditions from disconnect/reconnect
+            # Use QueuedConnection for cross-thread safety
             if not hasattr(worker, '_signals_connected') or not worker._signals_connected:
-                worker.preview_ready.connect(self._on_worker_ready)
-                worker.preview_error.connect(self._on_worker_error)
+                worker.preview_ready.connect(
+                    self._on_worker_ready,
+                    Qt.ConnectionType.QueuedConnection
+                )
+                worker.preview_error.connect(
+                    self._on_worker_error,
+                    Qt.ConnectionType.QueuedConnection
+                )
                 worker._signals_connected = True
-                logger.debug("Connected worker signals (first time)")
+                logger.debug("Connected worker signals (QueuedConnection)")
 
             # Move to active set
             self._active_workers.add(worker)
@@ -462,10 +469,16 @@ class PreviewWorkerPool(QObject):
                         # Setup and start worker
                         worker.setup_request(request, extractor, rom_cache)
 
-                        # Connect signals only if not already connected
+                        # Connect signals only if not already connected (QueuedConnection)
                         if not hasattr(worker, '_signals_connected') or not worker._signals_connected:
-                            worker.preview_ready.connect(self._on_worker_ready)
-                            worker.preview_error.connect(self._on_worker_error)
+                            worker.preview_ready.connect(
+                                self._on_worker_ready,
+                                Qt.ConnectionType.QueuedConnection
+                            )
+                            worker.preview_error.connect(
+                                self._on_worker_error,
+                                Qt.ConnectionType.QueuedConnection
+                            )
                             worker._signals_connected = True
                         self._active_workers.add(worker)
                         self._last_activity = time.time()
@@ -555,9 +568,11 @@ class PreviewWorkerPool(QObject):
             # First, cancel any current operation
             worker.cancel_current_request()
 
-            # Disconnect SPECIFIC slots to prevent crashes from blanket disconnect()
-            # Using specific slots avoids race conditions where disconnect() is called
-            # while signals are being emitted
+            # Block signals BEFORE disconnecting to prevent crashes
+            # This ensures no signals are emitted during disconnect
+            worker.blockSignals(True)
+
+            # Disconnect signals safely now that they're blocked
             if hasattr(worker, '_signals_connected') and worker._signals_connected:
                 try:
                     worker.preview_ready.disconnect(self._on_worker_ready)
@@ -568,7 +583,7 @@ class PreviewWorkerPool(QObject):
                 except (TypeError, RuntimeError):
                     pass  # Already disconnected or object deleted
                 worker._signals_connected = False
-                logger.debug("Disconnected specific worker signals during cleanup")
+                logger.debug("Disconnected worker signals after blocking")
 
             # Request interruption via Qt mechanism
             worker.requestInterruption()
@@ -636,7 +651,10 @@ class PreviewWorkerPool(QObject):
                     # First cancel the request
                     worker.cancel_current_request()
 
-                    # Disconnect signals before cleanup
+                    # Block signals BEFORE disconnecting to prevent crashes
+                    worker.blockSignals(True)
+
+                    # Disconnect signals safely now that they're blocked
                     if hasattr(worker, '_signals_connected') and worker._signals_connected:
                         with contextlib.suppress(TypeError):
                             worker.preview_ready.disconnect()

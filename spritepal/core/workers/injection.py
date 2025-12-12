@@ -7,7 +7,6 @@ to the InjectionManager while providing consistent threading interfaces.
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING, TypedDict, cast
 
 try:
@@ -63,19 +62,9 @@ class VRAMInjectionWorker(InjectionWorkerBase):
     def __init__(
         self,
         params: VRAMInjectionParams,
-        injection_manager: InjectionManager | None = None,
+        injection_manager: InjectionManager,
         parent: QObject | None = None,
     ) -> None:
-        if injection_manager is None:
-            warnings.warn(
-                "VRAMInjectionWorker: injection_manager parameter will become required. "
-                "Pass injection_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import InjectionManagerProtocol
-            injection_manager = inject(InjectionManagerProtocol)
         super().__init__(injection_manager, parent)
         self.params = params
         self._operation_name = "VRAMInjectionWorker"
@@ -139,19 +128,9 @@ class ROMInjectionWorker(InjectionWorkerBase):
     def __init__(
         self,
         params: ROMInjectionParams,
-        injection_manager: InjectionManager | None = None,
+        injection_manager: InjectionManager,
         parent: QObject | None = None,
     ) -> None:
-        if injection_manager is None:
-            warnings.warn(
-                "ROMInjectionWorker: injection_manager parameter will become required. "
-                "Pass injection_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import InjectionManagerProtocol
-            injection_manager = inject(InjectionManagerProtocol)
         super().__init__(injection_manager, parent)
         self.params = params
         self._operation_name = "ROMInjectionWorker"

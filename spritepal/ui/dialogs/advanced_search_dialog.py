@@ -43,7 +43,7 @@ from typing_extensions import override
 from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
 from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngine
 from core.workers.base import handle_worker_errors
-from ui.common.worker_manager import WorkerManager
+from ui.common import WorkerManager
 from ui.dialogs.similarity_results_dialog import show_similarity_results
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE
 from utils.preview_generator import PreviewGenerator, PreviewRequest
@@ -798,9 +798,8 @@ class SearchWorker(QThread):
                 if self._cancelled:
                     return ("", False)
                 # _user_response is set by another thread via _set_user_response()
-                # Type guard: ensure it's the expected tuple type
-                # type: ignore is needed because basedpyright doesn't track cross-thread mutations
-                if isinstance(self._user_response, tuple):  # type: ignore[reportUnnecessaryIsInstance]
+                # Note: isinstance check needed because basedpyright doesn't track cross-thread mutations
+                if isinstance(self._user_response, tuple):  # pyright: ignore[reportUnnecessaryIsInstance]
                     return self._user_response
                 # Fallback for unexpected response type
                 return ("", False)
@@ -824,9 +823,8 @@ class SearchWorker(QThread):
                 if self._cancelled:
                     return False
                 # _user_response is set by another thread via _set_user_response()
-                # Type guard: ensure it's the expected bool type
-                # type: ignore is needed because basedpyright doesn't track cross-thread mutations
-                if isinstance(self._user_response, bool):  # type: ignore[reportUnnecessaryIsInstance]
+                # Note: isinstance check needed because basedpyright doesn't track cross-thread mutations
+                if isinstance(self._user_response, bool):  # pyright: ignore[reportUnnecessaryIsInstance]
                     return self._user_response
                 # Fallback for unexpected response type
                 return False

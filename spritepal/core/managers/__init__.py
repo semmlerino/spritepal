@@ -23,17 +23,10 @@ from .injection_manager import InjectionManager
 
 # Import DI-based manager functions
 # Note: We import from registry now which supports both consolidated and original modes
+# Convenience functions removed - use inject() or ManagerRegistry() directly
 from .registry import (
-    are_managers_initialized,
     cleanup_managers,
-    get_application_state_manager,
-    get_container_stats,
-    get_core_operations_manager,
-    get_monitoring_manager,
-    get_registry,
-    get_ui_coordinator_manager,
     initialize_managers,
-    reset_managers,
     validate_manager_dependencies,
 )
 from .session_manager import SessionManager
@@ -59,16 +52,8 @@ __all__ = [
     "SessionManager",
     "UICoordinatorManager",
     "ValidationError",
-    # Manager access functions (DI-based)
-    "are_managers_initialized",
+    # Manager lifecycle functions (use inject() for manager access)
     "cleanup_managers",
-    "get_application_state_manager",
-    "get_container_stats",
-    "get_core_operations_manager",
-    "get_monitoring_manager",
-    "get_registry",
-    "get_ui_coordinator_manager",
     "initialize_managers",
-    "reset_managers",
     "validate_manager_dependencies",
 ]

@@ -13,7 +13,7 @@ from typing import Any, Generic, TypeVar, cast
 from PySide6.QtCore import QObject, QThread, Signal
 
 from core.managers.base_manager import BaseManager
-from ui.common.worker_manager import WorkerManager
+from ui.common import WorkerManager
 
 # Type variables for generic typing
 M = TypeVar("M", bound=BaseManager)

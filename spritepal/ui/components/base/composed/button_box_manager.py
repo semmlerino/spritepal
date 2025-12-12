@@ -105,23 +105,10 @@ class ButtonBoxManager(QObject):
 
             # Get the actual dialog object - check context.dialog first, then context itself
             dialog = context.dialog if hasattr(context, 'dialog') else context
-            print(f"DEBUGGING: Context type: {type(context)}")
-            print(f"DEBUGGING: Dialog resolved to: {type(dialog)}")
-            print(f"DEBUGGING: Dialog has accept: {hasattr(dialog, 'accept')}")
-            print(f"DEBUGGING: Dialog has reject: {hasattr(dialog, 'reject')}")
 
             if hasattr(dialog, 'accept') and hasattr(dialog, 'reject'):
-                print("DEBUGGING: Connecting ButtonBoxManager signals to dialog methods")
-                print(f"DEBUGGING: Dialog accept method: {dialog.accept}")
-                print(f"DEBUGGING: Dialog reject method: {dialog.reject}")
-                try:
-                    self.accepted.connect(dialog.accept)
-                    self.rejected.connect(dialog.reject)
-                    print("DEBUGGING: ButtonBoxManager signal connections SUCCESS")
-                except Exception as e:
-                    print(f"DEBUGGING: ButtonBoxManager signal connections FAILED: {e}")
-            else:
-                print(f"DEBUGGING: Dialog {type(dialog)} missing accept/reject methods")
+                self.accepted.connect(dialog.accept)
+                self.rejected.connect(dialog.reject)
 
             # Add to context for external access
             context.button_box = self._button_box

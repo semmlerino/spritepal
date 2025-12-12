@@ -238,8 +238,8 @@ class TestHALToolDetectionRegression(unittest.TestCase):
 
     def test_manager_initialization_robustness(self):
         """Test that manager initialization works regardless of working directory"""
-        from core.managers import cleanup_managers, initialize_managers
         from core.di_container import inject
+        from core.managers import cleanup_managers, initialize_managers
         from core.protocols.manager_protocols import InjectionManagerProtocol
 
         # Test from different directories

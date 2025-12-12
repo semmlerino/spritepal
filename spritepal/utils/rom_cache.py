@@ -20,7 +20,7 @@ except ImportError:
         return logging.getLogger(module_name)
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+    from core.protocols.manager_protocols import SettingsManagerProtocol
 
 logger = get_logger(__name__)
 

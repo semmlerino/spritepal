@@ -10,6 +10,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -169,7 +173,7 @@ class FileSelector(QWidget):
                     self._selection_callback(filename)
                 except Exception as e:
                     # Log error but don't crash
-                    print(f"Error in file selection callback: {e}")
+                    logger.exception("Error in file selection callback: %s", e)
 
     def get_path(self) -> str:
         """Get the current file path"""

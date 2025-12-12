@@ -64,7 +64,7 @@ def _get_implementation_class() -> type:
         class DummyDialog:
             def __init__(self, *args: Any, **kwargs: Any) -> None:
                 pass
-        return DummyDialog  # type: ignore[return-value]
+        return DummyDialog
 
 class ManualOffsetDialogAdapter:
     """

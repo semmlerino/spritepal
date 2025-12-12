@@ -6,14 +6,15 @@ import tempfile
 
 import pytest
 
-from core.managers import (
-    # Systematic pytest markers applied based on test content analysis
-    are_managers_initialized,
-    cleanup_managers,
-    initialize_managers,
-)
 from core.di_container import inject
+from core.managers import cleanup_managers, initialize_managers
+from core.managers.registry import ManagerRegistry
 from core.protocols.manager_protocols import ExtractionManagerProtocol
+
+
+def are_managers_initialized() -> bool:
+    """Check if managers are initialized."""
+    return ManagerRegistry().is_initialized()
 
 pytestmark = [
     pytest.mark.file_io,

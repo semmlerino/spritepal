@@ -22,6 +22,10 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Timeout constants for worker cleanup
+DEFAULT_CLEANUP_TIMEOUT = 1000  # 1 second - reasonable for most workers
+QUICK_CLEANUP_TIMEOUT = 100  # 100ms - for application shutdown scenarios
+
 class WorkerManager:
     """
     Safe helper for managing QThread worker lifecycle.
@@ -44,22 +48,22 @@ class WorkerManager:
     @staticmethod
     def cleanup_worker(
         worker: QThread | None,
-        timeout: int = 5000,
+        timeout: int = DEFAULT_CLEANUP_TIMEOUT,
         enable_force_cleanup: bool = False
     ) -> None:
         """
         Safely clean up a worker thread without using dangerous terminate().
 
         Uses a multi-stage approach:
-        1. Request cancellation via if hasattr(worker, "cancel"):
-     worker.cancel()  # type: ignore[attr-defined] if available
+        1. Request cancellation via cancel() if available (BaseWorker pattern)
         2. Use Qt's requestInterruption() mechanism
         3. Call quit() and wait() for clean shutdown
         4. Log warnings for unresponsive workers (never terminate)
 
         Args:
             worker: The worker thread to clean up (can be None)
-            timeout: Milliseconds to wait for graceful shutdown (default: 5000)
+            timeout: Milliseconds to wait for graceful shutdown (default: 1000ms).
+                    Use QUICK_CLEANUP_TIMEOUT (100ms) for shutdown scenarios.
             enable_force_cleanup: DEPRECATED - kept for backwards compatibility.
                                  This parameter is ignored as terminate() is never used.
 
@@ -114,7 +118,7 @@ class WorkerManager:
     def start_worker(
         worker: QThread,
         cleanup_existing: QThread | None = None,
-        cleanup_timeout: int = 5000
+        cleanup_timeout: int = DEFAULT_CLEANUP_TIMEOUT
     ) -> None:
         """
         Start a new worker, optionally cleaning up an existing one first.
@@ -122,7 +126,7 @@ class WorkerManager:
         Args:
             worker: The new worker to start
             cleanup_existing: Existing worker to clean up first (optional)
-            cleanup_timeout: Timeout for cleaning up existing worker (default: 5000ms)
+            cleanup_timeout: Timeout for cleaning up existing worker (default: 1000ms)
         """
         # Clean up existing worker if provided
         if cleanup_existing is not None:
@@ -138,7 +142,7 @@ class WorkerManager:
         worker_class: type,
         *args: Any,
         cleanup_existing: QThread | None = None,
-        cleanup_timeout: int = 5000,
+        cleanup_timeout: int = DEFAULT_CLEANUP_TIMEOUT,
         **kwargs: Any
     ) -> QThread:
         """
@@ -148,7 +152,7 @@ class WorkerManager:
             worker_class: The worker class to instantiate
             *args: Arguments for worker constructor
             cleanup_existing: Existing worker to clean up first (optional)
-            cleanup_timeout: Timeout for cleaning up existing worker (default: 5000ms)
+            cleanup_timeout: Timeout for cleaning up existing worker (default: 1000ms)
             **kwargs: Keyword arguments for worker constructor
 
         Returns:
@@ -289,3 +293,30 @@ class WorkerManager:
             return False
         else:
             return responsive
+
+    @staticmethod
+    def quick_cleanup(worker: QThread | None) -> None:
+        """
+        Quick cleanup for application shutdown scenarios.
+
+        Uses QUICK_CLEANUP_TIMEOUT (100ms) for minimal blocking during shutdown.
+        Workers that don't respond quickly will be scheduled for deletion anyway.
+
+        Args:
+            worker: The worker thread to clean up (can be None)
+        """
+        WorkerManager.cleanup_worker(worker, timeout=QUICK_CLEANUP_TIMEOUT)
+
+    @staticmethod
+    def cleanup_workers(workers: list[QThread | None], quick: bool = False) -> None:
+        """
+        Clean up multiple workers efficiently.
+
+        Args:
+            workers: List of worker threads to clean up (can contain None values)
+            quick: If True, use QUICK_CLEANUP_TIMEOUT for faster shutdown
+        """
+        timeout = QUICK_CLEANUP_TIMEOUT if quick else DEFAULT_CLEANUP_TIMEOUT
+        for worker in workers:
+            if worker is not None:
+                WorkerManager.cleanup_worker(worker, timeout=timeout)

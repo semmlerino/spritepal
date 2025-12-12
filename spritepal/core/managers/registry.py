@@ -498,11 +498,6 @@ def _ensure_registry() -> ManagerRegistry:
         raise ManagerError("Manager registry has been cleaned up or not initialized")
     return _registry
 
-def get_registry() -> ManagerRegistry:
-    """Get the global manager registry instance"""
-    return _ensure_registry()
-
-
 def initialize_managers(
     app_name: str = "SpritePal",
     settings_path: Any = None,
@@ -526,10 +521,6 @@ def cleanup_managers() -> None:
     """Cleanup all managers"""
     _ensure_registry().cleanup_managers()
 
-def are_managers_initialized() -> bool:
-    """Check if managers are initialized"""
-    return _ensure_registry().is_initialized()
-
 def validate_manager_dependencies() -> bool:
     """
     Validate that all manager dependencies are satisfied
@@ -538,86 +529,3 @@ def validate_manager_dependencies() -> bool:
         True if all dependencies are valid, False otherwise
     """
     return _ensure_registry().validate_manager_dependencies()
-
-def get_core_operations_manager():
-    """
-    Get the consolidated core operations manager instance
-
-    Returns:
-        CoreOperationsManager instance
-
-    Raises:
-        ManagerError: If managers not initialized
-    """
-    return _ensure_registry().get_core_operations_manager()
-
-def get_application_state_manager():
-    """
-    Get the consolidated application state manager instance
-
-    Returns:
-        ApplicationStateManager instance
-
-    Raises:
-        ManagerError: If managers not initialized
-    """
-    return _ensure_registry().get_application_state_manager()
-
-def get_ui_coordinator_manager():
-    """
-    Get the consolidated UI coordinator manager instance
-
-    Returns:
-        UICoordinatorManager instance
-
-    Raises:
-        ManagerError: If managers not initialized
-    """
-    return _ensure_registry().get_ui_coordinator_manager()
-
-def get_monitoring_manager():
-    """
-    Get the monitoring manager instance
-
-    Returns:
-        MonitoringManager instance
-
-    Raises:
-        ManagerError: If managers not initialized
-    """
-    return _ensure_registry().get_monitoring_manager()
-
-def reset_managers() -> None:
-    """
-    Reset managers (mainly for testing).
-
-    Alias for cleanup_managers() for backward compatibility.
-    """
-    cleanup_managers()
-
-def get_container_stats() -> dict[str, Any]:
-    """
-    Get statistics about the DI container for debugging.
-
-    Returns:
-        Dictionary with container statistics
-    """
-    from core.di_container import get_container
-    from core.protocols.manager_protocols import (
-        ExtractionManagerProtocol,
-        InjectionManagerProtocol,
-        NavigationManagerProtocol,
-        SessionManagerProtocol,
-    )
-
-    container = get_container()
-
-    stats = {
-        "initialized": are_managers_initialized(),
-        "session_manager_available": container.has(SessionManagerProtocol),
-        "extraction_manager_available": container.has(ExtractionManagerProtocol),
-        "injection_manager_available": container.has(InjectionManagerProtocol),
-        "navigation_manager_available": container.has(NavigationManagerProtocol),
-    }
-
-    return stats

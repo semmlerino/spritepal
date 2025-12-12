@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from core.managers import ExtractionManager
 
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMCacheProtocol, SettingsManagerProtocol
+from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 from ui.common import WorkerManager
 from ui.dialogs import UserErrorDialog
 from ui.rom_extraction.workers import SpriteScanWorker
@@ -54,26 +54,17 @@ class DetachedGalleryWindow(QMainWindow):
     def __init__(
         self,
         parent: QWidget | None = None,
-        extraction_manager: ExtractionManager | None = None,
+        *,
+        extraction_manager: ExtractionManager,
     ):
         """
         Initialize the detached gallery window.
 
         Args:
             parent: Parent widget (usually the main window)
-            extraction_manager: Optional injected ExtractionManager instance
+            extraction_manager: Injected ExtractionManager instance
         """
         super().__init__(parent)
-
-        # B.3 DI Migration: Optional extraction_manager with deprecation warning fallback
-        if extraction_manager is None:
-            warnings.warn(
-                "DetachedGalleryWindow: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            extraction_manager = inject(ExtractionManagerProtocol)
 
         # Window configuration
         self.setWindowTitle("Sprite Gallery")
@@ -445,7 +436,7 @@ class DetachedGalleryWindow(QMainWindow):
 
             # Force proper layout update if method exists
             if hasattr(self.gallery_widget, 'force_layout_update'):
-                self.gallery_widget.force_layout_update()  # type: ignore[attr-defined]
+                self.gallery_widget.force_layout_update()
 
             logger.info(f"Detached gallery loaded {len(sprites)} sprites")
 
@@ -1186,10 +1177,10 @@ class DetachedGalleryWindow(QMainWindow):
             logger.debug(f"Set thumbnail for sprite at 0x{offset:06X}")
         elif hasattr(self.gallery_widget, 'thumbnails'):
             # Old API - direct thumbnail dict access
-            if offset not in self.gallery_widget.thumbnails:  # type: ignore[attr-defined]
+            if offset not in self.gallery_widget.thumbnails:
                 return
 
-            thumbnail = self.gallery_widget.thumbnails[offset]  # type: ignore[attr-defined]
+            thumbnail = self.gallery_widget.thumbnails[offset]
 
             # Find sprite info for this offset
             sprite_info = None
@@ -1203,7 +1194,7 @@ class DetachedGalleryWindow(QMainWindow):
 
             # Set the actual sprite thumbnail
             if sprite_info and not pixmap.isNull():
-                thumbnail.set_sprite_data(pixmap, sprite_info)  # type: ignore[attr-defined]
+                thumbnail.set_sprite_data(pixmap, sprite_info)
                 logger.debug(f"Set thumbnail for sprite at 0x{offset:06X} using old API")
 
     def _on_thumbnail_progress(self, percent: int, message: str):

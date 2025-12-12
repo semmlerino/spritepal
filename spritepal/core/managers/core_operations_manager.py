@@ -301,7 +301,7 @@ class CoreOperationsManager(BaseManager):
         worker.progress.connect(lambda msg: self.injection_progress.emit(msg))
         worker.finished.connect(self._cleanup_current_worker)  # Ensure cleanup on finish (before emitting completion)
         worker.finished.connect(lambda: self._on_injection_finished(True, "VRAM injection completed"))
-        worker.error.connect(lambda msg: self._on_injection_finished(False, msg))  # type: ignore[attr-defined]  # Qt signal
+        worker.error.connect(lambda msg: self._on_injection_finished(False, msg))
 
         # Start worker
         self._current_worker = worker
@@ -329,7 +329,7 @@ class CoreOperationsManager(BaseManager):
         worker.progress.connect(lambda msg: self.injection_progress.emit(msg))
         worker.finished.connect(self._cleanup_current_worker)  # Ensure cleanup on finish (before emitting completion)
         worker.finished.connect(lambda: self._on_injection_finished(True, "ROM injection completed"))
-        worker.error.connect(lambda msg: self._on_injection_finished(False, msg))  # type: ignore[attr-defined]  # Qt signal
+        worker.error.connect(lambda msg: self._on_injection_finished(False, msg))  # type: ignore[attr-defined]
         worker.compression_info.connect(self.compression_info.emit)
 
         # Start worker

@@ -11,7 +11,7 @@ from utils.constants import (
 )
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import SessionManagerProtocol, SettingsManagerProtocol
+    from core.protocols.manager_protocols import SessionManagerProtocol
 
 
 class SettingsManager:

@@ -7,6 +7,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
@@ -114,7 +118,7 @@ class RowArrangementDialog(SplitterDialog):
             self.tile_width = 8  # Default tile width
             self.tile_height = 8  # Default tile height
             # Log the error for debugging
-            print(f"Error loading sprite data: {e}")
+            logger.exception("Error loading sprite data: %s", e)
             # Don't return here - continue with dialog setup but in error state
 
     @override

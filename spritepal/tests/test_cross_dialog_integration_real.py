@@ -27,7 +27,7 @@ from tests.infrastructure import (
     DataRepository,
     # Serial execution required: Real Qt components
     QtTestingFramework,
-    RealManagerFixtureFactory,
+    RealComponentFactory,
     qt_dialog_test,
     qt_test_context,
 )
@@ -63,7 +63,7 @@ class TestRealCrossDialogIntegration:
         self.qt_app = ApplicationFactory.get_application()
 
         # Initialize real manager factory
-        self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
 
         # Initialize test data repository
         self.test_data = DataRepository()
@@ -264,7 +264,7 @@ class TestRealTestingInfrastructureValidation:
         assert app.applicationName() == "SpritePal-Test"
 
         # Test real manager factory
-        factory = RealManagerFixtureFactory()
+        factory = RealComponentFactory()
         extraction_manager = factory.create_extraction_manager(isolated=True)
         assert extraction_manager is not None
         assert extraction_manager.parent() is app
@@ -290,7 +290,7 @@ class TestRealTestingInfrastructureValidation:
         This serves as documentation of why we moved away from mocking.
         """
         # Example 1: Qt parent/child lifecycle
-        factory = RealManagerFixtureFactory()
+        factory = RealComponentFactory()
         manager = factory.create_extraction_manager(isolated=True)
 
         # Real test: Can validate actual Qt parent relationship
@@ -323,7 +323,7 @@ if __name__ == "__main__":
     try:
         # Test infrastructure setup
         app = ApplicationFactory.get_application()
-        factory = RealManagerFixtureFactory()
+        factory = RealComponentFactory()
         test_data = DataRepository()
 
         print("✅ Real testing infrastructure initialized successfully")

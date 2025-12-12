@@ -3,7 +3,6 @@ Session coordination for MainWindow save/restore functionality
 """
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -27,7 +26,7 @@ class SessionCoordinator(QObject):
         extraction_panel: ExtractionPanel,
         output_settings_manager: OutputSettingsManager,
         settings_manager: SettingsManagerProtocol,
-        session_manager: SessionManager | None = None,
+        session_manager: SessionManager,
     ) -> None:
         """Initialize session coordinator
 
@@ -36,21 +35,9 @@ class SessionCoordinator(QObject):
             extraction_panel: Extraction panel for file path save/restore
             output_settings_manager: Output settings for save/restore
             settings_manager: Injected SettingsManagerProtocol instance
-            session_manager: Optional injected SessionManager instance
+            session_manager: Injected SessionManager instance
         """
         super().__init__()
-
-        # B.3 DI Migration: Optional session_manager with deprecation warning fallback
-        if session_manager is None:
-            warnings.warn(
-                "SessionCoordinator: session_manager parameter will become required. "
-                "Pass session_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import SessionManagerProtocol
-            session_manager = inject(SessionManagerProtocol)
 
         self.main_window = main_window
         self.extraction_panel = extraction_panel

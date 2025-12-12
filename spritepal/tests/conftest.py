@@ -36,8 +36,6 @@ instantiations by 68.6% based on usage analysis:
 Class-scoped and module-scoped fixtures include automatic state reset
 mechanisms to ensure test isolation:
 
-- `reset_main_window_state`: Resets main window state between tests
-- `reset_controller_state`: Resets controller state between tests
 - `reset_class_state`: Resets all class-scoped mock fixtures (requires @pytest.mark.usefixtures)
 
 ## Scope Selection Guidelines
@@ -403,48 +401,6 @@ def guard_qpixmap_threading(request: FixtureRequest, monkeypatch: pytest.MonkeyP
 # ============================================================================
 # Class-scoped State Reset Fixtures
 # ============================================================================
-
-@pytest.fixture(scope="class")
-def reset_main_window_state(main_window: MockMainWindowProtocol) -> Generator[None, None, None]:
-    """Reset main window state between tests within the same class.
-
-    This fixture ensures state isolation when using class-scoped main_window.
-    Must be explicitly requested by test classes that need it.
-    """
-    # Reset state before test
-    if hasattr(main_window, '_output_path'):
-        main_window._output_path = ""
-    if hasattr(main_window, '_extracted_files'):
-        main_window._extracted_files = []
-
-    # Reset all mock call histories
-    for attr_name in dir(main_window):
-        attr = getattr(main_window, attr_name, None)
-        if isinstance(attr, Mock):
-            attr.reset_mock()
-
-    yield
-
-    # Additional cleanup after test if needed
-    pass
-
-@pytest.fixture(scope="class")
-def reset_controller_state(controller: Mock) -> Generator[None, None, None]:
-    """Reset controller state between tests within the same class.
-
-    This fixture ensures state isolation when using class-scoped controller.
-    Must be explicitly requested by test classes that need it.
-    """
-    # Reset controller state if it's a real controller
-    if hasattr(controller, 'reset_state'):
-        controller.reset_state()
-    elif isinstance(controller, Mock):
-        controller.reset_mock()
-
-    yield
-
-    # Additional cleanup after test if needed
-    pass
 
 @pytest.fixture(scope="function")
 def reset_class_state(

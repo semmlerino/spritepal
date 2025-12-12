@@ -24,8 +24,8 @@ logger = get_logger("monitoring")
 def get_monitoring_manager():
     """Get the monitoring manager instance."""
     try:
-        from core.managers.registry import get_registry
-        registry = get_registry()
+        from core.managers.registry import ManagerRegistry
+        registry = ManagerRegistry()
         # Try to get monitoring manager if it exists
         managers = registry.get_all_managers()
         return managers.get("monitoring")

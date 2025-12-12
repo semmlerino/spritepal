@@ -44,11 +44,11 @@ class HeadlessQtTestingFramework:
     def __init__(self, qt_app: Any | None = None):
         raise HeadlessModeError("QtTestingFramework")
 
-class HeadlessRealManagerFixtureFactory:
-    """Fallback for RealManagerFixtureFactory in headless environments."""
+class HeadlessRealComponentFactory:
+    """Fallback for RealComponentFactory in headless environments."""
 
     def __init__(self, qt_parent: Any = None, manager_factory: Any = None):
-        raise HeadlessModeError("RealManagerFixtureFactory")
+        raise HeadlessModeError("RealComponentFactory")
 
 # Fallback functions
 def headless_qt_test_context(force_offscreen: bool = True):

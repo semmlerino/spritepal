@@ -38,7 +38,7 @@ import pytest
 
 from core.managers.base_manager import BaseManager
 from core.managers.registry import ManagerRegistry
-from ui.common.worker_manager import WorkerManager
+from ui.common import WorkerManager
 
 
 class TestWorkerCancellationStability:
@@ -148,9 +148,14 @@ class TestWorkerCancellationStability:
 
             # Verify safe patterns are used in methods that should have them
             if "cleanup" in name.lower() or "cancel" in name.lower():
-                assert ("requestInterruption" in actual_code or
-                       "cancel()" in actual_code or
-                       "quit()" in actual_code), f"Method {name} should use safe cancellation patterns"
+                # Either direct use of patterns OR delegation to cleanup_worker is valid
+                has_safe_pattern = (
+                    "requestInterruption" in actual_code or
+                    "cancel()" in actual_code or
+                    "quit()" in actual_code or
+                    "cleanup_worker" in actual_code  # Delegates to safe cleanup method
+                )
+                assert has_safe_pattern, f"Method {name} should use safe cancellation patterns"
 
     def test_worker_manager_timeout_handling(self):
         """Test WorkerManager timeout handling logic."""

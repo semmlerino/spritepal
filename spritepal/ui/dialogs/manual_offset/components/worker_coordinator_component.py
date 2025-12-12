@@ -101,11 +101,11 @@ class WorkerCoordinatorComponent:
         with QMutexLocker(self._mutex):
             # Set up preview coordinator with ROM data
             try:
+                from core.di_container import inject
+                from core.protocols.manager_protocols import ROMCacheProtocol
                 from ui.common.simple_preview_coordinator import (
                     SimplePreviewCoordinator,
                 )
-                from core.di_container import inject
-                from core.protocols.manager_protocols import ROMCacheProtocol
 
                 if not self._preview_coordinator:
                     self._preview_coordinator = SimplePreviewCoordinator(

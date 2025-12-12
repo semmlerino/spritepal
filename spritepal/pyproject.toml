@@ -91,6 +91,14 @@ select = [
     "FBT",    # flake8-boolean-trap
     "ICN",    # flake8-import-conventions
     "PYI",    # flake8-pyi (type stub rules)
+    "T20",    # flake8-print (catch debug prints)
+    "DTZ",    # flake8-datetimez (timezone awareness)
+    "FA",     # flake8-future-annotations
+    "SLF",    # flake8-self (private member access)
+    "TD",     # flake8-todos (track TODOs)
+    "FIX",    # flake8-fixme (track FIXMEs)
+    "Q",      # flake8-quotes (quote consistency)
+    "COM",    # flake8-commas (trailing commas)
 ]
 
 ignore = [
@@ -203,6 +211,19 @@ ignore = [
     "A001",     # shadowing-builtin-variable
     "A002",     # shadowing-builtin
     "TRY004",   # type-check-without-type-error
+
+    # New rule relaxations
+    "SLF001",   # private-member-access (Qt often requires this)
+    "TD002",    # missing-todo-author
+    "TD003",    # missing-todo-link
+    "FIX002",   # line-contains-todo (we track TODOs, don't error)
+    "COM812",   # missing-trailing-comma (conflicts with formatter)
+    "Q000",     # bad-quotes-inline-string (handled by formatter)
+    "Q001",     # bad-quotes-multiline-string
+    "Q002",     # bad-quotes-docstring
+    "FA100",    # future-rewritable-type-annotation (gradual migration)
+    "DTZ005",   # datetime.now() without tz (local timestamps are fine)
+    "DTZ007",   # strptime without %z (local parsing is fine)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -214,14 +235,36 @@ ignore = [
     "B018",     # useless expression
     "RUF",      # ruff rules
     "F401",     # unused imports (fixtures)
+    "F821",     # undefined names (skipped test files may have stale refs)
     "ARG",      # unused arguments (fixtures)
     "PT",       # pytest style
     "ERA001",   # commented code
     "N",        # naming
+    "TD",       # todos (test code often has TODOs)
+    "FIX",      # fixmes
+    "T20",      # print statements (debug in tests is fine)
 ]
+"benchmarks/**/*.py" = [
+    "T20",      # print statements (benchmark output)
+    "TD",       # todos
+    "FIX",      # fixmes
+]
+"examples/**/*.py" = [
+    "T20",      # print statements (example output)
+    "TD",       # todos
+    "FIX",      # fixmes
+]
+"docs/**/*.py" = [
+    "T20",      # print statements (documentation examples)
+    "TD",       # todos
+    "FIX",      # fixmes
+]
+"core/console_error_handler.py" = ["T20"]  # Console handler uses print by design
+"core/di_container.py" = ["T20"]  # Example code in __main__ block
+"utils/*error*handler*.py" = ["T20"]  # Error handlers print to stderr
 "**/conftest.py" = ["ARG", "PT", "F401"]
-"mesen2_integration/*.py" = ["E722", "B904", "T201", "S"]
-"scripts/*.py" = ["E722", "B904", "F401", "T201", "INP001", "RUF"]
+"mesen2_integration/*.py" = ["E722", "B904", "T201", "T20", "S", "TD", "FIX"]
+"scripts/*.py" = ["E722", "B904", "F401", "T201", "T20", "INP001", "RUF", "TD", "FIX"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "ui", "utils"]
@@ -304,6 +347,11 @@ reportImplicitOverride = true
 reportPropertyTypeMismatch = true
 reportTypeCommentUsage = true
 
+# Additional strict checks (enabled after cleanup)
+reportUnnecessaryTypeIgnoreComment = true  # Catch stale type: ignore comments
+reportDeprecated = true  # Catch deprecated API usage
+reportInvalidTypeVarUse = true  # Catch TypeVar misuse
+
 # Qt-specific relaxations
 reportMissingTypeStubs = false
 reportUnknownParameterType = false
@@ -311,7 +359,6 @@ reportUnknownArgumentType = false
 reportUnknownLambdaType = false
 reportUnknownVariableType = false
 reportUnknownMemberType = false
-reportUnnecessaryTypeIgnoreComment = false
 reportUnusedCallResult = false
 reportAny = false
 reportExplicitAny = false

@@ -4,12 +4,11 @@ Allows users to configure sprite injection parameters
 """
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
 
 # InjectionManager accessed via DI: inject(InjectionManagerProtocol)
 from core.sprite_validator import SpriteValidator
-from ui.common.worker_manager import WorkerManager
+from ui.common import WorkerManager
 from ui.components import (
     FileSelector,
     FormRow,
@@ -55,20 +54,9 @@ class InjectionDialog(TabbedDialog):
         sprite_path: str = "",
         metadata_path: str = "",
         input_vram: str = "",
-        injection_manager: InjectionManager | None = None,
+        *,
+        injection_manager: InjectionManager,
     ):
-        # B.3 DI Migration: Optional injection_manager with deprecation warning fallback
-        if injection_manager is None:
-            warnings.warn(
-                "InjectionDialog: injection_manager parameter will become required. "
-                "Pass injection_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import InjectionManagerProtocol
-            injection_manager = inject(InjectionManagerProtocol)
-
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path = sprite_path
         self.metadata_path = metadata_path
@@ -1117,3 +1105,13 @@ class InjectionDialog(TabbedDialog):
                     self.preview_widget.info_label.setText(f"{current_info} | {size_info}")
                 else:
                     self.preview_widget.info_label.setText(size_info)
+
+    @override
+    def closeEvent(self, event: QCloseEvent | None) -> None:
+        """Handle dialog close with worker cleanup."""
+        if self._rom_info_loader is not None and self._rom_info_loader.isRunning():
+            logger.debug("Stopping ROM info loader on dialog close")
+            WorkerManager.cleanup_worker(self._rom_info_loader, timeout=3000)
+            self._rom_info_loader = None
+        if event:
+            super().closeEvent(event)

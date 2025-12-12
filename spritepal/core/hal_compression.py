@@ -36,7 +36,7 @@ try:
     from PySide6.QtWidgets import QApplication
     QT_AVAILABLE = True
 except ImportError:
-    QApplication = None  # type: ignore[misc]
+    QApplication = None
     QT_AVAILABLE = False
 
 from utils.constants import (

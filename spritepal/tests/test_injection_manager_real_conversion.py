@@ -14,11 +14,11 @@ from unittest.mock import Mock, patch
 import pytest
 
 from core.controller import ExtractionController
+from core.di_container import inject
 from core.managers import (
     cleanup_managers,
     initialize_managers,
 )
-from core.di_container import inject
 from core.protocols.manager_protocols import InjectionManagerProtocol
 from tests.fixtures.test_main_window_helper_simple import MainWindowHelperSimple
 from tests.infrastructure import (

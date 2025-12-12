@@ -7,7 +7,6 @@ to the ExtractionManager while providing consistent threading interfaces.
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING, TypedDict, cast
 
 try:
@@ -66,19 +65,9 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
     def __init__(
         self,
         params: VRAMExtractionParams,
-        extraction_manager: ExtractionManager | None = None,
+        extraction_manager: ExtractionManager,
         parent: QObject | None = None,
     ) -> None:
-        if extraction_manager is None:
-            warnings.warn(
-                "VRAMExtractionWorker: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
-            extraction_manager = cast(ExtractionManager, inject(ExtractionManagerProtocol))
         super().__init__(manager=extraction_manager, parent=parent)
         self.params = params
         self._operation_name = "VRAMExtractionWorker"
@@ -151,19 +140,9 @@ class ROMExtractionWorker(ExtractionWorkerBase):
     def __init__(
         self,
         params: ROMExtractionParams,
-        extraction_manager: ExtractionManager | None = None,
+        extraction_manager: ExtractionManager,
         parent: QObject | None = None,
     ) -> None:
-        if extraction_manager is None:
-            warnings.warn(
-                "ROMExtractionWorker: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
-            extraction_manager = cast(ExtractionManager, inject(ExtractionManagerProtocol))
         super().__init__(manager=extraction_manager, parent=parent)
         self.params = params
         self._operation_name = "ROMExtractionWorker"

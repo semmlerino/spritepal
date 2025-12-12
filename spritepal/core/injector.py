@@ -164,7 +164,7 @@ class SpriteInjector:
             else:
                 # Convert to indexed mode
                 logger.warning(f"Converting {img.mode} to indexed mode - may lose color information")
-                converted = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=16)  # type: ignore[attr-defined]
+                converted = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=16)
                 # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
                 pixels = list(cast(Any, converted.getdata()))
 

@@ -214,7 +214,6 @@ class SmartPreviewCoordinator(QObject):
             offset: ROM offset for preview
             priority: Request priority (higher = more important)
         """
-        logger.debug("[DEBUG] ========== REQUEST_PREVIEW START ==========")
         logger.debug(f"[DEBUG] Coordinator.request_preview called: offset=0x{offset:06X}, priority={priority}")
         start_time = time.time()
 
@@ -224,7 +223,7 @@ class SmartPreviewCoordinator(QObject):
             logger.debug(f"[DEBUG] Request counter: {self._request_counter}")
 
         # Try dual-tier cache lookup first
-        logger.debug("[DEBUG] Attempting cache lookup...")
+        logger.debug(" Attempting cache lookup...")
         cache_hit = False
         try:
             cache_hit = self._try_show_cached_preview_dual_tier()
@@ -242,22 +241,20 @@ class SmartPreviewCoordinator(QObject):
             if len(response_times) > 100:
                 response_times.pop(0)
             logger.debug(f"[DEBUG] Cache hit, returning early (response time: {response_time:.2f}ms)")
-            logger.debug("[DEBUG] ========== REQUEST_PREVIEW END (CACHE HIT) ==========")
             return
 
         # Immediate UI update for smooth feedback
-        logger.debug("[DEBUG] Cache miss, scheduling UI update...")
+        logger.debug(" Cache miss, scheduling UI update...")
         self._schedule_ui_update()
 
         # Schedule preview based on current drag state
         if self._drag_state == DragState.DRAGGING:
-            logger.debug("[DEBUG] Drag state is DRAGGING, scheduling drag preview")
+            logger.debug(" Drag state is DRAGGING, scheduling drag preview")
             self._schedule_drag_preview()
         else:
             logger.debug(f"[DEBUG] Drag state is {self._drag_state}, scheduling release preview")
             self._schedule_release_preview()
 
-        logger.debug("[DEBUG] ========== REQUEST_PREVIEW END (SCHEDULED) ==========")
 
     def request_manual_preview(self, offset: int) -> None:
         """
@@ -368,16 +365,16 @@ class SmartPreviewCoordinator(QObject):
         Returns:
             bool: True if cached preview was shown
         """
-        logger.debug("[DEBUG] _try_show_cached_preview_dual_tier called")
+        logger.debug(" _try_show_cached_preview_dual_tier called")
         if not self._rom_data_provider:
-            logger.debug("[DEBUG] No ROM data provider, returning False")
+            logger.debug(" No ROM data provider, returning False")
             return False
 
         try:
-            logger.debug("[DEBUG] Getting ROM data from provider...")
+            logger.debug(" Getting ROM data from provider...")
             provider_result = self._rom_data_provider()
             if provider_result is None:
-                logger.debug("[DEBUG] ROM data provider returned None")
+                logger.debug(" ROM data provider returned None")
                 return False
             rom_path, _, _ = provider_result
             logger.debug(f"[DEBUG] Got ROM path: {rom_path}")
@@ -392,7 +389,7 @@ class SmartPreviewCoordinator(QObject):
             logger.debug(f"[TRACE] Checking memory cache with key: {cache_key}")
             cached_data = self._cache.get(cache_key)
             if cached_data:
-                logger.debug("[TRACE] Found data in memory cache")
+                logger.debug(" Found data in memory cache")
                 tile_data, width, height, sprite_name = cached_data
                 logger.debug(f"[TRACE] Unpacked cache data: {len(tile_data) if tile_data else 0} bytes, {width}x{height}, name={sprite_name}")
 
@@ -405,18 +402,18 @@ class SmartPreviewCoordinator(QObject):
 
                     if non_zero_count > 0:  # Has some non-zero data
                         logger.debug(f"[TRACE] Valid cache hit: {len(tile_data)} bytes, {non_zero_count}/{sample_size} non-zero")
-                        logger.debug("[TRACE] About to emit preview_cached signal...")
+                        logger.debug(" About to emit preview_cached signal...")
                         self.preview_cached.emit(tile_data, width, height, sprite_name)
                         mem_hits = self._cache_stats["memory_hits"]
                         assert isinstance(mem_hits, int)  # Type narrowing
                         self._cache_stats["memory_hits"] = mem_hits + 1
                         logger.debug(f"[SIGNAL_FLOW] Memory cache hit signal emitted for 0x{offset:06X}")
                         return True
-                    logger.debug("[TRACE] Cache hit but data is all zeros - ignoring and regenerating")
+                    logger.debug(" Cache hit but data is all zeros - ignoring and regenerating")
                     # Remove invalid entry from cache
                     self._cache.remove(cache_key)
                 else:
-                    logger.debug("[TRACE] Cache hit but data is empty - ignoring")
+                    logger.debug(" Cache hit but data is empty - ignoring")
                     # Remove invalid entry from cache
                     self._cache.remove(cache_key)
 
@@ -425,7 +422,7 @@ class SmartPreviewCoordinator(QObject):
             self._cache_stats["memory_misses"] = mem_misses + 1
 
             # Tier 2: Check ROM cache if available
-            logger.debug("[TRACE] Memory cache miss, checking ROM cache...")
+            logger.debug(" Memory cache miss, checking ROM cache...")
             if self._rom_cache and self._rom_cache.cache_enabled:
                 rom_cache_data = self._check_rom_cache(rom_path, offset)
                 if rom_cache_data:
@@ -446,9 +443,9 @@ class SmartPreviewCoordinator(QObject):
                             self._cache_stats["rom_hits"] = rom_hits + 1
                             logger.debug(f"[SIGNAL_FLOW] ROM cache hit signal emitted for 0x{offset:06X}")
                             return True
-                        logger.debug("[TRACE] ROM cache hit but data is all zeros - ignoring")
+                        logger.debug(" ROM cache hit but data is all zeros - ignoring")
                     else:
-                        logger.debug("[TRACE] ROM cache hit but data is empty - ignoring")
+                        logger.debug(" ROM cache hit but data is empty - ignoring")
 
             if self._rom_cache and self._rom_cache.cache_enabled:
                 rom_misses = self._cache_stats["rom_misses"]
@@ -654,10 +651,10 @@ class SmartPreviewCoordinator(QObject):
 
             # Check if ROM data is actually valid before proceeding
             if not rom_path or not rom_path.strip():
-                logger.debug("[DEBUG] ROM path not available, skipping preview request")
+                logger.debug(" ROM path not available, skipping preview request")
                 return
             if not extractor:
-                logger.debug("[DEBUG] ROM extractor not available, skipping preview request")
+                logger.debug(" ROM extractor not available, skipping preview request")
                 return
             with QMutexLocker(self._mutex):
                 offset = self._current_offset
@@ -673,7 +670,7 @@ class SmartPreviewCoordinator(QObject):
             )
 
             # Submit to worker pool with ROM cache support
-            logger.debug("[DEBUG] Submitting request to worker pool")
+            logger.debug(" Submitting request to worker pool")
             self._worker_pool.submit_request(request, extractor, rom_cache)
 
         except Exception as e:
@@ -719,12 +716,12 @@ class SmartPreviewCoordinator(QObject):
                 except Exception as e:
                     logger.warning(f"[DEBUG] Error caching preview: {e}")
             else:
-                logger.debug("[TRACE] Not caching preview - data appears to be all zeros (black)")
+                logger.debug(" Not caching preview - data appears to be all zeros (black)")
         else:
-            logger.debug("[TRACE] Not caching preview - data is empty or invalid")
+            logger.debug(" Not caching preview - data is empty or invalid")
 
         # Emit preview ready with enhanced debugging
-        logger.debug("[SIGNAL_FLOW] About to emit preview_ready signal")
+        logger.debug(" About to emit preview_ready signal")
         logger.debug(f"[SIGNAL_FLOW] Signal data: request_id={request_id}, data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}")
         # Note: PySide6 signals don't have receivers() method - removed debug line
 

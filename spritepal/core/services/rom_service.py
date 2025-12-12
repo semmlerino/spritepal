@@ -36,6 +36,7 @@ from utils.constants import (
 )
 from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
+
 # ROMCache accessed via DI: inject(ROMCacheProtocol)
 
 logger = get_logger(__name__)
@@ -86,8 +87,12 @@ class ROMService(QObject):
         self._logger.info("ROMService initialized")
 
     def cleanup(self) -> None:
-        """Cleanup service resources."""
-        pass  # Currently no resources to cleanup
+        """Cleanup service resources.
+
+        Note: Currently no persistent resources to cleanup.
+        ROM file handles are managed via context managers in MemoryMappedROMReader.
+        """
+        pass
 
     def get_rom_extractor(self) -> ROMExtractor:
         """

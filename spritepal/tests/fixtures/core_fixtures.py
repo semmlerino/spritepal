@@ -65,17 +65,25 @@ except ImportError:
 
 @dataclass
 class SessionState:
-    """Container for session-scoped state to avoid global mutable variables.
+    """Container for session-scoped test state.
 
-    This replaces the previous global _SESSION_SETTINGS_PATH variable,
-    preventing test pollution from mutable global state.
+    IMPORTANT: Single-writer semantics.
+    - WRITE: Only `session_managers` fixture should mutate this state
+    - READ: Other fixtures may read `is_initialized` and `settings_path`
+
+    This pattern prevents test pollution from bare global variables while
+    maintaining a single source of truth for session initialization state.
+
+    If you need to check whether session managers are active, read `is_initialized`.
+    Never set `is_initialized = True` outside of `session_managers` fixture.
     """
     settings_path: Path | None = None
     temp_dir: Path | None = None
     is_initialized: bool = False
 
 
-# Session state container (instantiated once, state mutated only by session fixture)
+# Session state container - SINGLE WRITER: only session_managers fixture modifies this
+# Other fixtures may read _session_state.is_initialized but should NEVER write to it
 _session_state = SessionState()
 
 
@@ -223,6 +231,13 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
 
     # Clean up managers after test
     cleanup_managers()
+
+    # Restore DI container configuration if session_managers was used earlier
+    # This prevents isolated_managers from breaking other tests that depend
+    # on session_managers having the DI container properly configured
+    if _session_state.is_initialized:
+        from core.di_container import configure_container
+        configure_container()
 
     # Process events to ensure cleanup completes
     if app and not IS_HEADLESS:
@@ -445,6 +460,10 @@ def setup_managers(request: FixtureRequest, tmp_path: Path) -> Iterator[None]:
         # Safe cleanup with error handling to prevent segfaults
         try:
             cleanup_managers()
+            # Restore DI container if session_managers was used
+            if _session_state.is_initialized:
+                from core.di_container import configure_container
+                configure_container()
         except (RuntimeError, AttributeError) as e:
             # Qt objects may already be deleted, log but don't crash
             import logging
@@ -497,6 +516,11 @@ def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     initialize_managers("TestApp_Class", settings_path=settings_path)
     yield
     cleanup_managers()
+
+    # Restore DI container if session_managers was used
+    if _session_state.is_initialized:
+        from core.di_container import configure_container
+        configure_container()
 
     # Process events to ensure cleanup completes
     if app and not IS_HEADLESS:

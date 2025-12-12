@@ -9,10 +9,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.controller import ExtractionController
-from core.managers import cleanup_managers, initialize_managers
-from utils.settings_manager import SettingsManager
 from core.di_container import inject
+from core.managers import cleanup_managers, initialize_managers
 from core.protocols.manager_protocols import SettingsManagerProtocol
+from utils.settings_manager import SettingsManager
 
 
 def get_settings_manager():

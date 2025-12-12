@@ -42,7 +42,7 @@ try:
     QObject = QtQObject  # type: ignore[misc]
     Signal = QtPyqtSignal  # type: ignore[misc]
     QMessageBox = QtQMessageBox  # type: ignore[misc]
-    QWidget = QtQWidget  # type: ignore[misc]
+    QWidget = QtQWidget
 except ImportError:
     # Fallback for environments without Qt
     QT_AVAILABLE = False
@@ -157,7 +157,7 @@ if TYPE_CHECKING:
     try:
         from PySide6.QtWidgets import QWidget  # type: ignore[import-not-found]
     except ImportError:
-        QWidget = None  # type: ignore[misc,assignment]
+        QWidget = None
 
 class IErrorDisplay(Protocol):
     """Protocol for error display handlers to break circular dependency"""

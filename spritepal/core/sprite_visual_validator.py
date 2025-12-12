@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     import cv2  # type: ignore[import-not-found]
 else:
     try:
-        import cv2  # type: ignore[import-not-found]
+        import cv2
     except ImportError:
         cv2 = None
 

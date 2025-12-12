@@ -166,3 +166,73 @@ class MyDialog(DialogBase):
 ```
 
 This prevents the common bug where instance variables declared after `_setup_ui()` overwrite already-created widgets.
+
+### Singleton Cleanup Order
+
+At application shutdown, singletons must be cleaned up in the correct order to avoid dangling references and segfaults:
+
+```
+1. UI Components (MainWindow, dialogs)
+   ↓
+2. Worker Pools (HALProcessPool, preview workers)
+   ↓
+3. ManagerRegistry.cleanup_managers()
+   ↓
+4. DI Container (reset_container())
+```
+
+#### Implementation
+
+The cleanup is orchestrated by `QApplication.aboutToQuit`:
+
+```python
+# In main.py or application entry point
+app = QApplication(sys.argv)
+
+def cleanup():
+    """Clean up all resources in correct order."""
+    # 1. Close UI (done automatically by Qt)
+
+    # 2. Stop worker pools
+    from core.services.worker_lifecycle import WorkerLifecycleService
+    WorkerLifecycleService.cleanup_all()
+
+    # 3. Clean up managers
+    from core.managers import cleanup_managers
+    cleanup_managers()
+
+    # 4. Reset DI container
+    from core.di_container import reset_container
+    reset_container()
+
+app.aboutToQuit.connect(cleanup)
+```
+
+#### Why Order Matters
+
+1. **UI First**: Qt widgets may hold references to managers; closing UI first prevents access to cleaned-up managers.
+2. **Workers Second**: Worker threads may reference managers; stopping workers prevents race conditions.
+3. **Managers Third**: Managers may hold resources (files, caches); cleaning them releases resources.
+4. **DI Container Last**: Container holds singleton references; resetting it ensures no dangling protocol implementations.
+
+### Dependency Injection Pattern
+
+SpritePal uses constructor injection with the `inject()` function:
+
+```python
+# Getting manager instances
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
+
+extraction_manager = inject(ExtractionManagerProtocol)
+
+# In class constructors (required parameters)
+class MyWorker:
+    def __init__(self, params: dict, extraction_manager: ExtractionManager):
+        self.manager = extraction_manager
+```
+
+**Do NOT use:**
+- Module-level convenience functions (removed)
+- Direct `ManagerRegistry()` access in production code (use `inject()`)
+- Optional manager parameters (now required)

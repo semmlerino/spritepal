@@ -5,12 +5,11 @@ ROM extraction panel for SpritePal
 from __future__ import annotations
 
 import threading
-import warnings
 from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
@@ -54,6 +53,7 @@ from utils.constants import (
     SETTINGS_NS_ROM_INJECTION,
 )
 from utils.logging_config import get_logger
+
 # SettingsManager accessed via DI: inject(SettingsManagerProtocol)
 from utils.thread_safe_singleton import QtThreadSafeSingleton
 
@@ -93,6 +93,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
     _instance: UnifiedManualOffsetDialog | None = None
     _creator_panel: ROMExtractionPanel | None = None
     _destroyed: bool = False  # Track if the dialog has been destroyed
+    _signals_connected: bool = False  # Track if signals are connected
     _lock = threading.Lock()
 
     @classmethod
@@ -104,90 +105,84 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
 
         logger.debug("Creating new ManualOffsetDialog singleton instance")
 
-        # Reset destroyed flag when creating new instance
+        # Reset flags when creating new instance
         cls._destroyed = False
+        cls._signals_connected = False
 
         # Create new instance with None as parent to avoid widget hierarchy contamination
-        try:
-            logger.debug("Creating UnifiedManualOffsetDialog instance...")
-            instance = UnifiedManualOffsetDialog(None)
-            cls._creator_panel = creator_panel
+        instance = UnifiedManualOffsetDialog(None)
+        cls._creator_panel = creator_panel
 
-            logger.debug(f"New dialog created with ID: {getattr(instance, '_debug_id', 'Unknown')}")
-
-            # Test if the dialog object is still valid
-            logger.debug(f"DEBUGGING: Dialog object type: {type(instance)}")
-            logger.debug(f"DEBUGGING: Dialog isVisible(): {instance.isVisible()}")
-            logger.debug(f"DEBUGGING: Dialog windowTitle(): {instance.windowTitle()}")
-
-            # Try to access the finished signal to see if it exists
-            logger.debug("DEBUGGING: About to test signal access...")
-            try:
-                signal_obj = instance.finished
-                logger.debug(f"DEBUGGING: Successfully accessed finished signal: {signal_obj}")
-            except Exception as e:
-                logger.error(f"DEBUGGING: Cannot access finished signal: {e}")
-
-            # Defer signal connection until dialog is shown to avoid Qt race condition
-            logger.debug("Deferring signal connection until dialog is shown...")
-
-            def _connect_signals_when_shown():
-                """Connect signals after dialog is fully shown and ready."""
-                try:
-                    logger.debug("Connecting Qt dialog signals via QtDialogSignalManager...")
-                    # Connect to QtDialogSignalManager instead of corrupted inherited signals
-                    qt_signal_manager = instance.get_component("qt_dialog_signals")
-                    if qt_signal_manager:
-                        qt_signal_manager.finished.connect(cls._on_dialog_closed)
-                        qt_signal_manager.rejected.connect(cls._on_dialog_closed)
-                        qt_signal_manager.destroyed.connect(cls._on_dialog_destroyed)
-                        logger.debug("All Qt dialog signals connected successfully via QtDialogSignalManager")
-                    else:
-                        logger.error("QtDialogSignalManager component not found - cannot connect Qt dialog signals")
-                except Exception as e:
-                    logger.error(f"Failed to connect signals after show: {e}")
-
-            # Store the connection function to call after show
-            instance._deferred_signal_connection = _connect_signals_when_shown
-
-        except Exception as e:
-            logger.error(f"Error during dialog creation or signal connection: {e}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            raise
+        # Connect signals immediately (not deferred) to avoid race conditions
+        cls._connect_signals(instance)
 
         return instance
 
     @classmethod
+    def _connect_signals(cls, instance: UnifiedManualOffsetDialog) -> None:
+        """Connect cleanup signals to the dialog instance."""
+        if cls._signals_connected:
+            return
+
+        try:
+            # Try component-based signals first (ComposedDialog pattern)
+            if hasattr(instance, 'get_component'):
+                qt_signal_manager = instance.get_component("qt_dialog_signals")
+                if qt_signal_manager:
+                    qt_signal_manager.finished.connect(
+                        cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
+                    )
+                    qt_signal_manager.rejected.connect(
+                        cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
+                    )
+                    qt_signal_manager.destroyed.connect(
+                        cls._on_dialog_destroyed, Qt.ConnectionType.UniqueConnection
+                    )
+                    cls._signals_connected = True
+                    logger.debug("Signals connected via QtDialogSignalManager")
+                    return
+
+            # Fall back to direct dialog signals (legacy DialogBase)
+            instance.finished.connect(
+                cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
+            )
+            instance.rejected.connect(
+                cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
+            )
+            instance.destroyed.connect(
+                cls._on_dialog_destroyed, Qt.ConnectionType.UniqueConnection
+            )
+            cls._signals_connected = True
+            logger.debug("Signals connected directly to dialog")
+
+        except Exception as e:
+            logger.warning(f"Failed to connect cleanup signals: {e}")
+
+    @classmethod
     def get_dialog(cls, creator_panel: ROMExtractionPanel) -> UnifiedManualOffsetDialog:
         """Get or create the singleton dialog instance (thread-safe)."""
-        logger.debug("ManualOffsetDialogSingleton.get_dialog called")
-        logger.debug(f"Current instance exists: {cls._instance is not None}")
-
         # Get instance using thread-safe pattern
         instance = cls.get(creator_panel)
 
         # Check if the dialog was marked as destroyed
         if cls._destroyed:
-            logger.debug("Dialog was destroyed, creating new instance")
             cls.reset()
             instance = cls.get(creator_panel)
 
         # Check if existing instance is still valid (only on main thread)
         if cls.safe_qt_call(lambda: instance.isVisible()):
-            logger.debug(f"Reusing existing ManualOffsetDialog singleton instance (ID: {getattr(instance, '_debug_id', 'Unknown')})")
             return instance
+
         # Dialog exists but is not visible - check if it's still valid
         try:
             cls._ensure_main_thread()
-            # Test if the dialog is still valid by accessing windowTitle (this will throw RuntimeError if deleted)
+            # Test if the dialog is still valid by accessing windowTitle
+            # This will throw RuntimeError if deleted by Qt
             _ = instance.windowTitle()
-            logger.debug("[DEBUG] Existing dialog not visible, but still valid")
         except RuntimeError:
             # Dialog has been destroyed by Qt but our reference is stale
             logger.debug("Stale dialog reference detected, cleaning up")
             cls.reset()
-            # Get new instance
             instance = cls.get(creator_panel)
 
         return instance
@@ -219,6 +214,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
     def reset(cls):
         """Reset the singleton instance and all associated state."""
         cls._destroyed = False
+        cls._signals_connected = False
         super().reset()
 
     @classmethod
@@ -265,21 +261,10 @@ class ROMExtractionPanel(QWidget):
     def __init__(
         self,
         parent: Any | None = None,
-        extraction_manager: ExtractionManager | None = None,
+        *,
+        extraction_manager: ExtractionManager,
     ):
         super().__init__(parent)
-
-        # B.3 DI Migration: Optional extraction_manager with deprecation warning fallback
-        if extraction_manager is None:
-            warnings.warn(
-                "ROMExtractionPanel: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
-            extraction_manager = inject(ExtractionManagerProtocol)
 
         self.rom_path = ""
         self.sprite_locations = {}
@@ -290,8 +275,9 @@ class ROMExtractionPanel(QWidget):
         self._manual_offset_mode = True  # Default to manual offset mode
 
         # State manager for coordinating operations (ApplicationStateManager)
-        from core.managers import get_registry
-        self.state_manager: ApplicationStateManager = get_registry().get_application_state_manager()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        self.state_manager: ApplicationStateManager = inject(ApplicationStateManagerProtocol)  # type: ignore[assignment]
         self.state_manager.workflow_state_changed.connect(self._on_state_changed)
 
         # Worker references to track and clean up
@@ -1723,7 +1709,9 @@ class ROMExtractionPanel(QWidget):
         worker_attrs = [
             'search_worker',
             'scan_worker',
-            'similarity_indexing_worker'
+            'similarity_indexing_worker',
+            '_header_loader',
+            '_sprite_location_loader',
         ]
 
         # Clean up each worker

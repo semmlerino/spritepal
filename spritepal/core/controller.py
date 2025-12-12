@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypedDict, cast
 
@@ -138,73 +137,18 @@ class ExtractionController(QObject):
     def __init__(
         self,
         main_window: MainWindowProtocol,
-        extraction_manager: ExtractionManagerProtocol | None = None,
-        session_manager: SessionManagerProtocol | None = None,
-        injection_manager: InjectionManagerProtocol | None = None,
-        settings_manager: SettingsManagerProtocol | None = None,
-        dialog_factory: DialogFactoryProtocol | None = None,
+        extraction_manager: ExtractionManagerProtocol,
+        session_manager: SessionManagerProtocol,
+        injection_manager: InjectionManagerProtocol,
+        settings_manager: SettingsManagerProtocol,
+        dialog_factory: DialogFactoryProtocol,
     ) -> None:
         super().__init__()
         self.main_window: MainWindowProtocol = main_window
-
-        # B.4 DI Migration: Optional managers with deprecation warning fallbacks
-        if extraction_manager is None:
-            warnings.warn(
-                "ExtractionController: extraction_manager parameter will become required. "
-                "Pass extraction_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
-            extraction_manager = cast(ExtractionManager, inject(ExtractionManagerProtocol))
         self.extraction_manager = extraction_manager
-
-        if session_manager is None:
-            warnings.warn(
-                "ExtractionController: session_manager parameter will become required. "
-                "Pass session_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import SessionManagerProtocol
-            session_manager = inject(SessionManagerProtocol)
         self.session_manager = session_manager
-
-        if injection_manager is None:
-            warnings.warn(
-                "ExtractionController: injection_manager parameter will become required. "
-                "Pass injection_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import InjectionManagerProtocol
-            injection_manager = cast(InjectionManager, inject(InjectionManagerProtocol))
         self.injection_manager = injection_manager
-
-        if settings_manager is None:
-            warnings.warn(
-                "ExtractionController: settings_manager parameter will become required. "
-                "Pass settings_manager explicitly instead of relying on DI container.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            settings_manager = inject(SettingsManagerProtocol)
         self.settings_manager = settings_manager
-
-        if dialog_factory is None:
-            warnings.warn(
-                "ExtractionController: dialog_factory parameter will become required. "
-                "Pass dialog_factory explicitly instead of relying on get_controller_dialog_factory().",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from ui.dialogs.controller_dialog_factory import get_controller_dialog_factory
-            dialog_factory = get_controller_dialog_factory()
         self.dialog_factory = dialog_factory
 
         # Workers still managed locally (thin wrappers)

@@ -306,8 +306,8 @@ class FullscreenSpriteViewer(QWidget):
         """
         # Try to get from parent gallery if available
         if self.parent():
-            gallery_window = self.parent()  # type: ignore[assignment]
-            if (hasattr(gallery_window, "gallery_widget") and  # type: ignore[arg-type]
+            gallery_window = self.parent()
+            if (hasattr(gallery_window, "gallery_widget") and
                     gallery_window.gallery_widget):  # type: ignore[attr-defined]
                 gallery = gallery_window.gallery_widget  # type: ignore[attr-defined]
 

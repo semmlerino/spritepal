@@ -10,10 +10,10 @@ from unittest.mock import patch
 
 import pytest
 
-from core.rom_injector import SpritePointer
-from utils.rom_cache import ROMCache
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol
+from core.rom_injector import SpritePointer
+from utils.rom_cache import ROMCache
 
 
 def get_rom_cache():

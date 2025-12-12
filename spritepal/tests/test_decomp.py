@@ -18,8 +18,8 @@ import sys
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from core.managers import initialize_managers
 from core.di_container import inject
+from core.managers import initialize_managers
 from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 

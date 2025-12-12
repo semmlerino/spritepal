@@ -56,7 +56,7 @@ from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
     QtTestingFramework,
-    RealManagerFixtureFactory,
+    RealComponentFactory,
     qt_widget_test,
     validate_qt_object_lifecycle,
 )
@@ -80,7 +80,7 @@ class TestRealMainWindowStateIntegration:
         self.qt_app = ApplicationFactory.get_application()
 
         # Initialize real manager factory
-        self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
 
         # Initialize test data repository
         self.test_data = DataRepository()
@@ -382,7 +382,7 @@ class TestRealMainWindowWorkflowIntegration:
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
         self.test_data = DataRepository()
         initialize_managers(app_name="SpritePal-Test")
 
@@ -490,7 +490,7 @@ class TestBugDiscoveryRealVsMocked:
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
         self.test_data = DataRepository()
         initialize_managers(app_name="SpritePal-Test")
 

@@ -84,7 +84,7 @@ class TestSpritePalAppDarkThemeIntegration:
         assert "#2d2d30" in stylesheet, "Stylesheet should include main dark background color"
         assert "#1e1e1e" in stylesheet, "Stylesheet should include preview dark background"
         assert "QPushButton:hover" in stylesheet, "Stylesheet should include button hover states"
-        assert "QLabel[preview=\"true\"]" in stylesheet, "Stylesheet should include preview label styling"
+        assert 'QLabel[preview="true"]' in stylesheet, "Stylesheet should include preview label styling"
 
         # Test comprehensive widget coverage
         essential_widgets = [

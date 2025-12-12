@@ -30,7 +30,7 @@ from PySide6.QtCore import (
 from PySide6.QtWidgets import QApplication
 
 from core.workers.base import BaseWorker, handle_worker_errors
-from ui.common.worker_manager import WorkerManager
+from ui.common import WorkerManager
 
 pytestmark = [
 

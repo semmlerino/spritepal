@@ -77,7 +77,7 @@ from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
     QtTestingFramework,
-    RealManagerFixtureFactory,
+    RealComponentFactory,
     validate_qt_object_lifecycle,
 )
 from ui.dialogs import (
@@ -106,7 +106,7 @@ class TestRealDialogIntegration:
         self.qt_app = ApplicationFactory.get_application()
 
         # Initialize real manager factory
-        self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
 
         # Initialize test data repository
         self.test_data = DataRepository()
@@ -515,7 +515,7 @@ class TestRealDialogManagerIntegration:
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
         self.test_data = DataRepository()
 
         yield
@@ -596,7 +596,7 @@ class TestBugDiscoveryRealVsMockedDialogs:
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealManagerFixtureFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
         self.test_data = DataRepository()
 
         yield
