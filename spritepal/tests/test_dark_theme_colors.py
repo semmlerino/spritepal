@@ -19,6 +19,10 @@ from ui.styles.theme import (
     get_theme_style,
 )
 
+pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # UI tests may involve managers that spawn threads
+]
+
 
 class TestColorConstants:
     """Test dark theme color constants validation."""

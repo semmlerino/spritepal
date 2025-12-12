@@ -20,13 +20,13 @@ from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtWidgets import QApplication
 
 from core.controller import ExtractionController
+from core.di_container import inject
 from core.managers import (
     # Serial execution required: QApplication management, Thread safety concerns, Real Qt components
     ExtractionManager,
     InjectionManager,
     initialize_managers,
 )
-from core.di_container import inject
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
     ExtractionManagerProtocol,
@@ -38,6 +38,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),  # Initialize DI container
+    pytest.mark.skip_thread_cleanup,  # Thread tests may intentionally leave threads running
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.thread_safety,

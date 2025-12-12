@@ -15,6 +15,7 @@ from ui.components.visualization.rom_map_widget import ROMMapWidget
 # Add parent directories to path
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # UI tests may involve managers that spawn threads
     pytest.mark.dialog,
     pytest.mark.file_io,
     pytest.mark.headless,

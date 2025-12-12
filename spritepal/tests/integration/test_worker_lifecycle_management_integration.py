@@ -19,6 +19,10 @@ import weakref
 import pytest
 from PySide6.QtCore import QThread, Signal
 
+pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # Integration tests involve managers that spawn threads
+]
+
 from tests.infrastructure.qt_real_testing import (
     EventLoopHelper,
     MemoryHelper,

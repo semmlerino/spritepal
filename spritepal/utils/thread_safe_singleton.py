@@ -16,9 +16,9 @@ from core.thread_safe_singleton import (
 )
 
 __all__ = [
-    "ThreadSafeSingleton",
-    "QtThreadSafeSingleton",
     "LazyThreadSafeSingleton",
-    "create_simple_singleton",
+    "QtThreadSafeSingleton",
+    "ThreadSafeSingleton",
     "create_qt_singleton",
+    "create_simple_singleton",
 ]

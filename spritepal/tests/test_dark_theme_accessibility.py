@@ -10,6 +10,10 @@ import pytest
 
 from ui.styles.theme import COLORS
 
+pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # UI tests may involve managers that spawn threads
+]
+
 
 class ContrastCalculator:
     """Utility class for calculating color contrast ratios according to WCAG 2.1."""

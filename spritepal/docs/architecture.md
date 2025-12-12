@@ -26,14 +26,18 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
    - Purpose: Presentation layer only, no business logic
 
 2. **Manager Layer (`core/managers/`)**
-   - ✅ CAN import from: `core/`, `utils/`
+   - ✅ CAN import from: `core/`, `utils/`, `PySide6`
    - ❌ CANNOT import from: `ui/`
    - Purpose: Business logic, workflow coordination
+   - Note: Managers inherit from QObject for signal-based communication
 
 3. **Core Layer (`core/`)**
-   - ✅ CAN import from: `utils/`
-   - ❌ CANNOT import from: `ui/`, `core/managers/`
+   - ✅ CAN import from: `utils/`, `PySide6` (for Qt event infrastructure)
+   - ❌ CANNOT import from: `ui/`, `core/managers/` (except via protocols)
    - Purpose: Domain logic, data structures, algorithms
+   - Note: Core uses PySide6 for QObject-based managers/workers (signals, threading).
+     This is intentional architecture for event-driven patterns, not a layer violation.
+     Core services may reference manager protocols for DI but should not import managers directly.
 
 4. **Utils Layer (`utils/`)**
    - ✅ CAN import from: Python standard library only

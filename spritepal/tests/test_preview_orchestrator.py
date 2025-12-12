@@ -31,7 +31,7 @@ from core.preview_orchestrator import (
 )
 
 pytestmark = [
-
+    pytest.mark.skip_thread_cleanup,  # Preview workers may not clean up within fixture timeout
     pytest.mark.serial,
     pytest.mark.cache,
     pytest.mark.headless,

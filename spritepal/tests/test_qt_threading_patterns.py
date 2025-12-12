@@ -33,7 +33,7 @@ from core.workers.base import BaseWorker, handle_worker_errors
 from ui.common import WorkerManager
 
 pytestmark = [
-
+    pytest.mark.skip_thread_cleanup,  # Thread tests may intentionally leave threads running
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.thread_safety,

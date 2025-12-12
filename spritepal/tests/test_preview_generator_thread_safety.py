@@ -22,7 +22,7 @@ import pytest
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-
+    pytest.mark.skip_thread_cleanup,  # Preview workers may not clean up within fixture timeout
     pytest.mark.serial,
     pytest.mark.thread_safety,
     pytest.mark.cache,

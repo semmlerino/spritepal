@@ -43,6 +43,10 @@ class ROMInjectionWorker(QThread):
         self.metadata_path: str | None = metadata_path
         self.injector: ROMInjector = ROMInjector()
 
+        # Auto-register with WorkerManager for cleanup_all()
+        from core.services.worker_lifecycle import WorkerManager
+        WorkerManager._register_worker(self)
+
     @override
     def run(self) -> None:
         """Run the ROM injection process with detailed progress reporting"""

@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QObject, Signal
 from typing_extensions import override
 
-from core.managers.base_manager import BaseManager
 from core.exceptions import NavigationError
+from core.managers.base_manager import BaseManager
 from utils.logging_config import get_logger
 
 from .data_structures import NavigationContext, NavigationHint, SpriteLocation

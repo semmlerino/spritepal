@@ -454,6 +454,11 @@ class PreviewOrchestrator(QObject):
         if self._metrics_timer:
             self._metrics_timer.stop()
 
+        # Shutdown worker pool
+        if self._worker_pool:
+            self._worker_pool.cleanup()
+            self._worker_pool = None
+
         # Shutdown async cache worker thread
         if self._async_cache:
             self._async_cache.shutdown()
@@ -465,6 +470,23 @@ class PreviewOrchestrator(QObject):
         self._active_requests.clear()
 
         logger.debug("PreviewOrchestrator cleanup complete")
+
+    def __del__(self) -> None:
+        """Ensure cleanup on deletion to prevent thread leaks."""
+        try:
+            # Call cleanup if it hasn't been called yet
+            # Use short timeout for __del__ context
+            if hasattr(self, '_async_cache') and self._async_cache:
+                self._async_cache.shutdown(timeout=1000)
+            if hasattr(self, '_worker_pool') and self._worker_pool:
+                self._worker_pool.cleanup()
+            if hasattr(self, '_process_timer') and self._process_timer:
+                self._process_timer.stop()
+            if hasattr(self, '_metrics_timer') and self._metrics_timer:
+                self._metrics_timer.stop()
+        except Exception as e:
+            # Don't raise in __del__ to avoid cascading issues during shutdown
+            logger.debug(f"PreviewOrchestrator __del__ cleanup error (ignored): {e}")
 
 
 class PreviewMemoryCache:

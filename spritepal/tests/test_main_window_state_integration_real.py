@@ -21,9 +21,9 @@ This replaces test_main_window_state_integration.py which heavily mocked:
 from __future__ import annotations
 
 import sys
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 from unittest.mock import patch
 
 import pytest

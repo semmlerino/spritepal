@@ -32,7 +32,6 @@ if TYPE_CHECKING:
     )
 
 from PySide6.QtCore import (
-    QEventLoop,
     QMutex,
     QMutexLocker,
     Qt,
@@ -68,7 +67,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.sprite_finder import SpriteFinder
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 
@@ -113,9 +111,9 @@ from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.dialogs.services import ViewStateManager
 from ui.rom_extraction.workers import SpritePreviewWorker, SpriteSearchWorker
-from ui.workers.sprite_scan_worker import SpriteScanWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
+from ui.workers.sprite_scan_worker import SpriteScanWorker
 from utils.logging_config import get_logger
 
 # from utils.rom_cache import get_rom_cache # Removed due to DI

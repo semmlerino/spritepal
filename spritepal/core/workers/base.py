@@ -178,6 +178,11 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
         # Register cleanup to prevent signal leaks
         self.finished.connect(self._cleanup_connections)
 
+        # Auto-register with WorkerManager for cleanup_all()
+        # Import here to avoid circular imports
+        from core.services.worker_lifecycle import WorkerManager
+        WorkerManager._register_worker(self)
+
     def _cleanup_connections(self) -> None:
         """Clean up signal connections to prevent memory leaks"""
         connection_count = len(self._signal_connections)

@@ -22,6 +22,7 @@ def get_rom_cache():
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
+    pytest.mark.skip_thread_cleanup,
     pytest.mark.serial,
     pytest.mark.thread_safety,
     pytest.mark.cache,

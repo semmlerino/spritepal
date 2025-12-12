@@ -356,26 +356,66 @@ class AsyncROMCache(QObject):
             timeout: Milliseconds to wait for thread to stop (default: 5000)
         """
         try:
-            # Stop the save timer first
-            if hasattr(self, "_save_timer"):
-                self._save_timer.stop()
+            # Stop the save timer first (before processEvents to avoid deletion issues)
+            if hasattr(self, "_save_timer") and self._save_timer is not None:
+                try:
+                    self._save_timer.stop()
+                except RuntimeError:
+                    # Timer may already be deleted
+                    pass
 
-            # Flush any pending saves
-            self._flush_save_queue()
-
-            # Stop worker
-            if hasattr(self, "_worker"):
+            # Stop worker from accepting new work
+            if hasattr(self, "_worker") and self._worker is not None:
                 self._worker.stop()
 
+            # Disconnect signals to prevent new work from being queued during shutdown
+            # Note: Import warnings to suppress disconnect warnings
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                try:
+                    if hasattr(self, "_request_load") and hasattr(self, "_worker"):
+                        self._request_load.disconnect(self._worker.load_from_cache)
+                except (RuntimeError, TypeError):
+                    pass
+                try:
+                    if hasattr(self, "_request_save") and hasattr(self, "_worker"):
+                        self._request_save.disconnect(self._worker.save_to_cache)
+                except (RuntimeError, TypeError):
+                    pass
+
+            # Flush any pending saves (do this AFTER disconnecting signals)
+            try:
+                self._flush_save_queue()
+            except RuntimeError:
+                # Queue or mutex may already be deleted
+                pass
+
             # Stop thread with adequate timeout
-            if hasattr(self, "_worker_thread") and self._worker_thread.isRunning():
-                self._worker_thread.quit()
-                if not self._worker_thread.wait(timeout):
-                    logger.warning(
-                        f"AsyncROMCache worker thread did not stop within {timeout}ms"
-                    )
+            if hasattr(self, "_worker_thread") and self._worker_thread is not None:
+                try:
+                    if self._worker_thread.isRunning():
+                        # Signal event loop to quit
+                        self._worker_thread.quit()
+
+                        # Wait for thread to finish gracefully
+                        if not self._worker_thread.wait(timeout):
+                            logger.warning(
+                                f"AsyncROMCache worker thread did not stop within {timeout}ms, "
+                                "terminating forcefully"
+                            )
+                            # Force terminate as last resort to prevent thread leak
+                            self._worker_thread.terminate()
+                            # Give terminate a moment to complete
+                            self._worker_thread.wait(1000)
+                except RuntimeError:
+                    # QThread may have been deleted already
+                    pass
 
             logger.debug("AsyncROMCache shutdown complete")
+        except RuntimeError as e:
+            # Qt objects may be deleted during shutdown, this is expected
+            logger.debug(f"AsyncROMCache shutdown (Qt object deleted): {e}")
         except Exception as e:
             logger.warning(f"AsyncROMCache shutdown error: {e}")
 

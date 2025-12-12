@@ -19,6 +19,7 @@ from tests.infrastructure.test_doubles import (
 )
 
 pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # Refactored sprite finder tests may create background threads
     pytest.mark.unit,
     pytest.mark.headless,
     pytest.mark.parallel_safe,

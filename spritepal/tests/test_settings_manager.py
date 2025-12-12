@@ -18,6 +18,7 @@ def get_settings_manager():
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
+    pytest.mark.skip_thread_cleanup,
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,

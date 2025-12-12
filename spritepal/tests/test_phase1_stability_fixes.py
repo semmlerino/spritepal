@@ -41,6 +41,12 @@ from core.managers.registry import ManagerRegistry
 from ui.common import WorkerManager
 
 
+# Systematic pytest markers applied based on test content analysis
+pytestmark = [
+    pytest.mark.skip_thread_cleanup,
+]
+
+
 class TestWorkerCancellationStability:
     """Test WorkerManager safe cancellation mechanisms."""
 

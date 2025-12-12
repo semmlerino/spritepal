@@ -15,6 +15,7 @@ pytest_plugins = ["pytestqt"]
 
 # Qt infrastructure tests must run serially to avoid QApplication conflicts
 pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # Thread tests may intentionally leave threads running
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.qt_app,

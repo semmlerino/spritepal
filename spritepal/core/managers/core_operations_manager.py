@@ -18,10 +18,6 @@ from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.rom_extractor import ROMExtractor
 from core.services import ROMService, VRAMService
-from utils.constants import (
-    DEFAULT_PREVIEW_HEIGHT,
-    DEFAULT_PREVIEW_WIDTH,
-)
 
 from .base_manager import BaseManager
 from .exceptions import (
@@ -192,52 +188,9 @@ class CoreOperationsManager(BaseManager):
         finally:
             self._finish_operation(operation)
 
-    def extract_from_rom(self, rom_path: str, offset: int, output_base: str,
-                        tile_count: int | None = None,
-                        palette_data: list[list[int]] | None = None,
-                        width: int = DEFAULT_PREVIEW_WIDTH,
-                        height: int = DEFAULT_PREVIEW_HEIGHT) -> dict[str, Any]:
-        """
-        Extract sprites from ROM.
-
-        Returns:
-            Dict with extraction results
-        """
-        operation = "rom_extraction"
-
-        if not self._start_operation(operation):
-            return {"success": False, "error": "Operation already in progress"}
-
-        try:
-            # Validate inputs
-            self._validate_required(
-                {"rom_path": rom_path, "offset": offset, "output_base": output_base},
-                ["rom_path", "offset", "output_base"]
-            )
-            self._validate_file_exists(rom_path, "ROM file")
-
-            # Perform extraction
-            extractor = self._ensure_rom_extractor()
-            result = extractor.extract_sprite(  # type: ignore[attr-defined]  # TODO: Add extract_sprite to ROMExtractor
-                rom_path, offset, output_base,
-                tile_count=tile_count,
-                palette_data=palette_data,
-                width=width,
-                height=height
-            )
-
-            # Emit signals
-            self.extraction_progress.emit("ROM extraction completed")
-            self.operation_completed.emit(operation, True, "Success")
-
-            return result
-
-        except Exception as e:
-            self._handle_error(e, operation)
-            self.operation_completed.emit(operation, False, str(e))
-            raise ExtractionError(f"ROM extraction failed: {e!s}") from e
-        finally:
-            self._finish_operation(operation)
+    # NOTE: ROM extraction is handled via ExtractionAdapter which delegates to
+    # ExtractionManager → ROMService → ROMExtractor. There is no direct
+    # extract_from_rom method on CoreOperationsManager.
 
     # ========== Injection Operations ==========
 

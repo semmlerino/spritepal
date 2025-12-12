@@ -13,6 +13,10 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # Integration tests involve managers that spawn threads
+]
+
 class SimpleEmitter(QObject):
     """Simple emitter for testing."""
     value_changed = Signal(int)

@@ -14,6 +14,7 @@ to fix layer boundary violations (core was importing from ui).
 from __future__ import annotations
 
 import contextlib
+import weakref
 from typing import Any
 
 from PySide6.QtCore import QThread
@@ -35,6 +36,7 @@ class WorkerManager:
     - Qt's built-in cancellation via requestInterruption()
     - Graceful shutdown with timeout handling
     - Debug logging for worker operations
+    - Global worker registry for cleanup_all()
 
     CRITICAL: Never uses QThread.terminate() which can corrupt Qt's internal state.
     Instead uses a multi-stage shutdown process:
@@ -44,6 +46,27 @@ class WorkerManager:
     3. Call quit() and wait() for clean shutdown
     4. Log warnings for unresponsive workers
     """
+
+    # Class-level registry of all workers for cleanup_all()
+    # Use strong references to ensure workers aren't GC'd before cleanup
+    # Workers are removed from registry after cleanup or when they finish
+    _worker_registry: set[QThread] = set()
+
+    @staticmethod
+    def _register_worker(worker: QThread) -> None:
+        """
+        Register a worker in the global registry for cleanup_all().
+
+        Workers remain in the registry until explicitly cleaned up via
+        cleanup_all() or cleanup_worker(). This ensures they're properly
+        stopped and waited for before removal.
+
+        Args:
+            worker: Worker to register
+        """
+        # Add worker to registry
+        WorkerManager._worker_registry.add(worker)
+        logger.debug(f"Registered worker {worker.__class__.__name__} (registry size: {len(WorkerManager._worker_registry)})")
 
     @staticmethod
     def cleanup_worker(
@@ -77,8 +100,18 @@ class WorkerManager:
         worker_name = worker.__class__.__name__
 
         if not worker.isRunning():
-            logger.debug(f"{worker_name} already stopped")
+            logger.debug(f"{worker_name} already stopped (isFinished: {worker.isFinished()})")
+            # Even if not running, wait to ensure thread has fully exited
+            # QThread may have emitted finished() but not yet fully cleaned up the OS thread
+            if not worker.isFinished():
+                # If not finished, wait for it to finish
+                worker.wait(timeout)
+            else:
+                # Already finished, but still wait to ensure OS thread cleanup
+                worker.wait(200)  # Wait for OS thread to fully exit
+            WorkerManager._worker_registry.discard(worker)
             worker.deleteLater()
+            logger.debug(f"{worker_name}: Cleanup complete for stopped worker")
             return
 
         logger.debug(f"Stopping {worker_name} safely")
@@ -110,6 +143,15 @@ class WorkerManager:
                 "to avoid Qt corruption. Consider reviewing worker cancellation logic."
             )
 
+        # Additional wait to ensure thread has fully exited
+        # This helps prevent thread leak detection from seeing the thread
+        if worker.isFinished():
+            # Thread has signaled finished, wait a bit more for complete cleanup
+            worker.wait(50)  # Extra 50ms to ensure thread exit is complete
+
+        # Remove from registry
+        WorkerManager._worker_registry.discard(worker)
+
         # Schedule for deletion regardless of shutdown success
         worker.deleteLater()
         logger.debug(f"{worker_name}: Scheduled for deletion")
@@ -131,6 +173,9 @@ class WorkerManager:
         # Clean up existing worker if provided
         if cleanup_existing is not None:
             WorkerManager.cleanup_worker(cleanup_existing, cleanup_timeout)
+
+        # Register the new worker for cleanup_all()
+        WorkerManager._register_worker(worker)
 
         # Start the new worker
         worker_name = worker.__class__.__name__
@@ -320,3 +365,98 @@ class WorkerManager:
         for worker in workers:
             if worker is not None:
                 WorkerManager.cleanup_worker(worker, timeout=timeout)
+
+    @staticmethod
+    def cleanup_all(timeout: int = QUICK_CLEANUP_TIMEOUT) -> int:
+        """
+        Clean up all registered workers.
+
+        This method is primarily used by test fixtures to ensure all workers
+        are properly cleaned up between tests. It cleans up all workers that
+        were registered via start_worker() or create_and_start().
+
+        Args:
+            timeout: Timeout in milliseconds for each worker cleanup.
+                    Defaults to QUICK_CLEANUP_TIMEOUT (100ms) for faster test cleanup.
+
+        Returns:
+            int: Number of workers that were cleaned up
+
+        Note:
+            This method only cleans up workers that were started through
+            WorkerManager methods. Workers started directly (worker.start())
+            without going through WorkerManager won't be tracked.
+        """
+        logger.debug(f"cleanup_all: Starting cleanup (registry size: {len(WorkerManager._worker_registry)})")
+
+        # Get all workers from registry (they're already strong references)
+        workers_to_cleanup = list(WorkerManager._worker_registry)
+
+        logger.debug(f"cleanup_all: Found {len(workers_to_cleanup)} registered workers")
+
+        # Clean up all workers (both running and stopped)
+        cleanup_count = 0
+        for worker in workers_to_cleanup:
+            if worker.isRunning():
+                logger.debug(f"cleanup_all: Cleaning up running worker {worker.__class__.__name__}")
+                cleanup_count += 1
+            else:
+                logger.debug(f"cleanup_all: Cleaning up stopped worker {worker.__class__.__name__}")
+
+            # Always call cleanup_worker to ensure proper shutdown sequence
+            # This handles both running and stopped workers consistently
+            WorkerManager.cleanup_worker(worker, timeout=timeout)
+
+            # Additional explicit cleanup to help with thread counting
+            # Disconnect all signals to break reference cycles
+            try:
+                worker.blockSignals(True)
+                # Try to set parent to None to help with cleanup
+                worker.setParent(None)
+            except Exception as e:
+                logger.debug(f"Error during final cleanup of {worker.__class__.__name__}: {e}")
+
+        # Clear the registry after cleanup (cleanup_worker removes workers individually,
+        # but this ensures the registry is fully cleared)
+        WorkerManager._worker_registry.clear()
+
+        # Delete all worker references to help with immediate cleanup
+        del workers_to_cleanup
+
+        # Process Qt events to allow deleteLater() calls to complete
+        # This helps ensure threads are fully cleaned up before returning
+        try:
+            from PySide6.QtCore import QCoreApplication
+            app = QCoreApplication.instance()
+            if app:
+                # Process events multiple times to ensure cleanup
+                for _ in range(10):
+                    app.processEvents()
+                logger.debug("cleanup_all: Processed Qt events for cleanup completion")
+        except Exception as e:
+            logger.debug(f"cleanup_all: Could not process events: {e}")
+
+        # Force garbage collection to help clean up deleted workers
+        try:
+            import gc
+            gc.collect()
+            logger.debug("cleanup_all: Forced garbage collection")
+        except Exception as e:
+            logger.debug(f"cleanup_all: Could not force GC: {e}")
+
+        # Give the OS a moment to fully destroy threads
+        # This is necessary because Python's threading.active_count() may still
+        # see threads that are in the process of being destroyed
+        try:
+            import time
+            time.sleep(0.05)  # 50ms should be enough for OS thread cleanup
+            logger.debug("cleanup_all: Waited for OS thread cleanup")
+        except Exception as e:
+            logger.debug(f"cleanup_all: Could not sleep: {e}")
+
+        if cleanup_count > 0:
+            logger.info(f"cleanup_all: Cleaned up {cleanup_count} worker(s)")
+        else:
+            logger.debug("cleanup_all: No workers needed cleanup")
+
+        return cleanup_count

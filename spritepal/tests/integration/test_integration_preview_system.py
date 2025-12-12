@@ -10,6 +10,10 @@ import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
+pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # Integration tests involve managers that spawn threads
+]
+
 from core.managers import ExtractionManager
 from ui.common.simple_preview_coordinator import SimplePreviewCoordinator, SimplePreviewWorker
 from utils.rom_cache import ROMCache

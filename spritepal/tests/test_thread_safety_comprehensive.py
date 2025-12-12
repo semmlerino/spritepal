@@ -16,6 +16,7 @@ from __future__ import annotations
 import pytest
 
 pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # Thread tests may intentionally leave threads running
     pytest.mark.cache,
     pytest.mark.headless,
     pytest.mark.rom_data,

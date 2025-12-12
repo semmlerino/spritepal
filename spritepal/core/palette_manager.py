@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from utils.file_validator import atomic_write
 from utils.constants import (
     CGRAM_EXPECTED_SIZE,
     COLOR_MASK_BLUE,
@@ -23,6 +22,7 @@ from utils.constants import (
     SPRITE_PALETTE_END,
     SPRITE_PALETTE_START,
 )
+from utils.file_validator import atomic_write
 from utils.validation import validate_cgram_file, validate_oam_file
 
 

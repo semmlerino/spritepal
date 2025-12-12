@@ -21,8 +21,8 @@ if TYPE_CHECKING:
     from core.extractor import SpriteExtractor
     from core.palette_manager import PaletteManager
 
-from core.extractor import SpriteExtractor
 from core.exceptions import ExtractionError, ValidationError
+from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from utils.constants import (
     BYTES_PER_TILE,

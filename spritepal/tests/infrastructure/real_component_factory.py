@@ -642,7 +642,40 @@ class RealComponentFactory:
         Note: Logs warnings instead of silently ignoring cleanup failures.
         This helps identify resource leaks during test development.
         """
-        # Clean up Qt components
+        # Step 1: Clean up all WorkerManager-registered workers FIRST
+        # This is the primary goal - ensure worker threads are properly stopped
+        try:
+            cleanup_count = WorkerManager.cleanup_all()
+            if cleanup_count > 0:
+                warnings.warn(
+                    f"RealComponentFactory cleaned up {cleanup_count} worker thread(s)",
+                    ResourceWarning,
+                    stacklevel=2,
+                )
+        except Exception as e:
+            warnings.warn(
+                f"WorkerManager.cleanup_all() failed: {e}",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
+        # Step 2: Clean up ManagerRegistry (if initialized by this factory)
+        # This ensures all managers and their associated workers are stopped
+        try:
+            registry = ManagerRegistry()
+            if registry.is_initialized():
+                # Clean up all managers
+                registry.cleanup_managers()
+                # Note: Don't reset the singleton here - other tests may share it
+                # The test fixture cleanup_managers will handle final cleanup
+        except Exception as e:
+            warnings.warn(
+                f"ManagerRegistry cleanup failed: {e}",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
+        # Step 3: Clean up Qt components
         for component in self._created_components:
             try:
                 if isinstance(component, QThread):
@@ -670,7 +703,44 @@ class RealComponentFactory:
 
         self._created_components.clear()
 
-        # Clean up temp directories
+        # Step 4: Process Qt events to allow deleteLater() calls to complete
+        # This ensures all QThread cleanup and signal disconnections are processed
+        try:
+            if QApplication.instance():
+                for _ in range(10):
+                    QApplication.processEvents()
+        except Exception as e:
+            warnings.warn(
+                f"Failed to process Qt events during cleanup: {e}",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
+        # Step 5: Force garbage collection to clean up deleted workers
+        try:
+            import gc
+            gc.collect()
+            gc.collect()  # Second pass to handle circular references
+        except Exception as e:
+            warnings.warn(
+                f"Failed to force garbage collection: {e}",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
+        # Step 6: Allow time for OS thread cleanup
+        # Python's threading.active_count() may still see threads being destroyed
+        try:
+            import time
+            time.sleep(0.15)  # 150ms for thread termination (increased from 100ms)
+        except Exception as e:
+            warnings.warn(
+                f"Failed to wait for thread cleanup: {e}",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
+        # Step 7: Clean up temp directories
         import shutil
         for temp_dir in self._temp_dirs:
             if temp_dir.exists():

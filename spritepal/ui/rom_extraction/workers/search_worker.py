@@ -46,6 +46,10 @@ class SpriteSearchWorker(QThread):
             step_size=self.step
         )
 
+        # Auto-register with WorkerManager for cleanup_all()
+        from core.services.worker_lifecycle import WorkerManager
+        WorkerManager._register_worker(self)
+
     @handle_worker_errors("sprite searching")
     def run(self):
         """Search for valid sprite in the specified direction"""

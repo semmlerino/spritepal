@@ -16,7 +16,7 @@ from utils.image_utils import pil_to_qpixmap
 
 # Serial execution required: Real Qt components
 pytestmark = [
-
+    pytest.mark.skip_thread_cleanup,  # UI tests may involve managers that spawn threads
     pytest.mark.serial,
     pytest.mark.dialog,
     pytest.mark.qt_real,

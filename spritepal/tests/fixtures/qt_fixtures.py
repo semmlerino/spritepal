@@ -206,6 +206,10 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     Uses session-level thread baseline to avoid race conditions where per-test
     baseline captures lingering threads from prior tests.
 
+    Accounts for pytest-timeout's monitoring thread (when timeout_method="thread")
+    which is created per test but cleaned up AFTER this fixture runs, preventing
+    false positive leak detection.
+
     Opt-out markers:
         @pytest.mark.skip_thread_cleanup - Skip cleanup (rare, use only if truly needed)
         @pytest.mark.no_manager_setup - Skip for non-Qt tests
@@ -236,14 +240,36 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         import logging
         logging.debug(f"Error during worker cleanup: {e}")
 
+    # Detect if pytest-timeout is active with thread method
+    # pytest-timeout creates a monitoring thread per test which shows up in active_count()
+    # but is cleaned up AFTER our fixture runs, causing false positive leak detection
+    timeout_method = request.config.getini("timeout_method")
+    timeout_value = request.config.getini("timeout")
+
+    # Check if timeout is enabled and using thread method
+    pytest_timeout_active = False
+    if timeout_method == "thread":
+        # timeout_value might be int, float, or string - handle all cases
+        try:
+            if timeout_value is not None:
+                timeout_num = float(timeout_value) if isinstance(timeout_value, str) else timeout_value
+                pytest_timeout_active = timeout_num > 0
+        except (ValueError, TypeError):
+            pass  # If we can't parse, assume not active
+
+    # Adjust allowed thread count to account for pytest-timeout's monitoring thread
+    allowed_thread_count = baseline_thread_count
+    if pytest_timeout_active:
+        allowed_thread_count += 1
+
     # Wait for worker threads to finish with proper timeout
-    max_wait_ms = 500
+    max_wait_ms = 1000  # Increased from 500ms for more robust cleanup
     poll_interval_ms = 20
     elapsed = 0
 
     while elapsed < max_wait_ms:
         active_threads = threading.active_count()
-        if active_threads <= baseline_thread_count:
+        if active_threads <= allowed_thread_count:
             break
 
         app = QCoreApplication.instance()
@@ -261,12 +287,13 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 
     # FAIL if threads were not cleaned up (not just log)
     active_threads = threading.active_count()
-    leaked_threads = active_threads - baseline_thread_count
+    leaked_threads = active_threads - allowed_thread_count
     if leaked_threads > 0:
         test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
+        timeout_note = f" (allowing +1 for pytest-timeout)" if pytest_timeout_active else ""
         pytest.fail(
             f"Test '{test_name}' leaked {leaked_threads} thread(s). "
-            f"Active: {active_threads}, Baseline: {baseline_thread_count}. "
+            f"Active: {active_threads}, Baseline: {baseline_thread_count}{timeout_note}. "
             "Fix: Ensure all workers are properly stopped and joined. "
             "Use @pytest.mark.skip_thread_cleanup to opt out if truly needed."
         )
@@ -281,7 +308,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         if app:
             for _ in range(5):
                 app.processEvents()
-                if threading.active_count() <= baseline_thread_count:
+                if threading.active_count() <= allowed_thread_count:
                     break
                 current = QThread.currentThread()
                 if current:

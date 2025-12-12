@@ -103,6 +103,10 @@ class SearchWorker(QThread):
         self._user_response_condition = QWaitCondition()
         self._user_response = None
 
+        # Auto-register with WorkerManager for cleanup_all()
+        from core.services.worker_lifecycle import WorkerManager
+        WorkerManager._register_worker(self)
+
     def __del__(self):
         """Ensure proper cleanup of resources."""
         self._cleanup_finder()

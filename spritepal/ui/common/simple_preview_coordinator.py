@@ -36,6 +36,10 @@ class SimplePreviewWorker(QThread):
         self.extractor = extractor
         self.sprite_name = f"manual_0x{offset:X}"
 
+        # Auto-register with WorkerManager for cleanup_all()
+        from core.services.worker_lifecycle import WorkerManager
+        WorkerManager._register_worker(self)
+
     @override
     def run(self) -> None:
         """Generate the preview."""

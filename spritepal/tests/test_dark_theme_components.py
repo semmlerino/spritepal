@@ -10,6 +10,10 @@ import re
 
 import pytest
 
+pytestmark = [
+    pytest.mark.skip_thread_cleanup,  # UI tests may involve managers that spawn threads
+]
+
 from ui.styles.components import (
     get_bold_text_style,
     get_borderless_preview_style,
