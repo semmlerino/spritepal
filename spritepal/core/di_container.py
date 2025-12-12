@@ -198,6 +198,7 @@ def configure_container(
     # Register ConfigurationService FIRST - it's needed by other managers
     from core.configuration_service import ConfigurationService
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ConfigurationServiceProtocol,
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
@@ -217,6 +218,11 @@ def configure_container(
 
     if use_consolidated:
         # Register consolidated managers with adapters
+        register_factory(
+            ApplicationStateManagerProtocol,
+            lambda: _get_application_state_manager()
+        )
+
         register_factory(
             SessionManagerProtocol,
             lambda: _get_consolidated_session_adapter()
@@ -313,9 +319,23 @@ def configure_container(
         lambda: _get_or_create_navigation_manager()
     )
 
+    # Register DialogFactory for controller dialog creation
+    from core.protocols.dialog_protocols import DialogFactoryProtocol
+    from ui.dialogs.controller_dialog_factory import ControllerDialogFactory
+
+    register_factory(
+        DialogFactoryProtocol,
+        lambda: ControllerDialogFactory()
+    )
+
     logger.info(f"DI container configured (consolidated={use_consolidated})")
 
 # Helper functions for lazy manager creation
+def _get_application_state_manager():
+    """Get ApplicationStateManager from registry."""
+    from core.managers.registry import ManagerRegistry
+    return ManagerRegistry().get_application_state_manager()
+
 def _get_consolidated_session_adapter():
     """Get session adapter from consolidated ApplicationStateManager."""
     from core.managers.registry import ManagerRegistry

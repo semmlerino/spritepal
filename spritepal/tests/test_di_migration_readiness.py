@@ -14,6 +14,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from core.di_container import get_container, inject
+from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
@@ -106,13 +107,15 @@ class TestPureDIComponentInitialization:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-            # Create with explicit deps (dialog_factory still uses fallback for now)
+            # Create with explicit deps
+            dialog_factory = Mock(spec=DialogFactoryProtocol)
             controller = ExtractionController(
                 mock_window,
                 extraction_manager=extraction_mgr,
                 session_manager=session_mgr,
                 injection_manager=injection_mgr,
                 settings_manager=settings_mgr,
+                dialog_factory=dialog_factory,
             )
 
         # Verify managers are the injected ones

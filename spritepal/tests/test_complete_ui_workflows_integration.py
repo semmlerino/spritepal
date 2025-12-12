@@ -57,8 +57,23 @@ pytestmark = [
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import real UI components (not mocks\!)
+from core.di_container import inject
 from core.managers.registry import cleanup_managers, initialize_managers
+from core.protocols.manager_protocols import (
+    ROMCacheProtocol,
+    SessionManagerProtocol,
+    SettingsManagerProtocol,
+)
 from ui.main_window import MainWindow
+
+
+def _create_main_window():
+    """Create MainWindow with DI dependencies."""
+    return MainWindow(
+        settings_manager=inject(SettingsManagerProtocol),
+        rom_cache=inject(ROMCacheProtocol),
+        session_manager=inject(SessionManagerProtocol),
+    )
 
 
 class TestCompleteUIWorkflowsIntegration:
@@ -163,7 +178,7 @@ class TestCompleteUIWorkflowsIntegration:
         - UI remains responsive throughout
         """
         # Step 1: Create and display main window
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
         main_window.show()
 
@@ -249,7 +264,7 @@ class TestCompleteUIWorkflowsIntegration:
         - Preview updates in response
         """
         # Step 1: Create main window
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
         main_window.show()
         qtbot.waitForWindowShown(main_window)
@@ -359,7 +374,7 @@ class TestCompleteUIWorkflowsIntegration:
         - UI updates in response to signal
         """
         # Step 1: Create main window with controller
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
         main_window.show()
         qtbot.waitForWindowShown(main_window)
@@ -580,7 +595,7 @@ class TestCompleteUIWorkflowsIntegration:
         is_headless = not display or qpa_platform == "offscreen"
 
         # Step 1: Create main window
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
         main_window.show()
         qtbot.waitForWindowShown(main_window)
@@ -706,7 +721,7 @@ class TestCompleteUIWorkflowsIntegration:
         - Smooth user interactions
         """
         # Step 1: Create main window
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
         main_window.show()
         qtbot.waitForWindowShown(main_window)
@@ -773,7 +788,7 @@ class TestCompleteUIWorkflowsIntegration:
         in headless mode. Instead, it tests UI state resilience directly.
         """
         # Step 1: Create main window
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
         main_window.show()
         qtbot.waitForWindowShown(main_window)

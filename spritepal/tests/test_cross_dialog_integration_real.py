@@ -20,6 +20,12 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 from core.controller import ExtractionController
+from core.di_container import inject
+from core.protocols.dialog_protocols import DialogFactoryProtocol
+from core.protocols.manager_protocols import (
+    InjectionManagerProtocol,
+    SettingsManagerProtocol,
+)
 
 # Import real testing infrastructure
 from tests.infrastructure import (
@@ -62,8 +68,8 @@ class TestRealCrossDialogIntegration:
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
 
-        # Initialize real manager factory
-        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
+        # Initialize real manager factory (no qt_parent - uses QApplication.instance())
+        self.manager_factory = RealComponentFactory()
 
         # Initialize test data repository
         self.test_data = DataRepository()
@@ -90,16 +96,16 @@ class TestRealCrossDialogIntegration:
         self.test_data.get_vram_extraction_data("medium")
         injection_data = self.test_data.get_injection_data("medium")
 
-        # Create real managers with proper Qt parents (worker-owned pattern)
-        extraction_manager = self.manager_factory.create_extraction_manager(isolated=True)
-        injection_manager = self.manager_factory.create_injection_manager(isolated=True)
+        # Create real managers
+        extraction_manager = self.manager_factory.create_extraction_manager()
+        injection_manager = self.manager_factory.create_injection_manager()
 
-        # Verify managers have proper Qt lifecycle management
-        assert extraction_manager.parent() is self.qt_app
-        assert injection_manager.parent() is self.qt_app
+        # Verify managers were created successfully
+        assert extraction_manager is not None
+        assert injection_manager is not None
 
         # Test injection dialog with real managers and data
-        with qt_dialog_test(InjectionDialog, sprite_path=injection_data["sprite_path"]) as dialog:
+        with qt_dialog_test(InjectionDialog, sprite_path=injection_data["sprite_path"], injection_manager=injection_manager) as dialog:
             # Validate dialog Qt parent relationship
             assert dialog.parent() is None
 
@@ -122,12 +128,10 @@ class TestRealCrossDialogIntegration:
         This validates that settings changes actually persist using real
         session management, not mocked settings behavior.
         """
-        # Create real session manager (worker-owned pattern)
-        session_manager = self.manager_factory.create_session_manager(
-            isolated=True, temp_settings=True
-        )
+        # Create real session manager
+        session_manager = self.manager_factory.create_session_manager()
 
-        # Validate session manager was created (isolated managers don't have Qt parents)
+        # Validate session manager was created
         assert session_manager is not None
 
         # Test settings dialog with real session manager
@@ -153,8 +157,18 @@ class TestRealCrossDialogIntegration:
         This validates that the controller properly coordinates between
         real manager instances, catching architectural bugs that mocks hide.
         """
-        # Create real manager set for controller
-        managers = self.manager_factory.create_manager_set(isolated=True)
+        # Create real managers for controller
+        extraction_manager = self.manager_factory.create_extraction_manager()
+        injection_manager = self.manager_factory.create_injection_manager()
+        session_manager = self.manager_factory.create_session_manager()
+        settings_manager = inject(SettingsManagerProtocol)
+        dialog_factory = Mock(spec=DialogFactoryProtocol)
+
+        managers = {
+            "extraction": extraction_manager,
+            "injection": injection_manager,
+            "session": session_manager,
+        }
 
         # Validate managers were created successfully (some don't support Qt parents)
         for manager_name, manager in managers.items():
@@ -173,7 +187,14 @@ class TestRealCrossDialogIntegration:
         with qt_test_context():
             # Create a mock main window for the controller
             mock_main_window = Mock()
-            controller = ExtractionController(mock_main_window)
+            controller = ExtractionController(
+                mock_main_window,
+                extraction_manager=extraction_manager,
+                injection_manager=injection_manager,
+                session_manager=session_manager,
+                settings_manager=settings_manager,
+                dialog_factory=dialog_factory,
+            )
 
             # Test real manager coordination
             test_data = self.test_data.get_vram_extraction_data("small")
@@ -208,15 +229,17 @@ class TestRealCrossDialogIntegration:
         but fail with real implementations, proving the value of real testing.
         """
         # Test 1: Real Qt parent/child relationships catch lifecycle bugs
-        manager = self.manager_factory.create_extraction_manager(isolated=True)
+        manager = self.manager_factory.create_extraction_manager()
 
         # This would pass with mocks but reveals real Qt lifecycle behavior
-        parent_before = manager.parent()
+        # Manager starts without a parent, we can set and clear it
+        manager.setParent(self.qt_app)
+        parent_after_set = manager.parent()
         manager.setParent(None)  # Remove Qt parent
-        parent_after = manager.parent()
+        parent_after_clear = manager.parent()
 
-        assert parent_before is self.qt_app, "Manager initially had Qt parent"
-        assert parent_after is None, "Manager parent was actually removed"
+        assert parent_after_set is self.qt_app, "Manager parent was set correctly"
+        assert parent_after_clear is None, "Manager parent was actually removed"
 
         # Test 2: Real manager validation catches parameter bugs
         invalid_params = {
@@ -265,9 +288,10 @@ class TestRealTestingInfrastructureValidation:
 
         # Test real manager factory
         factory = RealComponentFactory()
-        extraction_manager = factory.create_extraction_manager(isolated=True)
+        extraction_manager = factory.create_extraction_manager()
         assert extraction_manager is not None
-        assert extraction_manager.parent() is app
+        # Manager is a QObject without a default parent
+        assert hasattr(extraction_manager, "parent")
         factory.cleanup()
 
         # Test test data repository
@@ -291,14 +315,15 @@ class TestRealTestingInfrastructureValidation:
         """
         # Example 1: Qt parent/child lifecycle
         factory = RealComponentFactory()
-        manager = factory.create_extraction_manager(isolated=True)
-
-        # Real test: Can validate actual Qt parent relationship
+        manager = factory.create_extraction_manager()
         app = ApplicationFactory.get_application()
+
+        # Real test: Can set and validate actual Qt parent relationship
+        manager.setParent(app)
         assert manager.parent() is app, "Real test validates actual Qt parent"
 
         # Mock would have: mock_manager.parent.return_value = mock_app
-        # But couldn't validate the ACTUAL relationship
+        # But couldn't validate the ACTUAL setParent/parent() behavior
 
         # Example 2: Real parameter validation
         invalid_params = {"vram_path": ""}  # Empty path
@@ -329,7 +354,8 @@ if __name__ == "__main__":
         print("✅ Real testing infrastructure initialized successfully")
 
         # Test real manager creation
-        manager = factory.create_extraction_manager(isolated=True)
+        manager = factory.create_extraction_manager()
+        manager.setParent(app)  # Set parent explicitly
         assert manager.parent() is app
         print("✅ Real manager creation with Qt parent works")
 

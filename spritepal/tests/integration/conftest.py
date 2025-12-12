@@ -124,8 +124,12 @@ def rom_extraction_panel(qtbot, managers_initialized):
     Includes cleanup to reset the ManualOffsetDialogSingleton to prevent
     test pollution when multiple tests open the manual offset dialog.
     """
+    from core.di_container import inject
+    from core.protocols.manager_protocols import ExtractionManagerProtocol
     from ui.rom_extraction_panel import ManualOffsetDialogSingleton, ROMExtractionPanel
-    panel = ROMExtractionPanel()
+
+    extraction_manager = inject(ExtractionManagerProtocol)
+    panel = ROMExtractionPanel(extraction_manager=extraction_manager)
     qtbot.addWidget(panel)
     panel.show()
 

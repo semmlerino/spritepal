@@ -10,6 +10,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from core.di_container import inject
+from core.protocols.manager_protocols import InjectionManagerProtocol
 from ui.injection_dialog import InjectionDialog
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 
@@ -35,7 +37,8 @@ class TestSignalLoopFixes:
     @pytest.fixture
     def injection_dialog(self, qtbot):
         """Create injection dialog for testing"""
-        dialog = InjectionDialog()
+        injection_manager = inject(InjectionManagerProtocol)
+        dialog = InjectionDialog(injection_manager=injection_manager)
         qtbot.addWidget(dialog)
         return dialog
 
@@ -104,7 +107,8 @@ class TestOffsetParsingFixes:
     @pytest.fixture
     def injection_dialog(self, qtbot):
         """Create injection dialog for testing"""
-        dialog = InjectionDialog()
+        injection_manager = inject(InjectionManagerProtocol)
+        dialog = InjectionDialog(injection_manager=injection_manager)
         qtbot.addWidget(dialog)
         return dialog
 
@@ -180,7 +184,8 @@ class TestROMLoadingSafety:
     @pytest.fixture
     def injection_dialog(self, qtbot):
         """Create injection dialog for testing"""
-        dialog = InjectionDialog()
+        injection_manager = inject(InjectionManagerProtocol)
+        dialog = InjectionDialog(injection_manager=injection_manager)
         qtbot.addWidget(dialog)
         return dialog
 
@@ -367,7 +372,8 @@ class TestInputValidation:
     @pytest.fixture
     def injection_dialog(self, qtbot):
         """Create injection dialog for testing"""
-        dialog = InjectionDialog()
+        injection_manager = inject(InjectionManagerProtocol)
+        dialog = InjectionDialog(injection_manager=injection_manager)
         qtbot.addWidget(dialog)
         return dialog
 

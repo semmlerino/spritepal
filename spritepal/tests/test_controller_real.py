@@ -23,6 +23,9 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtTest import QSignalSpy
 
 from core.controller import ExtractionController
+from core.di_container import inject
+from core.protocols.dialog_protocols import DialogFactoryProtocol
+from core.protocols.manager_protocols import SettingsManagerProtocol
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: Real Qt components
@@ -178,11 +181,16 @@ class TestExtractionControllerReal:
             extraction_manager = factory.create_extraction_manager()
             injection_manager = factory.create_injection_manager()
             session_manager = factory.create_session_manager("TestControllerApp")
+            # Get settings_manager and dialog_factory from DI container
+            settings_manager = inject(SettingsManagerProtocol)
+            dialog_factory = Mock(spec=DialogFactoryProtocol)
 
             yield {
                 "extraction_manager": extraction_manager,
                 "injection_manager": injection_manager,
                 "session_manager": session_manager,
+                "settings_manager": settings_manager,
+                "dialog_factory": dialog_factory,
             }
 
     @pytest.fixture
@@ -192,7 +200,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
         yield ctrl
         # Cleanup any running workers
@@ -211,7 +221,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Verify initialization
@@ -237,7 +249,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Test signal emissions trigger controller methods
@@ -266,7 +280,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Test missing VRAM validation
@@ -290,7 +306,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Test missing CGRAM in color mode
@@ -315,7 +333,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Test nonexistent VRAM file
@@ -426,7 +446,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=extraction_mgr,
             injection_manager=injection_mgr,
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Test that the controller has the manager references
@@ -466,7 +488,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Create invalid file with wrong size
@@ -562,7 +586,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Mock extraction panel methods for preview update
@@ -591,7 +617,9 @@ class TestExtractionControllerReal:
             main_window=mock_main_window,
             extraction_manager=real_managers["extraction_manager"],
             injection_manager=real_managers["injection_manager"],
-            session_manager=real_managers["session_manager"]
+            session_manager=real_managers["session_manager"],
+            settings_manager=real_managers["settings_manager"],
+            dialog_factory=real_managers["dialog_factory"],
         )
 
         # Verify error handler is initialized

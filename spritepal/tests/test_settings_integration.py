@@ -11,7 +11,13 @@ import pytest
 from core.controller import ExtractionController
 from core.di_container import inject
 from core.managers import cleanup_managers, initialize_managers
-from core.protocols.manager_protocols import SettingsManagerProtocol
+from core.protocols.dialog_protocols import DialogFactoryProtocol
+from core.protocols.manager_protocols import (
+    ExtractionManagerProtocol,
+    InjectionManagerProtocol,
+    SessionManagerProtocol,
+    SettingsManagerProtocol,
+)
 from utils.settings_manager import SettingsManager
 
 
@@ -111,8 +117,15 @@ class TestSettingsIntegration:
         initialize_managers("TestApp")
 
         try:
-            # Create controller
-            ExtractionController(mock_main_window)
+            # Create controller with all required dependencies
+            ExtractionController(
+                main_window=mock_main_window,
+                extraction_manager=inject(ExtractionManagerProtocol),
+                session_manager=inject(SessionManagerProtocol),
+                injection_manager=inject(InjectionManagerProtocol),
+                settings_manager=settings,
+                dialog_factory=inject(DialogFactoryProtocol),
+            )
 
             # Controller should be able to access settings
             # (In real implementation, controller would use settings)

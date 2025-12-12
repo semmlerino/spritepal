@@ -19,6 +19,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 class TestDivisionByZeroFixes:
     """Test all division by zero scenarios in scan workers."""
 
+    @pytest.fixture(autouse=True)
+    def setup_managers(self, isolated_managers):
+        """Ensure DI container is initialized for tests that create workers."""
+        yield
+
     def test_scan_worker_zero_range(self):
         """Test SpriteScanWorker with zero scan range."""
         from ui.rom_extraction.workers.scan_worker import SpriteScanWorker

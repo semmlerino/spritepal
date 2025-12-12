@@ -11,7 +11,10 @@ from unittest.mock import Mock, patch
 import pytest
 
 from core.controller import ExtractionController
+from core.di_container import inject
 from core.managers import ExtractionManager, InjectionManager, SessionManager
+from core.protocols.dialog_protocols import DialogFactoryProtocol
+from core.protocols.manager_protocols import SettingsManagerProtocol
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: Real Qt components
@@ -41,19 +44,26 @@ class TestControllerWithRealManagers:
         self,
         real_extraction_manager,
         real_injection_manager,
-        real_session_manager
+        real_session_manager,
+        setup_managers,
     ):
         """Create controller with real managers."""
         # Create real main window with real components
         with RealComponentFactory() as factory:
             main_window = factory.create_main_window()
 
+            # Get settings_manager and dialog_factory from DI container
+            settings_manager = inject(SettingsManagerProtocol)
+            dialog_factory = Mock(spec=DialogFactoryProtocol)
+
             # Create controller with real managers
             controller = ExtractionController(
                 main_window,
                 extraction_manager=real_extraction_manager,
                 injection_manager=real_injection_manager,
-                session_manager=real_session_manager
+                session_manager=real_session_manager,
+                settings_manager=settings_manager,
+                dialog_factory=dialog_factory,
             )
 
             yield controller
@@ -105,24 +115,27 @@ class TestControllerWithRealManagers:
             with patch("core.controller.FileValidator") as mock_validator:
                 mock_validator.validate_file_existence.return_value.is_valid = True
 
-                # Mock dialog (patched at factory import location)
-                with patch("ui.injection_dialog.InjectionDialog") as mock_dialog:
-                    mock_dialog_instance = Mock()
-                    mock_dialog_instance.exec.return_value = True
-                    mock_dialog_instance.get_parameters.return_value = {
-                        "sprite_path": "/test/output.png",
-                        "mode": "vram",
-                        "target_path": "/test/target.vram"
-                    }
-                    mock_dialog.return_value = mock_dialog_instance
+                # Create mock dialog instance
+                mock_dialog_instance = Mock()
+                mock_dialog_instance.exec.return_value = True
+                mock_dialog_instance.get_parameters.return_value = {
+                    "sprite_path": "/test/output.png",
+                    "mode": "vram",
+                    "target_path": "/test/target.vram"
+                }
 
-                    # Start injection
-                    controller.start_injection()
+                # Mock the dialog_factory's create_injection_dialog method
+                controller.dialog_factory.create_injection_dialog = Mock(
+                    return_value=mock_dialog_instance
+                )
 
-                    # Verify dialog was shown with real manager's suggestion
-                    assert mock_dialog.called
-                    # The real InjectionManager's get_smart_vram_suggestion runs with actual logic
-                    assert mock_dialog_instance.exec.called
+                # Start injection
+                controller.start_injection()
+
+                # Verify dialog was shown with real manager's suggestion
+                assert controller.dialog_factory.create_injection_dialog.called
+                # The real InjectionManager's get_smart_vram_suggestion runs with actual logic
+                assert mock_dialog_instance.exec.called
 
     def test_session_persistence_with_real_manager(self, controller_with_real_managers, tmp_path):
         """Test session persistence using real SessionManager."""
@@ -149,6 +162,11 @@ class TestControllerWithRealManagers:
 
 class TestRealManagerBenefits:
     """Demonstrate benefits of using real managers in tests."""
+
+    @pytest.fixture(autouse=True)
+    def setup_di_container(self, isolated_managers):
+        """Ensure DI container is set up for manager creation."""
+        yield
 
     def test_catches_real_validation_bugs(self):
         """Real managers catch actual validation logic bugs."""

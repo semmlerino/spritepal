@@ -10,7 +10,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from core.di_container import inject
 from core.hal_compression import HALCompressionError, HALCompressor
+from core.protocols.manager_protocols import InjectionManagerProtocol
 from core.rom_injector import ROMHeader, ROMInjector
 
 # Systematic pytest markers applied based on test content analysis
@@ -158,7 +160,8 @@ class TestROMInjectionDialog(unittest.TestCase):
         """Test that dialog can be created"""
         from ui.injection_dialog import InjectionDialog
 
-        dialog = InjectionDialog()
+        injection_manager = inject(InjectionManagerProtocol)
+        dialog = InjectionDialog(injection_manager=injection_manager)
         self.qtbot.addWidget(dialog)
 
         # Check tabs exist - tab_widget is created when add_tab is called

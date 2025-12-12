@@ -26,9 +26,13 @@ from core.managers import (
     InjectionManager,
     initialize_managers,
 )
+from core.di_container import inject
+from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
+    SessionManagerProtocol,
+    SettingsManagerProtocol,
 )
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
@@ -129,8 +133,11 @@ class TestQtSignalArchitecture:
         # Create controller with managers as protocols
         controller = ExtractionController(
             main_window=main_window,
+            extraction_manager=extraction_mgr,
+            session_manager=inject(SessionManagerProtocol),
             injection_manager=injection_mgr,
-            extraction_manager=extraction_mgr
+            settings_manager=inject(SettingsManagerProtocol),
+            dialog_factory=inject(DialogFactoryProtocol),
         )
 
         # Connect signal capture to manager signals
@@ -358,8 +365,11 @@ class TestQtSignalArchitecture:
 
         controller = ExtractionController(
             main_window=main_window,
+            extraction_manager=extraction_mgr,
+            session_manager=inject(SessionManagerProtocol),
             injection_manager=injection_mgr,
-            extraction_manager=extraction_mgr
+            settings_manager=inject(SettingsManagerProtocol),
+            dialog_factory=inject(DialogFactoryProtocol),
         )
 
         # Capture controller's handling of manager signals

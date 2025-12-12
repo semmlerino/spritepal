@@ -32,7 +32,9 @@ from core.controller import ExtractionController
 from core.managers.extraction_manager import ExtractionManager
 from core.managers.injection_manager import InjectionManager
 from core.managers.session_manager import SessionManager
+from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.workers import VRAMExtractionWorker
+from utils.settings_manager import SettingsManager
 
 # Unified pytest markers for this consolidated module
 pytestmark = [
@@ -111,16 +113,18 @@ def standard_mock_main_window() -> Any:
 
 
 @pytest.fixture
-def standard_mock_managers() -> tuple[Mock, Mock, Mock]:
+def standard_mock_managers() -> tuple[Mock, Mock, Mock, Mock, Mock]:
     """Create standard mock managers for dependency injection.
 
-    Returns (extraction_manager, injection_manager, session_manager).
+    Returns (extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory).
     This consolidates repeated manager mock creation pattern.
     """
     extraction_manager = Mock(spec=ExtractionManager)
     injection_manager = Mock(spec=InjectionManager)
     session_manager = Mock(spec=SessionManager)
-    return extraction_manager, injection_manager, session_manager
+    settings_manager = Mock(spec=SettingsManager)
+    dialog_factory = Mock(spec=DialogFactoryProtocol)
+    return extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory
 
 
 @pytest.mark.no_manager_setup
@@ -155,13 +159,9 @@ class TestExtractionControllerUnit:
         return standard_mock_main_window
 
     @pytest.fixture
-    def controller(self, main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock]) -> ExtractionController:
+    def controller(self, main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock, Mock]) -> ExtractionController:
         """Create REAL controller instance with mock managers."""
-        extraction_manager, injection_manager, session_manager = standard_mock_managers
-
-        # Create mock settings manager to avoid DI lookup
-        from utils.settings_manager import SettingsManager
-        mock_settings_manager = Mock(spec=SettingsManager)
+        extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory = standard_mock_managers
 
         # Controller now uses ConsoleErrorHandler directly (no UI import)
         controller = ExtractionController(
@@ -169,7 +169,8 @@ class TestExtractionControllerUnit:
             extraction_manager=extraction_manager,
             injection_manager=injection_manager,
             session_manager=session_manager,
-            settings_manager=mock_settings_manager,
+            settings_manager=settings_manager,
+            dialog_factory=dialog_factory,
         )
 
         return controller
@@ -401,13 +402,9 @@ class TestControllerManagerContextIntegration:
     initialization and signal connections without requiring full DI setup.
     """
 
-    def test_controller_manager_access(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock]):
+    def test_controller_manager_access(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock, Mock]):
         """Test that controller can access injected managers."""
-        extraction_manager, injection_manager, session_manager = standard_mock_managers
-
-        # Create mock settings manager to avoid DI lookup
-        from utils.settings_manager import SettingsManager
-        mock_settings_manager = Mock(spec=SettingsManager)
+        extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory = standard_mock_managers
 
         # Controller now uses ConsoleErrorHandler directly (no UI import)
         controller = ExtractionController(
@@ -415,20 +412,17 @@ class TestControllerManagerContextIntegration:
             extraction_manager=extraction_manager,
             injection_manager=injection_manager,
             session_manager=session_manager,
-            settings_manager=mock_settings_manager,
+            settings_manager=settings_manager,
+            dialog_factory=dialog_factory,
         )
         # Verify the exact managers passed are used (not fetched from DI)
         assert controller.extraction_manager is extraction_manager
         assert controller.injection_manager is injection_manager
         assert controller.session_manager is session_manager
 
-    def test_controller_manager_state_persistence(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock]):
+    def test_controller_manager_state_persistence(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock, Mock]):
         """Test that managers maintain their state independently."""
-        extraction_manager, injection_manager, session_manager = standard_mock_managers
-
-        # Create mock settings manager to avoid DI lookup
-        from utils.settings_manager import SettingsManager
-        mock_settings_manager = Mock(spec=SettingsManager)
+        extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory = standard_mock_managers
 
         # Controller now uses ConsoleErrorHandler directly (no UI import)
         controller1 = ExtractionController(
@@ -436,7 +430,8 @@ class TestControllerManagerContextIntegration:
             extraction_manager=extraction_manager,
             injection_manager=injection_manager,
             session_manager=session_manager,
-            settings_manager=mock_settings_manager,
+            settings_manager=settings_manager,
+            dialog_factory=dialog_factory,
         )
         # Set state on the extraction manager
         extraction_manager.test_state = "persistent_value"
@@ -457,7 +452,8 @@ class TestControllerManagerContextIntegration:
             extraction_manager=extraction_manager,
             injection_manager=injection_manager,
             session_manager=session_manager,
-            settings_manager=mock_settings_manager,
+            settings_manager=settings_manager,
+            dialog_factory=dialog_factory,
         )
 
         assert controller2.extraction_manager is controller1.extraction_manager
@@ -486,13 +482,9 @@ class TestPrivateAttributeAccessFix:
         return window
 
     @pytest.fixture
-    def test_controller(self, test_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock]) -> ExtractionController:
+    def test_controller(self, test_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock, Mock]) -> ExtractionController:
         """Create controller instance for private attribute access tests."""
-        extraction_manager, injection_manager, session_manager = standard_mock_managers
-
-        # Create mock settings manager to avoid DI lookup
-        from utils.settings_manager import SettingsManager
-        mock_settings_manager = Mock(spec=SettingsManager)
+        extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory = standard_mock_managers
 
         # Controller now uses ConsoleErrorHandler directly (no UI import)
         controller = ExtractionController(
@@ -500,7 +492,8 @@ class TestPrivateAttributeAccessFix:
             extraction_manager=extraction_manager,
             injection_manager=injection_manager,
             session_manager=session_manager,
-            settings_manager=mock_settings_manager,
+            settings_manager=settings_manager,
+            dialog_factory=dialog_factory,
         )
         return controller
 

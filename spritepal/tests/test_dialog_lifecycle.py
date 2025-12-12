@@ -8,6 +8,8 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
+from core.di_container import inject
+from core.protocols.manager_protocols import InjectionManagerProtocol
 from ui.dialogs import UnifiedManualOffsetDialog as ManualOffsetDialog
 
 # Test characteristics: Real GUI components requiring display
@@ -113,12 +115,14 @@ class TestDialogReopenScenarios:
     """Test various dialog reopen scenarios"""
 
     @pytest.mark.gui
-    def test_non_singleton_dialog_lifecycle(self, qtbot):
+    def test_non_singleton_dialog_lifecycle(self, qtbot, isolated_managers):
         """Test that non-singleton dialogs are properly recreated"""
         from ui.injection_dialog import InjectionDialog
 
+        injection_manager = inject(InjectionManagerProtocol)
+
         # Create first instance
-        dialog1 = InjectionDialog(None, "test.png", "")
+        dialog1 = InjectionDialog(None, "test.png", "", injection_manager=injection_manager)
         qtbot.addWidget(dialog1)
 
         # Non-singleton dialogs CAN have DeleteOnClose
@@ -131,7 +135,7 @@ class TestDialogReopenScenarios:
         dialog1.close()
 
         # Create new instance - should be different object
-        dialog2 = InjectionDialog(None, "test.png", "")
+        dialog2 = InjectionDialog(None, "test.png", "", injection_manager=injection_manager)
         qtbot.addWidget(dialog2)
         id2 = id(dialog2)
 

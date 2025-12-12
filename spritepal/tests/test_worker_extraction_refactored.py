@@ -19,6 +19,9 @@ import pytest
 from PIL import Image
 from PySide6.QtTest import QSignalSpy
 
+from core.di_container import inject
+from core.managers.extraction_manager import ExtractionManager
+from core.protocols.manager_protocols import ExtractionManagerProtocol
 from core.workers.extraction import ROMExtractionWorker, VRAMExtractionWorker
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
@@ -45,6 +48,12 @@ class TestVRAMExtractionWorker:
             yield factory
 
     @pytest.fixture
+    def extraction_manager(self, managers) -> ExtractionManager:
+        """Get extraction manager from session managers."""
+        from typing import cast
+        return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+
+    @pytest.fixture
     def test_files(self, tmp_path):
         """Create real test files for extraction."""
         # Create minimal but valid VRAM file
@@ -67,7 +76,7 @@ class TestVRAMExtractionWorker:
             "output_base": str(output_dir),
         }
 
-    def test_vram_worker_initialization_real(self, managers, test_files):
+    def test_vram_worker_initialization_real(self, extraction_manager, test_files):
         """Test VRAM extraction worker initialization with real manager."""
         params = {
             "vram_path": test_files["vram_path"],
@@ -76,7 +85,7 @@ class TestVRAMExtractionWorker:
         }
 
         # Create worker with real manager (no mocking)
-        worker = VRAMExtractionWorker(params)
+        worker = VRAMExtractionWorker(params, extraction_manager)
 
         # Verify initialization
         assert worker.params == params
@@ -84,7 +93,7 @@ class TestVRAMExtractionWorker:
         assert worker._operation_name == "VRAMExtractionWorker"
         assert worker._connections == []
 
-    def test_vram_manager_signal_connections_real(self, managers, test_files):
+    def test_vram_manager_signal_connections_real(self, extraction_manager, test_files):
         """Test VRAM worker manager signal connections with real manager."""
         params = {
             "vram_path": test_files["vram_path"],
@@ -92,7 +101,7 @@ class TestVRAMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = VRAMExtractionWorker(params)
+        worker = VRAMExtractionWorker(params, extraction_manager)
 
         # Set up signal spies to verify real signal connections
         progress_spy = QSignalSpy(worker.progress)
@@ -116,7 +125,7 @@ class TestVRAMExtractionWorker:
         # Clean up connections
         worker.disconnect_manager_signals()
 
-    def test_vram_preview_signal_conversion_real(self, managers, test_files):
+    def test_vram_preview_signal_conversion_real(self, extraction_manager, test_files):
         """Test that preview signals emit PIL images directly with real manager."""
         params = {
             "vram_path": test_files["vram_path"],
@@ -125,7 +134,7 @@ class TestVRAMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = VRAMExtractionWorker(params)
+        worker = VRAMExtractionWorker(params, extraction_manager)
 
         # Set up signal spies
         preview_spy = QSignalSpy(worker.preview_ready)
@@ -154,7 +163,7 @@ class TestVRAMExtractionWorker:
         # Clean up
         worker.disconnect_manager_signals()
 
-    def test_vram_successful_operation_real(self, managers, test_files):
+    def test_vram_successful_operation_real(self, extraction_manager, test_files):
         """Test successful VRAM extraction operation with real manager."""
         params = {
             "vram_path": test_files["vram_path"],
@@ -165,7 +174,7 @@ class TestVRAMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = VRAMExtractionWorker(params)
+        worker = VRAMExtractionWorker(params, extraction_manager)
 
         # Set up signal spies
         extraction_spy = QSignalSpy(worker.extraction_finished)
@@ -202,7 +211,7 @@ class TestVRAMExtractionWorker:
             assert success is False
             assert "failed" in message.lower()
 
-    def test_vram_operation_error_handling_real(self, managers, tmp_path):
+    def test_vram_operation_error_handling_real(self, extraction_manager, tmp_path):
         """Test VRAM extraction error handling with real manager."""
         # Use invalid file path to trigger real error
         params = {
@@ -211,7 +220,7 @@ class TestVRAMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = VRAMExtractionWorker(params)
+        worker = VRAMExtractionWorker(params, extraction_manager)
 
         # Set up signal spies
         error_spy = QSignalSpy(worker.error)
@@ -232,7 +241,7 @@ class TestVRAMExtractionWorker:
         assert success is False
         assert "failed" in message.lower()
 
-    def test_vram_worker_cancellation_real(self, managers, test_files):
+    def test_vram_worker_cancellation_real(self, extraction_manager, test_files):
         """Test VRAM extraction cancellation with real manager."""
         params = {
             "vram_path": test_files["vram_path"],
@@ -240,7 +249,7 @@ class TestVRAMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = VRAMExtractionWorker(params)
+        worker = VRAMExtractionWorker(params, extraction_manager)
 
         # Request cancellation
         worker.cancel()
@@ -249,7 +258,7 @@ class TestVRAMExtractionWorker:
         with pytest.raises(InterruptedError, match="Operation was cancelled"):
             worker.perform_operation()
 
-    def test_vram_worker_interruption_check_real(self, managers, test_files):
+    def test_vram_worker_interruption_check_real(self, extraction_manager, test_files):
         """Test that worker properly checks for interruption during operation."""
         params = {
             "vram_path": test_files["vram_path"],
@@ -257,7 +266,7 @@ class TestVRAMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = VRAMExtractionWorker(params)
+        worker = VRAMExtractionWorker(params, extraction_manager)
 
         # The worker should check isInterruptionRequested() during long operations
         # This is enforced by the @handle_worker_errors decorator
@@ -270,6 +279,12 @@ class TestVRAMExtractionWorker:
 
 class TestROMExtractionWorker:
     """Test the ROMExtractionWorker class with real components."""
+
+    @pytest.fixture
+    def extraction_manager(self, managers) -> ExtractionManager:
+        """Get extraction manager from session managers."""
+        from typing import cast
+        return cast(ExtractionManager, inject(ExtractionManagerProtocol))
 
     @pytest.fixture
     def test_rom_files(self, tmp_path):
@@ -305,7 +320,7 @@ class TestROMExtractionWorker:
             "output_base": str(output_dir),
         }
 
-    def test_rom_worker_initialization_real(self, managers, test_rom_files):
+    def test_rom_worker_initialization_real(self, extraction_manager, test_rom_files):
         """Test ROM extraction worker initialization with real manager."""
         params = {
             "rom_path": test_rom_files["rom_path"],
@@ -315,7 +330,7 @@ class TestROMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = ROMExtractionWorker(params)
+        worker = ROMExtractionWorker(params, extraction_manager)
 
         # Verify initialization
         assert worker.params == params
@@ -323,7 +338,7 @@ class TestROMExtractionWorker:
         assert worker._operation_name == "ROMExtractionWorker"
         assert worker._connections == []
 
-    def test_rom_manager_signal_connections_real(self, managers, test_rom_files):
+    def test_rom_manager_signal_connections_real(self, extraction_manager, test_rom_files):
         """Test ROM worker manager signal connections with real manager."""
         params = {
             "rom_path": test_rom_files["rom_path"],
@@ -333,7 +348,7 @@ class TestROMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = ROMExtractionWorker(params)
+        worker = ROMExtractionWorker(params, extraction_manager)
 
         # Set up signal spy
         progress_spy = QSignalSpy(worker.progress)
@@ -353,7 +368,7 @@ class TestROMExtractionWorker:
         # Clean up
         worker.disconnect_manager_signals()
 
-    def test_rom_successful_operation_real(self, managers, test_rom_files):
+    def test_rom_successful_operation_real(self, extraction_manager, test_rom_files):
         """Test successful ROM extraction operation with real manager."""
         params = {
             "rom_path": test_rom_files["rom_path"],
@@ -364,7 +379,7 @@ class TestROMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = ROMExtractionWorker(params)
+        worker = ROMExtractionWorker(params, extraction_manager)
 
         # Set up signal spies
         extraction_spy = QSignalSpy(worker.extraction_finished)
@@ -391,7 +406,7 @@ class TestROMExtractionWorker:
             success, message = operation_spy.at(0)
             assert success is False
 
-    def test_rom_operation_error_handling_real(self, managers, tmp_path):
+    def test_rom_operation_error_handling_real(self, extraction_manager, tmp_path):
         """Test ROM extraction error handling with real manager."""
         params = {
             "rom_path": str(tmp_path / "nonexistent.sfc"),
@@ -401,7 +416,7 @@ class TestROMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = ROMExtractionWorker(params)
+        worker = ROMExtractionWorker(params, extraction_manager)
 
         # Set up signal spies
         error_spy = QSignalSpy(worker.error)
@@ -419,7 +434,7 @@ class TestROMExtractionWorker:
         success, message = operation_spy.at(0)
         assert success is False
 
-    def test_rom_operation_cancellation_real(self, managers, test_rom_files):
+    def test_rom_operation_cancellation_real(self, extraction_manager, test_rom_files):
         """Test ROM extraction cancellation with real manager."""
         params = {
             "rom_path": test_rom_files["rom_path"],
@@ -429,7 +444,7 @@ class TestROMExtractionWorker:
         }
 
         # Create worker with real manager
-        worker = ROMExtractionWorker(params)
+        worker = ROMExtractionWorker(params, extraction_manager)
 
         # Cancel the worker
         worker.cancel()

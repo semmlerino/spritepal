@@ -29,10 +29,25 @@ from PySide6.QtWidgets import (
 )
 
 # Import SpritePal components
+from core.di_container import inject
+from core.protocols.manager_protocols import (
+    ROMCacheProtocol,
+    SessionManagerProtocol,
+    SettingsManagerProtocol,
+)
 from launch_spritepal import SpritePalApp
 from ui.main_window import MainWindow
 from ui.styles.components import get_button_style, get_dark_preview_style
 from ui.styles.theme import COLORS, get_theme_style
+
+
+def _create_main_window():
+    """Create MainWindow with DI dependencies."""
+    return MainWindow(
+        settings_manager=inject(SettingsManagerProtocol),
+        rom_cache=inject(ROMCacheProtocol),
+        session_manager=inject(SessionManagerProtocol),
+    )
 
 # Import manual offset dialog
 try:
@@ -130,7 +145,7 @@ class TestMainWindowIntegration:
     def test_main_window_with_dark_theme_styling(self, qtbot) -> None:
         """Test MainWindow with real dark theme styling applied."""
         # Create real MainWindow
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
 
         # Apply dark theme
@@ -478,7 +493,7 @@ class TestCompleteUserWorkflowIntegration:
     def test_theme_consistency_across_workflow(self, qtbot) -> None:
         """Test that dark theme is consistent across entire user workflow."""
         # Step 1: Create main window
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
 
         # Step 2: Apply application theme
@@ -514,7 +529,7 @@ class TestCompleteUserWorkflowIntegration:
     def test_responsive_ui_with_size_constraints(self, qtbot) -> None:
         """Test that UI responds correctly to size constraints (1000x650)."""
         # Create main window
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
 
         # Test minimum size constraints
@@ -657,6 +672,6 @@ def test_app(qtbot) -> Generator[SpritePalApp, None, None]:
 def test_main_window(qtbot) -> Generator[MainWindow, None, None]:
     """Fixture providing a test MainWindow with mocked dependencies."""
     with mock_manager_dependencies():
-        main_window = MainWindow()
+        main_window = _create_main_window()
         qtbot.addWidget(main_window)
         yield main_window

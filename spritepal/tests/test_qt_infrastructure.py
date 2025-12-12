@@ -99,27 +99,27 @@ def test_qt_gui_functionality(qtbot):
         assert hasattr(qtbot, 'waitSignal')
         assert hasattr(qtbot, 'addWidget')
 
-def test_safe_qtbot_fallback(safe_qtbot):
-    """Test that safe_qtbot provides proper fallback in headless environments."""
-    # Should always have required methods
-    assert hasattr(safe_qtbot, 'addWidget')
-    assert hasattr(safe_qtbot, 'waitSignal')
-    assert hasattr(safe_qtbot, 'wait')
-    assert hasattr(safe_qtbot, 'mouseClick')
-    assert hasattr(safe_qtbot, 'keyClick')
+def test_qtbot_functionality(qtbot):
+    """Test that qtbot provides required methods for headless testing."""
+    # Should always have required methods (standard pytest-qt fixture)
+    assert hasattr(qtbot, 'addWidget')
+    assert hasattr(qtbot, 'waitSignal')
+    assert hasattr(qtbot, 'wait')
+    assert hasattr(qtbot, 'mouseClick')
+    assert hasattr(qtbot, 'keyClick')
 
     # Verify these methods are callable (signature check only)
-    assert callable(safe_qtbot.addWidget)
-    assert callable(safe_qtbot.waitSignal)
-    assert callable(safe_qtbot.wait)
+    assert callable(qtbot.addWidget)
+    assert callable(qtbot.waitSignal)
+    assert callable(qtbot.wait)
 
-def test_safe_qapp_functionality(safe_qapp):
-    """Test that safe_qapp provides necessary QApplication functionality."""
+def test_qapp_functionality(qapp):
+    """Test that qapp provides necessary QApplication functionality."""
     # Should always have processEvents method
-    assert hasattr(safe_qapp, 'processEvents')
+    assert hasattr(qapp, 'processEvents')
 
     # Should be callable without errors
-    safe_qapp.processEvents()
+    qapp.processEvents()
 
 @pytest.mark.no_gui
 def test_no_gui_marker():

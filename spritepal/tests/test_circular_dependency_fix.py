@@ -7,6 +7,12 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 from core.controller import ExtractionController
+from core.di_container import inject
+from core.protocols.manager_protocols import (
+    ROMCacheProtocol,
+    SessionManagerProtocol,
+    SettingsManagerProtocol,
+)
 from ui.main_window import MainWindow
 
 
@@ -33,23 +39,32 @@ class TestCircularDependencyFix:
         # Cleanup managers to prevent state pollution
         cleanup_managers()
 
-    def test_main_window_creates_without_controller(self, qtbot, app, initialized_managers):
+    @pytest.fixture
+    def main_window_deps(self, initialized_managers):
+        """Get MainWindow dependencies from DI container."""
+        return {
+            "settings_manager": inject(SettingsManagerProtocol),
+            "rom_cache": inject(ROMCacheProtocol),
+            "session_manager": inject(SessionManagerProtocol),
+        }
+
+    def test_main_window_creates_without_controller(self, qtbot, app, main_window_deps):
         """Test that MainWindow can be created without initializing the controller.
 
         This tests the lazy initialization - controller should not be created
         during MainWindow.__init__, breaking the circular dependency.
         """
-        # Create MainWindow - this should NOT create the controller
-        window = MainWindow()
+        # Create MainWindow with DI dependencies - this should NOT create the controller
+        window = MainWindow(**main_window_deps)
         qtbot.addWidget(window)  # Ensure proper cleanup
 
         # Verify controller is not created yet (lazy initialization)
         assert window._controller is None, "Controller should not be created during __init__"
 
 
-    def test_controller_setter_works(self, qtbot, app, initialized_managers):
+    def test_controller_setter_works(self, qtbot, app, main_window_deps):
         """Test that controller setter works for testing purposes."""
-        window = MainWindow()
+        window = MainWindow(**main_window_deps)
         qtbot.addWidget(window)  # Ensure proper cleanup
 
         # Create a mock controller
@@ -77,13 +92,13 @@ class TestCircularDependencyFix:
         assert ExtractionController is not None
 
     @pytest.mark.timeout(5)  # Should complete quickly, not hang
-    def test_main_window_creation_doesnt_hang(self, qtbot, app, initialized_managers):
+    def test_main_window_creation_doesnt_hang(self, qtbot, app, main_window_deps):
         """Test that MainWindow creation doesn't hang due to circular dependency.
 
         This test has a timeout to ensure it doesn't hang forever.
         """
         # This should complete quickly, not hang
-        window = MainWindow()
+        window = MainWindow(**main_window_deps)
         qtbot.addWidget(window)  # Ensure proper cleanup
 
         # If we get here, it didn't hang

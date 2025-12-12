@@ -21,7 +21,9 @@ This replaces test_main_window_state_integration.py which heavily mocked:
 from __future__ import annotations
 
 import sys
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Generator
 from unittest.mock import patch
 
 import pytest
@@ -80,7 +82,7 @@ class TestRealMainWindowStateIntegration:
         self.qt_app = ApplicationFactory.get_application()
 
         # Initialize real manager factory
-        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory()
 
         # Initialize test data repository
         self.test_data = DataRepository()
@@ -98,6 +100,16 @@ class TestRealMainWindowStateIntegration:
         self.test_data.cleanup()
         cleanup_managers()
 
+    @contextmanager
+    def main_window_test(self) -> Generator[MainWindow, None, None]:
+        """Context manager for creating MainWindow with proper DI dependencies."""
+        main_window = self.manager_factory.create_main_window()
+        try:
+            yield main_window
+        finally:
+            main_window.close()
+            self.qt_app.processEvents()
+
     def test_real_main_window_creation_and_qt_lifecycle(self):
         """
         Test real MainWindow creation with actual Qt lifecycle validation.
@@ -109,7 +121,7 @@ class TestRealMainWindowStateIntegration:
         - Memory leaks from Qt object creation
         """
         # Create real MainWindow (vs 200+ lines of mock creation)
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Validate actual Qt parent relationship
             # Note: QMainWindow should NOT have a parent (it's a top-level window)
             assert main_window.parent() is None, "MainWindow should be a top-level window with no parent"
@@ -149,7 +161,7 @@ class TestRealMainWindowStateIntegration:
         - Qt style sheet application during state changes
         - Real event handling during state transitions
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Set up real test data (vs mock data)
             extraction_data = self.test_data.get_vram_extraction_data("medium")
 
@@ -208,7 +220,7 @@ class TestRealMainWindowStateIntegration:
         - Signal parameter type validation
         - Real Qt event loop integration
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Set up real signal spies (vs mock signal tracking)
             QSignalSpy(main_window.extract_requested)
             editor_spy = QSignalSpy(main_window.open_in_editor_requested)
@@ -271,7 +283,7 @@ class TestRealMainWindowStateIntegration:
         - Widget state validation during parameter gathering
         - Integration between multiple UI panels
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Set up real UI values (vs mock.text.return_value simulation)
             QTest.keyClicks(main_window.output_name_edit, "param_test_output")
 
@@ -321,7 +333,7 @@ class TestRealMainWindowStateIntegration:
         - Widget enable/disable state recovery
         - Real error dialog integration (mocked to prevent blocking in headless mode)
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Set up initial state
             QTest.keyClicks(main_window.output_name_edit, "error_test_sprites")
 
@@ -355,7 +367,7 @@ class TestRealMainWindowStateIntegration:
         - Cross-component state synchronization
         - Real Qt layout and widget hierarchy issues
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Validate real component integration (vs mock component creation)
             assert hasattr(main_window, "extraction_panel"), "Should have real ExtractionPanel"
             assert hasattr(main_window, "rom_extraction_panel"), "Should have real ROMExtractionPanel"
@@ -382,7 +394,7 @@ class TestRealMainWindowWorkflowIntegration:
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory()
         self.test_data = DataRepository()
         initialize_managers(app_name="SpritePal-Test")
 
@@ -391,6 +403,16 @@ class TestRealMainWindowWorkflowIntegration:
         self.manager_factory.cleanup()
         self.test_data.cleanup()
         cleanup_managers()
+
+    @contextmanager
+    def main_window_test(self) -> Generator[MainWindow, None, None]:
+        """Context manager for creating MainWindow with proper DI dependencies."""
+        main_window = self.manager_factory.create_main_window()
+        try:
+            yield main_window
+        finally:
+            main_window.close()
+            self.qt_app.processEvents()
 
     def test_real_extraction_workflow_end_to_end(self):
         """
@@ -402,7 +424,7 @@ class TestRealMainWindowWorkflowIntegration:
         - Real Qt event handling during workflow
         - Real threading integration with UI updates
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Get real test data (vs mock file paths)
             self.test_data.get_vram_extraction_data("medium")
 
@@ -434,7 +456,7 @@ class TestRealMainWindowWorkflowIntegration:
         - Real file path validation
         - SessionManager integration with MainWindow
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Test real session manager integration (vs mock session manager)
             assert main_window.session_manager is not None, "Should have real session manager"
 
@@ -466,7 +488,7 @@ class TestRealMainWindowWorkflowIntegration:
         - Real menu action triggering
         - Menu-UI state synchronization
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Validate real menu bar exists (vs mock menu simulation)
             menubar = main_window.menuBar()
             assert menubar is not None, "Should have real QMenuBar"
@@ -490,7 +512,7 @@ class TestBugDiscoveryRealVsMocked:
     def setup_test_infrastructure(self):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory()
         self.test_data = DataRepository()
         initialize_managers(app_name="SpritePal-Test")
 
@@ -500,6 +522,16 @@ class TestBugDiscoveryRealVsMocked:
         self.test_data.cleanup()
         cleanup_managers()
 
+    @contextmanager
+    def main_window_test(self) -> Generator[MainWindow, None, None]:
+        """Context manager for creating MainWindow with proper DI dependencies."""
+        main_window = self.manager_factory.create_main_window()
+        try:
+            yield main_window
+        finally:
+            main_window.close()
+            self.qt_app.processEvents()
+
     def test_discovered_bug_qt_widget_hierarchy_issues(self):
         """
         Test that exposes Qt widget hierarchy bugs mocks would hide.
@@ -507,7 +539,7 @@ class TestBugDiscoveryRealVsMocked:
         REAL BUG DISCOVERED: Complex Qt widget hierarchies can have parent/child
         relationship issues that cause memory leaks or event handling problems.
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Test Qt widget hierarchy integrity (MOCKS CAN'T TEST THIS)
             def validate_widget_hierarchy(widget, parent=None):
                 """Recursively validate Qt widget hierarchy."""
@@ -528,7 +560,7 @@ class TestBugDiscoveryRealVsMocked:
         REAL BUG DISCOVERED: Signal connections in complex Qt applications can have
         timing issues where signals are emitted before connections are established.
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Test that signals are properly connected after construction
             # (This would catch initialization order bugs)
 
@@ -556,7 +588,7 @@ class TestBugDiscoveryRealVsMocked:
         REAL BUG DISCOVERED: Complex UI state changes can have synchronization
         issues where widget states get out of sync.
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Test state synchronization between related widgets
             # (This catches state management bugs mocks hide)
 
@@ -589,7 +621,7 @@ class TestBugDiscoveryRealVsMocked:
         This is a classic UI state inconsistency bug that 1600+ lines of mocks
         would completely hide.
         """
-        with qt_widget_test(MainWindow) as main_window:
+        with self.main_window_test() as main_window:
             # Initial state - button should be disabled
             assert main_window.open_editor_button.isEnabled() is False
             assert main_window._output_path == ""

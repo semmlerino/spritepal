@@ -14,6 +14,8 @@ import pytest
 
 from core.controller import ExtractionController
 from core.managers import ExtractionManager, InjectionManager, SessionManager
+from core.protocols.dialog_protocols import DialogFactoryProtocol
+from utils.settings_manager import SettingsManager
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -39,13 +41,17 @@ class TestControllerDependencyInjection:
         mock_extraction_manager = Mock(spec=ExtractionManager)
         mock_session_manager = Mock(spec=SessionManager)
         mock_injection_manager = Mock(spec=InjectionManager)
+        mock_settings_manager = Mock(spec=SettingsManager)
+        mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
         # Create controller with injected managers
         controller = ExtractionController(
             mock_main_window,
             extraction_manager=mock_extraction_manager,
             session_manager=mock_session_manager,
-            injection_manager=mock_injection_manager
+            injection_manager=mock_injection_manager,
+            settings_manager=mock_settings_manager,
+            dialog_factory=mock_dialog_factory,
         )
 
         # Verify the exact same objects are used
@@ -61,6 +67,8 @@ class TestControllerDependencyInjection:
         mock_extraction_manager = Mock(spec=ExtractionManager)
         mock_injection_manager = Mock(spec=InjectionManager)
         mock_session_manager = Mock(spec=SessionManager)
+        mock_settings_manager = Mock(spec=SettingsManager)
+        mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
         # Set up signals as Mock objects
         mock_extraction_manager.cache_operation_started = Mock()
@@ -77,7 +85,9 @@ class TestControllerDependencyInjection:
             mock_main_window,
             extraction_manager=mock_extraction_manager,
             session_manager=mock_session_manager,
-            injection_manager=mock_injection_manager
+            injection_manager=mock_injection_manager,
+            settings_manager=mock_settings_manager,
+            dialog_factory=mock_dialog_factory,
         )
 
         # Verify signals were connected

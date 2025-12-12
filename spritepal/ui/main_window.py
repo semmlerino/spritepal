@@ -779,8 +779,23 @@ class MainWindow(QMainWindow):
         if self._controller is None:
             # Import here to avoid circular dependency at module level
             from core.controller import ExtractionController
+            from core.di_container import inject
+            from core.protocols.dialog_protocols import DialogFactoryProtocol
+            from core.protocols.manager_protocols import (
+                ExtractionManagerProtocol,
+                InjectionManagerProtocol,
+                SessionManagerProtocol,
+            )
+
             # MainWindow implements MainWindowProtocol interface
-            self._controller = ExtractionController(self, settings_manager=self.settings_manager)  # type: ignore[arg-type]
+            self._controller = ExtractionController(
+                self,  # type: ignore[arg-type]  # MainWindow implements protocol
+                extraction_manager=inject(ExtractionManagerProtocol),
+                session_manager=inject(SessionManagerProtocol),
+                injection_manager=inject(InjectionManagerProtocol),
+                settings_manager=self.settings_manager,
+                dialog_factory=inject(DialogFactoryProtocol),
+            )
         return self._controller
 
     @controller.setter
