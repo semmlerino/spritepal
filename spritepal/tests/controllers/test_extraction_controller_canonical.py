@@ -286,57 +286,87 @@ class TestExtractionControllerUnit:
             mock_worker.start.assert_called_once()
 
     def test_on_progress_handler(self, controller: ExtractionController, main_window: Any):
-        """Test progress message handler."""
+        """Test progress message handler emits signal."""
         test_message = "Extracting sprites..."
+        # Capture signal emission
+        signal_received = []
+        controller.status_message_changed.connect(lambda msg: signal_received.append(msg))
         controller._on_progress(50, test_message)
-        main_window.status_bar.showMessage.assert_called_once_with(test_message)
+        assert len(signal_received) == 1
+        assert signal_received[0] == test_message
 
     def test_on_preview_ready_handler(self, controller: ExtractionController, main_window: Any):
-        """Test preview ready handler."""
+        """Test preview ready handler emits signals."""
         from PIL import Image
         test_image = Image.new('RGB', (8, 8), color='red')
         tile_count = 42
+        # Capture signal emissions
+        preview_signals = []
+        info_signals = []
+        controller.preview_ready.connect(lambda px, tc: preview_signals.append((px, tc)))
+        controller.preview_info_changed.connect(lambda info: info_signals.append(info))
         # Patch pil_to_qpixmap to avoid Qt context requirement
         with patch('core.controller.pil_to_qpixmap') as mock_pil_to_qpixmap:
             mock_pil_to_qpixmap.return_value = Mock()  # Return mock QPixmap
             controller._on_preview_ready(test_image, tile_count)
-        main_window.sprite_preview.set_preview.assert_called_once()
-        main_window.preview_coordinator.update_preview_info.assert_called_once()
+        assert len(preview_signals) == 1
+        assert preview_signals[0][1] == tile_count
+        assert len(info_signals) == 1
+        assert f"{tile_count}" in info_signals[0]
 
     def test_on_preview_image_ready_handler(self, controller: ExtractionController, main_window: Any):
-        """Test preview image ready handler."""
+        """Test preview image ready handler emits signal."""
         from PIL import Image
         test_image = Image.new('L', (8, 8), color=128)
+        # Capture signal emission
+        signals_received = []
+        controller.grayscale_image_ready.connect(lambda img: signals_received.append(img))
         controller._on_preview_image_ready(test_image)
-        main_window.sprite_preview.set_grayscale_image.assert_called_once()
+        assert len(signals_received) == 1
+        assert signals_received[0] is test_image
 
     def test_on_palettes_ready_handler(self, controller: ExtractionController, main_window: Any):
-        """Test palettes ready handler."""
+        """Test palettes ready handler emits signal."""
         test_palettes = {8: [[0, 0, 0], [255, 0, 0]]}
+        # Capture signal emission
+        signals_received = []
+        controller.palettes_ready.connect(lambda p: signals_received.append(p))
         controller._on_palettes_ready(test_palettes)
-        main_window.palette_preview.set_all_palettes.assert_called_once_with(test_palettes)
-        main_window.sprite_preview.set_palettes.assert_called_once_with(test_palettes)
+        assert len(signals_received) == 1
+        assert signals_received[0] == test_palettes
 
     def test_on_active_palettes_ready_handler(self, controller: ExtractionController, main_window: Any):
-        """Test active palettes ready handler."""
+        """Test active palettes ready handler emits signal."""
         active_palettes = [8, 9]
+        # Capture signal emission
+        signals_received = []
+        controller.active_palettes_ready.connect(lambda p: signals_received.append(p))
         controller._on_active_palettes_ready(active_palettes)
-        main_window.palette_preview.highlight_active_palettes.assert_called_once_with(active_palettes)
+        assert len(signals_received) == 1
+        assert signals_received[0] == active_palettes
 
     def test_on_extraction_finished_handler(self, controller: ExtractionController, main_window: Any):
-        """Test extraction finished handler."""
+        """Test extraction finished handler emits signal and cleans up worker."""
         extracted_files = ["sprite.png"]
-        controller.worker = DummyWorker() # Simulate worker being active
+        # Capture signal emission
+        signals_received = []
+        controller.extraction_completed.connect(lambda f: signals_received.append(f))
+        controller.worker = DummyWorker()  # Simulate worker being active
         controller._on_extraction_finished(extracted_files)
-        main_window.extraction_complete.assert_called_once_with(extracted_files)
+        assert len(signals_received) == 1
+        assert signals_received[0] == extracted_files
         assert controller.worker is None
 
     def test_on_extraction_error_handler(self, controller: ExtractionController, main_window: Any):
-        """Test extraction error handler."""
+        """Test extraction error handler emits signal and cleans up worker."""
         error_message = "Failed to read VRAM file"
-        controller.worker = DummyWorker() # Simulate worker being active
+        # Capture signal emission
+        signals_received = []
+        controller.extraction_error.connect(lambda msg: signals_received.append(msg))
+        controller.worker = DummyWorker()  # Simulate worker being active
         controller._on_extraction_error(error_message)
-        main_window.extraction_failed.assert_called_once_with(error_message)
+        assert len(signals_received) == 1
+        assert signals_received[0] == error_message
         assert controller.worker is None
 
     @patch("core.controller.subprocess.Popen")

@@ -796,7 +796,52 @@ class MainWindow(QMainWindow):
                 settings_manager=self.settings_manager,
                 dialog_factory=inject(DialogFactoryProtocol),
             )
+            # Connect controller output signals for decoupled UI updates
+            self._connect_controller_signals(self._controller)
         return self._controller
+
+    def _connect_controller_signals(self, ctrl: ExtractionController) -> None:
+        """Connect controller output signals to MainWindow slots.
+
+        This enables fully decoupled communication where the controller
+        emits signals instead of calling MainWindow methods directly.
+        """
+        # Status messages
+        ctrl.status_message_changed.connect(self.status_bar.showMessage)
+
+        # Preview updates
+        ctrl.preview_ready.connect(self._on_controller_preview_ready)
+        ctrl.grayscale_image_ready.connect(self._on_controller_grayscale_ready)
+
+        # Palette updates
+        ctrl.palettes_ready.connect(self._on_controller_palettes_ready)
+        ctrl.active_palettes_ready.connect(self._on_controller_active_palettes_ready)
+
+        # Extraction completion
+        ctrl.extraction_completed.connect(self.extraction_complete)
+        ctrl.extraction_error.connect(self.extraction_failed)
+
+        # Cache badge operations
+        ctrl.cache_badge_show.connect(self.show_cache_operation_badge)
+        ctrl.cache_badge_hide.connect(self.hide_cache_operation_badge)
+
+    def _on_controller_preview_ready(self, result: object, tile_count: int) -> None:
+        """Handle preview ready signal from controller."""
+        self.sprite_preview.set_preview(result, tile_count)
+
+    def _on_controller_grayscale_ready(self, image: object) -> None:
+        """Handle grayscale image ready signal from controller."""
+        self.sprite_preview.set_grayscale_image(image)
+
+    def _on_controller_palettes_ready(self, palettes: object) -> None:
+        """Handle palettes ready signal from controller."""
+        if hasattr(self, "palette_preview") and self.palette_preview:
+            self.palette_preview.set_all_palettes(palettes)  # type: ignore[arg-type]
+
+    def _on_controller_active_palettes_ready(self, palettes: object) -> None:
+        """Handle active palettes highlight signal from controller."""
+        if hasattr(self, "palette_preview") and self.palette_preview:
+            self.palette_preview.highlight_active_palettes(palettes)  # type: ignore[arg-type]
 
     @controller.setter
     def controller(self, value: ExtractionController) -> None:

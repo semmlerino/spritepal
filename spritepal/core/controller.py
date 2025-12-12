@@ -26,13 +26,12 @@ if TYPE_CHECKING:
         SettingsManagerProtocol,
     )
 
-from core.protocols.error_handler_protocol import ErrorHandlerProtocol
-
 from core.console_error_handler import ConsoleErrorHandler
 from core.managers import (
     ExtractionManager,
     InjectionManager,
 )
+from core.protocols.error_handler_protocol import ErrorHandlerProtocol
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 from utils.constants import (
@@ -253,10 +252,7 @@ class ExtractionController(QObject):
 
     def _on_progress(self, percent: int, message: str) -> None:
         """Handle progress updates"""
-        # Emit signal for decoupled UI updates
         self.status_message_changed.emit(message)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.status_bar.showMessage(message)
 
     def _on_preview_ready(self, pil_image: Image.Image, tile_count: int) -> None:
         """Handle preview ready - convert PIL Image to QPixmap in main thread"""
@@ -264,51 +260,31 @@ class ExtractionController(QObject):
         # Worker now emits PIL Image to avoid Qt threading violations
         pixmap = pil_to_qpixmap(pil_image)
         if pixmap is not None:
-            # Emit signals for decoupled UI updates
             self.preview_ready.emit(pixmap, tile_count)
             self.preview_info_changed.emit(f"Tiles: {tile_count}")
-            # Direct calls for backward compatibility (to be removed)
-            self.main_window.sprite_preview.set_preview(pixmap, tile_count)
-            self.main_window.preview_coordinator.update_preview_info(f"Tiles: {tile_count}")
         else:
             logger.error("Failed to convert PIL image to QPixmap for preview")
 
     def _on_preview_image_ready(self, pil_image: Image.Image) -> None:
         """Handle preview PIL image ready"""
-        # Emit signal for decoupled UI updates
         self.grayscale_image_ready.emit(pil_image)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.sprite_preview.set_grayscale_image(pil_image)
 
     def _on_palettes_ready(self, palettes: dict[str, list[tuple[int, int, int]]]) -> None:
         """Handle palettes ready"""
-        # Emit signal for decoupled UI updates
         self.palettes_ready.emit(palettes)
-        # Direct calls for backward compatibility (to be removed)
-        self.main_window.palette_preview.set_all_palettes(palettes)
-        self.main_window.sprite_preview.set_palettes(palettes)
 
     def _on_active_palettes_ready(self, active_palettes: list[int]) -> None:
         """Handle active palettes ready"""
-        # Emit signal for decoupled UI updates
         self.active_palettes_ready.emit(active_palettes)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.palette_preview.highlight_active_palettes(active_palettes)
 
     def _on_extraction_finished(self, extracted_files: list[str]) -> None:
         """Handle extraction finished"""
-        # Emit signal for decoupled UI updates
         self.extraction_completed.emit(extracted_files)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.extraction_complete(extracted_files)
         self._cleanup_worker()
 
     def _on_extraction_error(self, error_message: str, exception: Exception | None = None) -> None:
         """Handle extraction error"""
-        # Emit signal for decoupled UI updates
         self.extraction_error.emit(error_message)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.extraction_failed(error_message)
         self._cleanup_worker()
 
     def _cleanup_worker(self) -> None:
@@ -338,10 +314,7 @@ class ExtractionController(QObject):
 
             if not vram_path:
                 logger.warning("VRAM path is empty or None")
-                # Emit signal for decoupled UI updates
                 self.status_message_changed.emit("VRAM path not available")
-                # Direct call for backward compatibility (to be removed)
-                self.main_window.status_bar.showMessage("VRAM path not available")
                 return
 
             # Use PreviewGenerator service for unified preview generation
@@ -358,19 +331,13 @@ class ExtractionController(QObject):
             # Generate preview with progress tracking
             def progress_callback(percent: int, message: str) -> None:
                 progress_msg = f"{message} ({percent}%)"
-                # Emit signal for decoupled UI updates
                 self.status_message_changed.emit(progress_msg)
-                # Direct call for backward compatibility (to be removed)
-                self.main_window.status_bar.showMessage(progress_msg)
 
             result = self.preview_generator.generate_preview(preview_request, progress_callback)
 
             if result is None:
                 logger.error("Preview generation failed")
-                # Emit signal for decoupled UI updates
                 self.status_message_changed.emit("Preview generation failed")
-                # Direct call for backward compatibility (to be removed)
-                self.main_window.status_bar.showMessage("Preview generation failed")
                 return
 
             logger.debug(f"Generated preview with {result.tile_count} tiles, cached: {result.cached}")
@@ -380,24 +347,15 @@ class ExtractionController(QObject):
 
             # Update preview without resetting view (for real-time slider updates)
             logger.debug("Updating sprite preview widget")
-            # Emit signals for decoupled UI updates
             self.preview_updated.emit(pixmap, num_tiles)
-            # Direct call for backward compatibility (to be removed)
-            self.main_window.sprite_preview.update_preview(pixmap, num_tiles)
 
             info_text = f"Tiles: {num_tiles} (Offset: 0x{offset:04X})"
             logger.debug(f"Setting preview info text: {info_text}")
-            # Emit signal for decoupled UI updates
             self.preview_info_changed.emit(info_text)
-            # Direct call for backward compatibility (to be removed)
-            self.main_window.preview_coordinator.update_preview_info(info_text)
 
             # Also update the grayscale image for palette application
             logger.debug("Setting grayscale image in sprite preview")
-            # Emit signal for decoupled UI updates
             self.grayscale_image_ready.emit(img)
-            # Direct call for backward compatibility (to be removed)
-            self.main_window.sprite_preview.set_grayscale_image(img)
 
             logger.debug("Preview update completed successfully")
 
@@ -408,26 +366,10 @@ class ExtractionController(QObject):
             # Log through error handler
             self.error_handler.handle_exception(e, f"Preview update with offset 0x{offset:04X}")
 
-            # Emit signal for decoupled UI updates
+            # Emit signals for UI updates
             self.status_message_changed.emit(error_msg)
-
-            # Try to show error in status bar (backward compatibility)
-            try:
-                self.main_window.status_bar.showMessage(error_msg)
-            except Exception:
-                logger.exception("Failed to show error in status bar")
-
-            # Try to clear preview on error to prevent showing stale data
-            try:
-                logger.debug("Attempting to clear preview due to error")
-                # Emit signals for decoupled UI updates
-                self.preview_cleared.emit()
-                self.preview_info_changed.emit("Preview update failed")
-                # Direct calls for backward compatibility (to be removed)
-                self.main_window.sprite_preview.clear_preview()
-                self.main_window.preview_coordinator.update_preview_info("Preview update failed")
-            except Exception:
-                logger.exception("Failed to clear preview on error")
+            self.preview_cleared.emit()
+            self.preview_info_changed.emit("Preview update failed")
 
     def open_in_editor(self, sprite_file: str) -> None:
         """Open the extracted sprites in the pixel editor"""
@@ -658,26 +600,17 @@ class ExtractionController(QObject):
                 if not success:
                     # Log through error handler
                     self.error_handler.handle_warning("Injection", "Failed to start injection")
-                    # Emit signal for decoupled UI updates
                     self.status_message_changed.emit("Failed to start injection")
-                    # Direct call for backward compatibility (to be removed)
-                    self.main_window.status_bar.showMessage("Failed to start injection")
 
     def _on_injection_progress(self, message: str) -> None:
         """Handle injection progress updates"""
-        # Emit signal for decoupled UI updates
         self.status_message_changed.emit(message)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.status_bar.showMessage(message)
 
     def _on_injection_finished(self, success: bool, message: str) -> None:
         """Handle injection completion"""
         if success:
             success_msg = f"Injection successful: {message}"
-            # Emit signal for decoupled UI updates
             self.status_message_changed.emit(success_msg)
-            # Direct call for backward compatibility (to be removed)
-            self.main_window.status_bar.showMessage(success_msg)
 
             # Save injection parameters for future use if it was a ROM injection
             current_injection_params = self.session_manager.get("workflow", "current_injection_params")
@@ -699,10 +632,7 @@ class ExtractionController(QObject):
             fail_msg = f"Injection failed: {message}"
             # Log through error handler
             self.error_handler.handle_warning("Injection", fail_msg)
-            # Emit signal for decoupled UI updates
             self.status_message_changed.emit(fail_msg)
-            # Direct call for backward compatibility (to be removed)
-            self.main_window.status_bar.showMessage(fail_msg)
 
         # Clean up
         self._current_injection_dialog = None
@@ -714,35 +644,20 @@ class ExtractionController(QObject):
 
         # Only show if indicators are enabled
         if settings_manager.get("cache", "show_indicators", True):
-            # Show cache operation badge
             badge_text = f"{operation} {cache_type.replace('_', ' ')}"
-            # Emit signal for decoupled UI updates
             self.cache_badge_show.emit(badge_text)
-            # Direct call for backward compatibility (to be removed)
-            self.main_window.show_cache_operation_badge(badge_text)
 
     def _on_cache_hit(self, cache_type: str, time_saved: float) -> None:
         """Handle cache hit notification"""
         settings_manager = self.settings_manager
 
-        # Emit signal to hide badge
         self.cache_badge_hide.emit()
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.hide_cache_operation_badge()
 
         # Only show if indicators are enabled
         if settings_manager.get("cache", "show_indicators", True):
-            # Update status bar with cache hit info
             message = f"Loaded {cache_type.replace('_', ' ')} from cache (saved {time_saved:.1f}s)"
-            # Emit signals for decoupled UI updates
             self.status_message_timed.emit(message, 5000)
             self.cache_status_updated.emit(cache_type, time_saved)
-            # Direct calls for backward compatibility (to be removed)
-            self.main_window.status_bar.showMessage(message, 5000)
-
-            # Update cache status indicator through status bar manager
-            if hasattr(self.main_window.status_bar_manager, "update_cache_status"):
-                self.main_window.status_bar_manager.update_cache_status()
 
     def _on_cache_miss(self, cache_type: str) -> None:
         """Handle cache miss notification"""
@@ -753,26 +668,13 @@ class ExtractionController(QObject):
         """Handle cache saved notification"""
         settings_manager = self.settings_manager
 
-        # Emit signal to hide badge
         self.cache_badge_hide.emit()
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.hide_cache_operation_badge()
 
         # Only show if indicators are enabled
         if settings_manager.get("cache", "show_indicators", True):
-            # Update status bar with cache save info
-            message = f"💾 Saved {count} {cache_type.replace('_', ' ')} to cache"
-            # Emit signals for decoupled UI updates
+            message = f"Saved {count} {cache_type.replace('_', ' ')} to cache"
             self.status_message_timed.emit(message, 5000)
             self.cache_refresh_requested.emit()
-            # Direct calls for backward compatibility (to be removed)
-            self.main_window.status_bar.showMessage(message, 5000)
-            # Update cache status widget if method exists
-            if hasattr(self.main_window, "update_cache_status"):
-                self.main_window.update_cache_status()  # type: ignore[attr-defined]
-            # Refresh ROM file widget cache display
-            if hasattr(self.main_window, "rom_extraction_panel") and hasattr(self.main_window.rom_extraction_panel, "rom_file_widget"):
-                self.main_window.rom_extraction_panel.rom_file_widget.refresh_cache_status()
 
     def start_rom_extraction(self, params: dict[str, Any]) -> None:
         """Start ROM sprite extraction process"""
@@ -794,25 +696,16 @@ class ExtractionController(QObject):
 
     def _on_rom_progress(self, percent: int, message: str) -> None:
         """Handle ROM extraction progress"""
-        # Emit signal for decoupled UI updates
         self.status_message_changed.emit(message)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.status_bar.showMessage(message)
 
     def _on_rom_extraction_finished(self, extracted_files: list[str]) -> None:
         """Handle ROM extraction completion"""
-        # Emit signal for decoupled UI updates
         self.extraction_completed.emit(extracted_files)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.extraction_complete(extracted_files)
         self._cleanup_rom_worker()
 
     def _on_rom_extraction_error(self, error_message: str) -> None:
         """Handle ROM extraction error"""
-        # Emit signal for decoupled UI updates
         self.extraction_error.emit(error_message)
-        # Direct call for backward compatibility (to be removed)
-        self.main_window.extraction_failed(error_message)
         self._cleanup_rom_worker()
 
     def _cleanup_rom_worker(self) -> None:
