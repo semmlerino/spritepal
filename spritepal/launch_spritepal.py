@@ -63,12 +63,9 @@ from core.protocols.manager_protocols import (
     SessionManagerProtocol,
     SettingsManagerProtocol,
 )
-from ui.common.error_handler import get_error_handler
 from ui.main_window import MainWindow
 from ui.styles.accessibility import initialize_accessibility
-from utils.error_display_adapter import ErrorHandlerAdapter
 from utils.logging_config import get_logger, setup_logging
-from utils.unified_error_handler import set_global_error_display
 
 
 def handle_exception(
@@ -502,13 +499,6 @@ def main():
         logger.critical(f"Failed to initialize managers: {e}")
         logger.critical("Application cannot start without properly initialized managers")
         sys.exit(1)
-
-    # Set up error handler integration (breaks circular dependency)
-    logger.info("Setting up error handler integration...")
-    ui_error_handler = get_error_handler()
-    adapter = ErrorHandlerAdapter(ui_error_handler)
-    set_global_error_display(adapter)
-    logger.info("Error handler integration complete")
 
     try:
         # Create application

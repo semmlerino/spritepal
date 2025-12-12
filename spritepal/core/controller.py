@@ -264,6 +264,10 @@ class ExtractionController(QObject):
             self.preview_info_changed.emit(f"Tiles: {tile_count}")
         else:
             logger.error("Failed to convert PIL image to QPixmap for preview")
+            self.error_handler.handle_warning(
+                "Preview Error",
+                "Failed to convert preview image for display"
+            )
 
     def _on_preview_image_ready(self, pil_image: Image.Image) -> None:
         """Handle preview PIL image ready"""
