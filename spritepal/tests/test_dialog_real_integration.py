@@ -70,12 +70,13 @@ sys.path.insert(0, str(current_dir))
 # Import real testing infrastructure
 # Import real dialogs and managers (not mocked!)
 from core.managers import (
+    ExtractionManager,
+    InjectionManager,
+    SessionManager,
     cleanup_managers,
-    get_extraction_manager,
-    get_injection_manager,
-    get_session_manager,
     initialize_managers,
 )
+from core.managers.registry import ManagerRegistry
 from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
@@ -219,7 +220,8 @@ class TestRealDialogIntegration:
                 assert widget is not None, f"REAL BUG DISCOVERED: UI component {component} is None"
 
             # Test real manager integration (vs mocked manager returns)
-            injection_manager = get_injection_manager()
+            registry = ManagerRegistry()
+            injection_manager = registry.get("injection")
             assert dialog.injection_manager is injection_manager, "Dialog should use real injection manager"
 
             # Test tab switching functionality (could expose widget initialization bugs)
@@ -540,9 +542,10 @@ class TestRealDialogManagerIntegration:
         initialize_managers(app_name="SpritePal-Test")
 
         # Get real managers for coordination testing
-        extraction_manager = get_extraction_manager()
-        injection_manager = get_injection_manager()
-        session_manager = get_session_manager()
+        registry = ManagerRegistry()
+        extraction_manager = registry.get("extraction")
+        injection_manager = registry.get("injection")
+        session_manager = registry.get("session")
 
         # Test multiple dialogs using same managers (could expose resource conflicts)
         manual_dialog = ManualOffsetDialog()
