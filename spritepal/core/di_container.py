@@ -202,7 +202,6 @@ def configure_container(
         ConfigurationServiceProtocol,
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
-        NavigationManagerProtocol,
         SessionManagerProtocol,
         SettingsManagerProtocol,
     )
@@ -313,12 +312,6 @@ def configure_container(
         )
     )
 
-    # Navigation manager is always from core operations (if available)
-    register_factory(
-        NavigationManagerProtocol,
-        lambda: _get_or_create_navigation_manager()
-    )
-
     # Register DialogFactory for controller dialog creation
     from core.protocols.dialog_protocols import DialogFactoryProtocol
     from ui.dialogs.controller_dialog_factory import ControllerDialogFactory
@@ -365,16 +358,6 @@ def _get_or_create_injection_manager():
     """Get or create injection manager."""
     from core.managers.registry import ManagerRegistry
     return ManagerRegistry().get_injection_manager()
-
-def _get_or_create_navigation_manager():
-    """Get or create navigation manager."""
-    from core.managers.registry import ManagerRegistry
-    try:
-        core_mgr = ManagerRegistry().get_core_operations_manager()
-        return core_mgr._get_navigation_manager()
-    except Exception:
-        # Fallback to registry method if available
-        return ManagerRegistry().get_navigation_manager()
 
 # Example usage with protocols
 if __name__ == "__main__":

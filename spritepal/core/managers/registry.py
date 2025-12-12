@@ -184,12 +184,13 @@ class ManagerRegistry:
                     created_managers.append("injection")
                     self._logger.debug("InjectionManager created successfully")
 
-                # TODO: NavigationManager disabled due to threading issues in tests
-                # self._logger.debug("Creating NavigationManager...")
+                # NavigationManager is DISABLED due to threading issues in tests.
+                # Implementation exists at: core/navigation/manager.py (600+ lines)
+                # To re-enable: uncomment below and add "navigation" to expected_managers
+                # in is_initialized() method.
                 # from core.navigation.manager import NavigationManager
                 # self._managers["navigation"] = NavigationManager(parent=qt_parent)
                 # created_managers.append("navigation")
-                # self._logger.debug("NavigationManager created successfully")
 
                 # Initialize MonitoringManager
                 self._logger.debug("Creating MonitoringManager...")
@@ -239,8 +240,6 @@ class ManagerRegistry:
                     manager = self._managers[name]
                     manager.cleanup()
                     safe_debug(self._logger, f"Cleaned up {name} manager")
-                except (AttributeError, RuntimeError):
-                    safe_warning(self._logger, f"Error cleaning up {name} manager", exc_info=True)
                 except Exception:
                     safe_warning(self._logger, f"Error cleaning up {name} manager", exc_info=True)
 
@@ -404,34 +403,40 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not found, wrong type, or not properly initialized
         """
-        if name not in self._managers:
-            raise ManagerError(
-                f"{name.capitalize()} manager not initialized. "
-                "Call initialize_managers() first."
-            )
+        with self._lock:
+            if name not in self._managers:
+                raise ManagerError(
+                    f"{name.capitalize()} manager not initialized. "
+                    "Call initialize_managers() first."
+                )
 
-        manager = self._managers[name]
-        if not isinstance(manager, expected_type):
-            raise ManagerError(
-                f"Manager type mismatch: expected {expected_type.__name__}, "
-                f"got {type(manager).__name__}"
-            )
+            manager = self._managers[name]
+            if not isinstance(manager, expected_type):
+                raise ManagerError(
+                    f"Manager type mismatch: expected {expected_type.__name__}, "
+                    f"got {type(manager).__name__}"
+                )
 
-        # Validate that the manager is properly initialized
-        if not manager.is_initialized():
-            raise ManagerError(
-                f"{name.capitalize()} manager found but not properly initialized. "
-                "This may indicate a partial initialization failure."
-            )
+            # Validate that the manager is properly initialized
+            if not manager.is_initialized():
+                raise ManagerError(
+                    f"{name.capitalize()} manager found but not properly initialized. "
+                    "This may indicate a partial initialization failure."
+                )
 
-        return manager
+            return manager
 
     def is_initialized(self) -> bool:
         """Check if managers are initialized"""
-        # Check that all expected managers are present
-        # Note: NavigationManager is currently disabled due to threading issues in tests
+        # Check that all expected managers are present AND initialized
+        # Note: NavigationManager excluded - see initialize_managers() for re-enable instructions
         expected_managers = {"session", "extraction", "injection"}
-        return expected_managers.issubset(self._managers.keys())
+        if not expected_managers.issubset(self._managers.keys()):
+            return False
+        return all(
+            self._managers[name].is_initialized()
+            for name in expected_managers
+        )
 
     def get_all_managers(self) -> dict[str, Any]:
         """Get all registered managers (for testing/debugging)"""

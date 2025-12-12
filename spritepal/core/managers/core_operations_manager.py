@@ -81,7 +81,6 @@ class CoreOperationsManager(BaseManager):
         self._rom_extractor: ROMExtractor | None = None
         self._palette_manager: PaletteManager | None = None
         self._current_worker: Any = None
-        self._navigation_manager: Any = None  # Lazy loaded
 
         # Create backward compatibility adapters
         self._extraction_adapter: ExtractionAdapter | None = None
@@ -123,14 +122,6 @@ class CoreOperationsManager(BaseManager):
             self._logger.info("Stopping active worker")
             WorkerManager.cleanup_worker(self._current_worker, timeout=5000)
             self._current_worker = None
-
-        # Clean up navigation manager if initialized
-        if self._navigation_manager:
-            try:
-                self._navigation_manager.cleanup()
-            except Exception as e:
-                self._logger.warning(f"Error cleaning up navigation manager: {e}")
-            self._navigation_manager = None
 
         self._logger.info("CoreOperationsManager cleaned up")
 
@@ -378,22 +369,6 @@ class CoreOperationsManager(BaseManager):
             palette_index, output_path, companion_image
         )
 
-    # ========== Navigation Operations ==========
-
-    def get_navigation_hints(self, rom_path: str, current_offset: int,
-                            context: dict[str, Any] | None = None) -> list[Any]:
-        """Get navigation hints for sprite discovery."""
-        nav_manager = self._get_navigation_manager()
-        if nav_manager:
-            return nav_manager.get_navigation_hints(rom_path, current_offset, context)
-        return []
-
-    def update_navigation_context(self, sprite_data: dict[str, Any]) -> None:
-        """Update navigation context with found sprite."""
-        nav_manager = self._get_navigation_manager()
-        if nav_manager:
-            nav_manager.add_sprite_to_context(sprite_data)
-
     # ========== Helper Methods ==========
 
     def _ensure_sprite_extractor(self) -> SpriteExtractor:
@@ -407,16 +382,6 @@ class CoreOperationsManager(BaseManager):
         if self._rom_extractor is None:
             raise ExtractionError("ROM extractor not initialized")
         return self._rom_extractor
-
-    def _get_navigation_manager(self) -> Any:
-        """Get or create navigation manager (lazy loading)."""
-        if self._navigation_manager is None:
-            try:
-                from core.navigation.manager import NavigationManager
-                self._navigation_manager = NavigationManager(parent=self)
-            except ImportError:
-                self._logger.warning("Navigation manager not available")
-        return self._navigation_manager
 
     # ========== Backward Compatibility Adapters ==========
 

@@ -365,17 +365,7 @@ class HALProcessPool:
                 pass  # Ignore errors during shutdown
 
         atexit.register(cleanup_at_exit)
-
-        # Register with Qt if available
-        if QT_AVAILABLE and QApplication is not None:
-            try:
-                app = QApplication.instance()
-                if app is not None:
-                    # Use suppressed version for Qt cleanup too
-                    app.aboutToQuit.connect(cleanup_at_exit)
-                    logger.debug("Registered HAL pool cleanup with QApplication.aboutToQuit")
-            except Exception as e:
-                logger.debug(f"Could not register Qt cleanup: {e}")
+        # Qt cleanup is registered separately in _connect_qt_cleanup() during initialize()
 
     def initialize(self, exhal_path: str, inhal_path: str, pool_size: int = HAL_POOL_SIZE_DEFAULT) -> bool:
         """Initialize the process pool with HAL tool paths.
