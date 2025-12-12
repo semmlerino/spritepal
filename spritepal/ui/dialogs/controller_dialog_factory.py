@@ -87,9 +87,15 @@ class ControllerDialogFactory:
         Returns:
             An InjectionDialog instance
         """
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
         from ui.injection_dialog import InjectionDialog
 
-        return InjectionDialog(parent, sprite_path, metadata_path, input_vram)
+        injection_manager = inject(InjectionManagerProtocol)
+        return InjectionDialog(
+            parent, sprite_path, metadata_path, input_vram,
+            injection_manager=injection_manager  # type: ignore[arg-type]
+        )
 
 
 # Global accessor for the factory (for non-DI contexts)

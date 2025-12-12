@@ -45,6 +45,10 @@ if TYPE_CHECKING:
     from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent
 else:
     from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent
+# Preview coordinator selection - SmartPreviewCoordinator re-enabled after signal lifecycle fixes
+# Set SPRITEPAL_USE_SIMPLE_PREVIEW=1 to fall back to SimplePreviewCoordinator if issues occur
+import os
+
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -68,8 +72,12 @@ from core.sprite_finder import SpriteFinder
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 
-# Use SimplePreviewCoordinator to avoid worker pool crashes
-from ui.common.simple_preview_coordinator import SimplePreviewCoordinator
+_use_simple_preview = os.environ.get('SPRITEPAL_USE_SIMPLE_PREVIEW', '0').lower() in ('1', 'true', 'yes')
+
+if _use_simple_preview:
+    from ui.common.simple_preview_coordinator import SimplePreviewCoordinator as PreviewCoordinator
+else:
+    from ui.common.smart_preview_coordinator import SmartPreviewCoordinator as PreviewCoordinator
 
 
 def get_main_thread():
@@ -82,29 +90,21 @@ def _get_dialog_base_class():
     """Get the appropriate DialogBase class based on environment settings."""
     import os
 
-    from utils.logging_config import get_logger
-    logger = get_logger(__name__)
-
     flag_value = os.environ.get('SPRITEPAL_USE_COMPOSED_DIALOGS', '0').lower()
     use_composed = flag_value in ('1', 'true', 'yes', 'on')
 
-    logger.warning(f"DEBUGGING: Dialog selection - flag={flag_value}, use_composed={use_composed}")
 
     if use_composed:
         try:
-            logger.warning("DEBUGGING: Attempting to import DialogBaseMigrationAdapter")
             from ui.components.base.composed.migration_adapter import (
                 DialogBaseMigrationAdapter,
             )
-            logger.warning("DEBUGGING: Successfully imported DialogBaseMigrationAdapter")
             return DialogBaseMigrationAdapter
-        except Exception as e:
+        except Exception:
             # Fallback to legacy on any import error
-            logger.warning(f"DEBUGGING: Import failed ({e}), falling back to legacy")
             from ui.components import DialogBase
             return DialogBase
     else:
-        logger.warning("DEBUGGING: Using legacy DialogBase by config")
         from ui.components import DialogBase
         return DialogBase
 
@@ -124,7 +124,7 @@ logger = get_logger(__name__)
 # Import tab widgets from the new module
 from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmartTab
 
-# Using SimplePreviewCoordinator instead of SmartPreviewCoordinator to avoid worker pool crashes
+# SmartPreviewCoordinator re-enabled with signal lifecycle fixes (QueuedConnection, blockSignals)
 
 # SimpleBrowseTab, SimpleSmartTab, SimpleHistoryTab removed - now imported from ui.tabs.manual_offset
 
@@ -147,7 +147,6 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
                  extraction_manager: ExtractionManagerProtocol | None = None,
                  rom_extractor: ROMExtractorProtocol | None = None) -> None:
         # Debug logging for singleton tracking
-        logger.warning("DEBUGGING: UnifiedManualOffsetDialog.__init__ ENTRY - Starting initialization")
         logger.debug(f"Creating UnifiedManualOffsetDialog instance (parent: {parent.__class__.__name__ if parent else 'None'})")
 
         # UI Components - declare BEFORE super().__init__()
@@ -207,8 +206,8 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         self.preview_worker: SpritePreviewWorker | None = None
         self.search_worker: SpriteSearchWorker | None = None
 
-        # Simple preview coordinator handles preview generation without complex pooling
-        self._smart_preview_coordinator: SimplePreviewCoordinator | None = None
+        # Preview coordinator handles preview generation (Smart or Simple based on env flag)
+        self._smart_preview_coordinator: PreviewCoordinator | None = None
 
         # Preview update timer (legacy - kept for compatibility)
         self._preview_timer: QTimer | None = None
@@ -218,7 +217,6 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         logger.debug(f"Dialog debug ID: {self._debug_id}")
 
         # TEMPORARILY DISABLE LayoutManagerComponent to isolate the issue
-        logger.debug("DEBUGGING: Skipping LayoutManagerComponent creation")
 
         # Create minimal fallback object to prevent attribute errors
         class MinimalLayoutManager:
@@ -242,25 +240,16 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         self.layout_manager = MinimalLayoutManager()
         logger.debug("Using minimal layout manager for debugging")
 
-        logger.warning("DEBUGGING: About to call super().__init__ (DialogBaseMigrationAdapter)")
-        try:
-            super().__init__(
-                parent=parent,
-                title="Manual Offset Control - SpritePal",
-                modal=False,
-                size=(900, 600),  # More compact size
-                min_size=(800, 500),  # Smaller minimum
-                with_status_bar=False,
-                orientation=Qt.Orientation.Horizontal,
-                splitter_handle_width=8  # Thinner splitter handle
-            )
-            logger.warning("DEBUGGING: super().__init__ completed successfully")
-        except Exception as e:
-            logger.error(f"DEBUGGING: CAUGHT EXCEPTION in super().__init__: {e}")
-            logger.error(f"DEBUGGING: Exception type: {type(e)}")
-            import traceback
-            logger.error(f"DEBUGGING: Full traceback: {traceback.format_exc()}")
-            raise
+        super().__init__(
+            parent=parent,
+            title="Manual Offset Control - SpritePal",
+            modal=False,
+            size=(900, 600),  # More compact size
+            min_size=(800, 500),  # Smaller minimum
+            with_status_bar=False,
+            orientation=Qt.Orientation.Horizontal,
+            splitter_handle_width=8  # Thinner splitter handle
+        )
 
         # Initialize view state manager with injected settings_manager
         self.view_state_manager = ViewStateManager(self, self, settings_manager=self.settings_manager)
@@ -272,7 +261,6 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
 
         # DialogSignalManager handles custom signals to avoid Qt metaclass issues
 
-        logger.warning("DEBUGGING: UnifiedManualOffsetDialog.__init__ COMPLETED - Dialog should be fully created")
 
     def __del__(self):
         """Destructor for tracking dialog destruction."""
@@ -452,8 +440,8 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
     # _setup_signal_coordinator removed - SmartPreviewCoordinator handles all coordination
 
     def _setup_smart_preview_coordinator(self):
-        """Set up simple preview coordination without worker pool complexity."""
-        self._smart_preview_coordinator = SimplePreviewCoordinator(self, rom_cache=self.rom_cache)
+        """Set up preview coordination (Smart or Simple based on env flag)."""
+        self._smart_preview_coordinator = PreviewCoordinator(self, rom_cache=self.rom_cache)  # type: ignore[arg-type]
 
         # Use AutoConnection (default) to let Qt choose the best connection type
         # This will use DirectConnection when called from main thread (avoiding queue delays)
@@ -496,7 +484,7 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
 
         # Connect smart preview coordinator to browse tab
         if self._smart_preview_coordinator:
-            self.browse_tab.connect_smart_preview_coordinator(self._smart_preview_coordinator)
+            self.browse_tab.connect_smart_preview_coordinator(self._smart_preview_coordinator)  # type: ignore[arg-type]
 
         # Smart tab signals
         self.smart_tab.smart_mode_changed.connect(self._on_smart_mode_changed)

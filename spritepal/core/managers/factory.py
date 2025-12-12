@@ -143,9 +143,9 @@ class SingletonManagerFactory:
         Returns:
             Singleton ExtractionManager instance
         """
-        # Delayed import to avoid circular dependency:
-        # factory -> managers -> factory
-        from . import get_extraction_manager
+        # Use DI container to get singleton instance
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
 
         if parent is not None:
             self._logger.warning(
@@ -153,7 +153,7 @@ class SingletonManagerFactory:
                 "use StandardManagerFactory for per-instance parents"
             )
 
-        manager = get_extraction_manager()
+        manager: ExtractionManager = inject(ExtractionManagerProtocol)  # type: ignore[assignment]
         self._logger.debug("Returned singleton ExtractionManager")
         return manager
 
@@ -167,9 +167,9 @@ class SingletonManagerFactory:
         Returns:
             Singleton InjectionManager instance
         """
-        # Delayed import to avoid circular dependency:
-        # factory -> managers -> factory
-        from . import get_injection_manager
+        # Use DI container to get singleton instance
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
 
         if parent is not None:
             self._logger.warning(
@@ -177,7 +177,7 @@ class SingletonManagerFactory:
                 "use StandardManagerFactory for per-instance parents"
             )
 
-        manager = get_injection_manager()
+        manager: InjectionManager = inject(InjectionManagerProtocol)  # type: ignore[assignment]
         self._logger.debug("Returned singleton InjectionManager")
         return manager
 

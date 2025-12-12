@@ -4,7 +4,6 @@ Main window for SpritePal application
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -86,9 +85,9 @@ class MainWindow(QMainWindow):
 
     def __init__(
         self,
-        settings_manager: SettingsManagerProtocol | None = None,
-        rom_cache: ROMCacheProtocol | None = None,
-        session_manager: SessionManager | None = None,
+        settings_manager: SettingsManagerProtocol,
+        rom_cache: ROMCacheProtocol,
+        session_manager: SessionManager,
     ) -> None:
         super().__init__()
         # Declare instance variables with type hints
@@ -102,41 +101,9 @@ class MainWindow(QMainWindow):
         self.sprite_preview: PreviewPanel
         self.palette_preview: PalettePreviewWidget
 
-        # B.5 DI Migration: Optional dependencies with deprecation warning fallbacks
-        if settings_manager is None:
-            warnings.warn(
-                "MainWindow: settings_manager parameter will become required. "
-                "Pass settings_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            settings_manager = inject(SettingsManagerProtocol)
+        # Store injected dependencies
         self.settings_manager = settings_manager
-
-        if rom_cache is None:
-            warnings.warn(
-                "MainWindow: rom_cache parameter will become required. "
-                "Pass rom_cache explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            rom_cache = inject(ROMCacheProtocol)
         self.rom_cache = rom_cache
-
-        if session_manager is None:
-            warnings.warn(
-                "MainWindow: session_manager parameter will become required. "
-                "Pass session_manager explicitly instead of relying on DI.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.di_container import inject
-            from core.protocols.manager_protocols import SessionManagerProtocol
-            session_manager = inject(SessionManagerProtocol)
         self.session_manager = session_manager
 
         # Manager instances
@@ -223,7 +190,13 @@ class MainWindow(QMainWindow):
         self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
         # ROM extraction tab (first tab, selected by default)
-        self.rom_extraction_panel = ROMExtractionPanel(parent=self)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
+        extraction_manager = inject(ExtractionManagerProtocol)
+        self.rom_extraction_panel = ROMExtractionPanel(
+            parent=self,
+            extraction_manager=extraction_manager  # type: ignore[arg-type]
+        )
         self.extraction_tabs.addTab(self.rom_extraction_panel, "ROM Extraction")
 
         # VRAM extraction tab
@@ -253,7 +226,11 @@ class MainWindow(QMainWindow):
         # Backward compatibility: expose preview_info for existing code/tests
         self.preview_info = self.preview_coordinator.preview_info
 
-        self.session_coordinator = SessionCoordinator(self, self.extraction_panel, self.output_settings_manager, settings_manager=self.settings_manager)
+        self.session_coordinator = SessionCoordinator(
+            self, self.extraction_panel, self.output_settings_manager,
+            settings_manager=self.settings_manager,
+            session_manager=self.session_manager
+        )
 
         # Tab coordinator needs several managers
         self.tab_coordinator = TabCoordinator(

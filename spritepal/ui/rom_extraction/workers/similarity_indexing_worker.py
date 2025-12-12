@@ -18,13 +18,15 @@ from typing import TYPE_CHECKING, Any
 from PIL import Image
 from PySide6.QtCore import QObject, Signal, Slot
 
-from core.managers import ExtractionManager
 from core.visual_similarity_search import VisualSimilarityEngine
 from core.workers.base import BaseWorker, handle_worker_errors
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import SettingsManagerProtocol
+    from core.protocols.manager_protocols import (
+        ExtractionManagerProtocol,
+        SettingsManagerProtocol,
+    )
 
 logger = get_logger(__name__)
 
@@ -347,7 +349,7 @@ class SimilarityIndexingWorker(BaseWorker):
             logger.exception("Similarity indexing failed")
             self.operation_finished.emit(False, f"Indexing failed: {e}")
 
-    def _extract_sprite_image(self, offset: int, extraction_manager: ExtractionManager) -> Image.Image | None:
+    def _extract_sprite_image(self, offset: int, extraction_manager: ExtractionManagerProtocol) -> Image.Image | None:
         """
         Extract sprite image for indexing.
 

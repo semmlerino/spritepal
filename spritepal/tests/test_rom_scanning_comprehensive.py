@@ -62,7 +62,7 @@ class CustomMockHALCompressor(MockHALCompressor):
             with Path(rom_path).open("rb") as f:
                 file_signature = f.read(4)  # First 4 bytes as signature
         except OSError:
-            raise Exception("No sprite found")
+            raise Exception("No sprite found") from None
 
         # Check if signature matches any configured response
         if file_signature in self._sprite_responses:
@@ -99,7 +99,7 @@ class TestROMScanning:
         test_offsets = [0x8000, 0x10000, 0x18000]
         signatures = [b"\x01\x01\x01\x01", b"\x02\x02\x02\x02", b"\x03\x03\x03\x03"]
 
-        for i, (offset, sig) in enumerate(zip(test_offsets, signatures)):
+        for i, (offset, sig) in enumerate(zip(test_offsets, signatures, strict=True)):
             # Add unique signature at start of each sprite location
             rom_data[offset:offset+4] = sig
             # Add some tile-like data

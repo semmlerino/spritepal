@@ -594,8 +594,14 @@ class SpriteGalleryTab(QWidget):
         # Create or show existing detached window
         if not self.detached_window:
             # Local import to avoid circular dependency
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
             from ui.windows.detached_gallery_window import DetachedGalleryWindow
-            self.detached_window = DetachedGalleryWindow(self)
+            extraction_manager = inject(ExtractionManagerProtocol)
+            self.detached_window = DetachedGalleryWindow(
+                self,
+                extraction_manager=extraction_manager  # type: ignore[arg-type]
+            )
 
             # Connect signals
             self.detached_window.sprite_selected.connect(self.sprite_selected.emit)
