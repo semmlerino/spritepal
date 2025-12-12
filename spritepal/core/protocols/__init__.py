@@ -11,6 +11,7 @@ from .dialog_protocols import (
     DialogFactoryProtocol,
     InjectionDialogProtocol,
 )
+from .error_handler_protocol import ErrorHandlerProtocol
 from .manager_protocols import (
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
@@ -22,6 +23,7 @@ from .worker_protocol import WorkerManagerProtocol
 __all__ = [
     "ArrangementDialogProtocol",
     "DialogFactoryProtocol",
+    "ErrorHandlerProtocol",
     "ExtractionManagerProtocol",
     "InjectionDialogProtocol",
     "InjectionManagerProtocol",

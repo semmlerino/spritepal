@@ -1,43 +1,36 @@
 """
-Custom exceptions for manager classes
+Custom exceptions for manager classes.
+
+DEPRECATED: This module re-exports exceptions from core.exceptions for backward
+compatibility. New code should import directly from core.exceptions.
 """
 from __future__ import annotations
 
-# No imports needed for basic exceptions
+# Re-export all exceptions from the canonical location
+from core.exceptions import (
+    CacheCorruptionError,
+    CacheError,
+    CachePermissionError,
+    ExtractionError,
+    FileOperationError,
+    InjectionError,
+    ManagerError,
+    NavigationError,
+    PreviewError,
+    SessionError,
+    ValidationError,
+)
 
-class ManagerError(Exception):
-    """Base exception for all manager-related errors"""
-
-class ExtractionError(ManagerError):
-    """Exception raised during extraction operations"""
-
-class SessionError(ManagerError):
-    """Exception raised during session/settings operations"""
-
-class ValidationError(ManagerError):
-    """Exception raised when parameter validation fails"""
-
-class InjectionError(ManagerError):
-    """Exception raised during injection operations"""
-
-class PreviewError(ManagerError):
-    """Exception raised during preview generation"""
-
-class FileOperationError(ManagerError):
-    """Exception raised during file operations"""
-
-class CacheError(ManagerError):
-    """Exception raised during cache operations"""
-
-    def __init__(self, message: str, cache_path: str | None = None) -> None:
-        super().__init__(message)
-        self.cache_path = cache_path
-
-class CacheCorruptionError(CacheError):
-    """Exception raised when cache database is corrupted"""
-
-class CachePermissionError(CacheError):
-    """Exception raised when cache access is denied due to permissions"""
-
-class NavigationError(ManagerError):
-    """Exception raised during navigation operations"""
+__all__ = [
+    "CacheCorruptionError",
+    "CacheError",
+    "CachePermissionError",
+    "ExtractionError",
+    "FileOperationError",
+    "InjectionError",
+    "ManagerError",
+    "NavigationError",
+    "PreviewError",
+    "SessionError",
+    "ValidationError",
+]

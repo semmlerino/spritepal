@@ -33,7 +33,7 @@ pytestmark = [
 class TestVRAMExtractionWorkerMocked:
     """Test VRAMExtractionWorker with mocked Qt components using modern fixtures."""
 
-    @patch("utils.image_utils.QPixmap")
+    @patch("core.services.image_utils.QPixmap")
     def test_pixmap_creation_mocked(self, mock_qpixmap):
         """Test pixmap creation with mocked QPixmap"""
         from PIL import Image

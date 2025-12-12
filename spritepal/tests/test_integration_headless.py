@@ -251,8 +251,8 @@ class TestWorkerBusinessLogic:
         # Create a test image
         test_img = Image.new("P", (128, 128), 0)
 
-        # Mock QPixmap in the correct location (image_utils.py)
-        with patch("utils.image_utils.QPixmap") as mock_pixmap_class:
+        # Mock QPixmap in the correct location (core/services/image_utils.py)
+        with patch("core.services.image_utils.QPixmap") as mock_pixmap_class:
             mock_pixmap = Mock()
             mock_pixmap.loadFromData.return_value = True
             mock_pixmap_class.return_value = mock_pixmap

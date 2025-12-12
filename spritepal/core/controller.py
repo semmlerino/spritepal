@@ -7,7 +7,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
@@ -25,6 +25,8 @@ if TYPE_CHECKING:
         SessionManagerProtocol,
         SettingsManagerProtocol,
     )
+
+from core.protocols.error_handler_protocol import ErrorHandlerProtocol
 
 from core.console_error_handler import ConsoleErrorHandler
 from core.managers import (
@@ -67,38 +69,8 @@ class ROMExtractionParams(TypedDict):
 
 logger = get_logger(__name__)
 
-class ErrorHandlerProtocol(Protocol):
-    """Protocol defining the error handler interface for type safety"""
-
-    def handle_exception(self, exception: Exception, context: str = "") -> None:
-        """Handle an exception with optional context"""
-        ...
-
-    def handle_critical_error(self, title: str, message: str) -> None:
-        """Handle a critical error"""
-        ...
-
-    def handle_warning(self, title: str, message: str) -> None:
-        """Handle a warning"""
-        ...
-
-    def handle_info(self, title: str, message: str) -> None:
-        """Handle an info message"""
-        ...
-
-    def handle_validation_error(
-        self,
-        error: Exception,
-        context_info: str,
-        user_input: str | None = None,
-        **context_kwargs: Any
-    ) -> Any:
-        """Handle a validation error with context"""
-        ...
-
-# MockErrorHandler removed - replaced with ConsoleErrorHandler
-# The MockErrorHandler was a dangerous pattern that silently swallowed errors.
-# Now using ConsoleErrorHandler which properly logs errors to console/file.
+# ErrorHandlerProtocol moved to core/protocols/error_handler_protocol.py
+# ConsoleErrorHandler implements this protocol for console/file logging.
 
 class ExtractionController(QObject):
     """Controller for the extraction workflow.
@@ -433,6 +405,9 @@ class ExtractionController(QObject):
             error_msg = f"Preview update failed: {e!s}"
             logger.exception("Error in preview update with offset 0x%04X", offset)
 
+            # Log through error handler
+            self.error_handler.handle_exception(e, f"Preview update with offset 0x{offset:04X}")
+
             # Emit signal for decoupled UI updates
             self.status_message_changed.emit(error_msg)
 
@@ -501,10 +476,11 @@ class ExtractionController(QObject):
                 )
             except (OSError, subprocess.SubprocessError) as e:
                 # Expected subprocess errors (file not found, permission denied, etc.)
+                self.error_handler.handle_warning("Pixel Editor", f"Failed to open: {e}")
                 self.main_window.status_bar.showMessage(f"Failed to open pixel editor: {e}")
             except Exception as e:
                 # Unexpected errors - log for debugging
-                logger.exception("Unexpected error launching pixel editor")
+                self.error_handler.handle_exception(e, "Launching pixel editor")
                 self.main_window.status_bar.showMessage(f"Failed to open pixel editor: {e}")
         else:
             self.main_window.status_bar.showMessage("Pixel editor not found")
@@ -680,6 +656,8 @@ class ExtractionController(QObject):
                 # Start injection using manager
                 success = self.injection_manager.start_injection(params)
                 if not success:
+                    # Log through error handler
+                    self.error_handler.handle_warning("Injection", "Failed to start injection")
                     # Emit signal for decoupled UI updates
                     self.status_message_changed.emit("Failed to start injection")
                     # Direct call for backward compatibility (to be removed)
@@ -719,6 +697,8 @@ class ExtractionController(QObject):
                     logger.warning(f"Could not save ROM injection parameters: {e}")
         else:
             fail_msg = f"Injection failed: {message}"
+            # Log through error handler
+            self.error_handler.handle_warning("Injection", fail_msg)
             # Emit signal for decoupled UI updates
             self.status_message_changed.emit(fail_msg)
             # Direct call for backward compatibility (to be removed)

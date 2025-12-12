@@ -40,7 +40,7 @@ class TestPilToQPixmapMocked:
         result = pil_to_qpixmap(mock_image)
         assert result is None
 
-    @patch("utils.image_utils.QPixmap")
+    @patch("core.services.image_utils.QPixmap")
     def test_successful_conversion(self, mock_qpixmap_class):
         """Test successful PIL to QPixmap conversion"""
         # Create a small test image
@@ -62,7 +62,7 @@ class TestPilToQPixmapMocked:
         call_args = mock_pixmap.loadFromData.call_args[0][0]
         assert call_args.startswith(b"\x89PNG\r\n\x1a\n")
 
-    @patch("utils.image_utils.QPixmap")
+    @patch("core.services.image_utils.QPixmap")
     def test_buffer_too_small(self, mock_qpixmap_class, caplog):
         """Test handling when buffer is too small"""
         # Create a real PIL image
@@ -86,7 +86,7 @@ class TestPilToQPixmapMocked:
         assert result is None
         assert "Buffer data too small: 4 bytes" in caplog.text
 
-    @patch("utils.image_utils.QPixmap")
+    @patch("core.services.image_utils.QPixmap")
     def test_invalid_png_header(self, mock_qpixmap_class, caplog):
         """Test handling when buffer doesn't have PNG header"""
         # Create a real PIL image
@@ -105,7 +105,7 @@ class TestPilToQPixmapMocked:
         assert result is None
         assert "Buffer data doesn't start with PNG header" in caplog.text
 
-    @patch("utils.image_utils.QPixmap")
+    @patch("core.services.image_utils.QPixmap")
     def test_qpixmap_loadfromdata_failure(self, mock_qpixmap_class, caplog):
         """Test handling when QPixmap.loadFromData fails"""
         pil_image = Image.new("RGB", (10, 10), "blue")
@@ -154,7 +154,7 @@ class TestPilToQPixmapMocked:
         assert "Failed to convert PIL to QPixmap" in caplog.text
         assert "size=unknown, mode=unknown" in caplog.text
 
-    @patch("utils.image_utils.QPixmap")
+    @patch("core.services.image_utils.QPixmap")
     def test_different_image_modes(self, mock_qpixmap_class):
         """Test conversion of various PIL image modes"""
         # Mock successful QPixmap
@@ -184,7 +184,7 @@ class TestPilToQPixmapMocked:
 
             assert result is not None, f"Failed for mode {mode}"
 
-    @patch("utils.image_utils.QPixmap")
+    @patch("core.services.image_utils.QPixmap")
     def test_logging_debug_messages(self, mock_qpixmap_class, caplog):
         """Test debug logging during conversion"""
         pil_image = Image.new("RGBA", (20, 30))
@@ -206,7 +206,7 @@ class TestPilToQPixmapMocked:
         assert "bytes into QPixmap" in caplog.text
         assert "Successfully created QPixmap: 20x30" in caplog.text
 
-    @patch("utils.image_utils.QPixmap")
+    @patch("core.services.image_utils.QPixmap")
     def test_empty_buffer_after_save(self, mock_qpixmap_class):
         """Test handling when save produces empty buffer"""
         # Create a real PIL image
@@ -228,7 +228,7 @@ class TestPilToQPixmapMocked:
         pil_image = Image.new("RGB", (10, 10))
 
         # Mock BytesIO to raise IOError
-        with patch("utils.image_utils.io.BytesIO") as mock_bytesio:
+        with patch("core.services.image_utils.io.BytesIO") as mock_bytesio:
             mock_buffer = MagicMock()
             mock_buffer.write.side_effect = OSError("Disk full")
             mock_bytesio.return_value = mock_buffer

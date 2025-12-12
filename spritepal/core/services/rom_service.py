@@ -24,7 +24,7 @@ from PySide6.QtCore import QObject, Signal
 if TYPE_CHECKING:
     from core.palette_manager import PaletteManager
 
-from core.managers.exceptions import ExtractionError, ValidationError
+from core.exceptions import ExtractionError, ValidationError
 from core.palette_manager import PaletteManager
 from core.rom_extractor import ROMExtractor
 from utils.constants import (

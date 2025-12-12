@@ -1,6 +1,15 @@
 """
 Unified error handling service for SpritePal.
 
+DEPRECATED: This module is deprecated in favor of the simpler error handling pattern:
+- Use `core.protocols.error_handler_protocol.ErrorHandlerProtocol` for the interface
+- Use `core.console_error_handler.ConsoleErrorHandler` for console/file logging
+- Use `ui.common.error_handler.ErrorHandler` for Qt UI-based error display
+
+This module remains for backward compatibility but will be removed in a future version.
+New code should use ErrorHandlerProtocol and ConsoleErrorHandler instead.
+
+Original description:
 This module provides a comprehensive error handling system that standardizes
 error processing, categorization, and recovery across the entire application.
 It builds upon the existing error_handler.py and integrates with all error patterns.
@@ -22,7 +31,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget as _QWidget
 
 # Import core exceptions - these should always be available
-from core.managers.exceptions import (
+from core.exceptions import (
     CacheError,
     ExtractionError,
     FileOperationError,

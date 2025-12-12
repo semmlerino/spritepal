@@ -150,7 +150,7 @@ class TestPilToQPixmap:
         pil_image = Image.new("RGB", (10, 10), "white")
 
         # Mock QPixmap to fail loading
-        with patch("utils.image_utils.QPixmap") as mock_qpixmap_class:
+        with patch("core.services.image_utils.QPixmap") as mock_qpixmap_class:
             mock_pixmap = MagicMock()
             mock_pixmap.loadFromData.return_value = False
             mock_qpixmap_class.return_value = mock_pixmap
