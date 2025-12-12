@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from utils.file_validator import atomic_write
 from utils.constants import (
     CGRAM_EXPECTED_SIZE,
     COLOR_MASK_BLUE,
@@ -133,9 +134,9 @@ class PaletteManager:
                 "description": description,
             }
 
-        # Save file
-        with Path(output_path).open("w") as f:
-            json.dump(palette_data, f, indent=2)
+        # Save file atomically with fsync to prevent data loss on crash
+        json_bytes = json.dumps(palette_data, indent=2).encode("utf-8")
+        atomic_write(output_path, json_bytes)
 
         return output_path
 
@@ -199,10 +200,10 @@ class PaletteManager:
                 )
                 metadata["palette_info"][str(pal_idx)] = description
 
-        # Save metadata file
+        # Save metadata file atomically with fsync to prevent data loss on crash
         metadata_path = f"{output_base}.metadata.json"
-        with Path(metadata_path).open("w") as f:
-            json.dump(metadata, f, indent=2)
+        json_bytes = json.dumps(metadata, indent=2).encode("utf-8")
+        atomic_write(metadata_path, json_bytes)
 
         return metadata_path
 

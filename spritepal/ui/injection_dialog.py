@@ -90,6 +90,12 @@ class InjectionDialog(TabbedDialog):
         # Background workers for async operations
         self._rom_info_loader: ROMInfoLoaderWorker | None = None
 
+        # Pending offset to restore after async ROM info load completes
+        # This fixes a race condition where combo matching was attempted
+        # before the combo was populated by the background worker
+        self._pending_rom_offset: int | None = None
+        self._pending_custom_offset: str | None = None
+
         # Step 2: Call parent init (this will call _setup_ui)
         super().__init__(
             parent=parent,
@@ -736,6 +742,11 @@ class InjectionDialog(TabbedDialog):
             if "sprite_locations_error" in rom_info:
                 logger.warning(f"Failed to load some sprite locations: {rom_info['sprite_locations_error']}")
 
+            # Apply pending offset that was stored before async load started
+            # This fixes the race condition where offset matching was attempted
+            # before the combo was populated
+            self._apply_pending_offset()
+
             # Now restore the saved sprite location if we were loading defaults
             try:
                 self._restore_saved_sprite_location()
@@ -950,25 +961,19 @@ class InjectionDialog(TabbedDialog):
             self.input_rom_selector.set_path(defaults["input_rom"])
             if defaults["output_rom"] and self.output_rom_selector:
                 self.output_rom_selector.set_path(defaults["output_rom"])
-            # Load ROM info to populate sprite locations
-            self._load_rom_info(defaults["input_rom"])
 
-            # After ROM is loaded, set the offset if we have one
+            # Store pending offset to restore after async ROM info load completes
+            # This fixes a race condition where we tried to match offsets in the
+            # combo box before it was populated by the background worker
             if defaults["rom_offset"] is not None:
-                # Find matching sprite location in combo box
-                sprite_found = False
-                if self.sprite_location_combo:
-                    for i in range(self.sprite_location_combo.count()):
-                        offset_data = self.sprite_location_combo.itemData(i)
-                        if offset_data == defaults["rom_offset"]:
-                            if self.sprite_location_combo:
-                                self.sprite_location_combo.setCurrentIndex(i)
-                            sprite_found = True
-                            break
+                self._pending_rom_offset = defaults["rom_offset"]
+                self._pending_custom_offset = defaults["custom_offset"]
+            elif defaults["custom_offset"]:
+                self._pending_custom_offset = defaults["custom_offset"]
 
-                # If no exact match in combo, set custom offset
-                if not sprite_found and defaults["custom_offset"] and self.rom_offset_input:
-                    self.rom_offset_input.set_text(defaults["custom_offset"])
+            # Load ROM info to populate sprite locations (async)
+            # The pending offset will be applied in _on_rom_info_loaded()
+            self._load_rom_info(defaults["input_rom"])
         else:
             # No ROM to load, but still restore other settings
             self._restore_saved_sprite_location()
@@ -980,6 +985,34 @@ class InjectionDialog(TabbedDialog):
         # Set fast compression
         if self.fast_compression_check:
             self.fast_compression_check.setChecked(defaults["fast_compression"])
+
+    def _apply_pending_offset(self) -> None:
+        """Apply pending offset that was stored before async ROM info load.
+
+        This method is called after the combo box is populated to apply
+        any offset that was pending from _set_rom_injection_defaults().
+        """
+        if self._pending_rom_offset is None and self._pending_custom_offset is None:
+            return  # Nothing pending
+
+        try:
+            # Try to find matching sprite location in combo box
+            if self._pending_rom_offset is not None and self.sprite_location_combo:
+                for i in range(self.sprite_location_combo.count()):
+                    offset_data = self.sprite_location_combo.itemData(i)
+                    if offset_data == self._pending_rom_offset:
+                        self.sprite_location_combo.setCurrentIndex(i)
+                        logger.debug(f"Applied pending ROM offset: 0x{self._pending_rom_offset:X}")
+                        return  # Found match, done
+
+            # If no exact match in combo, set custom offset
+            if self._pending_custom_offset and self.rom_offset_input:
+                self.rom_offset_input.set_text(self._pending_custom_offset)
+                logger.debug(f"Applied pending custom offset: {self._pending_custom_offset}")
+        finally:
+            # Always clear pending values to prevent re-application
+            self._pending_rom_offset = None
+            self._pending_custom_offset = None
 
     def _restore_saved_sprite_location(self) -> None:
         """Restore saved sprite location in combo box"""
