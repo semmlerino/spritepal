@@ -224,7 +224,7 @@ class ManagerTestContext:
         self._workers.clear()
 
     def cleanup_managers(self) -> None:
-        """Clean up all managers."""
+        """Clean up all managers and reset global registry singleton."""
         with self._lock:
             # Clean up our managers (the ManagerRegistry is a singleton and doesn't support direct registration)
             for manager in self._managers.values():
@@ -237,6 +237,22 @@ class ManagerTestContext:
 
             self._managers.clear()
             self._original_registry_state.clear()
+
+            # Reset global registry singleton to prevent state pollution
+            # BUT only if session_managers fixture is NOT active - otherwise
+            # the session fixture owns the registry lifecycle
+            try:
+                from tests.fixtures.core_fixtures import is_session_managers_active
+
+                if not is_session_managers_active():
+                    # Safe to reset - no session fixture is managing the registry
+                    from core.managers import cleanup_managers as registry_cleanup
+                    from core.managers.registry import ManagerRegistry
+
+                    registry_cleanup()
+                    ManagerRegistry.reset_for_tests()
+            except Exception:
+                pass  # Best-effort cleanup
 
     def cleanup(self) -> None:
         """Clean up all resources."""

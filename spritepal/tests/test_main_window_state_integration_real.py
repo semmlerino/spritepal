@@ -31,29 +31,23 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import QCheckBox, QLineEdit, QPushButton
 
-# Add parent directory for imports
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Serial execution required: Thread safety concerns
 pytestmark = [
-
     pytest.mark.serial,
     pytest.mark.thread_safety,
     pytest.mark.dialog,
-    pytest.mark.gui,
+    pytest.mark.gui,  # NOTE: gui already implies display requirement
     pytest.mark.integration,
     pytest.mark.memory,
     pytest.mark.qt_real,
-    pytest.mark.requires_display,
+    # NOTE: Removed requires_display - redundant with gui marker
     pytest.mark.signals_slots,
     pytest.mark.slow,
 ]
 
-current_dir = Path(__file__).parent
-parent_dir = current_dir.parent
-sys.path.insert(0, str(parent_dir))
-sys.path.insert(0, str(current_dir))
-
 # Import real testing infrastructure
-from core.managers.registry import cleanup_managers, initialize_managers
 from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
@@ -76,7 +70,7 @@ class TestRealMainWindowStateIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
@@ -90,15 +84,14 @@ class TestRealMainWindowStateIntegration:
         # Initialize Qt testing framework
         self.qt_framework = QtTestingFramework()
 
-        # Initialize managers for MainWindow (using correct API signature)
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by isolated_managers fixture
 
         yield
 
         # Cleanup
         self.manager_factory.cleanup()
         self.test_data.cleanup()
-        cleanup_managers()
+        # Manager cleanup handled by isolated_managers fixture
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:
@@ -391,18 +384,18 @@ class TestRealMainWindowWorkflowIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory()
         self.test_data = DataRepository()
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by isolated_managers fixture
 
         yield
 
         self.manager_factory.cleanup()
         self.test_data.cleanup()
-        cleanup_managers()
+        # Manager cleanup handled by isolated_managers fixture
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:
@@ -509,18 +502,18 @@ class TestBugDiscoveryRealVsMocked:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory()
         self.test_data = DataRepository()
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by isolated_managers fixture
 
         yield
 
         self.manager_factory.cleanup()
         self.test_data.cleanup()
-        cleanup_managers()
+        # Manager cleanup handled by isolated_managers fixture
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:
