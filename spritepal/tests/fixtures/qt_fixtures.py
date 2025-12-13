@@ -144,19 +144,20 @@ def qt_app() -> Any:
 
 
 @pytest.fixture(scope="class")
-def main_window() -> MockMainWindowProtocol:
-    """Class-scoped MOCK main window fixture for performance optimization.
+def fast_mock_main_window() -> MockMainWindowProtocol:
+    """Class-scoped MOCK main window for fast unit tests.
 
     WARNING: Signals are MagicMock objects, NOT real Qt signals.
     - DO NOT use qtbot.waitSignal() with these signals - it will timeout
-    - For real signal behavior, use `real_test_main_window` fixture instead
+    - For real signal behavior, use `main_window` fixture instead
     - For testing signal emission: check `window.extract_requested.emit.called`
 
-    Used 129 times across tests. Class scope reduces instantiations
-    from 129 to ~30 (77% reduction).
+    Use this for unit tests that:
+    - Don't need real Qt signal behavior
+    - Use `.emit.called` or `.emit.assert_called_*()` patterns
+    - Need fast execution without Qt overhead
 
-    Creates a fully configured mock main window with all required
-    attributes and signals.
+    For integration tests, use `main_window` (real signals) instead.
     """
     # Create a simple mock window without spec to avoid issues
     window = Mock()
@@ -190,15 +191,20 @@ def main_window() -> MockMainWindowProtocol:
 
 
 @pytest.fixture(scope="function")
-def real_test_main_window(qtbot: Any) -> Any:
-    """Main window with REAL Qt signals for integration tests.
+def main_window(qtbot: Any) -> Any:
+    """Main window with REAL Qt signals - the DEFAULT for all tests.
 
-    Use this fixture when tests need to:
-    - Use qtbot.waitSignal() on main window signals
-    - Test signal-slot connections with real Qt behavior
-    - Test signal emission timing
+    This is the default main_window fixture. It provides:
+    - Real Qt signals for proper qtbot.waitSignal() testing
+    - Mock methods/attributes for UI components
+    - Suitable for integration tests and signal-slot testing
 
-    For unit tests that don't need signal behavior, use `main_window` instead.
+    Use this fixture for:
+    - Tests using qtbot.waitSignal() on main window signals
+    - Testing signal-slot connections
+    - Integration tests
+
+    For unit tests needing fast MagicMock signals, use `fast_mock_main_window`.
     """
     from tests.infrastructure.qt_mocks import RealTestMainWindow
 
@@ -235,9 +241,10 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     opt-out with @pytest.mark.skip_thread_cleanup.
 
     IMPROVED: Uses identity-based detection instead of count-based.
-    - Captures thread identities BEFORE test runs
-    - Compares identities AFTER test to find new threads
+    - ALWAYS captures thread identities BEFORE test runs
+    - ALWAYS compares identities AFTER test to find new threads
     - Reports leaked thread names and stack traces for debugging
+    - Only does Qt-specific cleanup when Qt is available
 
     Accounts for pytest-timeout's monitoring thread (when timeout_method="thread")
     which is created per test but cleaned up AFTER this fixture runs.
@@ -256,40 +263,40 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         yield
         return
 
-    # IMPROVED: Capture thread IDENTITIES before test (not just count)
+    # PHASE 4: ALWAYS capture thread IDENTITIES before test (not just count)
     # This allows us to identify WHICH threads leaked, not just "count increased"
+    # DO THIS BEFORE ANY EARLY RETURNS - we need baseline for leak detection
     before_threads: dict[int, str] = {
         t.ident: t.name for t in threading.enumerate() if t.ident is not None
     }
 
     yield
 
-    # IMPROVED: Gate cleanup on whether Qt is actually active
-    # This prevents importing Qt/WorkerManager for non-Qt tests
+    # PHASE 4: Determine if Qt is active for conditional Qt-specific cleanup
+    # But we ALWAYS check for leaked threads at the end regardless
+    qt_available = False
+    qt_app = None
     try:
         from PySide6.QtCore import QCoreApplication
         qt_app = QCoreApplication.instance()
+        qt_available = qt_app is not None
     except ImportError:
-        # PySide6 not even importable - definitely not a Qt test
-        return
+        # PySide6 not importable - definitely not a Qt test
+        qt_available = False
 
-    if qt_app is None:
-        # No QApplication instance - this test didn't use Qt
-        # Skip heavy cleanup to avoid importing unnecessary modules
-        return
+    # PHASE 4: Qt-specific cleanup (CONDITIONAL on Qt being available)
+    if qt_available:
+        from PySide6.QtCore import QThread
+        from PySide6.QtWidgets import QApplication
 
-    # Import remaining Qt modules only if Qt is active
-    from PySide6.QtCore import QThread
-    from PySide6.QtWidgets import QApplication
+        from ui.common import WorkerManager
 
-    from ui.common import WorkerManager
-
-    # Clean up any remaining workers
-    try:
-        WorkerManager.cleanup_all()
-    except Exception as e:
-        import logging
-        logging.debug(f"Error during worker cleanup: {e}")
+        # Clean up any remaining workers
+        try:
+            WorkerManager.cleanup_all()
+        except Exception as e:
+            import logging
+            logging.debug(f"Error during worker cleanup: {e}")
 
     # Detect if pytest-timeout is active with thread method
     timeout_method = request.config.getini("timeout_method")
@@ -304,7 +311,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         except (ValueError, TypeError):
             pass
 
-    # Wait for worker threads to finish with proper timeout
+    # PHASE 4: Wait for worker threads to finish with proper timeout
     # Scale with PYTEST_TIMEOUT_MULTIPLIER for slow CI environments
     max_wait_ms = int(1000 * _timeout_multiplier)
     poll_interval_ms = 20
@@ -331,20 +338,25 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         if not leaked_threads:
             break
 
-        # Process Qt events to allow threads to finish
-        app = QCoreApplication.instance()
-        if app:
-            app.processEvents()
+        # PHASE 4: Qt event processing (CONDITIONAL on Qt being available)
+        if qt_available:
+            from PySide6.QtCore import QThread
+            app = QCoreApplication.instance()
+            if app:
+                app.processEvents()
 
-        current_thread = QThread.currentThread()
-        if current_thread:
-            current_thread.msleep(poll_interval_ms)
+            current_thread = QThread.currentThread()
+            if current_thread:
+                current_thread.msleep(poll_interval_ms)
+            else:
+                time.sleep(poll_interval_ms / 1000.0)
         else:
+            # Non-Qt test: just sleep
             time.sleep(poll_interval_ms / 1000.0)
 
         elapsed += poll_interval_ms
 
-    # IMPROVED: Report leaked threads with names and stack traces
+    # PHASE 4: ALWAYS report leaked threads (not conditional on Qt)
     if leaked_threads:
         test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
 
@@ -375,12 +387,15 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 
         pytest.fail("\n".join(msg_lines))
 
+    # PHASE 4: Garbage collection (ALWAYS run for all tests)
     if IS_HEADLESS:
         import gc
         gc.collect()
 
-    # Also check for any QThread instances that might be running
-    if not IS_HEADLESS:
+    # PHASE 4: Additional Qt-specific checks (CONDITIONAL on Qt being available)
+    if qt_available and not IS_HEADLESS:
+        from PySide6.QtCore import QThread
+        from PySide6.QtWidgets import QApplication
         app = QApplication.instance()
         if app:
             for _ in range(5):
