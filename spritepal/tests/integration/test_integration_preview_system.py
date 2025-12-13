@@ -11,7 +11,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Integration tests involve managers that spawn threads
+    pytest.mark.skip_thread_cleanup(reason="Integration tests involve managers that spawn threads"),
 ]
 
 from core.managers import ExtractionManager
@@ -333,14 +333,14 @@ class TestSimplePreviewWorker:
 class TestPreviewCaching:
     """Test preview caching with ROM cache."""
 
-    def test_preview_cache_integration(self, test_rom_with_sprites, temp_dir):
+    def test_preview_cache_integration(self, test_rom_with_sprites, tmp_path):
         """Test that previews can be cached and retrieved."""
         # Register dependencies
         from core.di_container import register_singleton
         from core.protocols.manager_protocols import ROMCacheProtocol
-        
+
         # Create cache
-        cache = ROMCache(cache_dir=str(temp_dir))
+        cache = ROMCache(cache_dir=str(tmp_path))
         register_singleton(ROMCacheProtocol, cache)
 
         rom_info = test_rom_with_sprites

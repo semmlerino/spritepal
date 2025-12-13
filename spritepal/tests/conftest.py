@@ -25,7 +25,7 @@ instantiations by 68.6% based on usage analysis:
 - qt_app: Session scope (1,129 → 1 instance, 99.9% reduction)
 - main_window: Class scope (129 → ~30 instances, 77% reduction)
 - controller: Class scope (119 → ~30 instances, 75% reduction)
-- mock_manager_registry: Module scope (81 → ~15 instances, 81% reduction)
+- mock_manager_registry: Function scope (fresh per test for isolation)
 - real_extraction_manager: Class scope (51 → ~12 instances, 77% reduction)
 - rom_cache: Class scope (48 → ~10 instances, 79% reduction)
 - mock_settings_manager: Class scope (44 → ~10 instances, 77% reduction)
@@ -74,6 +74,7 @@ if TYPE_CHECKING:
 
 # Import consolidated mock utilities
 import contextlib
+import sys
 
 import pytest
 
@@ -146,6 +147,14 @@ def pytest_configure(config):
         "markers",
         "no_hal: Skip all HAL-related fixtures (implies skip_hal_reset)"
     )
+    config.addinivalue_line(
+        "markers",
+        "requires_display: Test requires a real display (skips cleanly in offscreen mode)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_real_rom: Test requires real Kirby ROM file (skips if not available)"
+    )
 
 
 def pytest_addoption(parser: Any) -> None:
@@ -159,6 +168,30 @@ def pytest_addoption(parser: Any) -> None:
     # NOTE: --run-segfault-tests option removed - segfault-prone tests have been deleted
 
 
+def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
+    """Validate marker usage during test collection.
+
+    Enforces that skip_thread_cleanup markers have a reason argument to prevent
+    mass opt-out from thread leak detection without documentation.
+
+    Args:
+        config: pytest config object (required by hook signature)
+        items: list of test items being collected
+    """
+    for item in items:
+        marker = item.get_closest_marker("skip_thread_cleanup")
+        if marker is not None:
+            # Check if reason kwarg is provided
+            reason = marker.kwargs.get("reason")
+            if not reason:
+                raise pytest.UsageError(
+                    f"Test {item.nodeid} uses @pytest.mark.skip_thread_cleanup "
+                    "without a reason. Add reason='...' explaining why thread "
+                    "cleanup should be skipped for this test.\n"
+                    "Example: @pytest.mark.skip_thread_cleanup(reason='Uses session_managers which owns threads')"
+                )
+
+
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
     """Clean up all singletons at session end to prevent state pollution.
 
@@ -170,22 +203,20 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
     Without this, state can leak between test runs or cause errors
     in subsequent test sessions.
     """
-    # 1. Reset ManagerRegistry singleton completely
+    # 1. Reset ManagerRegistry singleton completely using official API
     with contextlib.suppress(Exception):
         from core.managers.registry import ManagerRegistry
-        ManagerRegistry._instance = None
-        ManagerRegistry._cleanup_registered = False
+        ManagerRegistry.reset_for_tests()
 
     # 2. Clean up DataRepository (temp files and singleton)
     with contextlib.suppress(Exception):
         from tests.infrastructure.test_data_repository import cleanup_test_data_repository
         cleanup_test_data_repository()
 
-    # 3. Reset HAL singleton (already handled by atexit, but ensure clean state)
+    # 3. Reset HAL singleton using official API
     with contextlib.suppress(Exception):
         from core.hal_compression import HALProcessPool
-        if hasattr(HALProcessPool, '_instance'):
-            HALProcessPool._instance = None
+        HALProcessPool.reset_for_tests()
 
 
 # ============================================================================
@@ -339,18 +370,20 @@ def minimal_sprite_data(
 
 
 # ============================================================================
-# Module-scoped fixtures (remain in conftest.py for performance)
+# Function-scoped fixtures for proper test isolation
 # ============================================================================
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def mock_manager_registry() -> Generator[Mock, None, None]:
-    """Module-scoped manager registry fixture for performance optimization.
+    """Function-scoped mock registry for proper test isolation.
 
-    Used 81 times across tests. Module scope reduces instantiations
-    from 81 to ~15 (81% reduction).
+    Changed from module-scope to function-scope to ensure:
+    - Each test gets a fresh mock instance
+    - No call history leaks between tests
+    - No return value pollution between tests
 
-    Provides a mock manager registry with common manager access methods.
-    Resets mock state at end of module to prevent state leakage.
+    The ~80ms overhead (81 tests × ~1ms per Mock) is negligible compared
+    to the determinism benefit of fresh state per test.
     """
     registry = Mock()
 
@@ -366,9 +399,7 @@ def mock_manager_registry() -> Generator[Mock, None, None]:
     registry.get_session_manager = Mock()
 
     yield registry
-
-    # Reset mock state at end of module to prevent state leakage
-    registry.reset_mock(return_value=True, side_effect=True)
+    # No cleanup needed - fixture is discarded after each test
 
 
 # ============================================================================
@@ -397,6 +428,12 @@ def guard_qpixmap_threading(request: FixtureRequest, monkeypatch: pytest.MonkeyP
         yield
         return
 
+    # Don't import PySide6 if it hasn't been imported yet - avoids pulling
+    # Qt into non-Qt tests that don't have the no_qt marker
+    if 'PySide6.QtGui' not in sys.modules:
+        yield
+        return
+
     try:
         from PySide6.QtCore import QCoreApplication, QThread
         from PySide6.QtGui import QPixmap
@@ -420,6 +457,28 @@ def guard_qpixmap_threading(request: FixtureRequest, monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(QPixmap, '__init__', guarded_init)
     yield
+
+
+@pytest.fixture(autouse=True)
+def skip_requires_display(request: FixtureRequest):
+    """Skip tests marked with @pytest.mark.requires_display when running headless.
+
+    This fixture provides a clean skip mechanism for tests that require a real
+    display (not offscreen mode). Use this instead of xfail for environment
+    capabilities.
+
+    Example:
+        @pytest.mark.requires_display
+        def test_real_dialog():
+            '''This test needs a real display.'''
+            ...  # Skips cleanly in CI/offscreen, runs with real display
+    """
+    marker = request.node.get_closest_marker("requires_display")
+    if marker is not None:
+        # Check if running in offscreen mode
+        qpa_platform = os.environ.get("QT_QPA_PLATFORM", "")
+        if qpa_platform == "offscreen":
+            pytest.skip("Test requires real display (not offscreen mode)")
 
 
 # ============================================================================
@@ -560,9 +619,9 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
         return
 
     # List of fixtures that have mutable shared state
+    # NOTE: mock_manager_registry was removed - it's now function-scoped (see fixture definition)
     shared_mutable_fixtures = {
         'session_managers',
-        'mock_manager_registry',
         'rom_cache',  # Class-scoped, could be shared
     }
 
@@ -583,9 +642,8 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
 # ===========================================================================================
 # Wait Helper Fixtures for Eliminating Flaky qtbot.wait() Calls
 # ===========================================================================================
-# These fixtures replace timing-dependent qtbot.wait() calls with condition-based waits
-# that auto-complete when the expected state is reached. This eliminates flakiness caused
-# by hardcoded delays that may be insufficient in slow environments (CI, WSL2, etc.).
+# These fixtures are consolidated in tests/fixtures/qt_waits.py and re-exported here.
+# See that module for implementation details.
 #
 # Usage: Add fixture parameter to test method, then use instead of qtbot.wait()
 # Example:
@@ -594,168 +652,12 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
 #       wait_for_signal_processed()  # Instead of qtbot.wait(100)
 # ===========================================================================================
 
-@pytest.fixture
-def wait_for_widget_ready(qtbot):
-    """
-    Helper to wait for widget initialization.
-
-    Replaces fixed qtbot.wait() calls with condition-based waiting.
-    Auto-completes when widget becomes visible and enabled.
-
-    Example:
-        wait_for_widget_ready(dialog, timeout=1000)
-        # Instead of: dialog.show(); qtbot.wait(100)
-    """
-    def _wait(widget, timeout=1000):
-        """
-        Wait for widget to be visible and enabled.
-
-        Args:
-            widget: QWidget to wait for
-            timeout: Maximum wait time in milliseconds
-
-        Returns:
-            True if widget is ready within timeout
-
-        Raises:
-            TimeoutError: If widget not ready within timeout
-        """
-        try:
-            qtbot.waitUntil(
-                lambda: widget.isVisible() and widget.isEnabled(),
-                timeout=timeout
-            )
-            return True
-        except AssertionError as e:
-            raise TimeoutError(
-                f"Widget {widget.__class__.__name__} not ready within {timeout}ms"
-            ) from e
-    return _wait
-
-
-@pytest.fixture
-def wait_for_signal_processed(qtbot):
-    """
-    Helper to wait for signal processing to complete.
-
-    Ensures Qt event loop has processed pending signals.
-
-    Example:
-        slider.setValue(100)
-        wait_for_signal_processed()
-        # Instead of: slider.setValue(100); qtbot.wait(50)
-    """
-    def _wait(timeout=100):
-        """
-        Wait for pending signals to be processed.
-
-        Args:
-            timeout: Maximum wait time in milliseconds
-
-        Note:
-            Uses processEvents() to ensure all queued signals have been delivered.
-        """
-        from PySide6.QtWidgets import QApplication
-
-        # Process all pending events - this is sufficient for signal delivery
-        QApplication.processEvents()
-
-    return _wait
-
-
-@pytest.fixture
-def wait_for_theme_applied(qtbot):
-    """
-    Helper to wait for theme changes to be applied.
-
-    Qt theme changes may take multiple event loop cycles to apply.
-
-    Example:
-        window.apply_dark_theme()
-        wait_for_theme_applied(window)
-        # Instead of: window.apply_dark_theme(); qtbot.wait(100)
-    """
-    def _wait(widget, is_dark_theme=True, timeout=500):
-        """
-        Wait for theme to be applied to widget.
-
-        Args:
-            widget: QWidget to check
-            is_dark_theme: Whether to expect dark theme (True) or light (False)
-            timeout: Maximum wait time in milliseconds
-        """
-        # Check for headless mode FIRST - theme verification unreliable there
-        import os
-        display = os.environ.get("DISPLAY", "")
-        qpa_platform = os.environ.get("QT_QPA_PLATFORM", "")
-        is_headless = not display or qpa_platform == "offscreen"
-
-        if is_headless:
-            # Skip theme verification in headless mode - just process events
-            from PySide6.QtWidgets import QApplication
-            QApplication.processEvents()
-            return True
-
-        # In non-headless mode, actually verify theme
-        from PySide6.QtGui import QPalette
-
-        def theme_applied():
-            palette = widget.palette()
-            bg_color = palette.color(QPalette.ColorRole.Window)
-
-            if is_dark_theme:
-                # Dark theme: background should be dark
-                return bg_color.red() < 128 and bg_color.green() < 128 and bg_color.blue() < 128
-            else:
-                # Light theme: background should be light
-                return bg_color.red() > 128 or bg_color.green() > 128 or bg_color.blue() > 128
-
-        qtbot.waitUntil(theme_applied, timeout=timeout)
-        return True
-
-    return _wait
-
-
-@pytest.fixture
-def wait_for_layout_update(qtbot):
-    """
-    Helper to wait for layout changes to be applied.
-
-    Qt layouts may take multiple event cycles to fully update.
-
-    Example:
-        window.resize(1024, 768)
-        wait_for_layout_update(window, expected_width=1024)
-        # Instead of: window.resize(...); qtbot.wait(100)
-    """
-    def _wait(widget, expected_width=None, expected_height=None, timeout=500):
-        """
-        Wait for widget layout to update.
-
-        Args:
-            widget: QWidget to check
-            expected_width: Expected width (None to skip check)
-            expected_height: Expected height (None to skip check)
-            timeout: Maximum wait time in milliseconds
-        """
-        def layout_updated():
-            size = widget.size()
-            if expected_width is not None and size.width() != expected_width:
-                return False
-            if expected_height is not None and size.height() != expected_height:
-                return False
-            # If no specific size expected, just check that size is reasonable
-            return size.width() > 0 and size.height() > 0
-
-        try:
-            qtbot.waitUntil(layout_updated, timeout=timeout)
-            return True
-        except AssertionError as e:
-            current_size = widget.size()
-            raise TimeoutError(
-                f"Layout not updated within {timeout}ms. "
-                f"Current: {current_size.width()}x{current_size.height()}, "
-                f"Expected: {expected_width}x{expected_height}"
-            ) from e
-
-    return _wait
+# Re-export wait helpers from shared module
+from tests.fixtures.qt_waits import (
+    process_events,
+    wait_for,
+    wait_for_layout_update,
+    wait_for_signal_processed,
+    wait_for_theme_applied,
+    wait_for_widget_ready,
+)

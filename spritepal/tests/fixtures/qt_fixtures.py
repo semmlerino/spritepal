@@ -32,8 +32,7 @@ if TYPE_CHECKING:
         MockMainWindowProtocol,
     )
 
-# Add parent directories to path - centralized path setup for tests
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 from tests.infrastructure.environment_detection import (
     get_environment_info,
@@ -49,10 +48,24 @@ IS_HEADLESS = _environment_info.is_headless
 # 2. Baseline is captured after prior tests have already spawned threads
 _SESSION_THREAD_BASELINE: int = threading.active_count()
 
+# IMPROVED: Capture thread IDENTITIES not just count
+# Identity-based detection is more reliable than count-based:
+# - Detects specific threads that leaked vs just "count increased"
+# - Can report leaked thread names and stack traces
+# - Not confused by Qt/pytest helper threads that fluctuate
+_SESSION_THREAD_IDENTITIES: dict[int, str] = {
+    t.ident: t.name for t in threading.enumerate() if t.ident is not None
+}
+
 
 def _get_session_thread_baseline() -> int:
     """Get the session thread baseline (captured at module import time)."""
     return _SESSION_THREAD_BASELINE
+
+
+def _get_session_thread_identities() -> dict[int, str]:
+    """Get the session thread identities (captured at module import time)."""
+    return _SESSION_THREAD_IDENTITIES.copy()
 
 
 # Global timeout configuration - increased for CI/headless environments
@@ -86,14 +99,9 @@ def capture_thread_baseline() -> Iterator[None]:
     yield
 
 
-@pytest.fixture(scope="session", autouse=True)
-def qt_environment_setup() -> Iterator[None]:
-    """Setup Qt environment automatically.
-
-    Qt environment variables (QT_QPA_PLATFORM=offscreen) are set in pyproject.toml.
-    Tests that need real Qt must be marked @pytest.mark.gui.
-    """
-    yield
+# NOTE: qt_environment_setup was removed - it did nothing.
+# Qt environment variables (QT_QPA_PLATFORM=offscreen) are set in pyproject.toml.
+# Tests that need real Qt must be marked @pytest.mark.gui.
 
 
 # =============================================================================
@@ -203,18 +211,21 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     Previously this was opt-in with @pytest.mark.worker_threads; now it's
     opt-out with @pytest.mark.skip_thread_cleanup.
 
-    Uses session-level thread baseline to avoid race conditions where per-test
-    baseline captures lingering threads from prior tests.
+    IMPROVED: Uses identity-based detection instead of count-based.
+    - Captures thread identities BEFORE test runs
+    - Compares identities AFTER test to find new threads
+    - Reports leaked thread names and stack traces for debugging
 
     Accounts for pytest-timeout's monitoring thread (when timeout_method="thread")
-    which is created per test but cleaned up AFTER this fixture runs, preventing
-    false positive leak detection.
+    which is created per test but cleaned up AFTER this fixture runs.
 
     Opt-out markers:
         @pytest.mark.skip_thread_cleanup - Skip cleanup (rare, use only if truly needed)
         @pytest.mark.no_manager_setup - Skip for non-Qt tests
         @pytest.mark.no_qt - Skip for non-Qt tests
     """
+    import time
+
     markers = [m.name for m in request.node.iter_markers()]
 
     # Opt-OUT: Skip if explicitly marked
@@ -222,13 +233,30 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         yield
         return
 
-    # Use session-level baseline (captured before any tests ran)
-    baseline_thread_count = _get_session_thread_baseline()
+    # IMPROVED: Capture thread IDENTITIES before test (not just count)
+    # This allows us to identify WHICH threads leaked, not just "count increased"
+    before_threads: dict[int, str] = {
+        t.ident: t.name for t in threading.enumerate() if t.ident is not None
+    }
 
     yield
 
-    # Import here to avoid circular imports
-    from PySide6.QtCore import QCoreApplication, QThread
+    # IMPROVED: Gate cleanup on whether Qt is actually active
+    # This prevents importing Qt/WorkerManager for non-Qt tests
+    try:
+        from PySide6.QtCore import QCoreApplication
+        qt_app = QCoreApplication.instance()
+    except ImportError:
+        # PySide6 not even importable - definitely not a Qt test
+        return
+
+    if qt_app is None:
+        # No QApplication instance - this test didn't use Qt
+        # Skip heavy cleanup to avoid importing unnecessary modules
+        return
+
+    # Import remaining Qt modules only if Qt is active
+    from PySide6.QtCore import QThread
     from PySide6.QtWidgets import QApplication
 
     from ui.common import WorkerManager
@@ -241,37 +269,45 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         logging.debug(f"Error during worker cleanup: {e}")
 
     # Detect if pytest-timeout is active with thread method
-    # pytest-timeout creates a monitoring thread per test which shows up in active_count()
-    # but is cleaned up AFTER our fixture runs, causing false positive leak detection
     timeout_method = request.config.getini("timeout_method")
     timeout_value = request.config.getini("timeout")
 
-    # Check if timeout is enabled and using thread method
     pytest_timeout_active = False
     if timeout_method == "thread":
-        # timeout_value might be int, float, or string - handle all cases
         try:
             if timeout_value is not None:
                 timeout_num = float(timeout_value) if isinstance(timeout_value, str) else timeout_value
                 pytest_timeout_active = timeout_num > 0
         except (ValueError, TypeError):
-            pass  # If we can't parse, assume not active
-
-    # Adjust allowed thread count to account for pytest-timeout's monitoring thread
-    allowed_thread_count = baseline_thread_count
-    if pytest_timeout_active:
-        allowed_thread_count += 1
+            pass
 
     # Wait for worker threads to finish with proper timeout
-    max_wait_ms = 1000  # Increased from 500ms for more robust cleanup
+    max_wait_ms = 1000
     poll_interval_ms = 20
     elapsed = 0
+    leaked_threads: dict[int, str] = {}
 
     while elapsed < max_wait_ms:
-        active_threads = threading.active_count()
-        if active_threads <= allowed_thread_count:
+        # IMPROVED: Compare thread identities, not counts
+        current_threads = {
+            t.ident: t.name for t in threading.enumerate() if t.ident is not None
+        }
+        leaked_threads = {
+            ident: name for ident, name in current_threads.items()
+            if ident not in before_threads
+        }
+
+        # Filter out pytest-timeout's monitoring thread if active
+        if pytest_timeout_active:
+            leaked_threads = {
+                ident: name for ident, name in leaked_threads.items()
+                if "pytest_timeout" not in name.lower() and "timeout" not in name.lower()
+            }
+
+        if not leaked_threads:
             break
 
+        # Process Qt events to allow threads to finish
         app = QCoreApplication.instance()
         if app:
             app.processEvents()
@@ -280,23 +316,40 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         if current_thread:
             current_thread.msleep(poll_interval_ms)
         else:
-            import time
             time.sleep(poll_interval_ms / 1000.0)
 
         elapsed += poll_interval_ms
 
-    # FAIL if threads were not cleaned up (not just log)
-    active_threads = threading.active_count()
-    leaked_threads = active_threads - allowed_thread_count
-    if leaked_threads > 0:
+    # IMPROVED: Report leaked threads with names and stack traces
+    if leaked_threads:
         test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
-        timeout_note = f" (allowing +1 for pytest-timeout)" if pytest_timeout_active else ""
-        pytest.fail(
-            f"Test '{test_name}' leaked {leaked_threads} thread(s). "
-            f"Active: {active_threads}, Baseline: {baseline_thread_count}{timeout_note}. "
-            "Fix: Ensure all workers are properly stopped and joined. "
-            "Use @pytest.mark.skip_thread_cleanup to opt out if truly needed."
-        )
+
+        # Build detailed error message with thread info
+        msg_lines = [
+            f"Test '{test_name}' leaked {len(leaked_threads)} thread(s):",
+        ]
+
+        for ident, name in leaked_threads.items():
+            msg_lines.append(f"  - {name} (ident={ident})")
+
+            # Try to get stack trace for the leaked thread
+            try:
+                import sys
+                frame = sys._current_frames().get(ident)
+                if frame:
+                    import traceback
+                    msg_lines.append("    Stack trace:")
+                    for line in traceback.format_stack(frame):
+                        for subline in line.strip().split("\n"):
+                            msg_lines.append(f"      {subline}")
+            except Exception:
+                msg_lines.append("    (stack trace unavailable)")
+
+        msg_lines.append("")
+        msg_lines.append("Fix: Ensure all workers are properly stopped and joined.")
+        msg_lines.append("Use @pytest.mark.skip_thread_cleanup(reason='...') to opt out if truly needed.")
+
+        pytest.fail("\n".join(msg_lines))
 
     if IS_HEADLESS:
         import gc
@@ -308,7 +361,15 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         if app:
             for _ in range(5):
                 app.processEvents()
-                if threading.active_count() <= allowed_thread_count:
+                # Re-check with identity comparison
+                current_threads = {
+                    t.ident: t.name for t in threading.enumerate() if t.ident is not None
+                }
+                leaked = {
+                    ident: name for ident, name in current_threads.items()
+                    if ident not in before_threads
+                }
+                if not leaked:
                     break
                 current = QThread.currentThread()
                 if current:

@@ -133,7 +133,7 @@ class TestSpriteFinder:
 class TestHALCompression:
     """Test HAL compression/decompression with real data."""
 
-    def test_compress_decompress_cycle(self, temp_dir):
+    def test_compress_decompress_cycle(self, tmp_path):
         """Test that data survives compress/decompress cycle using files."""
         # Create test sprite data (4 tiles = 128 bytes)
         original_data = bytearray()
@@ -143,7 +143,7 @@ class TestHALCompression:
         original_data = bytes(original_data)
 
         # Write to file for compression
-        output_file = temp_dir / "test_sprite.hal"
+        output_file = tmp_path / "test_sprite.hal"
 
         # Compress using file-based method
         compressor = HALCompressor()
@@ -212,7 +212,7 @@ class TestHALCompression:
 class TestROMExtractor:
     """Test ROM extractor with real data."""
 
-    def test_extract_sprite_from_rom(self, test_rom_with_sprites, temp_dir):
+    def test_extract_sprite_from_rom(self, test_rom_with_sprites, tmp_path):
         """Test extracting sprites from ROM to files."""
         rom_info = test_rom_with_sprites
         rom_path = str(rom_info['path'])
@@ -224,7 +224,7 @@ class TestROMExtractor:
 
         # Extract at a known sprite offset
         sprite_info = rom_info['sprites'][0]
-        output_path = temp_dir / "extracted_sprite.bin"
+        output_path = tmp_path / "extracted_sprite.bin"
 
         # Use extract_sprite_data which returns decompressed bytes
         sprite_data = extractor.extract_sprite_data(
@@ -241,7 +241,7 @@ class TestROMExtractor:
         assert output_path.exists(), "Output file should exist"
         assert output_path.stat().st_size > 0, "File should have data"
 
-    def test_extract_with_decompression(self, test_rom_with_sprites, temp_dir):
+    def test_extract_with_decompression(self, test_rom_with_sprites, tmp_path):
         """Test extracting and decompressing sprites."""
         rom_info = test_rom_with_sprites
         rom_path = str(rom_info['path'])
@@ -252,7 +252,7 @@ class TestROMExtractor:
         extractor = ROMExtractor()
 
         sprite_info = rom_info['sprites'][0]
-        output_path = temp_dir / "decompressed_sprite.bin"
+        output_path = tmp_path / "decompressed_sprite.bin"
 
         # Extract with decompression
         with open(rom_path, 'rb') as f:

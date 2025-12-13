@@ -87,6 +87,18 @@ class SessionState:
 _session_state = SessionState()
 
 
+def is_session_managers_active() -> bool:
+    """Check if session_managers fixture is currently active.
+
+    This is the public API for checking session state. Use this instead of
+    directly accessing _session_state.is_initialized.
+
+    Returns:
+        True if session_managers fixture has initialized managers
+    """
+    return _session_state.is_initialized
+
+
 def _reset_manager_caches(registry: Any) -> None:
     """Reset manager state using public reset_state() APIs.
 

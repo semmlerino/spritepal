@@ -853,6 +853,18 @@ class HALProcessPool:
                 if not sys.is_finalizing():
                     logger.debug("HAL process pool singleton reset")
 
+    @classmethod
+    def reset_for_tests(cls) -> None:
+        """Reset singleton state for test isolation.
+
+        This is the ONLY approved way to reset the HAL pool in tests.
+        Alias for reset_singleton() to match ManagerRegistry API.
+
+        WARNING: This method is for test infrastructure only.
+        Do not use in production code.
+        """
+        cls.reset_singleton()
+
 class HALCompressor:
     """Handles HAL compression/decompression for ROM injection"""
 
