@@ -17,11 +17,13 @@ import pytest
 
 
 @pytest.fixture(scope="function")
-def managers_initialized(qt_app, request):
+def managers_initialized(qt_app, request, tmp_path):
     """Initialize managers for integration tests.
 
     If session_managers is already active, this fixture is a no-op to avoid
     conflicting cleanup.
+
+    Uses isolated settings path to avoid polluting repository root.
     """
     from core.managers.registry import ManagerRegistry, cleanup_managers, initialize_managers
     from tests.fixtures.core_fixtures import is_session_managers_active
@@ -30,7 +32,9 @@ def managers_initialized(qt_app, request):
     was_already_initialized = registry.is_initialized()
 
     if not was_already_initialized:
-        initialize_managers()
+        # Use isolated temp settings path - CRITICAL for preventing repo pollution
+        settings_path = tmp_path / ".test_integration_settings.json"
+        initialize_managers("TestApp_Integration", settings_path=settings_path)
 
     yield
 

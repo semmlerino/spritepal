@@ -145,7 +145,12 @@ def qt_app() -> Any:
 
 @pytest.fixture(scope="class")
 def main_window() -> MockMainWindowProtocol:
-    """Class-scoped main window fixture for performance optimization.
+    """Class-scoped MOCK main window fixture for performance optimization.
+
+    WARNING: Signals are MagicMock objects, NOT real Qt signals.
+    - DO NOT use qtbot.waitSignal() with these signals - it will timeout
+    - For real signal behavior, use `real_test_main_window` fixture instead
+    - For testing signal emission: check `window.extract_requested.emit.called`
 
     Used 129 times across tests. Class scope reduces instantiations
     from 129 to ~30 (77% reduction).
@@ -182,6 +187,24 @@ def main_window() -> MockMainWindowProtocol:
     window._extracted_files = []
 
     return window  # pyright: ignore[reportReturnType]  # Mock conforms to protocol at runtime
+
+
+@pytest.fixture(scope="function")
+def real_test_main_window(qtbot: Any) -> Any:
+    """Main window with REAL Qt signals for integration tests.
+
+    Use this fixture when tests need to:
+    - Use qtbot.waitSignal() on main window signals
+    - Test signal-slot connections with real Qt behavior
+    - Test signal emission timing
+
+    For unit tests that don't need signal behavior, use `main_window` instead.
+    """
+    from tests.infrastructure.qt_mocks import RealTestMainWindow
+
+    window = RealTestMainWindow()
+    qtbot.addWidget(window)  # Ensure proper cleanup
+    return window
 
 
 # =============================================================================

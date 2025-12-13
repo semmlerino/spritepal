@@ -156,6 +156,40 @@ def pytest_configure(config):
         "requires_real_rom: Test requires real Kirby ROM file (skips if not available)"
     )
 
+    # Install QPixmap guard early - catches most cases since qt_app imports Qt early
+    _install_qpixmap_guard_early()
+
+
+def _install_qpixmap_guard_early() -> None:
+    """Install QPixmap guard at session start if Qt is available.
+
+    This runs before any test collection/execution, ensuring the guard is in place
+    even for tests that import Qt late. The per-test fixture guard_qpixmap_threading
+    remains as a fallback.
+    """
+    try:
+        from PySide6.QtCore import QCoreApplication, QThread
+        from PySide6.QtGui import QPixmap
+
+        if hasattr(QPixmap, '_test_guard_installed'):
+            return  # Already installed
+
+        original_init = QPixmap.__init__
+
+        def guarded_init(self, *args, **kwargs):
+            app = QCoreApplication.instance()
+            if app and QThread.currentThread() != app.thread():
+                raise RuntimeError(
+                    "CRITICAL: QPixmap created in worker thread! "
+                    "Use QImage or ThreadSafeTestImage."
+                )
+            original_init(self, *args, **kwargs)
+
+        QPixmap.__init__ = guarded_init
+        QPixmap._test_guard_installed = True  # pyright: ignore[reportAttributeAccessIssue]
+    except ImportError:
+        pass  # Qt not available, skip guard
+
 
 def pytest_addoption(parser: Any) -> None:
     """Add custom command line options for SpritePal tests."""

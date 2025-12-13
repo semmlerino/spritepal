@@ -31,14 +31,23 @@ skip_in_offscreen = pytest.mark.skipif(
 class TestSimplePreviewCoordinator:
     """Test SimplePreviewCoordinator with real ROM data and decompression."""
 
-    def setup_method(self):
-        """Setup dependencies."""
-        from core.di_container import register_singleton
+    @pytest.fixture(autouse=True)
+    def setup_di(self, tmp_path):
+        """Setup and teardown DI dependencies with isolation.
+
+        Uses tmp_path for cache to prevent polluting $HOME with ~/.spritepal_rom_cache.
+        """
+        from core.di_container import register_singleton, reset_container
         from core.protocols.manager_protocols import ROMCacheProtocol
-        from utils.rom_cache import ROMCache
-        
-        # Register ROM cache for tests
-        register_singleton(ROMCacheProtocol, ROMCache())
+
+        cache_dir = tmp_path / "rom_cache"
+        cache_dir.mkdir(exist_ok=True)
+        register_singleton(ROMCacheProtocol, ROMCache(cache_dir=str(cache_dir)))
+
+        yield
+
+        # Clean up DI registrations to prevent leakage
+        reset_container()
 
     def test_coordinator_initialization(self, managers_initialized):
         """Test that coordinator initializes correctly."""
@@ -346,10 +355,7 @@ class TestPreviewCaching:
         rom_info = test_rom_with_sprites
         rom_path = str(rom_info['path'])
 
-        # Create cache
-        cache = ROMCache(cache_dir=str(temp_dir))
-
-        # Create coordinator with cache
+        # Create coordinator with cache (using cache created above)
         coordinator = SimplePreviewCoordinator(rom_cache=cache)
         extraction_manager = ExtractionManager()
 
