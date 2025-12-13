@@ -78,15 +78,6 @@ import sys
 
 import pytest
 
-# Import constants from timeout configuration module
-from .constants_timeout import (
-    INTEGRATION_PATTERNS,
-    SLOW_TEST_PATTERNS,
-    TIMEOUT_BENCHMARK,
-    TIMEOUT_INTEGRATION,
-    TIMEOUT_SLOW,
-    TIMEOUT_UNIT,
-)
 from .infrastructure.environment_detection import get_environment_info
 
 # ============================================================================

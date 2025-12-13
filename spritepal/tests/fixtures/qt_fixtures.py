@@ -305,7 +305,8 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
             pass
 
     # Wait for worker threads to finish with proper timeout
-    max_wait_ms = 1000
+    # Scale with PYTEST_TIMEOUT_MULTIPLIER for slow CI environments
+    max_wait_ms = int(1000 * _timeout_multiplier)
     poll_interval_ms = 20
     elapsed = 0
     leaked_threads: dict[int, str] = {}

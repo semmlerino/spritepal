@@ -5,9 +5,10 @@ This guide explains how to run SpritePal tests in headless environments (CI/CD, 
 ## Setup
 
 Tests are configured to run in headless mode using Qt's offscreen platform:
-- `pytest.ini` sets `qt_qpa_platform = offscreen` (enabled by default)
-- GUI tests are marked with `@pytest.mark.gui` and skipped in headless
-- Tests that need Qt but aren't marked @gui will **fail loudly** in headless
+- `tests/conftest.py` sets `QT_QPA_PLATFORM=offscreen` via `os.environ.setdefault`
+- GUI tests marked `@pytest.mark.gui` run with offscreen backend (not skipped)
+- Tests marked `@pytest.mark.requires_display` are skipped when offscreen
+- Tests that need Qt but have issues will **fail loudly** with clear error messages
 
 ## Test Behavior
 
@@ -49,12 +50,11 @@ QT_QPA_PLATFORM=offscreen python -m pytest tests/ -v
 
 ## Test Markers
 
-| Marker | Behavior in Headless |
+| Marker | Behavior in Headless (offscreen) |
 |--------|---------------------|
-| `@pytest.mark.gui` | Skipped |
+| `@pytest.mark.gui` | Runs (with offscreen backend) |
 | `@pytest.mark.headless` | Runs |
-| `@pytest.mark.qt_real` | Skipped |
-| `@pytest.mark.qt_mock` | Runs |
+| `@pytest.mark.requires_display` | Skipped |
 | (no marker) | Runs with offscreen |
 
 ## CI/CD Integration
@@ -66,7 +66,7 @@ For GitHub Actions or similar:
     uv run pytest tests/ -v --tb=short
 ```
 
-No additional environment variables needed - pytest.ini configures offscreen mode.
+No additional environment variables needed - `tests/conftest.py` configures offscreen mode.
 
 ## Troubleshooting
 
@@ -75,7 +75,7 @@ No additional environment variables needed - pytest.ini configures offscreen mod
 - The test may incorrectly require display - mark it @pytest.mark.gui
 
 ### Test fails with "Failed to create QApplication"
-- QT_QPA_PLATFORM=offscreen should be set (it's in pytest.ini)
+- QT_QPA_PLATFORM=offscreen should be set (done automatically in tests/conftest.py)
 - Check that no conflicting Qt environment variables are set
 
 ### Test passes locally but fails in CI

@@ -22,7 +22,7 @@ def get_rom_cache():
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,
+    pytest.mark.skip_thread_cleanup(reason="Cache tests use managers that may spawn async I/O threads"),
     pytest.mark.serial,
     pytest.mark.thread_safety,
     pytest.mark.cache,
@@ -397,10 +397,13 @@ class TestROMCacheCore:
         loaded = rom_cache.get_sprite_locations(test_rom_file)
         assert loaded is not None
 
-        # Wait a moment then modify ROM file
-        time.sleep(0.1)
+        # Modify ROM file and explicitly set mtime to future
+        # (avoids brittle time.sleep on low-resolution filesystems)
         with open(test_rom_file, "ab") as f:
             f.write(b"MODIFIED")
+        # Force mtime change - add 2 seconds to ensure detection on any filesystem
+        current_stat = os.stat(test_rom_file)
+        os.utime(test_rom_file, (current_stat.st_atime, current_stat.st_mtime + 2))
 
         # Cache should be invalidated
         loaded = rom_cache.get_sprite_locations(test_rom_file)

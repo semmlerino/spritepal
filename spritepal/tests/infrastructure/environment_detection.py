@@ -1,8 +1,8 @@
 """
 Minimal environment detection for SpritePal test suite.
 
-This module provides basic environment detection. Qt configuration is handled
-by pyproject.toml (qt_qpa_platform = "offscreen") - no complex detection needed.
+This module provides basic environment detection. Qt offscreen mode is set
+in tests/conftest.py via os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen').
 """
 
 from __future__ import annotations
@@ -143,7 +143,7 @@ def is_pyside6_available() -> bool:
 
 
 def configure_qt_for_environment() -> None:
-    """No-op. Qt configuration is handled by pyproject.toml."""
+    """No-op. Qt offscreen mode is set in tests/conftest.py."""
     pass
 
 

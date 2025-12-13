@@ -186,7 +186,6 @@ The `isolated_managers` fixture has an explicit guard that fails if ManagerRegis
 
 **Environment Variables** (implemented in `spritepal/tests/conftest.py`):
 - `PYTEST_TIMEOUT_MULTIPLIER=2.0` - Scale all timeouts (useful for slow CI)
-- `PYTEST_DEBUG_FIXTURES=1` - Enable fixture performance monitoring
 
 ## Project Architecture
 
