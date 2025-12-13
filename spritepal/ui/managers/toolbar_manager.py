@@ -141,10 +141,26 @@ class ToolbarManager(QObject):
         self.arrange_grid_button.clicked.connect(self.actions_handler.on_arrange_grid_clicked)
         self.inject_button.clicked.connect(self.actions_handler.on_inject_clicked)
 
-    def set_extract_enabled(self, enabled: bool) -> None:
-        """Set extract button enabled state"""
-        if hasattr(self, "extract_button") and self.extract_button:
-            self.extract_button.setEnabled(enabled)
+    def set_extract_enabled(self, enabled: bool, reason: str = "") -> None:
+        """Set extract button enabled state with validation feedback.
+        
+        Args:
+            enabled: Whether button should be enabled
+            reason: If disabled, explanation of why (e.g., "Load a ROM file")
+        """
+        if not hasattr(self, "extract_button") or not self.extract_button:
+            return
+            
+        self.extract_button.setEnabled(enabled)
+        
+        if enabled:
+            self.extract_button.setToolTip("Extract sprites for editing (Ctrl+E)")
+        else:
+            # Show disabled reason in tooltip
+            if reason:
+                self.extract_button.setToolTip(f"Cannot extract: {reason}")
+            else:
+                self.extract_button.setToolTip("Cannot extract - requirements not met")
 
     def set_post_extraction_buttons_enabled(self, enabled: bool) -> None:
         """Set post-extraction buttons enabled state"""

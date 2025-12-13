@@ -23,10 +23,12 @@ if TYPE_CHECKING:
 else:
     from PySide6.QtGui import QCloseEvent, QKeyEvent
 from PySide6.QtWidgets import (
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QMainWindow,
     QMessageBox,
+    QScrollArea,
     QSplitter,
     QStatusBar,
     QTabWidget,
@@ -49,6 +51,7 @@ from ui.managers import (
 )
 from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
+from ui.styles.components import get_action_zone_style
 from ui.zoomable_preview import PreviewPanel
 
 # Layout constants for consistent sizing and spacing
@@ -178,16 +181,35 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage("Ready to extract sprites")
 
     def _create_left_panel(self) -> QWidget:
-        """Create the left panel with tabs, output settings, and buttons"""
+        """Create the left panel with scrollable tabs and pinned action zone.
+        
+        Structure:
+        - Content Zone (top, scrollable): Contains extraction tabs
+        - Action Zone (bottom, fixed): Contains output settings + action buttons
+        
+        This ensures action buttons are always visible regardless of tab content height.
+        """
         left_panel = QWidget(self)
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS)
-        left_layout.setSpacing(LAYOUT_SPACING)
+        main_layout = QVBoxLayout(left_panel)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        # Create tab widget for extraction methods with proper size policy
+        # CONTENT ZONE: Scrollable area for extraction tabs
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, 0)
+        content_layout.setSpacing(LAYOUT_SPACING)
+
+        # Create tab widget for extraction methods
         self.extraction_tabs = QTabWidget(self)
         from PySide6.QtWidgets import QSizePolicy
-        self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
         # ROM extraction tab (first tab, selected by default)
         from core.di_container import inject
@@ -206,12 +228,30 @@ class MainWindow(QMainWindow):
         # Add tab navigation shortcuts
         self.extraction_tabs.setToolTip("Switch tabs with Ctrl+Tab/Ctrl+Shift+Tab")
 
-        left_layout.addWidget(self.extraction_tabs)
+        content_layout.addWidget(self.extraction_tabs)
+        content_layout.addStretch()  # Push tabs to top when content is small
+        
+        scroll_area.setWidget(content_widget)
+        main_layout.addWidget(scroll_area, stretch=1)  # Takes all available vertical space
 
-        # Output settings will be added by OutputSettingsManager
-        # Action buttons will be added by ToolbarManager
+        # ACTION ZONE: Fixed height, pinned to bottom
+        self.action_zone = QWidget()
+        self.action_zone.setObjectName("actionZone")
+        self.action_zone.setStyleSheet(get_action_zone_style())
+        action_zone_layout = QVBoxLayout(self.action_zone)
+        action_zone_layout.setContentsMargins(LAYOUT_MARGINS, 0, LAYOUT_MARGINS, LAYOUT_MARGINS)
+        action_zone_layout.setSpacing(LAYOUT_SPACING)
 
-        # Remove addStretch() to eliminate empty space at bottom
+        # Visual separator line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        action_zone_layout.addWidget(separator)
+
+        # Output settings and buttons will be added by managers in _setup_managers()
+        
+        main_layout.addWidget(self.action_zone)  # No stretch = fixed size based on content
+
         return left_panel
 
     def _setup_managers(self) -> None:
@@ -254,19 +294,19 @@ class MainWindow(QMainWindow):
         self.menu_bar_manager.create_menus()
         self.status_bar_manager.setup_status_bar_indicators()
 
-        # Add output settings to left panel
-        left_layout = self.left_panel.layout()
-        if left_layout is not None and isinstance(left_layout, QVBoxLayout):
-            # Add output settings group to left panel
+        # Add output settings and buttons to the pinned action zone
+        action_zone_layout = self.action_zone.layout()
+        if action_zone_layout is not None and isinstance(action_zone_layout, QVBoxLayout):
+            # Add output settings group to action zone
             output_group = self.output_settings_manager.create_output_settings_group()
-            left_layout.addWidget(output_group)
+            action_zone_layout.addWidget(output_group)
 
             # Add toolbar buttons
             button_layout = QGridLayout()
-            button_layout.setContentsMargins(0, LAYOUT_SPACING * 2, 0, 0)
+            button_layout.setContentsMargins(0, LAYOUT_SPACING, 0, 0)
             button_layout.setSpacing(LAYOUT_SPACING)
             self.toolbar_manager.create_action_buttons(button_layout)
-            left_layout.addLayout(button_layout)
+            action_zone_layout.addLayout(button_layout)
 
         # Add preview panel to main splitter
         main_splitter = self.centralWidget().findChild(QSplitter)
@@ -522,11 +562,11 @@ class MainWindow(QMainWindow):
         # Save session data when files change
         self.session_coordinator.save_session()
 
-    def _on_vram_extraction_ready(self, ready: bool) -> None:
+    def _on_vram_extraction_ready(self, ready: bool, reason: str = "") -> None:
         """Handle VRAM extraction ready state change"""
         # Only enable if VRAM tab is active
         if self.tab_coordinator.is_vram_tab_active():
-            self.toolbar_manager.set_extract_enabled(ready)
+            self.toolbar_manager.set_extract_enabled(ready, reason)
 
     def _on_extraction_mode_changed(self, mode_index: int) -> None:
         """Handle extraction mode change"""
@@ -546,11 +586,11 @@ class MainWindow(QMainWindow):
 
         self.output_settings_manager.update_output_info_label(is_vram_tab, is_grayscale_mode)
 
-    def _on_rom_extraction_ready(self, ready: bool) -> None:
+    def _on_rom_extraction_ready(self, ready: bool, reason: str = "") -> None:
         """Handle ROM extraction ready state change"""
         # Only enable if ROM tab is active
         if self.tab_coordinator.is_rom_tab_active():
-            self.toolbar_manager.set_extract_enabled(ready)
+            self.toolbar_manager.set_extract_enabled(ready, reason)
 
     def _on_rom_files_changed(self) -> None:
         """Handle when ROM extraction files change"""

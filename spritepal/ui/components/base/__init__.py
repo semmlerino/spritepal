@@ -11,6 +11,7 @@ from .dialog_selector import (
     is_composed_dialogs_enabled,
     set_dialog_implementation,
 )
+from .help_icon_button import HelpIconButton, HelpLabel, InfoBanner
 
 # Maintain backward compatibility alias
 BaseDialog = DialogBase
@@ -18,8 +19,11 @@ BaseDialog = DialogBase
 __all__ = [
     "BaseDialog",  # Backward compatibility alias
     "DialogBase",
+    "HelpIconButton",
+    "HelpLabel",
+    "InfoBanner",
     "InitializationOrderError",
     "get_dialog_implementation",
     "is_composed_dialogs_enabled",
-    "set_dialog_implementation"
+    "set_dialog_implementation",
 ]

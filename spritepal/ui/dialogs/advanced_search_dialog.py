@@ -44,23 +44,18 @@ from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
 from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngine
 from core.workers.base import handle_worker_errors
 from ui.common import WorkerManager
+from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.components.filters import SearchFiltersWidget
+from ui.components.filters.search_filters_widget import SearchFilter
+from ui.constants.help_text import TOOLTIPS
 from ui.dialogs.similarity_results_dialog import show_similarity_results
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE
 from utils.preview_generator import PreviewGenerator, PreviewRequest
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class SearchFilter:
-    """Container for search filter settings."""
-    min_size: int
-    max_size: int
-    min_tiles: int
-    max_tiles: int
-    alignment: int
-    include_compressed: bool
-    include_uncompressed: bool
-    confidence_threshold: float
+# SearchFilter is imported from ui.components.filters.search_filters_widget
+
 
 @dataclass
 class SearchHistoryEntry:
@@ -955,12 +950,14 @@ class AdvancedSearchDialog(QDialog):
 
         # Start offset
         self.start_offset_edit = QLineEdit("0x0")
+        self.start_offset_edit.setToolTip(TOOLTIPS["start_offset"])
         range_layout.addWidget(QLabel("Start Offset:"), 0, 0)
         range_layout.addWidget(self.start_offset_edit, 0, 1)
 
         # End offset
         self.end_offset_edit = QLineEdit("")
         self.end_offset_edit.setPlaceholderText("End of ROM")
+        self.end_offset_edit.setToolTip(TOOLTIPS["end_offset"])
         range_layout.addWidget(QLabel("End Offset:"), 1, 0)
         range_layout.addWidget(self.end_offset_edit, 1, 1)
 
@@ -971,20 +968,22 @@ class AdvancedSearchDialog(QDialog):
         self.step_size_spin.setSingleStep(0x10)
         self.step_size_spin.setPrefix("0x")
         self.step_size_spin.setDisplayIntegerBase(16)
+        self.step_size_spin.setToolTip(TOOLTIPS["step_size"])
         range_layout.addWidget(QLabel("Step Size:"), 2, 0)
         range_layout.addWidget(self.step_size_spin, 2, 1)
 
         range_group.setLayout(range_layout)
         layout.addWidget(range_group)
 
-        # Performance settings
-        perf_group = QGroupBox("Performance")
+        # Performance settings - collapsible, collapsed by default
+        perf_group = CollapsibleGroupBox("Performance", collapsed=True)
         perf_layout = QGridLayout()
 
         # Worker threads
         self.workers_spin = QSpinBox()
         self.workers_spin.setRange(1, 16)
         self.workers_spin.setValue(4)
+        self.workers_spin.setToolTip(TOOLTIPS["worker_threads"])
         perf_layout.addWidget(QLabel("Worker Threads:"), 0, 0)
         perf_layout.addWidget(self.workers_spin, 0, 1)
 
@@ -992,13 +991,15 @@ class AdvancedSearchDialog(QDialog):
         self.adaptive_check = QCheckBox("Adaptive Step Sizing")
         if self.adaptive_check:
             self.adaptive_check.setChecked(True)
+        self.adaptive_check.setToolTip(TOOLTIPS["adaptive_stepping"])
         perf_layout.addWidget(self.adaptive_check, 1, 0, 1, 2)
 
-        perf_group.setLayout(perf_layout)
+        perf_group.setContentLayout(perf_layout)
         layout.addWidget(perf_group)
 
-        # Filters
-        layout.addWidget(self._create_filters_group())
+        # Filters - use shared SearchFiltersWidget
+        self.filters_widget = SearchFiltersWidget(collapsible=True, expanded=True)
+        layout.addWidget(self.filters_widget)
 
         layout.addStretch()
         return widget
@@ -1016,6 +1017,7 @@ class AdvancedSearchDialog(QDialog):
         ref_select_layout = QHBoxLayout()
         self.ref_offset_edit = QLineEdit()
         self.ref_offset_edit.setPlaceholderText("Sprite offset (e.g. 0x12345)")
+        self.ref_offset_edit.setToolTip(TOOLTIPS["offset"])
         self.ref_offset_edit.textChanged.connect(self._on_reference_offset_changed)
         ref_select_layout.addWidget(self.ref_offset_edit)
 
@@ -1046,6 +1048,7 @@ class AdvancedSearchDialog(QDialog):
         self.similarity_slider = QSlider(Qt.Orientation.Horizontal)
         self.similarity_slider.setRange(0, 100)
         self.similarity_slider.setValue(80)
+        self.similarity_slider.setToolTip(TOOLTIPS["similarity_threshold"])
         self.similarity_label = QLabel("80%")
         self.similarity_slider.valueChanged.connect(self._update_similarity_label)
 
@@ -1060,6 +1063,7 @@ class AdvancedSearchDialog(QDialog):
             "All Indexed Sprites",
             "Selected Region"
         ])
+        self.visual_scope_combo.setToolTip(TOOLTIPS["search_scope"])
         sim_layout.addWidget(QLabel("Search Scope:"), 1, 0)
         sim_layout.addWidget(self.visual_scope_combo, 1, 1, 1, 2)
 
@@ -1195,60 +1199,7 @@ class AdvancedSearchDialog(QDialog):
 
         return widget
 
-    def _create_filters_group(self) -> QGroupBox:
-        """Create filters group box."""
-        group = QGroupBox("Filters")
-        layout = QGridLayout()
-
-        # Size filter
-        self.min_size_spin = QSpinBox()
-        self.min_size_spin.setRange(0, MAX_SPRITE_SIZE)
-        self.min_size_spin.setValue(MIN_SPRITE_SIZE)
-        self.min_size_spin.setSingleStep(0x100)
-
-        self.max_size_spin = QSpinBox()
-        self.max_size_spin.setRange(0, MAX_SPRITE_SIZE)
-        self.max_size_spin.setValue(MAX_SPRITE_SIZE)
-        self.max_size_spin.setSingleStep(0x100)
-
-        layout.addWidget(QLabel("Size Range:"), 0, 0)
-        layout.addWidget(self.min_size_spin, 0, 1)
-        layout.addWidget(QLabel("-"), 0, 2)
-        layout.addWidget(self.max_size_spin, 0, 3)
-
-        # Tile count filter
-        self.min_tiles_spin = QSpinBox()
-        self.min_tiles_spin.setRange(1, 1024)
-        self.min_tiles_spin.setValue(1)
-
-        self.max_tiles_spin = QSpinBox()
-        self.max_tiles_spin.setRange(1, 1024)
-        self.max_tiles_spin.setValue(1024)
-
-        layout.addWidget(QLabel("Tile Count:"), 1, 0)
-        layout.addWidget(self.min_tiles_spin, 1, 1)
-        layout.addWidget(QLabel("-"), 1, 2)
-        layout.addWidget(self.max_tiles_spin, 1, 3)
-
-        # Compression filter
-        self.compressed_check = QCheckBox("Include Compressed")
-        if self.compressed_check:
-            self.compressed_check.setChecked(True)
-        self.uncompressed_check = QCheckBox("Include Uncompressed")
-
-        layout.addWidget(self.compressed_check, 2, 0, 1, 2)
-        layout.addWidget(self.uncompressed_check, 2, 2, 1, 2)
-
-        # Alignment filter
-        self.alignment_combo = QComboBox()
-        self.alignment_combo.addItems([
-            "Any", "0x10", "0x100", "0x1000", "0x8000"
-        ])
-        layout.addWidget(QLabel("Alignment:"), 3, 0)
-        layout.addWidget(self.alignment_combo, 3, 1, 1, 3)
-
-        group.setLayout(layout)
-        return group
+    # NOTE: _create_filters_group has been replaced by SearchFiltersWidget
 
     def _update_similarity_label(self, value: int):
         """Update similarity label text."""
@@ -1307,17 +1258,8 @@ class AdvancedSearchDialog(QDialog):
                 self.results_label.setText("Invalid offset format")
             return
 
-        # Create filters
-        filters = SearchFilter(
-            min_size=self.min_size_spin.value(),
-            max_size=self.max_size_spin.value(),
-            min_tiles=self.min_tiles_spin.value(),
-            max_tiles=self.max_tiles_spin.value(),
-            alignment=self._get_alignment_value(),
-            include_compressed=self.compressed_check.isChecked(),
-            include_uncompressed=self.uncompressed_check.isChecked(),
-            confidence_threshold=0.5
-        )
+        # Get filters from widget
+        filters = self.filters_widget.get_filters()
 
         # Create worker
         params = {
@@ -1735,13 +1677,6 @@ class AdvancedSearchDialog(QDialog):
         result = item.data(Qt.ItemDataRole.UserRole)
         if result:
             self.sprite_selected.emit(result.offset)
-
-    def _get_alignment_value(self) -> int:
-        """Get alignment value from combo box."""
-        text = self.alignment_combo.currentText()
-        if text == "Any":
-            return 1
-        return int(text, 16)
 
     def _browse_reference_sprite(self):
         """Browse for reference sprite (thread-safe)."""

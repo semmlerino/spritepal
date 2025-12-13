@@ -371,7 +371,7 @@ class RealTestExtractionPanel(QObject):
     # Define signals as class attributes
     file_dropped = Signal(str)
     files_changed = Signal()
-    extraction_ready = Signal(bool)
+    extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
     offset_changed = Signal(int)
     mode_changed = Signal(int)
 
@@ -440,7 +440,7 @@ class RealTestROMExtractionPanel(QObject):
 
     # Define signals as class attributes
     files_changed = Signal()
-    extraction_ready = Signal(bool)
+    extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
     rom_extraction_requested = Signal(dict)
     output_name_changed = Signal(str)
 

@@ -695,3 +695,138 @@ def get_dark_panel_style() -> str:
         color: {COLORS["text_primary"]};
     }}
     """
+
+
+def get_action_zone_style() -> str:
+    """
+    Get styling for the action zone (output settings + buttons).
+    
+    This creates visual separation between the scrollable configuration
+    content above and the fixed action buttons below.
+    
+    Returns:
+        CSS string for action zone styling
+    """
+    return f"""
+    #actionZone {{
+        background-color: {COLORS["panel_background"]};
+        border-top: 1px solid {COLORS["border"]};
+        padding-top: {DIMENSIONS["spacing_sm"]}px;
+    }}
+    
+    #actionZone QGroupBox {{
+        background-color: transparent;
+        border: none;
+        margin-top: 0;
+        padding: 0;
+    }}
+    
+    #actionZone QGroupBox::title {{
+        color: {COLORS["text_secondary"]};
+        font-size: {FONTS["small_size"]};
+        subcontrol-origin: margin;
+        left: 0;
+        padding: 0;
+    }}
+    """
+
+
+def get_manual_offset_button_style() -> str:
+    """
+    Get styling for the manual offset control button.
+    
+    Creates a prominent, gradient-styled button that stands out
+    as the primary action for manual sprite offset selection.
+    
+    Returns:
+        CSS string for manual offset button styling
+    """
+    return """
+    QPushButton {
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 #5a9fd4, stop:1 #306998);
+        color: white;
+        font-weight: bold;
+        font-size: 13px;
+        border-radius: 6px;
+        padding: 8px 16px;
+        border: 1px solid #2e5a84;
+        min-height: 36px;
+    }
+    QPushButton:hover {
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 #6aafea, stop:1 #4079a8);
+        border: 1px solid #4488dd;
+    }
+    QPushButton:pressed {
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 #306998, stop:1 #204060);
+    }
+    """
+
+
+def get_cache_status_style(status: str) -> str:
+    """
+    Get styling for cache status labels based on status type.
+    
+    Used to visually indicate cache state (checking, resuming, fresh, saving, saved).
+    
+    Args:
+        status: Status type - "checking", "resuming", "fresh", "saving", "saved"
+    
+    Returns:
+        CSS string for cache status label styling
+    """
+    styles = {
+        "checking": """
+            QLabel {
+                background-color: #e3f2fd;
+                border: 1px solid #2196f3;
+                border-radius: 4px;
+                padding: 8px;
+                font-weight: bold;
+                color: #1976d2;
+            }
+        """,
+        "resuming": """
+            QLabel {
+                background-color: #e8f5e9;
+                border: 1px solid #4caf50;
+                border-radius: 4px;
+                padding: 8px;
+                font-weight: bold;
+                color: #2e7d32;
+            }
+        """,
+        "fresh": """
+            QLabel {
+                background-color: #fff3e0;
+                border: 1px solid #ff9800;
+                border-radius: 4px;
+                padding: 8px;
+                font-weight: bold;
+                color: #e65100;
+            }
+        """,
+        "saving": """
+            QLabel {
+                background-color: #e1f5fe;
+                border: 1px solid #039be5;
+                border-radius: 4px;
+                padding: 8px;
+                font-weight: bold;
+                color: #01579b;
+            }
+        """,
+        "saved": """
+            QLabel {
+                background-color: #c8e6c9;
+                border: 1px solid #4caf50;
+                border-radius: 4px;
+                padding: 8px;
+                font-weight: bold;
+                color: #1b5e20;
+            }
+        """,
+    }
+    return styles.get(status, styles["checking"])

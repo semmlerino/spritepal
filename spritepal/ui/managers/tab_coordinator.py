@@ -90,7 +90,10 @@ class TabCoordinator(QObject):
         """Configure UI for ROM extraction tab"""
         # Check extraction readiness
         params = self.actions_handler.get_rom_extraction_params()
-        self.toolbar_manager.set_extract_enabled(params is not None)
+        if params is not None:
+            self.toolbar_manager.set_extract_enabled(True)
+        else:
+            self.toolbar_manager.set_extract_enabled(False, "Load a ROM file")
 
         # Sync output name from ROM panel to main output field
         if params and params.get("output_base"):
@@ -103,7 +106,10 @@ class TabCoordinator(QObject):
         """Configure UI for VRAM extraction tab"""
         # Check extraction readiness based on mode
         ready = self.actions_handler.is_vram_extraction_ready()
-        self.toolbar_manager.set_extract_enabled(ready)
+        if ready:
+            self.toolbar_manager.set_extract_enabled(True)
+        else:
+            self.toolbar_manager.set_extract_enabled(False, "Load VRAM file")
 
         # Update output info label
         is_grayscale_mode = self.actions_handler.is_grayscale_mode()

@@ -253,7 +253,7 @@ class ExtractionPanel(QGroupBox):
     """
 
     files_changed = Signal()
-    extraction_ready = Signal(bool)
+    extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
     offset_changed = Signal(int)  # Emitted when VRAM offset changes
     mode_changed = Signal(int)  # Emitted when extraction mode changes
 
@@ -448,18 +448,23 @@ class ExtractionPanel(QGroupBox):
             self.offset_changed.emit(self.get_vram_offset())
 
     def _check_extraction_ready(self):
-        """Check if we're ready to extract"""
+        """Check if we're ready to extract with validation feedback"""
+        reasons: list[str] = []
+
         # Always need VRAM
         if not self.vram_drop.has_file():
-            self.extraction_ready.emit(False)
+            reasons.append("Load a VRAM file")
+            self.extraction_ready.emit(False, " | ".join(reasons))
             return
 
         # Check mode - grayscale doesn't need CGRAM
         if self.mode_combo.currentIndex() == 1:  # Grayscale Only
-            self.extraction_ready.emit(True)
+            self.extraction_ready.emit(True, "")
         else:  # Full Color mode
+            if not self.cgram_drop.has_file():
+                reasons.append("Load a CGRAM file (or use Grayscale mode)")
             ready = self.cgram_drop.has_file()
-            self.extraction_ready.emit(ready)
+            self.extraction_ready.emit(ready, " | ".join(reasons))
 
     def _auto_detect_related(self, file_path: str) -> None:
         """Try to auto-detect related dump files"""

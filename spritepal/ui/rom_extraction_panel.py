@@ -56,6 +56,7 @@ from utils.logging_config import get_logger
 
 # SettingsManager accessed via DI: inject(SettingsManagerProtocol)
 from utils.thread_safe_singleton import QtThreadSafeSingleton
+from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
 
 logger = get_logger(__name__)
 
@@ -252,7 +253,7 @@ class ROMExtractionPanel(QWidget):
 
     # Signals
     files_changed = Signal()
-    extraction_ready = Signal(bool)
+    extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
     rom_extraction_requested = Signal(
         str, int, str, str
     )  # rom_path, offset, output_base, sprite_name
@@ -398,7 +399,7 @@ class ROMExtractionPanel(QWidget):
         _ = button.clicked.connect(self._open_manual_offset_dialog)
         button.setVisible(True)  # Show by default (manual mode)
         button.setToolTip("Open advanced manual offset control window (Ctrl+M)")
-        button.setStyleSheet(self._get_manual_offset_button_style())
+        button.setStyleSheet(get_manual_offset_button_style())
         return button
 
     def _get_manual_offset_button_style(self) -> str:
@@ -1032,9 +1033,16 @@ class ROMExtractionPanel(QWidget):
     def _check_extraction_ready(self):
         """Check if extraction is ready - override to handle manual mode"""
         try:
-            # Check common requirements
+            # Build list of missing requirements for user feedback
+            reasons: list[str] = []
+
             has_rom = bool(self.rom_path)
+            if not has_rom:
+                reasons.append("Load a ROM file")
+
             has_output_name = bool(self.output_name_widget.get_output_name())
+            if not has_output_name:
+                reasons.append("Enter output name")
 
             if self._manual_offset_mode:
                 # In manual mode, just need ROM and output name
@@ -1042,14 +1050,17 @@ class ROMExtractionPanel(QWidget):
             else:
                 # In preset mode, also need sprite selection
                 has_sprite = self.sprite_selector_widget.get_current_index() > 0
+                if not has_sprite:
+                    reasons.append("Select a sprite")
                 ready = has_rom and has_sprite and has_output_name
 
+            reason_text = " | ".join(reasons) if reasons else ""
             logger.debug(f"Extraction ready: {ready} (manual_mode={self._manual_offset_mode})")
-            self.extraction_ready.emit(ready)
+            self.extraction_ready.emit(ready, reason_text)
 
         except Exception:
             logger.exception("Error in _check_extraction_ready")
-            self.extraction_ready.emit(False)
+            self.extraction_ready.emit(False, "Internal error")
 
     def get_extraction_params(self) -> dict[str, Any] | None:
         """Get parameters for ROM extraction"""
@@ -1163,7 +1174,7 @@ class ROMExtractionPanel(QWidget):
     def _create_cache_status_label(self) -> QLabel:
         """Create the cache status label."""
         label = QLabel("Checking cache...")
-        label.setStyleSheet(self._get_cache_status_style("checking"))
+        label.setStyleSheet(get_cache_status_style("checking"))
         return label
 
     def _create_progress_bar(self) -> QProgressBar:
@@ -1333,7 +1344,7 @@ class ROMExtractionPanel(QWidget):
             text: Status text to display
         """
         dialog.cache_status_label.setText(text)
-        dialog.cache_status_label.setStyleSheet(self._get_cache_status_style(status))
+        dialog.cache_status_label.setStyleSheet(get_cache_status_style(status))
 
     def _connect_scan_signals(self, dialog: ScanDialog, context: ScanContext) -> None:
         """Connect scan worker signals to handlers.
@@ -1489,7 +1500,7 @@ class ROMExtractionPanel(QWidget):
         else:
             style_type = "checking"
 
-        dialog.cache_status_label.setStyleSheet(self._get_cache_status_style(style_type))
+        dialog.cache_status_label.setStyleSheet(get_cache_status_style(style_type))
 
     def _on_cache_progress(self, dialog: ScanDialog, progress: int) -> None:
         """Handle cache progress update."""
@@ -1759,13 +1770,19 @@ class ROMExtractionPanel(QWidget):
             super().closeEvent(a0)
 
     def __del__(self):
-        """Destructor to ensure cleanup even if closeEvent isn't called"""
-        try:
-            # Ensure workers are cleaned up
-            self._cleanup_workers()
-        except Exception as e:
-            # Don't raise in destructor, just log
-            logger.debug(f"Error in ROMExtractionPanel destructor: {e}")
+        """Destructor - no-op to avoid crashes during garbage collection.
+
+        Workers registered with WorkerManager are cleaned up via:
+        1. closeEvent() when panel is closed normally
+        2. WorkerManager.cleanup_all() during test teardown
+        3. Process exit
+
+        Calling _cleanup_workers() here causes crashes because:
+        - During GC, Qt objects may already have deleted C++ backing
+        - WorkerManager.cleanup_all() may have already processed our workers
+        - Calling isRunning() on a deleted worker segfaults
+        """
+        pass
 
 class ScanContext:
     """Context object for sharing data between scan event handlers."""
