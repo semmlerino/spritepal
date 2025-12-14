@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QKeySequence
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -23,6 +23,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from spritepal.ui.styles import get_prominent_action_button_style
+from spritepal.ui.styles.theme import COLORS
 
 # Import AdvancedSearchDialog lazily to avoid circular imports
 from utils.logging_config import get_logger
@@ -79,12 +82,12 @@ class SimpleBrowseTab(QWidget):
         # Main control section with improved styling
         controls_frame = QFrame()
         controls_frame.setFrameStyle(QFrame.Shape.StyledPanel)
-        controls_frame.setStyleSheet("""
-            QFrame {
-                background-color: #2b2b2b;
-                border: 1px solid #3c3c3c;
+        controls_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS["input_background"]};
+                border: 1px solid {COLORS["panel_background"]};
                 border-radius: 6px;
-            }
+            }}
         """)
         controls_layout = QVBoxLayout(controls_frame)
         controls_layout.setSpacing(12)  # Better spacing between controls
@@ -92,7 +95,7 @@ class SimpleBrowseTab(QWidget):
 
         # Section title with better styling
         title = self._create_section_title("ROM Offset Control")
-        title.setStyleSheet("font-size: 14px; font-weight: bold; color: #4488dd;")
+        title.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLORS['highlight']};")
         controls_layout.addWidget(title)
 
         # Slider with smart preview support and type-safe range checking
@@ -116,28 +119,28 @@ class SimpleBrowseTab(QWidget):
 
         # Apply distinct styling for ROM offset slider
         if self.position_slider:
-            self.position_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                border: 2px solid #4488dd;
+            self.position_slider.setStyleSheet(f"""
+            QSlider::groove:horizontal {{
+                border: 2px solid {COLORS["highlight"]};
                 height: 8px;
-                background: #2b2b2b;
+                background: {COLORS["input_background"]};
                 border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #4488dd;
-                border: 2px solid #5599ee;
+            }}
+            QSlider::handle:horizontal {{
+                background: {COLORS["highlight"]};
+                border: 2px solid {COLORS["highlight_hover"]};
                 width: 18px;
                 margin: -5px 0;
                 border-radius: 9px;
-            }
-            QSlider::handle:horizontal:hover {
-                background: #5599ee;
-                border: 2px solid #66aaff;
-            }
-            QSlider::sub-page:horizontal {
-                background: #3377cc;
+            }}
+            QSlider::handle:horizontal:hover {{
+                background: {COLORS["highlight_hover"]};
+                border: 2px solid {COLORS["highlight_hover"]};
+            }}
+            QSlider::sub-page:horizontal {{
+                background: {COLORS["browse_pressed"]};
                 border-radius: 4px;
-            }
+            }}
         """)
         controls_layout.addWidget(self.position_slider)
 
@@ -164,7 +167,7 @@ class SimpleBrowseTab(QWidget):
         # Add separator line for visual clarity
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet("background-color: #3c3c3c; max-height: 1px;")
+        separator.setStyleSheet(f"background-color: {COLORS['panel_background']}; max-height: 1px;")
         controls_layout.addWidget(separator)
 
         # Navigation controls section with better grouping
@@ -172,22 +175,22 @@ class SimpleBrowseTab(QWidget):
         nav_row.setSpacing(8)  # Better button spacing
 
         # Navigation buttons with improved styling
-        button_style = """
-            QPushButton {
+        button_style = f"""
+            QPushButton {{
                 padding: 6px 12px;
-                background-color: #3c3c3c;
-                border: 1px solid #555;
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 4px;
-                color: #ddd;
+                color: {COLORS["text_secondary"]};
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #4a4a4a;
-                border-color: #4488dd;
-            }
-            QPushButton:pressed {
-                background-color: #2a2a2a;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS["focus_background_subtle"]};
+                border-color: {COLORS["highlight"]};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS["input_background"]};
+            }}
         """
 
         self.prev_button = QPushButton("◀ Previous")
@@ -214,11 +217,11 @@ class SimpleBrowseTab(QWidget):
 
         nav_row.addStretch()  # Add space between navigation and action buttons
 
-        # Find Sprites button
-        self.find_sprites_button = QPushButton("🔍 Find Sprites")
-        if self.find_sprites_button:
-            self.find_sprites_button.setStyleSheet(button_style)
-        self.find_sprites_button.setToolTip("Scan ROM for HAL-compressed sprites")
+        # Find Sprites button - prominent styling for discoverability
+        self.find_sprites_button = QPushButton("🔍 Find Sprites (Ctrl+F)")
+        self.find_sprites_button.setStyleSheet(get_prominent_action_button_style())
+        self.find_sprites_button.setShortcut(QKeySequence("Ctrl+F"))
+        self.find_sprites_button.setToolTip("Scan ROM for HAL-compressed sprites\n\nKeyboard shortcut: Ctrl+F")
         self.find_sprites_button.clicked.connect(self._on_find_sprites)
         nav_row.addWidget(self.find_sprites_button)
 
@@ -235,7 +238,7 @@ class SimpleBrowseTab(QWidget):
         # Add another separator for the manual controls section
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setStyleSheet("background-color: #3c3c3c; max-height: 1px;")
+        separator2.setStyleSheet(f"background-color: {COLORS['panel_background']}; max-height: 1px;")
         controls_layout.addWidget(separator2)
 
         # Manual input section with better organization
@@ -262,14 +265,14 @@ class SimpleBrowseTab(QWidget):
         self.manual_spinbox.setPrefix("0x")
         self.manual_spinbox.setMinimumWidth(120)
         if self.manual_spinbox:
-            self.manual_spinbox.setStyleSheet("""
-            QSpinBox {
+            self.manual_spinbox.setStyleSheet(f"""
+            QSpinBox {{
                 padding: 4px;
-                background-color: #3c3c3c;
-                border: 1px solid #555;
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 4px;
                 font-family: monospace;
-            }
+            }}
         """)
         self.manual_spinbox.valueChanged.connect(self._on_manual_changed)
         goto_group.addWidget(self.manual_spinbox)
@@ -287,7 +290,7 @@ class SimpleBrowseTab(QWidget):
         step_group.setSpacing(8)
 
         step_label = QLabel("Step Size:")
-        step_label.setStyleSheet("font-weight: bold; color: #aaa;")
+        step_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_muted']};")
         step_group.addWidget(step_label)
 
         self.step_spinbox = QSpinBox()
@@ -298,14 +301,14 @@ class SimpleBrowseTab(QWidget):
         self.step_spinbox.setPrefix("0x")
         self.step_spinbox.setMinimumWidth(100)
         if self.step_spinbox:
-            self.step_spinbox.setStyleSheet("""
-            QSpinBox {
+            self.step_spinbox.setStyleSheet(f"""
+            QSpinBox {{
                 padding: 4px;
-                background-color: #3c3c3c;
-                border: 1px solid #555;
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 4px;
                 font-family: monospace;
-            }
+            }}
         """)
         step_group.addWidget(self.step_spinbox)
 
@@ -578,5 +581,5 @@ class SimpleBrowseTab(QWidget):
         title_font.setBold(True)
         title_font.setPointSize(11)
         title.setFont(title_font)
-        title.setStyleSheet("color: #4488dd; padding: 2px 4px; border-radius: 3px;")
+        title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
         return title

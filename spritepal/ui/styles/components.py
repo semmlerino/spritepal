@@ -741,27 +741,27 @@ def get_manual_offset_button_style() -> str:
     Returns:
         CSS string for manual offset button styling
     """
-    return """
-    QPushButton {
+    return f"""
+    QPushButton {{
         background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 #5a9fd4, stop:1 #306998);
-        color: white;
-        font-weight: bold;
-        font-size: 13px;
-        border-radius: 6px;
-        padding: 8px 16px;
-        border: 1px solid #2e5a84;
+            stop:0 {COLORS["browse_gradient_start"]}, stop:1 {COLORS["browse_gradient_end"]});
+        color: {COLORS["white"]};
+        font-weight: {FONTS["bold_weight"]};
+        font-size: {FONTS["medium_size"]};
+        border-radius: {DIMENSIONS["border_radius_large"]}px;
+        padding: {DIMENSIONS["spacing_md"]}px {DIMENSIONS["spacing_lg"]}px;
+        border: 1px solid {COLORS["browse_pressed"]};
         min-height: 36px;
-    }
-    QPushButton:hover {
+    }}
+    QPushButton:hover {{
         background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 #6aafea, stop:1 #4079a8);
-        border: 1px solid #4488dd;
-    }
-    QPushButton:pressed {
+            stop:0 {COLORS["browse_hover"]}, stop:1 {COLORS["browse"]});
+        border: 1px solid {COLORS["highlight"]};
+    }}
+    QPushButton:pressed {{
         background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 #306998, stop:1 #204060);
-    }
+            stop:0 {COLORS["browse_pressed"]}, stop:1 {COLORS["browse_gradient_end"]});
+    }}
     """
 
 
@@ -778,57 +778,122 @@ def get_cache_status_style(status: str) -> str:
     Returns:
         CSS string for cache status label styling
     """
-    # Dark theme compatible: dark backgrounds with bright, high-contrast text
+    # Dark theme compatible: uses theme colors for consistency
     styles = {
-        "checking": """
-            QLabel {
-                background-color: #1a3a5c;
-                border: 1px solid #4a9eff;
-                border-radius: 4px;
-                padding: 8px;
-                font-weight: bold;
-                color: #7fbfff;
-            }
+        "checking": f"""
+            QLabel {{
+                background-color: {COLORS["cache_checking_bg"]};
+                border: 1px solid {COLORS["cache_checking_border"]};
+                border-radius: {DIMENSIONS["border_radius"]}px;
+                padding: {DIMENSIONS["spacing_md"]}px;
+                font-weight: {FONTS["bold_weight"]};
+                color: {COLORS["cache_checking_text"]};
+            }}
         """,
-        "resuming": """
-            QLabel {
-                background-color: #1a3d1a;
-                border: 1px solid #4caf50;
-                border-radius: 4px;
-                padding: 8px;
-                font-weight: bold;
-                color: #7fff7f;
-            }
+        "resuming": f"""
+            QLabel {{
+                background-color: {COLORS["cache_resuming_bg"]};
+                border: 1px solid {COLORS["cache_resuming_border"]};
+                border-radius: {DIMENSIONS["border_radius"]}px;
+                padding: {DIMENSIONS["spacing_md"]}px;
+                font-weight: {FONTS["bold_weight"]};
+                color: {COLORS["cache_resuming_text"]};
+            }}
         """,
-        "fresh": """
-            QLabel {
-                background-color: #3d2a1a;
-                border: 1px solid #ff9800;
-                border-radius: 4px;
-                padding: 8px;
-                font-weight: bold;
-                color: #ffbf4a;
-            }
+        "fresh": f"""
+            QLabel {{
+                background-color: {COLORS["cache_fresh_bg"]};
+                border: 1px solid {COLORS["cache_fresh_border"]};
+                border-radius: {DIMENSIONS["border_radius"]}px;
+                padding: {DIMENSIONS["spacing_md"]}px;
+                font-weight: {FONTS["bold_weight"]};
+                color: {COLORS["cache_fresh_text"]};
+            }}
         """,
-        "saving": """
-            QLabel {
-                background-color: #1a2d3d;
-                border: 1px solid #039be5;
-                border-radius: 4px;
-                padding: 8px;
-                font-weight: bold;
-                color: #4ac4ff;
-            }
+        "saving": f"""
+            QLabel {{
+                background-color: {COLORS["cache_saving_bg"]};
+                border: 1px solid {COLORS["cache_saving_border"]};
+                border-radius: {DIMENSIONS["border_radius"]}px;
+                padding: {DIMENSIONS["spacing_md"]}px;
+                font-weight: {FONTS["bold_weight"]};
+                color: {COLORS["cache_saving_text"]};
+            }}
         """,
-        "saved": """
-            QLabel {
-                background-color: #1a3d1a;
-                border: 1px solid #4caf50;
-                border-radius: 4px;
-                padding: 8px;
-                font-weight: bold;
-                color: #7fff7f;
-            }
+        "saved": f"""
+            QLabel {{
+                background-color: {COLORS["cache_resuming_bg"]};
+                border: 1px solid {COLORS["cache_resuming_border"]};
+                border-radius: {DIMENSIONS["border_radius"]}px;
+                padding: {DIMENSIONS["spacing_md"]}px;
+                font-weight: {FONTS["bold_weight"]};
+                color: {COLORS["cache_resuming_text"]};
+            }}
         """,
     }
     return styles.get(status, styles["checking"])
+
+
+def get_prominent_action_button_style() -> str:
+    """
+    Get styling for prominent action buttons like 'Find Sprites'.
+
+    Uses a gradient and larger size to draw attention while maintaining
+    dark theme consistency. Use for important discovery/action buttons.
+
+    Returns:
+        CSS string for prominent action button styling
+    """
+    return f"""
+    QPushButton {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 {COLORS["browse_gradient_start"]},
+            stop:1 {COLORS["browse_gradient_end"]});
+        color: {COLORS["white"]};
+        font-weight: {FONTS["bold_weight"]};
+        font-size: {FONTS["medium_size"]};
+        border-radius: {DIMENSIONS["border_radius_large"]}px;
+        padding: {DIMENSIONS["spacing_md"]}px {DIMENSIONS["spacing_lg"]}px;
+        border: 1px solid {COLORS["browse_pressed"]};
+        min-height: 36px;
+    }}
+    QPushButton:hover {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 {COLORS["browse_hover"]},
+            stop:1 {COLORS["browse"]});
+        border: 1px solid {COLORS["highlight"]};
+    }}
+    QPushButton:pressed {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 {COLORS["browse_pressed"]},
+            stop:1 {COLORS["browse_gradient_end"]});
+    }}
+    QPushButton:disabled {{
+        background: {COLORS["disabled"]};
+        color: {COLORS["disabled_text"]};
+        border: 1px solid {COLORS["border"]};
+    }}
+    """
+
+
+def get_extraction_checklist_style() -> str:
+    """
+    Get styling for extraction readiness checklist display.
+
+    Shows extraction requirements as a checklist with visual indicators.
+    Uses a left border accent to draw attention to pending items.
+
+    Returns:
+        CSS string for extraction checklist label styling
+    """
+    return f"""
+    QLabel {{
+        color: {COLORS["text_secondary"]};
+        font-size: {FONTS["small_size"]};
+        padding: {DIMENSIONS["spacing_sm"]}px {DIMENSIONS["spacing_md"]}px;
+        background-color: {COLORS["panel_background"]};
+        border-left: 3px solid {COLORS["warning"]};
+        border-radius: {DIMENSIONS["border_radius_small"]}px;
+        line-height: 1.4;
+    }}
+    """

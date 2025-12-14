@@ -1,6 +1,9 @@
 """
 Global accessibility styles for SpritePal application.
 Provides consistent focus indicators, keyboard navigation hints, and WCAG 2.1 compliance.
+
+NOTE: This file uses dark theme compatible colors from theme.py.
+Focus states use bright borders instead of light backgrounds.
 """
 from __future__ import annotations
 
@@ -8,6 +11,8 @@ from typing import cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
+
+from .theme import COLORS
 
 
 def apply_global_accessibility_styles() -> None:
@@ -19,238 +24,240 @@ def apply_global_accessibility_styles() -> None:
     # Cast to QApplication for type checker
     app = cast(QApplication, app)
 
-    # Global accessibility stylesheet with focus indicators and high contrast
-    global_style = """
-    /* ===== FOCUS INDICATORS ===== */
+    # Global accessibility stylesheet with focus indicators
+    # Uses dark theme compatible colors - bright borders instead of light backgrounds
+    global_style = f"""
+    /* ===== FOCUS INDICATORS (Dark Theme Compatible) ===== */
     /* All focusable widgets get a clear focus outline */
-    QWidget:focus {
-        outline: 2px solid #0078d4;
+    QWidget:focus {{
+        outline: 2px solid {COLORS["border_focus"]};
         outline-offset: 1px;
-    }
+    }}
 
-    /* Text input fields */
-    QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
-        border: 2px solid #0078d4;
-        background-color: #f0f8ff;
-        color: #000000;
-    }
+    /* Text input fields - dark background with bright border */
+    QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
+        border: 2px solid {COLORS["border_focus"]};
+        background-color: {COLORS["focus_background"]};
+        color: {COLORS["text_primary"]};
+    }}
 
-    /* Buttons */
-    QPushButton:focus {
-        border: 2px solid #0078d4;
+    /* Buttons - dark background with bright border */
+    QPushButton:focus {{
+        border: 2px solid {COLORS["border_focus"]};
         padding: 3px;
-        background-color: #e6f2ff;
-        color: #000000;
-    }
+        background-color: {COLORS["focus_background"]};
+        color: {COLORS["text_primary"]};
+    }}
 
-    QPushButton:default {
+    QPushButton:default {{
         font-weight: bold;
         border-width: 2px;
-    }
+    }}
 
     /* Dropdowns and spinners */
-    QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
-        border: 2px solid #0078d4;
-        background-color: #f0f8ff;
-        color: #000000;
-    }
+    QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
+        border: 2px solid {COLORS["border_focus"]};
+        background-color: {COLORS["focus_background"]};
+        color: {COLORS["text_primary"]};
+    }}
 
     /* Sliders */
-    QSlider:focus {
-        border: 1px solid #0078d4;
-        background-color: #f0f8ff;
-        color: #000000;
-    }
+    QSlider:focus {{
+        border: 1px solid {COLORS["border_focus"]};
+        background-color: {COLORS["focus_background_subtle"]};
+        color: {COLORS["text_primary"]};
+    }}
 
     /* Checkboxes and radio buttons */
-    QCheckBox:focus, QRadioButton:focus {
-        color: #0078d4;
+    QCheckBox:focus, QRadioButton:focus {{
+        color: {COLORS["highlight"]};
         font-weight: bold;
-    }
+    }}
 
-    QCheckBox:focus::indicator, QRadioButton:focus::indicator {
-        border: 2px solid #0078d4;
-    }
+    QCheckBox:focus::indicator, QRadioButton:focus::indicator {{
+        border: 2px solid {COLORS["border_focus"]};
+    }}
 
     /* Tab widgets */
-    QTabBar::tab:focus {
-        border: 2px solid #0078d4;
-        background-color: #e6f2ff;
-        color: #000000;
-    }
+    QTabBar::tab:focus {{
+        border: 2px solid {COLORS["border_focus"]};
+        background-color: {COLORS["focus_background"]};
+        color: {COLORS["text_primary"]};
+    }}
 
-    QTabBar::tab:selected {
+    QTabBar::tab:selected {{
         font-weight: bold;
-        background-color: #ffffff;
-        color: #000000;
-    }
+        background-color: {COLORS["panel_background"]};
+        color: {COLORS["text_primary"]};
+    }}
 
     /* List widgets */
-    QListWidget:focus, QTreeWidget:focus, QTableWidget:focus {
-        border: 2px solid #0078d4;
-    }
+    QListWidget:focus, QTreeWidget:focus, QTableWidget:focus {{
+        border: 2px solid {COLORS["border_focus"]};
+    }}
 
-    QListWidget::item:focus, QTreeWidget::item:focus, QTableWidget::item:focus {
-        background-color: #0078d4;
-        color: white;
-    }
+    QListWidget::item:focus, QTreeWidget::item:focus, QTableWidget::item:focus {{
+        background-color: {COLORS["border_focus"]};
+        color: {COLORS["text_primary"]};
+    }}
 
-    /* ===== HIGH CONTRAST ===== */
-    /* Tooltips with high contrast */
-    QToolTip {
-        background-color: #ffffcc;
-        color: #000000;
-        border: 2px solid #000000;
+    /* ===== TOOLTIPS (Dark Theme) ===== */
+    QToolTip {{
+        background-color: {COLORS["panel_background"]};
+        color: {COLORS["text_primary"]};
+        border: 1px solid {COLORS["border_focus"]};
         padding: 5px;
         font-size: 10pt;
-    }
+    }}
 
     /* Status bar messages */
-    QStatusBar {
+    QStatusBar {{
         font-size: 10pt;
-        color: #000000;
-        background-color: #f0f0f0;
-    }
+        color: {COLORS["text_primary"]};
+        background-color: {COLORS["panel_background"]};
+    }}
 
     /* ===== KEYBOARD NAVIGATION HINTS ===== */
     /* Menu bar items */
-    QMenuBar::item:selected {
-        background-color: #0078d4;
-        color: white;
-    }
+    QMenuBar::item:selected {{
+        background-color: {COLORS["border_focus"]};
+        color: {COLORS["text_primary"]};
+    }}
 
-    QMenuBar::item:focus {
-        border: 2px solid #0078d4;
-    }
+    QMenuBar::item:focus {{
+        border: 2px solid {COLORS["border_focus"]};
+    }}
 
     /* Menu items */
-    QMenu::item:selected {
-        background-color: #0078d4;
-        color: white;
-    }
+    QMenu::item:selected {{
+        background-color: {COLORS["border_focus"]};
+        color: {COLORS["text_primary"]};
+    }}
 
-    QMenu::item:focus {
-        background-color: #0078d4;
-        color: white;
+    QMenu::item:focus {{
+        background-color: {COLORS["border_focus"]};
+        color: {COLORS["text_primary"]};
         font-weight: bold;
-    }
+    }}
 
     /* Toolbar buttons */
-    QToolButton:focus {
-        border: 2px solid #0078d4;
-        background-color: #e6f2ff;
-    }
+    QToolButton:focus {{
+        border: 2px solid {COLORS["border_focus"]};
+        background-color: {COLORS["focus_background"]};
+    }}
 
-    /* ===== DISABLED STATES ===== */
+    /* ===== DISABLED STATES (Dark Theme) ===== */
     /* Clear visual distinction for disabled items */
-    QWidget:disabled {
-        color: #808080;
-        background-color: #f0f0f0;
-    }
+    QWidget:disabled {{
+        color: {COLORS["disabled_text"]};
+        background-color: {COLORS["disabled"]};
+    }}
 
-    QPushButton:disabled {
-        color: #808080;
-        background-color: #e0e0e0;
-        border: 1px solid #c0c0c0;
-    }
+    QPushButton:disabled {{
+        color: {COLORS["disabled_text"]};
+        background-color: {COLORS["disabled"]};
+        border: 1px solid {COLORS["border"]};
+    }}
 
-    QLineEdit:disabled, QTextEdit:disabled {
-        color: #808080;
-        background-color: #f5f5f5;
-        border: 1px solid #d0d0d0;
-    }
+    QLineEdit:disabled, QTextEdit:disabled {{
+        color: {COLORS["disabled_text"]};
+        background-color: {COLORS["disabled"]};
+        border: 1px solid {COLORS["border"]};
+    }}
 
-    /* ===== GROUP BOXES ===== */
+    /* ===== GROUP BOXES (Dark Theme) ===== */
     /* Make group boxes more visible */
-    QGroupBox {
+    QGroupBox {{
         font-weight: bold;
-        border: 2px solid #d0d0d0;
+        border: 2px solid {COLORS["border"]};
         border-radius: 5px;
         margin-top: 10px;
         padding-top: 10px;
-    }
+    }}
 
-    QGroupBox::title {
+    QGroupBox::title {{
         subcontrol-origin: margin;
         left: 10px;
         padding: 0 5px 0 5px;
-        background-color: white;
-        color: #000000;
-    }
+        background-color: {COLORS["panel_background"]};
+        color: {COLORS["text_primary"]};
+    }}
 
-    QGroupBox:focus {
-        border: 2px solid #0078d4;
-    }
+    QGroupBox:focus {{
+        border: 2px solid {COLORS["border_focus"]};
+    }}
 
-    /* ===== SCROLL BARS ===== */
+    /* ===== SCROLL BARS (Dark Theme) ===== */
     /* Larger scroll bars for better accessibility */
-    QScrollBar:vertical {
+    QScrollBar:vertical {{
         width: 16px;
-    }
+        background-color: {COLORS["background"]};
+    }}
 
-    QScrollBar:horizontal {
+    QScrollBar:horizontal {{
         height: 16px;
-    }
+        background-color: {COLORS["background"]};
+    }}
 
-    QScrollBar::handle {
-        background-color: #808080;
+    QScrollBar::handle {{
+        background-color: {COLORS["border"]};
         border-radius: 3px;
-    }
+    }}
 
-    QScrollBar::handle:hover {
-        background-color: #606060;
-    }
+    QScrollBar::handle:hover {{
+        background-color: {COLORS["light_gray"]};
+    }}
 
-    QScrollBar::handle:focus {
-        background-color: #0078d4;
-    }
+    QScrollBar::handle:focus {{
+        background-color: {COLORS["border_focus"]};
+    }}
 
-    /* ===== SPLITTERS ===== */
+    /* ===== SPLITTERS (Dark Theme) ===== */
     /* More visible splitter handles */
-    QSplitter::handle {
-        background-color: #d0d0d0;
-    }
+    QSplitter::handle {{
+        background-color: {COLORS["separator"]};
+    }}
 
-    QSplitter::handle:hover {
-        background-color: #a0a0a0;
-    }
+    QSplitter::handle:hover {{
+        background-color: {COLORS["border"]};
+    }}
 
-    QSplitter::handle:focus {
-        background-color: #0078d4;
-    }
+    QSplitter::handle:focus {{
+        background-color: {COLORS["border_focus"]};
+    }}
 
-    /* ===== ERROR STATES ===== */
+    /* ===== ERROR STATES (Dark Theme) ===== */
     /* Clear error indication */
-    QLineEdit[hasError="true"], QTextEdit[hasError="true"] {
-        border: 2px solid #ff0000;
-        background-color: #fff0f0;
-        color: #000000;
-    }
+    QLineEdit[hasError="true"], QTextEdit[hasError="true"] {{
+        border: 2px solid {COLORS["border_error"]};
+        background-color: #3d1a1a;
+        color: {COLORS["text_primary"]};
+    }}
 
     /* ===== SELECTION COLORS ===== */
     /* High contrast selection */
-    QWidget::selection {
-        background-color: #0078d4;
-        color: white;
-    }
+    QWidget::selection {{
+        background-color: {COLORS["border_focus"]};
+        color: {COLORS["text_primary"]};
+    }}
 
     /* ===== DIALOG BUTTONS ===== */
     /* Standard dialog buttons */
-    QDialogButtonBox QPushButton {
+    QDialogButtonBox QPushButton {{
         min-width: 80px;
         min-height: 25px;
-    }
+    }}
 
-    QDialogButtonBox QPushButton:default {
-        background-color: #0078d4;
-        color: white;
+    QDialogButtonBox QPushButton:default {{
+        background-color: {COLORS["border_focus"]};
+        color: {COLORS["text_primary"]};
         font-weight: bold;
-    }
+    }}
 
-    QDialogButtonBox QPushButton:default:focus {
+    QDialogButtonBox QPushButton:default:focus {{
         background-color: #005a9e;
-        border: 2px solid #003d6b;
-    }
+        border: 2px solid {COLORS["highlight"]};
+    }}
     """
 
     # Apply the stylesheet

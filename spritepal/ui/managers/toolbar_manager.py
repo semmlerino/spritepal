@@ -9,7 +9,8 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QWidget
 
-from ui.styles import get_button_style
+from ui.styles import get_button_style, get_extraction_checklist_style
+from ui.styles.theme import COLORS, FONTS
 
 
 class ToolbarActionsProtocol(Protocol):
@@ -82,14 +83,7 @@ class ToolbarManager(QObject):
     def _create_extraction_status_label(self, layout: QGridLayout) -> None:
         """Create inline status label showing extraction readiness"""
         self.extraction_status_label = QLabel("")
-        self.extraction_status_label.setStyleSheet("""
-            QLabel {
-                color: #ffbf4a;
-                font-size: 11px;
-                font-style: italic;
-                padding: 2px 4px;
-            }
-        """)
+        self.extraction_status_label.setStyleSheet(get_extraction_checklist_style())
         self.extraction_status_label.setWordWrap(True)
         self.extraction_status_label.hide()  # Hidden when extraction is ready
         # Add to row -1 (before extract button), spanning both columns

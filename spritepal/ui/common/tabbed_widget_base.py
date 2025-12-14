@@ -20,16 +20,12 @@ from PySide6.QtWidgets import (
 )
 
 from .spacing_constants import (
-    COLOR_BACKGROUND,
-    COLOR_BORDER,
-    COLOR_MUTED,
-    COLOR_PRIMARY,
-    COLOR_SURFACE,
     FONT_SIZE_NORMAL,
     TAB_CONTENT_PADDING,
     TAB_MAX_WIDTH,
     TAB_MIN_WIDTH,
 )
+from spritepal.ui.styles.theme import COLORS
 
 
 class TabbedWidgetBase(QWidget):
@@ -86,8 +82,8 @@ class TabbedWidgetBase(QWidget):
         if self._tab_widget:
             self._tab_widget.setStyleSheet(f"""
             QTabWidget::pane {{
-                border: 1px solid {COLOR_BORDER};
-                background-color: {COLOR_SURFACE};
+                border: 1px solid {COLORS["border"]};
+                background-color: {COLORS["preview_background"]};
                 border-radius: 4px;
                 margin-top: -1px;
             }}
@@ -97,9 +93,9 @@ class TabbedWidgetBase(QWidget):
             }}
 
             QTabBar::tab {{
-                background-color: {COLOR_BACKGROUND};
-                color: {COLOR_MUTED};
-                border: 1px solid {COLOR_BORDER};
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_muted"]};
+                border: 1px solid {COLORS["border"]};
                 border-bottom: none;
                 padding: 8px 16px;
                 margin-right: 2px;
@@ -111,15 +107,15 @@ class TabbedWidgetBase(QWidget):
             }}
 
             QTabBar::tab:selected {{
-                background-color: {COLOR_SURFACE};
-                color: {COLOR_PRIMARY};
-                border-bottom: 1px solid {COLOR_SURFACE};
+                background-color: {COLORS["preview_background"]};
+                color: {COLORS["highlight"]};
+                border-bottom: 1px solid {COLORS["preview_background"]};
                 font-weight: bold;
             }}
 
             QTabBar::tab:hover:!selected {{
-                background-color: rgba(85, 153, 255, 0.1);
-                color: {COLOR_PRIMARY};
+                background-color: rgba(68, 136, 221, 0.1);
+                color: {COLORS["highlight"]};
             }}
 
             QTabBar::tab:first {{

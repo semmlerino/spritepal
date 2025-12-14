@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QDialogButtonBox, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
+from spritepal.ui.styles.theme import COLORS
+
 if TYPE_CHECKING:
     from core.managers.extraction_manager import ExtractionManager
     from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
@@ -112,39 +114,40 @@ class TabManagerComponent:
         return flag_value in ('1', 'true', 'yes', 'on')
 
     def _apply_enhanced_tab_styling(self) -> None:
-        """Apply enhanced visual styling to tab widget."""
+        """Apply enhanced visual styling to tab widget (dark theme)."""
         if self.tab_widget:
-            self.tab_widget.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid #c0c0c0;
+            self.tab_widget.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: 1px solid {COLORS["border"]};
                 border-radius: 6px;
-                background-color: #fafafa;
-                color: #000000;
+                background-color: {COLORS["panel_background"]};
+                color: {COLORS["text_primary"]};
                 padding: 4px;
-            }
-            QTabBar::tab {
-                background-color: #e1e1e1;
-                border: 1px solid #c0c0c0;
+            }}
+            QTabBar::tab {{
+                background-color: {COLORS["input_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-bottom-color: transparent;
                 border-radius: 4px 4px 0 0;
                 padding: 8px 16px;
                 margin-right: 2px;
                 min-width: 80px;
                 font-weight: 500;
-            }
-            QTabBar::tab:selected {
-                background-color: #ffffff;
-                color: #000000;
-                border-bottom-color: #ffffff;
+                color: {COLORS["text_secondary"]};
+            }}
+            QTabBar::tab:selected {{
+                background-color: {COLORS["panel_background"]};
+                color: {COLORS["text_primary"]};
+                border-bottom-color: {COLORS["panel_background"]};
                 font-weight: 600;
-            }
-            QTabBar::tab:hover:!selected {
-                background-color: #f0f0f0;
-                color: #000000;
-            }
-            QTabWidget::tab-bar {
+            }}
+            QTabBar::tab:hover:!selected {{
+                background-color: {COLORS["focus_background_subtle"]};
+                color: {COLORS["text_primary"]};
+            }}
+            QTabWidget::tab-bar {{
                 alignment: left;
-            }
+            }}
         """)
 
     def setup_custom_buttons(self, button_box: QDialogButtonBox) -> None:

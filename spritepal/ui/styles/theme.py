@@ -58,6 +58,44 @@ COLORS = {
     "text_primary": "#ffffff",      # Primary white text
     "text_secondary": "#cccccc",    # Secondary light gray text
     "text_muted": "#999999",        # Muted gray text
+
+    # Browse/Navigation action colors
+    "browse": "#5a9fd4",            # Teal-blue for Browse ROM button
+    "browse_hover": "#6aafea",
+    "browse_pressed": "#306998",
+    "browse_gradient_start": "#5a9fd4",
+    "browse_gradient_end": "#306998",
+
+    # Focus colors (dark-theme compatible)
+    "focus_background": "#1a3a5c",  # Dark blue for focused inputs
+    "focus_background_subtle": "#252535",  # Very subtle highlight
+
+    # Cache status semantic colors
+    "cache_checking_bg": "#1a3a5c",
+    "cache_checking_border": "#4a9eff",
+    "cache_checking_text": "#7fbfff",
+    "cache_resuming_bg": "#1a3d1a",
+    "cache_resuming_border": "#4caf50",
+    "cache_resuming_text": "#7fff7f",
+    "cache_fresh_bg": "#3d2a1a",
+    "cache_fresh_border": "#ff9800",
+    "cache_fresh_text": "#ffbf4a",
+    "cache_saving_bg": "#1a2d3d",
+    "cache_saving_border": "#039be5",
+    "cache_saving_text": "#4ac4ff",
+
+    # Highlight colors for important UI elements
+    "highlight": "#4488dd",
+    "highlight_hover": "#5599ee",
+    "highlight_border": "#66aaff",
+
+    # Interactive surface colors
+    "surface_hover": "#404040",
+    "surface_pressed": "#353535",
+    "surface_selected": "#505050",
+
+    # Separator/divider
+    "separator": "#3c3c3c",
 }
 
 # Typography
@@ -202,3 +240,16 @@ class Theme:
     # Action colors
     EXTRACT = COLORS["extract"]
     EDITOR = COLORS["editor"]
+
+    # Browse/Navigation colors
+    BROWSE = COLORS["browse"]
+    BROWSE_HOVER = COLORS["browse_hover"]
+    BROWSE_PRESSED = COLORS["browse_pressed"]
+
+    # Focus colors
+    FOCUS_BACKGROUND = COLORS["focus_background"]
+    FOCUS_BACKGROUND_SUBTLE = COLORS["focus_background_subtle"]
+
+    # Highlight colors
+    HIGHLIGHT = COLORS["highlight"]
+    HIGHLIGHT_HOVER = COLORS["highlight_hover"]

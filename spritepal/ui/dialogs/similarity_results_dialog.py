@@ -19,6 +19,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from spritepal.ui.styles.theme import COLORS
 from typing_extensions import override
 
 from core.visual_similarity_search import SimilarityMatch
@@ -38,20 +40,21 @@ class SimilarityResultWidget(QFrame):
         self.thumbnail = thumbnail
 
         self.setFrameStyle(QFrame.Shape.Box)
-        self.setStyleSheet("""
-            SimilarityResultWidget {
-                border: 2px solid #ddd;
+        # Use dark theme colors for consistency
+        self.setStyleSheet(f"""
+            SimilarityResultWidget {{
+                border: 2px solid {COLORS["border"]};
                 border-radius: 8px;
-                background-color: #f9f9f9;
-                color: #000000;
+                background-color: {COLORS["panel_background"]};
+                color: {COLORS["text_primary"]};
                 margin: 4px;
                 padding: 8px;
-            }
-            SimilarityResultWidget:hover {
-                border-color: #4488dd;
-                background-color: #f0f8ff;
-                color: #000000;
-            }
+            }}
+            SimilarityResultWidget:hover {{
+                border-color: {COLORS["highlight"]};
+                background-color: {COLORS["focus_background"]};
+                color: {COLORS["text_primary"]};
+            }}
         """)
 
         self._setup_ui()

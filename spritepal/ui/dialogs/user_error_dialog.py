@@ -159,8 +159,10 @@ class UserErrorDialog(BaseDialog):
                 f"Technical Details:\n{error_info.get('technical', '')}\n\n"
                 f"Full Error:\n{technical_details or error_message}"
             )
+            # Use dark theme colors for consistency
+            from spritepal.ui.styles.theme import COLORS, FONTS
             details_text.setStyleSheet(
-                "QTextEdit { background-color: #f5f5f5; color: #000000; font-family: monospace; }"
+                f"QTextEdit {{ background-color: {COLORS['panel_background']}; color: {COLORS['text_primary']}; font-family: {FONTS['monospace_family']}; }}"
             )
             details_text.hide()  # Hidden by default
 

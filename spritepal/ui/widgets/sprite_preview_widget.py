@@ -29,10 +29,10 @@ from core.default_palette_loader import DefaultPaletteLoader
 from core.visual_similarity_search import VisualSimilarityEngine
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.common.spacing_constants import (
-    COLOR_MUTED,
     COMPACT_BUTTON_HEIGHT,
     SPACING_TINY,
 )
+from spritepal.ui.styles.theme import COLORS
 from ui.styles import get_muted_text_style
 from utils.logging_config import get_logger
 
@@ -103,7 +103,7 @@ class SpritePreviewWidget(QWidget):
         if self.essential_info_label:
             self.essential_info_label.setStyleSheet(f"""
             QLabel {{
-                color: {COLOR_MUTED};
+                color: {COLORS["text_muted"]};
                 font-size: 11px;
                 padding: 2px;
                 margin: 0px;

@@ -17,6 +17,7 @@ from .file_dialogs import (
 )
 
 # Import spacing and sizing constants explicitly
+# NOTE: Color constants moved to ui/styles/theme.py - use COLORS dict instead
 from .spacing_constants import (
     BASE_UNIT,
     BORDER_THICK,
@@ -29,14 +30,6 @@ from .spacing_constants import (
     CIRCLE_INDICATOR_SIZE,
     COLLAPSIBLE_ANIMATION_DURATION,
     COLLAPSIBLE_EASING,
-    COLOR_BACKGROUND,
-    COLOR_BORDER,
-    COLOR_ERROR,
-    COLOR_MUTED,
-    COLOR_PRIMARY,
-    COLOR_SUCCESS,
-    COLOR_SURFACE,
-    COLOR_WARNING,
     COMBO_BOX_MIN_WIDTH,
     COMPACT_BUTTON_HEIGHT,
     COMPACT_WIDTH,
@@ -82,6 +75,7 @@ from .widget_factory import (
 
 __all__ = [
     # Spacing and sizing constants
+    # NOTE: Color constants removed - use ui.styles.theme.COLORS instead
     "BASE_UNIT",
     "BORDER_THICK",
     "BORDER_THIN",
@@ -93,14 +87,6 @@ __all__ = [
     "CIRCLE_INDICATOR_SIZE",
     "COLLAPSIBLE_ANIMATION_DURATION",
     "COLLAPSIBLE_EASING",
-    "COLOR_BACKGROUND",
-    "COLOR_BORDER",
-    "COLOR_ERROR",
-    "COLOR_MUTED",
-    "COLOR_PRIMARY",
-    "COLOR_SUCCESS",
-    "COLOR_SURFACE",
-    "COLOR_WARNING",
     "COMBO_BOX_MIN_WIDTH",
     "COMPACT_BUTTON_HEIGHT",
     "COMPACT_WIDTH",

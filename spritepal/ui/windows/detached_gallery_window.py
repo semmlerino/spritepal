@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+from spritepal.ui.styles.theme import COLORS
 from ui.common import WorkerManager
 from ui.dialogs import UserErrorDialog
 from ui.rom_extraction.workers import SpriteScanWorker
@@ -158,141 +159,141 @@ class DetachedGalleryWindow(QMainWindow):
         self._create_status_bar()
 
         # Style for dark theme with proper text colors
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #1e1e1e;
-                color: #ffffff;
-            }
+        self.setStyleSheet(f"""
+            QMainWindow {{
+                background-color: {COLORS["preview_background"]};
+                color: {COLORS["text_primary"]};
+            }}
 
             /* Menu Bar Styling */
-            QMenuBar {
-                background-color: #2d2d2d;
-                color: #ffffff;
-                border-bottom: 1px solid #444444;
-            }
+            QMenuBar {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
+                border-bottom: 1px solid {COLORS["border"]};
+            }}
 
-            QMenuBar::item {
+            QMenuBar::item {{
                 background-color: transparent;
-                color: #ffffff;
+                color: {COLORS["text_primary"]};
                 padding: 4px 8px;
-            }
+            }}
 
-            QMenuBar::item:selected {
-                background-color: #404040;
-            }
+            QMenuBar::item:selected {{
+                background-color: {COLORS["panel_background"]};
+            }}
 
-            QMenu {
-                background-color: #2d2d2d;
-                color: #ffffff;
-                border: 1px solid #444444;
-            }
+            QMenu {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
+            }}
 
-            QMenu::item {
+            QMenu::item {{
                 padding: 4px 20px;
-                color: #ffffff;
-            }
+                color: {COLORS["text_primary"]};
+            }}
 
-            QMenu::item:selected {
-                background-color: #404040;
-            }
+            QMenu::item:selected {{
+                background-color: {COLORS["panel_background"]};
+            }}
 
             /* Toolbar Styling */
-            QToolBar {
-                background-color: #2d2d2d;
-                color: #ffffff;
+            QToolBar {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
                 border: none;
                 spacing: 3px;
-            }
+            }}
 
-            QToolButton {
-                background-color: #404040;
-                color: #ffffff;
-                border: 1px solid #555555;
+            QToolButton {{
+                background-color: {COLORS["panel_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 3px;
                 padding: 6px 12px;
                 margin: 2px;
-            }
+            }}
 
-            QToolButton:hover {
-                background-color: #505050;
-                border-color: #666666;
-            }
+            QToolButton:hover {{
+                background-color: {COLORS["focus_background_subtle"]};
+                border-color: {COLORS["border"]};
+            }}
 
-            QToolButton:pressed {
-                background-color: #353535;
-            }
+            QToolButton:pressed {{
+                background-color: {COLORS["input_background"]};
+            }}
 
             /* Status Bar Styling */
-            QStatusBar {
-                background-color: #2d2d2d;
-                color: #ffffff;
-                border-top: 1px solid #444444;
-            }
+            QStatusBar {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
+                border-top: 1px solid {COLORS["border"]};
+            }}
 
-            QProgressBar {
-                background-color: #404040;
-                border: 1px solid #555555;
+            QProgressBar {{
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 3px;
                 text-align: center;
-                color: #ffffff;
-            }
+                color: {COLORS["text_primary"]};
+            }}
 
-            QProgressBar::chunk {
-                background-color: #0078d4;
+            QProgressBar::chunk {{
+                background-color: {COLORS["border_focus"]};
                 border-radius: 2px;
-            }
+            }}
 
             /* Message Box Styling */
-            QMessageBox {
-                background-color: #2d2d2d;
-                color: #ffffff;
-            }
+            QMessageBox {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
+            }}
 
-            QMessageBox QPushButton {
-                background-color: #404040;
-                color: #ffffff;
-                border: 1px solid #555555;
+            QMessageBox QPushButton {{
+                background-color: {COLORS["panel_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 3px;
                 padding: 6px 12px;
                 min-width: 80px;
-            }
+            }}
 
-            QMessageBox QPushButton:hover {
-                background-color: #505050;
-            }
+            QMessageBox QPushButton:hover {{
+                background-color: {COLORS["focus_background_subtle"]};
+            }}
 
             /* Dialog Styling */
-            QDialog {
-                background-color: #2d2d2d;
-                color: #ffffff;
-            }
+            QDialog {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
+            }}
 
-            QLabel {
-                color: #ffffff;
-            }
+            QLabel {{
+                color: {COLORS["text_primary"]};
+            }}
 
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #ffffff;
-                border: 1px solid #444444;
+            QTextEdit {{
+                background-color: {COLORS["preview_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 3px;
-            }
+            }}
 
-            QPushButton {
-                background-color: #404040;
-                color: #ffffff;
-                border: 1px solid #555555;
+            QPushButton {{
+                background-color: {COLORS["panel_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 3px;
                 padding: 6px 12px;
-            }
+            }}
 
-            QPushButton:hover {
-                background-color: #505050;
-            }
+            QPushButton:hover {{
+                background-color: {COLORS["focus_background_subtle"]};
+            }}
 
-            QPushButton:pressed {
-                background-color: #353535;
-            }
+            QPushButton:pressed {{
+                background-color: {COLORS["input_background"]};
+            }}
         """)
 
     def _create_menu_bar(self):

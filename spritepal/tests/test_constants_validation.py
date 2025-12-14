@@ -11,6 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from ui.common import spacing_constants
+from ui.styles.theme import COLORS
 from utils import constants
 
 # Systematic pytest markers applied based on test content analysis
@@ -199,16 +200,17 @@ class TestSpacingConstantsValidation:
         assert spacing_constants.MEDIUM_WIDTH < spacing_constants.WIDE_WIDTH
 
     def test_color_constants_valid_hex(self):
-        """Test that color constants are valid hex colors"""
+        """Test that color constants in theme.py are valid hex colors"""
+        # Now using COLORS from ui/styles/theme.py (single source of truth)
         colors = [
-            spacing_constants.COLOR_PRIMARY,
-            spacing_constants.COLOR_SUCCESS,
-            spacing_constants.COLOR_WARNING,
-            spacing_constants.COLOR_ERROR,
-            spacing_constants.COLOR_MUTED,
-            spacing_constants.COLOR_BACKGROUND,
-            spacing_constants.COLOR_SURFACE,
-            spacing_constants.COLOR_BORDER,
+            COLORS["primary"],
+            COLORS["success"],
+            COLORS["warning"],
+            COLORS["danger"],  # Renamed from ERROR
+            COLORS["text_muted"],
+            COLORS["background"],
+            COLORS["preview_background"],  # Renamed from SURFACE
+            COLORS["border"],
         ]
 
         for color in colors:

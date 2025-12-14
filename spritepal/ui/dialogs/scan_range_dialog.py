@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from spritepal.ui.styles.theme import COLORS
+
 # from typing_extensions import override
 
 
@@ -89,7 +91,8 @@ class ScanRangeDialog(QDialog):
             "• Kirby PAL: 0xC0000 - 0xF0000<br>"
             "• Headers: 0x0 - 0x40000 (rarely has sprites)"
         )
-        ranges_label.setStyleSheet("background-color: #f0f0f0; color: #000000; padding: 10px; margin-top: 10px;")
+        # Use dark theme colors for consistency
+        ranges_label.setStyleSheet(f"background-color: {COLORS['panel_background']}; color: {COLORS['text_primary']}; padding: 10px; margin-top: 10px;")
         layout.addWidget(ranges_label)
 
         # Buttons

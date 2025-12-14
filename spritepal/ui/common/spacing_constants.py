@@ -44,15 +44,8 @@ FONT_SIZE_MEDIUM = "14px"
 FONT_SIZE_LARGE = "16px"
 FONT_SIZE_XLARGE = "18px"
 
-# Colors (following dark theme)
-COLOR_PRIMARY = "#5599ff"           # Blue primary
-COLOR_SUCCESS = "#66ff66"           # Green success
-COLOR_WARNING = "#ffaa33"           # Orange warning
-COLOR_ERROR = "#ff6666"             # Red error
-COLOR_MUTED = "#888888"             # Gray muted text
-COLOR_BACKGROUND = "#2b2b2b"        # Dark background
-COLOR_SURFACE = "#1a1a1a"           # Darker surface
-COLOR_BORDER = "#444444"            # Border color
+# NOTE: Color constants moved to ui/styles/theme.py - use COLORS dict instead
+# Import from: from spritepal.ui.styles.theme import COLORS
 
 # Widget specific dimensions
 PALETTE_PREVIEW_SIZE = 32            # 32x32 pixel palette preview widgets

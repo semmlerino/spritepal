@@ -30,13 +30,11 @@ from ui.utils.safe_animation import SafeAnimation, is_headless_environment
 
 from .spacing_constants import (
     COLLAPSIBLE_ANIMATION_DURATION,
-    COLOR_MUTED,
-    COLOR_PRIMARY,
-    COLOR_SURFACE,
     FONT_SIZE_MEDIUM,
     GROUP_PADDING,
     SPACING_SMALL,
 )
+from spritepal.ui.styles.theme import COLORS
 
 
 class CollapsibleGroupBox(QFrame):
@@ -91,9 +89,9 @@ class CollapsibleGroupBox(QFrame):
         self.setFrameStyle(QFrame.Shape.StyledPanel)
         self.setStyleSheet(f"""
             CollapsibleGroupBox {{
-                border: 1px solid {COLOR_SURFACE};
+                border: 1px solid {COLORS["preview_background"]};
                 border-radius: 4px;
-                background-color: {COLOR_SURFACE};
+                background-color: {COLORS["preview_background"]};
                 margin: 2px;
             }}
         """)
@@ -116,7 +114,7 @@ class CollapsibleGroupBox(QFrame):
         title_font.setBold(True)
         self._title_label.setFont(title_font)
         if self._title_label:
-            self._title_label.setStyleSheet(f"color: {COLOR_PRIMARY};")
+            self._title_label.setStyleSheet(f"color: {COLORS['highlight']};")
         header_layout.addWidget(self._title_label)
 
         header_layout.addStretch()
@@ -129,13 +127,13 @@ class CollapsibleGroupBox(QFrame):
             QPushButton {{
                 border: none;
                 background: transparent;
-                color: {COLOR_MUTED};
+                color: {COLORS["text_muted"]};
                 font-size: 16px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
-                color: {COLOR_PRIMARY};
-                background-color: rgba(85, 153, 255, 0.1);
+                color: {COLORS["highlight"]};
+                background-color: rgba(68, 136, 221, 0.1);
                 border-radius: 10px;
             }}
         """)

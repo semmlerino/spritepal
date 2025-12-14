@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 from typing_extensions import override
 
+from spritepal.ui.styles.theme import COLORS
 from ui.delegates.sprite_gallery_delegate import SpriteGalleryDelegate
 from ui.models.sprite_gallery_model import SpriteGalleryModel
 from utils.logging_config import get_logger
@@ -130,134 +131,134 @@ class SpriteGalleryWidget(QWidget):
         self.setLayout(layout)
 
         # Style with proper dark theme colors
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #1e1e1e;
-                color: #ffffff;
-            }
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS["preview_background"]};
+                color: {COLORS["text_primary"]};
+            }}
 
-            QListView {
-                background-color: #1e1e1e;
-                border: 1px solid #333;
-                color: #ffffff;
+            QListView {{
+                background-color: {COLORS["preview_background"]};
+                border: 1px solid {COLORS["border"]};
+                color: {COLORS["text_primary"]};
                 outline: none;
-            }
+            }}
 
-            QListView::item {
+            QListView::item {{
                 background-color: transparent;
                 border: none;
-            }
+            }}
 
-            QListView::item:hover {
+            QListView::item:hover {{
                 background-color: transparent;
-            }
+            }}
 
-            QListView::item:selected {
+            QListView::item:selected {{
                 background-color: transparent;
-            }
+            }}
 
-            QLabel {
-                color: #ffffff;
+            QLabel {{
+                color: {COLORS["text_primary"]};
                 background-color: transparent;
-            }
+            }}
 
-            QLineEdit {
-                background-color: #2d2d2d;
-                color: #ffffff;
-                border: 1px solid #444444;
+            QLineEdit {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 3px;
                 padding: 4px;
-            }
+            }}
 
-            QLineEdit:focus {
-                border-color: #0078d4;
-            }
+            QLineEdit:focus {{
+                border-color: {COLORS["border_focus"]};
+            }}
 
-            QComboBox {
-                background-color: #2d2d2d;
-                color: #ffffff;
-                border: 1px solid #444444;
+            QComboBox {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 3px;
                 padding: 4px;
                 min-width: 80px;
-            }
+            }}
 
-            QComboBox:hover {
-                background-color: #404040;
-            }
+            QComboBox:hover {{
+                background-color: {COLORS["panel_background"]};
+            }}
 
-            QComboBox::drop-down {
+            QComboBox::drop-down {{
                 border: none;
                 width: 20px;
-            }
+            }}
 
-            QComboBox::down-arrow {
+            QComboBox::down-arrow {{
                 image: none;
                 border-left: 5px solid transparent;
                 border-right: 5px solid transparent;
-                border-top: 5px solid #ffffff;
+                border-top: 5px solid {COLORS["text_primary"]};
                 margin-right: 5px;
-            }
+            }}
 
-            QComboBox QAbstractItemView {
-                background-color: #2d2d2d;
-                color: #ffffff;
-                border: 1px solid #444444;
-                selection-background-color: #404040;
-            }
+            QComboBox QAbstractItemView {{
+                background-color: {COLORS["input_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
+                selection-background-color: {COLORS["panel_background"]};
+            }}
 
-            QCheckBox {
-                color: #ffffff;
+            QCheckBox {{
+                color: {COLORS["text_primary"]};
                 background-color: transparent;
-            }
+            }}
 
-            QCheckBox::indicator {
+            QCheckBox::indicator {{
                 width: 16px;
                 height: 16px;
-                background-color: #2d2d2d;
-                border: 1px solid #444444;
+                background-color: {COLORS["input_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 2px;
-            }
+            }}
 
-            QCheckBox::indicator:checked {
-                background-color: #0078d4;
-                border-color: #0078d4;
-            }
+            QCheckBox::indicator:checked {{
+                background-color: {COLORS["border_focus"]};
+                border-color: {COLORS["border_focus"]};
+            }}
 
-            QSlider::groove:horizontal {
-                background-color: #404040;
+            QSlider::groove:horizontal {{
+                background-color: {COLORS["panel_background"]};
                 height: 4px;
                 border-radius: 2px;
-            }
+            }}
 
-            QSlider::handle:horizontal {
-                background-color: #0078d4;
-                border: 1px solid #0078d4;
+            QSlider::handle:horizontal {{
+                background-color: {COLORS["border_focus"]};
+                border: 1px solid {COLORS["border_focus"]};
                 width: 16px;
                 height: 16px;
                 margin: -6px 0;
                 border-radius: 8px;
-            }
+            }}
 
-            QSlider::handle:horizontal:hover {
-                background-color: #106ebe;
-            }
+            QSlider::handle:horizontal:hover {{
+                background-color: {COLORS["highlight"]};
+            }}
 
-            QPushButton {
-                background-color: #404040;
-                color: #ffffff;
-                border: 1px solid #555555;
+            QPushButton {{
+                background-color: {COLORS["panel_background"]};
+                color: {COLORS["text_primary"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 3px;
                 padding: 6px 12px;
-            }
+            }}
 
-            QPushButton:hover {
-                background-color: #505050;
-            }
+            QPushButton:hover {{
+                background-color: {COLORS["focus_background_subtle"]};
+            }}
 
-            QPushButton:pressed {
-                background-color: #353535;
-            }
+            QPushButton:pressed {{
+                background-color: {COLORS["input_background"]};
+            }}
         """)
 
     def _create_controls(self) -> QWidget:

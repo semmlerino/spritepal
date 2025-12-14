@@ -57,6 +57,7 @@ from utils.logging_config import get_logger
 # SettingsManager accessed via DI: inject(SettingsManagerProtocol)
 from utils.thread_safe_singleton import QtThreadSafeSingleton
 from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
+from spritepal.ui.styles.theme import COLORS
 
 logger = get_logger(__name__)
 
@@ -405,35 +406,6 @@ class ROMExtractionPanel(QWidget):
         button.setStyleSheet(get_manual_offset_button_style())
         return button
 
-    def _get_manual_offset_button_style(self) -> str:
-        """Get the stylesheet for the manual offset button.
-
-        Returns:
-            str: CSS stylesheet
-        """
-        return """
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #5a9fd4, stop:1 #306998);
-                color: white;
-                font-weight: bold;
-                font-size: 13px;
-                border-radius: 6px;
-                padding: 8px 16px;
-                border: 1px solid #2e5a84;
-                min-height: 36px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #6aafea, stop:1 #4079a8);
-                border: 1px solid #4488dd;
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #306998, stop:1 #204060);
-            }
-        """
-
     def _create_manual_offset_status(self) -> QLabel:
         """Create and configure the manual offset status label.
 
@@ -441,12 +413,12 @@ class ROMExtractionPanel(QWidget):
             QLabel: The configured status label
         """
         status = QLabel("Click button above or press Ctrl+M to browse ROM for sprites")
-        status.setStyleSheet("""
+        status.setStyleSheet(f"""
             padding: 8px;
-            background: #2b2b2b;
-            border: 1px solid #444444;
+            background: {COLORS["input_background"]};
+            border: 1px solid {COLORS["border"]};
             border-radius: 4px;
-            color: #cccccc;
+            color: {COLORS["text_secondary"]};
             font-style: italic;
         """)
         status.setWordWrap(True)
@@ -472,12 +444,12 @@ class ROMExtractionPanel(QWidget):
         Returns:
             str: CSS stylesheet
         """
-        return """
+        return f"""
             padding: 6px;
-            background: #1a3d5c;
-            border: 1px solid #2196f3;
+            background: {COLORS["focus_background"]};
+            border: 1px solid {COLORS["info"]};
             border-radius: 4px;
-            color: #bbdefb;
+            color: {COLORS["cache_checking_text"]};
             font-size: 12px;
         """
 
@@ -940,12 +912,12 @@ class ROMExtractionPanel(QWidget):
             if self.similarity_status:
                 self.similarity_status.setText(f"Similarity indexing error: {e}")
             if self.similarity_status:
-                self.similarity_status.setStyleSheet("""
+                self.similarity_status.setStyleSheet(f"""
                 padding: 6px;
-                background: #3d1a1a;
-                border: 1px solid #f44336;
+                background: {COLORS["danger"]}22;
+                border: 1px solid {COLORS["danger"]};
                 border-radius: 4px;
-                color: #ffcdd2;
+                color: {COLORS["danger"]};
                 font-size: 12px;
             """)
 
@@ -983,12 +955,12 @@ class ROMExtractionPanel(QWidget):
         if self.similarity_status:
             self.similarity_status.setText(f"Similarity error: {error_message}")
         if self.similarity_status:
-            self.similarity_status.setStyleSheet("""
+            self.similarity_status.setStyleSheet(f"""
             padding: 6px;
-            background: #3d1a1a;
-            border: 1px solid #f44336;
+            background: {COLORS["danger"]}22;
+            border: 1px solid {COLORS["danger"]};
             border-radius: 4px;
-            color: #ffcdd2;
+            color: {COLORS["danger"]};
             font-size: 12px;
         """)
         logger.error(f"Similarity indexing error: {error_message}", exc_info=exception)
@@ -1207,69 +1179,6 @@ class ROMExtractionPanel(QWidget):
             apply_btn.setText("Use Selected Offset")
             apply_btn.setEnabled(False)
         return button_box
-
-    def _get_cache_status_style(self, status: str) -> str:
-        """Get the stylesheet for cache status label based on status.
-
-        Args:
-            status: Status type (checking, resuming, fresh, saved, error)
-
-        Returns:
-            CSS stylesheet string
-        """
-        styles = {
-            "checking": """
-                QLabel {
-                    background-color: #e3f2fd;
-                    border: 1px solid #2196f3;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-weight: bold;
-                    color: #1976d2;
-                }
-            """,
-            "resuming": """
-                QLabel {
-                    background-color: #e8f5e9;
-                    border: 1px solid #4caf50;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-weight: bold;
-                    color: #2e7d32;
-                }
-            """,
-            "fresh": """
-                QLabel {
-                    background-color: #fff3e0;
-                    border: 1px solid #ff9800;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-weight: bold;
-                    color: #e65100;
-                }
-            """,
-            "saving": """
-                QLabel {
-                    background-color: #e1f5fe;
-                    border: 1px solid #039be5;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-weight: bold;
-                    color: #01579b;
-                }
-            """,
-            "saved": """
-                QLabel {
-                    background-color: #c8e6c9;
-                    border: 1px solid #4caf50;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-weight: bold;
-                    color: #1b5e20;
-                }
-            """
-        }
-        return styles.get(status, styles["checking"])
 
     def _setup_scan_worker(self, dialog: ScanDialog) -> None:
         """Set up the scan worker and connect signals.

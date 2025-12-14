@@ -3,7 +3,11 @@ from typing import Any
 """Sprite selector widget for ROM extraction"""
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+
+from spritepal.ui.styles import get_prominent_action_button_style
+from spritepal.ui.styles.theme import COLORS
 
 from .base_widget import BaseExtractionWidget
 
@@ -70,17 +74,19 @@ class SpriteSelectorWidget(BaseExtractionWidget):
 
         self.offset_label = QLabel("--")
         if self.offset_label:
-            self.offset_label.setStyleSheet("font-family: monospace; color: #0078d4; font-size: 14px;")
+            self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['border_focus']}; font-size: 14px;")
         self.offset_label.setMinimumWidth(100)
         offset_row.addWidget(self.offset_label)
 
         offset_row.addStretch()
 
-        # Find Sprites button
-        self.find_sprites_btn = QPushButton("Find Sprites")
+        # Find Sprites button - prominent styling for discoverability
+        self.find_sprites_btn = QPushButton("Find Sprites (Ctrl+F)")
         self.find_sprites_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.find_sprites_btn.setFixedWidth(BUTTON_MAX_WIDTH)
-        self.find_sprites_btn.setToolTip("Scan ROM for valid sprite offsets")
+        self.find_sprites_btn.setFixedWidth(BUTTON_MAX_WIDTH + 30)  # Slightly wider for shortcut text
+        self.find_sprites_btn.setShortcut(QKeySequence("Ctrl+F"))
+        self.find_sprites_btn.setToolTip("Scan ROM for valid sprite offsets\n\nKeyboard shortcut: Ctrl+F")
+        self.find_sprites_btn.setStyleSheet(get_prominent_action_button_style())
         _ = self.find_sprites_btn.clicked.connect(self.find_sprites_clicked.emit)
         if self.find_sprites_btn:
             self.find_sprites_btn.setEnabled(False)
