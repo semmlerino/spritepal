@@ -32,8 +32,8 @@ from ui.common.spacing_constants import (
     COMPACT_BUTTON_HEIGHT,
     SPACING_TINY,
 )
-from spritepal.ui.styles.theme import COLORS
 from ui.styles import get_muted_text_style
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

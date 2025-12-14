@@ -359,7 +359,7 @@ class AsyncROMCache(QObject):
         """
         try:
             # Stop the save timer first (before processEvents to avoid deletion issues)
-            if hasattr(self, "_save_timer") and self._save_timer is not None:
+            if hasattr(self, "_save_timer"):
                 try:
                     self._save_timer.stop()
                 except RuntimeError:
@@ -367,7 +367,7 @@ class AsyncROMCache(QObject):
                     pass
 
             # Stop worker from accepting new work
-            if hasattr(self, "_worker") and self._worker is not None:
+            if hasattr(self, "_worker"):
                 self._worker.stop()
 
             # Disconnect signals to prevent new work from being queued during shutdown
@@ -395,7 +395,7 @@ class AsyncROMCache(QObject):
 
             # Stop thread with WorkerManager for proper cleanup and registry removal
             # This uses safe cancellation patterns (no terminate()) and removes from registry
-            if hasattr(self, "_worker_thread") and self._worker_thread is not None:
+            if hasattr(self, "_worker_thread"):
                 try:
                     WorkerManager.cleanup_worker(self._worker_thread, timeout=timeout)
                 except RuntimeError:

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from spritepal.ui.styles.theme import COLORS
+from ui.styles.theme import COLORS
 
 # from typing_extensions import override
 

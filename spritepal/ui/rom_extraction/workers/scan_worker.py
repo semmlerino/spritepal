@@ -33,7 +33,8 @@ class SpriteScanWorker(BaseWorker):
 
     def __init__(self, rom_path: str, extractor: Any, use_cache: bool = True,
                  start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None,
-                 rom_cache: ROMCacheProtocol | None = None):
+                 rom_cache: ROMCacheProtocol | None = None,
+                 parallel_finder: ParallelSpriteFinder | None = None):
         super().__init__(parent)
         self.rom_path = rom_path
         self.extractor = extractor
@@ -42,7 +43,7 @@ class SpriteScanWorker(BaseWorker):
         self.custom_end_offset = end_offset      # Custom scan range
         self._last_save_progress = 0
         self._cancellation_token = threading.Event()
-        self._parallel_finder = ParallelSpriteFinder(
+        self._parallel_finder = parallel_finder or ParallelSpriteFinder(
             num_workers=4,
             chunk_size=0x40000,  # 256KB chunks
             step_size=0x100      # 256-byte alignment

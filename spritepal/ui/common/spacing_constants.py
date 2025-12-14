@@ -45,7 +45,7 @@ FONT_SIZE_LARGE = "16px"
 FONT_SIZE_XLARGE = "18px"
 
 # NOTE: Color constants moved to ui/styles/theme.py - use COLORS dict instead
-# Import from: from spritepal.ui.styles.theme import COLORS
+# Import from: from ui.styles.theme import COLORS
 
 # Widget specific dimensions
 PALETTE_PREVIEW_SIZE = 32            # 32x32 pixel palette preview widgets

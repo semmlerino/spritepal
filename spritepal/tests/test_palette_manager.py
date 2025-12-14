@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-
 from core.palette_manager import PaletteManager
 from utils.constants import (
     COLORS_PER_PALETTE,

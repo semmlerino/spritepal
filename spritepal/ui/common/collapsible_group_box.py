@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.styles.theme import COLORS
 from ui.utils.safe_animation import SafeAnimation, is_headless_environment
 
 from .spacing_constants import (
@@ -34,7 +35,6 @@ from .spacing_constants import (
     GROUP_PADDING,
     SPACING_SMALL,
 )
-from spritepal.ui.styles.theme import COLORS
 
 
 class CollapsibleGroupBox(QFrame):
@@ -366,6 +366,10 @@ class CollapsibleGroupBox(QFrame):
         """Add a layout to the collapsible content area."""
         if self._content_layout is not None:
             self._content_layout.addLayout(layout)
+
+    def setContentLayout(self, layout: QLayout) -> None:
+        """Set the content layout (convenience wrapper around add_layout)."""
+        self.add_layout(layout)
 
     def add_stretch(self, stretch: int = 0) -> None:
         """Add stretch to the collapsible content area."""

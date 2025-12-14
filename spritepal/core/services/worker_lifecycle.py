@@ -14,7 +14,6 @@ to fix layer boundary violations (core was importing from ui).
 from __future__ import annotations
 
 import contextlib
-import weakref
 from typing import Any
 
 from PySide6.QtCore import QThread

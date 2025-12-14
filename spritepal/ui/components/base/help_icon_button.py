@@ -7,8 +7,6 @@ in a tooltip or What's This popup.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
@@ -18,9 +16,6 @@ from PySide6.QtWidgets import (
     QWhatsThis,
     QWidget,
 )
-
-if TYPE_CHECKING:
-    pass
 
 
 class HelpIconButton(QToolButton):

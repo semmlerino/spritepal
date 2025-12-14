@@ -6,7 +6,6 @@ Consolidates filter controls that were duplicated across search tabs.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -23,9 +22,6 @@ from PySide6.QtWidgets import (
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE
 
-if TYPE_CHECKING:
-    pass
-
 
 @dataclass
 class SearchFilter:
@@ -41,7 +37,7 @@ class SearchFilter:
     confidence_threshold: float = 0.5  # For visual similarity searches
 
     @classmethod
-    def default(cls) -> "SearchFilter":
+    def default(cls) -> SearchFilter:
         """Create default filter settings."""
         return cls(
             min_size=MIN_SPRITE_SIZE,

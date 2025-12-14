@@ -160,7 +160,7 @@ class UserErrorDialog(BaseDialog):
                 f"Full Error:\n{technical_details or error_message}"
             )
             # Use dark theme colors for consistency
-            from spritepal.ui.styles.theme import COLORS, FONTS
+            from ui.styles.theme import COLORS, FONTS
             details_text.setStyleSheet(
                 f"QTextEdit {{ background-color: {COLORS['panel_background']}; color: {COLORS['text_primary']}; font-family: {FONTS['monospace_family']}; }}"
             )

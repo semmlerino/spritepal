@@ -130,6 +130,14 @@ def _reset_manager_caches(registry: Any) -> None:
                 mm.reset_stats()
 
 
+def _should_fail_on_leaks(config: Any) -> bool:
+    """Determine whether leak checks should fail or warn based on CLI flag."""
+    leak_mode = "fail"
+    with contextlib.suppress(Exception):
+        leak_mode = config.getoption("--leak-mode")
+    return leak_mode != "warn"
+
+
 @pytest.fixture(scope="session")
 def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     """
@@ -210,32 +218,26 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
     from core.managers.registry import ManagerRegistry
 
     test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
-    has_no_manager_setup = request.node.get_closest_marker("no_manager_setup") is not None
+    session_active = _session_state.is_initialized
+    session_settings_path = _session_state.settings_path
+    restore_session_after = False
 
     # Isolation guard: fail if registry already initialized (indicates pollution)
     # EXCEPTION: If test has no_manager_setup marker, it opted out of session_managers
     # and we should clean up and provide fresh isolated managers
     registry = ManagerRegistry()
     if registry.is_initialized():
-        if _session_state.is_initialized:
-            if has_no_manager_setup:
-                # Test opted out of session_managers - clean up and provide fresh state
-                # This is the intended use case: test wants isolated managers regardless
-                # of session state
-                try:
-                    cleanup_managers()
-                    ManagerRegistry.reset_for_tests()
-                except Exception:
-                    pass
-            else:
-                # Session managers are active - this test is incorrectly using isolated_managers
-                # when it should use session_managers or no manager fixture at all
-                pytest.fail(
-                    f"Test '{test_name}': isolated_managers fixture cannot be used when "
-                    "session_managers is active. Either:\n"
-                    "  1. Remove isolated_managers and use session_managers instead, or\n"
-                    "  2. Add @pytest.mark.no_manager_setup to skip session_managers for this test"
-                )
+        if session_active:
+            # Session managers are active - pause them so isolated_managers can provide
+            # a clean environment, then restore after the test.
+            restore_session_after = True
+            try:
+                cleanup_managers()
+                ManagerRegistry.reset_for_tests()
+            except Exception:
+                pass
+            # Reflect that session managers are temporarily paused
+            _session_state.is_initialized = False
         else:
             # Registry initialized without session - likely test pollution
             # Try to clean up
@@ -268,10 +270,19 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
     # Clean up managers after test
     cleanup_managers()
 
+    # Restore session managers if we paused them for isolation
+    if restore_session_after and session_settings_path:
+        try:
+            initialize_managers("TestApp", settings_path=session_settings_path)
+            _session_state.is_initialized = True
+        except Exception as restore_error:
+            pytest.fail(
+                f"Test '{test_name}': Failed to restore session managers after isolation: {restore_error}"
+            )
     # Restore DI container configuration if session_managers was used earlier
     # This prevents isolated_managers from breaking other tests that depend
     # on session_managers having the DI container properly configured
-    if _session_state.is_initialized:
+    elif _session_state.is_initialized:
         from core.di_container import configure_container
         configure_container()
 
@@ -630,9 +641,10 @@ def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
 # ============================================================================
 
 @pytest.fixture
-def real_factory() -> Generator[RealComponentFactory, None, None]:
+def real_factory(request: pytest.FixtureRequest) -> Generator[RealComponentFactory, None, None]:
     """Provide a RealComponentFactory for creating test components."""
-    factory = RealComponentFactory()
+    fail_on_leaks = _should_fail_on_leaks(request.config)
+    factory = RealComponentFactory(fail_on_leaks=fail_on_leaks)
     yield factory
     # Cleanup will be handled by factory's cleanup method if needed
     if hasattr(factory, 'cleanup'):
@@ -651,7 +663,7 @@ def real_extraction_manager(
     NOTE: This returns a REAL ExtractionManager, not a mock.
     For actual mocks, create them locally with Mock(spec=ExtractionManager).
     """
-    factory = RealComponentFactory()
+    factory = RealComponentFactory(fail_on_leaks=_should_fail_on_leaks(request.config))
     manager = factory.create_extraction_manager()
 
     def reset_state():
@@ -688,7 +700,7 @@ def real_session_manager(
     NOTE: This returns a REAL SessionManager, not a mock.
     For actual mocks, create them locally with Mock(spec=SessionManager).
     """
-    factory = RealComponentFactory()
+    factory = RealComponentFactory(fail_on_leaks=_should_fail_on_leaks(request.config))
     manager = factory.create_session_manager()
 
     def reset_state():
@@ -715,7 +727,7 @@ def rom_cache(
     Provides a real ROM cache with common caching functionality.
     Reset between tests via clear_cache() in reset_class_state fixture.
     """
-    factory = RealComponentFactory()
+    factory = RealComponentFactory(fail_on_leaks=_should_fail_on_leaks(request.config))
     cache = factory.create_rom_cache()
 
     def reset_cache():

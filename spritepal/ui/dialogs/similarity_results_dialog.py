@@ -19,12 +19,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from spritepal.ui.styles.theme import COLORS
 from typing_extensions import override
 
 from core.visual_similarity_search import SimilarityMatch
 from ui.components import BaseDialog
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

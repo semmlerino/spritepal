@@ -47,6 +47,8 @@ from ui.rom_extraction.workers import SpriteScanWorker
 from ui.rom_extraction.workers.similarity_indexing_worker import (
     SimilarityIndexingWorker,
 )
+from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
+from ui.styles.theme import COLORS
 from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoaderWorker
 from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
@@ -56,8 +58,6 @@ from utils.logging_config import get_logger
 
 # SettingsManager accessed via DI: inject(SettingsManagerProtocol)
 from utils.thread_safe_singleton import QtThreadSafeSingleton
-from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
-from spritepal.ui.styles.theme import COLORS
 
 logger = get_logger(__name__)
 

@@ -22,9 +22,9 @@ from PySide6.QtWidgets import (
 )
 from typing_extensions import override
 
-from spritepal.ui.styles.theme import COLORS
 from ui.delegates.sprite_gallery_delegate import SpriteGalleryDelegate
 from ui.models.sprite_gallery_model import SpriteGalleryModel
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

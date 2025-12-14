@@ -6,8 +6,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
-from spritepal.ui.styles import get_prominent_action_button_style
-from spritepal.ui.styles.theme import COLORS
+from ui.styles import get_prominent_action_button_style
+from ui.styles.theme import COLORS
 
 from .base_widget import BaseExtractionWidget
 

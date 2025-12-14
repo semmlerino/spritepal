@@ -9,7 +9,6 @@ import pytest
 from PIL import Image
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.workers import VRAMExtractionWorker

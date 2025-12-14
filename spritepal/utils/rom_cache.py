@@ -68,6 +68,18 @@ class ROMCache:
         # Create cache directory if it doesn't exist, with error handling
         if self._cache_enabled:
             self._cache_enabled = self._setup_cache_directory()
+            if self._cache_enabled and not self._ensure_writable_cache_dir():
+                fallback_dir = Path(tempfile.gettempdir()) / self.CACHE_DIR_NAME
+                try:
+                    fallback_dir.mkdir(parents=True, exist_ok=True)
+                    self.cache_dir = fallback_dir
+                    if self._ensure_writable_cache_dir():
+                        logger.info(f"Using fallback cache directory: {self.cache_dir}")
+                    else:
+                        self._cache_enabled = False
+                except (OSError, PermissionError):
+                    logger.exception("Failed to prepare fallback cache directory")
+                    self._cache_enabled = False
 
     @property
     def cache_enabled(self) -> bool:
@@ -95,6 +107,18 @@ class ROMCache:
             return True
 
         return True
+
+    def _ensure_writable_cache_dir(self) -> bool:
+        """Verify cache directory is writable; return False if not."""
+        try:
+            with tempfile.NamedTemporaryFile(dir=self.cache_dir, delete=True) as tmp:
+                tmp.write(b"0")
+                tmp.flush()
+                os.fsync(tmp.fileno())
+            return True
+        except Exception as e:
+            logger.warning(f"Cache directory not writable {self.cache_dir}: {e}")
+            return False
 
     def _get_rom_hash(self, rom_path: str) -> str:
         """Generate SHA-256 hash of ROM file for cache key with caching optimization.
@@ -1171,5 +1195,4 @@ class ROMCache:
                     logger.info(f"Cache directory changed from {self.cache_dir} to {new_dir}")
                     self.cache_dir = new_dir
                     self._cache_enabled = self._setup_cache_directory()
-
 

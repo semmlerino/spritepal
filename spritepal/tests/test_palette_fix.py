@@ -13,7 +13,6 @@ Test palette application to see why we get black boxes.
 import os
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-
 import numpy as np
 from PIL import Image
 

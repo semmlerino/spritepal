@@ -32,10 +32,10 @@ if TYPE_CHECKING:
 
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
-from spritepal.ui.styles.theme import COLORS
 from ui.common import WorkerManager
 from ui.dialogs import UserErrorDialog
 from ui.rom_extraction.workers import SpriteScanWorker
+from ui.styles.theme import COLORS
 from ui.widgets.fullscreen_sprite_viewer import FullscreenSpriteViewer
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController

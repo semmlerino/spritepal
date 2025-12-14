@@ -25,7 +25,6 @@ import pytest
 from PySide6.QtTest import QSignalSpy
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-
 import core.controller
 from core.controller import ExtractionController
 from core.managers.extraction_manager import ExtractionManager

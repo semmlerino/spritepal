@@ -28,7 +28,6 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-
 from core.managers.monitoring_manager import (
     ErrorEvent,
     ErrorTracker,
@@ -86,7 +85,7 @@ class TestPerformanceCollector:
         # Add some test metrics
         for i in range(5):
             op_id = collector.start_operation("test_op")
-            time.sleep(0.001)  # Small delay
+            time.sleep(0.001)  # sleep-ok: benchmark timing
             collector.finish_operation(op_id, success=True)
         
         stats = collector.get_operation_stats("test_op")
@@ -312,7 +311,7 @@ class TestMonitoringManager:
     def test_monitor_operation_context(self, monitoring_manager):
         """Test operation monitoring context manager."""
         with monitoring_manager.monitor_operation("test_operation", {"test": "context"}):
-            time.sleep(0.001)  # Small operation
+            time.sleep(0.001)  # sleep-ok: benchmark timing
         
         # Should have recorded performance data
         stats = monitoring_manager.get_performance_stats("test_operation")
@@ -355,7 +354,7 @@ class TestMonitoringManager:
         """Test report generation."""
         # Add some test data
         with monitoring_manager.monitor_operation("test_op"):
-            time.sleep(0.001)
+            time.sleep(0.001)  # sleep-ok: benchmark timing
         
         report = monitoring_manager.generate_report(hours=1)
         assert report.report_id
@@ -514,6 +513,7 @@ class TestMonitoringSettings:
 
 
 @pytest.mark.skip(reason="GUI test requires display")
+@pytest.mark.usefixtures("isolated_managers")
 class TestMonitoringDashboard:
     """Test the monitoring dashboard UI."""
     
@@ -579,17 +579,17 @@ class TestIntegrationScenarios:
             # Step 1: Validate ROM path
             workflow.step("validate_path")
             with manager.monitor_operation("validate_rom_path"):
-                time.sleep(0.001)
-            
+                time.sleep(0.001)  # sleep-ok: benchmark timing
+
             # Step 2: Load ROM data
             workflow.step("load_data")
             with manager.monitor_operation("load_rom_data"):
-                time.sleep(0.002)
-            
+                time.sleep(0.002)  # sleep-ok: benchmark timing
+
             # Step 3: Parse ROM headers
             workflow.step("parse_headers")
             with manager.monitor_operation("parse_rom_headers"):
-                time.sleep(0.001)
+                time.sleep(0.001)  # sleep-ok: benchmark timing
             
             workflow.complete(success=True)
             
@@ -617,7 +617,7 @@ class TestIntegrationScenarios:
                         raise ValueError(f"Extraction failed on attempt {attempt}")
                     else:
                         # Succeed on third attempt
-                        time.sleep(0.001)
+                        time.sleep(0.001)  # sleep-ok: benchmark timing
                         
             except ValueError:
                 pass # manager.track_error("ExtractionError", str(e), f"extraction_attempt_{attempt}") # Redundant, monitor_operation catches it
@@ -642,7 +642,7 @@ class TestIntegrationScenarios:
             operation_time = 0.001 * (i + 1)  # Increasing time
             
             with manager.monitor_operation("degrading_operation"):
-                time.sleep(operation_time)
+                time.sleep(operation_time)  # sleep-ok: benchmark timing
         
         # Generate insights to detect degradation
         insights = manager.generate_insights()

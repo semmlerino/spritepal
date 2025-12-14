@@ -24,8 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from spritepal.ui.styles import get_prominent_action_button_style
-from spritepal.ui.styles.theme import COLORS
+from ui.styles import get_prominent_action_button_style
+from ui.styles.theme import COLORS
 
 # Import AdvancedSearchDialog lazily to avoid circular imports
 from utils.logging_config import get_logger

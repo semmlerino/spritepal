@@ -14,16 +14,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+
+@pytest.mark.usefixtures("session_managers")
 class TestDivisionByZeroFixes:
     """Test all division by zero scenarios in scan workers."""
-
-    @pytest.fixture(autouse=True)
-    def init_managers(self, setup_managers):
-        """Ensure DI container is initialized for tests that create workers.
-
-        Uses setup_managers which respects session_managers if active.
-        """
-        yield
 
     def test_scan_worker_zero_range(self):
         """Test SpriteScanWorker with zero scan range."""
@@ -34,18 +28,18 @@ class TestDivisionByZeroFixes:
             tmp.flush()
 
             # Create worker with same start and end (zero range)
+            parallel_finder = MagicMock()
+            parallel_finder.search_parallel = MagicMock(return_value=[])
+            parallel_finder.step_size = 0x100
+
             worker = SpriteScanWorker(
                 rom_path=tmp.name,
                 extractor=MagicMock(),
                 use_cache=False,
                 start_offset=0x1000,
-                end_offset=0x1000  # Same as start = zero range
+                end_offset=0x1000,  # Same as start = zero range
+                parallel_finder=parallel_finder
             )
-
-            # Mock the parallel finder to avoid actual scanning
-            worker._parallel_finder = MagicMock()
-            worker._parallel_finder.search_parallel = MagicMock(return_value=[])
-            worker._parallel_finder.step_size = 0x100
 
             # Should not raise division by zero
             worker.run()
@@ -64,16 +58,17 @@ class TestDivisionByZeroFixes:
             tmp.write(b'x' * 1024)
             tmp.flush()
 
+            parallel_finder = MagicMock()
             worker = SpriteScanWorker(
                 rom_path=tmp.name,
                 extractor=MagicMock(),
                 use_cache=False,
                 start_offset=0x500,
-                end_offset=0x500  # Zero range
+                end_offset=0x500,  # Zero range
+                parallel_finder=parallel_finder
             )
 
             # Capture the progress callback
-            worker._parallel_finder = MagicMock()
             progress_callback = None
 
             def capture_callback(*args, **kwargs):
@@ -81,8 +76,8 @@ class TestDivisionByZeroFixes:
                 progress_callback = kwargs.get('progress_callback')
                 return []
 
-            worker._parallel_finder.search_parallel = capture_callback
-            worker._parallel_finder.step_size = 0x100
+            parallel_finder.search_parallel = capture_callback
+            parallel_finder.step_size = 0x100
 
             # Run to capture callback
             worker.run()
@@ -240,17 +235,17 @@ class TestDivisionByZeroFixes:
             # Empty file (0 bytes) - don't write anything
             tmp.flush()
 
+            parallel_finder = MagicMock()
+            parallel_finder.search_parallel = MagicMock(return_value=[])
+            parallel_finder.step_size = 0x100
+
             worker = SpriteScanWorker(
                 rom_path=tmp.name,
                 extractor=MagicMock(),
-                use_cache=False
+                use_cache=False,
+                parallel_finder=parallel_finder
                 # No custom offsets, will use defaults based on file size
             )
-
-            # Mock parallel finder
-            worker._parallel_finder = MagicMock()
-            worker._parallel_finder.search_parallel = MagicMock(return_value=[])
-            worker._parallel_finder.step_size = 0x100
 
             # Should handle zero ROM size gracefully
             worker.run()
@@ -271,16 +266,18 @@ class TestDivisionByZeroFixes:
             tmp.flush()
 
             # Test 1: Scan that finds no sprites
+            scan_parallel_finder = MagicMock()
+            scan_parallel_finder.search_parallel = MagicMock(return_value=[])
+            scan_parallel_finder.step_size = 16
+
             scan_worker = SpriteScanWorker(
                 rom_path=tmp.name,
                 extractor=MagicMock(),
                 use_cache=False,
                 start_offset=0,
-                end_offset=64
+                end_offset=64,
+                parallel_finder=scan_parallel_finder
             )
-            scan_worker._parallel_finder = MagicMock()
-            scan_worker._parallel_finder.search_parallel = MagicMock(return_value=[])
-            scan_worker._parallel_finder.step_size = 16
 
             scan_worker.run()
 
@@ -325,17 +322,18 @@ class TestDivisionByZeroFixes:
                 tmp.write(b'x' * 1024)
                 tmp.flush()
 
+                parallel_finder = MagicMock()
+                parallel_finder.search_parallel = MagicMock(return_value=[])
+                parallel_finder.step_size = 1
+
                 worker = SpriteScanWorker(
                     rom_path=tmp.name,
                     extractor=MagicMock(),
                     use_cache=False,
                     start_offset=start,
-                    end_offset=end
+                    end_offset=end,
+                    parallel_finder=parallel_finder
                 )
-
-                worker._parallel_finder = MagicMock()
-                worker._parallel_finder.search_parallel = MagicMock(return_value=[])
-                worker._parallel_finder.step_size = 1
 
                 # Should handle all boundary conditions
                 try:

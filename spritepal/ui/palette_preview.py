@@ -35,7 +35,7 @@ class PaletteColorWidget(QWidget):
         from PySide6.QtWidgets import QApplication
 
         try:
-            import shiboken6  # type: ignore[import-untyped]
+            import shiboken6
             if not shiboken6.isValid(self):
                 return
         except ImportError:

@@ -10,7 +10,6 @@ from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QWidget
 
 from ui.styles import get_button_style, get_extraction_checklist_style
-from ui.styles.theme import COLORS, FONTS
 
 
 class ToolbarActionsProtocol(Protocol):

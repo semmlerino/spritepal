@@ -19,13 +19,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.styles.theme import COLORS
+
 from .spacing_constants import (
     FONT_SIZE_NORMAL,
     TAB_CONTENT_PADDING,
     TAB_MAX_WIDTH,
     TAB_MIN_WIDTH,
 )
-from spritepal.ui.styles.theme import COLORS
 
 
 class TabbedWidgetBase(QWidget):

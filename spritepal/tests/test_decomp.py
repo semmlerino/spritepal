@@ -17,7 +17,6 @@ Test decompression at a known sprite offset.
 import os
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-
 from core.di_container import inject
 from core.protocols.manager_protocols import ExtractionManagerProtocol
 

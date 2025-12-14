@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QDialogButtonBox, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
-from spritepal.ui.styles.theme import COLORS
+from ui.styles.theme import COLORS
 
 if TYPE_CHECKING:
     from core.managers.extraction_manager import ExtractionManager
