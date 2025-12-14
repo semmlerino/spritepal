@@ -149,11 +149,6 @@ class TestMainWindowIntegration:
 
     @pytest.mark.gui
     @pytest.mark.usefixtures("setup_managers")
-    @pytest.mark.xfail(
-        _is_offscreen,
-        reason="MainWindow paint events cause segfaults during teardown in offscreen mode",
-        strict=False,
-    )
     def test_main_window_with_dark_theme_styling(self, qtbot) -> None:
         """Test MainWindow with real dark theme styling applied."""
         # Create real MainWindow
@@ -178,11 +173,6 @@ class TestMainWindowIntegration:
         assert size.height() >= 650, f"Window height should be at least 650, got {size.height()}"
 
 
-@pytest.mark.xfail(
-    _is_offscreen,
-    reason="Manual offset dialog may fail in Qt offscreen mode",
-    strict=False,
-)
 class TestManualOffsetDialogSignalIntegration:
     """Test manual offset dialog with new signals (offset_changed, sprite_found)."""
 
@@ -213,6 +203,11 @@ class TestManualOffsetDialogSignalIntegration:
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
+    @pytest.mark.xfail(
+        _is_offscreen,
+        reason="Signal emission testing requires real widget interaction which fails in offscreen mode",
+        strict=False,
+    )
     def test_manual_offset_dialog_offset_changed_signal_emission(self, qtbot) -> None:
         """Test offset_changed signal emission with real Qt signal testing."""
         with mock_manager_dependencies():
@@ -248,6 +243,11 @@ class TestManualOffsetDialogSignalIntegration:
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
+    @pytest.mark.xfail(
+        _is_offscreen,
+        reason="Signal emission testing requires real widget interaction which fails in offscreen mode",
+        strict=False,
+    )
     def test_manual_offset_dialog_sprite_found_signal_emission(self, qtbot) -> None:
         """Test sprite_found signal emission with real Qt signal testing."""
         with mock_manager_dependencies():
@@ -578,28 +578,23 @@ class TestRegressionPrevention:
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
-    @pytest.mark.xfail(
-        _is_offscreen,
-        reason="Manual offset dialog may fail in Qt offscreen mode",
-        strict=False,
-    )
     def test_no_regression_in_manual_offset_signals(self, qtbot) -> None:
         """Test that manual offset dialog signals haven't regressed."""
-        # Pass mock extraction_manager directly (replaces deprecated get_extraction_manager patch)
-        mock_extraction_manager = Mock()
+        # Use mock_manager_dependencies for proper isolation
+        with mock_manager_dependencies():
+            dialog = UnifiedManualOffsetDialog()
+            qtbot.addWidget(dialog)
 
-        dialog = UnifiedManualOffsetDialog(extraction_manager=mock_extraction_manager)
+            # Test that new signals are still present
+            required_signals = ['offset_changed', 'sprite_found']
+            for signal_name in required_signals:
+                assert hasattr(dialog, signal_name), (
+                    f"Signal regression detected! Manual offset dialog missing {signal_name} signal. "
+                    "These signals were added in recent UI improvements."
+                )
 
-        # Test that new signals are still present
-        required_signals = ['offset_changed', 'sprite_found']
-        for signal_name in required_signals:
-            assert hasattr(dialog, signal_name), (
-                f"Signal regression detected! Manual offset dialog missing {signal_name} signal. "
-                "These signals were added in recent UI improvements."
-            )
-
-            signal_obj = getattr(dialog, signal_name)
-            assert isinstance(signal_obj, Signal), f"{signal_name} should be a Qt Signal"
+                signal_obj = getattr(dialog, signal_name)
+                assert isinstance(signal_obj, Signal), f"{signal_name} should be a Qt Signal"
 
     @pytest.mark.gui
     def test_no_regression_in_button_styling_system(self, qtbot) -> None:

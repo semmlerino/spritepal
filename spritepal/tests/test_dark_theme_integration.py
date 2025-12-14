@@ -145,11 +145,6 @@ class TestPreviewWidgetDarkTheme:
 
     @pytest.mark.gui
     @pytest.mark.skipif(not WIDGETS_AVAILABLE, reason="Preview widgets not available")
-    @pytest.mark.xfail(
-        _is_offscreen,
-        reason="SpritePreviewWidget may fail to initialize in offscreen mode",
-        strict=False,
-    )
     def test_sprite_preview_widget_dark_backgrounds(self, qtbot) -> None:
         """Test that SpritePreviewWidget applies dark backgrounds correctly."""
         preview_widget = SpritePreviewWidget("Test Preview")
@@ -170,11 +165,6 @@ class TestPreviewWidgetDarkTheme:
 
     @pytest.mark.gui
     @pytest.mark.skipif(not WIDGETS_AVAILABLE, reason="Preview widgets not available")
-    @pytest.mark.xfail(
-        _is_offscreen,
-        reason="ZoomablePreviewWidget may fail to initialize in offscreen mode",
-        strict=False,
-    )
     def test_zoomable_preview_widget_dark_backgrounds(self, qtbot) -> None:
         """Test that ZoomablePreviewWidget applies dark backgrounds correctly."""
         zoomable_widget = ZoomablePreviewWidget()
