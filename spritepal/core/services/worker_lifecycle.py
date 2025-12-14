@@ -96,6 +96,10 @@ class WorkerManager:
         if worker is None:
             return
 
+        # Block signals FIRST to prevent race conditions with queued signals
+        # This ensures no callbacks fire on deleted objects during cleanup
+        worker.blockSignals(True)
+
         worker_name = worker.__class__.__name__
 
         if not worker.isRunning():

@@ -1158,7 +1158,10 @@ class InjectionDialog(TabbedDialog):
         self._is_closing = True
 
         if self._rom_info_loader is not None:
-            # Disconnect signals BEFORE cleanup to prevent callbacks on deleted dialog
+            # Block signals FIRST to prevent race with queued signals
+            self._rom_info_loader.blockSignals(True)
+
+            # Then disconnect signals to break references
             try:
                 self._rom_info_loader.rom_info_loaded.disconnect(self._on_rom_info_loaded)
                 self._rom_info_loader.error.disconnect(self._on_rom_info_error)

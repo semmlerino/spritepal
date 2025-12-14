@@ -1343,7 +1343,27 @@ class ROMExtractionPanel(QWidget):
 
     def _on_dialog_finished(self, dialog: ScanDialog, result: int, context: ScanContext) -> None:
         """Handle dialog close."""
-        # Clean up worker
+        # Disconnect signals BEFORE cleanup to prevent crashes from queued signals
+        if self.scan_worker:
+            self.scan_worker.blockSignals(True)
+            # Disconnect cross-worker signals
+            if self.similarity_indexing_worker is not None:
+                try:
+                    self.scan_worker.sprite_found.disconnect(self.similarity_indexing_worker.on_sprite_found)
+                    self.scan_worker.finished.disconnect(self.similarity_indexing_worker.on_scan_finished)
+                except (RuntimeError, TypeError):
+                    pass  # Already disconnected
+            # Disconnect lambda signals to prevent accessing deleted dialog
+            try:
+                self.scan_worker.progress_detailed.disconnect()
+                self.scan_worker.sprite_found.disconnect()
+                self.scan_worker.finished.disconnect()
+                self.scan_worker.cache_status.disconnect()
+                self.scan_worker.cache_progress.disconnect()
+            except (RuntimeError, TypeError):
+                pass  # Already disconnected
+
+        # NOW safe to cleanup
         WorkerManager.cleanup_worker(self.scan_worker)
         self.scan_worker = None
 
