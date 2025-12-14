@@ -34,6 +34,9 @@ if TYPE_CHECKING:
 
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.managers.application_state_manager import ExtractionState
+
+# SettingsManager accessed via DI: inject(SettingsManagerProtocol)
+from core.thread_safe_singleton import QtThreadSafeSingleton
 from ui.common import WorkerManager
 from ui.dialogs import ResumeScanDialog, UnifiedManualOffsetDialog, UserErrorDialog
 from ui.rom_extraction.widgets import (
@@ -53,9 +56,6 @@ from utils.constants import (
     SETTINGS_NS_ROM_INJECTION,
 )
 from utils.logging_config import get_logger
-
-# SettingsManager accessed via DI: inject(SettingsManagerProtocol)
-from core.thread_safe_singleton import QtThreadSafeSingleton
 
 logger = get_logger(__name__)
 

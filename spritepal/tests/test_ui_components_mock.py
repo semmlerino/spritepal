@@ -10,9 +10,9 @@ from PIL import Image
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QPixmap
 
+from core.services.image_utils import pil_to_qpixmap
 from ui.row_arrangement_dialog import RowArrangementDialog
 from ui.zoomable_preview import PreviewPanel, ZoomablePreviewWidget
-from core.services.image_utils import pil_to_qpixmap
 
 # Serial execution required: Real Qt components
 pytestmark = [

@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
 from typing_extensions import override
 
 from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
+from core.services.preview_generator import PreviewGenerator, PreviewRequest
 from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngine
 from core.workers.base import handle_worker_errors
 from ui.common import WorkerManager
@@ -51,7 +52,6 @@ from ui.constants.help_text import TOOLTIPS
 from ui.dialogs.similarity_results_dialog import show_similarity_results
 from ui.styles.theme import COLORS
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE
-from core.services.preview_generator import PreviewGenerator, PreviewRequest
 
 logger = logging.getLogger(__name__)
 

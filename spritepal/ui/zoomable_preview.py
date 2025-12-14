@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.services.image_utils import pil_to_qpixmap
 from ui.common.spacing_constants import (
     BORDER_THIN,
     MAX_ZOOM,
@@ -52,7 +53,6 @@ from utils.constants import (
     PREVIEW_SCALE_FACTOR,
     TILE_WIDTH,
 )
-from core.services.image_utils import pil_to_qpixmap
 
 from .row_arrangement.palette_colorizer import PaletteColorizer
 

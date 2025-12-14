@@ -32,6 +32,7 @@ from core.managers import (
     InjectionManager,
 )
 from core.protocols.error_handler_protocol import ErrorHandlerProtocol
+from core.services.image_utils import pil_to_qpixmap
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 from utils.constants import (
@@ -40,7 +41,6 @@ from utils.constants import (
     VRAM_SPRITE_OFFSET,
 )
 from utils.file_validator import FileValidator
-from core.services.image_utils import pil_to_qpixmap
 from utils.logging_config import get_logger
 
 # from utils.settings_manager import get_settings_manager # Removed due to DI
