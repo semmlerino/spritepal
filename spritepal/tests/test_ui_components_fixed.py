@@ -8,10 +8,11 @@ from pathlib import Path
 
 import pytest
 
-# Add parent directories to path
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Test characteristics: Real GUI components requiring display
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # UI tests may involve managers that spawn threads
+    pytest.mark.skip_thread_cleanup(reason="UI tests may involve managers that spawn threads"),
     pytest.mark.file_io,
     pytest.mark.gui,
     pytest.mark.qt_app,
@@ -22,7 +23,6 @@ pytestmark = [
     pytest.mark.requires_display,
 ]
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 class TestROMMapWidgetFixed:
     """Test ROMMapWidget functionality with proper setup"""

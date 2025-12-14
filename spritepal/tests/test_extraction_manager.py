@@ -67,6 +67,7 @@ from utils.constants import BYTES_PER_TILE
 
 
 @pytest.mark.no_manager_setup
+@pytest.mark.allows_registry_state  # Uses manager_context for own lifecycle
 class TestExtractionManager:
     """TDD tests for ExtractionManager with real component integration.
     
@@ -549,7 +550,7 @@ class TestExtractionParameterValidation:
     """
 
     @pytest.fixture
-    def extraction_manager(self, isolated_managers):
+    def extraction_manager(self, setup_managers):
         """Create ExtractionManager instance with proper DI setup."""
         from core.managers.registry import ManagerRegistry
         registry = ManagerRegistry()
@@ -702,7 +703,7 @@ class TestExtractionErrorPaths:
     """
 
     @pytest.fixture
-    def extraction_manager(self, isolated_managers):
+    def extraction_manager(self, setup_managers):
         """Create ExtractionManager via registry adapter."""
         from core.managers.registry import ManagerRegistry
         registry = ManagerRegistry()

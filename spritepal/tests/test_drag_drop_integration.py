@@ -12,7 +12,8 @@ from unittest.mock import Mock
 
 import pytest
 
-# Add parent directories to path
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.file_io,
@@ -26,8 +27,6 @@ pytestmark = [
     pytest.mark.signals_slots,
     pytest.mark.slow,
 ]
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # We'll test the core drag-drop logic without Qt dependencies
 from utils.constants import VRAM_SPRITE_OFFSET

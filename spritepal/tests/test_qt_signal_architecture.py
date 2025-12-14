@@ -25,7 +25,6 @@ from core.managers import (
     # Serial execution required: QApplication management, Thread safety concerns, Real Qt components
     ExtractionManager,
     InjectionManager,
-    initialize_managers,
 )
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
@@ -38,7 +37,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),  # Initialize DI container
-    pytest.mark.skip_thread_cleanup,  # Thread tests may intentionally leave threads running
+    pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.thread_safety,
@@ -121,8 +120,7 @@ class TestQtSignalArchitecture:
 
     def test_signal_connection_with_casting(self, app, mock_factory, signal_capture):
         """Test that signal connections work correctly with protocol casting"""
-        # Initialize managers first
-        initialize_managers()
+        # Managers initialized by session_managers fixture
 
         # Create real managers
         injection_mgr = InjectionManager()

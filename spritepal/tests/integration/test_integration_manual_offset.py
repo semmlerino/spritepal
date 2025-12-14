@@ -12,6 +12,7 @@ from core.managers import ExtractionManager
 
 @pytest.mark.integration
 @pytest.mark.gui
+@pytest.mark.skip_thread_cleanup(reason="Dialog uses background workers for preview generation")
 class TestManualOffsetDialog:
     """Test manual offset dialog with real ROM data and preview generation."""
 
@@ -291,6 +292,7 @@ class TestSpriteScanDialog:
 
 @pytest.mark.integration
 @pytest.mark.gui
+@pytest.mark.skip_thread_cleanup(reason="Dialog uses background workers for preview generation")
 class TestDialogIntegrationWithPanel:
     """Test manual offset dialog integration with ROM extraction panel."""
 

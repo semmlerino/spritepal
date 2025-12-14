@@ -27,7 +27,7 @@ import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 from core.managers.monitoring_manager import (
     ErrorEvent,

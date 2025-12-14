@@ -27,7 +27,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: QApplication management, Real Qt components
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Extraction worker tests create background extraction threads
+    pytest.mark.skip_thread_cleanup(reason="Extraction worker tests create background extraction threads"),
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.file_io,
@@ -36,6 +36,7 @@ pytestmark = [
     pytest.mark.requires_display,
     pytest.mark.rom_data,
     pytest.mark.signals_slots,
+    pytest.mark.usefixtures("session_managers"),
 ]
 
 class TestVRAMExtractionWorker:

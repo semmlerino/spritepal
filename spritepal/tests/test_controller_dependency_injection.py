@@ -33,7 +33,7 @@ pytestmark = [
 class TestControllerDependencyInjection:
     """Test dependency injection functionality for ExtractionController."""
 
-    def test_dependency_injection_with_custom_managers(self, isolated_managers):
+    def test_dependency_injection_with_custom_managers(self, setup_managers):
         """Test that controller uses injected managers when provided."""
         mock_main_window = Mock()
 
@@ -59,7 +59,7 @@ class TestControllerDependencyInjection:
         assert controller.session_manager is mock_session_manager
         assert controller.injection_manager is mock_injection_manager
 
-    def test_controller_signals_connected_with_injected_managers(self, isolated_managers):
+    def test_controller_signals_connected_with_injected_managers(self, setup_managers):
         """Test that controller properly connects signals with injected managers."""
         mock_main_window = Mock()
 

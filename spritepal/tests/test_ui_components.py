@@ -12,10 +12,11 @@ import pytest
 
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 
-# Add parent directories to path
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # UI tests may involve managers that spawn threads
+    pytest.mark.skip_thread_cleanup(reason="UI tests may involve managers that spawn threads"),
     pytest.mark.dialog,
     pytest.mark.file_io,
     pytest.mark.headless,
@@ -29,8 +30,6 @@ pytestmark = [
     pytest.mark.qt_real,
     pytest.mark.requires_display,
 ]
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Note: initialize_managers and cleanup_managers are no longer needed here
 # as we use the shared class_managers fixture

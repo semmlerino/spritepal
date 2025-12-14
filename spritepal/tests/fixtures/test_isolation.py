@@ -56,11 +56,8 @@ def _cleanup_managers() -> None:
     try:
         from spritepal.core.managers.registry import ManagerRegistry
 
-        # Force reset singleton
-        if hasattr(ManagerRegistry, '_instance'):
-            ManagerRegistry._instance = None
-        if hasattr(ManagerRegistry, '_cleanup_registered'):
-            ManagerRegistry._cleanup_registered = False
+        # Use official API for test isolation
+        ManagerRegistry.reset_for_tests()
 
         # Clear any module-level registry
         import spritepal.core.managers.registry as registry_module

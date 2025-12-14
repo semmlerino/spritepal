@@ -13,6 +13,8 @@ import tempfile
 import pytest
 from PIL import Image
 
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.file_io,
@@ -22,8 +24,6 @@ pytestmark = [
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
 ]
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from core.managers import ExtractionManager, InjectionManager, SessionManager
 from ui.row_arrangement.grid_arrangement_manager import (

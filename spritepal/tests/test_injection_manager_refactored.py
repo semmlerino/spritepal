@@ -16,14 +16,14 @@ from collections.abc import Generator
 import pytest
 from PIL import Image
 
-from core.managers import cleanup_managers, initialize_managers
 from core.managers.exceptions import ValidationError
 from core.managers.injection_manager import InjectionManager
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: Real Qt components
 pytestmark = [
-
+    pytest.mark.usefixtures("isolated_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns cleanup"),
     pytest.mark.serial,
     pytest.mark.file_io,
     pytest.mark.gui,
@@ -36,15 +36,8 @@ pytestmark = [
 class TestInjectionManagerReal:
     """Test InjectionManager with real components and minimal mocking."""
 
-    @pytest.fixture(scope="class")
-    def class_managers(self):
-        """Class-scoped managers for performance."""
-        initialize_managers("TestApp")
-        yield
-        cleanup_managers()
-
     @pytest.fixture
-    def injection_manager(self, class_managers):
+    def injection_manager(self, isolated_managers):
         """Provide real injection manager."""
         return InjectionManager()
 

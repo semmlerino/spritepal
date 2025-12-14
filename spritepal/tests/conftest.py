@@ -146,6 +146,14 @@ def pytest_configure(config):
         "markers",
         "requires_real_rom: Test requires real Kirby ROM file (skips if not available)"
     )
+    config.addinivalue_line(
+        "markers",
+        "skip_session_reset: Skip automatic session manager state reset"
+    )
+    config.addinivalue_line(
+        "markers",
+        "allows_resource_leaks: Allow test to have resource leaks without failure"
+    )
 
     # Install QPixmap guard early - catches most cases since qt_app imports Qt early
     _install_qpixmap_guard_early()

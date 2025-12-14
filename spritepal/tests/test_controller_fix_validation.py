@@ -19,7 +19,8 @@ import pytest
 # Determine if running in offscreen mode
 _is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 
-# Add parent directory for imports
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 # xfail for offscreen mode - real MainWindow may crash
 pytestmark = [
@@ -40,15 +41,7 @@ pytestmark = [
     ),
 ]
 
-current_dir = Path(__file__).parent
-parent_dir = current_dir.parent
-sys.path.insert(0, str(parent_dir))
-
 from core.controller import ExtractionController
-from core.managers import (
-    cleanup_managers,
-    initialize_managers,
-)
 from tests.infrastructure import (
     ApplicationFactory,
     qt_widget_test,
@@ -61,19 +54,16 @@ class TestControllerDefensiveValidationFix:
     """Test that the defensive validation fix prevents blocking behavior."""
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
-        """Set up testing infrastructure."""
+    def setup_test_infrastructure(self, isolated_managers):
+        """Set up testing infrastructure using isolated_managers fixture."""
         self.qt_app = ApplicationFactory.get_application()
-
         yield
-
-        cleanup_managers()
 
     def test_fixed_fast_failure_with_invalid_vram_path(self):
         """Test that invalid VRAM path fails fast (< 1 second) after fix."""
         print("=== TESTING FIXED FAST FAILURE WITH INVALID VRAM PATH ===")
 
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers initialized by isolated_managers fixture
 
         with qt_widget_test(MainWindow) as main_window:
             controller = ExtractionController(main_window)
@@ -136,7 +126,7 @@ class TestControllerDefensiveValidationFix:
         """Test that invalid CGRAM path fails fast in Full Color mode."""
         print("=== TESTING FIXED FAST FAILURE WITH INVALID CGRAM PATH ===")
 
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers initialized by isolated_managers fixture
 
         with qt_widget_test(MainWindow) as main_window:
             controller = ExtractionController(main_window)
@@ -203,7 +193,7 @@ class TestControllerDefensiveValidationFix:
         """Test that Grayscale Only mode bypasses CGRAM validation correctly."""
         print("=== TESTING GRAYSCALE MODE CGRAM BYPASS ===")
 
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers initialized by isolated_managers fixture
 
         with qt_widget_test(MainWindow) as main_window:
             controller = ExtractionController(main_window)

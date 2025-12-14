@@ -30,17 +30,7 @@ class TestCircularDependencyFix:
         app.quit()
 
     @pytest.fixture
-    def initialized_managers(self):
-        """Initialize managers for tests."""
-        from core.managers.registry import cleanup_managers, initialize_managers
-
-        initialize_managers()
-        yield
-        # Cleanup managers to prevent state pollution
-        cleanup_managers()
-
-    @pytest.fixture
-    def main_window_deps(self, initialized_managers):
+    def main_window_deps(self, setup_managers):
         """Get MainWindow dependencies from DI container."""
         return {
             "settings_manager": inject(SettingsManagerProtocol),

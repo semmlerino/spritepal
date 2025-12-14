@@ -6,6 +6,8 @@ import pytest
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.rom_data,
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
 ]
 #!/usr/bin/env python3
 """
@@ -13,22 +15,17 @@ Test decompression at a known sprite offset.
 """
 
 import os
-import sys
 
-# Add the parent directory to the path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 from core.di_container import inject
-from core.managers import initialize_managers
 from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 
 def test_decompression():
     """Test if decompression works at a known sprite offset."""
 
-    # Initialize managers
-    print("Initializing managers...")
-    initialize_managers()
+    # Managers initialized by session_managers fixture
     extraction_manager = inject(ExtractionManagerProtocol)
     rom_extractor = extraction_manager.get_rom_extractor()
 

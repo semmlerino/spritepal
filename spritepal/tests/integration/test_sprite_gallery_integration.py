@@ -19,6 +19,11 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
+pytestmark = [
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+]
+
 
 @pytest.fixture
 def real_factory(tmp_path):

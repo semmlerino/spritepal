@@ -28,7 +28,7 @@ from utils.constants import DEFAULT_SCAN_STEP
 logger = logging.getLogger(__name__)
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Parallel finder tests create thread pools that take time to clean up
+    pytest.mark.skip_thread_cleanup(reason="Parallel finder tests create thread pools that take time to clean up"),
     pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
     pytest.mark.serial,
     pytest.mark.thread_safety,

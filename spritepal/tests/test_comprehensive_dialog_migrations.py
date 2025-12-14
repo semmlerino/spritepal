@@ -27,6 +27,8 @@ from ui.row_arrangement_dialog import RowArrangementDialog
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.dialog,
     pytest.mark.file_io,
     pytest.mark.headless,
@@ -39,11 +41,10 @@ pytestmark = [
 ]
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestComprehensiveDialogMigrations:
     """Test all migrated dialogs work together correctly.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses session_managers via pytestmark - no local setup needed.
     """
 
     @pytest.fixture
@@ -426,11 +427,10 @@ class TestComprehensiveDialogMigrations:
                     pass
 
 # Manager Context Integration Tests
-@pytest.mark.usefixtures("class_managers")
 class TestManagerContextIntegration:
     """Test manager context integration with dialog migrations.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses session_managers via pytestmark - no local setup needed.
     """
 
     @pytest.fixture

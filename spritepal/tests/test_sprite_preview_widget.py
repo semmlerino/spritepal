@@ -31,6 +31,8 @@ pytestmark = [
     pytest.mark.qt_real,
     pytest.mark.requires_display,
     pytest.mark.rom_data,
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
 ]
 
 # Note: Uses shared class_managers fixture - no local setup_managers needed

@@ -269,8 +269,11 @@ class TestHALToolDetectionRegression(unittest.TestCase):
             finally:
                 # Clean up managers to prevent interference with other tests
                 # This test class has no_manager_setup marker, so other tests expect no managers
+                # BUT: Don't cleanup if session_managers is active - it owns the lifecycle
                 try:
-                    cleanup_managers()
+                    from tests.fixtures.core_fixtures import is_session_managers_active
+                    if not is_session_managers_active():
+                        cleanup_managers()
                 except Exception:
                     pass  # Ignore cleanup errors
 

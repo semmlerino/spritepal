@@ -8,8 +8,7 @@ from pathlib import Path
 
 import pytest
 
-# Add parent directories to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 from core.palette_manager import PaletteManager
 from utils.constants import (

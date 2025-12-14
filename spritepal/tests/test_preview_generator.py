@@ -27,7 +27,7 @@ from core.services.preview_generator import (
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Preview workers may not clean up within fixture timeout
+    pytest.mark.skip_thread_cleanup(reason="Preview workers may not clean up within fixture timeout"),
     pytest.mark.benchmark,
     pytest.mark.headless,
     pytest.mark.performance,
@@ -40,6 +40,7 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.signals_slots,
     pytest.mark.slow,
+    pytest.mark.usefixtures("session_managers"),  # DI system initialization
 ]
 class TestLRUCache:
     """Test the LRU cache implementation."""

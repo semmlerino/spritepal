@@ -12,8 +12,8 @@ from __future__ import annotations
 import concurrent.futures
 import os
 
-# Import with proper path
-import sys
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 import threading
 import time
 from unittest.mock import MagicMock, patch
@@ -22,16 +22,15 @@ import pytest
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Preview workers may not clean up within fixture timeout
+    pytest.mark.skip_thread_cleanup(reason="Preview workers may not clean up within fixture timeout"),
     pytest.mark.serial,
     pytest.mark.thread_safety,
     pytest.mark.cache,
     pytest.mark.ci_safe,
     pytest.mark.headless,
     pytest.mark.worker_threads,
+    pytest.mark.usefixtures("session_managers"),  # DI system initialization
 ]
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.services.preview_generator import (
     PreviewGenerator,

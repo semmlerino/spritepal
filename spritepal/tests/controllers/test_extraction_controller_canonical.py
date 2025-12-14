@@ -24,8 +24,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from PySide6.QtTest import QSignalSpy
 
-# Add parent directories to path for module imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 import core.controller
 from core.controller import ExtractionController
@@ -58,9 +57,23 @@ def get_main_window_mock_spec():
 # ============================================================================
 
 class DummyWorker:
-    """Reusable dummy worker for cleanup testing - prevents duplication"""
+    """Reusable dummy worker for cleanup testing - prevents duplication.
+
+    Must implement all methods that WorkerManager.cleanup_worker() expects:
+    - isRunning(): Return False to indicate worker is not running
+    - isFinished(): Return True to indicate worker has finished
+    - wait(timeout=None): No-op, return True for immediate success
+    - deleteLater(): No-op for cleanup scheduling
+    """
     def isRunning(self) -> bool:
         return False
+
+    def isFinished(self) -> bool:
+        return True
+
+    def wait(self, timeout: int = 0) -> bool:  # noqa: ARG002
+        """Simulate successful wait."""
+        return True
 
     def deleteLater(self) -> None:
         pass

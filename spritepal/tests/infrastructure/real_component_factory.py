@@ -44,7 +44,7 @@ from __future__ import annotations
 import tempfile
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 
 from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QApplication, QWidget
@@ -99,10 +99,14 @@ class RealComponentFactory:
     - Integration with DataRepository
     """
 
+    FAIL_ON_LEAKS: ClassVar[bool] = True
+
     def __init__(
         self,
         data_repository: DataRepository | None = None,
         settings_dir: Path | None = None,
+        *,
+        fail_on_leaks: bool | None = None,
     ):
         """
         Initialize the real component factory.
@@ -112,10 +116,15 @@ class RealComponentFactory:
             settings_dir: Optional directory for test settings files.
                          If not provided, a temp directory will be created
                          and cleaned up when cleanup() is called.
+            fail_on_leaks: If True, raise AssertionError on resource leaks.
+                          If False, emit warnings instead.
+                          If None, uses FAIL_ON_LEAKS class variable (default: True).
         """
         self._data_repo = data_repository or get_test_data_repository()
         self._temp_dirs: list[Path] = []
         self._created_components: list[QObject] = []
+        self._fail_on_leaks = fail_on_leaks if fail_on_leaks is not None else self.FAIL_ON_LEAKS
+        self._leaked_resources: list[str] = []
 
         # Set up isolated settings directory
         if settings_dir is not None:
@@ -639,7 +648,8 @@ class RealComponentFactory:
     def cleanup(self) -> None:
         """Clean up all created components and temporary files.
 
-        Note: Logs warnings instead of silently ignoring cleanup failures.
+        Note: By default raises AssertionError on resource leaks (fail_on_leaks=True).
+        Set fail_on_leaks=False to emit warnings instead.
         This helps identify resource leaks during test development.
         """
         # Step 1: Clean up all WorkerManager-registered workers FIRST
@@ -647,35 +657,22 @@ class RealComponentFactory:
         try:
             cleanup_count = WorkerManager.cleanup_all()
             if cleanup_count > 0:
-                warnings.warn(
-                    f"RealComponentFactory cleaned up {cleanup_count} worker thread(s)",
-                    ResourceWarning,
-                    stacklevel=2,
-                )
+                leak_msg = f"RealComponentFactory cleaned up {cleanup_count} worker thread(s)"
+                self._leaked_resources.append(leak_msg)
         except Exception as e:
-            warnings.warn(
-                f"WorkerManager.cleanup_all() failed: {e}",
-                ResourceWarning,
-                stacklevel=2,
-            )
+            leak_msg = f"WorkerManager.cleanup_all() failed: {e}"
+            self._leaked_resources.append(leak_msg)
 
-        # Step 2: Clean up ManagerRegistry (if initialized by this factory)
-        # This ensures all managers and their associated workers are stopped
-        try:
-            registry = ManagerRegistry()
-            if registry.is_initialized():
-                # Clean up all managers
-                registry.cleanup_managers()
-                # Note: Don't reset the singleton here - other tests may share it
-                # The test fixture cleanup_managers will handle final cleanup
-        except Exception as e:
-            warnings.warn(
-                f"ManagerRegistry cleanup failed: {e}",
-                ResourceWarning,
-                stacklevel=2,
-            )
+        # Step 2: Manager lifecycle is owned by test fixtures (session_managers,
+        # isolated_managers). RealComponentFactory MUST NOT call cleanup_managers()
+        # because:
+        # - session_managers: Managers persist for entire session
+        # - isolated_managers: Fixture handles cleanup after test
+        # - Neither: Test infrastructure expects consistent state
+        # Calling cleanup_managers() here would break fixture contracts and cause
+        # "Session managers were cleaned up mid-session" errors.
 
-        # Step 3: Clean up Qt components
+        # Step 2: Clean up Qt components
         for component in self._created_components:
             try:
                 if isinstance(component, QThread):
@@ -683,27 +680,21 @@ class RealComponentFactory:
                         component.quit()
                         # Increased timeout from 1s to 5s for CI environments
                         if not component.wait(5000):
-                            warnings.warn(
-                                f"Thread {component} did not terminate within 5 seconds",
-                                ResourceWarning,
-                                stacklevel=2,
-                            )
+                            leak_msg = f"Thread {component} did not terminate within 5 seconds"
+                            self._leaked_resources.append(leak_msg)
                             continue  # Skip deleteLater on still-running thread
                 elif isinstance(component, QWidget):
                     component.close()
 
                 component.deleteLater()
             except Exception as e:
-                # Log instead of silently ignoring - helps catch resource leaks
-                warnings.warn(
-                    f"Cleanup failed for {component}: {e}",
-                    ResourceWarning,
-                    stacklevel=2,
-                )
+                # Track cleanup failures as leaks
+                leak_msg = f"Cleanup failed for {component}: {e}"
+                self._leaked_resources.append(leak_msg)
 
         self._created_components.clear()
 
-        # Step 4: Process Qt events to allow deleteLater() calls to complete
+        # Step 3: Process Qt events to allow deleteLater() calls to complete
         # This ensures all QThread cleanup and signal disconnections are processed
         try:
             if QApplication.instance():
@@ -716,7 +707,7 @@ class RealComponentFactory:
                 stacklevel=2,
             )
 
-        # Step 5: Force garbage collection to clean up deleted workers
+        # Step 4: Force garbage collection to clean up deleted workers
         try:
             import gc
             gc.collect()
@@ -728,7 +719,7 @@ class RealComponentFactory:
                 stacklevel=2,
             )
 
-        # Step 6: Allow time for OS thread cleanup
+        # Step 5: Allow time for OS thread cleanup
         # Python's threading.active_count() may still see threads being destroyed
         try:
             import time
@@ -740,7 +731,7 @@ class RealComponentFactory:
                 stacklevel=2,
             )
 
-        # Step 7: Clean up temp directories
+        # Step 6: Clean up temp directories
         import shutil
         for temp_dir in self._temp_dirs:
             if temp_dir.exists():
@@ -749,13 +740,32 @@ class RealComponentFactory:
 
         self._temp_dirs.clear()
 
+        # Step 7: Final leak reporting
+        if self._leaked_resources:
+            if self._fail_on_leaks:
+                msg = "Resource leaks detected during cleanup:\n" + "\n".join(
+                    f"  - {leak}" for leak in self._leaked_resources
+                )
+                raise AssertionError(msg)
+            else:
+                for leak in self._leaked_resources:
+                    warnings.warn(leak, ResourceWarning, stacklevel=2)
+
     def __enter__(self) -> RealComponentFactory:
         """Context manager entry."""
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit with cleanup."""
-        self.cleanup()
+        try:
+            self.cleanup()
+        except AssertionError:
+            if exc_type is None:
+                # Test succeeded but cleanup found leaks - re-raise
+                raise
+            # Test already failed - log leaks as warnings instead
+            for leak in self._leaked_resources:
+                warnings.warn(leak, ResourceWarning, stacklevel=2)
 
 class TypedManagerFactory(Generic[M]):
     """

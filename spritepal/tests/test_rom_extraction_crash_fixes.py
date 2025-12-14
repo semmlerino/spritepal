@@ -17,6 +17,8 @@ from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
+    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.dialog,
     pytest.mark.file_io,
     pytest.mark.headless,
@@ -28,7 +30,6 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.qt_real,
     pytest.mark.signals_slots,
-    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
 ]
 
 class TestSignalLoopFixes:

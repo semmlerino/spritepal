@@ -21,10 +21,25 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.no_qt,
+    pytest.mark.no_manager_setup,  # This test manages its own manager lifecycle
+    pytest.mark.allows_registry_state,  # Intentionally modifies registry state
     pytest.mark.rom_data,
 ]
 class TestManagerLifecycle:
     """Debug tests for manager lifecycle issues."""
+
+    @pytest.fixture(autouse=True)
+    def skip_if_session_managers_active(self):
+        """Skip tests if session_managers is active.
+
+        These tests explicitly manage manager lifecycle (cleanup_managers, initialize_managers).
+        Running them while session_managers is active would break the session fixture's state.
+        """
+        from tests.fixtures.core_fixtures import is_session_managers_active
+
+        if is_session_managers_active():
+            pytest.skip("Skipping lifecycle test: session_managers is active")
+        yield
 
     def test_manager_direct_usage(self):
         """Test using manager directly without workers."""

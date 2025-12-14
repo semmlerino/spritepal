@@ -1,19 +1,20 @@
 {
   "session": {
-    "vram_path": "/test/vram.dmp",
-    "cgram_path": "/test/cgram.dmp",
+    "vram_path": "",
+    "cgram_path": "",
     "oam_path": "",
-    "output_name": "my_sprite",
+    "output_name": "",
     "create_grayscale": true,
     "create_metadata": true,
     "last_rom_path": "",
     "last_vram_path": "",
     "last_output_dir": "",
-    "recent_files": []
+    "recent_files": [],
+    "extraction_mode": 0
   },
   "ui": {
-    "window_width": 1024,
-    "window_height": 768,
+    "window_width": 1000,
+    "window_height": 650,
     "window_x": 0,
     "window_y": 0,
     "restore_position": false,
@@ -92,7 +93,11 @@
     "use_composed_dialogs": true
   },
   "workflow": {
-    "current_injection_params": null
+    "current_injection_params": {
+      "sprite_path": "/test/output.png",
+      "mode": "vram",
+      "target_path": "/test/target.vram"
+    }
   },
   "custom": {
     "last_export_dir": "/exports"

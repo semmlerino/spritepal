@@ -36,6 +36,7 @@ from PySide6.QtCore import (
 if TYPE_CHECKING:
     from utils.rom_cache import ROMCache
 
+from core.services.worker_lifecycle import WorkerManager
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -208,8 +209,9 @@ class AsyncROMCache(QObject):
         self._memory_cache: dict[str, tuple[bytes, dict[str, Any], float]] = {}
         self._memory_cache_max = 10
 
-        # Start worker thread
+        # Start worker thread and register with WorkerManager for proper cleanup tracking
         self._worker_thread.start()
+        WorkerManager._register_worker(self._worker_thread)
 
         logger.info(f"AsyncROMCache initialized with directory: {self.cache_dir}")
 
@@ -391,23 +393,11 @@ class AsyncROMCache(QObject):
                 # Queue or mutex may already be deleted
                 pass
 
-            # Stop thread with adequate timeout
+            # Stop thread with WorkerManager for proper cleanup and registry removal
+            # This uses safe cancellation patterns (no terminate()) and removes from registry
             if hasattr(self, "_worker_thread") and self._worker_thread is not None:
                 try:
-                    if self._worker_thread.isRunning():
-                        # Signal event loop to quit
-                        self._worker_thread.quit()
-
-                        # Wait for thread to finish gracefully
-                        if not self._worker_thread.wait(timeout):
-                            logger.warning(
-                                f"AsyncROMCache worker thread did not stop within {timeout}ms, "
-                                "terminating forcefully"
-                            )
-                            # Force terminate as last resort to prevent thread leak
-                            self._worker_thread.terminate()
-                            # Give terminate a moment to complete
-                            self._worker_thread.wait(1000)
+                    WorkerManager.cleanup_worker(self._worker_thread, timeout=timeout)
                 except RuntimeError:
                     # QThread may have been deleted already
                     pass

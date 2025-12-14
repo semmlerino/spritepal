@@ -9,11 +9,9 @@ feature flag system and test patterns. It can run without Qt to show the
 testing approach.
 """
 
-import sys
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parents[5]))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 def demo_feature_flag_system():
     """Demonstrate the feature flag system."""

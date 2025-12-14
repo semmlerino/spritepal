@@ -23,7 +23,7 @@ from utils.thread_safe_singleton import (
 )
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Thread tests may intentionally leave threads running
+    pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.thread_safety,

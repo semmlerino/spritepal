@@ -45,6 +45,7 @@ pytestmark = [
     # NOTE: Removed requires_display - redundant with gui marker
     pytest.mark.signals_slots,
     pytest.mark.slow,
+    pytest.mark.no_manager_setup,  # Uses isolated_managers, skip session_managers
 ]
 
 # Import real testing infrastructure

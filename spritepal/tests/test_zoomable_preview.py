@@ -12,7 +12,8 @@ from PIL import Image
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent, QPixmap
 
-# Add parent directories to path
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.file_io,
@@ -23,8 +24,6 @@ pytestmark = [
     pytest.mark.widget,
     pytest.mark.ci_safe,
 ]
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from ui.zoomable_preview import PreviewPanel, ZoomablePreviewWidget
 

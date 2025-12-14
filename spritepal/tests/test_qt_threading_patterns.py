@@ -33,7 +33,8 @@ from core.workers.base import BaseWorker, handle_worker_errors
 from ui.common import WorkerManager
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Thread tests may intentionally leave threads running
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.thread_safety,
@@ -86,18 +87,6 @@ class TestQThreadPatterns:
         if app is None:
             app = QApplication([])
         yield app
-
-    @pytest.fixture(autouse=True)
-    def cleanup_managers(self):
-        """Ensure managers are cleaned up after each test"""
-        yield
-        # Clean up any managers created during test
-        try:
-            from core.managers.registry import _registry
-            if _registry:
-                _registry.cleanup_managers()
-        except Exception:
-            pass
 
     @pytest.fixture
     def thread_capture(self):

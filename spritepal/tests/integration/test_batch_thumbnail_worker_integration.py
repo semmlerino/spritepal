@@ -48,7 +48,7 @@ from ui.workers.batch_thumbnail_worker import BatchThumbnailWorker
 configure_qt_for_environment()
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Integration tests involve managers that spawn threads
+    pytest.mark.skip_thread_cleanup(reason="Integration tests involve managers that spawn threads"),
 ]
 
 class WorkerThreadWrapper:

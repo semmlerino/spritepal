@@ -6,9 +6,12 @@ This document provides comprehensive guidance on using the systematic pytest mar
 
 The marker system organizes tests into clear categories that allow for:
 - **Environment-aware execution**: Run only tests compatible with your environment
-- **Performance optimization**: Skip slow tests during development  
+- **Performance optimization**: Skip slow tests during development
 - **Parallel execution control**: Safely run tests in parallel or force serial execution
 - **Development workflow enhancement**: Focus on specific test types during development
+
+> **Note**: Parallel test execution (`-n auto`) requires `pytest-xdist`, which is not installed by default.
+> To enable: `uv add pytest-xdist --dev`. Commands in this guide show serial execution by default.
 
 ## Quick Usage Examples
 
@@ -21,8 +24,8 @@ pytest -m 'headless and not slow'
 # Unit tests only - fastest possible execution
 pytest -m 'unit'
 
-# Integration tests with parallel execution
-pytest -m 'integration and parallel_safe' -n auto
+# Integration tests (add -n auto if pytest-xdist is installed)
+pytest -m 'integration and parallel_safe'
 
 # All GUI tests (requires display)
 pytest -m 'gui'
@@ -134,8 +137,8 @@ pytest -m 'signals_slots or timer'
 
 #### Usage:
 ```bash
-# Safe parallel execution
-pytest -m 'parallel_safe' -n auto
+# Tests safe for parallel execution (add -n auto if pytest-xdist is installed)
+pytest -m 'parallel_safe'
 
 # Force serial execution
 pytest -m 'serial'
@@ -203,8 +206,8 @@ pytest -m 'gui or qt_real' --tb=short
 
 #### Parallel Execution Strategy
 ```bash
-# Maximum parallel efficiency
-pytest -m 'parallel_safe and not slow' -n auto
+# Maximum parallel efficiency (requires pytest-xdist: uv add pytest-xdist --dev)
+pytest -m 'parallel_safe and not slow'  # Add -n auto if xdist installed
 
 # Followed by serial tests
 pytest -m 'serial or singleton'
@@ -298,7 +301,7 @@ pytest -m 'not (rom_data or file_io)'
 
 ### 4. Performance Optimization
 - Regular developers: `pytest -m 'not slow'` for quick feedback
-- Integration testing: `pytest -m 'parallel_safe' -n auto` for speed
+- Integration testing: `pytest -m 'parallel_safe'` (add `-n auto` if pytest-xdist installed)
 - Full validation: Run complete suite in CI, not locally
 
 ## Troubleshooting
@@ -373,8 +376,8 @@ Monitor test execution times and adjust markers accordingly:
 # Profile slow tests
 pytest --durations=10 -m 'slow'
 
-# Validate parallel safety
-pytest -m 'parallel_safe' -n auto --tb=short
+# Validate parallel safety (add -n auto if pytest-xdist installed)
+pytest -m 'parallel_safe' --tb=short
 ```
 
 This comprehensive marker system enables precise control over test execution, improving both development productivity and CI reliability while maintaining comprehensive test coverage across different environments.

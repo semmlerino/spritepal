@@ -53,12 +53,10 @@ pytestmark = [
     pytest.mark.signals_slots,
 ]
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
-# Import real UI components (not mocks\!)
+# Import real UI components (not mocks!)
 from core.di_container import inject
-from core.managers.registry import cleanup_managers, initialize_managers
 from core.protocols.manager_protocols import (
     ROMCacheProtocol,
     SessionManagerProtocol,
@@ -85,11 +83,9 @@ class TestCompleteUIWorkflowsIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_environment(self, qtbot):
+    def setup_test_environment(self, qtbot, isolated_managers):
         """Set up test environment for each workflow test."""
-        # Ensure clean manager state
-        cleanup_managers()
-        initialize_managers("SpritePal-UITest")
+        # Managers already initialized by isolated_managers fixture
 
         # Create temporary directory for test files
         self.temp_dir = tempfile.mkdtemp()
@@ -97,8 +93,7 @@ class TestCompleteUIWorkflowsIntegration:
 
         yield
 
-        # Cleanup
-        cleanup_managers()
+        # Cleanup temp directory (manager cleanup handled by fixture)
         if hasattr(self, 'temp_dir'):
             import shutil
             shutil.rmtree(self.temp_dir, ignore_errors=True)

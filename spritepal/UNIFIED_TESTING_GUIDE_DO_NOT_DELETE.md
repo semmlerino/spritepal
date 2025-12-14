@@ -901,11 +901,10 @@ def test_dialog(qtbot, monkeypatch):
 ```
 
 #### 2. Use pytest-timeout to Prevent Hanging Tests
-```ini
-# pytest.ini
-addopts = 
-    --timeout=30
-    --timeout-method=thread
+```toml
+# In pyproject.toml [tool.pytest.ini_options]:
+timeout = 30
+timeout_method = "thread"
 ```
 
 #### 3. Set QT_QPA_PLATFORM=offscreen (RECOMMENDED)

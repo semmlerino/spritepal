@@ -11,14 +11,19 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = [
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Manager tests may spawn worker threads")
+]
+
 
 @pytest.fixture
-def vram_test_data(temp_dir: Path) -> Path:
+def vram_test_data(tmp_path: Path) -> Path:
     """Create a valid VRAM dump file for testing.
 
     Creates a 64KB VRAM file with recognizable 4bpp tile patterns.
     """
-    vram_path = temp_dir / "test_vram.bin"
+    vram_path = tmp_path / "test_vram.bin"
 
     # Create 64KB VRAM dump
     vram_size = 65536  # 64KB standard VRAM size
@@ -45,7 +50,7 @@ class TestCoreOperationsManagerVRAMExtraction:
 
     def test_extract_from_vram_returns_success(
         self,
-        temp_dir: Path,
+        tmp_path: Path,
         vram_test_data: Path,
         managers_initialized,
     ) -> None:
@@ -59,7 +64,7 @@ class TestCoreOperationsManagerVRAMExtraction:
 
         manager = CoreOperationsManager()
 
-        output_base = str(temp_dir / "output")
+        output_base = str(tmp_path / "output")
 
         result = manager.extract_from_vram(
             vram_path=str(vram_test_data),
@@ -75,7 +80,7 @@ class TestCoreOperationsManagerVRAMExtraction:
 
     def test_extract_from_vram_creates_output_file(
         self,
-        temp_dir: Path,
+        tmp_path: Path,
         vram_test_data: Path,
         managers_initialized,
     ) -> None:
@@ -84,7 +89,7 @@ class TestCoreOperationsManagerVRAMExtraction:
 
         manager = CoreOperationsManager()
 
-        output_base = str(temp_dir / "extraction_output")
+        output_base = str(tmp_path / "extraction_output")
 
         result = manager.extract_from_vram(
             vram_path=str(vram_test_data),
@@ -100,7 +105,7 @@ class TestCoreOperationsManagerVRAMExtraction:
 
     def test_extract_from_vram_with_offset(
         self,
-        temp_dir: Path,
+        tmp_path: Path,
         vram_test_data: Path,
         managers_initialized,
     ) -> None:
@@ -109,7 +114,7 @@ class TestCoreOperationsManagerVRAMExtraction:
 
         manager = CoreOperationsManager()
 
-        output_base = str(temp_dir / "offset_output")
+        output_base = str(tmp_path / "offset_output")
 
         result = manager.extract_from_vram(
             vram_path=str(vram_test_data),
@@ -123,7 +128,7 @@ class TestCoreOperationsManagerVRAMExtraction:
 
     def test_extract_from_vram_optional_params_stored(
         self,
-        temp_dir: Path,
+        tmp_path: Path,
         vram_test_data: Path,
         managers_initialized,
     ) -> None:
@@ -132,11 +137,11 @@ class TestCoreOperationsManagerVRAMExtraction:
 
         manager = CoreOperationsManager()
 
-        output_base = str(temp_dir / "params_output")
+        output_base = str(tmp_path / "params_output")
 
         # Create dummy cgram/oam files
-        cgram_path = temp_dir / "test.cgram"
-        oam_path = temp_dir / "test.oam"
+        cgram_path = tmp_path / "test.cgram"
+        oam_path = tmp_path / "test.oam"
         cgram_path.write_bytes(b"\x00" * 512)
         oam_path.write_bytes(b"\x00" * 544)
 
@@ -166,14 +171,14 @@ class TestSpriteExtractorExtractSprite:
 
     def test_extract_sprite_returns_dict(
         self,
-        temp_dir: Path,
+        tmp_path: Path,
         vram_test_data: Path,
     ) -> None:
         """Verify extract_sprite returns a dict with expected keys."""
         from core.extractor import SpriteExtractor
 
         extractor = SpriteExtractor()
-        output_base = str(temp_dir / "sprite_output")
+        output_base = str(tmp_path / "sprite_output")
 
         result = extractor.extract_sprite(
             vram_path=str(vram_test_data),
@@ -188,14 +193,14 @@ class TestSpriteExtractorExtractSprite:
 
     def test_extract_sprite_signature_matches_caller(
         self,
-        temp_dir: Path,
+        tmp_path: Path,
         vram_test_data: Path,
     ) -> None:
         """Verify extract_sprite accepts all parameters CoreOperationsManager passes."""
         from core.extractor import SpriteExtractor
 
         extractor = SpriteExtractor()
-        output_base = str(temp_dir / "sig_test")
+        output_base = str(tmp_path / "sig_test")
 
         # Call with all parameters that CoreOperationsManager passes
         result = extractor.extract_sprite(

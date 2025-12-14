@@ -7,14 +7,13 @@ implements batch saving functionality, and integrates correctly with the memory 
 from __future__ import annotations
 
 # Import test dependencies
-import sys
 import weakref
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 # Mark all tests in this module to skip manager setup
 pytestmark = pytest.mark.no_manager_setup

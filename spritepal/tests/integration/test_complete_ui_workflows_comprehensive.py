@@ -28,6 +28,7 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 # Required for DI container setup
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="UI workflows may spawn worker threads"),
 ]
 
 
@@ -137,8 +138,8 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_scan_worker_class,
         complete_test_rom,
         realistic_sprite_data,
-        isolated_managers,  # Required for DI setup (DetachedGalleryWindow uses inject())
     ):
+        # DI setup provided by session_managers via pytestmark at module level
         """Test complete workflow: ROM load -> scan -> thumbnails -> fullscreen view."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
 

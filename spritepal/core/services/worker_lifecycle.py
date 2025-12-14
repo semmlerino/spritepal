@@ -397,24 +397,43 @@ class WorkerManager:
         # Clean up all workers (both running and stopped)
         cleanup_count = 0
         for worker in workers_to_cleanup:
-            if worker.isRunning():
-                logger.debug(f"cleanup_all: Cleaning up running worker {worker.__class__.__name__}")
-                cleanup_count += 1
-            else:
-                logger.debug(f"cleanup_all: Cleaning up stopped worker {worker.__class__.__name__}")
-
-            # Always call cleanup_worker to ensure proper shutdown sequence
-            # This handles both running and stopped workers consistently
-            WorkerManager.cleanup_worker(worker, timeout=timeout)
-
-            # Additional explicit cleanup to help with thread counting
-            # Disconnect all signals to break reference cycles
+            # Check if Qt object is still valid before accessing it
+            # This prevents "Internal C++ object already deleted" errors
             try:
-                worker.blockSignals(True)
-                # Try to set parent to None to help with cleanup
-                worker.setParent(None)
-            except Exception as e:
-                logger.debug(f"Error during final cleanup of {worker.__class__.__name__}: {e}")
+                from shiboken6 import isValid
+                if not isValid(worker):
+                    worker_name = getattr(worker, '__class__', type(worker)).__name__
+                    logger.debug(f"cleanup_all: Skipping already-deleted worker {worker_name}")
+                    continue
+            except (ImportError, RuntimeError):
+                # shiboken6 not available or worker already invalid - proceed with caution
+                pass
+
+            try:
+                if worker.isRunning():
+                    logger.debug(f"cleanup_all: Cleaning up running worker {worker.__class__.__name__}")
+                    cleanup_count += 1
+                else:
+                    logger.debug(f"cleanup_all: Cleaning up stopped worker {worker.__class__.__name__}")
+
+                # Always call cleanup_worker to ensure proper shutdown sequence
+                # This handles both running and stopped workers consistently
+                WorkerManager.cleanup_worker(worker, timeout=timeout)
+
+                # Additional explicit cleanup to help with thread counting
+                # Disconnect all signals to break reference cycles
+                try:
+                    worker.blockSignals(True)
+                    # Try to set parent to None to help with cleanup
+                    worker.setParent(None)
+                except Exception as e:
+                    logger.debug(f"Error during final cleanup of {worker.__class__.__name__}: {e}")
+            except RuntimeError as e:
+                # Qt object was deleted between isValid check and method call
+                if "Internal C++ object" in str(e) and "already deleted" in str(e):
+                    logger.debug(f"cleanup_all: Worker was deleted during cleanup: {e}")
+                else:
+                    raise
 
         # Clear the registry after cleanup (cleanup_worker removes workers individually,
         # but this ensures the registry is fully cleared)
@@ -460,3 +479,60 @@ class WorkerManager:
             logger.debug("cleanup_all: No workers needed cleanup")
 
         return cleanup_count
+
+    @staticmethod
+    def get_active_worker_count() -> int:
+        """Get the number of currently registered workers.
+
+        Returns:
+            int: Number of workers in the registry (may be running or stopped)
+        """
+        return len(WorkerManager._worker_registry)
+
+    @staticmethod
+    def get_running_worker_count() -> int:
+        """Get the number of currently running workers.
+
+        Returns:
+            int: Number of workers that are currently running
+        """
+        return sum(1 for w in WorkerManager._worker_registry if w.isRunning())
+
+    @staticmethod
+    def get_active_worker_names() -> list[str]:
+        """Get names of all registered workers for debugging.
+
+        Returns:
+            list[str]: List of worker class names and their running status
+        """
+        return [
+            f"{w.__class__.__name__} (running={w.isRunning()})"
+            for w in WorkerManager._worker_registry
+        ]
+
+    @staticmethod
+    def assert_no_active_workers(message: str = "") -> None:
+        """Assert that no workers are registered (for test cleanup verification).
+
+        This method should be called at the end of tests to verify all workers
+        have been properly cleaned up. It fails with detailed information
+        about any remaining workers.
+
+        Args:
+            message: Optional context message to include in failure
+
+        Raises:
+            AssertionError: If any workers are still registered
+        """
+        count = WorkerManager.get_active_worker_count()
+        if count > 0:
+            worker_info = WorkerManager.get_active_worker_names()
+            msg_parts = [
+                f"Expected 0 active workers, but found {count}:",
+                *[f"  - {info}" for info in worker_info],
+            ]
+            if message:
+                msg_parts.insert(0, message)
+            msg_parts.append("")
+            msg_parts.append("Hint: Ensure WorkerManager.cleanup_all() was called.")
+            raise AssertionError("\n".join(msg_parts))

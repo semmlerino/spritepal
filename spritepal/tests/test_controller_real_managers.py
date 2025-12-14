@@ -164,8 +164,11 @@ class TestRealManagerBenefits:
     """Demonstrate benefits of using real managers in tests."""
 
     @pytest.fixture(autouse=True)
-    def setup_di_container(self, isolated_managers):
-        """Ensure DI container is set up for manager creation."""
+    def setup_di_container(self, setup_managers):
+        """Ensure DI container is set up for manager creation.
+
+        Uses setup_managers which respects session_managers if active.
+        """
         yield
 
     def test_catches_real_validation_bugs(self):

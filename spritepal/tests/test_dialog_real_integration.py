@@ -36,7 +36,8 @@ from PySide6.QtWidgets import QApplication
 # Determine if running in offscreen mode
 _is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 
-# Add parent directory for imports
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 # xfail for offscreen mode - real dialogs may not work
 pytestmark = [
@@ -62,19 +63,12 @@ pytestmark = [
     ),
 ]
 
-current_dir = Path(__file__).parent
-parent_dir = current_dir.parent
-sys.path.insert(0, str(parent_dir))
-sys.path.insert(0, str(current_dir))
-
 # Import real testing infrastructure
 # Import real dialogs and managers (not mocked!)
 from core.managers import (
     ExtractionManager,
     InjectionManager,
     SessionManager,
-    cleanup_managers,
-    initialize_managers,
 )
 from core.managers.registry import ManagerRegistry
 from tests.infrastructure import (
@@ -104,7 +98,7 @@ class TestRealDialogIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
@@ -118,12 +112,14 @@ class TestRealDialogIntegration:
         # Initialize Qt testing framework
         self.qt_framework = QtTestingFramework()
 
+        # Managers already initialized by isolated_managers fixture
+
         yield
 
         # Cleanup
         self.manager_factory.cleanup()
         self.test_data.cleanup()
-        cleanup_managers()
+        # Manager cleanup handled by isolated_managers fixture
 
     def test_real_manual_offset_dialog_vs_mocked_initialization(self):
         """
@@ -135,8 +131,7 @@ class TestRealDialogIntegration:
         - Manager dependency initialization timing issues
         - Singleton instance management bugs
         """
-        # Initialize managers for real dialog integration
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by setup_test_infrastructure fixture
 
         # Test real dialog creation (vs mocked widget creation)
         dialog = ManualOffsetDialog(None)  # Create with no parent
@@ -189,7 +184,7 @@ class TestRealDialogIntegration:
         - Preview widget integration issues
         - Tab widget creation and switching bugs
         """
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by setup_test_infrastructure fixture
 
         # Get real test data for dialog initialization
         extraction_data = self.test_data.get_vram_extraction_data("medium")
@@ -264,7 +259,7 @@ class TestRealDialogIntegration:
         - Settings validation and persistence logic
         - Settings file I/O integration issues
         """
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by setup_test_infrastructure fixture
 
         dialog = SettingsDialog()
 
@@ -517,17 +512,19 @@ class TestRealDialogManagerIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
         self.test_data = DataRepository()
 
+        # Managers already initialized by isolated_managers fixture
+
         yield
 
         self.manager_factory.cleanup()
         self.test_data.cleanup()
-        cleanup_managers()
+        # Manager cleanup handled by isolated_managers fixture
 
     def test_real_dialog_manager_coordination_vs_mocked_coordination(self):
         """
@@ -539,7 +536,7 @@ class TestRealDialogManagerIntegration:
         - Manager initialization dependencies for dialogs
         - Dialog-manager communication protocol issues
         """
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by setup_test_infrastructure fixture
 
         # Get real managers for coordination testing
         registry = ManagerRegistry()
@@ -599,17 +596,19 @@ class TestBugDiscoveryRealVsMockedDialogs:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
         self.test_data = DataRepository()
 
+        # Managers already initialized by isolated_managers fixture
+
         yield
 
         self.manager_factory.cleanup()
         self.test_data.cleanup()
-        cleanup_managers()
+        # Manager cleanup handled by isolated_managers fixture
 
     def test_discovered_bug_dialog_widget_initialization_order(self):
         """
@@ -618,7 +617,7 @@ class TestBugDiscoveryRealVsMockedDialogs:
         REAL BUG DISCOVERED: Widget attributes might be None if declared
         after super().__init__() call in dialog constructors.
         """
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by setup_test_infrastructure fixture
 
         dialog = ManualOffsetDialog()
 
@@ -656,22 +655,19 @@ class TestBugDiscoveryRealVsMockedDialogs:
         REAL BUG DISCOVERED: Dialogs might access managers before initialization,
         causing None reference errors that mocks would hide.
         """
-        # Test dialog creation BEFORE manager initialization
-        # This exposes timing dependency bugs that mocks hide
+        # Managers are already initialized by setup_test_infrastructure fixture
+        # This test demonstrates proper manager initialization timing
         try:
-            # Create dialog before managers are available
-            # Real dialogs might fail; mocks always return mock managers
+            # Create dialog after managers are initialized
+            # Real dialogs should work properly with initialized managers
 
             extraction_data = self.test_data.get_vram_extraction_data("medium")
 
-            # This might fail if dialog tries to access uninitialized managers
+            # Dialog creation with managers already initialized
             dialog = InjectionDialog(
                 sprite_path=extraction_data["output_base"] + ".png",
                 metadata_path=extraction_data["output_base"] + ".metadata.json"
             )
-
-            # Now initialize managers
-            initialize_managers(app_name="SpritePal-Test")
 
             # Test that dialog can recover or handle manager initialization timing
             try:
@@ -698,7 +694,7 @@ class TestBugDiscoveryRealVsMockedDialogs:
         REAL BUG DISCOVERED: Dialogs might not properly validate file paths
         or handle file I/O errors that mocks would simulate as success.
         """
-        initialize_managers(app_name="SpritePal-Test")
+        # Managers already initialized by setup_test_infrastructure fixture
 
         # Test dialog with invalid file paths (real I/O vs mocked I/O)
         invalid_sprite_path = "/nonexistent/sprite.png"

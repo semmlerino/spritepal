@@ -42,12 +42,12 @@ A comprehensive environment detection system has been implemented for the Sprite
 - Comprehensive skip reason reporting
 - Environment report display in verbose mode
 
-**File:** `pytest.ini`
+**File:** `pyproject.toml` (under `[tool.pytest.ini_options]`) and `tests/conftest.py`
 
-**Additions:**
-- Environment-specific markers
+**Key configurations:**
+- Environment-specific markers (pyproject.toml)
+- Qt offscreen mode setup (tests/conftest.py line 56: `os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')`)
 - Configuration profiles for different execution contexts
-- Usage examples and best practices
 
 ### 4. Environment Reporting
 

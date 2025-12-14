@@ -64,11 +64,11 @@ def test_bad(qtbot):
 pytest --timeout=10  # 10 seconds per test
 ```
 
-**In pytest.ini:**
-```ini
+**In pyproject.toml:**
+```toml
 [tool.pytest.ini_options]
 timeout = 10
-timeout_method = signal  # or 'thread'
+timeout_method = "signal"  # or "thread"
 ```
 
 **Programmatic:**

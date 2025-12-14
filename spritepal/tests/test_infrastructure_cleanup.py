@@ -18,7 +18,8 @@ from pathlib import Path
 
 import pytest
 
-# Add parent directory for imports
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.dialog,
@@ -32,8 +33,6 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.integration,
 ]
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 class InfrastructureAnalyzer:
     """Analyzes and reports on test infrastructure issues."""

@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-# Add parent directories to path
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.file_io,
@@ -20,8 +21,6 @@ pytestmark = [
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
 ]
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from core.palette_manager import PaletteManager
 from utils.constants import SPRITE_PALETTE_END, SPRITE_PALETTE_START

@@ -11,9 +11,12 @@ from pathlib import Path
 
 import pytest
 
-# Add parent directories to path
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.benchmark,
     pytest.mark.file_io,
     pytest.mark.headless,
@@ -27,8 +30,6 @@ pytestmark = [
     pytest.mark.signals_slots,
     pytest.mark.slow,
 ]
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from tests.fixtures.test_preview_helper import (
     ControllerHelper,

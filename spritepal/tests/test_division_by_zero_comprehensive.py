@@ -6,22 +6,23 @@ Comprehensive tests for division by zero prevention in all scan workers.
 Tests all identified division operations to ensure they handle zero cases.
 """
 
-# Add parent directory to path for imports
-import sys
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
+
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 class TestDivisionByZeroFixes:
     """Test all division by zero scenarios in scan workers."""
 
     @pytest.fixture(autouse=True)
-    def setup_managers(self, isolated_managers):
-        """Ensure DI container is initialized for tests that create workers."""
+    def init_managers(self, setup_managers):
+        """Ensure DI container is initialized for tests that create workers.
+
+        Uses setup_managers which respects session_managers if active.
+        """
         yield
 
     def test_scan_worker_zero_range(self):

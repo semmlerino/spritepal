@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 TestDataDict: TypeAlias = dict[str, Any]
 ParameterSet: TypeAlias = tuple[Any, ...]
 
+
 class TestComprehensiveTypingExample:
     """Demonstrate comprehensive typing patterns in test classes."""
 

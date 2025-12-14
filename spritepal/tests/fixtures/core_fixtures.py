@@ -210,20 +210,32 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
     from core.managers.registry import ManagerRegistry
 
     test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
+    has_no_manager_setup = request.node.get_closest_marker("no_manager_setup") is not None
 
     # Isolation guard: fail if registry already initialized (indicates pollution)
-    # IMPORTANT: If session_managers is active, we MUST NOT clean it up - fail immediately
+    # EXCEPTION: If test has no_manager_setup marker, it opted out of session_managers
+    # and we should clean up and provide fresh isolated managers
     registry = ManagerRegistry()
     if registry.is_initialized():
         if _session_state.is_initialized:
-            # Session managers are active - this test is incorrectly using isolated_managers
-            # when it should use session_managers or no manager fixture at all
-            pytest.fail(
-                f"Test '{test_name}': isolated_managers fixture cannot be used when "
-                "session_managers is active. Either:\n"
-                "  1. Remove isolated_managers and use session_managers instead, or\n"
-                "  2. Add @pytest.mark.no_manager_setup to skip session_managers for this test"
-            )
+            if has_no_manager_setup:
+                # Test opted out of session_managers - clean up and provide fresh state
+                # This is the intended use case: test wants isolated managers regardless
+                # of session state
+                try:
+                    cleanup_managers()
+                    ManagerRegistry.reset_for_tests()
+                except Exception:
+                    pass
+            else:
+                # Session managers are active - this test is incorrectly using isolated_managers
+                # when it should use session_managers or no manager fixture at all
+                pytest.fail(
+                    f"Test '{test_name}': isolated_managers fixture cannot be used when "
+                    "session_managers is active. Either:\n"
+                    "  1. Remove isolated_managers and use session_managers instead, or\n"
+                    "  2. Add @pytest.mark.no_manager_setup to skip session_managers for this test"
+                )
         else:
             # Registry initialized without session - likely test pollution
             # Try to clean up

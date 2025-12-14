@@ -90,6 +90,9 @@ class InjectionDialog(TabbedDialog):
         # Background workers for async operations
         self._rom_info_loader: ROMInfoLoaderWorker | None = None
 
+        # Guard flag to prevent signal callbacks on closing/deleted dialog
+        self._is_closing: bool = False
+
         # Pending offset to restore after async ROM info load completes
         # This fixes a race condition where combo matching was attempted
         # before the combo was populated by the background worker
@@ -684,6 +687,9 @@ class InjectionDialog(TabbedDialog):
 
     def _on_rom_info_loaded(self, rom_info: dict[str, Any]) -> None:
         """Handle ROM info loaded from background worker."""
+        # Guard: skip if dialog is closing to prevent crash on deleted widget
+        if self._is_closing:
+            return
         if not rom_info:
             return
 
@@ -761,6 +767,9 @@ class InjectionDialog(TabbedDialog):
 
     def _on_rom_info_error(self, message: str, exception: Exception) -> None:
         """Handle ROM info loading error from worker."""
+        # Guard: skip if dialog is closing to prevent crash on deleted widget
+        if self._is_closing:
+            return
         logger.error(f"ROM info loading failed: {message}")
         if self.sprite_location_combo:
             self.sprite_location_combo.clear()
@@ -768,6 +777,9 @@ class InjectionDialog(TabbedDialog):
 
     def _on_rom_info_finished(self, success: bool, message: str) -> None:
         """Handle ROM info worker completion."""
+        # Guard: skip if dialog is closing to prevent crash on deleted widget
+        if self._is_closing:
+            return
         logger.debug(f"ROM info loading finished: success={success}, message={message}")
 
     def _clear_rom_ui_state(self) -> None:
@@ -1142,9 +1154,22 @@ class InjectionDialog(TabbedDialog):
     @override
     def closeEvent(self, event: QCloseEvent | None) -> None:
         """Handle dialog close with worker cleanup."""
-        if self._rom_info_loader is not None and self._rom_info_loader.isRunning():
-            logger.debug("Stopping ROM info loader on dialog close")
-            WorkerManager.cleanup_worker(self._rom_info_loader, timeout=3000)
+        # Set closing flag FIRST to guard against queued signal callbacks
+        self._is_closing = True
+
+        if self._rom_info_loader is not None:
+            # Disconnect signals BEFORE cleanup to prevent callbacks on deleted dialog
+            try:
+                self._rom_info_loader.rom_info_loaded.disconnect(self._on_rom_info_loaded)
+                self._rom_info_loader.error.disconnect(self._on_rom_info_error)
+                self._rom_info_loader.operation_finished.disconnect(self._on_rom_info_finished)
+            except (RuntimeError, TypeError):
+                pass  # Already disconnected or object deleted
+
+            if self._rom_info_loader.isRunning():
+                logger.debug("Stopping ROM info loader on dialog close")
+                WorkerManager.cleanup_worker(self._rom_info_loader, timeout=3000)
             self._rom_info_loader = None
+
         if event:
             super().closeEvent(event)

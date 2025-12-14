@@ -249,7 +249,13 @@ class SimplePreviewCoordinator(QObject):
         # Only clear reference if this is still the current worker
         if worker == self._current_worker:
             self._current_worker = None
-        worker.deleteLater()
+        # Use WorkerManager for proper cleanup and unregistration
+        try:
+            from core.services.worker_lifecycle import WorkerManager
+            WorkerManager.cleanup_worker(worker, timeout=100)
+        except RuntimeError:
+            # Worker was already deleted by Qt
+            logger.debug("[SIMPLE] Worker already deleted during cleanup")
         logger.debug("[SIMPLE] Worker cleaned up after finishing")
 
     def _on_preview_ready(self, tile_data: bytes, width: int, height: int, name: str):
@@ -269,14 +275,11 @@ class SimplePreviewCoordinator(QObject):
         # Stop timer
         self._debounce_timer.stop()
 
-        # Stop current worker if running
+        # Stop current worker if running - use WorkerManager for proper cleanup and unregistration
         try:
-            if self._current_worker and self._current_worker.isRunning():
-                self._current_worker.requestInterruption()
-                self._current_worker.quit()
-                if not self._current_worker.wait(200):
-                    logger.warning("[SIMPLE] Worker didn't stop cleanly")
-                self._current_worker.deleteLater()
+            if self._current_worker:
+                from core.services.worker_lifecycle import WorkerManager
+                WorkerManager.cleanup_worker(self._current_worker, timeout=200)
                 self._current_worker = None
         except RuntimeError:
             # Worker was already deleted by Qt

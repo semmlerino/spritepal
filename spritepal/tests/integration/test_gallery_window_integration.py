@@ -25,7 +25,10 @@ from tests.infrastructure.qt_real_testing import (
 from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
 # Initialize DI container for all tests
-pytestmark = pytest.mark.usefixtures("session_managers")
+pytestmark = [
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+]
 
 # Module-level constants for reuse
 SIGNALS_TO_DISCONNECT = [

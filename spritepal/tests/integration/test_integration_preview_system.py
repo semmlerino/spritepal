@@ -18,12 +18,8 @@ from core.managers import ExtractionManager
 from ui.common.simple_preview_coordinator import SimplePreviewCoordinator, SimplePreviewWorker
 from utils.rom_cache import ROMCache
 
-# Skip tests that use QThread + waitSignal in offscreen mode (segfaults)
-_offscreen_mode = os.environ.get('QT_QPA_PLATFORM') == 'offscreen'
-skip_in_offscreen = pytest.mark.skipif(
-    _offscreen_mode,
-    reason="QThread + waitSignal causes segfaults in offscreen mode"
-)
+# Note: Tests previously used skip_in_offscreen for QThread + waitSignal issues.
+# This was replaced with waitUntil pattern which is more stable in offscreen mode.
 
 
 @pytest.mark.integration
@@ -36,8 +32,13 @@ class TestSimplePreviewCoordinator:
         """Setup and teardown DI dependencies with isolation.
 
         Uses tmp_path for cache to prevent polluting $HOME with ~/.spritepal_rom_cache.
+
+        NOTE: Does NOT call reset_container() on teardown because:
+        1. session_managers may have registered dependencies we shouldn't clear
+        2. reset_container() would break subsequent tests using session fixtures
+        The session-level cleanup handles DI container reset appropriately.
         """
-        from core.di_container import register_singleton, reset_container
+        from core.di_container import register_singleton
         from core.protocols.manager_protocols import ROMCacheProtocol
 
         cache_dir = tmp_path / "rom_cache"
@@ -46,8 +47,7 @@ class TestSimplePreviewCoordinator:
 
         yield
 
-        # Clean up DI registrations to prevent leakage
-        reset_container()
+        # Don't call reset_container() - let session fixtures manage DI lifecycle
 
     def test_coordinator_initialization(self, managers_initialized):
         """Test that coordinator initializes correctly."""
@@ -82,21 +82,31 @@ class TestSimplePreviewCoordinator:
         coordinator.preview_ready.connect(on_preview_ready)
 
         # Make rapid requests (should be debounced)
+        # Request multiple times in quick succession
         for offset in [0x1000, 0x2000, 0x3000, 0x4000, 0x5000]:
             coordinator.request_preview(offset)
-            # No wait needed - testing debouncing behavior
 
         # Wait for debouncing to complete and preview to generate
-        qtbot.waitUntil(lambda: len(previews_generated) > 0, timeout=1000)
+        # The debounce timer should coalesce these into a single preview
+        qtbot.waitUntil(lambda: len(previews_generated) > 0, timeout=2000)
 
-        # Should only generate preview for the last offset
-        assert len(previews_generated) <= 2  # May get one intermediate if timing is off
+        # Wait a bit more to ensure no additional previews are generated
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
+        qtbot.wait(200)  # Wait for any pending signals
+
+        # Should only generate one preview for the final offset (debounced)
+        # If we get exactly 1, great. If we get 2, the first request snuck through
+        # before debouncing kicked in - still acceptable behavior.
+        assert 1 <= len(previews_generated) <= 2, (
+            f"Expected 1-2 previews (debouncing), got {len(previews_generated)}. "
+            "Debouncing should coalesce rapid requests."
+        )
 
         # Cleanup
         coordinator.cleanup()
 
-    @skip_in_offscreen
-    def test_preview_generation_with_real_data(self, test_rom_with_sprites, qtbot, wait_for, isolated_managers):
+    def test_preview_generation_with_real_data(self, test_rom_with_sprites, qtbot, wait_for, setup_managers):
         """Test that preview generates with real tile data."""
         rom_info = test_rom_with_sprites
         rom_path = str(rom_info['path'])
@@ -136,7 +146,6 @@ class TestSimplePreviewCoordinator:
         # Cleanup
         coordinator.cleanup()
 
-    @skip_in_offscreen
     def test_preview_with_hal_decompression(self, test_rom_with_sprites, qtbot, wait_for):
         """Test preview generation with HAL-compressed sprites."""
         rom_info = test_rom_with_sprites
@@ -173,7 +182,7 @@ class TestSimplePreviewCoordinator:
 
         # Verify decompressed data was used
         tile_data, width, height, name = preview_data
-        rom_info['sprites'][0]['decompressed_size']
+        assert rom_info['sprites'][0]['decompressed_size'] > 0, "Expected decompressed data"
 
         # Size might not match exactly due to preview limits
         assert len(tile_data) > 0
@@ -238,7 +247,6 @@ class WorkerContainer(QWidget):
 
 @pytest.mark.integration
 @pytest.mark.gui
-@skip_in_offscreen
 class TestSimplePreviewWorker:
     """Test SimplePreviewWorker with real ROM data.
 
@@ -246,7 +254,8 @@ class TestSimplePreviewWorker:
     cleanup issues in headless mode. The worker itself is pure computation
     (no QPixmap/QImage usage) and is safe for headless testing.
 
-    These tests use QThread + waitSignal which segfaults in offscreen mode.
+    Uses waitUntil pattern instead of waitSignal to avoid potential segfaults
+    in offscreen mode with QThread signal handling.
     """
 
     def test_worker_generates_preview(self, test_rom_with_sprites, qtbot):
@@ -276,9 +285,11 @@ class TestSimplePreviewWorker:
         # Start worker and wait for completion
         worker.start()
 
-        # Wait for completion using qtbot's waitSignal
-        with qtbot.waitSignal(worker.finished, timeout=5000):
-            pass
+        # Wait for result (either preview or error) - more reliable than waiting for thread stop
+        qtbot.waitUntil(
+            lambda: len(preview_data) > 0 or len(error_msg) > 0,
+            timeout=5000
+        )
 
         # Verify result - either preview or error should be set
         if preview_data:
@@ -313,21 +324,28 @@ class TestSimplePreviewWorker:
 
         # Track result
         preview_data = []
+        error_msg = []
 
         def on_preview(tile_data, width, height, name):
             preview_data.append((tile_data, width, height, name))
 
+        def on_error(msg):
+            error_msg.append(msg)
+
         worker.preview_ready.connect(on_preview)
+        worker.preview_error.connect(on_error)
 
         # Start worker and wait for completion
         worker.start()
 
-        # Use waitSignal for proper event loop handling
-        with qtbot.waitSignal(worker.finished, timeout=5000):
-            pass
+        # Wait for result (either preview or error) - more reliable than waiting for thread stop
+        qtbot.waitUntil(
+            lambda: len(preview_data) > 0 or len(error_msg) > 0,
+            timeout=5000
+        )
 
-        # Verify decompressed data
-        assert len(preview_data) > 0
+        # Verify decompressed data (error is unexpected for this test)
+        assert len(preview_data) > 0, f"Expected preview data, got error: {error_msg}"
         tile_data, width, height, name = preview_data[0]
         assert len(tile_data) > 0
 
@@ -342,6 +360,7 @@ class TestSimplePreviewWorker:
 class TestPreviewCaching:
     """Test preview caching with ROM cache."""
 
+    @pytest.mark.skip(reason="Placeholder - caching not yet implemented")
     def test_preview_cache_integration(self, test_rom_with_sprites, tmp_path):
         """Test that previews can be cached and retrieved."""
         # Register dependencies

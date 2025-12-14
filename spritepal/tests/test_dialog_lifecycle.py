@@ -23,6 +23,8 @@ pytestmark = [
     pytest.mark.widget,
     pytest.mark.headless,
     pytest.mark.requires_display,
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Dialogs may spawn worker threads via managers")
 ]
 
 class TestDialogLifecycle:

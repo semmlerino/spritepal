@@ -34,12 +34,13 @@ from core.protocols.manager_protocols import (
 )
 
 pytestmark = [
-
     pytest.mark.serial,
     pytest.mark.thread_safety,
     pytest.mark.dialog,
     pytest.mark.headless,
     pytest.mark.integration,
+    pytest.mark.usefixtures("session_managers"),  # DI tests need real managers for fallback tests
+    pytest.mark.skip_thread_cleanup(reason="DI tests may spawn worker threads via managers")
 ]
 class TestManagerContext:
     """Test the ManagerContext class functionality."""

@@ -33,6 +33,8 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.di_migration,
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="DI tests create real managers which may spawn threads"),
 ]
 
 

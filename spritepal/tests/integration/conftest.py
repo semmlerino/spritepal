@@ -73,42 +73,53 @@ def test_rom_data():
 
 
 @pytest.fixture
-def test_rom_with_sprites(tmp_path, test_rom_data):
-    """Create a test ROM with known sprite data at specific locations.
+def test_rom_with_sprites(tmp_path, test_rom_data, real_kirby_rom):
+    """Create a test ROM for integration tests.
 
-    DETERMINISTIC: Always uses synthetic test data to ensure reproducible tests.
-    For tests that need real ROM data, use @pytest.mark.requires_real_rom
-    and the real_kirby_rom fixture instead.
+    PRIORITY: Uses real Kirby ROM if available (has real HAL-compressed sprites).
+    FALLBACK: Uses synthetic test data (no valid HAL sprites - tests will skip).
+
+    Tests that require HAL decompression should check `if not rom_info['sprites']`
+    and skip appropriately.
+
+    For tests that MUST have real sprites, use @pytest.mark.requires_real_rom
+    and the test_rom_with_real_sprites fixture instead.
     """
     rom_path = tmp_path / "test_rom.sfc"
 
-    # Always use synthetic data for deterministic tests
-    rom_path.write_bytes(test_rom_data)
+    if real_kirby_rom is not None:
+        # Use real Kirby ROM - has actual HAL-compressed sprites
+        rom_data = real_kirby_rom.read_bytes()
+        rom_path.write_bytes(rom_data)
 
-    # Synthetic sprite locations that match test_rom_data patterns
-    return {
-        'path': rom_path,
-        'sprites': [
-            {
-                'offset': 0x1000,
-                'compressed_size': 256,
-                'decompressed_size': 256,
-                'tile_count': 8,
-            },
-            {
-                'offset': 0x2000,
-                'compressed_size': 512,
-                'decompressed_size': 512,
-                'tile_count': 16,
-            },
-            {
-                'offset': 0x10000,
-                'compressed_size': 8192,
-                'decompressed_size': 8192,
-                'tile_count': 256,
-            },
-        ],
-    }
+        # Known sprite locations in Kirby Super Star (USA)
+        return {
+            'path': rom_path,
+            'sprites': [
+                {
+                    'offset': 0x200000,
+                    'compressed_size': 65464,
+                    'decompressed_size': 7744,
+                    'tile_count': 242,
+                },
+                {
+                    'offset': 0x206000,
+                    'compressed_size': 40888,
+                    'decompressed_size': 832,
+                    'tile_count': 26,
+                },
+            ],
+        }
+    else:
+        # Use synthetic data - NO valid HAL-compressed sprites
+        # Tests that need HAL decompression should skip via:
+        #   if not rom_info['sprites']: pytest.skip("No sprites...")
+        rom_path.write_bytes(test_rom_data)
+
+        return {
+            'path': rom_path,
+            'sprites': [],  # Empty: synthetic data has no valid HAL sprites
+        }
 
 
 @pytest.fixture

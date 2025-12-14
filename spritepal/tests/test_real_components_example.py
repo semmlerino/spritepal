@@ -37,7 +37,8 @@ from tests.infrastructure.typed_worker_base import (
 )
 
 pytestmark = [
-
+    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.serial,
     pytest.mark.ci_safe,
     pytest.mark.headless,

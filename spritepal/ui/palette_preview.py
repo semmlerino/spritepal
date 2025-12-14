@@ -30,43 +30,64 @@ class PaletteColorWidget(QWidget):
     @override
     def paintEvent(self, a0: QPaintEvent | None) -> None:
         """Paint the color swatch"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Guard against paint events during widget destruction
+        # shiboken6.isValid() checks if the underlying C++ object still exists
+        from PySide6.QtWidgets import QApplication
 
-        # Draw background for transparency
-        if self.index == 0:
-            # Draw checkerboard for transparent color
-            checker_size = 8
-            for y in range(0, self.height(), checker_size):
-                for x in range(0, self.width(), checker_size):
-                    if (x // checker_size + y // checker_size) % 2:
-                        painter.fillRect(
-                            x, y, checker_size, checker_size, QColor(80, 80, 80)
-                        )
-                    else:
-                        painter.fillRect(
-                            x, y, checker_size, checker_size, QColor(100, 100, 100)
-                        )
+        try:
+            import shiboken6  # type: ignore[import-untyped]
+            if not shiboken6.isValid(self):
+                return
+        except ImportError:
+            pass  # Continue without check if shiboken6 not available
 
-        # Draw color
-        painter.fillRect(self.rect(), self.color)
+        if QApplication.instance() is None:
+            return
 
-        # Draw border
-        painter.setPen(QPen(QColor(100, 100, 100), BORDER_THIN))
-        painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
+        try:
+            # Check if the widget is still valid
+            _ = self.isVisible()
 
-        # Draw index number
-        painter.setPen(
-            QPen(
-                (
-                    Qt.GlobalColor.white
-                    if self.color.lightness() < 128
-                    else Qt.GlobalColor.black
-                ),
-                1,
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            # Draw background for transparency
+            if self.index == 0:
+                # Draw checkerboard for transparent color
+                checker_size = 8
+                for y in range(0, self.height(), checker_size):
+                    for x in range(0, self.width(), checker_size):
+                        if (x // checker_size + y // checker_size) % 2:
+                            painter.fillRect(
+                                x, y, checker_size, checker_size, QColor(80, 80, 80)
+                            )
+                        else:
+                            painter.fillRect(
+                                x, y, checker_size, checker_size, QColor(100, 100, 100)
+                            )
+
+            # Draw color
+            painter.fillRect(self.rect(), self.color)
+
+            # Draw border
+            painter.setPen(QPen(QColor(100, 100, 100), BORDER_THIN))
+            painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
+
+            # Draw index number
+            painter.setPen(
+                QPen(
+                    (
+                        Qt.GlobalColor.white
+                        if self.color.lightness() < 128
+                        else Qt.GlobalColor.black
+                    ),
+                    1,
+                )
             )
-        )
-        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, str(self.index))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, str(self.index))
+        except RuntimeError:
+            # Widget's C++ object has been deleted
+            pass
 
     @override
     def mousePressEvent(self, a0: QMouseEvent | None):

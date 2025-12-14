@@ -7,8 +7,7 @@ from pathlib import Path
 
 import pytest
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 # Mark this entire module for core logic tests
 pytestmark = [

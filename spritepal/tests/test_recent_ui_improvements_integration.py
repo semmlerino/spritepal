@@ -149,6 +149,11 @@ class TestMainWindowIntegration:
 
     @pytest.mark.gui
     @pytest.mark.usefixtures("setup_managers")
+    @pytest.mark.xfail(
+        _is_offscreen,
+        reason="MainWindow paint events cause segfaults during teardown in offscreen mode",
+        strict=False,
+    )
     def test_main_window_with_dark_theme_styling(self, qtbot) -> None:
         """Test MainWindow with real dark theme styling applied."""
         # Create real MainWindow

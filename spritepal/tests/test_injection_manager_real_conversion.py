@@ -15,10 +15,6 @@ import pytest
 
 from core.controller import ExtractionController
 from core.di_container import inject
-from core.managers import (
-    cleanup_managers,
-    initialize_managers,
-)
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
     ExtractionManagerProtocol,
@@ -43,19 +39,16 @@ pytestmark = [
     pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
+    pytest.mark.no_manager_setup,  # Uses isolated_managers, skip session_managers
 ]
 class TestInjectionManagerRealConversion:
     """Demonstrate conversion from mocked to real injection_manager methods"""
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        initialize_managers(app_name="SpritePal-Test")
-
         yield
-
-        cleanup_managers()
 
     def test_real_injection_manager_vs_mocked_methods(self):
         """
@@ -173,8 +166,6 @@ class TestInjectionManagerRealConversion:
 
     def test_real_injection_manager_error_scenarios(self):
         """Test real injection_manager error handling vs mocked error scenarios"""
-        initialize_managers(app_name="SpritePal-Test")
-
         window_helper = MainWindowHelperSimple()
         # Get managers from DI container
         extraction_mgr = inject(ExtractionManagerProtocol)

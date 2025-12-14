@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 from typing_extensions import override
 
+from core.services.worker_lifecycle import WorkerManager
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 from utils.logging_config import get_logger
 
@@ -400,6 +401,7 @@ class PreviewWorkerPool(QObject):
         effective_count = self._worker_count - len(self._zombie_workers)
         if effective_count < self._max_workers:
             worker = PooledPreviewWorker(weakref.ref(self))
+            WorkerManager._register_worker(worker)  # Register with centralized tracker
             self._worker_count += 1
             logger.debug(f"Created new worker (count: {self._worker_count}, zombies: {len(self._zombie_workers)})")
             return worker
@@ -412,6 +414,7 @@ class PreviewWorkerPool(QObject):
             effective_count = self._worker_count - len(self._zombie_workers)
             if effective_count < self._max_workers:
                 worker = PooledPreviewWorker(weakref.ref(self))
+                WorkerManager._register_worker(worker)  # Register with centralized tracker
                 self._worker_count += 1
                 logger.debug("Created new worker after zombie cleanup")
                 return worker
@@ -560,7 +563,10 @@ class PreviewWorkerPool(QObject):
             logger.info(f"Cleaned up {cleaned} zombie workers")
 
     def _cleanup_worker(self, worker: PooledPreviewWorker) -> None:
-        """Clean up a single worker safely without using terminate()."""
+        """Clean up a single worker safely using WorkerManager.
+
+        Uses the centralized WorkerManager for proper cleanup and registry removal.
+        """
         try:
             # Mark worker as being destroyed to prevent signal processing
             worker._being_destroyed = True
@@ -585,33 +591,17 @@ class PreviewWorkerPool(QObject):
                 worker._signals_connected = False
                 logger.debug("Disconnected worker signals after blocking")
 
-            # Request interruption via Qt mechanism
-            worker.requestInterruption()
+            # Use WorkerManager for proper cleanup and registry removal
+            # This handles: requestInterruption, quit, wait, deleteLater
+            WorkerManager.cleanup_worker(worker, timeout=1500)
 
-            # Give worker time to finish gracefully
+            # If worker is unresponsive, mark as zombie (WorkerManager won't terminate)
             if worker.isRunning():
-                if worker.wait(500):  # Half second initial wait
-                    logger.debug("Worker stopped after cancellation")
-                    worker.deleteLater()
-                    return
-
-            # If still running, try quit
-            if worker.isRunning():
-                worker.quit()
-                if worker.wait(1000):  # 1 second for quit
-                    logger.debug("Worker stopped after quit")
-                else:
-                    # Worker is stuck, but we can't safely terminate
-                    # Mark it as zombie and remove from pool
-                    logger.warning("Worker not responding to quit after 1s, marking as zombie")
-                    self._zombie_workers.add(worker)
-                    # Decrement worker count so we can create a replacement
-                    if self._worker_count > 0:
-                        self._worker_count -= 1
-
-            # Schedule for deletion regardless
-            # This is safe even if the thread is still running
-            worker.deleteLater()
+                logger.warning("Worker still running after cleanup, marking as zombie")
+                self._zombie_workers.add(worker)
+                # Decrement worker count so we can create a replacement
+                if self._worker_count > 0:
+                    self._worker_count -= 1
 
         except Exception as e:
             logger.warning(f"Error cleaning up worker: {e}")

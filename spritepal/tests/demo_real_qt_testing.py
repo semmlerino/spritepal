@@ -25,7 +25,7 @@ from unittest.mock import Mock
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QApplication, QDialog, QLabel, QPushButton, QVBoxLayout
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 from infrastructure.qt_mocks import MockSignal
 from infrastructure.signal_testing_utils import SignalSpy
 

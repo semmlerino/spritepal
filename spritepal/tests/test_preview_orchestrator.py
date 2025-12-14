@@ -31,7 +31,7 @@ from core.preview_orchestrator import (
 )
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Preview workers may not clean up within fixture timeout
+    pytest.mark.skip_thread_cleanup(reason="Preview workers may not clean up within fixture timeout"),
     pytest.mark.serial,
     pytest.mark.cache,
     pytest.mark.headless,
@@ -41,6 +41,7 @@ pytestmark = [
     pytest.mark.rom_data,
     pytest.mark.signals_slots,
     pytest.mark.slow,
+    pytest.mark.usefixtures("session_managers"),  # DI system initialization
 ]
 class MockROMCache:
     """Mock ROM cache for testing"""

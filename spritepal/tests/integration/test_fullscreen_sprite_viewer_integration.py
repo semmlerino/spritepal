@@ -28,7 +28,7 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 from ui.widgets.fullscreen_sprite_viewer import FullscreenSpriteViewer
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,  # Integration tests involve managers that spawn threads
+    pytest.mark.skip_thread_cleanup(reason="Integration tests involve managers that spawn threads"),
 ]
 
 

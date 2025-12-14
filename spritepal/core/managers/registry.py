@@ -479,6 +479,28 @@ class ManagerRegistry:
             self._logger.exception(f"Manager dependency validation failed: {e}")
             return False
 
+    @classmethod
+    def reset_for_tests(cls) -> None:
+        """Reset singleton state for test isolation.
+
+        This is the ONLY approved way to reset the registry in tests.
+        Call cleanup_managers() first to properly shut down managers.
+
+        WARNING: This method is for test infrastructure only.
+        Do not use in production code.
+        """
+        global _registry
+        with cls._lock:
+            # Reset the singleton instance
+            cls._instance = None
+            # Reset cleanup registration flag
+            cls._cleanup_registered = False
+            # CRITICAL: Also reset the module-level _registry to match
+            # This ensures both ManagerRegistry() and _ensure_registry() return the same instance
+            # Without this, DI factories using ManagerRegistry() get a different instance
+            # than initialize_managers() which uses _registry via _ensure_registry()
+            _registry = ManagerRegistry()
+
 # Global instance accessor functions with context support
 _registry = ManagerRegistry()
 

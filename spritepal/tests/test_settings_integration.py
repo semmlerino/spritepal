@@ -10,7 +10,6 @@ import pytest
 
 from core.controller import ExtractionController
 from core.di_container import inject
-from core.managers import cleanup_managers, initialize_managers
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
     ExtractionManagerProtocol,
@@ -27,7 +26,8 @@ def get_settings_manager():
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.skip_thread_cleanup,
+    pytest.mark.usefixtures("isolated_managers"),
+    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns cleanup"),
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
@@ -65,11 +65,8 @@ class TestSettingsIntegration:
         mock.palette_list = MagicMock()
         return mock
 
-    def test_settings_persistence_across_sessions(self, temp_settings_dir):
+    def test_settings_persistence_across_sessions(self, temp_settings_dir, isolated_managers):
         """Test that settings persist across application restarts"""
-        # Initialize managers first
-        initialize_managers("TestApp")
-
         # Session 1: Save settings
         settings1 = SettingsManager("TestApp")
 
@@ -83,12 +80,6 @@ class TestSettingsIntegration:
 
         settings1.save_settings()
 
-        # Clean up first session
-        cleanup_managers()
-
-        # Initialize for session 2
-        initialize_managers("TestApp")
-
         # Session 2: Load settings in new instance
         settings2 = SettingsManager("TestApp")
 
@@ -100,7 +91,7 @@ class TestSettingsIntegration:
         assert settings2.get("ui", "window_height") == 768
         assert settings2.get("custom", "last_export_dir") == "/exports"
 
-    def test_controller_settings_integration(self, temp_settings_dir, mock_main_window):
+    def test_controller_settings_integration(self, temp_settings_dir, mock_main_window, isolated_managers):
         """Test controller interaction with settings manager"""
         # Reset global instance to ensure it uses temp directory
         import utils.settings_manager
@@ -114,33 +105,23 @@ class TestSettingsIntegration:
         settings.set("session", "last_tile_count", 64)
         settings.save_settings()
 
-        # Initialize managers before creating controller
-        initialize_managers("TestApp")
+        # Create controller with all required dependencies
+        ExtractionController(
+            main_window=mock_main_window,
+            extraction_manager=inject(ExtractionManagerProtocol),
+            session_manager=inject(SessionManagerProtocol),
+            injection_manager=inject(InjectionManagerProtocol),
+            settings_manager=settings,
+            dialog_factory=inject(DialogFactoryProtocol),
+        )
 
-        try:
-            # Create controller with all required dependencies
-            ExtractionController(
-                main_window=mock_main_window,
-                extraction_manager=inject(ExtractionManagerProtocol),
-                session_manager=inject(SessionManagerProtocol),
-                injection_manager=inject(InjectionManagerProtocol),
-                settings_manager=settings,
-                dialog_factory=inject(DialogFactoryProtocol),
-            )
+        # Controller should be able to access settings
+        # (In real implementation, controller would use settings)
+        last_offset = settings.get("session", "last_extraction_offset", 0)
+        assert last_offset == 0xC000
 
-            # Controller should be able to access settings
-            # (In real implementation, controller would use settings)
-            last_offset = settings.get("session", "last_extraction_offset", 0)
-            assert last_offset == 0xC000
-        finally:
-            # Clean up managers
-            cleanup_managers()
-
-    def test_window_geometry_persistence(self, temp_settings_dir):
+    def test_window_geometry_persistence(self, temp_settings_dir, isolated_managers):
         """Test UI geometry settings persistence"""
-        # Initialize managers first
-        initialize_managers("SpritePal")
-
         # Create fresh settings instance to avoid conflicts
         settings = SettingsManager("SpritePal")
 
@@ -159,12 +140,6 @@ class TestSettingsIntegration:
 
         settings.save_settings()
 
-        # Clean up first session
-        cleanup_managers()
-
-        # Initialize for second session
-        initialize_managers("SpritePal")
-
         # Load in new instance
         new_settings = SettingsManager("SpritePal")
 
@@ -176,10 +151,8 @@ class TestSettingsIntegration:
         assert not new_settings.get("ui", "window_maximized")
         assert new_settings.get("ui", "window_splitter_sizes") == [300, 900]
 
-    def test_recent_files_management(self, temp_settings_dir):
+    def test_recent_files_management(self, temp_settings_dir, isolated_managers):
         """Test recent files list in settings"""
-        # Initialize managers first
-        initialize_managers("TestApp")
         settings = get_settings_manager()
 
         # Add recent files
@@ -207,10 +180,8 @@ class TestSettingsIntegration:
         assert final_list[0] == new_file
         assert len(final_list) == 5
 
-    def test_extraction_preferences_persistence(self, temp_settings_dir):
+    def test_extraction_preferences_persistence(self, temp_settings_dir, isolated_managers):
         """Test extraction preference settings"""
-        # Initialize managers first
-        initialize_managers("TestApp")
         settings = get_settings_manager()
 
         # Set extraction preferences
@@ -228,22 +199,14 @@ class TestSettingsIntegration:
 
         settings.save_settings()
 
-        # Clean up first session
-        cleanup_managers()
-
-        # Initialize for second session
-        initialize_managers("TestApp")
-
         # Verify in new session
         new_settings = get_settings_manager()
         for key, expected in prefs.items():
             actual = new_settings.get("extraction", key)
             assert actual == expected, f"Preference {key} not persisted"
 
-    def test_color_scheme_persistence(self, temp_settings_dir):
+    def test_color_scheme_persistence(self, temp_settings_dir, isolated_managers):
         """Test UI color scheme settings"""
-        # Initialize managers first
-        initialize_managers("TestApp")
         settings = get_settings_manager()
 
         # Save color scheme
@@ -288,10 +251,8 @@ class TestSettingsIntegration:
         assert settings.get("ui", "window_width") == 800
         assert settings.get("ui", "window_height") == 600
 
-    def test_concurrent_settings_access(self, temp_settings_dir):
+    def test_concurrent_settings_access(self, temp_settings_dir, isolated_managers):
         """Test concurrent access to settings"""
-        # Initialize managers first
-        initialize_managers("TestApp")
         settings1 = get_settings_manager()
         settings2 = get_settings_manager()
 
@@ -331,10 +292,8 @@ class TestSettingsIntegration:
             data = json.load(f)
             assert data["session"]["vram_path"] == "/new/path.dmp"
 
-    def test_settings_permission_handling(self, temp_settings_dir):
+    def test_settings_permission_handling(self, temp_settings_dir, isolated_managers):
         """Test handling of permission errors"""
-        # Initialize managers first
-        initialize_managers("TestApp")
         settings = get_settings_manager()
 
         # Set some data
@@ -352,10 +311,8 @@ class TestSettingsIntegration:
         # Settings should still be in memory
         assert settings.get("test", "new_data") == "new_value"
 
-    def test_export_import_settings(self, temp_settings_dir):
+    def test_export_import_settings(self, temp_settings_dir, isolated_managers):
         """Test exporting and importing settings"""
-        # Initialize managers first
-        initialize_managers("TestApp")
         settings = get_settings_manager()
 
         # Configure settings

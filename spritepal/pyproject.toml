@@ -402,8 +402,7 @@ filterwarnings = [
     "ignore:.*QMouseEvent.*deprecated:DeprecationWarning",
     # multiprocessing fork warning in multi-threaded process (expected in tests)
     "ignore:.*multi-threaded.*use of fork.*:DeprecationWarning",
-    # Manager mid-session cleanup - informational, fixture auto-recovers
-    "ignore:.*Managers were cleaned up mid-session.*:UserWarning",
+    # NOTE: Mid-session cleanup warnings are NO LONGER suppressed to surface test pollution
     # Service locator deprecation warnings (B.1 - transitioning to DI)
     "ignore:get_session_manager.*is deprecated:DeprecationWarning",
     "ignore:get_extraction_manager.*is deprecated:DeprecationWarning",
