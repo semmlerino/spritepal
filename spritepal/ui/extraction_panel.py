@@ -69,6 +69,7 @@ from ui.styles import (
     get_slider_style,
     get_success_text_style,
 )
+from ui.styles.theme import COLORS
 from utils.constants import VRAM_SPRITE_OFFSET
 from utils.logging_config import get_logger
 
@@ -86,12 +87,12 @@ class DropZone(QWidget):
         self.setAcceptDrops(True)
         self.setMinimumHeight(DROP_ZONE_MIN_HEIGHT)
         self.setStyleSheet(
-            """
-            DropZone {
-                border: {BORDER_THICK}px dashed #666;
+            f"""
+            DropZone {{
+                border: {BORDER_THICK}px dashed {COLORS["text_muted"]};
                 border-radius: 8px;
-                background-color: #2b2b2b;
-            }
+                background-color: {COLORS["input_background"]};
+            }}
         """
         )
 
@@ -136,12 +137,12 @@ class DropZone(QWidget):
             if mime_data and mime_data.hasUrls():
                 event.acceptProposedAction()
                 self.setStyleSheet(
-                    """
-                    DropZone {
-                        border: {BORDER_THICK}px solid #0078d4;
+                    f"""
+                    DropZone {{
+                        border: {BORDER_THICK}px solid {COLORS["border_focus"]};
                         border-radius: 8px;
-                        background-color: #383838;
-                    }
+                        background-color: {COLORS["panel_background"]};
+                    }}
                 """
                 )
 
@@ -149,12 +150,12 @@ class DropZone(QWidget):
     def dragLeaveEvent(self, event: QDragLeaveEvent | None):
         """Handle drag leave events"""
         self.setStyleSheet(
-            """
-            DropZone {
-                border: {BORDER_THICK}px dashed #666;
+            f"""
+            DropZone {{
+                border: {BORDER_THICK}px dashed {COLORS["text_muted"]};
                 border-radius: 8px;
-                background-color: #2b2b2b;
-            }
+                background-color: {COLORS["input_background"]};
+            }}
         """
         )
 

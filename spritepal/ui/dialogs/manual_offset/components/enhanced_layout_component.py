@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         ManualOffsetDialogCore,
     )
 
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -193,7 +194,7 @@ class EnhancedLayoutComponent:
         title_font.setPointSize(11)
         title_font.setWeight(QFont.Weight.Bold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #2c3e50; margin-bottom: 2px;")
+        title_label.setStyleSheet(f"color: {COLORS['highlight']}; margin-bottom: 2px;")
         layout.addWidget(title_label)
 
         # Subtitle if provided
@@ -202,7 +203,7 @@ class EnhancedLayoutComponent:
             subtitle_font = QFont()
             subtitle_font.setPointSize(9)
             subtitle_label.setFont(subtitle_font)
-            subtitle_label.setStyleSheet("color: #7f8c8d; font-style: italic;")
+            subtitle_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic;")
             layout.addWidget(subtitle_label)
 
         # Add bottom spacing
@@ -219,12 +220,12 @@ class EnhancedLayoutComponent:
         separator = QFrame()
         separator.setFrameStyle(QFrame.Shape.HLine | QFrame.Shadow.Sunken)
         separator.setMaximumHeight(1)
-        separator.setStyleSheet("""
-            QFrame {
-                color: #bdc3c7;
-                background-color: #bdc3c7;
+        separator.setStyleSheet(f"""
+            QFrame {{
+                color: {COLORS["border"]};
+                background-color: {COLORS["border"]};
                 border: none;
-            }
+            }}
         """)
         layout.addWidget(separator)
 

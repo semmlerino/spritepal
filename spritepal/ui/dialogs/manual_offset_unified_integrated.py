@@ -69,6 +69,7 @@ from PySide6.QtWidgets import (
 
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.styles.theme import COLORS
 
 _use_simple_preview = os.environ.get('SPRITEPAL_USE_SIMPLE_PREVIEW', '0').lower() in ('1', 'true', 'yes')
 
@@ -232,7 +233,7 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
             def create_section_title(self, title: str, subtitle: str = "") -> Any:
                 from PySide6.QtWidgets import QLabel
                 label = QLabel(title)
-                label.setStyleSheet("font-weight: bold; font-size: 12px; color: #333;")
+                label.setStyleSheet(f"font-weight: bold; font-size: 12px; color: {COLORS['text_primary']};")
                 return label
             def on_dialog_show(self) -> None: pass
             def update_for_tab(self, index: int, width: int) -> None: pass
@@ -366,18 +367,18 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
 
         # Title with better styling
         title = QLabel("Sprite Preview")
-        title.setStyleSheet("font-size: 14px; font-weight: bold; color: #4488dd;")
+        title.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLORS['highlight']};")
         layout.addWidget(title, 0)  # No stretch for title
 
         # Preview widget with frame for better visibility
         preview_frame = QFrame()
         preview_frame.setFrameStyle(QFrame.Shape.StyledPanel)
-        preview_frame.setStyleSheet("""
-            QFrame {
-                background-color: #2b2b2b;
-                border: 1px solid #3c3c3c;
+        preview_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS["input_background"]};
+                border: 1px solid {COLORS["panel_background"]};
                 border-radius: 6px;
-            }
+            }}
         """)
         preview_layout = QVBoxLayout(preview_frame)
         preview_layout.setContentsMargins(8, 8, 8, 8)

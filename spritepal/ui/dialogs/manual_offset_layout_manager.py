@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING, Protocol
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QLabel, QSizePolicy, QSplitter, QTabWidget, QVBoxLayout, QWidget
 
+from ui.styles.theme import COLORS
+
 if TYPE_CHECKING:
     class DialogProtocol(Protocol):
         """Protocol for dialogs that use LayoutManager."""
@@ -260,7 +262,7 @@ class LayoutManager:
         title_font.setBold(True)
         title_font.setPointSize(11)
         title.setFont(title_font)
-        title.setStyleSheet("color: #4488dd; padding: 2px 4px; border-radius: 3px;")
+        title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
         title.setSizePolicy(QSizePolicy.Policy.Preferred,
                           QSizePolicy.Policy.Maximum)
         return title

@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.styles.theme import COLORS
+
 
 class RangeScanDialog(QDialog):
     """Dialog for selecting range scanning parameters"""
@@ -53,7 +55,7 @@ class RangeScanDialog(QDialog):
         # Range preview
         self.range_label = QLabel()
         if self.range_label:
-            self.range_label.setStyleSheet("color: #666; font-family: monospace;")
+            self.range_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-family: monospace;")
         form_layout.addRow("Scan Range:", self.range_label)
 
         layout.addLayout(form_layout)

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QWidget
 from typing_extensions import override
 
 from ui.common.spacing_constants import BORDER_THIN, PALETTE_PREVIEW_SIZE
+from ui.styles.theme import COLORS
 
 
 class PaletteColorWidget(QWidget):
@@ -111,13 +112,13 @@ class PaletteWidget(QFrame):
         self.colors = []
         self.setFrameStyle(QFrame.Shape.StyledPanel)
         self.setStyleSheet(
-            """
-            PaletteWidget {
-                background-color: #2b2b2b;
-                border: {BORDER_THIN}px solid #555;
+            f"""
+            PaletteWidget {{
+                background-color: {COLORS["input_background"]};
+                border: {BORDER_THIN}px solid {COLORS["border"]};
                 border-radius: 4px;
                 padding: 4px;
-            }
+            }}
         """
         )
 
@@ -130,7 +131,7 @@ class PaletteWidget(QFrame):
         self.label = QLabel(f"{palette_index}", self)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if self.label:
-            self.label.setStyleSheet("font-weight: bold; color: #ddd;")
+            self.label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
         layout.addWidget(self.label, 0, 0, 1, 4)
 
         # Color swatches
@@ -214,24 +215,24 @@ class PalettePreviewWidget(QWidget):
             widget = self.palette_widgets[palette_index]
             if highlight:
                 widget.setStyleSheet(
-                    """
-                    PaletteWidget {
-                        background-color: #2b2b2b;
-                        border: {BORDER_THICK}px solid #0078d4;
+                    f"""
+                    PaletteWidget {{
+                        background-color: {COLORS["input_background"]};
+                        border: 2px solid {COLORS["border_focus"]};
                         border-radius: 4px;
                         padding: 4px;
-                    }
+                    }}
                 """
                 )
             else:
                 widget.setStyleSheet(
-                    """
-                    PaletteWidget {
-                        background-color: #2b2b2b;
-                        border: {BORDER_THIN}px solid #555;
+                    f"""
+                    PaletteWidget {{
+                        background-color: {COLORS["input_background"]};
+                        border: {BORDER_THIN}px solid {COLORS["border"]};
                         border-radius: 4px;
                         padding: 4px;
-                    }
+                    }}
                 """
                 )
 

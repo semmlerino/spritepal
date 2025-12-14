@@ -24,6 +24,7 @@ from ui.common.spacing_constants import (
     GROUP_PADDING,
     SPACING_TINY,
 )
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 from utils.sprite_history_manager import SpriteHistoryManager
 
@@ -174,5 +175,5 @@ class SimpleHistoryTab(QWidget):
         title_font.setBold(True)
         title_font.setPointSize(11)
         title.setFont(title_font)
-        title.setStyleSheet("color: #4488dd; padding: 2px 4px; border-radius: 3px;")
+        title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
         return title

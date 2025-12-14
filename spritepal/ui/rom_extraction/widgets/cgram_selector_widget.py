@@ -5,6 +5,8 @@ from typing import Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
+from ui.styles.theme import COLORS
+
 from .base_widget import BaseExtractionWidget
 
 # UI Spacing Constants (matching main panel)
@@ -46,8 +48,8 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         )
         info_label.setWordWrap(True)
         info_label.setStyleSheet(
-            "QLabel { color: #666; font-style: italic; padding: 10px; "
-            "border: 1px solid #444; border-radius: 4px; }"
+            f"QLabel {{ color: {COLORS['text_muted']}; font-style: italic; padding: 10px; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
         )
         cgram_layout.addWidget(info_label)
 

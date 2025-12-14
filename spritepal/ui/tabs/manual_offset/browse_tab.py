@@ -159,7 +159,7 @@ class SimpleBrowseTab(QWidget):
 
         self.offset_label = QLabel(f"0x{self._current_offset:06X}")
         if self.offset_label:
-            self.offset_label.setStyleSheet("font-family: monospace; color: #888; font-size: 12px;")
+            self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['text_muted']}; font-size: 12px;")
         info_row.addWidget(self.offset_label)
 
         controls_layout.addLayout(info_row)
@@ -254,7 +254,7 @@ class SimpleBrowseTab(QWidget):
         goto_group.setSpacing(8)
 
         goto_label = QLabel("Jump to Offset:")
-        goto_label.setStyleSheet("font-weight: bold; color: #aaa;")
+        goto_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
         goto_group.addWidget(goto_label)
 
         self.manual_spinbox = QSpinBox()

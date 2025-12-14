@@ -27,6 +27,7 @@ from ui.common.spacing_constants import (
     SPACING_SMALL,
     SPACING_TINY,
 )
+from ui.styles.theme import COLORS
 from utils.sprite_regions import SpriteRegion
 
 
@@ -187,7 +188,7 @@ class SimpleSmartTab(QWidget):
         title_font.setBold(True)
         title_font.setPointSize(11)
         title.setFont(title_font)
-        title.setStyleSheet("color: #4488dd; padding: 2px 4px; border-radius: 3px;")
+        title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
         return title
 
     def get_current_region_index(self) -> int:

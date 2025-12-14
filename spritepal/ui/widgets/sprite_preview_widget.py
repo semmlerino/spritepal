@@ -750,30 +750,30 @@ class SpritePreviewWidget(QWidget):
     def _apply_empty_state_style(self) -> None:
         """Apply dark theme styling for empty state that's clearly visible"""
         if self.preview_label:
-            self.preview_label.setStyleSheet("""
-            QLabel {
-                border: 2px dashed #666;
-                background-color: #1e1e1e;
-                color: #ccc;
+            self.preview_label.setStyleSheet(f"""
+            QLabel {{
+                border: 2px dashed {COLORS["text_muted"]};
+                background-color: {COLORS["preview_background"]};
+                color: {COLORS["text_secondary"]};
                 margin: 0px;
                 padding: 20px;
                 border-radius: 8px;
                 font-size: 14px;
                 font-weight: normal;
-            }
+            }}
         """)
 
     def _apply_content_style(self) -> None:
         """Apply style for actual content display with checkerboard background"""
         # Use dark background for better sprite visibility on dark theme
         if self.preview_label:
-            self.preview_label.setStyleSheet("""
-            QLabel {
-                background-color: #1e1e1e;
-                border: 1px solid #555;
+            self.preview_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {COLORS["preview_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 4px;
                 padding: 4px;
-            }
+            }}
         """)
 
     def set_sprite(self, pixmap: QPixmap | None) -> None:
@@ -1200,17 +1200,17 @@ class SpritePreviewWidget(QWidget):
         if self.preview_label is not None:
             self.preview_label.setText("Loading...")
             if self.preview_label:
-                self.preview_label.setStyleSheet("""
-                QLabel {
-                    border: 1px solid #87ceeb;
-                    background-color: #2d2d30;
-                    color: #87ceeb;
+                self.preview_label.setStyleSheet(f"""
+                QLabel {{
+                    border: 1px solid {COLORS["info"]};
+                    background-color: {COLORS["background"]};
+                    color: {COLORS["info"]};
                     margin: 0px;
                     padding: 10px;
                     border-radius: 4px;
                     font-size: 12px;
                     font-weight: bold;
-                }
+                }}
             """)
             # Force immediate update for loading state
             self._force_widget_update()
@@ -1220,17 +1220,17 @@ class SpritePreviewWidget(QWidget):
         if self.preview_label is not None:
             self.preview_label.setText(f"Error: {error_type}")
             if self.preview_label:
-                self.preview_label.setStyleSheet("""
-                QLabel {
-                    border: 1px solid #ff6347;
-                    background-color: #2d2d30;
-                    color: #ff6347;
+                self.preview_label.setStyleSheet(f"""
+                QLabel {{
+                    border: 1px solid {COLORS["danger"]};
+                    background-color: {COLORS["background"]};
+                    color: {COLORS["danger"]};
                     margin: 0px;
                     padding: 10px;
                     border-radius: 4px;
                     font-size: 12px;
                     font-weight: bold;
-                }
+                }}
             """)
             # Force immediate update for error state
             self._force_widget_update()

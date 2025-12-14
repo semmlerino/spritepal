@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
 )
 from typing_extensions import override
 
+from ui.styles.theme import COLORS
+
 from .components import SplitterDialog
 from .row_arrangement import (
     ArrangementManager,
@@ -212,7 +214,7 @@ class RowArrangementDialog(SplitterDialog):
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if self.preview_label:
             self.preview_label.setStyleSheet(
-            "background-color: #2d2d2d; border: 1px solid #555;"
+            f"background-color: {COLORS['background']}; border: 1px solid {COLORS['border']};"
         )
         scroll_area.setWidget(self.preview_label)
         scroll_area.setWidgetResizable(True)

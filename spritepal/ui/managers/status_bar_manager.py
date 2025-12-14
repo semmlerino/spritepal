@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QStatusBar, QWidget
 
 from ui.styles import get_muted_text_style
+from ui.styles.theme import COLORS
 
 # from utils.rom_cache import get_rom_cache # Removed due to DI
 # from utils.settings_manager import get_settings_manager # Removed due to DI
@@ -72,7 +73,7 @@ class StatusBarManager:
         self.cache_operation_badge = QLabel()
         if self.cache_operation_badge:
             self.cache_operation_badge.setStyleSheet(
-            "background-color: #3498db; color: white; padding: 2px 6px; "
+            f"background-color: {COLORS['info']}; color: {COLORS['text_primary']}; padding: 2px 6px; "
             "border-radius: 3px; font-size: 10px; font-weight: bold;"
         )
         self.cache_operation_badge.setVisible(False)

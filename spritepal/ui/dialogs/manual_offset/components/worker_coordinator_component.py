@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QMutex, QMutexLocker
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from ui.styles.theme import COLORS
+
 if TYPE_CHECKING:
     from core.managers.extraction_manager import ExtractionManager
     from ui.common.simple_preview_coordinator import SimplePreviewCoordinator
@@ -53,12 +55,12 @@ class WorkerCoordinatorComponent:
                 layout.setSpacing(12)                      # Better separation
 
                 # Apply modern styling to panel
-                panel.setStyleSheet("""
-                    QWidget {
-                        background-color: #fcfcfc;
-                        color: #000000;
+                panel.setStyleSheet(f"""
+                    QWidget {{
+                        background-color: {COLORS["panel_background"]};
+                        color: {COLORS["text_primary"]};
                         border-radius: 8px;
-                    }
+                    }}
                 """)
             else:
                 # Legacy layout

@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.styles.theme import COLORS
+
 
 class AccessibilityHelper:
     """Helper class for adding accessibility features to Qt widgets."""
@@ -156,14 +158,16 @@ class AccessibilityHelper:
         return label, input_widget
 
     @staticmethod
-    def add_focus_indicators(widget: QWidget, color: str = "#0078d4"):
+    def add_focus_indicators(widget: QWidget, color: str | None = None):
         """
         Add visual focus indicators to a widget.
 
         Args:
             widget: Widget to add focus indicators to
-            color: Color for the focus border
+            color: Color for the focus border (defaults to theme border_focus)
         """
+        if color is None:
+            color = COLORS["border_focus"]
         current_style = widget.styleSheet()
         focus_style = f"""
         QWidget:focus {{
@@ -369,53 +373,54 @@ def apply_global_accessibility_styles():
     # Cast to QApplication for type checker
     app = cast(QApplication, app)
 
-    # Global focus indicator styles
-    global_style = """
+    # Global focus indicator styles - using theme colors for dark theme compatibility
+    focus_color = COLORS["border_focus"]
+    global_style = f"""
     /* Focus indicators for all focusable widgets */
-    QWidget:focus {
-        outline: 2px solid #0078d4;
+    QWidget:focus {{
+        outline: 2px solid {focus_color};
         outline-offset: 2px;
-    }
+    }}
 
-    QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
-        border: 2px solid #0078d4;
-    }
+    QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
+        border: 2px solid {focus_color};
+    }}
 
-    QPushButton:focus {
-        border: 2px solid #0078d4;
+    QPushButton:focus {{
+        border: 2px solid {focus_color};
         padding: 3px;
-    }
+    }}
 
-    QComboBox:focus, QSpinBox:focus {
-        border: 2px solid #0078d4;
-    }
+    QComboBox:focus, QSpinBox:focus {{
+        border: 2px solid {focus_color};
+    }}
 
-    QSlider:focus {
-        border: 1px solid #0078d4;
-    }
+    QSlider:focus {{
+        border: 1px solid {focus_color};
+    }}
 
-    QCheckBox:focus, QRadioButton:focus {
-        color: #0078d4;
-    }
+    QCheckBox:focus, QRadioButton:focus {{
+        color: {focus_color};
+    }}
 
-    /* High contrast for better visibility */
-    QToolTip {
-        background-color: #ffffcc;
-        color: #000000;
-        border: 1px solid #000000;
+    /* High contrast for better visibility - dark theme compatible */
+    QToolTip {{
+        background-color: {COLORS["panel_background"]};
+        color: {COLORS["text_primary"]};
+        border: 1px solid {COLORS["border"]};
         padding: 5px;
-    }
+    }}
 
     /* Keyboard navigation hints */
-    QMenuBar::item:selected {
-        background-color: #0078d4;
-        color: white;
-    }
+    QMenuBar::item:selected {{
+        background-color: {focus_color};
+        color: {COLORS["text_primary"]};
+    }}
 
-    QMenu::item:selected {
-        background-color: #0078d4;
-        color: white;
-    }
+    QMenu::item:selected {{
+        background-color: {focus_color};
+        color: {COLORS["text_primary"]};
+    }}
     """
 
     current_style = app.styleSheet()

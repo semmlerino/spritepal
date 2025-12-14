@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout
 
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 # from utils.rom_cache import get_rom_cache # Removed due to DI
@@ -87,7 +88,7 @@ class ROMFileWidget(BaseExtractionWidget):
         self.rom_info_label = QLabel("No ROM loaded")
         self.rom_info_label.setWordWrap(True)
         if self.rom_info_label:
-            self.rom_info_label.setStyleSheet("QLabel { color: #666; font-size: 11px; padding: 5px; }")
+            self.rom_info_label.setStyleSheet(f"QLabel {{ color: {COLORS['text_muted']}; font-size: 11px; padding: 5px; }}")
         rom_layout.addWidget(self.rom_info_label)
 
         # Loading progress bar (hidden by default)
@@ -95,16 +96,16 @@ class ROMFileWidget(BaseExtractionWidget):
         self.loading_progress.setRange(0, 0)  # Indeterminate mode
         self.loading_progress.setTextVisible(False)
         self.loading_progress.setMaximumHeight(4)
-        self.loading_progress.setStyleSheet("""
-            QProgressBar {
+        self.loading_progress.setStyleSheet(f"""
+            QProgressBar {{
                 border: none;
-                background-color: #2b2b2b;
+                background-color: {COLORS["input_background"]};
                 border-radius: 2px;
-            }
-            QProgressBar::chunk {
-                background-color: #0078d4;
+            }}
+            QProgressBar::chunk {{
+                background-color: {COLORS["border_focus"]};
                 border-radius: 2px;
-            }
+            }}
         """)
         self.loading_progress.hide()
         rom_layout.addWidget(self.loading_progress)
@@ -146,7 +147,7 @@ class ROMFileWidget(BaseExtractionWidget):
         if hasattr(self, "loading_progress"):
             self.loading_progress.show()
         if self.rom_info_label:
-            self.rom_info_label.setText(f'<span style="color: #87ceeb;">{message}</span>')
+            self.rom_info_label.setText(f'<span style="color: {COLORS["info"]};">{message}</span>')
 
     def hide_loading(self):
         """Hide loading indicator."""
@@ -220,10 +221,10 @@ class ROMFileWidget(BaseExtractionWidget):
 
         if self._cache_status.get("has_sprite_cache"):
             count = self._cache_status.get("sprite_count", 0)
-            cache_parts.append(f'<span style="color: #0078d4;">💾 {count} sprites cached</span>')
+            cache_parts.append(f'<span style="color: {COLORS["border_focus"]};">💾 {count} sprites cached</span>')
 
         if self._cache_status.get("has_scan_cache"):
-            cache_parts.append('<span style="color: #107c41;">📊 Partial scan cached</span>')
+            cache_parts.append(f'<span style="color: {COLORS["success"]};">📊 Partial scan cached</span>')
 
         return " | ".join(cache_parts) if cache_parts else ""
 

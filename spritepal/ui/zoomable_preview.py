@@ -46,6 +46,7 @@ from ui.common.spacing_constants import (
     PREVIEW_MIN_SIZE,
     TILE_GRID_THICKNESS,
 )
+from ui.styles.theme import COLORS
 from utils.constants import (
     MAX_BYTE_VALUE,
     PREVIEW_SCALE_FACTOR,
@@ -83,11 +84,11 @@ class ZoomablePreviewWidget(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self.setStyleSheet(
-            """
-            ZoomablePreviewWidget {
-                background-color: #1e1e1e;
-                border: 1px solid #555;
-            }
+            f"""
+            ZoomablePreviewWidget {{
+                background-color: {COLORS["preview_background"]};
+                border: 1px solid {COLORS["border"]};
+            }}
         """
         )
 
@@ -447,7 +448,7 @@ class PreviewPanel(QWidget):
         help_label = QLabel(
             "Scroll: Zoom | Drag/MMB: Pan | Right-click: Reset | G: Grid | C: Palette | Ctrl+0: 4x | Ctrl+Shift+0: Fit"
         )
-        help_label.setStyleSheet("color: #ccc; font-size: 10px;")
+        help_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 10px;")
 
         controls.addWidget(self.palette_toggle)
         controls.addWidget(self.palette_selector)

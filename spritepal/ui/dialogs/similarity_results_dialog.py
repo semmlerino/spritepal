@@ -76,7 +76,7 @@ class SimilarityResultWidget(QFrame):
             thumbnail_label.setPixmap(scaled_thumbnail)
         else:
             thumbnail_label.setText("No preview")
-            thumbnail_label.setStyleSheet("color: #999; font-style: italic;")
+            thumbnail_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic;")
 
         thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         thumbnail_label.setMinimumSize(80, 80)
@@ -84,41 +84,41 @@ class SimilarityResultWidget(QFrame):
 
         # Offset
         offset_label = QLabel(f"0x{self.match.offset:06X}")
-        offset_label.setStyleSheet("font-family: monospace; font-weight: bold; color: #0078d4;")
+        offset_label.setStyleSheet(f"font-family: monospace; font-weight: bold; color: {COLORS['border_focus']};")
         offset_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(offset_label)
 
         # Similarity score
         score_text = f"Score: {self.match.similarity_score:.2f}"
         score_label = QLabel(score_text)
-        score_label.setStyleSheet("font-size: 11px; color: #666;")
+        score_label.setStyleSheet(f"font-size: 11px; color: {COLORS['text_muted']};")
         score_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(score_label)
 
         # Hash distance
         distance_text = f"Distance: {self.match.hash_distance}"
         distance_label = QLabel(distance_text)
-        distance_label.setStyleSheet("font-size: 10px; color: #888;")
+        distance_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         distance_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(distance_label)
 
         # Select button
         select_btn = QPushButton("Go to Sprite")
-        select_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4488dd;
-                color: white;
+        select_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS["highlight"]};
+                color: {COLORS["text_primary"]};
                 border: none;
                 border-radius: 4px;
                 padding: 6px 12px;
                 font-size: 11px;
-            }
-            QPushButton:hover {
-                background-color: #5599ee;
-            }
-            QPushButton:pressed {
-                background-color: #3377cc;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS["highlight_hover"]};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS["browse_pressed"]};
+            }}
         """)
         select_btn.clicked.connect(lambda: self.sprite_selected.emit(self.match.offset))
         layout.addWidget(select_btn)
@@ -164,7 +164,7 @@ class SimilarityResultsDialog(BaseDialog):
         if not self.matches:
             # No results found
             no_results_label = QLabel("No similar sprites found.\n\nTry adjusting the similarity threshold or ensuring more sprites are indexed.")
-            no_results_label.setStyleSheet("color: #666; font-style: italic; text-align: center; margin: 40px;")
+            no_results_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic; text-align: center; margin: 40px;")
             no_results_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(no_results_label)
         else:

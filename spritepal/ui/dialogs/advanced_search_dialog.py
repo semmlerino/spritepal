@@ -49,6 +49,7 @@ from ui.components.filters import SearchFiltersWidget
 from ui.components.filters.search_filters_widget import SearchFilter
 from ui.constants.help_text import TOOLTIPS
 from ui.dialogs.similarity_results_dialog import show_similarity_results
+from ui.styles.theme import COLORS
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE
 from utils.preview_generator import PreviewGenerator, PreviewRequest
 
@@ -1033,7 +1034,7 @@ class AdvancedSearchDialog(QDialog):
         self.ref_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if self.ref_preview_label:
             self.ref_preview_label.setStyleSheet(
-            "border: 1px solid #666; background-color: #333;"
+            f"border: 1px solid {COLORS['border']}; background-color: {COLORS['background']};"
         )
         ref_layout.addWidget(self.ref_preview_label)
 
@@ -1164,7 +1165,7 @@ class AdvancedSearchDialog(QDialog):
 
         examples_label = QLabel(examples_text)
         examples_label.setWordWrap(True)
-        examples_label.setStyleSheet("QLabel { font-size: 9pt; color: #666; }")
+        examples_label.setStyleSheet(f"QLabel {{ font-size: 9pt; color: {COLORS['text_muted']}; }}")
         examples_layout.addWidget(examples_label)
 
         examples_group.setLayout(examples_layout)
