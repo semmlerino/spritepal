@@ -5,6 +5,7 @@ ROM extraction panel for SpritePal
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -34,12 +35,10 @@ if TYPE_CHECKING:
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.managers.application_state_manager import ExtractionState
 from ui.common import WorkerManager
-from ui.components.navigation import SpriteNavigator
 from ui.dialogs import ResumeScanDialog, UnifiedManualOffsetDialog, UserErrorDialog
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
     ModeSelectorWidget,
-    OutputNameWidget,
     ROMFileWidget,
     SpriteSelectorWidget,
 )
@@ -48,7 +47,6 @@ from ui.rom_extraction.workers.similarity_indexing_worker import (
     SimilarityIndexingWorker,
 )
 from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
-from ui.styles.theme import COLORS
 from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoaderWorker
 from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
@@ -289,11 +287,29 @@ class ROMExtractionPanel(QWidget):
         self._header_loader: ROMHeaderLoaderWorker | None = None
         self._sprite_location_loader: ROMInfoLoaderWorker | None = None
 
-        # Navigation components
-        self.sprite_navigator = None
+        # Output name provider callback (injected from main window)
+        self._output_name_provider: Callable[[], str] | None = None
 
         self._setup_ui()
         self._load_last_rom()
+
+    def set_output_name_provider(self, provider: Callable[[], str]) -> None:
+        """Set the callback to get output name from shared OutputSettingsManager.
+
+        Args:
+            provider: Callable that returns the current output name string
+        """
+        self._output_name_provider = provider
+
+    def _get_output_name(self) -> str:
+        """Get the current output name from the shared provider.
+
+        Returns:
+            Output name string, or empty string if provider not set
+        """
+        if self._output_name_provider:
+            return self._output_name_provider()
+        return ""
 
     def _setup_ui(self):
         """Initialize the user interface"""
@@ -318,10 +334,8 @@ class ROMExtractionPanel(QWidget):
 
         # Add all widget groups
         self._add_rom_controls(layout)
-        self._add_navigation_controls(layout)
         self._add_mode_controls(layout)
         self._add_manual_offset_controls(layout)
-        self._add_status_indicators(layout)
         self._add_output_controls(layout)
 
         # Add vertical spacer at the bottom
@@ -340,19 +354,6 @@ class ROMExtractionPanel(QWidget):
         self.rom_file_widget.partial_scan_detected.connect(self._on_partial_scan_detected)
         layout.addWidget(self.rom_file_widget)
 
-    def _add_navigation_controls(self, layout: QVBoxLayout):
-        """Add sprite navigation controls to the layout.
-
-        Args:
-            layout: Layout to add controls to
-        """
-        self.sprite_navigator = SpriteNavigator()
-        self.sprite_navigator.offset_changed.connect(self._on_navigator_offset_changed)
-        self.sprite_navigator.sprite_selected.connect(self._on_navigator_sprite_selected)
-        self.sprite_navigator.setMaximumHeight(120)  # Drastically limit height
-        self.sprite_navigator.setVisible(False)  # Hide by default in manual mode
-        layout.addWidget(self.sprite_navigator)
-
     def _add_mode_controls(self, layout: QVBoxLayout):
         """Add mode selection and sprite selector controls to the layout.
 
@@ -368,11 +369,11 @@ class ROMExtractionPanel(QWidget):
         self.sprite_selector_widget = SpriteSelectorWidget()
         self.sprite_selector_widget.sprite_changed.connect(self._on_sprite_changed)
         self.sprite_selector_widget.find_sprites_clicked.connect(self._find_sprites)
-        self.sprite_selector_widget.setEnabled(False)  # Disabled by default (manual mode is default)
+        self.sprite_selector_widget.setVisible(False)  # Hidden by default (manual mode is default)
         layout.addWidget(self.sprite_selector_widget)
 
     def _add_manual_offset_controls(self, layout: QVBoxLayout):
-        """Add manual offset control button and status to the layout.
+        """Add manual offset control button to the layout.
 
         Args:
             layout: Layout to add controls to
@@ -380,10 +381,6 @@ class ROMExtractionPanel(QWidget):
         # Create and style the manual offset button
         self.manual_offset_button = self._create_manual_offset_button()
         layout.addWidget(self.manual_offset_button)
-
-        # Manual offset status label
-        self.manual_offset_status = self._create_manual_offset_status()
-        layout.addWidget(self.manual_offset_status)
 
         # Initialize dialog reference
         self._manual_offset_dialog = None  # Legacy - now managed by singleton
@@ -395,7 +392,7 @@ class ROMExtractionPanel(QWidget):
         Returns:
             QPushButton: The configured button
         """
-        button = QPushButton("Browse ROM for Sprites (Ctrl+M)")
+        button = QPushButton("Browse Sprites (Ctrl+M)")
         button.setMinimumHeight(40)  # Reasonable height
         _ = button.clicked.connect(self._open_manual_offset_dialog)
         button.setVisible(True)  # Always visible (enabled/disabled based on mode)
@@ -406,55 +403,10 @@ class ROMExtractionPanel(QWidget):
         button.setStyleSheet(get_manual_offset_button_style())
         return button
 
-    def _create_manual_offset_status(self) -> QLabel:
-        """Create and configure the manual offset status label.
-
-        Returns:
-            QLabel: The configured status label
-        """
-        status = QLabel("Click button above or press Ctrl+M to browse ROM for sprites")
-        status.setStyleSheet(f"""
-            padding: 8px;
-            background: {COLORS["input_background"]};
-            border: 1px solid {COLORS["border"]};
-            border-radius: 4px;
-            color: {COLORS["text_secondary"]};
-            font-style: italic;
-        """)
-        status.setWordWrap(True)
-        status.setVisible(True)
-        return status
-
-    def _add_status_indicators(self, layout: QVBoxLayout):
-        """Add similarity status indicator to the layout.
-
-        Args:
-            layout: Layout to add indicators to
-        """
-        self.similarity_status = QLabel("Similarity search ready")
-        if self.similarity_status:
-            self.similarity_status.setStyleSheet(self._get_similarity_status_style())
-        self.similarity_status.setWordWrap(True)
-        self.similarity_status.setVisible(False)  # Hidden until ROM is loaded
-        layout.addWidget(self.similarity_status)
-
-    def _get_similarity_status_style(self) -> str:
-        """Get the stylesheet for the similarity status label.
-
-        Returns:
-            str: CSS stylesheet
-        """
-        return f"""
-            padding: 6px;
-            background: {COLORS["focus_background"]};
-            border: 1px solid {COLORS["info"]};
-            border-radius: 4px;
-            color: {COLORS["cache_checking_text"]};
-            font-size: 12px;
-        """
-
     def _add_output_controls(self, layout: QVBoxLayout):
-        """Add CGRAM and output name controls to the layout.
+        """Add CGRAM controls to the layout.
+
+        Note: Output name is now handled by shared OutputSettingsManager in main window.
 
         Args:
             layout: Layout to add controls to
@@ -463,12 +415,6 @@ class ROMExtractionPanel(QWidget):
         self.cgram_selector_widget = CGRAMSelectorWidget()
         self.cgram_selector_widget.browse_clicked.connect(self._browse_cgram)
         layout.addWidget(self.cgram_selector_widget)
-
-        # Output name widget
-        self.output_name_widget = OutputNameWidget()
-        self.output_name_widget.text_changed.connect(self._check_extraction_ready)
-        self.output_name_widget.text_changed.connect(self.output_name_changed.emit)
-        layout.addWidget(self.output_name_widget)
 
     def _browse_rom(self):
         """Browse for ROM file"""
@@ -545,9 +491,6 @@ class ROMExtractionPanel(QWidget):
                     current_dialog = ManualOffsetDialogSingleton.get_current_dialog()
                     if current_dialog is not None:
                         current_dialog.set_rom_data(self.rom_path, self.rom_size, self.extraction_manager)
-                    # Update navigator
-                    if self.sprite_navigator is not None:
-                        self.sprite_navigator.set_rom_data(self.rom_path, self.rom_size, self.extraction_manager)
                     logger.debug(f"ROM size: {self.rom_size} bytes (0x{self.rom_size:X})")
             except Exception as e:
                 logger.warning(f"Could not determine ROM size: {e}")
@@ -731,16 +674,10 @@ class ROMExtractionPanel(QWidget):
         """Handle offset changes from the dialog"""
         self._manual_offset = offset
         # Preview now handled in manual offset dialog
-        # Update status label
-        if self.manual_offset_status:
-            self.manual_offset_status.setText(f"Current offset: 0x{offset:06X}")
 
     def _on_dialog_sprite_found(self, offset: int, sprite_name: str):
         """Handle sprite found signal from dialog"""
         self._manual_offset = offset
-        # Update status to show sprite was selected
-        if self.manual_offset_status:
-            self.manual_offset_status.setText(f"Selected sprite at 0x{offset:06X}")
         # Check extraction readiness
         self._check_extraction_ready()
 
@@ -896,35 +833,15 @@ class ROMExtractionPanel(QWidget):
             self.similarity_indexing_worker.operation_finished.connect(self._on_similarity_finished)
             self.similarity_indexing_worker.error.connect(self._on_similarity_error)
 
-            # Show similarity status
-            self.similarity_status.setVisible(True)
             indexed_count = self.similarity_indexing_worker.get_indexed_count()
-            if indexed_count > 0:
-                if self.similarity_status:
-                    self.similarity_status.setText(f"Similarity index ready ({indexed_count} sprites loaded)")
-            elif self.similarity_status:
-                self.similarity_status.setText("Similarity indexing ready - sprites will be indexed as found")
-
-            logger.info(f"Initialized similarity indexing worker for ROM: {Path(self.rom_path).name}")
+            logger.info(f"Initialized similarity indexing worker for ROM: {Path(self.rom_path).name} ({indexed_count} sprites indexed)")
 
         except Exception as e:
             logger.exception(f"Failed to initialize similarity indexing worker: {e}")
-            if self.similarity_status:
-                self.similarity_status.setText(f"Similarity indexing error: {e}")
-            if self.similarity_status:
-                self.similarity_status.setStyleSheet(f"""
-                padding: 6px;
-                background: {COLORS["danger"]}22;
-                border: 1px solid {COLORS["danger"]};
-                border-radius: 4px;
-                color: {COLORS["danger"]};
-                font-size: 12px;
-            """)
 
     def _on_similarity_progress(self, percent: int, message: str):
         """Handle similarity indexing progress updates"""
-        if self.similarity_status:
-            self.similarity_status.setText(f"Indexing sprites: {percent}% - {message}")
+        logger.debug(f"Indexing sprites: {percent}% - {message}")
 
     def _on_sprite_indexed(self, offset: int):
         """Handle individual sprite indexing completion"""
@@ -942,27 +859,12 @@ class ROMExtractionPanel(QWidget):
         """Handle similarity indexing completion"""
         if success:
             indexed_count = self.similarity_indexing_worker.get_indexed_count() if self.similarity_indexing_worker else 0
-            if self.similarity_status:
-                self.similarity_status.setText(f"Similarity index ready ({indexed_count} sprites)")
-            logger.info(f"Similarity indexing complete: {message}")
+            logger.info(f"Similarity indexing complete: {indexed_count} sprites indexed - {message}")
         else:
-            if self.similarity_status:
-                self.similarity_status.setText(f"Similarity indexing failed: {message}")
             logger.error(f"Similarity indexing failed: {message}")
 
     def _on_similarity_error(self, error_message: str, exception: Exception):
         """Handle similarity indexing errors"""
-        if self.similarity_status:
-            self.similarity_status.setText(f"Similarity error: {error_message}")
-        if self.similarity_status:
-            self.similarity_status.setStyleSheet(f"""
-            padding: 6px;
-            background: {COLORS["danger"]}22;
-            border: 1px solid {COLORS["danger"]};
-            border-radius: 4px;
-            color: {COLORS["danger"]};
-            font-size: 12px;
-        """)
         logger.error(f"Similarity indexing error: {error_message}", exc_info=exception)
 
     def _on_sprite_changed(self, index: int):
@@ -981,12 +883,12 @@ class ROMExtractionPanel(QWidget):
                     self.sprite_selector_widget.set_offset_text(f"0x{offset:06X}")
                     logger.debug("Updated offset label")
 
-                    # Auto-generate output name based on sprite
-                    current_output = self.output_name_widget.get_output_name()
+                    # Auto-suggest output name based on sprite (via shared OutputSettingsManager)
+                    current_output = self._get_output_name()
                     if not current_output:
                         new_name = f"{sprite_name}_sprites"
-                        logger.debug(f"Auto-generating output name: {new_name}")
-                        self.output_name_widget.set_output_name(new_name)
+                        logger.debug(f"Auto-suggesting output name: {new_name}")
+                        self.output_name_changed.emit(new_name)
 
                     # Show preview of selected sprite
                     logger.debug("Showing preview of selected sprite")
@@ -1019,7 +921,7 @@ class ROMExtractionPanel(QWidget):
             if not has_rom:
                 reasons.append("Load a ROM file")
 
-            has_output_name = bool(self.output_name_widget.get_output_name())
+            has_output_name = bool(self._get_output_name())
             if not has_output_name:
                 reasons.append("Enter output name")
 
@@ -1063,21 +965,22 @@ class ROMExtractionPanel(QWidget):
             "rom_path": self.rom_path,
             "sprite_offset": offset,
             "sprite_name": sprite_name,
-            "output_base": self.output_name_widget.get_output_name(),
+            "output_base": self._get_output_name(),
             "cgram_path": (
                 self.cgram_selector_widget.get_cgram_path() if self.cgram_selector_widget.get_cgram_path() else None
             ),
         }
 
     def clear_files(self):
-        """Clear all file selections"""
+        """Clear all file selections.
+
+        Note: Output name clearing is handled by main window's OutputSettingsManager.
+        """
         self.rom_path = ""
         if self.rom_file_widget:
             self.rom_file_widget.clear()
         if self.cgram_selector_widget:
             self.cgram_selector_widget.clear()
-        if self.output_name_widget:
-            self.output_name_widget.clear()
         if self.sprite_selector_widget:
             self.sprite_selector_widget.clear()
         self.sprite_locations = {}
@@ -1305,12 +1208,6 @@ class ROMExtractionPanel(QWidget):
         current_text = dialog.results_text.toPlainText()
         dialog.results_text.setPlainText(current_text + text)
 
-        # Update navigator
-        if self.sprite_navigator is not None:
-            self.sprite_navigator.add_found_sprite(
-                sprite_info["offset"], sprite_info.get("quality", 1.0)
-            )
-
         # Enable apply button after first find
         if len(context.found_offsets) == 1 and dialog.apply_btn:
             dialog.apply_btn.setEnabled(True)
@@ -1340,12 +1237,6 @@ class ROMExtractionPanel(QWidget):
         if context.found_offsets:
             # Save results to cache
             self._save_scan_results_to_cache(dialog, context.found_offsets)
-
-            # Update navigator
-            if self.sprite_navigator is not None:
-                sprites_with_quality = [(s["offset"], s.get("quality", 1.0))
-                                      for s in context.found_offsets]
-                self.sprite_navigator.set_found_sprites(sprites_with_quality)
         # No sprites found
         elif dialog.apply_btn:
             dialog.apply_btn.setEnabled(False)
@@ -1502,19 +1393,9 @@ class ROMExtractionPanel(QWidget):
         """Handle extraction mode change"""
         self._manual_offset_mode = (index == 1)
 
-        # Enable/disable controls based on mode (keep visible, just dim inactive ones)
-        # This is less disorienting than completely hiding entire sections
-        self.sprite_selector_widget.setEnabled(not self._manual_offset_mode)
-        self.manual_offset_button.setEnabled(self._manual_offset_mode)
-        self.manual_offset_status.setEnabled(self._manual_offset_mode)
-
-        # Update status text to explain current mode
-        if self._manual_offset_mode:
-            self.manual_offset_status.setText(
-                "Click button above or press Ctrl+M to browse ROM for sprites"
-            )
-        else:
-            self.manual_offset_status.setText("(Switch to Manual mode to browse ROM)")
+        # Hide inactive mode controls entirely for cleaner UI
+        self.sprite_selector_widget.setVisible(not self._manual_offset_mode)
+        self.manual_offset_button.setVisible(self._manual_offset_mode)
 
         # Update extraction ready state
         self._check_extraction_ready()
@@ -1523,39 +1404,6 @@ class ROMExtractionPanel(QWidget):
         if self._manual_offset_mode and self.rom_path:
             # Preview now handled in manual offset dialog
             pass
-
-    def _on_navigator_offset_changed(self, offset: int):
-        """Handle offset change from navigator"""
-        self._manual_offset = offset
-        if self.manual_offset_status:
-            self.manual_offset_status.setText(f"Navigator: 0x{offset:06X}")
-
-        # Update manual offset dialog if open
-        current_dialog = ManualOffsetDialogSingleton.get_current_dialog()
-        if current_dialog is not None:
-            current_dialog.set_offset(offset)
-
-        # Update extraction readiness
-        self._check_extraction_ready()
-
-    def _on_navigator_sprite_selected(self, offset: int, sprite_name: str):
-        """Handle sprite selection from navigator"""
-        self._manual_offset = offset
-
-        # If in preset mode, try to find and select the sprite
-        if not self._manual_offset_mode:
-            # Look for sprite in combo box
-            for i in range(self.sprite_selector_widget.count()):
-                data = self.sprite_selector_widget.item_data(i)
-                if data and len(data) >= 2 and data[1] == offset:
-                    self.sprite_selector_widget.set_current_index(i)
-                    break
-        # In manual mode, just update the offset
-        elif self.manual_offset_status:
-            self.manual_offset_status.setText(f"Selected sprite at 0x{offset:06X}")
-
-        # Update extraction readiness
-        self._check_extraction_ready()
 
     # Manual preview functionality removed - now handled in manual offset dialog
 
@@ -1580,25 +1428,17 @@ class ROMExtractionPanel(QWidget):
     def _on_search_sprite_found(self, offset: int, quality: float):
         """Handle sprite found during search"""
         self._manual_offset = offset
-        if self.manual_offset_status:
-            self.manual_offset_status.setText(
-            f"Found sprite at 0x{offset:06X} (quality: {quality:.2f})"
-        )
+        logger.debug(f"Found sprite at 0x{offset:06X} (quality: {quality:.2f})")
         # Update dialog if open
         current_dialog = ManualOffsetDialogSingleton.get_current_dialog()
         if current_dialog is not None:
             current_dialog.set_offset(offset)
             current_dialog.add_found_sprite(offset, quality)
-        # Update navigator
-        if self.sprite_navigator is not None:
-            self.sprite_navigator.add_found_sprite(offset, quality)
 
     def _on_search_complete(self, found: bool):
         """Handle search completion"""
-        if not found and self.manual_offset_status:
-            self.manual_offset_status.setText(
-            "No valid sprites found in search range. Try a different area."
-            )
+        if not found:
+            logger.debug("No valid sprites found in search range")
 
     def _on_state_changed(self, old_state: ExtractionState, new_state: ExtractionState):
         """Handle state changes to update UI accordingly"""
@@ -1665,17 +1505,6 @@ class ROMExtractionPanel(QWidget):
                 finally:
                     # Always clear the reference
                     setattr(self, attr_name, None)
-
-        # Also check sprite navigator for any preview workers
-        if hasattr(self, 'sprite_navigator') and self.sprite_navigator is not None:
-            if hasattr(self.sprite_navigator, 'preview_workers'):
-                logger.debug("Cleaning up sprite navigator preview workers")
-                for worker in self.sprite_navigator.preview_workers:
-                    try:
-                        WorkerManager.cleanup_worker(worker)
-                    except Exception as e:
-                        logger.warning(f"Error cleaning up preview worker: {e}")
-                self.sprite_navigator.preview_workers.clear()
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:

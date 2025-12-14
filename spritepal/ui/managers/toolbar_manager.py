@@ -89,30 +89,30 @@ class ToolbarManager(QObject):
         layout.addWidget(self.extraction_status_label, 0, 0, 1, 2)
 
     def _create_extract_button(self, layout: QGridLayout) -> None:
-        """Create extract button"""
-        self.extract_button = QPushButton("Extract for Editing")
+        """Create extract button with keyboard shortcut hint"""
+        self.extract_button = QPushButton("Extract (Ctrl+E)")
         self.extract_button.setMinimumHeight(35)
         self.extract_button.setShortcut(QKeySequence("Ctrl+E"))
-        self.extract_button.setToolTip("Extract sprites for editing (Ctrl+E)")
+        self.extract_button.setToolTip("Extract sprites for editing")
         if self.extract_button:
             self.extract_button.setStyleSheet(get_button_style("extract"))
         layout.addWidget(self.extract_button, 1, 0)  # Row 1 (status label at row 0)
 
     def _create_open_editor_button(self, layout: QGridLayout) -> None:
-        """Create open editor button"""
-        self.open_editor_button = QPushButton("Open in Editor")
+        """Create open editor button with keyboard shortcut hint"""
+        self.open_editor_button = QPushButton("Open Editor (Ctrl+O)")
         self.open_editor_button.setMinimumHeight(35)
         if self.open_editor_button:
             self.open_editor_button.setEnabled(False)
         self.open_editor_button.setShortcut(QKeySequence("Ctrl+O"))
-        self.open_editor_button.setToolTip("Open extracted sprites in pixel editor (Ctrl+O)")
+        self.open_editor_button.setToolTip("Open extracted sprites in pixel editor")
         if self.open_editor_button:
             self.open_editor_button.setStyleSheet(get_button_style("editor"))
         layout.addWidget(self.open_editor_button, 1, 1)  # Row 1 (status label at row 0)
 
     def _create_arrange_buttons(self, layout: QGridLayout) -> None:
         """Create arrange buttons"""
-        self.arrange_rows_button = QPushButton("Arrange Rows")
+        self.arrange_rows_button = QPushButton("Arrange Rows (Ctrl+R)")
         self.arrange_rows_button.setMinimumHeight(35)
         if self.arrange_rows_button:
             self.arrange_rows_button.setEnabled(False)
@@ -122,7 +122,7 @@ class ToolbarManager(QObject):
             self.arrange_rows_button.setStyleSheet(get_button_style("primary"))
         layout.addWidget(self.arrange_rows_button, 2, 0)  # Row 2 (status at 0, extract at 1)
 
-        self.arrange_grid_button = QPushButton("Grid Arrange")
+        self.arrange_grid_button = QPushButton("Grid Arrange (Ctrl+G)")
         self.arrange_grid_button.setMinimumHeight(35)
         if self.arrange_grid_button:
             self.arrange_grid_button.setEnabled(False)
@@ -136,7 +136,7 @@ class ToolbarManager(QObject):
 
     def _create_inject_button(self, layout: QGridLayout) -> None:
         """Create inject button"""
-        self.inject_button = QPushButton("Inject")
+        self.inject_button = QPushButton("Inject (Ctrl+I)")
         self.inject_button.setMinimumHeight(35)
         if self.inject_button:
             self.inject_button.setEnabled(False)

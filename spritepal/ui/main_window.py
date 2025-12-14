@@ -260,6 +260,12 @@ class MainWindow(QMainWindow):
         self.menu_bar_manager = MenuBarManager(self, self)
         self.status_bar_manager = StatusBarManager(self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         self.output_settings_manager = OutputSettingsManager(self, self)
+
+        # Connect ROM panel to shared output name (removes redundant output field from ROM panel)
+        self.rom_extraction_panel.set_output_name_provider(
+            self.output_settings_manager.get_output_name
+        )
+
         self.toolbar_manager = ToolbarManager(self, self)
         self.preview_coordinator = PreviewCoordinator(self.sprite_preview, self.palette_preview)
 
@@ -538,7 +544,7 @@ class MainWindow(QMainWindow):
         )
 
         # Connect output settings manager signals
-        self.output_settings_manager.output_name_changed.connect(self._on_output_name_changed)
+        # Note: No longer sync TO ROM panel - output name is now shared (ROM panel uses provider callback)
         self.output_settings_manager.grayscale_toggled.connect(self._update_output_info_label)
         self.output_settings_manager.metadata_toggled.connect(self._update_output_info_label)
 
@@ -595,22 +601,6 @@ class MainWindow(QMainWindow):
     def _on_rom_files_changed(self) -> None:
         """Handle when ROM extraction files change"""
         # ROM extraction handles its own output naming
-
-    def _on_output_name_changed(self, text: str) -> None:
-        """Handle output name change to sync with active panel"""
-        # If ROM extraction tab is active, update its output name
-        if self.tab_coordinator.is_rom_tab_active():
-            # Temporarily disconnect specific slot to avoid infinite loop
-            try:
-                self.rom_extraction_panel.output_name_changed.disconnect(
-                    self._on_rom_output_name_changed
-                )
-            except (TypeError, RuntimeError):
-                pass  # Already disconnected
-            self.rom_extraction_panel.output_name_widget.set_output_name(text)
-            self.rom_extraction_panel.output_name_changed.connect(
-                self._on_rom_output_name_changed
-            )
 
     def _on_rom_output_name_changed(self, text: str) -> None:
         """Handle ROM panel output name change"""
