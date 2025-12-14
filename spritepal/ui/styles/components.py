@@ -277,9 +277,9 @@ def get_muted_text_style(
         CSS string for muted text styling
     """
     color_map = {
-        "light": "#999999",  # Very light gray
+        "light": "#b0b0b0",  # Brightened for WCAG AA contrast on dark backgrounds
         "medium": COLORS["gray"],  # Standard gray
-        "dark": "#666666",   # Darker gray
+        "dark": "#a0a0a0",   # Adjusted for dark theme visibility
     }
 
     color = color_map.get(color_level, COLORS["gray"])
@@ -344,12 +344,12 @@ def get_monospace_text_style(
         font_size = FONTS["medium_size"]
 
     color_map = {
-        "default": COLORS["black"],
+        "default": COLORS["text_primary"],  # White for dark theme visibility
         "extract": COLORS["extract"],
         "muted": COLORS["gray"],
     }
 
-    text_color = color_map.get(color, COLORS["black"])
+    text_color = color_map.get(color, COLORS["text_primary"])
 
     return f"""
     QLabel {{
@@ -370,12 +370,12 @@ def get_bold_text_style(color: str = "default") -> str:
         CSS string for bold text styling
     """
     color_map = {
-        "default": COLORS["black"],
+        "default": COLORS["text_primary"],  # White for dark theme visibility
         "white": COLORS["white"],
         "muted": COLORS["gray"],
     }
 
-    text_color = color_map.get(color, COLORS["black"])
+    text_color = color_map.get(color, COLORS["text_primary"])
 
     return f"""
     QLabel {{
@@ -700,10 +700,10 @@ def get_dark_panel_style() -> str:
 def get_action_zone_style() -> str:
     """
     Get styling for the action zone (output settings + buttons).
-    
+
     This creates visual separation between the scrollable configuration
     content above and the fixed action buttons below.
-    
+
     Returns:
         CSS string for action zone styling
     """
@@ -713,14 +713,14 @@ def get_action_zone_style() -> str:
         border-top: 1px solid {COLORS["border"]};
         padding-top: {DIMENSIONS["spacing_sm"]}px;
     }}
-    
+
     #actionZone QGroupBox {{
         background-color: transparent;
         border: none;
         margin-top: 0;
         padding: 0;
     }}
-    
+
     #actionZone QGroupBox::title {{
         color: {COLORS["text_secondary"]};
         font-size: {FONTS["small_size"]};
@@ -734,10 +734,10 @@ def get_action_zone_style() -> str:
 def get_manual_offset_button_style() -> str:
     """
     Get styling for the manual offset control button.
-    
+
     Creates a prominent, gradient-styled button that stands out
     as the primary action for manual sprite offset selection.
-    
+
     Returns:
         CSS string for manual offset button styling
     """
@@ -768,64 +768,66 @@ def get_manual_offset_button_style() -> str:
 def get_cache_status_style(status: str) -> str:
     """
     Get styling for cache status labels based on status type.
-    
+
     Used to visually indicate cache state (checking, resuming, fresh, saving, saved).
-    
+    Uses dark backgrounds with bright text for WCAG AA compliance on dark theme.
+
     Args:
         status: Status type - "checking", "resuming", "fresh", "saving", "saved"
-    
+
     Returns:
         CSS string for cache status label styling
     """
+    # Dark theme compatible: dark backgrounds with bright, high-contrast text
     styles = {
         "checking": """
             QLabel {
-                background-color: #e3f2fd;
-                border: 1px solid #2196f3;
+                background-color: #1a3a5c;
+                border: 1px solid #4a9eff;
                 border-radius: 4px;
                 padding: 8px;
                 font-weight: bold;
-                color: #1976d2;
+                color: #7fbfff;
             }
         """,
         "resuming": """
             QLabel {
-                background-color: #e8f5e9;
+                background-color: #1a3d1a;
                 border: 1px solid #4caf50;
                 border-radius: 4px;
                 padding: 8px;
                 font-weight: bold;
-                color: #2e7d32;
+                color: #7fff7f;
             }
         """,
         "fresh": """
             QLabel {
-                background-color: #fff3e0;
+                background-color: #3d2a1a;
                 border: 1px solid #ff9800;
                 border-radius: 4px;
                 padding: 8px;
                 font-weight: bold;
-                color: #e65100;
+                color: #ffbf4a;
             }
         """,
         "saving": """
             QLabel {
-                background-color: #e1f5fe;
+                background-color: #1a2d3d;
                 border: 1px solid #039be5;
                 border-radius: 4px;
                 padding: 8px;
                 font-weight: bold;
-                color: #01579b;
+                color: #4ac4ff;
             }
         """,
         "saved": """
             QLabel {
-                background-color: #c8e6c9;
+                background-color: #1a3d1a;
                 border: 1px solid #4caf50;
                 border-radius: 4px;
                 padding: 8px;
                 font-weight: bold;
-                color: #1b5e20;
+                color: #7fff7f;
             }
         """,
     }

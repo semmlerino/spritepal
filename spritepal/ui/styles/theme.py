@@ -40,7 +40,7 @@ COLORS = {
     "dark_gray": "#2d2d30",         # Main dark background
     "darker_gray": "#1e1e1e",       # Darker panels
     "disabled": "#555555",
-    "disabled_text": "#999999",
+    "disabled_text": "#b0b0b0",  # Brightened for WCAG AA contrast on dark backgrounds
     "black": "#000000",
 
     # Dark theme background colors

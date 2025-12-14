@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout
 
 from utils.logging_config import get_logger
 
@@ -90,6 +90,25 @@ class ROMFileWidget(BaseExtractionWidget):
             self.rom_info_label.setStyleSheet("QLabel { color: #666; font-size: 11px; padding: 5px; }")
         rom_layout.addWidget(self.rom_info_label)
 
+        # Loading progress bar (hidden by default)
+        self.loading_progress = QProgressBar()
+        self.loading_progress.setRange(0, 0)  # Indeterminate mode
+        self.loading_progress.setTextVisible(False)
+        self.loading_progress.setMaximumHeight(4)
+        self.loading_progress.setStyleSheet("""
+            QProgressBar {
+                border: none;
+                background-color: #2b2b2b;
+                border-radius: 2px;
+            }
+            QProgressBar::chunk {
+                background-color: #0078d4;
+                border-radius: 2px;
+            }
+        """)
+        self.loading_progress.hide()
+        rom_layout.addWidget(self.loading_progress)
+
         rom_group.setLayout(rom_layout)
         layout.addWidget(rom_group)
 
@@ -117,6 +136,22 @@ class ROMFileWidget(BaseExtractionWidget):
                 html += "<br>" + cache_html
         if self.rom_info_label:
             self.rom_info_label.setText(html)
+
+    def show_loading(self, message: str = "Loading ROM header..."):
+        """Show loading indicator with optional message.
+
+        Args:
+            message: Loading message to display
+        """
+        if hasattr(self, "loading_progress"):
+            self.loading_progress.show()
+        if self.rom_info_label:
+            self.rom_info_label.setText(f'<span style="color: #87ceeb;">{message}</span>')
+
+    def hide_loading(self):
+        """Hide loading indicator."""
+        if hasattr(self, "loading_progress"):
+            self.loading_progress.hide()
 
     def clear(self):
         """Clear the ROM selection"""

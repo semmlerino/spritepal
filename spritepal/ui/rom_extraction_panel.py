@@ -367,7 +367,7 @@ class ROMExtractionPanel(QWidget):
         self.sprite_selector_widget = SpriteSelectorWidget()
         self.sprite_selector_widget.sprite_changed.connect(self._on_sprite_changed)
         self.sprite_selector_widget.find_sprites_clicked.connect(self._find_sprites)
-        self.sprite_selector_widget.setVisible(False)  # Hide by default (manual mode is default)
+        self.sprite_selector_widget.setEnabled(False)  # Disabled by default (manual mode is default)
         layout.addWidget(self.sprite_selector_widget)
 
     def _add_manual_offset_controls(self, layout: QVBoxLayout):
@@ -394,11 +394,14 @@ class ROMExtractionPanel(QWidget):
         Returns:
             QPushButton: The configured button
         """
-        button = QPushButton("Open Manual Offset Control")
+        button = QPushButton("Browse ROM for Sprites (Ctrl+M)")
         button.setMinimumHeight(40)  # Reasonable height
         _ = button.clicked.connect(self._open_manual_offset_dialog)
-        button.setVisible(True)  # Show by default (manual mode)
-        button.setToolTip("Open advanced manual offset control window (Ctrl+M)")
+        button.setVisible(True)  # Always visible (enabled/disabled based on mode)
+        button.setToolTip(
+            "Open advanced sprite browser to explore ROM offsets manually\n"
+            "Keyboard shortcut: Ctrl+M"
+        )
         button.setStyleSheet(get_manual_offset_button_style())
         return button
 
@@ -437,13 +440,14 @@ class ROMExtractionPanel(QWidget):
         Returns:
             QLabel: The configured status label
         """
-        status = QLabel("Use Manual Offset Control to explore ROM offsets")
+        status = QLabel("Click button above or press Ctrl+M to browse ROM for sprites")
         status.setStyleSheet("""
             padding: 8px;
             background: #2b2b2b;
             border: 1px solid #444444;
             border-radius: 4px;
             color: #cccccc;
+            font-style: italic;
         """)
         status.setWordWrap(True)
         status.setVisible(True)
@@ -586,7 +590,7 @@ class ROMExtractionPanel(QWidget):
             logger.debug(f"Saved ROM to settings: {filename}")
 
             # Read ROM header asynchronously to prevent UI freeze
-            self.rom_file_widget.set_info_text('<span style="color: gray;">Loading ROM header...</span>')
+            self.rom_file_widget.show_loading("Loading ROM header...")
             self._start_header_loading(filename)
 
             # Note: _load_rom_sprites() and _init_similarity_indexing_worker() will be called
@@ -635,6 +639,9 @@ class ROMExtractionPanel(QWidget):
         Args:
             result: Dict with 'header' and 'sprite_configs' keys
         """
+        # Hide loading indicator
+        self.rom_file_widget.hide_loading()
+
         header = result.get("header")
         sprite_configs = result.get("sprite_configs")
 
@@ -1586,12 +1593,19 @@ class ROMExtractionPanel(QWidget):
         """Handle extraction mode change"""
         self._manual_offset_mode = (index == 1)
 
-        # Show/hide appropriate controls
-        self.sprite_selector_widget.setVisible(not self._manual_offset_mode)
-        self.manual_offset_button.setVisible(self._manual_offset_mode)
-        self.manual_offset_status.setVisible(self._manual_offset_mode)
+        # Enable/disable controls based on mode (keep visible, just dim inactive ones)
+        # This is less disorienting than completely hiding entire sections
+        self.sprite_selector_widget.setEnabled(not self._manual_offset_mode)
+        self.manual_offset_button.setEnabled(self._manual_offset_mode)
+        self.manual_offset_status.setEnabled(self._manual_offset_mode)
 
-        # Mode switching handled
+        # Update status text to explain current mode
+        if self._manual_offset_mode:
+            self.manual_offset_status.setText(
+                "Click button above or press Ctrl+M to browse ROM for sprites"
+            )
+        else:
+            self.manual_offset_status.setText("(Switch to Manual mode to browse ROM)")
 
         # Update extraction ready state
         self._check_extraction_ready()

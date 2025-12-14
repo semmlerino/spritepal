@@ -7,7 +7,7 @@ from typing import Protocol
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QGridLayout, QPushButton, QWidget
+from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QWidget
 
 from ui.styles import get_button_style
 
@@ -63,17 +63,37 @@ class ToolbarManager(QObject):
         self.arrange_grid_button: QPushButton
         self.inject_button: QPushButton
 
+        # Status label for extraction readiness feedback
+        self.extraction_status_label: QLabel
+
     def create_action_buttons(self, layout: QGridLayout) -> None:
         """Create action buttons and add them to the provided layout
 
         Args:
             layout: Grid layout to add buttons to
         """
+        self._create_extraction_status_label(layout)
         self._create_extract_button(layout)
         self._create_open_editor_button(layout)
         self._create_arrange_buttons(layout)
         self._create_inject_button(layout)
         self._connect_button_signals()
+
+    def _create_extraction_status_label(self, layout: QGridLayout) -> None:
+        """Create inline status label showing extraction readiness"""
+        self.extraction_status_label = QLabel("")
+        self.extraction_status_label.setStyleSheet("""
+            QLabel {
+                color: #ffbf4a;
+                font-size: 11px;
+                font-style: italic;
+                padding: 2px 4px;
+            }
+        """)
+        self.extraction_status_label.setWordWrap(True)
+        self.extraction_status_label.hide()  # Hidden when extraction is ready
+        # Add to row -1 (before extract button), spanning both columns
+        layout.addWidget(self.extraction_status_label, 0, 0, 1, 2)
 
     def _create_extract_button(self, layout: QGridLayout) -> None:
         """Create extract button"""
@@ -83,7 +103,7 @@ class ToolbarManager(QObject):
         self.extract_button.setToolTip("Extract sprites for editing (Ctrl+E)")
         if self.extract_button:
             self.extract_button.setStyleSheet(get_button_style("extract"))
-        layout.addWidget(self.extract_button, 0, 0)
+        layout.addWidget(self.extract_button, 1, 0)  # Row 1 (status label at row 0)
 
     def _create_open_editor_button(self, layout: QGridLayout) -> None:
         """Create open editor button"""
@@ -95,7 +115,7 @@ class ToolbarManager(QObject):
         self.open_editor_button.setToolTip("Open extracted sprites in pixel editor (Ctrl+O)")
         if self.open_editor_button:
             self.open_editor_button.setStyleSheet(get_button_style("editor"))
-        layout.addWidget(self.open_editor_button, 0, 1)
+        layout.addWidget(self.open_editor_button, 1, 1)  # Row 1 (status label at row 0)
 
     def _create_arrange_buttons(self, layout: QGridLayout) -> None:
         """Create arrange buttons"""
@@ -107,7 +127,7 @@ class ToolbarManager(QObject):
         self.arrange_rows_button.setToolTip("Arrange sprite rows for easier editing (Ctrl+R)")
         if self.arrange_rows_button:
             self.arrange_rows_button.setStyleSheet(get_button_style("primary"))
-        layout.addWidget(self.arrange_rows_button, 1, 0)
+        layout.addWidget(self.arrange_rows_button, 2, 0)  # Row 2 (status at 0, extract at 1)
 
         self.arrange_grid_button = QPushButton("Grid Arrange")
         self.arrange_grid_button.setMinimumHeight(35)
@@ -119,7 +139,7 @@ class ToolbarManager(QObject):
         )
         if self.arrange_grid_button:
             self.arrange_grid_button.setStyleSheet(get_button_style("secondary"))
-        layout.addWidget(self.arrange_grid_button, 1, 1)
+        layout.addWidget(self.arrange_grid_button, 2, 1)  # Row 2
 
     def _create_inject_button(self, layout: QGridLayout) -> None:
         """Create inject button"""
@@ -131,7 +151,7 @@ class ToolbarManager(QObject):
         self.inject_button.setToolTip("Inject edited sprite back into VRAM or ROM (Ctrl+I)")
         if self.inject_button:
             self.inject_button.setStyleSheet(get_button_style("accent"))
-        layout.addWidget(self.inject_button, 2, 0, 1, 2)  # Span both columns
+        layout.addWidget(self.inject_button, 3, 0, 1, 2)  # Row 3, span both columns
 
     def _connect_button_signals(self) -> None:
         """Connect button signals to action handlers"""
@@ -143,24 +163,35 @@ class ToolbarManager(QObject):
 
     def set_extract_enabled(self, enabled: bool, reason: str = "") -> None:
         """Set extract button enabled state with validation feedback.
-        
+
         Args:
             enabled: Whether button should be enabled
             reason: If disabled, explanation of why (e.g., "Load a ROM file")
         """
         if not hasattr(self, "extract_button") or not self.extract_button:
             return
-            
+
         self.extract_button.setEnabled(enabled)
-        
+
+        # Update inline status label visibility and text
+        if hasattr(self, "extraction_status_label") and self.extraction_status_label:
+            if enabled:
+                self.extraction_status_label.hide()
+                self.extraction_status_label.setText("")
+            elif reason:
+                self.extraction_status_label.setText(f"⚠ {reason}")
+                self.extraction_status_label.show()
+            else:
+                self.extraction_status_label.setText("⚠ Requirements not met")
+                self.extraction_status_label.show()
+
+        # Also keep tooltip for accessibility
         if enabled:
             self.extract_button.setToolTip("Extract sprites for editing (Ctrl+E)")
+        elif reason:
+            self.extract_button.setToolTip(f"Cannot extract: {reason}")
         else:
-            # Show disabled reason in tooltip
-            if reason:
-                self.extract_button.setToolTip(f"Cannot extract: {reason}")
-            else:
-                self.extract_button.setToolTip("Cannot extract - requirements not met")
+            self.extract_button.setToolTip("Cannot extract - requirements not met")
 
     def set_post_extraction_buttons_enabled(self, enabled: bool) -> None:
         """Set post-extraction buttons enabled state"""
