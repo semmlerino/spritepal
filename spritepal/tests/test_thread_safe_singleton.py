@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytest
 from PySide6.QtWidgets import QApplication, QWidget
 
-from utils.thread_safe_singleton import (
+from core.thread_safe_singleton import (
     # Serial execution required: QApplication management, Thread safety concerns
     LazyThreadSafeSingleton,
     QtThreadSafeSingleton,
@@ -90,7 +90,7 @@ class TestThreadSafeSingleton:
             @classmethod
             def _create_instance(cls, value: str = "test") -> MockClass:
                 # Add small delay to increase chance of race condition
-                time.sleep(0.01)
+                time.sleep(0.01)  # sleep-ok: race condition test
                 return MockClass(value)
 
         instances = []
@@ -300,7 +300,7 @@ class TestRealWorldScenarios:
             @classmethod
             def _create_instance(cls) -> MockClass:
                 # Simulate some work during creation
-                time.sleep(0.001)
+                time.sleep(0.001)  # sleep-ok: race condition test
                 return MockClass("stress_test")
 
         num_threads = 50
@@ -312,7 +312,7 @@ class TestRealWorldScenarios:
             for _i in range(num_calls_per_thread):
                 instance = StressSingleton.get()
                 instances.append(instance)
-                time.sleep(0.001)  # Small delay
+                time.sleep(0.001)  # sleep-ok: thread interleaving
             return instances
 
         with ThreadPoolExecutor(max_workers=num_threads) as executor:

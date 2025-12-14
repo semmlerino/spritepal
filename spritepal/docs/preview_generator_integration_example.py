@@ -16,7 +16,7 @@ from __future__ import annotations
 # Example of how to modify ManualOffsetDialogSimplified to use PreviewGenerator
 import logging
 
-from utils.preview_generator import (
+from core.services.preview_generator import (
     create_rom_preview_request,
     create_vram_preview_request,
     get_preview_generator,

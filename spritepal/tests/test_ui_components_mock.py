@@ -12,7 +12,7 @@ from PySide6.QtGui import QPixmap
 
 from ui.row_arrangement_dialog import RowArrangementDialog
 from ui.zoomable_preview import PreviewPanel, ZoomablePreviewWidget
-from utils.image_utils import pil_to_qpixmap
+from core.services.image_utils import pil_to_qpixmap
 
 # Serial execution required: Real Qt components
 pytestmark = [

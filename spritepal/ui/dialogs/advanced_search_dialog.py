@@ -51,7 +51,7 @@ from ui.constants.help_text import TOOLTIPS
 from ui.dialogs.similarity_results_dialog import show_similarity_results
 from ui.styles.theme import COLORS
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE
-from utils.preview_generator import PreviewGenerator, PreviewRequest
+from core.services.preview_generator import PreviewGenerator, PreviewRequest
 
 logger = logging.getLogger(__name__)
 

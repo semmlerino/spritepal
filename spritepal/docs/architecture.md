@@ -12,11 +12,15 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
 ├─────────────────────────────────────┤
 │     Manager Layer (core/managers/)  │  ← Business Logic
 ├─────────────────────────────────────┤
+│    Services Layer (core/services/)  │  ← Stateless Operations
+├─────────────────────────────────────┤
 │       Core Layer (core/)            │  ← Domain Logic
 ├─────────────────────────────────────┤
 │       Utils Layer (utils/)          │  ← Shared Utilities
 └─────────────────────────────────────┘
 ```
+
+**For detailed data flow diagrams**, see [data_flow_guide.md](./data_flow_guide.md).
 
 ### Import Rules
 
@@ -26,12 +30,23 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
    - Purpose: Presentation layer only, no business logic
 
 2. **Manager Layer (`core/managers/`)**
-   - ✅ CAN import from: `core/`, `utils/`, `PySide6`
+   - ✅ CAN import from: `core/`, `core/services/`, `utils/`, `PySide6`
    - ❌ CANNOT import from: `ui/`
-   - Purpose: Business logic, workflow coordination
+   - Purpose: Business logic, workflow coordination, state ownership
    - Note: Managers inherit from QObject for signal-based communication
 
-3. **Core Layer (`core/`)**
+3. **Services Layer (`core/services/`)**
+   - ✅ CAN import from: `core/`, `utils/`, `PySide6`
+   - ❌ CANNOT import from: `ui/`, `core/managers/` (except via protocols)
+   - Purpose: Stateless operations, data transformations
+   - Files:
+     - `image_utils.py` - Image format conversions
+     - `preview_generator.py` - Thumbnail/preview generation
+     - `rom_service.py` - ROM file operations
+     - `vram_service.py` - VRAM extraction operations
+     - `worker_lifecycle.py` - Background worker management
+
+4. **Core Layer (`core/`)**
    - ✅ CAN import from: `utils/`, `PySide6` (for Qt event infrastructure)
    - ❌ CANNOT import from: `ui/`, `core/managers/` (except via protocols)
    - Purpose: Domain logic, data structures, algorithms
@@ -39,10 +54,49 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
      This is intentional architecture for event-driven patterns, not a layer violation.
      Core services may reference manager protocols for DI but should not import managers directly.
 
-4. **Utils Layer (`utils/`)**
+5. **Utils Layer (`utils/`)**
    - ✅ CAN import from: Python standard library only
    - ❌ CANNOT import from: ANY SpritePal modules
    - Purpose: Shared utilities, constants, helpers
+
+### Naming Conventions: Manager vs Coordinator
+
+SpritePal uses two naming patterns for orchestration classes. Choose based on **where the class lives and what it owns**:
+
+| Pattern | Layer | State Ownership | Example |
+|---------|-------|-----------------|---------|
+| **Manager** | Core (`core/managers/`) | Owns business state | `ExtractionManager`, `SessionManager` |
+| **Coordinator** | UI (`ui/managers/`) | Coordinates widgets, no business state | `PreviewCoordinator`, `TabCoordinator` |
+
+**When to use each:**
+
+- **Manager**: Use when the class:
+  - Lives in `core/managers/`
+  - Owns business logic and state
+  - Emits signals that cross component boundaries
+  - Example: `ExtractionManager` owns extraction state and emits `extraction_complete`
+
+- **Coordinator**: Use when the class:
+  - Lives in `ui/managers/` or `ui/common/`
+  - Coordinates UI widgets without owning business logic
+  - Delegates business operations to Managers via DI
+  - Example: `PreviewCoordinator` coordinates preview widgets but delegates generation to `PreviewGenerator`
+
+**Adding a new orchestration class:**
+
+1. Business logic needed? → `core/managers/*_manager.py`
+2. UI coordination only? → `ui/managers/*_coordinator.py`
+3. Hybrid (UI + some logic)? → Create Manager in core, Coordinator in UI that uses it
+
+### Known Layer Boundary Limitations
+
+Some imports cross layer boundaries by necessity:
+
+1. **Dialog Factories in DI Container** (`core/di_container.py:304,321`)
+   - `ManualOffsetDialogFactory` and `ControllerDialogFactory` are imported from UI
+   - **Reason**: Factories create UI objects, so they belong in UI. DI container needs the class as a registration key.
+   - **Mitigation**: Imports are inside `configure_container()`, not at module level, reducing coupling.
+   - **Future fix**: Create protocol interfaces for factories in `core/protocols/`
 
 ### Common Patterns
 
@@ -51,7 +105,7 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
 1. **Use Type Checking Imports**
    ```python
    from typing import TYPE_CHECKING
-   
+
    if TYPE_CHECKING:
        from spritepal.core.controller import Controller
    ```
@@ -110,7 +164,7 @@ This pattern is acceptable ONLY in `utils/` modules that need to work independen
    ```python
    # Bad
    from spritepal.core import *
-   
+
    # Good
    from spritepal.core import SpriteExtractor, PaletteManager
    ```
@@ -160,10 +214,10 @@ class MyDialog(DialogBase):
         # Step 1: Declare ALL instance variables
         self.my_widget: QWidget | None = None
         self.my_data: list[str] = []
-        
-        # Step 2: Call super().__init__() 
+
+        # Step 2: Call super().__init__()
         super().__init__(parent)  # This calls _setup_ui()
-        
+
     def _setup_ui(self):
         # Step 3: Create widgets (variables already declared)
         self.my_widget = QPushButton("Click me")
@@ -171,18 +225,41 @@ class MyDialog(DialogBase):
 
 This prevents the common bug where instance variables declared after `_setup_ui()` overwrite already-created widgets.
 
-### Singleton Cleanup Order
+---
 
-At application shutdown, singletons must be cleaned up in the correct order to avoid dangling references and segfaults:
+## Singletons and Cleanup
+
+### Active Singletons
+
+SpritePal uses multiple singleton patterns for resource management:
+
+| Singleton | Location | Purpose | Thread-Safe | Reset Method |
+|-----------|----------|---------|-------------|--------------|
+| `ManagerRegistry` | `core/managers/registry.py` | Manager lifecycle | Yes (QMutex) | `reset_for_tests()` |
+| `DIContainer` | `core/di_container.py` | Protocol bindings | No | `reset_container()` |
+| `HALProcessPool` | `core/hal_compression.py` | Compression workers | Yes (Lock) | `shutdown()` |
+| `PreviewGenerator` | `core/services/preview_generator.py` | Thumbnail generation | Yes (QMutex) | `cleanup()` |
+| `ManagerFactory` | `core/managers/factory.py` | Manager creation | Yes (Lock) | N/A |
+
+### Cleanup Order
+
+At application shutdown, singletons **must** be cleaned up in this order:
 
 ```
-1. UI Components (MainWindow, dialogs)
-   ↓
-2. Worker Pools (HALProcessPool, preview workers)
-   ↓
-3. ManagerRegistry.cleanup_managers()
-   ↓
-4. DI Container (reset_container())
+Application Exit (QApplication.aboutToQuit signal)
+         ↓
+    1. UI Components
+       - MainWindow and dialogs closed by Qt automatically
+         ↓
+    2. Worker Pools
+       - HALProcessPool.shutdown()
+       - PreviewGenerator.cleanup()
+         ↓
+    3. Manager Registry
+       - ManagerRegistry().cleanup_managers()
+         ↓
+    4. DI Container
+       - reset_container()
 ```
 
 #### Implementation
@@ -219,24 +296,130 @@ app.aboutToQuit.connect(cleanup)
 3. **Managers Third**: Managers may hold resources (files, caches); cleaning them releases resources.
 4. **DI Container Last**: Container holds singleton references; resetting it ensures no dangling protocol implementations.
 
-### Dependency Injection Pattern
+### Threading Constraints
 
-SpritePal uses constructor injection with the `inject()` function:
+**Main Thread Only** - These singletons must be accessed/reset from the main (GUI) thread:
+
+| Singleton | Reason |
+|-----------|--------|
+| `ManagerRegistry` | Managers are QObjects with Qt parents |
+| `PreviewGenerator` | Uses QTimer for debouncing |
+| `DIContainer` | May return QObject-based implementations |
+
+**Signal Connection Rules** - When connecting signals from managers, use `Qt.QueuedConnection` unless you're certain both sender and receiver are on the same thread:
 
 ```python
-# Getting manager instances
+# Safe cross-thread signal connection
+manager.operation_complete.connect(
+    self.on_operation_complete,
+    Qt.ConnectionType.QueuedConnection
+)
+```
+
+### Test Cleanup
+
+The `isolated_managers` fixture handles all singleton cleanup automatically:
+
+```python
+def test_something(isolated_managers):
+    # Managers and DI container are fresh
+    manager = inject(ExtractionManagerProtocol)
+    # ... test ...
+    # Cleanup happens automatically after test
+```
+
+---
+
+## Dependency Injection
+
+SpritePal has two DI mechanisms that work **together**:
+
+### The Two Systems
+
+#### DIContainer (`core/di_container.py`) - Preferred
+
+The DIContainer maps protocol types to implementations. Use it to obtain dependencies:
+
+```python
 from core.di_container import inject
 from core.protocols.manager_protocols import ExtractionManagerProtocol
 
-extraction_manager = inject(ExtractionManagerProtocol)
-
-# In class constructors (required parameters)
-class MyWorker:
-    def __init__(self, params: dict, extraction_manager: ExtractionManager):
-        self.manager = extraction_manager
+# Get a manager instance
+manager = inject(ExtractionManagerProtocol)
 ```
 
-**Do NOT use:**
-- Module-level convenience functions (removed)
-- Direct `ManagerRegistry()` access in production code (use `inject()`)
-- Optional manager parameters (now required)
+**Key functions:**
+- `inject(ProtocolType)` - Get an instance for a protocol
+- `register_singleton(protocol, instance)` - Register a singleton
+- `register_factory(protocol, factory_fn)` - Register a factory function
+- `reset_container()` - Clear all bindings (for tests)
+
+#### ManagerRegistry (`core/managers/registry.py`) - Lifecycle Management
+
+The ManagerRegistry is a **singleton** that:
+1. Creates all manager instances at startup
+2. Configures the DIContainer (calls `configure_container()` internally)
+3. Handles cleanup at shutdown
+
+**Flow:**
+```
+Application Start
+       ↓
+ManagerRegistry.initialize_managers()
+       ↓
+├── Creates ApplicationStateManager, CoreOperationsManager, etc.
+├── Calls configure_container() to register protocols
+└── Stores managers for lifecycle management
+       ↓
+Application Code: inject(ExtractionManagerProtocol)
+       ↓
+DIContainer returns the registered implementation
+```
+
+### Quick Reference
+
+| Need | Use |
+|------|-----|
+| Get a manager in application code | `inject(ExtractionManagerProtocol)` |
+| Pass manager to a class | Constructor parameter: `def __init__(self, manager: ExtractionManagerProtocol)` |
+| Initialize all managers | `ManagerRegistry().initialize_managers()` (done at app startup) |
+| Clean up at shutdown | `ManagerRegistry().cleanup_managers()` |
+| Reset for tests | Use `isolated_managers` fixture |
+
+### Available Protocols
+
+All protocols are defined in `core/protocols/manager_protocols.py`:
+
+| Protocol | Purpose |
+|----------|---------|
+| `SessionManagerProtocol` | Session state, settings |
+| `ExtractionManagerProtocol` | Sprite extraction |
+| `InjectionManagerProtocol` | Sprite injection |
+| `ConfigurationServiceProtocol` | App configuration |
+| `SettingsManagerProtocol` | Persistent settings |
+| `ROMCacheProtocol` | ROM file caching |
+| `ROMExtractorProtocol` | Low-level ROM extraction |
+| `ROMServiceProtocol` | ROM file operations |
+| `VRAMServiceProtocol` | VRAM operations |
+
+### What NOT to Do
+
+```python
+# DEPRECATED - don't use in new code
+from core.managers.registry import ManagerRegistry
+manager = ManagerRegistry().get_extraction_manager()
+
+# CORRECT - use inject()
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
+manager = inject(ExtractionManagerProtocol)
+```
+
+```python
+# BAD - tight coupling
+from core.managers.extraction_manager import ExtractionManager
+manager = ExtractionManager()
+
+# GOOD - loose coupling via protocol
+manager = inject(ExtractionManagerProtocol)
+```

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from utils.image_utils import pil_to_qpixmap
+from core.services.image_utils import pil_to_qpixmap
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [

@@ -130,8 +130,8 @@ class InjectionManager(BaseManager):
         try:
             # Local imports to avoid circular dependency
             from core.services.worker_lifecycle import WorkerManager
-            from ui.workers.injection_worker import InjectionWorker
-            from ui.workers.rom_injection_worker import ROMInjectionWorker
+            from core.workers.injection_worker import InjectionWorker
+            from core.workers.rom_injection_worker import ROMInjectionWorker
 
             # Validate parameters
             self.validate_injection_params(params)

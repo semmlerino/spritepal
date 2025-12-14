@@ -55,7 +55,7 @@ from utils.constants import (
 from utils.logging_config import get_logger
 
 # SettingsManager accessed via DI: inject(SettingsManagerProtocol)
-from utils.thread_safe_singleton import QtThreadSafeSingleton
+from core.thread_safe_singleton import QtThreadSafeSingleton
 
 logger = get_logger(__name__)
 
@@ -87,6 +87,13 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
     This singleton uses proper thread synchronization and Qt thread affinity checking
     to prevent crashes when accessed from worker threads.
     """
+    # WARNING: SPOOKY ACTION AT A DISTANCE
+    # These class-level variables are SHARED across ALL uses of this singleton.
+    # _signals_connected especially can cause issues:
+    # - If dialog closes but _signals_connected stays True, new dialogs won't reconnect signals
+    # - If dialog is destroyed externally, flag state becomes stale
+    # - The reset() method must clear ALL flags to avoid signal reconnection bugs
+    # Any code that modifies dialog lifecycle must check/reset these flags.
     _instance: UnifiedManualOffsetDialog | None = None
     _creator_panel: ROMExtractionPanel | None = None
     _destroyed: bool = False  # Track if the dialog has been destroyed

@@ -343,6 +343,11 @@ class ThreadLocalContextManager:
 _context_manager = ThreadLocalContextManager()
 
 # Module-level cleanup for context manager
+# WARNING: SPOOKY ACTION AT A DISTANCE
+# This atexit handler runs in UNDEFINED ORDER relative to other atexit handlers in:
+# - core/managers/registry.py (_cleanup_global_registry)
+# - core/hal_compression.py (_cleanup_hal_singleton)
+# Do not assume managers or HAL are still alive when this runs.
 @suppress_logging_errors
 def _cleanup_context_manager():
     """Cleanup context manager at module exit"""

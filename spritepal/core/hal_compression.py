@@ -1366,6 +1366,12 @@ class HALCompressor:
         }
 
 # Module-level cleanup for memory leak prevention
+# WARNING: SPOOKY ACTION AT A DISTANCE
+# This atexit handler runs in UNDEFINED ORDER relative to other atexit handlers in:
+# - core/managers/registry.py (_cleanup_global_registry)
+# - core/managers/context.py (_cleanup_context_manager)
+# If HAL tries to access managers that were already cleaned up, it will fail silently.
+# If you add new atexit handlers, ensure they don't depend on HAL or vice versa.
 @suppress_logging_errors
 def _cleanup_hal_singleton():
     """Cleanup HAL singleton at module exit"""

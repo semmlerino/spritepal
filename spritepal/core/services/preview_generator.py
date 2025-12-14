@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from core.managers.extraction_manager import ExtractionManager
     from core.rom_extractor import ROMExtractor
 
-from utils.image_utils import pil_to_qpixmap
+from core.services.image_utils import pil_to_qpixmap
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

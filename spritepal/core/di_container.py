@@ -298,28 +298,30 @@ def configure_container(
         lambda: VRAMService()
     )
 
-    # Import ManualOffsetDialogFactory
-    from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
-
-    # Register ManualOffsetDialogFactory
-    register_factory(
-        ManualOffsetDialogFactory,
-        lambda: ManualOffsetDialogFactory(
+    # Register ManualOffsetDialogFactory with lazy import to avoid layer violation
+    # The factory creates UI objects so it lives in ui/, but we defer the import
+    def _create_manual_offset_dialog_factory():
+        from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
+        return ManualOffsetDialogFactory(
             rom_cache=inject(ROMCacheProtocol),
             settings_manager=inject(SettingsManagerProtocol),
             extraction_manager=inject(ExtractionManagerProtocol),
             rom_extractor=inject(ROMExtractorProtocol)
         )
-    )
 
-    # Register DialogFactory for controller dialog creation
+    # Import the class reference for registration (TYPE_CHECKING would be better but
+    # we need the actual class for the container key)
+    from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
+    register_factory(ManualOffsetDialogFactory, _create_manual_offset_dialog_factory)
+
+    # Register DialogFactory for controller dialog creation with lazy import
     from core.protocols.dialog_protocols import DialogFactoryProtocol
-    from ui.dialogs.controller_dialog_factory import ControllerDialogFactory
 
-    register_factory(
-        DialogFactoryProtocol,
-        lambda: ControllerDialogFactory()
-    )
+    def _create_controller_dialog_factory():
+        from ui.dialogs.controller_dialog_factory import ControllerDialogFactory
+        return ControllerDialogFactory()
+
+    register_factory(DialogFactoryProtocol, _create_controller_dialog_factory)
 
     logger.info(f"DI container configured (consolidated={use_consolidated})")
 

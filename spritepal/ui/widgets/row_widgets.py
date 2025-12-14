@@ -19,7 +19,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QListWidget, QWidget
 from typing_extensions import override
 
-from utils.image_utils import pil_to_qpixmap
+from core.services.image_utils import pil_to_qpixmap
 
 
 class RowPreviewWidget(QWidget):

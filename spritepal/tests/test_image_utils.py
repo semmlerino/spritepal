@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from utils.image_utils import create_checkerboard_pattern, pil_to_qpixmap
+from core.services.image_utils import create_checkerboard_pattern, pil_to_qpixmap
 
 # Check if Qt is available without initializing
 try:
@@ -42,6 +42,7 @@ def is_headless_environment():
     )
 
 @pytest.mark.gui
+@pytest.mark.usefixtures("session_managers")
 @pytest.mark.skipif(not QT_AVAILABLE, reason="Qt not available")
 @pytest.mark.skipif(
     is_headless_environment(), reason="GUI tests skipped in headless environment"

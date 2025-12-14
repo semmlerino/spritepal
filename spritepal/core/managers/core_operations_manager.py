@@ -228,7 +228,7 @@ class CoreOperationsManager(BaseManager):
 
     def _start_vram_injection(self, params: dict[str, Any]) -> bool:
         """Start VRAM injection."""
-        from ui.workers.injection_worker import InjectionWorker  # Local import to avoid circular dependency
+        from core.workers.injection_worker import InjectionWorker  # Local import
 
         self._validate_required(params, ["input_vram", "output_vram", "offset"])
 
@@ -255,7 +255,7 @@ class CoreOperationsManager(BaseManager):
 
     def _start_rom_injection(self, params: dict[str, Any]) -> bool:
         """Start ROM injection."""
-        from ui.workers.rom_injection_worker import ROMInjectionWorker  # Local import to avoid circular dependency
+        from core.workers.rom_injection_worker import ROMInjectionWorker  # Local import
 
         self._validate_required(params, ["input_rom", "output_rom", "offset"])
 

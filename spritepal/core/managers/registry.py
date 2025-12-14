@@ -81,6 +81,14 @@ class ManagerRegistry:
             except Exception as e:
                 self._logger.debug(f"Could not register Qt cleanup: {e}")
 
+    # WARNING: SPOOKY ACTION AT A DISTANCE
+    # Manager initialization order matters! Some managers depend on others being
+    # registered in the DI container. Changing the order below can cause:
+    # - inject() calls to fail during __init__
+    # - Signals to connect to None
+    # - Subtle test failures due to missing dependencies
+    # Current order: ApplicationStateManager → CoreOperationsManager → UICoordinatorManager
+    # If adding a new manager, trace its dependencies carefully!
     def initialize_managers(
         self,
         app_name: str = "SpritePal",

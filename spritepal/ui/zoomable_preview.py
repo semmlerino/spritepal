@@ -52,7 +52,7 @@ from utils.constants import (
     PREVIEW_SCALE_FACTOR,
     TILE_WIDTH,
 )
-from utils.image_utils import pil_to_qpixmap
+from core.services.image_utils import pil_to_qpixmap
 
 from .row_arrangement.palette_colorizer import PaletteColorizer
 
