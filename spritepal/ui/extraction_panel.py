@@ -299,7 +299,7 @@ class ExtractionPanel(QGroupBox):
         self.offset_widget = QWidget(self)
         offset_layout = QVBoxLayout(self.offset_widget)
 
-        # Offset label with enhanced display
+        # Simplified offset label - just the hex value
         offset_label_layout = QHBoxLayout()
         offset_label_layout.addWidget(QLabel("VRAM Offset:"))
 
@@ -308,20 +308,9 @@ class ExtractionPanel(QGroupBox):
         if self.offset_hex_label:
             self.offset_hex_label.setStyleSheet(get_hex_label_style(background=True, color="extract"))
         self.offset_hex_label.setMinimumWidth(OFFSET_LABEL_MIN_WIDTH)
-        self.offset_hex_label.setToolTip("Current offset in VRAM")
+        # Enhanced tooltip with tile info and position
+        self.offset_hex_label.setToolTip("Current offset in VRAM\nTile #1536 | 75.0%")
         offset_label_layout.addWidget(self.offset_hex_label)
-
-        # Tile info label
-        self.tile_info_label = QLabel("(Tile #1536)")
-        if self.tile_info_label:
-            self.tile_info_label.setStyleSheet(get_muted_text_style(color_level="medium"))
-        offset_label_layout.addWidget(self.tile_info_label)
-
-        # Position percentage
-        self.position_label = QLabel("75.0%")
-        if self.position_label:
-            self.position_label.setStyleSheet(get_muted_text_style(color_level="medium"))
-        offset_label_layout.addWidget(self.position_label)
 
         offset_label_layout.addStretch()
         offset_layout.addLayout(offset_label_layout)
@@ -342,7 +331,7 @@ class ExtractionPanel(QGroupBox):
         self.offset_slider.setToolTip("VRAM Offset: Adjust position within VRAM dump (0x0000-0x10000)")
         offset_layout.addWidget(self.offset_slider)
 
-        # Offset controls row
+        # Primary offset control row (always visible)
         offset_controls_layout = QHBoxLayout()
 
         # Offset spinbox with hex input
@@ -358,8 +347,26 @@ class ExtractionPanel(QGroupBox):
         self.offset_spinbox.setToolTip("Enter offset in hex (0x prefix) or decimal")
         offset_controls_layout.addWidget(self.offset_spinbox)
 
+        offset_controls_layout.addStretch()
+
+        # Advanced toggle button
+        self.advanced_toggle = QPushButton("Advanced...")
+        self.advanced_toggle.setCheckable(True)
+        self.advanced_toggle.setChecked(False)
+        self.advanced_toggle.setMaximumWidth(100)
+        _ = self.advanced_toggle.clicked.connect(self._toggle_advanced_controls)
+        self.advanced_toggle.setToolTip("Show step size and quick jump options")
+        offset_controls_layout.addWidget(self.advanced_toggle)
+
+        offset_layout.addLayout(offset_controls_layout)
+
+        # Advanced controls section (hidden by default)
+        self.advanced_controls = QWidget(self)
+        advanced_layout = QHBoxLayout(self.advanced_controls)
+        advanced_layout.setContentsMargins(0, 4, 0, 0)
+
         # Step size selector
-        offset_controls_layout.addWidget(QLabel("Step:"))
+        advanced_layout.addWidget(QLabel("Step:"))
         self.step_combo = QComboBox(self)
         self.step_combo.addItems([
             "0x20 (1 tile)",
@@ -371,10 +378,12 @@ class ExtractionPanel(QGroupBox):
             self.step_combo.setCurrentIndex(0)  # Default to tile-aligned
         _ = self.step_combo.currentIndexChanged.connect(self._on_step_changed)
         self.step_combo.setToolTip("Select step size for navigation")
-        offset_controls_layout.addWidget(self.step_combo)
+        advanced_layout.addWidget(self.step_combo)
+
+        advanced_layout.addSpacing(16)
 
         # Quick jump dropdown
-        offset_controls_layout.addWidget(QLabel("Quick Jump:"))
+        advanced_layout.addWidget(QLabel("Quick Jump:"))
         self.jump_combo = QComboBox(self)
         self.jump_combo.addItems([
             "Select...",
@@ -386,10 +395,11 @@ class ExtractionPanel(QGroupBox):
         ])
         _ = self.jump_combo.currentIndexChanged.connect(self._on_jump_selected)
         self.jump_combo.setMinimumWidth(COMBO_BOX_MIN_WIDTH)
-        offset_controls_layout.addWidget(self.jump_combo)
+        advanced_layout.addWidget(self.jump_combo)
 
-        offset_controls_layout.addStretch()
-        offset_layout.addLayout(offset_controls_layout)
+        advanced_layout.addStretch()
+        self.advanced_controls.setVisible(False)
+        offset_layout.addWidget(self.advanced_controls)
 
         # Hide by default
         self.offset_widget.setVisible(False)
@@ -406,7 +416,7 @@ class ExtractionPanel(QGroupBox):
         mode_layout.addStretch()
         layout.addLayout(mode_layout)
 
-        # Drop zones
+        # Drop zones - Required files
         self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager)
         self.vram_drop.setToolTip("Contains sprite graphics data (required for any extraction)")
         layout.addWidget(self.vram_drop)
@@ -415,8 +425,20 @@ class ExtractionPanel(QGroupBox):
         self.cgram_drop.setToolTip("Contains color palette data (optional - without it, only grayscale extraction is possible)")
         layout.addWidget(self.cgram_drop)
 
-        self.oam_drop = DropZone("OAM ()", settings_manager=self.settings_manager)
+        # Optional OAM section (collapsed by default)
+        self.oam_toggle = QPushButton("+ Show OAM input (optional)")
+        self.oam_toggle.setCheckable(True)
+        self.oam_toggle.setChecked(False)
+        self.oam_toggle.setFlat(True)
+        if self.oam_toggle:
+            self.oam_toggle.setStyleSheet(get_link_text_style("extract"))
+        _ = self.oam_toggle.clicked.connect(self._toggle_oam_input)
+        self.oam_toggle.setToolTip("OAM improves palette selection but is not required")
+        layout.addWidget(self.oam_toggle)
+
+        self.oam_drop = DropZone("OAM", settings_manager=self.settings_manager)
         self.oam_drop.setToolTip("Shows active sprites and palettes (optional - improves palette selection)")
+        self.oam_drop.setVisible(False)
         layout.addWidget(self.oam_drop)
 
         # Auto-detect button
@@ -676,6 +698,22 @@ class ExtractionPanel(QGroupBox):
                 self.offset_slider.blockSignals(False)
             # Don't re-raise to prevent crash, just log the error
 
+    def _toggle_advanced_controls(self, checked: bool) -> None:
+        """Toggle visibility of advanced offset controls"""
+        self.advanced_controls.setVisible(checked)
+        if checked:
+            self.advanced_toggle.setText("Hide Advanced")
+        else:
+            self.advanced_toggle.setText("Advanced...")
+
+    def _toggle_oam_input(self, checked: bool) -> None:
+        """Toggle visibility of OAM drop zone"""
+        self.oam_drop.setVisible(checked)
+        if checked:
+            self.oam_toggle.setText("- Hide OAM input")
+        else:
+            self.oam_toggle.setText("+ Show OAM input (optional)")
+
     def _update_offset_display(self, value: int) -> None:
         """Update all offset display elements"""
         # Update hex label
@@ -683,19 +721,17 @@ class ExtractionPanel(QGroupBox):
         if self.offset_hex_label:
             self.offset_hex_label.setText(hex_text)
 
-        # Update tile info
+        # Update tooltip with tile info and position percentage
         tile_number = value // 32  # 32 bytes per tile
-        if self.tile_info_label:
-            self.tile_info_label.setText(f"(Tile #{tile_number})")
-
-        # Update position percentage
         max_val = self.offset_slider.maximum()
         if max_val > 0:
             percentage = (value / max_val) * 100
-            if self.position_label:
-                self.position_label.setText(f"{percentage:.1f}%")
-        elif self.position_label:
-            self.position_label.setText("0%")
+        else:
+            percentage = 0.0
+
+        tooltip = f"Current offset in VRAM\nTile #{tile_number} | {percentage:.1f}%"
+        if self.offset_hex_label:
+            self.offset_hex_label.setToolTip(tooltip)
 
     def _on_step_changed(self, index: int) -> None:
         """Handle step size change"""

@@ -7,7 +7,7 @@ from typing import Protocol
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QGridLayout, QLabel, QMenu, QPushButton, QWidget
 
 from ui.styles import get_button_style, get_extraction_checklist_style
 
@@ -59,8 +59,8 @@ class ToolbarManager(QObject):
         # Button references
         self.extract_button: QPushButton
         self.open_editor_button: QPushButton
-        self.arrange_rows_button: QPushButton
-        self.arrange_grid_button: QPushButton
+        self.arrange_button: QPushButton  # Consolidated arrange button with menu
+        self.arrange_menu: QMenu  # Menu for arrange options
         self.inject_button: QPushButton
 
         # Status label for extraction readiness feedback
@@ -75,7 +75,7 @@ class ToolbarManager(QObject):
         self._create_extraction_status_label(layout)
         self._create_extract_button(layout)
         self._create_open_editor_button(layout)
-        self._create_arrange_buttons(layout)
+        self._create_arrange_button(layout)
         self._create_inject_button(layout)
         self._connect_button_signals()
 
@@ -89,54 +89,54 @@ class ToolbarManager(QObject):
         layout.addWidget(self.extraction_status_label, 0, 0, 1, 2)
 
     def _create_extract_button(self, layout: QGridLayout) -> None:
-        """Create extract button with keyboard shortcut hint"""
-        self.extract_button = QPushButton("Extract (Ctrl+E)")
+        """Create extract button"""
+        self.extract_button = QPushButton("Extract")
         self.extract_button.setMinimumHeight(35)
         self.extract_button.setShortcut(QKeySequence("Ctrl+E"))
-        self.extract_button.setToolTip("Extract sprites for editing")
+        self.extract_button.setToolTip("Extract sprites for editing (Ctrl+E)")
         if self.extract_button:
             self.extract_button.setStyleSheet(get_button_style("extract"))
         layout.addWidget(self.extract_button, 1, 0)  # Row 1 (status label at row 0)
 
     def _create_open_editor_button(self, layout: QGridLayout) -> None:
-        """Create open editor button with keyboard shortcut hint"""
-        self.open_editor_button = QPushButton("Open Editor (Ctrl+O)")
+        """Create open editor button"""
+        self.open_editor_button = QPushButton("Open Editor")
         self.open_editor_button.setMinimumHeight(35)
         if self.open_editor_button:
             self.open_editor_button.setEnabled(False)
         self.open_editor_button.setShortcut(QKeySequence("Ctrl+O"))
-        self.open_editor_button.setToolTip("Open extracted sprites in pixel editor")
+        self.open_editor_button.setToolTip("Open extracted sprites in pixel editor (Ctrl+O)")
         if self.open_editor_button:
             self.open_editor_button.setStyleSheet(get_button_style("editor"))
         layout.addWidget(self.open_editor_button, 1, 1)  # Row 1 (status label at row 0)
 
-    def _create_arrange_buttons(self, layout: QGridLayout) -> None:
-        """Create arrange buttons"""
-        self.arrange_rows_button = QPushButton("Arrange Rows (Ctrl+R)")
-        self.arrange_rows_button.setMinimumHeight(35)
-        if self.arrange_rows_button:
-            self.arrange_rows_button.setEnabled(False)
-        self.arrange_rows_button.setShortcut(QKeySequence("Ctrl+R"))
-        self.arrange_rows_button.setToolTip("Arrange sprite rows for easier editing (Ctrl+R)")
-        if self.arrange_rows_button:
-            self.arrange_rows_button.setStyleSheet(get_button_style("primary"))
-        layout.addWidget(self.arrange_rows_button, 2, 0)  # Row 2 (status at 0, extract at 1)
+    def _create_arrange_button(self, layout: QGridLayout) -> None:
+        """Create consolidated arrange button with dropdown menu"""
+        self.arrange_button = QPushButton("Arrange...")
+        self.arrange_button.setMinimumHeight(35)
+        if self.arrange_button:
+            self.arrange_button.setEnabled(False)
+        self.arrange_button.setToolTip("Arrange sprites (Ctrl+R for rows, Ctrl+G for grid)")
+        if self.arrange_button:
+            self.arrange_button.setStyleSheet(get_button_style("primary"))
 
-        self.arrange_grid_button = QPushButton("Grid Arrange (Ctrl+G)")
-        self.arrange_grid_button.setMinimumHeight(35)
-        if self.arrange_grid_button:
-            self.arrange_grid_button.setEnabled(False)
-        self.arrange_grid_button.setShortcut(QKeySequence("Ctrl+G"))
-        self.arrange_grid_button.setToolTip(
-            "Arrange sprites using flexible grid (rows/columns/tiles) (Ctrl+G)"
-        )
-        if self.arrange_grid_button:
-            self.arrange_grid_button.setStyleSheet(get_button_style("secondary"))
-        layout.addWidget(self.arrange_grid_button, 2, 1)  # Row 2
+        # Create dropdown menu for arrange options
+        self.arrange_menu = QMenu(self.parent_widget)
+        self.arrange_rows_action = self.arrange_menu.addAction("By Rows (Ctrl+R)")
+        self.arrange_rows_action.setShortcut(QKeySequence("Ctrl+R"))
+        self.arrange_rows_action.setToolTip("Arrange sprite rows for easier editing")
+
+        self.arrange_grid_action = self.arrange_menu.addAction("By Grid (Ctrl+G)")
+        self.arrange_grid_action.setShortcut(QKeySequence("Ctrl+G"))
+        self.arrange_grid_action.setToolTip("Arrange sprites in flexible grid layout")
+
+        self.arrange_button.setMenu(self.arrange_menu)
+
+        layout.addWidget(self.arrange_button, 2, 0, 1, 2)  # Row 2, span both columns
 
     def _create_inject_button(self, layout: QGridLayout) -> None:
         """Create inject button"""
-        self.inject_button = QPushButton("Inject (Ctrl+I)")
+        self.inject_button = QPushButton("Inject")
         self.inject_button.setMinimumHeight(35)
         if self.inject_button:
             self.inject_button.setEnabled(False)
@@ -150,8 +150,8 @@ class ToolbarManager(QObject):
         """Connect button signals to action handlers"""
         self.extract_button.clicked.connect(self.actions_handler.on_extract_clicked)
         self.open_editor_button.clicked.connect(self.actions_handler.on_open_editor_clicked)
-        self.arrange_rows_button.clicked.connect(self.actions_handler.on_arrange_rows_clicked)
-        self.arrange_grid_button.clicked.connect(self.actions_handler.on_arrange_grid_clicked)
+        self.arrange_rows_action.triggered.connect(self.actions_handler.on_arrange_rows_clicked)
+        self.arrange_grid_action.triggered.connect(self.actions_handler.on_arrange_grid_clicked)
         self.inject_button.clicked.connect(self.actions_handler.on_inject_clicked)
 
     def set_extract_enabled(self, enabled: bool, reason: str = "") -> None:
@@ -190,10 +190,8 @@ class ToolbarManager(QObject):
         """Set post-extraction buttons enabled state"""
         if hasattr(self, "open_editor_button") and self.open_editor_button:
             self.open_editor_button.setEnabled(enabled)
-        if hasattr(self, "arrange_rows_button") and self.arrange_rows_button:
-            self.arrange_rows_button.setEnabled(enabled)
-        if hasattr(self, "arrange_grid_button") and self.arrange_grid_button:
-            self.arrange_grid_button.setEnabled(enabled)
+        if hasattr(self, "arrange_button") and self.arrange_button:
+            self.arrange_button.setEnabled(enabled)
         if hasattr(self, "inject_button") and self.inject_button:
             self.inject_button.setEnabled(enabled)
 

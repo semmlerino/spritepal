@@ -758,18 +758,22 @@ class MainWindow(QMainWindow):
         return None
 
     @property
-    def arrange_rows_button(self):
-        """Delegate to toolbar manager"""
+    def arrange_button(self):
+        """Delegate to toolbar manager (consolidated arrange button)"""
         if hasattr(self, "toolbar_manager"):
-            return self.toolbar_manager.arrange_rows_button
+            return self.toolbar_manager.arrange_button
         return None
+
+    # Legacy compatibility properties - delegate to consolidated arrange_button
+    @property
+    def arrange_rows_button(self):
+        """Legacy: delegate to consolidated arrange button for compatibility"""
+        return self.arrange_button
 
     @property
     def arrange_grid_button(self):
-        """Delegate to toolbar manager"""
-        if hasattr(self, "toolbar_manager"):
-            return self.toolbar_manager.arrange_grid_button
-        return None
+        """Legacy: delegate to consolidated arrange button for compatibility"""
+        return self.arrange_button
 
     @property
     def inject_button(self):

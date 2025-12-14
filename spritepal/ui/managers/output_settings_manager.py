@@ -91,19 +91,21 @@ class OutputSettingsManager(QObject):
 
     def _create_output_options_section(self, layout: QVBoxLayout) -> None:
         """Create output options checkboxes"""
-        self.grayscale_check = QCheckBox("Create grayscale with palettes")
+        self.grayscale_check = QCheckBox("Export palette files (.pal.json)")
         if self.grayscale_check:
             self.grayscale_check.setChecked(True)
         self.grayscale_check.setToolTip(
-            "Extract sprites in grayscale with separate .pal.json files"
+            "Creates 8 separate palette files for applying different color schemes.\n"
+            "Required for palette switching in the editor."
         )
         layout.addWidget(self.grayscale_check)
 
-        self.metadata_check = QCheckBox("Generate metadata for palette switching")
+        self.metadata_check = QCheckBox("Include palette metadata")
         if self.metadata_check:
             self.metadata_check.setChecked(True)
         self.metadata_check.setToolTip(
-            "Create .metadata.json file for easy palette switching in editor"
+            "Creates a .metadata.json file that enables palette switching.\n"
+            "Without this, you can only use the default palette."
         )
         layout.addWidget(self.metadata_check)
 
@@ -260,17 +262,21 @@ class OutputSettingsManager(QObject):
         # Update tooltips to explain why they're disabled
         if is_grayscale_mode:
             self.grayscale_check.setToolTip(
-                "Not applicable in Grayscale Only mode - no palette files will be created"
+                "Not available in Grayscale Only mode.\n"
+                "Palette files are only created with color extraction."
             )
             self.metadata_check.setToolTip(
-                "Not applicable in Grayscale Only mode - no metadata file will be created"
+                "Not available in Grayscale Only mode.\n"
+                "Metadata is only created with color extraction."
             )
         else:
             self.grayscale_check.setToolTip(
-                "Extract sprites in grayscale with separate .pal.json files"
+                "Creates 8 separate palette files for applying different color schemes.\n"
+                "Required for palette switching in the editor."
             )
             self.metadata_check.setToolTip(
-                "Create .metadata.json file for easy palette switching in editor"
+                "Creates a .metadata.json file that enables palette switching.\n"
+                "Without this, you can only use the default palette."
             )
 
     def clear_output_name(self) -> None:

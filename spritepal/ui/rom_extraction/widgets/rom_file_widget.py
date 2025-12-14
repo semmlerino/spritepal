@@ -84,11 +84,10 @@ class ROMFileWidget(BaseExtractionWidget):
 
         rom_layout.addLayout(rom_row)
 
-        # ROM info display
-        self.rom_info_label = QLabel("No ROM loaded")
+        # ROM info display with helpful empty state guidance
+        self.rom_info_label = QLabel()
         self.rom_info_label.setWordWrap(True)
-        if self.rom_info_label:
-            self.rom_info_label.setStyleSheet(f"QLabel {{ color: {COLORS['text_muted']}; font-size: 11px; padding: 5px; }}")
+        self._set_empty_state_guidance()
         rom_layout.addWidget(self.rom_info_label)
 
         # Loading progress bar (hidden by default)
@@ -114,6 +113,22 @@ class ROMFileWidget(BaseExtractionWidget):
         layout.addWidget(rom_group)
 
         self.setLayout(layout)
+
+    def _set_empty_state_guidance(self) -> None:
+        """Show helpful guidance message when no ROM is loaded"""
+        guidance_html = f"""
+        <div style="color: {COLORS['text_secondary']}; font-size: 12px; padding: 8px;
+                    background-color: {COLORS['input_background']}; border-radius: 4px;">
+            <b>Getting Started</b><br/>
+            <span style="color: {COLORS['text_muted']};">
+            1. Click <b>Browse</b> to select a SNES ROM file<br/>
+            2. Choose a preset sprite or explore manually<br/>
+            3. Click <b>Extract</b> to begin
+            </span>
+        </div>
+        """
+        if self.rom_info_label:
+            self.rom_info_label.setText(guidance_html)
 
     def set_rom_path(self, path: str):
         """Set the ROM path display"""
@@ -160,8 +175,8 @@ class ROMFileWidget(BaseExtractionWidget):
         self._cache_status = {"has_cache": False, "cache_type": None}
         if self.rom_path_edit:
             self.rom_path_edit.clear()
-        if self.rom_info_label:
-            self.rom_info_label.setText("No ROM loaded")
+        # Restore empty state guidance
+        self._set_empty_state_guidance()
 
     def _check_cache_status(self):
         """Check cache status for the current ROM"""
