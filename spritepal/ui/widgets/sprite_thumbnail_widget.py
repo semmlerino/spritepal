@@ -11,6 +11,7 @@ from PySide6.QtGui import QColor, QEnterEvent, QFont, QMouseEvent, QPainter, QPe
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from typing_extensions import override
 
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -77,12 +78,12 @@ class SpriteThumbnailWidget(QWidget):
         )
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if self.thumbnail_label:
-            self.thumbnail_label.setStyleSheet("""
-            QLabel {
-                background-color: #2b2b2b;
-                border: 2px solid #444;
+            self.thumbnail_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {COLORS["input_background"]};
+                border: 2px solid {COLORS["border"]};
                 border-radius: 4px;
-            }
+            }}
         """)
         # Don't use setScaledContents - it stretches and distorts sprites
         # We'll scale properly in set_sprite_data() with aspect ratio preserved
@@ -95,7 +96,7 @@ class SpriteThumbnailWidget(QWidget):
         font_size = "12px" if self.thumbnail_size >= 256 else "10px"
         self.info_label.setStyleSheet(f"""
             QLabel {{
-                color: #aaa;
+                color: {COLORS["text_secondary"]};
                 font-size: {font_size};
                 font-family: monospace;
                 font-weight: bold;
@@ -256,17 +257,17 @@ class SpriteThumbnailWidget(QWidget):
     def _update_style(self):
         """Update the visual style based on state."""
         if self.is_selected:
-            border_color = "#4a9eff"
+            border_color = COLORS["border_focus"]
             border_width = "2px"
-            bg_color = "#3a3a4a"
+            bg_color = COLORS["focus_background_subtle"]
         elif self.is_hovered:
-            border_color = "#666"
+            border_color = COLORS["text_muted"]
             border_width = "1px"
-            bg_color = "#333"
+            bg_color = COLORS["panel_background"]
         else:
-            border_color = "#444"
+            border_color = COLORS["border"]
             border_width = "1px"
-            bg_color = "#2b2b2b"
+            bg_color = COLORS["input_background"]
 
         if self.thumbnail_label:
             self.thumbnail_label.setStyleSheet(f"""

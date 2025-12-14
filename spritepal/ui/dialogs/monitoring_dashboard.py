@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
 from typing_extensions import override
 
 from core.monitoring import get_monitoring_manager
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 
@@ -53,7 +54,7 @@ class MetricWidget(QFrame):
         # Title
         title_label = QLabel(title)
         title_label.setFont(QFont("Arial", 10))
-        title_label.setStyleSheet("color: #666; font-weight: bold;")
+        title_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-weight: bold;")
 
         # Value with trend indicator
         value_layout = QHBoxLayout()
@@ -93,13 +94,13 @@ class MetricWidget(QFrame):
     def _get_trend_color(self, trend: str) -> str:
         """Get color for trend indication."""
         colors = {
-            'increasing': '#ff6b6b',  # Red for bad trends like memory/CPU up
-            'decreasing': '#51cf66',  # Green for good trends like errors down
-            'stable': '#868e96',      # Gray for stable
-            'up': '#ff6b6b',
-            'down': '#51cf66'
+            'increasing': COLORS["danger"],  # Red for bad trends like memory/CPU up
+            'decreasing': COLORS["success"],  # Green for good trends like errors down
+            'stable': COLORS["text_muted"],  # Gray for stable
+            'up': COLORS["danger"],
+            'down': COLORS["success"]
         }
-        return colors.get(trend, '#868e96')
+        return colors.get(trend, COLORS["text_muted"])
 
 
 class PerformanceTab(QWidget):
@@ -300,7 +301,7 @@ class ErrorsTab(QWidget):
             severity_item = QTableWidgetItem("ERROR")  # Default
             if critical_count > 0:
                 severity_item.setText("CRITICAL")
-                severity_item.setBackground(QColor("#ffebee"))  # Light red
+                severity_item.setBackground(QColor(COLORS["danger"]))  # Dark theme red
             self.error_table.setItem(i, 4, severity_item)
 
 

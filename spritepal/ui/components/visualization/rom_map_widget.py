@@ -17,6 +17,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 from utils.sprite_regions import SpriteRegion
 
@@ -170,10 +171,10 @@ class ROMMapWidget(QWidget):
             # Draw ROM regions
             # Common sprite areas (based on typical SNES ROM layout)
             regions = [
-                (0x000000, 0x100000, "#2b2b2b", "Low ROM"),
-                (0x100000, 0x200000, "#3b3b3b", "Mid ROM"),
-                (0x200000, 0x300000, "#4b4b4b", "High ROM"),
-                (0x300000, 0x400000, "#5b5b5b", "Extended ROM"),
+                (0x000000, 0x100000, COLORS["input_background"], "Low ROM"),
+                (0x100000, 0x200000, COLORS["panel_background"], "Mid ROM"),
+                (0x200000, 0x300000, COLORS["border"], "High ROM"),
+                (0x300000, 0x400000, COLORS["border"], "Extended ROM"),
             ]
 
             for start, end, color, _label in regions:

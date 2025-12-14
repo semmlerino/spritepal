@@ -31,6 +31,7 @@ from ui.components.dialogs import RangeScanDialog
 from ui.components.visualization import ROMMapWidget
 from ui.rom_extraction.workers import RangeScanWorker
 from ui.styles import get_panel_style
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 # from utils.rom_cache import get_rom_cache # Removed due to DI
@@ -127,13 +128,13 @@ class ScanControlsPanel(QWidget):
         # Cache status label
         self.cache_status_label = QLabel("")
         if self.cache_status_label:
-            self.cache_status_label.setStyleSheet("""
-            QLabel {
-                color: #666;
+            self.cache_status_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS["text_muted"]};
                 font-size: 11px;
                 padding: 4px;
                 border-radius: 3px;
-            }
+            }}
         """)
         self.cache_status_label.setVisible(False)  # Hidden by default
         layout.addWidget(self.cache_status_label)
@@ -602,58 +603,58 @@ class ScanControlsPanel(QWidget):
             self.cache_status_label.setText(message)
         self.cache_status_label.setVisible(True)
 
-        # Different styles for different cache operations
+        # Different styles for different cache operations (dark theme compatible)
         if "resumed" in message.lower() or "resuming" in message.lower():
-            # Cache resume - blue theme
-            style = """
-                QLabel {
-                    background-color: #e3f2fd;
-                    color: #1976d2;
-                    border: 1px solid #2196f3;
+            # Cache resume - blue theme (dark)
+            style = f"""
+                QLabel {{
+                    background-color: {COLORS["cache_checking_bg"]};
+                    color: {COLORS["cache_checking_text"]};
+                    border: 1px solid {COLORS["cache_checking_border"]};
                     border-radius: 3px;
                     padding: 4px;
                     font-size: 11px;
                     font-weight: bold;
-                }
+                }}
             """
         elif "saved" in message.lower() or "progress" in message.lower():
-            # Cache save - orange theme
-            style = """
-                QLabel {
-                    background-color: #fff3e0;
-                    color: #f57c00;
-                    border: 1px solid #ff9800;
+            # Cache save - orange theme (dark)
+            style = f"""
+                QLabel {{
+                    background-color: {COLORS["cache_fresh_bg"]};
+                    color: {COLORS["cache_fresh_text"]};
+                    border: 1px solid {COLORS["cache_fresh_border"]};
                     border-radius: 3px;
                     padding: 4px;
                     font-size: 11px;
                     font-weight: bold;
-                }
+                }}
             """
         elif "complete" in message.lower():
-            # Completion - green theme
-            style = """
-                QLabel {
-                    background-color: #e8f5e8;
-                    color: #2e7d32;
-                    border: 1px solid #4caf50;
+            # Completion - green theme (dark)
+            style = f"""
+                QLabel {{
+                    background-color: {COLORS["cache_resuming_bg"]};
+                    color: {COLORS["cache_resuming_text"]};
+                    border: 1px solid {COLORS["cache_resuming_border"]};
                     border-radius: 3px;
                     padding: 4px;
                     font-size: 11px;
                     font-weight: bold;
-                }
+                }}
             """
         else:
-            # Default - gray theme
-            style = """
-                QLabel {
-                    background-color: #f5f5f5;
-                    color: #666;
-                    border: 1px solid #ddd;
+            # Default - gray theme (dark)
+            style = f"""
+                QLabel {{
+                    background-color: {COLORS["panel_background"]};
+                    color: {COLORS["text_muted"]};
+                    border: 1px solid {COLORS["border"]};
                     border-radius: 3px;
                     padding: 4px;
                     font-size: 11px;
                     font-weight: bold;
-                }
+                }}
             """
 
         if self.cache_status_label:

@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.styles.theme import COLORS
+
 
 class HelpIconButton(QToolButton):
     """
@@ -60,23 +62,23 @@ class HelpIconButton(QToolButton):
 
         # Styling
         self.setStyleSheet(
-            """
-            QToolButton {
+            f"""
+            QToolButton {{
                 background-color: transparent;
-                border: 1px solid #666;
+                border: 1px solid {COLORS["text_muted"]};
                 border-radius: 9px;
                 font-size: 11px;
                 font-weight: bold;
-                color: #888;
-            }
-            QToolButton:hover {
-                background-color: #444;
-                border-color: #888;
-                color: #fff;
-            }
-            QToolButton:pressed {
-                background-color: #555;
-            }
+                color: {COLORS["text_muted"]};
+            }}
+            QToolButton:hover {{
+                background-color: {COLORS["border"]};
+                border-color: {COLORS["text_muted"]};
+                color: {COLORS["text_primary"]};
+            }}
+            QToolButton:pressed {{
+                background-color: {COLORS["border"]};
+            }}
             """
         )
 
@@ -187,13 +189,13 @@ class InfoBanner(QFrame):
         """Set up the banner UI."""
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Plain)
         self.setStyleSheet(
-            """
-            InfoBanner {
-                background-color: #2a3a4a;
-                border: 1px solid #3a4a5a;
+            f"""
+            InfoBanner {{
+                background-color: {COLORS["focus_background"]};
+                border: 1px solid {COLORS["cache_checking_border"]};
                 border-radius: 4px;
                 padding: 8px;
-            }
+            }}
             """
         )
 
@@ -203,7 +205,7 @@ class InfoBanner(QFrame):
         # Message label
         self.message_label = QLabel(self._message)
         self.message_label.setWordWrap(True)
-        self.message_label.setStyleSheet("color: #aabbcc;")
+        self.message_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
         layout.addWidget(self.message_label)
 
     def set_message(self, message: str) -> None:

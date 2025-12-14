@@ -56,6 +56,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -116,12 +117,12 @@ class FullscreenSpriteViewer(QWidget):
         self.sprite_label = QLabel()
         self.sprite_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if self.sprite_label:
-            self.sprite_label.setStyleSheet("""
-            QLabel {
+            self.sprite_label.setStyleSheet(f"""
+            QLabel {{
                 background-color: transparent;
-                border: 2px solid #444444;
+                border: 2px solid {COLORS["border"]};
                 border-radius: 8px;
-            }
+            }}
         """)
         self.sprite_label.setMinimumSize(200, 200)
 
@@ -136,15 +137,15 @@ class FullscreenSpriteViewer(QWidget):
         self.info_overlay = QLabel()
         self.info_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if self.info_overlay:
-            self.info_overlay.setStyleSheet("""
-            QLabel {
+            self.info_overlay.setStyleSheet(f"""
+            QLabel {{
                 background-color: rgba(0, 0, 0, 180);
-                color: #ffffff;
+                color: {COLORS["text_primary"]};
                 padding: 15px 30px;
                 border-radius: 10px;
                 font-size: 16px;
                 font-weight: bold;
-            }
+            }}
         """)
         self.info_overlay.hide()  # Initially hidden
 
@@ -155,13 +156,13 @@ class FullscreenSpriteViewer(QWidget):
         font.setPointSize(12)
         self.status_label.setFont(font)
         if self.status_label:
-            self.status_label.setStyleSheet("""
-            QLabel {
+            self.status_label.setStyleSheet(f"""
+            QLabel {{
                 background-color: rgba(0, 0, 0, 150);
-                color: #cccccc;
+                color: {COLORS["text_secondary"]};
                 padding: 10px 20px;
                 border-radius: 6px;
-            }
+            }}
         """)
 
         # Add status at top
@@ -196,11 +197,11 @@ class FullscreenSpriteViewer(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
         # Dark background
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #0f0f0f;
-                color: #ffffff;
-            }
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS["preview_background"]};
+                color: {COLORS["text_primary"]};
+            }}
         """)
 
         # Set cursor to hidden after a delay - use weakref to avoid preventing GC
@@ -278,14 +279,14 @@ class FullscreenSpriteViewer(QWidget):
             if self.sprite_label:
                 self.sprite_label.setText(f"Loading sprite...\n0x{offset:06X}")
             if self.sprite_label:
-                self.sprite_label.setStyleSheet("""
-                QLabel {
-                    background-color: #2d2d2d;
-                    border: 2px solid #444444;
+                self.sprite_label.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {COLORS["background"]};
+                    border: 2px solid {COLORS["border"]};
                     border-radius: 8px;
-                    color: #888888;
+                    color: {COLORS["text_muted"]};
                     font-size: 18px;
-                }
+                }}
             """)
 
         # Update info overlay

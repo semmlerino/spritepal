@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 from typing_extensions import override
 
 from ui.common import WorkerManager
+from ui.styles.theme import COLORS
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.components.navigation.region_jump_widget import RegionJumpWidget
 from ui.components.visualization.rom_map_widget import ROMMapWidget
@@ -67,22 +68,22 @@ class SpriteThumbnail(QWidget):
         # Don't use setScaledContents - preserve aspect ratio
         self.preview_label.setScaledContents(False)
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setStyleSheet("""
-            QLabel {
-                background: #2b2b2b;
-                border: 2px solid #444;
+        self.preview_label.setStyleSheet(f"""
+            QLabel {{
+                background: {COLORS["input_background"]};
+                border: 2px solid {COLORS["border"]};
                 border-radius: 4px;
                 padding: 2px;
-            }
-            QLabel:hover {
-                border: 2px solid #4488dd;
-                background: #3b3b3b;
-            }
+            }}
+            QLabel:hover {{
+                border: 2px solid {COLORS["highlight"]};
+                background: {COLORS["panel_background"]};
+            }}
         """)
 
         self.offset_label = QLabel(f"0x{offset:06X}")
         if self.offset_label:
-            self.offset_label.setStyleSheet("font-size: 10px; color: #888;")
+            self.offset_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         self.offset_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Layout
@@ -116,23 +117,23 @@ class SpriteThumbnail(QWidget):
 
         # Update border color based on quality
         if quality > 0.8:
-            border_color = "#4CAF50"  # Green for high quality
+            border_color = COLORS["success"]  # Green for high quality
         elif quality > 0.5:
-            border_color = "#FFC107"  # Yellow for medium
+            border_color = COLORS["warning"]  # Yellow for medium
         else:
-            border_color = "#F44336"  # Red for low quality
+            border_color = COLORS["danger"]  # Red for low quality
 
         if self.preview_label:
             self.preview_label.setStyleSheet(f"""
             QLabel {{
-                background: #2b2b2b;
+                background: {COLORS["input_background"]};
                 border: 2px solid {border_color};
                 border-radius: 4px;
                 padding: 2px;
             }}
             QLabel:hover {{
-                border: 2px solid #4488dd;
-                background: #3b3b3b;
+                border: 2px solid {COLORS["highlight"]};
+                background: {COLORS["panel_background"]};
             }}
         """)
 
@@ -143,14 +144,14 @@ class SpriteThumbnail(QWidget):
         if self.preview_label:
             self.preview_label.setText("Empty")
         if self.preview_label:
-            self.preview_label.setStyleSheet("""
-            QLabel {
-                background: #1b1b1b;
-                border: 2px solid #333;
+            self.preview_label.setStyleSheet(f"""
+            QLabel {{
+                background: {COLORS["preview_background"]};
+                border: 2px solid {COLORS["panel_background"]};
                 border-radius: 4px;
                 padding: 2px;
-                color: #555;
-            }
+                color: {COLORS["border"]};
+            }}
         """)
         if self.offset_label:
             self.offset_label.setText("--")
@@ -229,13 +230,13 @@ class SpriteNavigator(QWidget):
         # Main navigation frame
         nav_frame = QFrame()
         nav_frame.setFrameStyle(QFrame.Shape.StyledPanel)
-        nav_frame.setStyleSheet("""
-            QFrame {
-                background: #2b2b2b;
-                border: 1px solid #444;
+        nav_frame.setStyleSheet(f"""
+            QFrame {{
+                background: {COLORS["input_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 6px;
                 padding: 8px;
-            }
+            }}
         """)
         nav_layout = QVBoxLayout(nav_frame)
 
@@ -247,7 +248,7 @@ class SpriteNavigator(QWidget):
         title_font.setBold(True)
         title_font.setPointSize(12)
         title.setFont(title_font)
-        title.setStyleSheet("color: #4488dd;")
+        title.setStyleSheet(f"color: {COLORS['highlight']};")
         title_bar.addWidget(title)
 
         title_bar.addStretch()
@@ -260,17 +261,17 @@ class SpriteNavigator(QWidget):
 
         self.position_label = QLabel("0x200000")
         if self.position_label:
-            self.position_label.setStyleSheet("""
+            self.position_label.setStyleSheet(f"""
             font-family: monospace;
             font-size: 14px;
             font-weight: bold;
-            color: #FFF;
+            color: {COLORS["text_primary"]};
         """)
         self.position_label.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.context_label = QLabel("High ROM - Common sprite area")
         if self.context_label:
-            self.context_label.setStyleSheet("font-size: 10px; color: #888;")
+            self.context_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         self.context_label.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         position_layout.addWidget(self.position_label)
@@ -296,16 +297,16 @@ class SpriteNavigator(QWidget):
         map_controls.setSpacing(4)
 
         density_label = QLabel("Sprite Density:")
-        density_label.setStyleSheet("font-size: 10px; color: #888;")
+        density_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         map_controls.addWidget(density_label)
 
         # Density legend
-        for color, text in [("#4CAF50", "High"), ("#FFC107", "Medium"), ("#F44336", "Low")]:
+        for color, text in [(COLORS["success"], "High"), (COLORS["warning"], "Medium"), (COLORS["danger"], "Low")]:
             legend_item = QLabel("■")
             legend_item.setStyleSheet(f"color: {color}; font-size: 14px;")
             map_controls.addWidget(legend_item)
             legend_label = QLabel(text)
-            legend_label.setStyleSheet("font-size: 10px; color: #888; margin-right: 10px;")
+            legend_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']}; margin-right: 10px;")
             map_controls.addWidget(legend_label)
 
         map_controls.addStretch()
@@ -401,7 +402,7 @@ class SpriteNavigator(QWidget):
 
         # Keyboard shortcuts help
         help_text = QLabel("Keyboard: ← → (fine), PageUp/Down (sprites), Ctrl+G (go to), Ctrl+B (bookmarks)")
-        help_text.setStyleSheet("font-size: 10px; color: #666; padding: 4px;")
+        help_text.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']}; padding: 4px;")
         help_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(help_text)
 

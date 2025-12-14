@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QVBoxLayout, QWidget
 
 from ui.styles import get_muted_text_style, get_panel_style
+from ui.styles.theme import COLORS
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
@@ -55,7 +56,7 @@ class StatusPanel(QWidget):
         self.detection_info = QLabel("Ready", parent=self)
         self.detection_info.setWordWrap(True)
         if self.detection_info:
-            self.detection_info.setStyleSheet("color: #cccccc; font-size: 10px;")  # Smaller text
+            self.detection_info.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 10px;")  # Smaller text
         layout.addWidget(self.detection_info)
 
         # Progress bar (initially hidden) - set proper parent
@@ -158,7 +159,7 @@ class StatusPanel(QWidget):
                     if self.cache_icon_label:
                         self.cache_icon_label.setText("✓")
                     if self.cache_icon_label:
-                        self.cache_icon_label.setStyleSheet("color: green; font-weight: bold;")
+                        self.cache_icon_label.setStyleSheet(f"color: {COLORS['success']}; font-weight: bold;")
 
                     # Update info
                     total_files = stats.get("total_files", 0)
@@ -187,7 +188,7 @@ class StatusPanel(QWidget):
                     if self.cache_icon_label:
                         self.cache_icon_label.setText("⚠")
                     if self.cache_icon_label:
-                        self.cache_icon_label.setStyleSheet("color: orange; font-weight: bold;")
+                        self.cache_icon_label.setStyleSheet(f"color: {COLORS['warning']}; font-weight: bold;")
                     if self.cache_info_label:
                         self.cache_info_label.setText("Error")
                     self.cache_status_widget.setToolTip("Error reading cache statistics")
@@ -196,7 +197,7 @@ class StatusPanel(QWidget):
                 if self.cache_icon_label:
                     self.cache_icon_label.setText("✗")
                 if self.cache_icon_label:
-                    self.cache_icon_label.setStyleSheet("color: gray; font-weight: bold;")
+                    self.cache_icon_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-weight: bold;")
                 if self.cache_info_label:
                     self.cache_info_label.setText("Disabled")
                 self.cache_status_widget.setToolTip("ROM caching is disabled")

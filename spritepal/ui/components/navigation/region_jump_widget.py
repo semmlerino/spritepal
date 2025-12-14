@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 from utils.sprite_regions import SpriteRegion
 
@@ -68,13 +69,13 @@ class RegionJumpWidget(QWidget):
 
         # Main container frame
         container = QFrame()
-        container.setStyleSheet("""
-            QFrame {
-                background: #363636;
-                border: 1px solid #555;
+        container.setStyleSheet(f"""
+            QFrame {{
+                background: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 4px;
                 padding: 6px;
-            }
+            }}
         """)
         container_layout = QVBoxLayout(container)
         container_layout.setSpacing(6)
@@ -91,7 +92,7 @@ class RegionJumpWidget(QWidget):
 
         self.stats_label = QLabel("No regions")
         if self.stats_label:
-            self.stats_label.setStyleSheet("font-size: 10px; color: #888;")
+            self.stats_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         title_row.addWidget(self.stats_label)
 
         container_layout.addLayout(title_row)
@@ -108,51 +109,51 @@ class RegionJumpWidget(QWidget):
         self.region_combo.setMinimumWidth(200)
         self.region_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         if self.region_combo:
-            self.region_combo.setStyleSheet("""
-            QComboBox {
-                background: #2b2b2b;
-                border: 1px solid #555;
+            self.region_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: {COLORS["input_background"]};
+                border: 1px solid {COLORS["border"]};
                 padding: 4px;
                 border-radius: 3px;
-            }
-            QComboBox:hover {
-                border-color: #4488dd;
-            }
-            QComboBox::drop-down {
+            }}
+            QComboBox:hover {{
+                border-color: {COLORS["highlight"]};
+            }}
+            QComboBox::drop-down {{
                 border: none;
-            }
-            QComboBox::down-arrow {
+            }}
+            QComboBox::down-arrow {{
                 image: none;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 6px solid #888;
+                border-top: 6px solid {COLORS["text_muted"]};
                 margin-right: 4px;
-            }
+            }}
         """)
         region_row.addWidget(self.region_combo)
 
         self.go_button = QPushButton("Go")
         self.go_button.setMinimumWidth(40)
         if self.go_button:
-            self.go_button.setStyleSheet("""
-            QPushButton {
-                background: #4488dd;
-                color: white;
+            self.go_button.setStyleSheet(f"""
+            QPushButton {{
+                background: {COLORS["highlight"]};
+                color: {COLORS["text_primary"]};
                 border: none;
                 padding: 4px 8px;
                 border-radius: 3px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #5599ee;
-            }
-            QPushButton:pressed {
-                background: #3377cc;
-            }
-            QPushButton:disabled {
-                background: #555;
-                color: #888;
-            }
+            }}
+            QPushButton:hover {{
+                background: {COLORS["highlight_hover"]};
+            }}
+            QPushButton:pressed {{
+                background: {COLORS["browse_pressed"]};
+            }}
+            QPushButton:disabled {{
+                background: {COLORS["border"]};
+                color: {COLORS["text_muted"]};
+            }}
         """)
         region_row.addWidget(self.go_button)
 
@@ -173,17 +174,17 @@ class RegionJumpWidget(QWidget):
         self.offset_spinbox.setDisplayIntegerBase(16)
         self.offset_spinbox.setPrefix("0x")
         if self.offset_spinbox:
-            self.offset_spinbox.setStyleSheet("""
-            QSpinBox {
-                background: #2b2b2b;
-                border: 1px solid #555;
+            self.offset_spinbox.setStyleSheet(f"""
+            QSpinBox {{
+                background: {COLORS["input_background"]};
+                border: 1px solid {COLORS["border"]};
                 padding: 4px;
                 border-radius: 3px;
                 font-family: monospace;
-            }
-            QSpinBox:hover {
-                border-color: #4488dd;
-            }
+            }}
+            QSpinBox:hover {{
+                border-color: {COLORS["highlight"]};
+            }}
         """)
         offset_row.addWidget(self.offset_spinbox)
 
@@ -325,49 +326,49 @@ class RegionJumpWidget(QWidget):
         if self.region_combo is not None:
             if enabled:
                 if self.region_combo:
-                    self.region_combo.setStyleSheet("""
-                    QComboBox {
-                        background: #2b4b2b;  /* Green tint for smart mode */
-                        border: 2px solid #4CAF50;
+                    self.region_combo.setStyleSheet(f"""
+                    QComboBox {{
+                        background: {COLORS["cache_resuming_bg"]};
+                        border: 2px solid {COLORS["success"]};
                         padding: 4px;
                         border-radius: 3px;
-                    }
-                    QComboBox:hover {
-                        border-color: #66BB6A;
-                    }
-                    QComboBox::drop-down {
+                    }}
+                    QComboBox:hover {{
+                        border-color: {COLORS["cache_resuming_text"]};
+                    }}
+                    QComboBox::drop-down {{
                         border: none;
-                    }
-                    QComboBox::down-arrow {
+                    }}
+                    QComboBox::down-arrow {{
                         image: none;
                         border-left: 4px solid transparent;
                         border-right: 4px solid transparent;
-                        border-top: 6px solid #4CAF50;
+                        border-top: 6px solid {COLORS["success"]};
                         margin-right: 4px;
-                    }
+                    }}
                 """)
             # Reset to normal style
             elif self.region_combo:
-                self.region_combo.setStyleSheet("""
-                    QComboBox {
-                        background: #2b2b2b;
-                        border: 1px solid #555;
+                self.region_combo.setStyleSheet(f"""
+                    QComboBox {{
+                        background: {COLORS["input_background"]};
+                        border: 1px solid {COLORS["border"]};
                         padding: 4px;
                         border-radius: 3px;
-                    }
-                    QComboBox:hover {
-                        border-color: #4488dd;
-                    }
-                    QComboBox::drop-down {
+                    }}
+                    QComboBox:hover {{
+                        border-color: {COLORS["highlight"]};
+                    }}
+                    QComboBox::drop-down {{
                         border: none;
-                    }
-                    QComboBox::down-arrow {
+                    }}
+                    QComboBox::down-arrow {{
                         image: none;
                         border-left: 4px solid transparent;
                         border-right: 4px solid transparent;
-                        border-top: 6px solid #888;
+                        border-top: 6px solid {COLORS["text_muted"]};
                         margin-right: 4px;
-                    }
+                    }}
                 """)
 
     def get_current_region_index(self) -> int:
