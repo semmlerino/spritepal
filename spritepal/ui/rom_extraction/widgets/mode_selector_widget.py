@@ -5,17 +5,14 @@ from typing import Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout
 
+# UI Spacing Constants (imported from centralized module)
+from ui.common.spacing_constants import (
+    EXTRACTION_COMBO_MIN_WIDTH as COMBO_MIN_WIDTH,
+    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
+)
+
 from .base_widget import BaseExtractionWidget
 
-# UI Spacing Constants (matching main panel)
-SPACING_SMALL = 6
-SPACING_MEDIUM = 10
-SPACING_LARGE = 16
-SPACING_XLARGE = 20
-BUTTON_MIN_HEIGHT = 32
-COMBO_MIN_WIDTH = 200
-BUTTON_MAX_WIDTH = 150
-LABEL_MIN_WIDTH = 120
 
 class ModeSelectorWidget(BaseExtractionWidget):
     """Widget for selecting extraction mode (preset vs manual)"""

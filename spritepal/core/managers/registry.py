@@ -184,14 +184,6 @@ class ManagerRegistry:
                     created_managers.append("injection")
                     self._logger.debug("InjectionManager created successfully")
 
-                # NavigationManager is DISABLED due to threading issues in tests.
-                # Implementation exists at: core/navigation/manager.py (600+ lines)
-                # To re-enable: uncomment below and add "navigation" to expected_managers
-                # in is_initialized() method.
-                # from core.navigation.manager import NavigationManager
-                # self._managers["navigation"] = NavigationManager(parent=qt_parent)
-                # created_managers.append("navigation")
-
                 # Initialize MonitoringManager
                 self._logger.debug("Creating MonitoringManager...")
                 monitoring_manager = MonitoringManager(parent=qt_parent)
@@ -323,24 +315,6 @@ class ManagerRegistry:
         except ValueError as e:
             raise ManagerError("InjectionManager not initialized. Call initialize_managers() first.") from e
 
-    def get_navigation_manager(self):
-        """
-        Get the navigation manager instance
-
-        Returns:
-            NavigationManager instance
-
-        Raises:
-            ManagerError: If manager not initialized
-        """
-        # Use DI container to resolve NavigationManager - eliminates circular dependencies
-        from core.di_container import inject
-        from core.protocols.manager_protocols import NavigationManagerProtocol
-        try:
-            return inject(NavigationManagerProtocol)
-        except ValueError as e:
-            raise ManagerError("NavigationManager not initialized. Call initialize_managers() first.") from e
-
     def get_core_operations_manager(self):
         """
         Get the consolidated core operations manager instance
@@ -437,6 +411,18 @@ class ManagerRegistry:
             self._managers[name].is_initialized()
             for name in expected_managers
         )
+
+    @classmethod
+    def is_clean(cls) -> bool:
+        """Check if the registry is in a clean (uninitialized) state.
+
+        Used by test infrastructure to detect state pollution between tests.
+        A clean registry has no singleton instance.
+
+        Returns:
+            True if no singleton instance exists, False if initialized.
+        """
+        return cls._instance is None
 
     def get_all_managers(self) -> dict[str, Any]:
         """Get all registered managers (for testing/debugging)"""

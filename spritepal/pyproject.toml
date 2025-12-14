@@ -407,7 +407,6 @@ filterwarnings = [
     "ignore:get_session_manager.*is deprecated:DeprecationWarning",
     "ignore:get_extraction_manager.*is deprecated:DeprecationWarning",
     "ignore:get_injection_manager.*is deprecated:DeprecationWarning",
-    "ignore:get_navigation_manager.*is deprecated:DeprecationWarning",
     "ignore:get_settings_manager.*is deprecated:DeprecationWarning",
     "ignore:get_rom_cache.*is deprecated:DeprecationWarning",
     # Worker constructor injection deprecation warnings (B.2 - transitioning to DI)

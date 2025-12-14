@@ -8,12 +8,24 @@ following modern UI design principles.
 # Base spacing unit (8px grid system)
 BASE_UNIT = 8
 
-# Spacing values
+# Spacing values (8px grid system)
 SPACING_TINY = BASE_UNIT // 2       # 4px - for very tight spacing
 SPACING_SMALL = BASE_UNIT           # 8px - for compact layouts
 SPACING_MEDIUM = BASE_UNIT * 2      # 16px - standard spacing
 SPACING_LARGE = BASE_UNIT * 3       # 24px - generous spacing
 SPACING_XLARGE = BASE_UNIT * 4      # 32px - section separation
+
+# Compact spacing values (for dense widget areas like extraction panels)
+SPACING_COMPACT_SMALL = 6           # 6px - tight spacing for dense UIs
+SPACING_COMPACT_MEDIUM = 10         # 10px - compact standard spacing
+SPACING_COMPACT_LARGE = 16          # 16px - compact generous spacing
+SPACING_COMPACT_XLARGE = 20         # 20px - compact section separation
+
+# Extraction panel widget sizes
+EXTRACTION_BUTTON_MIN_HEIGHT = 32   # Minimum button height for extraction widgets
+EXTRACTION_COMBO_MIN_WIDTH = 200    # Minimum combo box width
+EXTRACTION_BUTTON_MAX_WIDTH = 150   # Maximum button width
+EXTRACTION_LABEL_MIN_WIDTH = 120    # Minimum label width for alignment
 
 # Widget heights
 BUTTON_HEIGHT = BASE_UNIT * 5       # 40px - standard button height
