@@ -35,7 +35,7 @@ pytestmark = [
     pytest.mark.signals_slots,
     pytest.mark.slow,
     pytest.mark.worker_threads,
-    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.usefixtures("isolated_managers", "mock_hal"),  # DI + HAL mocking
 ]
 
 class TestROMCacheCore:
@@ -652,6 +652,7 @@ class TestROMCacheCore:
             assert str(cache.cache_dir).startswith(tempfile.gettempdir())
             assert cache.cache_enabled is True
 
+@pytest.mark.usefixtures("isolated_managers")
 class TestROMCacheSingleton:
     """Test the global ROM cache singleton."""
 
@@ -690,6 +691,7 @@ class TestROMCacheSingleton:
         assert loaded is not None
         assert "test" in loaded
 
+@pytest.mark.usefixtures("isolated_managers")
 class TestROMCacheIntegration:
     """Test ROM cache integration with UI components."""
 

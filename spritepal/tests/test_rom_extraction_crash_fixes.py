@@ -17,8 +17,8 @@ from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
-    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+    pytest.mark.usefixtures("isolated_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
     pytest.mark.dialog,
     pytest.mark.file_io,
     pytest.mark.headless,
@@ -36,7 +36,7 @@ class TestSignalLoopFixes:
     """Test signal loop protection in injection dialog"""
 
     @pytest.fixture
-    def injection_dialog(self, qtbot):
+    def injection_dialog(self, qtbot, isolated_managers):
         """Create injection dialog for testing"""
         injection_manager = inject(InjectionManagerProtocol)
         dialog = InjectionDialog(injection_manager=injection_manager)
@@ -106,7 +106,7 @@ class TestOffsetParsingFixes:
     """Test improved offset parsing with error handling"""
 
     @pytest.fixture
-    def injection_dialog(self, qtbot):
+    def injection_dialog(self, qtbot, isolated_managers):
         """Create injection dialog for testing"""
         injection_manager = inject(InjectionManagerProtocol)
         dialog = InjectionDialog(injection_manager=injection_manager)
@@ -183,7 +183,7 @@ class TestROMLoadingSafety:
     """Test safe ROM loading with error handling"""
 
     @pytest.fixture
-    def injection_dialog(self, qtbot):
+    def injection_dialog(self, qtbot, isolated_managers):
         """Create injection dialog for testing"""
         injection_manager = inject(InjectionManagerProtocol)
         dialog = InjectionDialog(injection_manager=injection_manager)
@@ -371,7 +371,7 @@ class TestInputValidation:
     """Test input validation improvements"""
 
     @pytest.fixture
-    def injection_dialog(self, qtbot):
+    def injection_dialog(self, qtbot, isolated_managers):
         """Create injection dialog for testing"""
         injection_manager = inject(InjectionManagerProtocol)
         dialog = InjectionDialog(injection_manager=injection_manager)

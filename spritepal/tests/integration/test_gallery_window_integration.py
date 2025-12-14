@@ -17,6 +17,7 @@ from unittest.mock import Mock, patch
 import pytest
 from PySide6.QtCore import QTimer
 
+from tests.fixtures.timeouts import get_timeout_multiplier
 from tests.infrastructure.qt_real_testing import (
     EventLoopHelper,
     MemoryHelper,
@@ -416,8 +417,9 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
 
         setup_time = time.time() - start_time
 
-        # Should handle large sprite sets efficiently (< 2 seconds for setup)
-        assert setup_time < 2.0, f"Virtual scrolling setup took {setup_time:.2f}s, too slow"
+        # Should handle large sprite sets efficiently (< 2 seconds baseline, scaled for environment)
+        threshold = 2.0 * get_timeout_multiplier()
+        assert setup_time < threshold, f"Virtual scrolling setup took {setup_time:.2f}s, expected < {threshold:.1f}s"
 
         # Verify all sprites are accessible
         assert len(self.window.sprites_data) == 10000

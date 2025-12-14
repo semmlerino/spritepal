@@ -485,12 +485,12 @@ class TestButtonStylingWithGradients:
         final_size = button.size()
         assert final_size == original_size, "Button size should be consistent after hover"
 
+@pytest.mark.usefixtures("isolated_managers")
 class TestCompleteUserWorkflowIntegration:
     """Test complete user workflows with real Qt interaction."""
 
 
     @pytest.mark.gui
-    @pytest.mark.usefixtures("setup_managers")
     def test_theme_consistency_across_workflow(self, qtbot) -> None:
         """Test that dark theme is consistent across entire user workflow."""
         # Step 1: Create main window
@@ -526,7 +526,6 @@ class TestCompleteUserWorkflowIntegration:
         assert expected_preview_bg in theme_css or expected_preview_bg == "#1e1e1e", "Theme should include preview background"
 
     @pytest.mark.gui
-    @pytest.mark.usefixtures("setup_managers")
     def test_responsive_ui_with_size_constraints(self, qtbot) -> None:
         """Test that UI responds correctly to size constraints (1000x650)."""
         # Create main window
