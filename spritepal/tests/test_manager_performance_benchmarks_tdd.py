@@ -110,13 +110,15 @@ class TestManagerPerformanceBenchmarksTDD:
         assert result is not None
 
     @pytest.mark.benchmark
-    def test_parameter_validation_performance_tdd(self, benchmark, test_data_repo):
+    def test_parameter_validation_performance_tdd(self, benchmark, test_data_repo, tmp_path):
         """TDD: Parameter validation should be fast enough for real-time UI.
-        
+
         RED: Establish validation time requirements (< 10ms per validation)
         GREEN: Optimize validation logic for speed
         REFACTOR: Maintain validation accuracy while improving speed
         """
+        output_vram_path = str(tmp_path / "perf_test.vram")
+
         def validate_parameters():
             with manager_context("extraction", "injection") as ctx:
                 extraction_mgr = ctx.get_extraction_manager()
@@ -142,8 +144,8 @@ class TestManagerPerformanceBenchmarksTDD:
                     "mode": "vram",
                     "sprite_path": injection_data["sprite_path"],
                     "input_vram": vram_data["vram_path"],
-                    "output_vram": "/tmp/perf_test.vram",
-                    "offset": 0x8000
+                    "output_vram": output_vram_path,
+                    "offset": 0x8000,
                 }
 
                 try:

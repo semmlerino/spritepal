@@ -122,7 +122,7 @@ class TestControllerDefensiveValidationFix:
                 main_window.get_extraction_params = original_get_params
                 main_window.extraction_failed = original_extraction_failed
 
-    def test_fixed_fast_failure_with_invalid_cgram_path(self):
+    def test_fixed_fast_failure_with_invalid_cgram_path(self, tmp_path):
         """Test that invalid CGRAM path fails fast in Full Color mode."""
         print("=== TESTING FIXED FAST FAILURE WITH INVALID CGRAM PATH ===")
 
@@ -157,7 +157,7 @@ class TestControllerDefensiveValidationFix:
                 invalid_params = {
                     "vram_path": vram_path,  # Valid file
                     "cgram_path": "/nonexistent/cgram.dmp",  # Invalid file
-                    "output_base": "/tmp/test_output",
+                    "output_base": str(tmp_path / "test_output"),
                     "create_grayscale": True,
                     "grayscale_mode": False,  # Full Color mode - requires CGRAM
                 }
@@ -189,7 +189,7 @@ class TestControllerDefensiveValidationFix:
                 main_window.extraction_failed = original_extraction_failed
                 repo.cleanup()
 
-    def test_fixed_grayscale_mode_bypasses_cgram_validation(self):
+    def test_fixed_grayscale_mode_bypasses_cgram_validation(self, tmp_path):
         """Test that Grayscale Only mode bypasses CGRAM validation correctly."""
         print("=== TESTING GRAYSCALE MODE CGRAM BYPASS ===")
 
@@ -223,7 +223,7 @@ class TestControllerDefensiveValidationFix:
                 params = {
                     "vram_path": vram_path,  # Valid file
                     "cgram_path": "/nonexistent/cgram.dmp",  # Invalid but should be ignored
-                    "output_base": "/tmp/test_output",
+                    "output_base": str(tmp_path / "test_output"),
                     "create_grayscale": True,
                     "grayscale_mode": True,  # Grayscale mode - CGRAM not required
                 }

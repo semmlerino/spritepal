@@ -163,20 +163,20 @@ class TestExtractionManagerEdgeCases:
     Uses shared class_managers fixture - no local setup_managers needed.
     """
 
-    def test_validate_missing_path_types(self, real_factory):
+    def test_validate_missing_path_types(self, real_factory, tmp_path):
         """Test validation when neither vram_path nor rom_path provided."""
         manager = real_factory.create_extraction_manager()
 
         # No path type provided should raise ValidationError
-        params = {"output_base": "/tmp/test"}
+        params = {"output_base": str(tmp_path / "test")}
         with pytest.raises(ValidationError, match="vram_path or rom_path"):
             manager.validate_extraction_params(params)
 
-    def test_validate_with_empty_vram_path(self, real_factory):
+    def test_validate_with_empty_vram_path(self, real_factory, tmp_path):
         """Test validation with empty VRAM path."""
         manager = real_factory.create_extraction_manager()
 
-        params = {"vram_path": "", "output_base": "/tmp/test"}
+        params = {"vram_path": "", "output_base": str(tmp_path / "test")}
         with pytest.raises(ValidationError):
             manager.validate_extraction_params(params)
 
@@ -213,7 +213,7 @@ class TestExtractionManagerEdgeCases:
         params = {
             "rom_path": str(rom_path),
             "offset": -1,
-            "output_base": "/tmp/test"
+            "output_base": str(tmp_path / "test"),
         }
         with pytest.raises(ValidationError, match="offset"):
             manager.validate_extraction_params(params)
@@ -420,7 +420,7 @@ class TestWorkflowEdgeCases:
         params = {
             "rom_path": str(rom_path),
             "offset": "not_an_int",
-            "output_base": "/tmp/test"
+            "output_base": str(tmp_path / "test"),
         }
         with pytest.raises((ValidationError, TypeError)):
             manager.validate_extraction_params(params)
@@ -469,8 +469,8 @@ class TestFileValidationEdgeCases:
         # Grayscale mode should NOT require CGRAM
         params = {
             "vram_path": str(vram_path),
-            "output_base": "/tmp/test",
-            "grayscale_mode": True
+            "output_base": str(tmp_path / "test"),
+            "grayscale_mode": True,
         }
         # Should pass validation (no CGRAM required)
         result = manager.validate_extraction_params(params)
@@ -486,8 +486,8 @@ class TestFileValidationEdgeCases:
         # Full color mode without CGRAM should fail
         params = {
             "vram_path": str(vram_path),
-            "output_base": "/tmp/test",
-            "grayscale_mode": False
+            "output_base": str(tmp_path / "test"),
+            "grayscale_mode": False,
         }
         with pytest.raises(ValidationError, match="CGRAM"):
             manager.validate_extraction_params(params)

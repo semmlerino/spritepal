@@ -432,7 +432,7 @@ class TestDragDropErrorHandling:
         return drop_zone
 
     @pytest.mark.integration
-    def test_file_system_error_recovery(self, mock_drop_zone):
+    def test_file_system_error_recovery(self, mock_drop_zone, tmp_path):
         """Test recovery from file system errors during drag & drop"""
 
         # Mock drop event that throws file system error
@@ -447,7 +447,7 @@ class TestDragDropErrorHandling:
         # Create drop event
         drop_event = Mock()
         url = Mock()
-        url.toLocalFile.return_value = "/tmp/test.dmp"
+        url.toLocalFile.return_value = str(tmp_path / "test.dmp")
         drop_event.mimeData.return_value.urls.return_value = [url]
 
         # Test drop event with file system error
@@ -459,7 +459,7 @@ class TestDragDropErrorHandling:
         assert not mock_drop_zone.file_dropped.emit.called
 
     @pytest.mark.integration
-    def test_concurrent_drop_events(self, mock_drop_zone):
+    def test_concurrent_drop_events(self, mock_drop_zone, tmp_path):
         """Test handling of concurrent drop events"""
 
         # Mock drop event that sets file
@@ -476,7 +476,7 @@ class TestDragDropErrorHandling:
         for i in range(3):
             drop_event = Mock()
             url = Mock()
-            url.toLocalFile.return_value = f"/tmp/test{i}.dmp"
+            url.toLocalFile.return_value = str(tmp_path / f"test{i}.dmp")
             drop_event.mimeData.return_value.urls.return_value = [url]
             drop_events.append(drop_event)
 
@@ -485,7 +485,7 @@ class TestDragDropErrorHandling:
             mock_drop_zone.dropEvent(drop_event)
 
         # Verify final state - should have last file
-        assert mock_drop_zone.file_path == "/tmp/test2.dmp"
+        assert mock_drop_zone.file_path == str(tmp_path / "test2.dmp")
         assert mock_drop_zone.file_dropped.emit.call_count == 3
 
     @pytest.mark.integration

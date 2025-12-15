@@ -29,9 +29,10 @@ pytestmark = [
 class TestSpriteCandidate:
     """Test SpriteCandidate dataclass behavior."""
 
-    def test_sprite_candidate_creation_and_properties(self):
+    def test_sprite_candidate_creation_and_properties(self, tmp_path):
         """Test creating a sprite candidate and accessing its properties."""
         # Create candidate with test data
+        preview_path = str(tmp_path / "preview.png")
         candidate = SpriteCandidate(
             offset=0x100000,
             compressed_size=1024,
@@ -39,7 +40,7 @@ class TestSpriteCandidate:
             tile_count=64,
             confidence=0.85,
             visual_metrics={"coherence": 0.8},
-            preview_path="/tmp/preview.png"
+            preview_path=preview_path,
         )
 
         # Verify properties are correctly set
@@ -49,11 +50,12 @@ class TestSpriteCandidate:
         assert candidate.tile_count == 64
         assert candidate.confidence == 0.85
         assert candidate.visual_metrics == {"coherence": 0.8}
-        assert candidate.preview_path == "/tmp/preview.png"
+        assert candidate.preview_path == preview_path
 
-    def test_sprite_candidate_serialization(self):
+    def test_sprite_candidate_serialization(self, tmp_path):
         """Test converting candidate to dictionary for serialization."""
         # Create candidate with floating point values
+        preview_path = str(tmp_path / "preview.png")
         candidate = SpriteCandidate(
             offset=0x100000,
             compressed_size=1024,
@@ -61,7 +63,7 @@ class TestSpriteCandidate:
             tile_count=64,
             confidence=0.856789,
             visual_metrics={"coherence": 0.823456, "edge_score": 0.712345},
-            preview_path="/tmp/preview.png"
+            preview_path=preview_path,
         )
 
         # Convert to dictionary
@@ -76,7 +78,7 @@ class TestSpriteCandidate:
         assert result["confidence"] == 0.857  # Rounded to 3 decimal places
         assert result["visual_metrics"]["coherence"] == 0.823  # Rounded
         assert result["visual_metrics"]["edge_score"] == 0.712  # Rounded
-        assert result["preview_path"] == "/tmp/preview.png"
+        assert result["preview_path"] == preview_path
 
 class TestSpriteFinderWithRealComponents:
     """Test SpriteFinder using real components with test doubles for external dependencies."""

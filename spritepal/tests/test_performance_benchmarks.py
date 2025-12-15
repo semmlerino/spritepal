@@ -285,19 +285,21 @@ class TestAsyncROMCachePerformance:
 class TestPreviewOrchestratorPerformance:
     """Performance tests for PreviewOrchestrator"""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup_orchestrator(self, tmp_path):
         """Set up orchestrator performance tests"""
         self.orchestrator = PreviewOrchestrator()
         self.test_sprites = PerformanceTestData.generate_test_dataset(100)
 
         # Mock ROM cache for testing
         mock_rom_cache = Mock()
-        mock_rom_cache.cache_dir = "/tmp/test_cache"
+        mock_rom_cache.cache_dir = str(tmp_path / "test_cache")
         self.orchestrator.set_rom_cache(mock_rom_cache)
 
-    def teardown_method(self):
-        """Clean up orchestrator tests"""
-        if hasattr(self, 'orchestrator'):
+        yield
+
+        # Cleanup
+        if hasattr(self, "orchestrator"):
             del self.orchestrator
 
     @pytest.mark.performance

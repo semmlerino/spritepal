@@ -85,8 +85,9 @@ def mock_validator():
 class TestSpriteCandidate:
     """Test SpriteCandidate dataclass"""
 
-    def test_sprite_candidate_creation(self):
+    def test_sprite_candidate_creation(self, tmp_path):
         """Test creating a sprite candidate"""
+        preview_path = str(tmp_path / "preview.png")
         candidate = SpriteCandidate(
             offset=0x100000,
             compressed_size=1024,
@@ -94,7 +95,7 @@ class TestSpriteCandidate:
             tile_count=64,
             confidence=0.85,
             visual_metrics={"coherence": 0.8},
-            preview_path="/tmp/preview.png"
+            preview_path=preview_path,
         )
 
         assert candidate.offset == 0x100000
@@ -103,10 +104,11 @@ class TestSpriteCandidate:
         assert candidate.tile_count == 64
         assert candidate.confidence == 0.85
         assert candidate.visual_metrics == {"coherence": 0.8}
-        assert candidate.preview_path == "/tmp/preview.png"
+        assert candidate.preview_path == preview_path
 
-    def test_sprite_candidate_to_dict(self):
+    def test_sprite_candidate_to_dict(self, tmp_path):
         """Test converting candidate to dictionary"""
+        preview_path = str(tmp_path / "preview.png")
         candidate = SpriteCandidate(
             offset=0x100000,
             compressed_size=1024,
@@ -114,7 +116,7 @@ class TestSpriteCandidate:
             tile_count=64,
             confidence=0.856789,
             visual_metrics={"coherence": 0.823456, "edge_score": 0.712345},
-            preview_path="/tmp/preview.png"
+            preview_path=preview_path,
         )
 
         result = candidate.to_dict()
@@ -127,7 +129,7 @@ class TestSpriteCandidate:
         assert result["confidence"] == 0.857  # Rounded to 3 places
         assert result["visual_metrics"]["coherence"] == 0.823
         assert result["visual_metrics"]["edge_score"] == 0.712
-        assert result["preview_path"] == "/tmp/preview.png"
+        assert result["preview_path"] == preview_path
 
 class TestSpriteFinder:
     """Test SpriteFinder class"""
