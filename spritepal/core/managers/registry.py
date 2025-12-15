@@ -26,7 +26,6 @@ from .extraction_manager import ExtractionManager
 from .injection_manager import InjectionManager
 from .monitoring_manager import MonitoringManager
 from .session_manager import SessionManager
-from .ui_coordinator_manager import UICoordinatorManager
 
 if TYPE_CHECKING:
     from .base_manager import BaseManager
@@ -92,7 +91,6 @@ class ManagerRegistry:
         ApplicationStateManager,
         CoreOperationsManager,
         MonitoringManager,
-        UICoordinatorManager,
     ]
 
     def __new__(cls) -> ManagerRegistry:
@@ -174,7 +172,7 @@ class ManagerRegistry:
     # 2. Add the manager class to MANAGED_CLASSES below
     # 3. Add initialization code in initialize_managers() following the pattern
     #
-    # Current order: ApplicationStateManager → CoreOperationsManager → MonitoringManager → UICoordinatorManager
+    # Current order: ApplicationStateManager → CoreOperationsManager → MonitoringManager
     #
     # Use _validate_initialization_order() to verify the hardcoded order matches
     # what topological sort would produce.
@@ -264,13 +262,6 @@ class ManagerRegistry:
                     monitoring_manager.register_manager_monitoring(self._managers["injection"])
                 if "session" in self._managers:
                     monitoring_manager.register_manager_monitoring(self._managers["session"])
-
-                # UICoordinatorManager handles UI coordination
-                self._logger.debug("Creating UICoordinatorManager...")
-                ui_manager = UICoordinatorManager(parent=qt_parent)
-                self._managers["ui_coordinator"] = ui_manager
-                created_managers.append("ui_coordinator")
-                self._logger.debug("UICoordinatorManager created successfully")
 
                 # Future managers will be added here
 
@@ -432,18 +423,6 @@ class ManagerRegistry:
             ManagerError: If manager not initialized
         """
         return self._get_manager("state", ApplicationStateManager)
-
-    def get_ui_coordinator_manager(self):
-        """
-        Get the consolidated UI coordinator manager instance
-
-        Returns:
-            UICoordinatorManager instance
-
-        Raises:
-            ManagerError: If manager not initialized
-        """
-        return self._get_manager("ui_coordinator", UICoordinatorManager)
 
     def get_monitoring_manager(self):
         """

@@ -7,11 +7,7 @@ Simplifies sprite extraction with automatic palette association
 """
 
 import sys
-from pathlib import Path
 from types import TracebackType
-
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
