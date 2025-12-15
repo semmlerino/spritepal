@@ -16,13 +16,13 @@ import pytest
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
+    pytest.mark.shared_state_safe,  # Tests don't mutate shared state
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.benchmark,
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.mock_only,
-    pytest.mark.parallel_safe,
     pytest.mark.performance,
     pytest.mark.qt_mock,
     pytest.mark.rom_data,

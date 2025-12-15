@@ -769,6 +769,37 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
     yield
 
 
+@pytest.fixture(autouse=True)
+def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, None]:
+    """Enforce that session_managers usage requires @pytest.mark.shared_state_safe.
+
+    This fixture validates at test execution time that any test using session_managers
+    has the shared_state_safe marker, ensuring developers consciously acknowledge
+    they're using shared state.
+
+    The marker requirement ensures:
+    1. Developers understand session_managers shares state across tests
+    2. Tests are reviewed for statelessness before using session_managers
+    3. Order-dependent test failures are easier to diagnose
+    """
+    # Only check tests that use session_managers
+    fixture_names = set(getattr(request, 'fixturenames', []))
+    if 'session_managers' not in fixture_names:
+        yield
+        return
+
+    # Require the marker
+    if not request.node.get_closest_marker('shared_state_safe'):
+        pytest.fail(
+            f"Test '{request.node.name}' uses session_managers but lacks "
+            "@pytest.mark.shared_state_safe marker. Either:\n"
+            "  1. Add @pytest.mark.shared_state_safe (if test is verified stateless), or\n"
+            "  2. Use isolated_managers instead (recommended for most tests)"
+        )
+
+    yield
+
+
 # ===========================================================================================
 # Wait Helper Fixtures for Eliminating Flaky qtbot.wait() Calls
 # ===========================================================================================

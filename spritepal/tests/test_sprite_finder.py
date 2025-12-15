@@ -24,7 +24,7 @@ pytestmark = [
     pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
-    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.usefixtures("mock_hal"),  # HAL mocking for compression
 ]
 
 @pytest.fixture

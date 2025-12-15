@@ -220,24 +220,32 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
     test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
     session_active = _session_state.is_initialized
     session_settings_path = _session_state.settings_path
-    restore_session_after = False
 
-    # Isolation guard: fail if registry already initialized (indicates pollution)
-    # EXCEPTION: If test has no_manager_setup marker, it opted out of session_managers
-    # and we should clean up and provide fresh isolated managers
+    # Check if THIS test's module also uses session_managers (same-module mixing)
+    fixture_names = set(getattr(request, 'fixturenames', []))
+    same_module_mixing = session_active and 'session_managers' in fixture_names
+
+    # Isolation guard: fail if registry already initialized (indicates pollution or mixing)
     registry = ManagerRegistry()
     if registry.is_initialized():
-        if session_active:
-            # Session managers are active - pause them so isolated_managers can provide
-            # a clean environment, then restore after the test.
-            restore_session_after = True
+        if same_module_mixing:
+            # FAIL FAST: Same module uses both session_managers and isolated_managers
+            # This indicates a test design problem - keep modules consistent.
+            pytest.fail(
+                f"Test '{test_name}': Cannot use isolated_managers when session_managers is also "
+                "requested in the same module. This causes order-dependent failures. Either:\n"
+                "  1. Use isolated_managers for ALL tests in this module, or\n"
+                "  2. Use session_managers + @pytest.mark.shared_state_safe for ALL tests\n"
+                "See CLAUDE.md 'Test Fixture Selection Guide' for guidance."
+            )
+        elif session_active:
+            # Cross-module case: session_managers is from a different module
+            # Clean up session state so this test gets fresh isolated managers
             try:
                 cleanup_managers()
                 ManagerRegistry.reset_for_tests()
             except Exception:
                 pass
-            # Reflect that session managers are temporarily paused
-            _session_state.is_initialized = False
         else:
             # Registry initialized without session - likely test pollution
             # Try to clean up
@@ -270,21 +278,12 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
     # Clean up managers after test
     cleanup_managers()
 
-    # Restore session managers if we paused them for isolation
-    if restore_session_after and session_settings_path:
+    # Restore session managers if they were active from a different module
+    if session_active and not same_module_mixing and session_settings_path:
         try:
             initialize_managers("TestApp", settings_path=session_settings_path)
-            _session_state.is_initialized = True
-        except Exception as restore_error:
-            pytest.fail(
-                f"Test '{test_name}': Failed to restore session managers after isolation: {restore_error}"
-            )
-    # Restore DI container configuration if session_managers was used earlier
-    # This prevents isolated_managers from breaking other tests that depend
-    # on session_managers having the DI container properly configured
-    elif _session_state.is_initialized:
-        from core.di_container import configure_container
-        configure_container()
+        except Exception:
+            pass  # Best effort restore
 
     # Process events to ensure cleanup completes
     if app and not IS_HEADLESS:

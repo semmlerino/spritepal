@@ -34,7 +34,7 @@ All tools run via `uv` from the `spritepal/` directory.
 **Defaults configured in `pyproject.toml`.** Qt offscreen mode set automatically in `conftest.py`.
 
 ```bash
-# Sync dependencies (from exhal-master/)
+# Sync dependencies (uv finds workspace root automatically)
 uv sync --extra dev
 
 # Linting
@@ -68,13 +68,18 @@ SpritePal uses real components over mocks. **Prefer real components; mock only a
 ```python
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
-def test_extraction_workflow():
+def test_extraction_workflow(tmp_path):  # Always use tmp_path for file operations
     with RealComponentFactory() as factory:
         manager = factory.create_extraction_manager(with_test_data=True)
+        # Create test files in tmp_path (parallel-safe, auto-cleaned)
+        vram_file = tmp_path / "vram.bin"
+        cgram_file = tmp_path / "cgram.bin"
+        vram_file.write_bytes(b"\x00" * 0x8000)  # Test data
+        cgram_file.write_bytes(b"\x00" * 0x200)
         params = {
-            "vram_path": "/path/to/vram.bin",
-            "cgram_path": "/path/to/cgram.bin",
-            "output_base": "test_sprite",
+            "vram_path": str(vram_file),
+            "cgram_path": str(cgram_file),
+            "output_base": str(tmp_path / "test_sprite"),
         }
         result = manager.validate_extraction_params(params)
         assert result is True  # Real validation behavior
@@ -113,10 +118,14 @@ def test_async_operation(qtbot, worker):
     with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
         worker.start()
 
-# Multiple signals (finished OR failed) - wait for any one:
-def test_async_with_failure_case(qtbot, worker):
-    with qtbot.waitSignals([worker.finished, worker.failed], timeout=worker_timeout(), raising=False):
-        worker.start()
+# Multiple possible outcomes - test ONE path per test (pytest-qt has no "wait for any"):
+def test_worker_success(qtbot, worker):
+    with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
+        worker.start()  # Configure worker for success path
+
+def test_worker_failure(qtbot, worker):
+    with qtbot.waitSignal(worker.failed, timeout=worker_timeout()):
+        worker.start()  # Configure worker for failure path
 
 # For slow operations, use the LONG multiplier:
 def test_slow_extraction(qtbot, worker):
@@ -142,6 +151,12 @@ qtbot.waitSignal(worker.finished, timeout=worker_timeout())  # May miss signal!
 | `cleanup_timeout()` | 2000 | Thread termination, resource cleanup |
 
 Multipliers: `SHORT=0.5`, `MEDIUM=1.0` (default), `LONG=2.0`
+
+**Timeout Escalation Policy:**
+- If a test times out in CI but passes locally: **fix the async logic**, don't increase `PYTEST_TIMEOUT_MULTIPLIER`
+- Only increase multiplier for known-slow environments (e.g., ARM CI runners, resource-constrained VMs)
+- Never use multiplier >3.0 without investigating root cause first
+- If you find yourself repeatedly increasing timeouts for a test, the test is flaky—fix the race condition
 
 ### Test Markers
 
@@ -189,8 +204,10 @@ def test_extraction_logic(isolated_managers, tmp_path):
     # ... test code using isolated managers ...
 ```
 
-**Validation:** The `check_parallel_isolation` fixture automatically validates that
-`parallel_safe` tests don't use incompatible fixtures like `session_managers`.
+**Validation:** The `check_parallel_isolation` fixture (`autouse=True`) validates at test
+execution time that `parallel_safe` tests don't use incompatible fixtures. Tests using
+`session_managers` or `class_managers` with `@pytest.mark.parallel_safe` will fail with
+an explicit error message.
 
 **Common Mistakes:**
 - Using `session_managers` with `parallel_safe` - causes fixture conflicts
@@ -232,10 +249,10 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 | Need | Use | NOT |
 |------|-----|-----|
 | **Default for all tests** | `isolated_managers` | `session_managers` |
-| Proven-safe shared state | `session_managers` + `@pytest.mark.shared_state_safe` | bare `session_managers` |
+| Proven-safe shared state | `session_managers` + `@pytest.mark.shared_state_safe` (enforced) | bare `session_managers` (fails) |
 | Real component testing | `RealComponentFactory` | `Mock()` + `cast()` |
 | Qt images in worker thread | `ThreadSafeTestImage` | `QPixmap` |
-| Singleton dialog cleanup | `cleanup_singleton` | Own cleanup fixture |
+| Singleton dialog cleanup | `cleanup_singleton` fixture (auto-cleans DialogRegistry) | Own cleanup fixture |
 | Signal waiting | `qtbot.waitSignal()` | `time.sleep()` |
 | HAL with mocks (fast) | `hal_pool` (default) | Real HAL |
 | HAL with real impl | `@pytest.mark.real_hal` | Mock HAL |
@@ -257,7 +274,7 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 |---------|-------------|--------|
 | `fast_managers` | `isolated_managers` | Hidden session state causes order-dependent failures |
 
-**⚠️ Do not mix `session_managers` and `isolated_managers` in the same module.** While there is a fallback mechanism that pauses session managers, relying on it masks test design problems and creates order-dependent behavior. Keep each test module consistent: either all `isolated_managers` or all `session_managers` (with proper markers).
+**⚠️ Do not mix `session_managers` and `isolated_managers` in the same module.** Same-module mixing causes test failures—this is intentional. It indicates a test design problem where some tests expect clean state while others expect shared state. Keep each test module consistent: either all `isolated_managers` or all `session_managers` (with proper markers). Cross-module usage (different files using different fixtures) is handled automatically.
 
 **HAL Fixtures:**
 
@@ -265,6 +282,7 @@ HAL (compression/decompression) is **mock-by-default** because:
 - Real HAL requires the external `exhal` binary which may not be available
 - Mock HAL is ~100x faster (~1ms vs ~100ms per operation)
 - Use `@pytest.mark.real_hal` only for integration tests validating actual compression
+- Tests marked `@pytest.mark.real_hal` will **skip** if `exhal` is not in PATH
 
 | Fixture | Default Behavior | With `--use-real-hal` or `@pytest.mark.real_hal` |
 |---------|------------------|--------------------------------------------------|
@@ -278,7 +296,7 @@ HAL (compression/decompression) is **mock-by-default** because:
 | Marker | Effect |
 |--------|--------|
 | `@pytest.mark.allows_registry_state` | Skip pollution detection for this test |
-| `@pytest.mark.shared_state_safe` | Required when using `session_managers` (certifies test is stateless) |
+| `@pytest.mark.shared_state_safe` | **Enforced** when using `session_managers` - test fails without it |
 | `@pytest.mark.no_manager_setup` | Skip setup_managers fixture |
 | `@pytest.mark.real_hal` | Use real HAL implementation |
 
@@ -304,7 +322,7 @@ HAL (compression/decompression) is **mock-by-default** because:
 **Environment Variables** (optional, read by `tests/conftest.py`):
 - `PYTEST_TIMEOUT_MULTIPLIER=2.0` - Scale all timeouts (useful for slow CI)
 
-Note: `QT_QPA_PLATFORM=offscreen` is set automatically by conftest.py if not already set.
+Note: `QT_QPA_PLATFORM=offscreen` is set at the **top** of conftest.py (before any Qt imports) to ensure reliable headless operation. Do not add Qt imports above line 56 in conftest.py.
 
 ## Project Architecture
 
@@ -382,7 +400,7 @@ SpritePal uses a **consolidated manager architecture** with inheritance-based ad
 - **Legacy managers** (SessionManager, ExtractionManager, InjectionManager) exist only as base classes
   for adapters - direct instantiation is deprecated and emits a warning
 
-**Example Usage:**
+**Example Usage (Production Code):**
 ```python
 from core.di_container import inject
 from core.protocols.manager_protocols import (
@@ -399,6 +417,20 @@ injection_mgr = inject(InjectionManagerProtocol)
 # DEPRECATED: Direct instantiation emits DeprecationWarning
 # from core.managers import SessionManager
 # session_mgr = SessionManager()  # Don't do this!
+```
+
+**In Tests:** Use fixtures, not `inject()` directly:
+```python
+# CORRECT: Fixtures provide isolated or session-scoped managers
+def test_extraction(isolated_managers):  # or session_managers + marker
+    from core.managers.registry import ManagerRegistry
+    registry = ManagerRegistry()
+    extraction_mgr = registry.extraction_manager
+    # ... test code ...
+
+# WRONG: inject() returns shared singletons, breaks test isolation
+def test_extraction_wrong():
+    extraction_mgr = inject(ExtractionManagerProtocol)  # Don't do this in tests!
 ```
 
 ### Circular Import Resolution

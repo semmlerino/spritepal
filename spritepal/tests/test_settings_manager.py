@@ -19,13 +19,13 @@ def get_settings_manager():
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
+    pytest.mark.shared_state_safe,  # Tests are stateless reads/writes to isolated temp dirs
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
 ]
@@ -264,22 +264,7 @@ class TestSettingsManager:
         assert settings_manager.get("session", "create_grayscale") is True
         assert settings_manager.get("session", "create_metadata") is True
 
-class TestGlobalSettingsInstance:
-    """Test the global settings instance"""
 
-    def test_get_settings_manager_singleton(self, isolated_managers):
-        """Test that get_settings_manager returns singleton"""
-        # Get instance twice - should return same object
-        manager1 = get_settings_manager()
-        manager2 = get_settings_manager()
-
-        assert manager1 is manager2
-        assert isinstance(manager1, SettingsManager)
-
-    def test_get_settings_manager_preserves_state(self, isolated_managers):
-        """Test that singleton preserves state"""
-        manager1 = get_settings_manager()
-        manager1.set("custom", "key", "value")
-
-        manager2 = get_settings_manager()
-        assert manager2.get("custom", "key") == "value"
+# NOTE: TestGlobalSettingsInstance was moved to test_settings_manager_singleton.py
+# because it requires isolated_managers (fresh state) while this module uses
+# session_managers. See CLAUDE.md 'Test Fixture Selection Guide'.

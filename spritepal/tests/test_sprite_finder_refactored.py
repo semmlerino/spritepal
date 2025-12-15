@@ -23,7 +23,7 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.headless,
     pytest.mark.parallel_safe,
-    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.usefixtures("mock_hal"),  # HAL mocking for compression
 ]
 
 class TestSpriteCandidate:
@@ -80,6 +80,7 @@ class TestSpriteCandidate:
         assert result["visual_metrics"]["edge_score"] == 0.712  # Rounded
         assert result["preview_path"] == preview_path
 
+@pytest.mark.usefixtures("isolated_managers")
 class TestSpriteFinderWithRealComponents:
     """Test SpriteFinder using real components with test doubles for external dependencies."""
 
@@ -244,6 +245,7 @@ class TestSpriteFinderWithRealComponents:
             assert len(candidates) == 0
 
 
+@pytest.mark.usefixtures("isolated_managers")
 class TestSpriteFinderIntegration:
     """Integration tests for SpriteFinder with minimal mocking."""
 
