@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import threading
 import time
 from pathlib import Path
@@ -123,7 +124,11 @@ class CacheWorker(QObject):
                 # Write data
                 f.write(data)
 
-            # Atomic rename
+                # Ensure data is on disk before atomic rename
+                f.flush()
+                os.fsync(f.fileno())
+
+            # Atomic rename (safe after fsync)
             temp_file.replace(cache_file)
 
             self.save_complete.emit(cache_key, True)

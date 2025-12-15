@@ -20,6 +20,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 import weakref
 from enum import Enum
 from pathlib import Path
@@ -72,6 +73,7 @@ class HALRequest(NamedTuple):
     output_path: str | None = None
     fast: bool = False
     request_id: str | None = None
+    batch_id: str | None = None  # Unique batch identifier to prevent result misattribution
 
 class HALResult(NamedTuple):
     """Result structure for HAL process pool operations.
@@ -83,6 +85,7 @@ class HALResult(NamedTuple):
         error_message: Error description if failed
         request_id: ID to correlate request with result
         status: Explicit status tracking (COMPLETED, TIMED_OUT, PENDING)
+        batch_id: Unique batch identifier to validate result ownership
     """
     success: bool
     data: bytes | None = None
@@ -90,6 +93,7 @@ class HALResult(NamedTuple):
     error_message: str | None = None
     request_id: str | None = None
     status: HALResultStatus = HALResultStatus.COMPLETED
+    batch_id: str | None = None
 
 def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queue[HALRequest | None], result_queue: mp.Queue[HALResult]) -> None:
     """Worker process function for HAL operations.
@@ -151,7 +155,8 @@ def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queu
                 result = HALResult(
                     success=False,
                     error_message=f"Unknown operation: {request.operation}",
-                    request_id=request.request_id
+                    request_id=request.request_id,
+                    batch_id=request.batch_id
                 )
 
             # Put result in queue with error handling for closed pipes
@@ -178,7 +183,8 @@ def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queu
                 result = HALResult(
                     success=False,
                     error_message=f"Worker process error: {e!s}",
-                    request_id=getattr(request, "request_id", None) if request is not None else None
+                    request_id=getattr(request, "request_id", None) if request is not None else None,
+                    batch_id=getattr(request, "batch_id", None) if request is not None else None
                 )
                 result_queue.put(result)
             except (BrokenPipeError, EOFError, OSError, ConnectionResetError):
@@ -200,7 +206,8 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
             return HALResult(
                 success=False,
                 error_message=f"ROM file not found: {request.rom_path}",
-                request_id=request.request_id
+                request_id=request.request_id,
+                batch_id=request.batch_id
             )
 
         # Create temporary output file
@@ -214,7 +221,8 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
                 return HALResult(
                     success=False,
                     error_message=f"Invalid offset: {request.offset} (must be non-negative integer)",
-                    request_id=request.request_id
+                    request_id=request.request_id,
+                    batch_id=request.batch_id
                 )
 
             offset_hex = f"0x{request.offset:X}"
@@ -226,7 +234,8 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
                 return HALResult(
                     success=False,
                     error_message=f"Decompression failed: {result.stderr}",
-                    request_id=request.request_id
+                    request_id=request.request_id,
+                    batch_id=request.batch_id
                 )
 
             # Read decompressed data
@@ -236,7 +245,8 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
                 success=True,
                 data=data,
                 size=len(data),
-                request_id=request.request_id
+                request_id=request.request_id,
+                batch_id=request.batch_id
             )
 
         finally:
@@ -248,7 +258,8 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
         return HALResult(
             success=False,
             error_message=f"Decompression error: {e!s}",
-            request_id=request.request_id
+            request_id=request.request_id,
+            batch_id=request.batch_id
         )
 
 def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
@@ -258,7 +269,8 @@ def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
             return HALResult(
                 success=False,
                 error_message="No data provided for compression",
-                request_id=request.request_id
+                request_id=request.request_id,
+                batch_id=request.batch_id
             )
 
         # Write input to temp file
@@ -280,7 +292,8 @@ def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
                     return HALResult(
                         success=False,
                         error_message=f"Compression failed: {result.stderr}",
-                        request_id=request.request_id
+                        request_id=request.request_id,
+                        batch_id=request.batch_id
                     )
 
                 # Get compressed size
@@ -289,13 +302,15 @@ def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
                 return HALResult(
                     success=True,
                     size=compressed_size,
-                    request_id=request.request_id
+                    request_id=request.request_id,
+                    batch_id=request.batch_id
                 )
             # ROM injection - not supported in pool mode for safety
             return HALResult(
                 success=False,
                 error_message="ROM injection not supported in pool mode",
-                request_id=request.request_id
+                request_id=request.request_id,
+                batch_id=request.batch_id
             )
 
         finally:
@@ -307,7 +322,8 @@ def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
         return HALResult(
             success=False,
             error_message=f"Compression error: {e!s}",
-            request_id=request.request_id
+            request_id=request.request_id,
+            batch_id=request.batch_id
         )
 
 class HALProcessPool:
@@ -548,6 +564,9 @@ class HALProcessPool:
             return []
 
         try:
+            # Generate unique batch ID to prevent result misattribution between batches
+            current_batch_id = f"batch_{uuid.uuid4().hex[:12]}"
+
             # Validate unique request IDs to prevent result collisions
             # HALRequest is a NamedTuple (immutable), so we need to create new instances
             request_ids = [req.request_id for req in requests]
@@ -557,9 +576,9 @@ class HALProcessPool:
                     logger,
                     "Non-unique request IDs detected in batch - reassigning unique IDs"
                 )
-                # Create new requests with unique IDs to prevent result collision
+                # Create new requests with unique IDs and batch_id to prevent result collision
                 requests = [
-                    req._replace(request_id=f"batch_{id(req)}_{i}")
+                    req._replace(request_id=f"batch_{id(req)}_{i}", batch_id=current_batch_id)
                     for i, req in enumerate(requests)
                 ]
             elif None in request_ids:
@@ -567,12 +586,17 @@ class HALProcessPool:
                     logger,
                     "None request_id detected in batch - assigning unique IDs"
                 )
-                # Create new requests for those with None IDs
+                # Create new requests for those with None IDs, add batch_id to all
                 requests = [
-                    req._replace(request_id=f"batch_none_{id(req)}_{i}")
-                    if req.request_id is None else req
+                    req._replace(
+                        request_id=f"batch_none_{id(req)}_{i}" if req.request_id is None else req.request_id,
+                        batch_id=current_batch_id
+                    )
                     for i, req in enumerate(requests)
                 ]
+            else:
+                # All IDs valid, just add batch_id
+                requests = [req._replace(batch_id=current_batch_id) for req in requests]
 
             # Submit all requests
             for req in requests:
@@ -606,9 +630,18 @@ class HALProcessPool:
                         result = self._result_queue.get(timeout=wait_time)
                     else:
                         raise HALPoolError("Result queue not initialized")
-                    if result.request_id:
-                        results[result.request_id] = result
-                        received_count += 1
+
+                    # Validate batch_id to prevent misattribution from stale results
+                    if result.batch_id == current_batch_id:
+                        if result.request_id:
+                            results[result.request_id] = result
+                            received_count += 1
+                    else:
+                        # Stale result from previous batch - discard and log
+                        safe_debug(
+                            logger,
+                            f"Discarding stale result with batch_id={result.batch_id} (expected {current_batch_id})"
+                        )
                 except queue.Empty:
                     # Individual request timed out, but continue trying for others
                     # This prevents one slow request from blocking all subsequent results
@@ -618,13 +651,18 @@ class HALProcessPool:
             # Use zero timeout to capture anything already in queue
             if received_count < len(requests):
                 drained_count = 0
+                discarded_stale = 0
                 while True:
                     try:
                         if self._result_queue is not None:
                             late_result = self._result_queue.get(timeout=0.0)
-                            if late_result.request_id:
-                                results[late_result.request_id] = late_result
-                                drained_count += 1
+                            # Only accept results from current batch
+                            if late_result.batch_id == current_batch_id:
+                                if late_result.request_id:
+                                    results[late_result.request_id] = late_result
+                                    drained_count += 1
+                            else:
+                                discarded_stale += 1
                         else:
                             break
                     except queue.Empty:
@@ -633,6 +671,11 @@ class HALProcessPool:
                     safe_debug(
                         logger,
                         f"Drained {drained_count} late-arriving results from queue"
+                    )
+                if discarded_stale > 0:
+                    safe_debug(
+                        logger,
+                        f"Discarded {discarded_stale} stale results from previous batches"
                     )
 
             # Return results in same order as requests with explicit status
@@ -648,6 +691,7 @@ class HALProcessPool:
                             error_message=f"Operation timed out after {total_timeout}s",
                             request_id=req.request_id,
                             status=HALResultStatus.TIMED_OUT,
+                            batch_id=current_batch_id,
                         )
                     )
             return final_results

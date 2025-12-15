@@ -283,6 +283,9 @@ class BatchThumbnailWorker(QObject):
         logger.info("BatchThumbnailWorker started")
         self.started.emit()
 
+        # Idle threshold for releasing ROM handle (2 seconds = 20 * 100ms)
+        IDLE_ROM_RELEASE_THRESHOLD = 20
+
         try:
             # Load ROM data using memory mapping
             self._load_rom_data()
@@ -308,6 +311,11 @@ class BatchThumbnailWorker(QObject):
                 if self._use_multithreading and not self._request_queue.empty():
                     batch_requests = []
                     batch_size = min(self._max_workers * 2, 8)  # Process up to 8 at once
+
+                    # Reload ROM if needed after idle release
+                    if self._rom_mmap is None:
+                        logger.debug("Reloading ROM data after idle release")
+                        self._load_rom_data()
 
                     for _ in range(batch_size):
                         request = self._get_next_request()
@@ -342,6 +350,11 @@ class BatchThumbnailWorker(QObject):
                     # Increment idle counter
                     idle_iterations += 1
 
+                    # Release ROM handle after 2 seconds idle to free file lock on Windows
+                    if idle_iterations == IDLE_ROM_RELEASE_THRESHOLD and self._rom_mmap is not None:
+                        logger.debug("Releasing ROM handle during idle to free file lock")
+                        self._clear_rom_data()
+
                     # Auto-stop after being idle for too long
                     if idle_iterations >= max_idle_iterations:
                         logger.info(f"Auto-stopping after {idle_iterations * 100}ms idle, processed {processed_count} total")
@@ -353,6 +366,11 @@ class BatchThumbnailWorker(QObject):
 
                 # Reset idle counter when we get work
                 idle_iterations = 0
+
+                # Reload ROM if needed after idle release
+                if self._rom_mmap is None:
+                    logger.debug("Reloading ROM data after idle release")
+                    self._load_rom_data()
 
                 logger.debug(f"Processing thumbnail request: offset=0x{request.offset:06X}, size={request.size}")
 

@@ -385,7 +385,10 @@ python_functions = "test_*"
 pythonpath = ["."]
 
 # Show extra test summary info
-addopts = "-v --tb=short --strict-markers"
+# -ra: show summary of all non-passing tests
+# --maxfail=3: stop after 3 failures (override with --maxfail=N)
+# --strict-markers: error on unknown markers
+addopts = "-v --tb=short -ra --maxfail=3 --strict-markers"
 
 # Qt-specific settings for pytest-qt
 qt_api = "pyside6"

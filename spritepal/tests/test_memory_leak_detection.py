@@ -369,6 +369,9 @@ class TestLargeDataProcessingMemoryLeaks:
         # Memory should be released
         memory_monitor.assert_no_leak(max_increase_mb=30)  # Allow for 16MB ROM
 
+@pytest.mark.skip_thread_cleanup(
+    reason="ThreadPoolExecutor Dummy threads require OS-level cleanup time after shutdown"
+)
 class TestMemoryLeakIntegration:
     """Integration tests for memory leak detection."""
 

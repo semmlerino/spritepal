@@ -18,11 +18,11 @@ from core.protocols.dialog_protocols import DialogFactoryProtocol
 from utils.settings_manager import SettingsManager
 
 # Systematic pytest markers applied based on test content analysis
+# NOTE: parallel_safe removed - tests use setup_managers fixture and mocks
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.unit,
     pytest.mark.cache,

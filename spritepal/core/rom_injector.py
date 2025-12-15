@@ -210,14 +210,14 @@ class ROMInjector(SpriteInjector):
             tmp_rom = tmp.name
 
         try:
-            # Decompress sprite data from the window
-            decompressed = self.hal_compressor.decompress_from_rom(tmp_rom, adjusted_offset)
+            # Decompress sprite data from the window - cache full result
+            full_decompressed = self.hal_compressor.decompress_from_rom(tmp_rom, adjusted_offset)
 
             # Validate decompressed data
-            if len(decompressed) == 0:
+            if len(full_decompressed) == 0:
                 raise ValueError("Decompression produced no data")
 
-            original_size = len(decompressed)
+            original_size = len(full_decompressed)
 
             # Safety validation: Check if original decompressed size is reasonable
             max_reasonable_sprite_size = 65536  # 64KB absolute max for SNES sprites
@@ -230,6 +230,9 @@ class ROMInjector(SpriteInjector):
                     f"Sprite data too large: {original_size} bytes. "
                     f"Maximum reasonable size is {max_reasonable_sprite_size} bytes."
                 )
+
+            # Work with full data, truncate only when returning
+            decompressed = full_decompressed
 
             # Truncate to expected size if specified
             if expected_size and len(decompressed) > expected_size:
@@ -246,15 +249,13 @@ class ROMInjector(SpriteInjector):
                         "Searching for sprite data within decompressed block..."
                     )
 
-                    # Try to find valid sprite data within the full decompressed data
-                    # Need to use the original full data, not truncated
-                    full_data = self.hal_compressor.decompress_from_rom(tmp_rom, adjusted_offset)
-                    sprite_offset = self._find_sprite_in_data(full_data, expected_size)
+                    # Use cached full_decompressed instead of re-decompressing
+                    sprite_offset = self._find_sprite_in_data(full_decompressed, expected_size)
                     if sprite_offset >= 0:
                         logger.info(
                             f"Found valid sprite data at offset {sprite_offset} within decompressed block"
                         )
-                        decompressed = full_data[sprite_offset:sprite_offset + expected_size]
+                        decompressed = full_decompressed[sprite_offset:sprite_offset + expected_size]
                     else:
                         logger.warning(
                             "Could not find valid sprite data. Consider using sprite scanner."

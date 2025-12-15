@@ -577,7 +577,11 @@ class ROMExtractor:
 
         except (OSError, PermissionError, MemoryError, Exception) as e:
             self._handle_scan_error(e, found_sprites, rom_cache, rom_path, scan_params, resume_offset)
-            return []
+            # Return partial results instead of discarding all progress
+            if found_sprites:
+                found_sprites.sort(key=lambda x: x["quality"], reverse=True)
+                logger.info(f"Returning {len(found_sprites)} sprites found before error")
+            return found_sprites
 
     def _create_scan_params(self, start_offset: int, end_offset: int, step: int) -> dict[str, Any]:
         """Create scan parameters dictionary for caching.

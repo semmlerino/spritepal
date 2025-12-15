@@ -28,6 +28,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from PIL import Image
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 
@@ -492,22 +493,15 @@ class PreviewGenerator(QObject):
         """
         width, height = request.size
 
-        # Always create palette mode image for consistency
-        img = Image.new("P", (width, height), 0)
+        # Use NumPy array for efficient pixel operations (10-100x faster than putpixel)
+        pixel_array = np.zeros((height, width), dtype=np.uint8)
 
         # Handle empty sprite data
         if len(sprite_data) == 0:
-            # Create error palette (red color to indicate error)
-            error_palette = []
-            error_palette.extend([255, 0, 0])  # Red
-            for _ in range(255):
-                error_palette.extend([0, 0, 0])
+            # Create error image
+            img = Image.fromarray(pixel_array, mode='P')
+            error_palette = [255, 0, 0] + [0, 0, 0] * 255  # Red for index 0
             img.putpalette(error_palette)
-
-            for y in range(height):
-                for x in range(width):
-                    img.putpixel((x, y), 0)
-
             logger.debug(f"Empty sprite data at offset {request.offset:06X}, returning error image")
             return img
 
@@ -520,7 +514,7 @@ class PreviewGenerator(QObject):
         tiles_y = (height + TILE_SIZE - 1) // TILE_SIZE
 
         # Create local palette (thread-safe: new list each call)
-        palette = []
+        palette: list[int] = []
 
         # Apply palette if available
         if request.palette and hasattr(request.palette, 'data'):
@@ -547,8 +541,6 @@ class PreviewGenerator(QObject):
         while len(palette) < 768:
             palette.extend([0, 0, 0])
 
-        img.putpalette(palette)
-
         # Decode 4bpp planar tile data
         tile_count = min(len(sprite_data) // BYTES_PER_TILE, tiles_x * tiles_y)
 
@@ -559,35 +551,44 @@ class PreviewGenerator(QObject):
             if len(tile_data) < BYTES_PER_TILE:
                 tile_data += b'\x00' * (BYTES_PER_TILE - len(tile_data))
 
-            # Decode 4bpp planar format
-            tile_pixels = []
+            # Decode 4bpp planar format into an 8x8 NumPy array
+            tile_pixels = np.zeros((TILE_SIZE, TILE_SIZE), dtype=np.uint8)
+
             for row in range(TILE_SIZE):
-                row_pixels = []
                 plane0 = tile_data[row * 2] if row * 2 < len(tile_data) else 0
                 plane1 = tile_data[row * 2 + 1] if row * 2 + 1 < len(tile_data) else 0
                 plane2 = tile_data[16 + row * 2] if 16 + row * 2 < len(tile_data) else 0
                 plane3 = tile_data[16 + row * 2 + 1] if 16 + row * 2 + 1 < len(tile_data) else 0
 
                 for bit in range(7, -1, -1):
+                    col = 7 - bit
                     pixel = ((plane0 >> bit) & 1) | \
                            (((plane1 >> bit) & 1) << 1) | \
                            (((plane2 >> bit) & 1) << 2) | \
                            (((plane3 >> bit) & 1) << 3)
-                    row_pixels.append(pixel)
-                tile_pixels.extend(row_pixels)
+                    tile_pixels[row, col] = pixel
 
-            # Place tile in image
+            # Place tile in image using NumPy slicing (much faster than putpixel)
             tile_x = tile_idx % tiles_x
             tile_y = tile_idx // tiles_x
 
-            for y in range(TILE_SIZE):
-                for x in range(TILE_SIZE):
-                    img_x = tile_x * TILE_SIZE + x
-                    img_y = tile_y * TILE_SIZE + y
-                    if img_x < width and img_y < height:
-                        pixel_idx = y * TILE_SIZE + x
-                        if pixel_idx < len(tile_pixels):
-                            img.putpixel((img_x, img_y), tile_pixels[pixel_idx])
+            # Calculate destination region
+            dest_y_start = tile_y * TILE_SIZE
+            dest_y_end = min(dest_y_start + TILE_SIZE, height)
+            dest_x_start = tile_x * TILE_SIZE
+            dest_x_end = min(dest_x_start + TILE_SIZE, width)
+
+            # Calculate source region (may be smaller at edges)
+            src_y_end = dest_y_end - dest_y_start
+            src_x_end = dest_x_end - dest_x_start
+
+            # Copy tile to pixel array
+            pixel_array[dest_y_start:dest_y_end, dest_x_start:dest_x_end] = \
+                tile_pixels[:src_y_end, :src_x_end]
+
+        # Create PIL Image from NumPy array and apply palette
+        img = Image.fromarray(pixel_array, mode='P')
+        img.putpalette(palette)
 
         return img
 

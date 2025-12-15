@@ -353,15 +353,13 @@ ManagerRegistry.initialize_managers()
          │
          ├── 2. SettingsManager           (reads ConfigurationService paths)
          │
-         ├── 3. UICoordinatorManager      (depends on StateManager)
+         ├── 3. CoreOperationsManager     (depends on StateManager)
          │
-         ├── 4. CoreOperationsManager     (depends on StateManager)
+         ├── 4. ExtractionManager         (depends on services)
          │
-         ├── 5. ExtractionManager         (depends on services)
+         ├── 5. InjectionManager          (depends on services)
          │
-         ├── 6. InjectionManager          (depends on services)
-         │
-         └── 7. MonitoringManager         (depends on all above)
+         └── 6. MonitoringManager         (depends on all above)
 ```
 
 **WARNING**: The order is implicit in `core/managers/registry.py:initialize_managers()`. Adding new managers requires careful consideration of dependencies.
