@@ -1,12 +1,33 @@
 """
-Manager classes for SpritePal business logic
+Manager classes for SpritePal business logic.
+
+This package provides the consolidated manager architecture with backward-compatible
+adapters. The recommended way to access managers is via dependency injection::
+
+    from core.di_container import inject
+    from core.protocols.manager_protocols import (
+        SessionManagerProtocol,
+        ExtractionManagerProtocol,
+        InjectionManagerProtocol,
+    )
+
+    session_mgr = inject(SessionManagerProtocol)
+    extraction_mgr = inject(ExtractionManagerProtocol)
+    injection_mgr = inject(InjectionManagerProtocol)
+
+Architecture:
+    - ApplicationStateManager: Consolidated manager for session, settings, state
+    - CoreOperationsManager: Consolidated manager for extraction, injection, palette
+    - SessionManager, ExtractionManager, InjectionManager: Legacy base classes for
+      adapters. These provide interface compatibility but all logic lives in the
+      consolidated managers.
 """
 from __future__ import annotations
 
 from .application_state_manager import ApplicationStateManager
 from .base_manager import BaseManager
 
-# Import new consolidated managers
+# Consolidated managers (NEW - these hold the actual logic)
 from .core_operations_manager import CoreOperationsManager
 from .exceptions import (
     ExtractionError,
@@ -18,6 +39,10 @@ from .exceptions import (
     SessionError,
     ValidationError,
 )
+
+# DEPRECATED: Legacy manager classes below are base classes for adapters only.
+# Do not instantiate directly. Use inject(XxxManagerProtocol) instead.
+# See module docstring above for the recommended access pattern.
 from .extraction_manager import ExtractionManager
 from .injection_manager import InjectionManager
 
@@ -29,8 +54,9 @@ from .registry import (
     initialize_managers,
     validate_manager_dependencies,
 )
+
+# DEPRECATED: See note above about legacy manager classes.
 from .session_manager import SessionManager
-from .ui_coordinator_manager import UICoordinatorManager
 
 __all__ = [
     "ApplicationStateManager",
@@ -50,7 +76,6 @@ __all__ = [
     "PreviewError",
     "SessionError",
     "SessionManager",
-    "UICoordinatorManager",
     "ValidationError",
     # Manager lifecycle functions (use inject() for manager access)
     "cleanup_managers",

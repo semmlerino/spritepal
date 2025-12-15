@@ -1,12 +1,28 @@
 """
-Manager for handling all extraction operations.
+ExtractionManager - Base class for ExtractionAdapter.
 
-This manager acts as a facade that delegates ROM and VRAM operations
-to specialized services (ROMService and VRAMService) while maintaining
-the same public interface for backward compatibility.
+This module provides the ExtractionManager class which serves as a base class
+for the ExtractionAdapter in the consolidated manager architecture.
+
+.. deprecated::
+    Direct instantiation of ExtractionManager is deprecated. Use dependency injection::
+
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
+
+        extraction_mgr = inject(ExtractionManagerProtocol)
+
+    This class exists primarily as a base class for ExtractionAdapter, which
+    provides backward compatibility while delegating to CoreOperationsManager.
+    All business logic now lives in CoreOperationsManager.
+
+See Also:
+    - :class:`core.managers.core_operations_manager.CoreOperationsManager`
+    - :class:`core.managers.core_operations_manager.ExtractionAdapter`
 """
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
@@ -31,7 +47,20 @@ from .exceptions import ExtractionError, ValidationError
 
 
 class ExtractionManager(BaseManager):
-    """Manages all extraction workflows (VRAM and ROM)"""
+    """
+    Base class for extraction management - provides interface for ExtractionAdapter.
+
+    .. deprecated::
+        Do not instantiate directly. Use dependency injection instead::
+
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            extraction_mgr = inject(ExtractionManagerProtocol)
+
+        This class serves as a base class for ExtractionAdapter, which inherits
+        from it for interface compatibility while delegating to
+        CoreOperationsManager for actual functionality.
+    """
 
     # Additional signals specific to extraction
     extraction_progress = Signal(str)  # Progress message
@@ -46,7 +75,25 @@ class ExtractionManager(BaseManager):
     cache_saved = Signal(str, int)  # Cache type, number of items saved
 
     def __init__(self, parent: QObject | None = None) -> None:
-        """Initialize the extraction manager"""
+        """
+        Initialize the extraction manager.
+
+        Args:
+            parent: Optional parent QObject
+
+        .. deprecated::
+            Direct instantiation is deprecated. Use ``inject(ExtractionManagerProtocol)``
+            to get the managed ExtractionAdapter instance instead.
+        """
+        # Emit deprecation warning only for direct instantiation (not adapter subclasses)
+        if type(self).__name__ == "ExtractionManager":
+            warnings.warn(
+                "Direct ExtractionManager instantiation is deprecated. "
+                "Use inject(ExtractionManagerProtocol) from core.di_container instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Declare instance variables with type hints
         self._sprite_extractor: SpriteExtractor | None = None
         self._rom_extractor: ROMExtractor | None = None

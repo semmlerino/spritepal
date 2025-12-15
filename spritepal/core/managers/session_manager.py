@@ -1,9 +1,29 @@
 """
-Manager for session state and application settings
+SessionManager - Base class for SessionAdapter.
+
+This module provides the SessionManager class which serves as a base class
+for the SessionAdapter in the consolidated manager architecture.
+
+.. deprecated::
+    Direct instantiation of SessionManager is deprecated. Use dependency injection::
+
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SessionManagerProtocol
+
+        session_mgr = inject(SessionManagerProtocol)
+
+    This class exists primarily as a base class for SessionAdapter, which
+    provides backward compatibility while delegating to ApplicationStateManager.
+    All business logic now lives in ApplicationStateManager.
+
+See Also:
+    - :class:`core.managers.application_state_manager.ApplicationStateManager`
+    - :class:`core.managers.application_state_manager.SessionAdapter`
 """
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from typing import Any, TypeVar, override
 
@@ -17,7 +37,20 @@ from .exceptions import SessionError, ValidationError
 T = TypeVar("T")
 
 class SessionManager(BaseManager):
-    """Manages session state and application settings"""
+    """
+    Base class for session management - provides interface for SessionAdapter.
+
+    .. deprecated::
+        Do not instantiate directly. Use dependency injection instead::
+
+            from core.di_container import inject
+            from core.protocols.manager_protocols import SessionManagerProtocol
+            session_mgr = inject(SessionManagerProtocol)
+
+        This class serves as a base class for SessionAdapter, which inherits
+        from it for interface compatibility while delegating to
+        ApplicationStateManager for actual functionality.
+    """
 
     # Signals for session events
     session_changed: Signal = Signal()  # Emitted when session state changes
@@ -27,12 +60,25 @@ class SessionManager(BaseManager):
 
     def __init__(self, app_name: str = "SpritePal", settings_path: Path | None = None) -> None:
         """
-        Initialize session manager
+        Initialize session manager.
 
         Args:
             app_name: Application name for settings file
             settings_path: Optional custom path for settings file (for testing)
+
+        .. deprecated::
+            Direct instantiation is deprecated. Use ``inject(SessionManagerProtocol)``
+            to get the managed SessionAdapter instance instead.
         """
+        # Emit deprecation warning only for direct instantiation (not adapter subclasses)
+        if type(self).__name__ == "SessionManager":
+            warnings.warn(
+                "Direct SessionManager instantiation is deprecated. "
+                "Use inject(SessionManagerProtocol) from core.di_container instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Initialize attributes needed by _initialize() before calling super()
         self._app_name: str
         self._settings_file: Path

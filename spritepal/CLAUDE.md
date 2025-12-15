@@ -29,7 +29,9 @@ spritepal/
 
 ## Development Tools
 
-All tools run via `uv` from the `spritepal/` directory:
+All tools run via `uv` from the `spritepal/` directory.
+
+**Defaults configured in `pyproject.toml`.** Qt offscreen mode set automatically in `conftest.py`.
 
 ```bash
 # Sync dependencies (from exhal-master/)
@@ -42,19 +44,20 @@ uv run ruff check . --fix
 # Type checking
 uv run basedpyright core ui utils
 
-# Tests - routine run (stop on first failure, short tracebacks)
-QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=1 --tb=short
+# Tests - routine run (uses pyproject.toml defaults: -v --tb=short -ra --maxfail=3)
+uv run pytest
 
-# Tests - full suite (increase maxfail for broader coverage)
-QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=5 --tb=short -q
+# Tests - on failure, drill down with full context
+uv run pytest tests/path/test_file.py::TestClass::test_name -vv --tb=long -s
 
-# Tests - specific subsets
-QT_QPA_PLATFORM=offscreen uv run pytest tests -m "headless and not slow" --maxfail=1  # Fast tests
-QT_QPA_PLATFORM=offscreen uv run pytest tests -m "gui" --maxfail=1                    # GUI tests (offscreen)
+# Tests - full suite (override maxfail)
+uv run pytest --maxfail=10
 
-# Tests - drill down on failure (verbose, full traceback)
-QT_QPA_PLATFORM=offscreen uv run pytest tests/path/test_file.py::TestClass::test_name -vv --tb=long
+# Tests - parallel (marked tests only)
+uv run pytest -m parallel_safe -n auto
 ```
+
+**Do not use `-q` when debugging failures** - it hides information you need.
 
 ## Qt Testing Best Practices
 
@@ -99,36 +102,59 @@ class MockDialog(QDialog):  # Don't do this!
 ```
 
 ### Signal Testing
+
+**Always use the context manager form** — it handles both fast and slow signals without race conditions:
+
 ```python
-from tests.fixtures.timeouts import worker_timeout, signal_timeout
+from tests.fixtures.timeouts import worker_timeout, signal_timeout, LONG
 
-# Simple case: signal emits after start() returns
+# PREFERRED: Context manager catches signals that emit before/during/after start()
 def test_async_operation(qtbot, worker):
-    worker.start()
-    qtbot.waitSignal(worker.finished, timeout=worker_timeout())
-
-# Use context manager when signal may emit BEFORE start() returns
-# (e.g., very fast operations or synchronous signals)
-def test_fast_operation(qtbot, worker):
-    with qtbot.waitSignal(worker.finished, timeout=signal_timeout()):
+    with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
         worker.start()
 
 # Multiple signals (finished OR failed) - wait for any one:
 def test_async_with_failure_case(qtbot, worker):
     with qtbot.waitSignals([worker.finished, worker.failed], timeout=worker_timeout(), raising=False):
         worker.start()
+
+# For slow operations, use the LONG multiplier:
+def test_slow_extraction(qtbot, worker):
+    with qtbot.waitSignal(worker.finished, timeout=worker_timeout(LONG)):
+        worker.start()
 ```
 
-**Never use hardcoded timeout values** like `timeout=5000`. Use semantic timeouts from `tests/fixtures/timeouts.py` which scale with `PYTEST_TIMEOUT_MULTIPLIER`.
+**⚠️ Anti-pattern (causes flaky tests):**
+```python
+# DON'T: Races with fast-completing workers
+worker.start()
+qtbot.waitSignal(worker.finished, timeout=worker_timeout())  # May miss signal!
+```
+
+**Timeout Reference** (base values, scaled by `PYTEST_TIMEOUT_MULTIPLIER`):
+
+| Function | Base (ms) | Use For |
+|----------|-----------|---------|
+| `ui_timeout()` | 1000 | Widget visibility, layout updates |
+| `signal_timeout()` | 2000 | Generic signal waits, event propagation |
+| `dialog_timeout()` | 3000 | Dialog accept/reject |
+| `worker_timeout()` | 5000 | Background workers, QThread operations |
+| `cleanup_timeout()` | 2000 | Thread termination, resource cleanup |
+
+Multipliers: `SHORT=0.5`, `MEDIUM=1.0` (default), `LONG=2.0`
 
 ### Test Markers
-- `@pytest.mark.gui` - Uses real Qt widgets (run with `QT_QPA_PLATFORM=offscreen`)
-- `@pytest.mark.headless` - No display required (can use real components if no rendering)
-- `@pytest.mark.serial` - No parallel execution
-- `@pytest.mark.parallel_safe` - Can run in parallel with pytest-xdist
 
-**IMPORTANT**: Always run tests with `QT_QPA_PLATFORM=offscreen` to avoid display dependencies.
-Do NOT use pytest-xvfb - it causes hangs in WSL2 and some CI environments.
+| Marker | Requires Display | Can Combine With | Notes |
+|--------|-----------------|------------------|-------|
+| `@pytest.mark.gui` | Yes (offscreen OK) | `parallel_safe`, `slow` | Uses real Qt widgets |
+| `@pytest.mark.headless` | No | `parallel_safe`, `slow` | No rendering needed |
+| `@pytest.mark.serial` | — | Any | Forces sequential execution |
+| `@pytest.mark.parallel_safe` | — | `gui`, `headless` | Safe for pytest-xdist |
+
+**Mutual exclusivity:** `gui` and `headless` are mutually exclusive — a test is either one or the other.
+
+**Note**: Qt offscreen mode is set automatically in `conftest.py`. Do NOT use pytest-xvfb - it causes hangs in WSL2 and some CI environments.
 
 ### Parallel Test Execution (pytest-xdist)
 
@@ -136,14 +162,14 @@ SpritePal supports parallel test execution using pytest-xdist with a conservativ
 
 **Running Tests:**
 ```bash
-# Serial execution (default, safe for all tests)
-QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=3
+# Serial execution (default)
+uv run pytest
 
 # Parallel execution for marked tests only
-QT_QPA_PLATFORM=offscreen uv run pytest tests -m "parallel_safe" -n auto --maxfail=3
+uv run pytest -m parallel_safe -n auto
 
-# Run both: serial first, then parallel
-./scripts/run_tests_parallel.sh
+# Run both: serial tests first, then parallel-safe tests
+uv run pytest -m "not parallel_safe" && uv run pytest -m parallel_safe -n auto
 ```
 
 **Marking Tests as Parallel-Safe:**
@@ -222,11 +248,16 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 |---------|-------|---------------------|----------|
 | `isolated_managers` | Function | YES (full cleanup) | **Default choice** - tests that need predictable state |
 | `setup_managers` | Function | YES | Alternative default with conditional setup |
-| `session_managers` | Session | NO | **Unsafe** - only with `@pytest.mark.shared_state_safe` |
-| `fast_managers` | Function (backed by session) | NO | **Unsafe** - alias for session_managers |
+| `session_managers` | Session | NO | Only with `@pytest.mark.shared_state_safe` |
 | `reset_manager_state` | Function | YES (caches only) | Need clean counters without full isolation |
 
-**Mixing session + isolated fixtures:** If a module already activated `session_managers`, `isolated_managers` will temporarily pause the session managers and restore them (with the original settings path) after the test. Prefer keeping suites consistent (all isolated or all session-backed), but this safety net prevents cross-test pollution when you must mix.
+**Deprecated fixtures (do not use in new code):**
+
+| Fixture | Replacement | Reason |
+|---------|-------------|--------|
+| `fast_managers` | `isolated_managers` | Hidden session state causes order-dependent failures |
+
+**⚠️ Do not mix `session_managers` and `isolated_managers` in the same module.** While there is a fallback mechanism that pauses session managers, relying on it masks test design problems and creates order-dependent behavior. Keep each test module consistent: either all `isolated_managers` or all `session_managers` (with proper markers).
 
 **HAL Fixtures:**
 
@@ -251,11 +282,8 @@ HAL (compression/decompression) is **mock-by-default** because:
 | `@pytest.mark.no_manager_setup` | Skip setup_managers fixture |
 | `@pytest.mark.real_hal` | Use real HAL implementation |
 
-The `isolated_managers` fixture now pauses active `session_managers` during the test and restores them afterward; it still fails if it cannot restore or if it detects unmanaged registry pollution.
-
 **Common Mistakes to Avoid:**
 - `QPixmap` in worker threads causes fatal crashes - use `ThreadSafeTestImage`
-- Hardcoded timeout values like `timeout=5000` - use `worker_timeout()` from `timeouts.py`
 - Hardcoded thread counts - capture baseline at test start
 - `time.sleep()` in Qt tests - use `qtbot.wait()` or `waitSignal()`
 - Inheriting `QDialog` in mocks - causes metaclass crashes
@@ -273,9 +301,10 @@ The `isolated_managers` fixture now pauses active `session_managers` during the 
 
 **Intentional sleeps:** If `time.sleep()` is truly needed (thread interleaving tests, OS cleanup), annotate with `# sleep-ok: <reason>`.
 
-**Environment Variables** (set externally, read by `tests/conftest.py`):
+**Environment Variables** (optional, read by `tests/conftest.py`):
 - `PYTEST_TIMEOUT_MULTIPLIER=2.0` - Scale all timeouts (useful for slow CI)
-- `QT_QPA_PLATFORM=offscreen` - Required for headless Qt testing
+
+Note: `QT_QPA_PLATFORM=offscreen` is set automatically by conftest.py if not already set.
 
 ## Project Architecture
 
@@ -306,47 +335,70 @@ spritepal/
 
 Note: Managers live at `core/managers/`, not a top-level `managers/` directory.
 
-### Manager Architecture (Consolidated)
+### Manager Architecture (Consolidated with Adapters)
 
-SpritePal uses a **consolidated manager architecture** with backward-compatible adapters:
+SpritePal uses a **consolidated manager architecture** with inheritance-based adapters:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    DI Container (inject())                   │
-│  - Protocol-based dependency resolution                      │
-│  - Thread-safe singleton/factory management                  │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-        ┌─────────────┴─────────────┐
-        │                           │
-        ▼                           ▼
-┌──────────────────────┐   ┌────────────────────────┐
-│ ApplicationStateManager │ │ CoreOperationsManager  │
-│ - Session state         │   │ - Extraction operations │
-│ - Settings persistence  │   │ - Injection operations  │
-│ - History management    │   │ - Palette management    │
-│ - Workflow state        │   │                        │
-│                        │   │                        │
-│ Adapters:              │   │ Adapters:              │
-│ └─ SessionManager      │   │ ├─ ExtractionManager   │
-│                        │   │ └─ InjectionManager    │
-└──────────────────────┘   └────────────────────────┘
+│            DI Container (inject() via protocols)            │
+│  - inject(SessionManagerProtocol)    → SessionAdapter       │
+│  - inject(ExtractionManagerProtocol) → ExtractionAdapter    │
+│  - inject(InjectionManagerProtocol)  → InjectionAdapter     │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        ▼                   ▼                   ▼
+┌──────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ ApplicationState │ │ CoreOperations  │ │   Monitoring    │
+│     Manager      │ │     Manager     │ │     Manager     │
+│ (session, state, │ │ (extraction,    │ │ (performance)   │
+│  settings, hist) │ │  injection,     │ │                 │
+│                  │ │  palette)       │ │                 │
+└────────┬─────────┘ └────────┬────────┘ └─────────────────┘
+         │                    │
+         │ provides           │ provides
+         ▼                    ▼
+┌──────────────────┐ ┌──────────────────────────────────────┐
+│  SessionAdapter  │ │ ExtractionAdapter │ InjectionAdapter │
+│ (extends         │ │ (extends          │ (extends         │
+│  SessionManager) │ │  ExtractionMgr)   │  InjectionMgr)   │
+└────────┬─────────┘ └────────┬─────────┴──────┬───────────┘
+         │                    │                │
+    inherits from        inherits from    inherits from
+         ▼                    ▼                ▼
+┌──────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ SessionManager   │ │ExtractionManager│ │InjectionManager │
+│ (DEPRECATED      │ │ (DEPRECATED     │ │ (DEPRECATED     │
+│  base class)     │ │  base class)    │ │  base class)    │
+└──────────────────┘ └─────────────────┘ └─────────────────┘
 ```
 
 **Key Points:**
-- Use `inject(ExtractionManagerProtocol)` to get managers - never instantiate directly
-- Adapters (SessionManager, ExtractionManager, InjectionManager) provide backward-compatible interfaces
-- All managers registered via `initialize_managers()` at app startup
-- Cleanup via `cleanup_managers()` at app exit
+- **Always use DI**: `inject(XxxManagerProtocol)` - never instantiate managers directly
+- **Consolidated managers** hold all business logic (ApplicationStateManager, CoreOperationsManager)
+- **Adapters** (SessionAdapter, ExtractionAdapter, InjectionAdapter) inherit from legacy base classes
+  for interface compatibility but delegate all work to consolidated managers
+- **Legacy managers** (SessionManager, ExtractionManager, InjectionManager) exist only as base classes
+  for adapters - direct instantiation is deprecated and emits a warning
 
 **Example Usage:**
 ```python
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.protocols.manager_protocols import (
+    SessionManagerProtocol,
+    ExtractionManagerProtocol,
+    InjectionManagerProtocol,
+)
 
-# Get manager instance via DI
-extraction_manager = inject(ExtractionManagerProtocol)
-result = extraction_manager.extract_from_rom(params)
+# Correct: Use DI to get adapter instances
+session_mgr = inject(SessionManagerProtocol)
+extraction_mgr = inject(ExtractionManagerProtocol)
+injection_mgr = inject(InjectionManagerProtocol)
+
+# DEPRECATED: Direct instantiation emits DeprecationWarning
+# from core.managers import SessionManager
+# session_mgr = SessionManager()  # Don't do this!
 ```
 
 ### Circular Import Resolution
@@ -404,4 +456,4 @@ see `DEV_NOTES.md`. This file contains only operational development guidelines.
 
 ---
 
-*Last updated: January 6, 2026*
+*Last updated: December 15, 2025*

@@ -1,11 +1,31 @@
 """
-Manager for handling all injection operations (VRAM and ROM)
+InjectionManager - Base class for InjectionAdapter.
+
+This module provides the InjectionManager class which serves as a base class
+for the InjectionAdapter in the consolidated manager architecture.
+
+.. deprecated::
+    Direct instantiation of InjectionManager is deprecated. Use dependency injection::
+
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
+
+        injection_mgr = inject(InjectionManagerProtocol)
+
+    This class exists primarily as a base class for InjectionAdapter, which
+    provides backward compatibility while delegating to CoreOperationsManager.
+    All business logic now lives in CoreOperationsManager.
+
+See Also:
+    - :class:`core.managers.core_operations_manager.CoreOperationsManager`
+    - :class:`core.managers.core_operations_manager.InjectionAdapter`
 """
 from __future__ import annotations
 
 import json
 import os
 import time
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -35,7 +55,20 @@ from .exceptions import ValidationError
 
 
 class InjectionManager(BaseManager):
-    """Manages all injection workflows (VRAM and ROM)"""
+    """
+    Base class for injection management - provides interface for InjectionAdapter.
+
+    .. deprecated::
+        Do not instantiate directly. Use dependency injection instead::
+
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            injection_mgr = inject(InjectionManagerProtocol)
+
+        This class serves as a base class for InjectionAdapter, which inherits
+        from it for interface compatibility while delegating to
+        CoreOperationsManager for actual functionality.
+    """
 
     # Additional signals specific to injection
     injection_progress: Signal = Signal(str)  # Progress message
@@ -45,7 +78,25 @@ class InjectionManager(BaseManager):
     cache_saved: Signal = Signal(str, int)  # Cache type, number of items saved
 
     def __init__(self, parent: QObject | None = None) -> None:
-        """Initialize the injection manager"""
+        """
+        Initialize the injection manager.
+
+        Args:
+            parent: Optional parent QObject
+
+        .. deprecated::
+            Direct instantiation is deprecated. Use ``inject(InjectionManagerProtocol)``
+            to get the managed InjectionAdapter instance instead.
+        """
+        # Emit deprecation warning only for direct instantiation (not adapter subclasses)
+        if type(self).__name__ == "InjectionManager":
+            warnings.warn(
+                "Direct InjectionManager instantiation is deprecated. "
+                "Use inject(InjectionManagerProtocol) from core.di_container instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Declare instance variables with type hints
         self._current_worker: QThread | None = None
 
