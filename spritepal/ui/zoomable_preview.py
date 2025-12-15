@@ -3,10 +3,9 @@ Zoomable sprite preview widget for SpritePal
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt
-from typing_extensions import override
 
 if TYPE_CHECKING:
     from PySide6.QtGui import (

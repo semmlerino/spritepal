@@ -14,10 +14,9 @@ import logging
 import time
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 from PIL import Image
-from typing_extensions import override
 
 from core.mmap_rom_reader import MemoryMappedROMReader, optimize_rom_operations
 from core.rom_extractor import ROMExtractor

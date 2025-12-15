@@ -7,7 +7,7 @@ late instance variable declarations.
 """
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, override
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 from utils.logging_config import get_logger
 

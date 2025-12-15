@@ -5,7 +5,7 @@ Allows users to configure sprite injection parameters
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 if TYPE_CHECKING:
     from core.managers import InjectionManager

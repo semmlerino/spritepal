@@ -11,7 +11,7 @@ Provides a comprehensive dashboard for viewing monitoring data including:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QFont
@@ -33,7 +33,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 from core.monitoring import get_monitoring_manager
 from ui.styles.theme import COLORS

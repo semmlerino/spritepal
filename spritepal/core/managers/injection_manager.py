@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 try:
-    from typing_extensions import override
+    from typing import override
 except ImportError:
-    from typing_extensions import override
+    from typing import override
 
 from PySide6.QtCore import QObject, QThread, Signal
 

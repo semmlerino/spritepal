@@ -15,8 +15,9 @@ if TYPE_CHECKING:
         SettingsManagerProtocol,
     )
 
+from typing import override
+
 from PySide6.QtCore import Qt, Signal
-from typing_extensions import override
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent, QKeyEvent

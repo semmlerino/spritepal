@@ -10,8 +10,9 @@ if TYPE_CHECKING:
 
     from core.protocols.manager_protocols import ROMCacheProtocol
 
+from typing import override
+
 from PySide6.QtCore import Signal
-from typing_extensions import override
 
 from core.parallel_sprite_finder import ParallelSpriteFinder
 from core.workers.base import BaseWorker, handle_worker_errors

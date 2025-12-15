@@ -9,9 +9,9 @@ from __future__ import annotations
 from collections.abc import Callable
 
 try:
-    from typing_extensions import override
+    from typing import override
 except ImportError:
-    from typing_extensions import override
+    from typing import override
 
 from PySide6.QtCore import QEasingCurve, Signal
 from PySide6.QtGui import QFont

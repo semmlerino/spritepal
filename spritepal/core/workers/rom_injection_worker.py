@@ -7,9 +7,9 @@ Moved from ui/workers/ to core/workers/ to fix layer boundary violations.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import override
 
 from PySide6.QtCore import QThread, Signal
-from typing_extensions import override
 
 from core.rom_injector import ROMInjector
 from core.rom_validator import ROMValidator

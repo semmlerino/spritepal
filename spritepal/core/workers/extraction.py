@@ -14,7 +14,7 @@ try:
 except ImportError:
     from typing import NotRequired
 
-from typing_extensions import override
+from typing import override
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject

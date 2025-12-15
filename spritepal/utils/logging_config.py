@@ -6,9 +6,7 @@ import logging.handlers
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
-
-from typing_extensions import override
+from typing import Any, override
 
 
 def setup_logging(

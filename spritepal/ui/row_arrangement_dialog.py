@@ -11,6 +11,8 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+from typing import override
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
@@ -23,7 +25,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QVBoxLayout,
 )
-from typing_extensions import override
 
 from ui.styles.theme import COLORS
 

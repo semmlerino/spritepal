@@ -13,11 +13,10 @@ from collections import OrderedDict
 from datetime import UTC, datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, ClassVar, TypeVar
+from typing import Any, ClassVar, TypeVar, override
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
-from typing_extensions import override
 
 from utils.state_manager import StateEntry, StateSnapshot
 

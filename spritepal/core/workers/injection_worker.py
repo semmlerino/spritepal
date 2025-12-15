@@ -6,9 +6,7 @@ Moved from ui/workers/ to core/workers/ to fix layer boundary violations.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, override
 
 from core.injector import SpriteInjector
 from core.workers.base import BaseWorker, handle_worker_errors

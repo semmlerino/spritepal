@@ -8,7 +8,7 @@ import threading
 from collections.abc import Callable
 from operator import itemgetter
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QCloseEvent
@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 if TYPE_CHECKING:
     from core.managers import ExtractionManager
@@ -131,24 +130,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
             return
 
         try:
-            # Try component-based signals first (ComposedDialog pattern)
-            if hasattr(instance, 'get_component'):
-                qt_signal_manager = instance.get_component("qt_dialog_signals")
-                if qt_signal_manager:
-                    qt_signal_manager.finished.connect(
-                        cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
-                    )
-                    qt_signal_manager.rejected.connect(
-                        cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
-                    )
-                    qt_signal_manager.destroyed.connect(
-                        cls._on_dialog_destroyed, Qt.ConnectionType.UniqueConnection
-                    )
-                    instance._signals_connected = True
-                    logger.debug("Signals connected via QtDialogSignalManager")
-                    return
-
-            # Fall back to direct dialog signals (legacy DialogBase)
+            # Connect dialog signals directly
             instance.finished.connect(
                 cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
             )
@@ -203,7 +185,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
             if cls._instance is not None:
                 # Schedule deletion on main thread
                 instance = cls._instance  # Capture reference to avoid race condition
-                cls.safe_qt_call(lambda: instance.deleteLater() if instance else None)  # type: ignore[arg-type]
+                cls.safe_qt_call(lambda: instance.deleteLater() if instance else None)
                 cls._cleanup_instance(cls._instance)
                 cls._instance = None  # Clear the instance reference
 
@@ -243,7 +225,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
 
         # Use safe Qt call to check visibility
         instance = cls._instance  # Capture reference to avoid race condition
-        is_visible = cls.safe_qt_call(lambda: instance.isVisible() if instance else False)  # type: ignore[arg-type]
+        is_visible = cls.safe_qt_call(lambda: instance.isVisible() if instance else False)
         return is_visible is True  # Handle None return from safe_qt_call
 
     @classmethod
@@ -254,7 +236,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
 
         # Check if dialog is visible using thread-safe method
         instance = cls._instance  # Capture reference to avoid race condition
-        is_visible = cls.safe_qt_call(lambda: instance.isVisible() if instance else False)  # type: ignore[arg-type]
+        is_visible = cls.safe_qt_call(lambda: instance.isVisible() if instance else False)
         return cls._instance if is_visible else None
 
 class ROMExtractionPanel(QWidget):
@@ -661,11 +643,13 @@ class ROMExtractionPanel(QWidget):
 
             # Connect deferred signals after Qt processes the show event
             # Using QTimer.singleShot(0) defers execution to next event loop iteration
-            if hasattr(dialog, '_deferred_signal_connection'):
+            deferred_conn = getattr(dialog, '_deferred_signal_connection', None)
+            if deferred_conn is not None:
                 def _do_deferred_connect():
-                    if hasattr(dialog, '_deferred_signal_connection'):
+                    conn = getattr(dialog, '_deferred_signal_connection', None)
+                    if conn is not None:
                         logger.debug("[DEBUG] Calling deferred signal connection...")
-                        dialog._deferred_signal_connection()
+                        conn()
                         delattr(dialog, '_deferred_signal_connection')  # Clean up
                 QTimer.singleShot(0, _do_deferred_connect)
 

@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, override
 
 from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QApplication
-from typing_extensions import override
 
 try:
     from utils.logging_config import get_logger
@@ -33,6 +32,7 @@ TSingleton = TypeVar("TSingleton")
 TQt = TypeVar("TQt")
 TLazy = TypeVar("TLazy")
 TFactory = TypeVar("TFactory")
+TResult = TypeVar("TResult")  # For safe_qt_call return type
 
 
 class ThreadSafeSingleton(Generic[T]):
@@ -214,7 +214,7 @@ class QtThreadSafeSingleton(ThreadSafeSingleton[TQt]):
             )
 
     @classmethod
-    def safe_qt_call(cls, qt_method: Callable[[], TQt]) -> TQt | None:
+    def safe_qt_call(cls, qt_method: Callable[[], TResult]) -> TResult | None:
         """
         Safely call a Qt method, returning None if not on main thread.
 

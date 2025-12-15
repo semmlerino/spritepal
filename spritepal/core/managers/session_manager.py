@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, override
 
 from PySide6.QtCore import Signal
-from typing_extensions import override
 
 from utils.file_validator import atomic_write
 

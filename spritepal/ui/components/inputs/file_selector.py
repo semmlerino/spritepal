@@ -14,6 +14,8 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+from typing import override
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -23,7 +25,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QWidget,
 )
-from typing_extensions import override
 
 # from utils.settings_manager import get_settings_manager # Removed due to DI
 

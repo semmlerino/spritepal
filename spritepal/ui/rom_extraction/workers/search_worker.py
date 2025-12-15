@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMExtractorProtocol
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal
 
 from core.parallel_sprite_finder import ParallelSpriteFinder
 from core.workers.base import handle_worker_errors
@@ -33,7 +33,7 @@ class SpriteSearchWorker(QThread):
     """Emitted with search progress. Args: current_offset, total_offsets."""
 
     def __init__(self, rom_path: str, start_offset: int, end_offset: int,
-                 direction: int, extractor: ROMExtractorProtocol, parent: QThread | None = None):
+                 direction: int, extractor: ROMExtractorProtocol, parent: QObject | None = None):
         super().__init__(parent)
         self.rom_path = rom_path
         self.start_offset = start_offset

@@ -112,6 +112,11 @@ ignore = [
     "E402",     # module level import not at top
     "PLC0415",  # import-outside-top-level
 
+    # PEP 695 type parameter syntax (gradual adoption)
+    "UP040",    # TypeAlias vs `type` keyword syntax
+    "UP046",    # Generic[T] vs class Foo[T]: syntax
+    "UP047",    # TypeVar in function vs def foo[T](): syntax
+
     # Complexity (Qt widgets can be complex)
     "PLR0912",  # too-many-branches
     "PLR0915",  # too-many-statements

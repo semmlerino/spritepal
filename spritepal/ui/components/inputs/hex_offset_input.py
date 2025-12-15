@@ -9,10 +9,10 @@ from __future__ import annotations
 import builtins
 import contextlib
 from collections.abc import Callable
+from typing import override
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QWidget
-from typing_extensions import override
 
 from utils.logging_config import get_logger
 

@@ -8,12 +8,11 @@ inheritance hierarchies.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QObject
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QWidget
-from typing_extensions import override
 
 from .button_box_manager import ButtonBoxManager
 from .dialog_context import DialogContext

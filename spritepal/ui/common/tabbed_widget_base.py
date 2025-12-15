@@ -7,9 +7,9 @@ UI/UX principles like progressive disclosure and clear visual hierarchy.
 from __future__ import annotations
 
 try:
-    from typing_extensions import override
+    from typing import override
 except ImportError:
-    from typing_extensions import override
+    from typing import override
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (

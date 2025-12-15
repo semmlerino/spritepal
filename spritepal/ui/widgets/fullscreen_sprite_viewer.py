@@ -39,9 +39,7 @@ from __future__ import annotations
 
 import platform
 import weakref
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor

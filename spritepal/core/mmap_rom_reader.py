@@ -12,9 +12,7 @@ import mmap
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Protocol
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any, BinaryIO, Protocol, override
 
 if TYPE_CHECKING:
     class Decompressor(Protocol):

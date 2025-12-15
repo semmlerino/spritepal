@@ -4,12 +4,11 @@ Palette preview widget for SpritePal
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QWidget
-from typing_extensions import override
 
 from ui.common.spacing_constants import BORDER_THIN, PALETTE_PREVIEW_SIZE
 from ui.styles.theme import COLORS

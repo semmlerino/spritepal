@@ -11,7 +11,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import PriorityQueue
-from typing import Any
+from typing import Any, override
 
 from PIL import Image
 from PySide6.QtCore import (
@@ -24,7 +24,6 @@ from PySide6.QtCore import (
     Slot,
 )
 from PySide6.QtGui import QImage, QPixmap
-from typing_extensions import override
 
 from core.rom_extractor import ROMExtractor
 from core.tile_renderer import TileRenderer

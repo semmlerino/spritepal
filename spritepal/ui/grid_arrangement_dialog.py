@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from PIL import Image
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
@@ -38,7 +38,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 from .components import SplitterDialog
 from .row_arrangement import PaletteColorizer
@@ -843,7 +842,7 @@ class GridArrangementDialog(SplitterDialog):
 
         # Del for clear selection
         delete_shortcut = QShortcut(QKeySequence("Delete"), self)
-        delete_shortcut.activated.connect(lambda: self.graphics_view.clear_selection() if hasattr(self, 'graphics_view') and hasattr(self.graphics_view, 'clear_selection') else None)
+        delete_shortcut.activated.connect(lambda: getattr(getattr(self, 'graphics_view', None), 'clear_selection', lambda: None)())
 
     def _create_selection_mode_group(self, parent: QWidget) -> QGroupBox:
         """Create the selection mode controls group.

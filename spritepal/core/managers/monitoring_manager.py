@@ -23,11 +23,10 @@ from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from weakref import WeakSet
 
 import psutil
-from typing_extensions import override
 
 from .base_manager import BaseManager
 

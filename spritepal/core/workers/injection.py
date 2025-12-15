@@ -10,9 +10,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypedDict, cast
 
 try:
-    from typing_extensions import override
+    from typing import override
 except ImportError:
-    from typing_extensions import override
+    from typing import override
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject

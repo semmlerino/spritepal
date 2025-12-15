@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any
 
 try:
-    from typing_extensions import override
+    from typing import override
 except ImportError:
-    from typing_extensions import override
+    from typing import override
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen

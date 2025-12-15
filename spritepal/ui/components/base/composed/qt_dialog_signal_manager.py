@@ -7,9 +7,7 @@ by providing clean signal proxies in a separate QObject.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent

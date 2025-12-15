@@ -4,7 +4,7 @@ Provides efficient virtual scrolling using Model/View architecture.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap, QResizeEvent, QShowEvent
@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 from ui.delegates.sprite_gallery_delegate import SpriteGalleryDelegate
 from ui.models.sprite_gallery_model import SpriteGalleryModel

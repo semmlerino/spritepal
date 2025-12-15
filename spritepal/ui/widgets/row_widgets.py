@@ -3,6 +3,8 @@ Row-related widgets for SpritePal row arrangement dialog
 """
 from __future__ import annotations
 
+from typing import override
+
 from PIL import Image
 from PySide6.QtCore import QEvent, QMimeData, Qt, Signal
 from PySide6.QtGui import (
@@ -17,7 +19,6 @@ from PySide6.QtGui import (
     QPen,
 )
 from PySide6.QtWidgets import QListWidget, QWidget
-from typing_extensions import override
 
 from core.services.image_utils import pil_to_qpixmap
 

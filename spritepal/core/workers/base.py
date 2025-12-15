@@ -10,10 +10,9 @@ import weakref
 from abc import abstractmethod
 from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, override
 
 from PySide6.QtCore import QMetaObject, QThread, Signal
-from typing_extensions import override
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject

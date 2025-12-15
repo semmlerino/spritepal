@@ -16,7 +16,7 @@ class ArrangementDialogProtocol(Protocol):
     """Protocol for arrangement dialogs (row and grid)."""
 
     def set_palettes(
-        self, palettes: dict[str, list[tuple[int, int, int]]]
+        self, palettes_dict: dict[int, Any]
     ) -> None:
         """Set available palettes for the dialog."""
         ...

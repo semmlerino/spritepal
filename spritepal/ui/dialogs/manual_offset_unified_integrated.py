@@ -375,9 +375,11 @@ class UnifiedManualOffsetDialog(DialogBase):
 
     def _setup_custom_buttons(self):
         """Set up custom dialog buttons with improved layout."""
+        if self.button_box is None:
+            return
+
         # Clear default buttons and create a more organized button layout
-        if self.button_box:
-            self.button_box.clear()
+        self.button_box.clear()
 
         # Primary action buttons (left side)
         self.apply_btn = QPushButton("Apply Offset")
@@ -405,8 +407,7 @@ class UnifiedManualOffsetDialog(DialogBase):
         self.button_box.addButton(close_btn, self.button_box.ButtonRole.RejectRole)
 
         # Apply consistent spacing to button box
-        if self.button_box:
-            self.button_box.setStyleSheet("""
+        self.button_box.setStyleSheet("""
             QDialogButtonBox {
                 padding: 8px;
                 spacing: 8px;
@@ -1414,7 +1415,8 @@ Cache Misses: {session_stats['misses']}"""
                     self.bookmarks_menu.exec(self.mapToGlobal(self.rect().center()))
                 event.accept()
 
-        super().keyPressEvent(event)
+        if event is not None:
+            super().keyPressEvent(event)
 
     @override
     def closeEvent(self, event: QCloseEvent | None) -> None:
@@ -1504,10 +1506,12 @@ Cache Misses: {session_stats['misses']}"""
                 dialog_width = self.width()
                 dialog_height = self.height()
 
-                # Verify all values are numeric before arithmetic
-                if not all(isinstance(v, (int, float)) for v in
-                          [available_x, available_y, available_width, available_height,
-                           dialog_width, dialog_height]):
+                # Verify all values are numeric before arithmetic (defensive check for mocks)
+                if not all(
+                    isinstance(v, int | float)  # type: ignore[arg-type]  # defensive mock check
+                    for v in [available_x, available_y, available_width, available_height,
+                              dialog_width, dialog_height]
+                ):
                     # Skip validation if any values are not numeric (likely mocks)
                     return
 

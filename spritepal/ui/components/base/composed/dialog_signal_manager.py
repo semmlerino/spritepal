@@ -6,10 +6,9 @@ It's designed to avoid Qt metaclass system issues with signals in complex inheri
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QObject, Signal
-from typing_extensions import override
 
 
 class DialogSignalManager(QObject):

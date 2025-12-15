@@ -7,9 +7,7 @@ the same public interface for backward compatibility.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
     from core.extractor import SpriteExtractor

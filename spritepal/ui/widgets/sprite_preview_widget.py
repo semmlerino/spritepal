@@ -4,7 +4,7 @@ Shows visual preview of sprites with optional palette support
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PIL import Image
 from PySide6.QtCore import QSize, Qt, QThread, QTimer, Signal
@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 from core.default_palette_loader import DefaultPaletteLoader
 

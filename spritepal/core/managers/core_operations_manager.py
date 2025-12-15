@@ -9,10 +9,9 @@ adapter patterns.
 from __future__ import annotations
 
 import threading
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QObject, Signal
-from typing_extensions import override
 
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager

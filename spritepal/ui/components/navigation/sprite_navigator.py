@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from core.managers import ExtractionManager
     from core.protocols.manager_protocols import ROMCacheProtocol
 
+from typing import override
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
@@ -29,7 +31,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox

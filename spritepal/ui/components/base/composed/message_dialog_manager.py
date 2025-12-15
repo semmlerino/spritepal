@@ -7,11 +7,10 @@ into dialogs via the DialogBase composition system.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QDialog, QMessageBox
-from typing_extensions import override
 
 
 class MessageDialogManager(QObject):

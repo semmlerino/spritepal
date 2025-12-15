@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QDialogButtonBox, QPushButton
-from typing_extensions import override
 
 
 class ButtonBoxManager(QObject):

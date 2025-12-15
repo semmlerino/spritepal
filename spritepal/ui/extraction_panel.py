@@ -6,10 +6,9 @@ from __future__ import annotations
 import builtins
 import contextlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from typing_extensions import override
 
 if TYPE_CHECKING:
     from PySide6.QtGui import (

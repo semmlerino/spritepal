@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import override
 
 from PySide6.QtCore import QObject, Signal
-from typing_extensions import override
 
 
 class ArrangementType(Enum):

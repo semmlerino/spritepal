@@ -14,9 +14,7 @@ Usage:
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent

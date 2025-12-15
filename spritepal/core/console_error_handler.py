@@ -8,9 +8,7 @@ from __future__ import annotations
 
 import sys
 import traceback
-from typing import Any
-
-from typing_extensions import override
+from typing import Any, override
 
 from utils.logging_config import get_logger
 

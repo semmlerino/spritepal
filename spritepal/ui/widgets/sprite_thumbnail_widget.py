@@ -4,12 +4,11 @@ Compact version of SpritePreviewWidget optimized for grid layouts.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QEnterEvent, QFont, QMouseEvent, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
-from typing_extensions import override
 
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger

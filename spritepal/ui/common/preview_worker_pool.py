@@ -16,10 +16,9 @@ import threading
 import time
 import weakref
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
-from typing_extensions import override
 
 from core.services.worker_lifecycle import WorkerManager
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
