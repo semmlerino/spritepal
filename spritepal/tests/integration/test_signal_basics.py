@@ -379,5 +379,101 @@ class TestSignalThreadSafety:
         # Should be received in order
         assert receiver.received_values == list(range(10))
 
+@pytest.mark.headless
+class TestSignalRegistry:
+    """Test the SignalRegistry utility for debugging and connection tracking."""
+
+    def test_registry_connect_and_count(self):
+        """Test that SignalRegistry tracks connections."""
+        from utils.signal_registry import SignalRegistry
+
+        # Reset for clean test
+        SignalRegistry.reset_instance()
+        registry = SignalRegistry()
+
+        emitter = SimpleEmitter()
+        receiver = SimpleReceiver()
+
+        # Connect through registry
+        registry.connect(
+            emitter.value_changed,
+            receiver.on_value_changed,
+            "Test value propagation"
+        )
+
+        assert registry.get_connection_count() == 1
+
+        # Signal should still work
+        emitter.emit_value(42)
+        assert 42 in receiver.received_values
+
+        # Cleanup
+        SignalRegistry.reset_instance()
+
+    def test_registry_dump_connections(self):
+        """Test that dump_connections produces readable output."""
+        from utils.signal_registry import SignalRegistry
+
+        SignalRegistry.reset_instance()
+        registry = SignalRegistry()
+
+        emitter = SimpleEmitter()
+        receiver = SimpleReceiver()
+
+        registry.connect(
+            emitter.value_changed,
+            receiver.on_value_changed,
+            "Value change notification"
+        )
+        registry.connect(
+            emitter.message_sent,
+            receiver.on_message_sent,
+            "Message delivery"
+        )
+
+        dump = registry.dump_connections()
+
+        assert "Signal Registry Connections" in dump
+        assert "Value change notification" in dump
+        assert "Message delivery" in dump
+        assert "Total active connections: 2" in dump
+
+        SignalRegistry.reset_instance()
+
+    def test_registry_disconnect_all(self):
+        """Test that disconnect_all clears all connections."""
+        from utils.signal_registry import SignalRegistry
+
+        SignalRegistry.reset_instance()
+        registry = SignalRegistry()
+
+        emitter = SimpleEmitter()
+        receiver = SimpleReceiver()
+
+        registry.connect(emitter.value_changed, receiver.on_value_changed)
+        registry.connect(emitter.message_sent, receiver.on_message_sent)
+
+        assert registry.get_connection_count() == 2
+
+        registry.disconnect_all()
+
+        assert registry.get_connection_count() == 0
+
+        SignalRegistry.reset_instance()
+
+    def test_registry_singleton_pattern(self):
+        """Test that SignalRegistry follows singleton pattern."""
+        from utils.signal_registry import SignalRegistry
+
+        SignalRegistry.reset_instance()
+
+        registry1 = SignalRegistry()
+        registry2 = SignalRegistry()
+
+        assert registry1 is registry2
+
+        SignalRegistry.reset_instance()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

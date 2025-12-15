@@ -40,34 +40,43 @@ class CoreOperationsManager(BaseManager):
     compatibility through embedded adapter classes.
     """
 
-    # Unified signals
-    operation_progress = Signal(str, str, int)  # Operation type, message, percentage
-    operation_completed = Signal(str, bool, str)  # Operation type, success, message
+    # ========== Signal Architecture ==========
+    #
+    # CANONICAL SIGNALS (use these in new code):
+    #   operation_progress - Unified progress for all operations
+    #   operation_completed - Unified completion for all operations
+    #
+    # DOMAIN-SPECIFIC SIGNALS (simplified signatures for specific use cases):
+    #   extraction_progress, injection_progress - Message-only progress
+    #   preview_generated, palettes_extracted - Data delivery signals
+    #   cache_hit, cache_miss, cache_saved - Cache monitoring
+    #
+    # Signal Registry: Use utils.signal_registry.SignalRegistry for debugging
+    # connection flow across the application.
+    # =========================================
 
-    # Extraction-specific signals (for backward compatibility)
-    extraction_progress = Signal(str)
-    preview_generated = Signal(object, int)
-    palettes_extracted = Signal(dict)
-    active_palettes_found = Signal(list)
-    files_created = Signal(list)
+    # Unified signals (canonical - use in new code)
+    operation_progress = Signal(str, str, int)  # op_type, message, percent
+    operation_completed = Signal(str, bool, str)  # op_type, success, message
 
-    # Injection-specific signals
-    injection_progress = Signal(str)
-    injection_finished = Signal(bool, str)
-    compression_info = Signal(dict)
-    progress_percent = Signal(int)
+    # Extraction signals (domain-specific)
+    extraction_progress = Signal(str)  # message only (simpler for UI consumers)
+    preview_generated = Signal(object, int)  # pixmap, offset
+    palettes_extracted = Signal(dict)  # palette data
+    active_palettes_found = Signal(list)  # list of active palette indices
+    files_created = Signal(list)  # list of created file paths
 
-    # Navigation-specific signals
-    navigation_hints_ready = Signal(list)
-    region_map_updated = Signal(dict)
-    pattern_learned = Signal(str, dict)
-    similarity_found = Signal(int, list)
+    # Injection signals (domain-specific)
+    injection_progress = Signal(str)  # message only
+    injection_finished = Signal(bool, str)  # success, message
+    compression_info = Signal(dict)  # compression statistics
+    progress_percent = Signal(int)  # percent only (for progress bars)
 
-    # Cache operation signals
-    cache_operation_started = Signal(str, str)
-    cache_hit = Signal(str, float)
-    cache_miss = Signal(str)
-    cache_saved = Signal(str, int)
+    # Cache signals (monitoring)
+    cache_operation_started = Signal(str, str)  # operation, key
+    cache_hit = Signal(str, float)  # key, load_time
+    cache_miss = Signal(str)  # key
+    cache_saved = Signal(str, int)  # key, size_bytes
 
     def __init__(self, parent: QObject | None = None) -> None:
         """Initialize the core operations manager."""

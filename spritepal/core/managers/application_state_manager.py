@@ -10,11 +10,12 @@ from __future__ import annotations
 import json
 import threading
 from collections import OrderedDict
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from enum import Enum, auto
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, ClassVar, Mapping, Sequence, TypeVar, override
+from typing import Any, ClassVar, TypeVar, override
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
@@ -103,31 +104,42 @@ class ApplicationStateManager(BaseManager):
         ExtractionState.EXTRACTING,
     }
 
-    # ========== Signals ==========
+    # ========== Signal Architecture ==========
+    #
+    # CANONICAL SIGNALS (use in new code):
+    #   state_changed - Unified state change with category and data
+    #   workflow_state_changed - Workflow state machine transitions
+    #   application_state_snapshot - Full state snapshot for debugging
+    #
+    # DOMAIN-SPECIFIC SIGNALS (simplified for specific use cases):
+    #   session_changed, settings_saved - Persistence events
+    #   history_updated, sprite_added - History tracking
+    #   preview_ready, current_offset_changed - UI updates
+    #
+    # Signal Registry: Use utils.signal_registry.SignalRegistry for debugging
+    # =========================================
 
-    # Unified signals
-    state_changed = Signal(str, dict)  # State type, data
+    # Unified signals (canonical)
+    state_changed = Signal(str, dict)  # category, data
+    workflow_state_changed = Signal(object, object)  # old_state, new_state
+    application_state_snapshot = Signal(dict)  # full state for debugging
 
-    # Workflow signals
-    workflow_state_changed = Signal(object, object)  # old_state, new_state (ExtractionState)
+    # Session signals (persistence)
+    session_changed = Signal()  # session data modified
+    files_updated = Signal(dict)  # file paths changed
+    settings_saved = Signal()  # settings persisted to disk
+    session_restored = Signal(dict)  # session loaded from disk
 
-    # Session-specific signals (for backward compatibility)
-    session_changed = Signal()
-    files_updated = Signal(dict)
-    settings_saved = Signal()
-    session_restored = Signal(dict)
+    # History signals (sprite tracking)
+    history_updated = Signal(list)  # list of sprite offsets
+    sprite_added = Signal(int, float)  # offset, quality_score
 
-    # History-specific signals
-    history_updated = Signal(list)  # List of sprite offsets
-    sprite_added = Signal(int, float)  # Offset, quality
+    # Cache signals (monitoring)
+    cache_stats_updated = Signal(dict)  # updated cache metrics
 
-    # Cache statistics signals
-    cache_stats_updated = Signal(dict)  # Updated cache session stats
-
-    # Unified state signals (A.3 - consolidated state notifications)
-    current_offset_changed = Signal(int)  # Current ROM offset changed
-    preview_ready = Signal(int, QImage)  # Offset, preview image ready for display
-    application_state_snapshot = Signal(dict)  # Full state snapshot emitted
+    # UI coordination signals
+    current_offset_changed = Signal(int)  # ROM offset changed
+    preview_ready = Signal(int, QImage)  # offset, preview_image
 
     def __init__(self, app_name: str = "SpritePal", settings_path: Path | None = None,
                  parent: QObject | None = None) -> None:
