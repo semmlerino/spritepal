@@ -261,6 +261,13 @@ class TestSpriteScanDialog:
             # Check if a results dialog was shown
             pass  # Results depend on implementation
 
+        # Explicitly stop the scan to prevent thread leak
+        # The scan worker runs in a background thread and may not have finished
+        dialog._cancel_sprite_scan()
+
+        # Give the worker time to clean up
+        qtbot.wait(100)
+
     def test_sprite_selection_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
         """Test selecting a sprite from results navigates to it."""
         dialog = manual_offset_dialog
@@ -302,14 +309,15 @@ class TestDialogIntegrationWithPanel:
 
         # Open manual offset dialog
         panel._open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
+        qtbot.waitUntil(lambda: panel._offset_dialog_manager.is_open(), timeout=500)
 
         # Verify dialog was created
-        assert panel._manual_offset_dialog is not None
+        dialog = panel._offset_dialog_manager.get_current_dialog()
+        assert dialog is not None
 
         # Verify dialog has ROM data
-        assert panel._manual_offset_dialog.rom_path == str(rom_info['path'])
-        assert panel._manual_offset_dialog.rom_size > 0
+        assert dialog.rom_path == str(rom_info['path'])
+        assert dialog.rom_size > 0
 
     def test_dialog_offset_sync_with_panel(self, loaded_rom_panel, qtbot):
         """Test that offset changes sync between dialog and panel."""
@@ -317,7 +325,9 @@ class TestDialogIntegrationWithPanel:
 
         # Open dialog
         panel._open_manual_offset_dialog()
-        dialog = panel._manual_offset_dialog
+        qtbot.waitUntil(lambda: panel._offset_dialog_manager.is_open(), timeout=500)
+        dialog = panel._offset_dialog_manager.get_current_dialog()
+        assert dialog is not None
 
         dialog.show()
         qtbot.waitForWindowShown(dialog)
@@ -342,12 +352,13 @@ class TestDialogIntegrationWithPanel:
 
         # Open dialog first time
         panel._open_manual_offset_dialog()
-        dialog1 = panel._manual_offset_dialog
+        qtbot.waitUntil(lambda: panel._offset_dialog_manager.is_open(), timeout=500)
+        dialog1 = panel._offset_dialog_manager.get_current_dialog()
         assert dialog1 is not None
 
         # Opening again without closing should return same instance
         panel._open_manual_offset_dialog()
-        dialog2 = panel._manual_offset_dialog
+        dialog2 = panel._offset_dialog_manager.get_current_dialog()
         # Same instance when not closed
         assert dialog1 is dialog2
 
@@ -357,7 +368,8 @@ class TestDialogIntegrationWithPanel:
 
         # Open again after close - may get new instance due to singleton reset
         panel._open_manual_offset_dialog()
-        dialog3 = panel._manual_offset_dialog
+        qtbot.waitUntil(lambda: panel._offset_dialog_manager.is_open(), timeout=500)
+        dialog3 = panel._offset_dialog_manager.get_current_dialog()
         # New instance should still be valid and functional
         assert dialog3 is not None
         assert dialog3.rom_path == str(rom_info['path'])

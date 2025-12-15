@@ -473,7 +473,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_thumbnail_controller.cleanup.assert_called()
 
     @patch('ui.windows.detached_gallery_window.QMessageBox.critical')
-    @patch('ui.windows.detached_gallery_window.UserErrorDialog.display_error')
+    @patch('ui.dialogs.UserErrorDialog.display_error')  # Patched at definition since lazy import
     def test_error_recovery_workflow(
         self,
         mock_show_error,

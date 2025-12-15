@@ -262,9 +262,15 @@ class TestManagedWorker:
 
         finished_spy = QSignalSpy(worker.operation_finished)
 
+        from PySide6.QtWidgets import QApplication
+        from tests.fixtures.timeouts import worker_timeout
+
         # Run the worker
         worker.start()
-        worker.wait(1000)
+        worker.wait(worker_timeout())
+
+        # Process events to ensure cross-thread signals are delivered
+        QApplication.processEvents()
 
         # Verify lifecycle
         assert worker.operation_called
@@ -287,12 +293,18 @@ class TestManagedWorker:
         worker = TestManagedWorker(manager)
         qtbot.addWidget(worker)
 
+        from PySide6.QtWidgets import QApplication
+        from tests.fixtures.timeouts import worker_timeout
+
         error_spy = QSignalSpy(worker.error)
         finished_spy = QSignalSpy(worker.operation_finished)
 
         # Run the worker
         worker.start()
-        worker.wait(1000)
+        worker.wait(worker_timeout())
+
+        # Process events to ensure cross-thread signals are delivered
+        QApplication.processEvents()
 
         # Verify error handling
         assert error_spy.count() == 1
@@ -317,6 +329,9 @@ class TestManagedWorker:
         worker = TestManagedWorker(manager)
         qtbot.addWidget(worker)
 
+        from PySide6.QtWidgets import QApplication
+        from tests.fixtures.timeouts import worker_timeout
+
         # Cancel before starting
         worker.cancel()
 
@@ -324,7 +339,10 @@ class TestManagedWorker:
 
         # Run the worker
         worker.start()
-        worker.wait(1000)
+        worker.wait(worker_timeout())
+
+        # Process events to ensure cross-thread signals are delivered
+        QApplication.processEvents()
 
         # Verify cancellation handling
         assert finished_spy.count() == 1
@@ -347,13 +365,19 @@ class TestManagedWorker:
             def perform_operation(self):
                 raise RuntimeError("Cleanup test")
 
+        from PySide6.QtWidgets import QApplication
+        from tests.fixtures.timeouts import worker_timeout
+
         manager = Mock(spec=BaseManager)
         worker = TestManagedWorker(manager)
         qtbot.addWidget(worker)
 
         # Run the worker
         worker.start()
-        worker.wait(1000)
+        worker.wait(worker_timeout())
+
+        # Process events to ensure cross-thread signals are delivered
+        QApplication.processEvents()
 
         # Verify cleanup was called despite exception
         assert worker.cleanup_called

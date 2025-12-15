@@ -561,11 +561,10 @@ class ManagerRegistry:
             cls._instance = None
             # Reset cleanup registration flag
             cls._cleanup_registered = False
-            # CRITICAL: Also reset the module-level _registry to match
-            # This ensures both ManagerRegistry() and _ensure_registry() return the same instance
-            # Without this, DI factories using ManagerRegistry() get a different instance
-            # than initialize_managers() which uses _registry via _ensure_registry()
-            _registry = ManagerRegistry()
+            # Reset module-level _registry to None - lazy init via _ensure_registry()
+            # will create a new instance when next accessed. This ensures is_clean()
+            # returns True immediately after reset.
+            _registry = None
 
 # Global instance accessor functions with context support
 _registry = ManagerRegistry()
@@ -586,9 +585,14 @@ import atexit
 atexit.register(_cleanup_global_registry)
 
 def _ensure_registry() -> ManagerRegistry:
-    """Ensure the global registry is available and return it."""
+    """Ensure the global registry is available and return it.
+
+    Lazily creates the registry if it was reset for tests or not yet initialized.
+    This ensures both ManagerRegistry() and _ensure_registry() return the same instance.
+    """
+    global _registry
     if _registry is None:
-        raise ManagerError("Manager registry has been cleaned up or not initialized")
+        _registry = ManagerRegistry()
     return _registry
 
 def initialize_managers(

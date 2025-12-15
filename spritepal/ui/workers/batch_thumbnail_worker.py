@@ -403,9 +403,14 @@ class BatchThumbnailWorker(QObject):
         finally:
             logger.info("BatchThumbnailWorker stopped")
             # Shutdown thread pool first to prevent resource leak
+            # IMPORTANT: Use wait=True to ensure all executor threads finish
+            # before this worker's run() method exits. This prevents orphan
+            # threads that cause crashes during garbage collection.
             if self._thread_pool:
                 try:
-                    self._thread_pool.shutdown(wait=False, cancel_futures=True)
+                    # cancel_futures=True cancels queued work, wait=True waits
+                    # for in-progress work to complete
+                    self._thread_pool.shutdown(wait=True, cancel_futures=True)
                     logger.debug("Thread pool shutdown complete in finally block")
                 except Exception as pool_error:
                     logger.warning(f"Error shutting down thread pool: {pool_error}")
@@ -549,6 +554,10 @@ class BatchThumbnailWorker(QObject):
         if not self._thread_pool:
             return
 
+        # Check stop flag before starting batch
+        if self._is_stop_requested():
+            return
+
         # Submit all requests to thread pool
         futures = []
         for request in batch_requests:
@@ -557,6 +566,13 @@ class BatchThumbnailWorker(QObject):
 
         # Collect results as they complete
         for future, request in futures:
+            # Check stop flag during batch processing for faster response
+            if self._is_stop_requested():
+                # Cancel remaining futures
+                for remaining_future, _ in futures:
+                    remaining_future.cancel()
+                return
+
             try:
                 qimage = future.result(timeout=2.0)  # 2 second timeout per thumbnail
                 if qimage:
@@ -884,8 +900,14 @@ class ThumbnailWorkerController(QObject):
                 # and actually running before trying to quit
                 if self._thread.isRunning():
                     self._thread.quit()
-                    if not self._thread.wait(3000):  # Wait up to 3 seconds
-                        logger.warning("Thread did not stop within timeout")
+                    if not self._thread.wait(5000):  # Wait up to 5 seconds
+                        # Log critical error but do NOT call terminate() - it causes
+                        # undefined behavior including resource leaks, mutex deadlocks,
+                        # and memory corruption. Let the orphan thread eventually finish.
+                        logger.critical(
+                            "Thread did not stop within timeout. "
+                            "Thread may be orphaned - check for blocking operations."
+                        )
             except RuntimeError:
                 # C++ object already deleted - this is expected when cleanup
                 # is called after the thread has finished and deleteLater executed

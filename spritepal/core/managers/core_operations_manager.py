@@ -86,6 +86,10 @@ class CoreOperationsManager(BaseManager):
         self._palette_manager: PaletteManager | None = None
         self._current_worker: Any = None
 
+        # Services (owned by this manager, shared by adapters)
+        self._rom_service: ROMService | None = None
+        self._vram_service: VRAMService | None = None
+
         # Create backward compatibility adapters
         self._extraction_adapter: ExtractionAdapter | None = None
         self._injection_adapter: InjectionAdapter | None = None
@@ -100,6 +104,18 @@ class CoreOperationsManager(BaseManager):
             self._sprite_extractor = SpriteExtractor()
             self._rom_extractor = ROMExtractor()
             self._palette_manager = PaletteManager()
+
+            # Initialize services (shared by adapters via delegation)
+            self._rom_service = ROMService(
+                rom_extractor=self._rom_extractor,
+                palette_manager=self._palette_manager,
+                parent=self,
+            )
+            self._vram_service = VRAMService(
+                sprite_extractor=self._sprite_extractor,
+                palette_manager=self._palette_manager,
+                parent=self,
+            )
 
             # Create adapters for backward compatibility
             self._extraction_adapter = ExtractionAdapter(self)
@@ -347,6 +363,22 @@ class CoreOperationsManager(BaseManager):
             raise ExtractionError("ROM extractor not initialized")
         return self._rom_extractor
 
+    # ========== Service Accessors (for adapter delegation) ==========
+
+    @property
+    def rom_service(self) -> ROMService:
+        """Get ROM service for adapter delegation."""
+        if self._rom_service is None:
+            raise ExtractionError("ROM service not initialized")
+        return self._rom_service
+
+    @property
+    def vram_service(self) -> VRAMService:
+        """Get VRAM service for adapter delegation."""
+        if self._vram_service is None:
+            raise ExtractionError("VRAM service not initialized")
+        return self._vram_service
+
     # ========== Backward Compatibility Adapters ==========
 
     def get_extraction_adapter(self) -> ExtractionManager:
@@ -365,6 +397,9 @@ class ExtractionAdapter(ExtractionManager):
     """
     Adapter class that provides ExtractionManager interface while
     delegating to CoreOperationsManager.
+
+    This adapter does NOT create its own services - it delegates to
+    CoreOperationsManager's services via properties.
     """
 
     def __init__(self, core_manager: CoreOperationsManager):
@@ -376,29 +411,14 @@ class ExtractionAdapter(ExtractionManager):
         self._name = "ExtractionAdapter"
         self._logger = core_manager._logger
 
-        # Set up required attributes that parent methods expect
-        self._rom_extractor = core_manager._rom_extractor
-        self._sprite_extractor = core_manager._sprite_extractor
-        self._palette_manager = core_manager._palette_manager
-
-        # Create services with shared components (required for delegated methods)
-        self._rom_service: ROMService | None = ROMService(
-            rom_extractor=self._rom_extractor,
-            palette_manager=self._palette_manager,
-            parent=self,
-        )
-        self._vram_service: VRAMService | None = VRAMService(
-            sprite_extractor=self._sprite_extractor,
-            palette_manager=self._palette_manager,
-            parent=self,
-        )
-        self._connect_service_signals()
-
         # Thread safety attributes required by BaseManager methods
         self._lock = threading.RLock()
         self._active_operations: set[str] = set()
 
-        # Forward signals
+        # Connect service signals (delegates to core's services)
+        self._connect_service_signals()
+
+        # Forward signals from core manager
         core_manager.extraction_progress.connect(self.extraction_progress.emit)
         core_manager.preview_generated.connect(self.preview_generated.emit)
         core_manager.palettes_extracted.connect(self.palettes_extracted.emit)
@@ -408,6 +428,34 @@ class ExtractionAdapter(ExtractionManager):
         core_manager.cache_hit.connect(self.cache_hit.emit)
         core_manager.cache_miss.connect(self.cache_miss.emit)
         core_manager.cache_saved.connect(self.cache_saved.emit)
+
+    # ========== Delegation Properties ==========
+    # These delegate to CoreOperationsManager's instances instead of creating our own
+
+    @property
+    def _rom_service(self) -> ROMService:  # type: ignore[override]
+        """Delegate to core manager's ROM service."""
+        return self._core.rom_service
+
+    @property
+    def _vram_service(self) -> VRAMService:  # type: ignore[override]
+        """Delegate to core manager's VRAM service."""
+        return self._core.vram_service
+
+    @property
+    def _rom_extractor(self) -> ROMExtractor | None:  # type: ignore[override]
+        """Delegate to core manager's ROM extractor."""
+        return self._core._rom_extractor
+
+    @property
+    def _sprite_extractor(self) -> SpriteExtractor | None:  # type: ignore[override]
+        """Delegate to core manager's sprite extractor."""
+        return self._core._sprite_extractor
+
+    @property
+    def _palette_manager(self) -> PaletteManager | None:  # type: ignore[override]
+        """Delegate to core manager's palette manager."""
+        return self._core._palette_manager
 
     @override
     def _initialize(self) -> None:

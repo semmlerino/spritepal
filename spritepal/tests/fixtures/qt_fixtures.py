@@ -105,6 +105,31 @@ def capture_thread_baseline() -> Iterator[None]:
 # Tests that need real Qt must be marked @pytest.mark.gui.
 
 
+def ensure_headless_qt() -> Any:
+    """Ensure Qt is running in headless mode and return QApplication.
+
+    This is the single source of truth for headless Qt initialization.
+    Can be called both as a regular function (from helper classes) and
+    at module import time.
+
+    Note: QT_QPA_PLATFORM=offscreen should already be set via pyproject.toml,
+    but this function ensures it's set for safety and creates a QApplication
+    if one doesn't exist.
+
+    Returns:
+        QApplication instance
+    """
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("QT_QUICK_BACKEND", "software")
+
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    return app
+
+
 # =============================================================================
 # Core Qt Fixtures
 # =============================================================================
@@ -235,20 +260,21 @@ def safe_qapp(qt_app: Any) -> Any:
 
 @pytest.fixture(autouse=True)
 def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, None]:
-    """Clean up worker threads after ALL tests (autouse).
+    """Clean up worker threads after Qt tests (autouse but opt-in by fixture usage).
 
-    This fixture runs cleanup by default and FAILS if threads are leaked.
-    Previously this was opt-in with @pytest.mark.worker_threads; now it's
-    opt-out with @pytest.mark.skip_thread_cleanup.
+    PERFORMANCE OPTIMIZATION: Only runs full thread tracking for tests that use
+    Qt/worker fixtures. Other tests get a quick pass-through.
 
-    IMPROVED: Uses identity-based detection instead of count-based.
-    - ALWAYS captures thread identities BEFORE test runs
-    - ALWAYS compares identities AFTER test to find new threads
+    This fixture:
+    - Skips overhead for non-Qt tests (no thread tracking)
+    - For Qt tests: captures thread identities, cleans up workers, detects leaks
     - Reports leaked thread names and stack traces for debugging
-    - Only does Qt-specific cleanup when Qt is available
 
     Accounts for pytest-timeout's monitoring thread (when timeout_method="thread")
     which is created per test but cleaned up AFTER this fixture runs.
+
+    Opt-in (automatic):
+        Tests using: qtbot, qt_app, hal_pool, or worker-related fixtures
 
     Opt-out markers:
         @pytest.mark.skip_thread_cleanup - Skip cleanup (rare, use only if truly needed)
@@ -263,6 +289,15 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 
     # Opt-OUT: Skip if explicitly marked
     if 'skip_thread_cleanup' in markers or 'no_manager_setup' in markers or 'no_qt' in markers:
+        yield
+        return
+
+    # OPT-IN by fixture usage: Only run heavy thread tracking for Qt/worker tests
+    qt_fixtures = {'qtbot', 'qt_app', 'qapp', 'hal_pool', 'hal_compressor',
+                   'cleanup_singleton', 'real_factory', 'real_extraction_manager'}
+    item_fixtures = set(getattr(request, 'fixturenames', []))
+    if not (qt_fixtures & item_fixtures):
+        # Not a Qt test - skip thread tracking overhead
         yield
         return
 

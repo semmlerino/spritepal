@@ -312,7 +312,9 @@ class TestGalleryIntegration:
         # The detached gallery loads thumbnails on demand
         # So we just verify the detached gallery was created with the right sprite count
 
-        # Clean up - give time for worker threads to stop
-        tab.detached_window.close()
+        # Clean up - tab.cleanup() handles closing detached window and stopping workers
+        # Don't call close() separately as it can cause double-cleanup issues
         tab.cleanup()
-        qtbot.wait(200)  # Wait for background threads to clean up
+        # Process any pending events synchronously to prevent segfaults from dangling references
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()

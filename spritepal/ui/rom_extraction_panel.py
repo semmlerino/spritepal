@@ -1,10 +1,14 @@
 """
-ROM extraction panel for SpritePal
+ROM extraction panel for SpritePal.
+
+This panel coordinates ROM-based sprite extraction using:
+- ROMWorkerOrchestrator: Background worker management
+- ScanController: Sprite scanning workflow and cache
+- OffsetDialogManager: Manual offset dialog lifecycle
 """
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from operator import itemgetter
 from pathlib import Path
@@ -34,22 +38,17 @@ if TYPE_CHECKING:
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.managers.application_state_manager import ExtractionState
 
-# SettingsManager accessed via DI: inject(SettingsManagerProtocol)
-from core.thread_safe_singleton import QtThreadSafeSingleton
-from ui.common import WorkerManager
-from ui.dialogs import ResumeScanDialog, UnifiedManualOffsetDialog, UserErrorDialog
+# Import extracted components
+from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
+# Dialog imports moved to lazy imports in methods that use them (see _on_partial_scan_detected, _open_manual_offset_dialog, _find_sprites, _check_scan_cache)
+from ui.rom_extraction.workers import SpriteScanWorker
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
     ModeSelectorWidget,
     ROMFileWidget,
     SpriteSelectorWidget,
 )
-from ui.rom_extraction.workers import SpriteScanWorker
-from ui.rom_extraction.workers.similarity_indexing_worker import (
-    SimilarityIndexingWorker,
-)
 from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
-from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoaderWorker
 from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
     SETTINGS_NS_ROM_INJECTION,
@@ -57,6 +56,13 @@ from utils.constants import (
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# UI Spacing Constants (imported from centralized module)
+from ui.common.spacing_constants import (
+    SPACING_COMPACT_LARGE as SPACING_LARGE,
+    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
+)
+
 
 class ScanDialog(QDialog):
     """Dialog for sprite scanning with typed attributes."""
@@ -71,176 +77,24 @@ class ScanDialog(QDialog):
         self.apply_btn: QPushButton | None
         self.rom_cache: Any = None  # Cache object, type depends on implementation
 
-# UI Spacing Constants (imported from centralized module)
-from ui.common.spacing_constants import (
-    SPACING_COMPACT_LARGE as SPACING_LARGE,
-    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
-)
 
+class ScanContext:
+    """Context object for sharing data between scan event handlers."""
 
-class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDialog"]):
-    """
-    Thread-safe application-wide singleton for manual offset dialog.
-    Ensures only one dialog instance exists across the entire application.
+    def __init__(self):
+        self.found_offsets: list[dict[str, Any]] = []
+        self.selected_offset: int | None = None
 
-    This singleton uses proper thread synchronization and Qt thread affinity checking
-    to prevent crashes when accessed from worker threads.
-
-    Signal tracking is done per-instance (not class-level) to avoid stale flag bugs
-    when dialogs are destroyed externally. Each instance tracks its own _signals_connected
-    attribute, so new instances naturally have no signals connected yet.
-    """
-    _instance: UnifiedManualOffsetDialog | None = None
-    _creator_panel: ROMExtractionPanel | None = None
-    _destroyed: bool = False  # Track if the dialog has been destroyed
-    _lock = threading.Lock()
-
-    @classmethod
-    @override
-    def _create_instance(cls, creator_panel: ROMExtractionPanel | None = None) -> UnifiedManualOffsetDialog:
-        """Create a new dialog instance (thread-safe, main thread only)."""
-        # Ensure we're on the main thread for Qt object creation
-        cls._ensure_main_thread()
-
-        logger.debug("Creating new ManualOffsetDialog singleton instance")
-
-        # Reset destroyed flag when creating new instance
-        cls._destroyed = False
-
-        # Create new instance with None as parent to avoid widget hierarchy contamination
-        instance = UnifiedManualOffsetDialog(None)
-        cls._creator_panel = creator_panel
-
-        # Connect signals immediately (not deferred) to avoid race conditions
-        # Signal tracking is per-instance, so new instances naturally need signals connected
-        cls._connect_signals(instance)
-
-        return instance
-
-    @classmethod
-    def _connect_signals(cls, instance: UnifiedManualOffsetDialog) -> None:
-        """Connect cleanup signals to the dialog instance.
-
-        Signal tracking is per-instance to avoid stale flag bugs when dialogs
-        are destroyed externally. Each instance tracks its own _signals_connected
-        attribute.
-        """
-        # Check instance-level flag (not class-level) to avoid stale state bugs
-        if getattr(instance, '_signals_connected', False):
-            return
-
-        try:
-            # Connect dialog signals directly
-            instance.finished.connect(
-                cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
-            )
-            instance.rejected.connect(
-                cls._on_dialog_closed, Qt.ConnectionType.UniqueConnection
-            )
-            instance.destroyed.connect(
-                cls._on_dialog_destroyed, Qt.ConnectionType.UniqueConnection
-            )
-            instance._signals_connected = True
-            logger.debug("Signals connected directly to dialog")
-
-        except Exception as e:
-            logger.warning(f"Failed to connect cleanup signals: {e}")
-
-    @classmethod
-    def get_dialog(cls, creator_panel: ROMExtractionPanel) -> UnifiedManualOffsetDialog:
-        """Get or create the singleton dialog instance (thread-safe)."""
-        # Get instance using thread-safe pattern
-        instance = cls.get(creator_panel)
-
-        # Check if the dialog was marked as destroyed
-        if cls._destroyed:
-            cls.reset()
-            instance = cls.get(creator_panel)
-
-        # Check if existing instance is still valid (only on main thread)
-        if cls.safe_qt_call(lambda: instance.isVisible()):
-            return instance
-
-        # Dialog exists but is not visible - check if it's still valid
-        try:
-            cls._ensure_main_thread()
-            # Test if the dialog is still valid by accessing windowTitle
-            # This will throw RuntimeError if deleted by Qt
-            _ = instance.windowTitle()
-        except RuntimeError:
-            # Dialog has been destroyed by Qt but our reference is stale
-            logger.debug("Stale dialog reference detected, cleaning up")
-            cls.reset()
-            instance = cls.get(creator_panel)
-
-        return instance
-
-    @classmethod
-    def _on_dialog_closed(cls):
-        """Handle dialog close event for cleanup (thread-safe)."""
-        logger.debug("Manual offset dialog closed, scheduling cleanup")
-
-        # Use thread-safe cleanup
-        with cls._lock:
-            if cls._instance is not None:
-                # Schedule deletion on main thread
-                instance = cls._instance  # Capture reference to avoid race condition
-                cls.safe_qt_call(lambda: instance.deleteLater() if instance else None)
-                cls._cleanup_instance(cls._instance)
-                cls._instance = None  # Clear the instance reference
-
-    @classmethod
-    def _on_dialog_destroyed(cls):
-        """Handle dialog destroyed signal for ultimate cleanup (thread-safe)."""
-        logger.debug("Manual offset dialog destroyed signal received")
-        with cls._lock:
-            cls._destroyed = True
-        cls.reset()
-
-    @classmethod
-    @override
-    def reset(cls):
-        """Reset the singleton instance and all associated state.
-
-        Note: _signals_connected is tracked per-instance, not class-level,
-        so it doesn't need to be reset here. New instances naturally have
-        no signals connected yet.
-        """
-        cls._destroyed = False
-        super().reset()
-
-    @classmethod
-    @override
-    def _cleanup_instance(cls, instance: UnifiedManualOffsetDialog) -> None:
-        """Clean up the singleton instance (thread-safe)."""
-        logger.debug("Cleaning up ManualOffsetDialog singleton instance")
-        cls._creator_panel = None
-        # Parent class handles instance cleanup
-
-    @classmethod
-    def is_dialog_open(cls) -> bool:
-        """Check if dialog is currently open (thread-safe)."""
-        if cls._instance is None:
-            return False
-
-        # Use safe Qt call to check visibility
-        instance = cls._instance  # Capture reference to avoid race condition
-        is_visible = cls.safe_qt_call(lambda: instance.isVisible() if instance else False)
-        return is_visible is True  # Handle None return from safe_qt_call
-
-    @classmethod
-    def get_current_dialog(cls) -> UnifiedManualOffsetDialog | None:
-        """Get current dialog instance if it exists and is visible (thread-safe)."""
-        if cls._instance is None:
-            return None
-
-        # Check if dialog is visible using thread-safe method
-        instance = cls._instance  # Capture reference to avoid race condition
-        is_visible = cls.safe_qt_call(lambda: instance.isVisible() if instance else False)
-        return cls._instance if is_visible else None
 
 class ROMExtractionPanel(QWidget):
-    """Panel for ROM-based sprite extraction"""
+    """Panel for ROM-based sprite extraction.
+
+    This panel coordinates:
+    - ROM file selection and header loading
+    - Sprite location loading (from cache or ROM)
+    - Manual offset browsing via dialog
+    - Sprite scanning workflow
+    """
 
     # Signals
     files_changed = Signal()
@@ -259,7 +113,7 @@ class ROMExtractionPanel(QWidget):
         super().__init__(parent)
 
         self.rom_path = ""
-        self.sprite_locations = {}
+        self.sprite_locations: dict[str, Any] = {}
         # Use injected extraction manager
         self.extraction_manager = extraction_manager
         self.rom_extractor = self.extraction_manager.get_rom_extractor()
@@ -272,18 +126,51 @@ class ROMExtractionPanel(QWidget):
         self.state_manager: ApplicationStateManager = inject(ApplicationStateManagerProtocol)  # type: ignore[assignment]
         self.state_manager.workflow_state_changed.connect(self._on_state_changed)
 
-        # Worker references to track and clean up
-        self.search_worker = None
-        self.scan_worker = None
-        self.similarity_indexing_worker = None
-        self._header_loader: ROMHeaderLoaderWorker | None = None
-        self._sprite_location_loader: ROMInfoLoaderWorker | None = None
+        # Initialize extracted components
+        self._worker_orchestrator = ROMWorkerOrchestrator(self)
+        self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
+        self._scan_controller: ScanController | None = None  # Created on first use
+
+        # Connect orchestrator signals
+        self._connect_orchestrator_signals()
+
+        # Connect dialog manager signals
+        self._offset_dialog_manager.offset_changed.connect(self._on_dialog_offset_changed)
+        self._offset_dialog_manager.sprite_found.connect(self._on_dialog_sprite_found)
+
+        # Legacy worker reference for scan worker (still managed locally for now)
+        self.scan_worker: SpriteScanWorker | None = None
 
         # Output name provider callback (injected from main window)
         self._output_name_provider: Callable[[], str] | None = None
 
+        # Manual offset tracking
+        self._manual_offset = 0x200000  # Default offset
+
         self._setup_ui()
         self._load_last_rom()
+
+    def _connect_orchestrator_signals(self) -> None:
+        """Connect signals from the worker orchestrator."""
+        # Header loading
+        self._worker_orchestrator.header_loaded.connect(self._on_header_loaded)
+        self._worker_orchestrator.header_error.connect(self._on_header_load_error)
+
+        # Sprite locations
+        self._worker_orchestrator.sprite_locations_loaded.connect(
+            self._on_sprite_locations_loaded
+        )
+        self._worker_orchestrator.sprite_locations_error.connect(
+            self._on_sprite_locations_error
+        )
+
+        # Similarity indexing (logging only)
+        self._worker_orchestrator.similarity_progress.connect(self._on_similarity_progress)
+        self._worker_orchestrator.sprite_indexed.connect(self._on_sprite_indexed)
+        self._worker_orchestrator.index_saved.connect(self._on_index_saved)
+        self._worker_orchestrator.index_loaded.connect(self._on_index_loaded)
+        self._worker_orchestrator.similarity_finished.connect(self._on_similarity_finished)
+        self._worker_orchestrator.similarity_error.connect(self._on_similarity_error)
 
     def set_output_name_provider(self, provider: Callable[[], str]) -> None:
         """Set the callback to get output name from shared OutputSettingsManager.
@@ -374,10 +261,6 @@ class ROMExtractionPanel(QWidget):
         self.manual_offset_button = self._create_manual_offset_button()
         layout.addWidget(self.manual_offset_button)
 
-        # Initialize dialog reference
-        self._manual_offset_dialog = None  # Legacy - now managed by singleton
-        self._manual_offset = 0x200000  # Default offset
-
     def _create_manual_offset_button(self) -> QPushButton:
         """Create and configure the manual offset control button.
 
@@ -427,6 +310,8 @@ class ROMExtractionPanel(QWidget):
 
     def _on_partial_scan_detected(self, scan_info: dict[str, Any]):
         """Handle detection of partial scan cache"""
+        from ui.dialogs import ResumeScanDialog  # Lazy import to avoid cross-UI coupling
+
         # Show resume dialog to ask user what to do
         user_choice = ResumeScanDialog.show_resume_dialog(scan_info, self)
 
@@ -480,7 +365,7 @@ class ROMExtractionPanel(QWidget):
                     f.seek(0, 2)  # Seek to end
                     self.rom_size = f.tell()
                     # Update dialog if it exists
-                    current_dialog = ManualOffsetDialogSingleton.get_current_dialog()
+                    current_dialog = self._offset_dialog_manager.get_current_dialog()
                     if current_dialog is not None:
                         current_dialog.set_rom_data(self.rom_path, self.rom_size, self.extraction_manager)
                     logger.debug(f"ROM size: {self.rom_size} bytes (0x{self.rom_size:X})")
@@ -496,12 +381,9 @@ class ROMExtractionPanel(QWidget):
             settings.set_last_used_directory(str(Path(filename).parent))
             logger.debug(f"Saved ROM to settings: {filename}")
 
-            # Read ROM header asynchronously to prevent UI freeze
+            # Read ROM header asynchronously using orchestrator
             self.rom_file_widget.show_loading("Loading ROM header...")
-            self._start_header_loading(filename)
-
-            # Note: _load_rom_sprites() and _init_similarity_indexing_worker() will be called
-            # from _on_header_loaded callback to ensure proper sequencing
+            self._worker_orchestrator.load_header(filename, self.rom_extractor)
 
             # Notify that files changed
             self.files_changed.emit()
@@ -514,34 +396,8 @@ class ROMExtractionPanel(QWidget):
             self.rom_path = ""
             self.rom_file_widget.set_rom_path("")
 
-    def _start_header_loading(self, filename: str) -> None:
-        """Start async ROM header loading.
-
-        Args:
-            filename: Path to ROM file
-        """
-        # Clean up existing header loader
-        if self._header_loader is not None:
-            WorkerManager.cleanup_worker(self._header_loader)
-            self._header_loader = None
-
-        # Create and start background worker
-        self._header_loader = ROMHeaderLoaderWorker(
-            rom_path=filename,
-            rom_injector=self.rom_extractor.rom_injector,
-            sprite_config_loader=self.rom_extractor.sprite_config_loader,
-        )
-
-        # Connect signals
-        self._header_loader.header_loaded.connect(self._on_header_loaded)
-        self._header_loader.error.connect(self._on_header_load_error)
-
-        # Start loading
-        logger.debug(f"Starting async header load for: {filename}")
-        self._header_loader.start()
-
     def _on_header_loaded(self, result: dict[str, Any]) -> None:
-        """Handle ROM header loaded from background worker.
+        """Handle ROM header loaded from orchestrator.
 
         Args:
             result: Dict with 'header' and 'sprite_configs' keys
@@ -561,32 +417,34 @@ class ROMExtractionPanel(QWidget):
 
             # Check if this matches known configurations
             if sprite_configs:
-                info_text += '<span style="color: green;"><b>Status:</b> Configuration found ✓</span>'
+                info_text += '<span style="color: green;"><b>Status:</b> Configuration found</span>'
             else:
                 info_text += '<span style="color: orange;"><b>Status:</b> Unknown ROM version - use "Find Sprites" to scan</span>'
 
             self.rom_file_widget.set_info_text(info_text)
 
-        # Now continue with sprite location loading and similarity indexing
+        # Continue with sprite location loading and similarity indexing
         self._load_rom_sprites()
-        self._init_similarity_indexing_worker()
+        self._init_similarity_indexing()
 
-    def _on_header_load_error(self, message: str, exception: Exception) -> None:
+    def _on_header_load_error(self, message: str) -> None:
         """Handle ROM header loading error.
 
         Args:
             message: Error message
-            exception: Exception that occurred
         """
         logger.warning(f"Could not read ROM header: {message}")
+        self.rom_file_widget.hide_loading()
         self.rom_file_widget.set_info_text('<span style="color: red;">Error reading ROM header</span>')
         # Still try to load sprite locations even if header fails
         self._load_rom_sprites()
-        self._init_similarity_indexing_worker()
+        self._init_similarity_indexing()
 
     def _open_manual_offset_dialog(self):
-        """Open the manual offset control dialog using singleton pattern"""
-        logger.debug("[DEBUG] _open_manual_offset_dialog called")
+        """Open the manual offset control dialog using manager"""
+        from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
+
+        logger.debug("_open_manual_offset_dialog called")
 
         if not self.rom_path:
             UserErrorDialog.display_error(
@@ -596,81 +454,26 @@ class ROMExtractionPanel(QWidget):
             )
             return
 
-        # Get or create singleton dialog instance
-        logger.debug("[DEBUG] Getting dialog from singleton...")
-        dialog = ManualOffsetDialogSingleton.get_dialog(self)
-        logger.debug(f"[DEBUG] Got dialog: {dialog} (ID: {getattr(dialog, '_debug_id', 'Unknown')})")
-
-        # Defer custom signal connections to avoid Qt timing issues
-        if not hasattr(dialog, "_custom_signals_connected"):
-            def _connect_custom_signals():
-                """Connect custom dialog signals after dialog is shown."""
-                try:
-                    logger.debug("Connecting custom dialog signals...")
-                    # Connect directly to dialog signals
-                    dialog.offset_changed.connect(self._on_dialog_offset_changed)
-                    dialog.sprite_found.connect(self._on_dialog_sprite_found)
-                    dialog._custom_signals_connected = True
-                    logger.debug("Custom dialog signals connected successfully")
-                except Exception as e:
-                    logger.error(f"Failed to connect custom dialog signals: {e}")
-
-            # Add to existing deferred signal connection or create new one
-            existing_deferred = getattr(dialog, '_deferred_signal_connection', None)
-            if existing_deferred:
-                # Chain the custom signal connection with existing deferred connection
-                def _combined_deferred():
-                    existing_deferred()
-                    _connect_custom_signals()
-                dialog._deferred_signal_connection = _combined_deferred
-            else:
-                dialog._deferred_signal_connection = _connect_custom_signals
-
-        # Update dialog with current ROM data every time it's opened
-        dialog.set_rom_data(
-            self.rom_path, self.rom_size, self.extraction_manager
+        # Use dialog manager to open the dialog
+        dialog = self._offset_dialog_manager.open_dialog(
+            rom_path=self.rom_path,
+            extractor=self.rom_extractor,
+            rom_size=self.rom_size,
+            extraction_manager=self.extraction_manager,
+            initial_offset=self._manual_offset,
         )
 
-        # Set current offset
-        dialog.set_offset(self._manual_offset)
-
-        # Show the dialog (or bring to front if already visible)
-        if not dialog.isVisible():
-            logger.debug("[DEBUG] Dialog not visible, showing and raising")
-            dialog.show()
-            dialog.raise_()  # Also raise to ensure it's on top
-            dialog.activateWindow()  # And activate to ensure focus
-
-            # Connect deferred signals after Qt processes the show event
-            # Using QTimer.singleShot(0) defers execution to next event loop iteration
-            deferred_conn = getattr(dialog, '_deferred_signal_connection', None)
-            if deferred_conn is not None:
-                def _do_deferred_connect():
-                    conn = getattr(dialog, '_deferred_signal_connection', None)
-                    if conn is not None:
-                        logger.debug("[DEBUG] Calling deferred signal connection...")
-                        conn()
-                        delattr(dialog, '_deferred_signal_connection')  # Clean up
-                QTimer.singleShot(0, _do_deferred_connect)
-
-            logger.debug("[DEBUG] Showed and raised ManualOffsetDialog singleton")
-        else:
-            # Bring to front if already visible
-            logger.debug("[DEBUG] Dialog already visible, raising to front")
-            dialog.raise_()
-            dialog.activateWindow()
-            logger.debug("[DEBUG] Brought ManualOffsetDialog singleton to front")
-
-        # Update legacy reference for compatibility
-        self._manual_offset_dialog = dialog
+        if dialog:
+            logger.debug("Opened ManualOffsetDialog via manager")
 
     def _on_dialog_offset_changed(self, offset: int):
         """Handle offset changes from the dialog"""
         self._manual_offset = offset
         # Preview now handled in manual offset dialog
 
-    def _on_dialog_sprite_found(self, offset: int, sprite_name: str):
+    def _on_dialog_sprite_found(self, sprite_data: dict[str, Any]):
         """Handle sprite found signal from dialog"""
+        offset = sprite_data.get("offset", 0)
         self._manual_offset = offset
         # Check extraction readiness
         self._check_extraction_ready()
@@ -700,7 +503,7 @@ class ROMExtractionPanel(QWidget):
             settings.set_last_used_directory(str(Path(filename).parent))
 
     def _load_rom_sprites(self):
-        """Load known sprite locations from ROM asynchronously."""
+        """Load known sprite locations from ROM using orchestrator."""
         if self.sprite_selector_widget:
             self.sprite_selector_widget.clear()
             self.sprite_selector_widget.add_sprite("Loading sprite locations...", None)
@@ -719,60 +522,46 @@ class ROMExtractionPanel(QWidget):
         except Exception:
             self._is_sprites_from_cache = False
 
-        # Clean up existing worker
-        if self._sprite_location_loader is not None:
-            WorkerManager.cleanup_worker(self._sprite_location_loader)
-            self._sprite_location_loader = None
+        # Use orchestrator to load sprite locations
+        self._worker_orchestrator.load_sprite_locations(self.rom_path, self.rom_extractor)
 
-        # Start async sprite location loading
-        self._sprite_location_loader = ROMInfoLoaderWorker(
-            rom_path=self.rom_path,
-            injection_manager=None,  # Not needed for sprite locations
-            extraction_manager=self.extraction_manager,
-            load_header=False,  # Header already loaded separately
-            load_sprite_locations=True,
-        )
-
-        # Connect signals
-        self._sprite_location_loader.sprite_locations_loaded.connect(
-            self._on_sprite_locations_loaded
-        )
-        self._sprite_location_loader.error.connect(self._on_sprite_locations_error)
-
-        # Start loading
-        logger.debug(f"Starting async sprite location load for: {self.rom_path}")
-        self._sprite_location_loader.start()
-
-    def _on_sprite_locations_loaded(self, locations: dict[str, Any]) -> None:
-        """Handle sprite locations loaded from background worker.
+    def _on_sprite_locations_loaded(self, locations: list[dict[str, Any]]) -> None:
+        """Handle sprite locations loaded from orchestrator.
 
         Args:
-            locations: Dict of sprite name -> SpritePointer
+            locations: List of sprite location dictionaries
         """
         if self.sprite_selector_widget:
             self.sprite_selector_widget.clear()
 
         is_from_cache = getattr(self, '_is_sprites_from_cache', False)
 
-        if locations:
+        # Convert list to dict format expected by sprite selector
+        locations_dict: dict[str, Any] = {}
+        for loc in locations:
+            name = loc.get("name", f"sprite_0x{loc.get('offset', 0):X}")
+            locations_dict[name] = loc
+
+        if locations_dict:
             # Show count of known sprites to make it clear they're available
             cache_text = " (cached)" if is_from_cache else ""
             self.sprite_selector_widget.add_sprite(
-                f"-- {len(locations)} Known Sprites Available{cache_text} --", None
+                f"-- {len(locations_dict)} Known Sprites Available{cache_text} --", None
             )
 
             # Add separator for clarity
             self.sprite_selector_widget.insert_separator(1)
 
-            for name, pointer in locations.items():
+            for name, info in locations_dict.items():
+                offset = info.get("offset", 0)
                 display_name = name.replace("_", " ").title()
                 # Add cache indicator if sprites came from cache
-                cache_indicator = " 💾" if is_from_cache else ""
+                cache_indicator = " \U0001F4BE" if is_from_cache else ""  # floppy disk emoji
                 self.sprite_selector_widget.add_sprite(
-                    f"{display_name} (0x{pointer.offset:06X}){cache_indicator}",
-                    (name, pointer.offset)
+                    f"{display_name} (0x{offset:06X}){cache_indicator}",
+                    (name, offset)
                 )
-            self.sprite_locations = locations
+            self.sprite_locations = locations_dict
             self.sprite_selector_widget.set_enabled(True)
 
             # Change button text to indicate scanner is optional
@@ -792,12 +581,11 @@ class ROMExtractionPanel(QWidget):
             )
             self.sprite_selector_widget.set_find_button_enabled(True)
 
-    def _on_sprite_locations_error(self, message: str, exception: Exception) -> None:
+    def _on_sprite_locations_error(self, message: str) -> None:
         """Handle sprite locations loading error.
 
         Args:
             message: Error message
-            exception: Exception that occurred
         """
         logger.exception(f"Failed to load sprite locations: {message}")
         if self.sprite_selector_widget:
@@ -805,61 +593,46 @@ class ROMExtractionPanel(QWidget):
             self.sprite_selector_widget.add_sprite("Error loading ROM", None)
             self.sprite_selector_widget.set_enabled(False)
 
-    def _init_similarity_indexing_worker(self):
-        """Initialize similarity indexing worker for the current ROM"""
+    def _init_similarity_indexing(self):
+        """Initialize similarity indexing using orchestrator."""
         if not self.rom_path:
             return
 
         try:
-            # Clean up existing worker if any
-            if self.similarity_indexing_worker is not None:
-                WorkerManager.cleanup_worker(self.similarity_indexing_worker)
-                self.similarity_indexing_worker = None
-
-            # Create new similarity indexing worker
-            self.similarity_indexing_worker = SimilarityIndexingWorker(self.rom_path)
-
-            # Connect signals for progress updates
-            self.similarity_indexing_worker.progress.connect(self._on_similarity_progress)
-            self.similarity_indexing_worker.sprite_indexed.connect(self._on_sprite_indexed)
-            self.similarity_indexing_worker.index_saved.connect(self._on_index_saved)
-            self.similarity_indexing_worker.index_loaded.connect(self._on_index_loaded)
-            self.similarity_indexing_worker.operation_finished.connect(self._on_similarity_finished)
-            self.similarity_indexing_worker.error.connect(self._on_similarity_error)
-
-            indexed_count = self.similarity_indexing_worker.get_indexed_count()
-            logger.info(f"Initialized similarity indexing worker for ROM: {Path(self.rom_path).name} ({indexed_count} sprites indexed)")
-
+            # Start similarity indexing via orchestrator
+            self._worker_orchestrator.start_similarity_indexing(
+                rom_path=self.rom_path,
+                sprites=[],  # Will be populated by scan
+                extractor=self.rom_extractor,
+            )
+            logger.info(f"Initialized similarity indexing for ROM: {Path(self.rom_path).name}")
         except Exception as e:
-            logger.exception(f"Failed to initialize similarity indexing worker: {e}")
+            logger.exception(f"Failed to initialize similarity indexing: {e}")
 
-    def _on_similarity_progress(self, percent: int, message: str):
+    def _on_similarity_progress(self, message: str):
         """Handle similarity indexing progress updates"""
-        logger.debug(f"Indexing sprites: {percent}% - {message}")
+        logger.debug(f"Indexing sprites: {message}")
 
-    def _on_sprite_indexed(self, offset: int):
+    def _on_sprite_indexed(self, sprite_data: dict[str, Any]):
         """Handle individual sprite indexing completion"""
+        offset = sprite_data.get("offset", 0)
         logger.debug(f"Sprite at 0x{offset:X} indexed for similarity search")
 
     def _on_index_saved(self, index_path: str):
         """Handle similarity index save completion"""
         logger.info(f"Similarity index saved to: {index_path}")
 
-    def _on_index_loaded(self, sprite_count: int):
+    def _on_index_loaded(self, load_path: str):
         """Handle similarity index loading"""
-        logger.info(f"Loaded {sprite_count} sprites from similarity index")
+        logger.info(f"Loaded similarity index from: {load_path}")
 
-    def _on_similarity_finished(self, success: bool, message: str):
+    def _on_similarity_finished(self):
         """Handle similarity indexing completion"""
-        if success:
-            indexed_count = self.similarity_indexing_worker.get_indexed_count() if self.similarity_indexing_worker else 0
-            logger.info(f"Similarity indexing complete: {indexed_count} sprites indexed - {message}")
-        else:
-            logger.error(f"Similarity indexing failed: {message}")
+        logger.info("Similarity indexing complete")
 
-    def _on_similarity_error(self, error_message: str, exception: Exception):
+    def _on_similarity_error(self, error_message: str):
         """Handle similarity indexing errors"""
-        logger.error(f"Similarity indexing error: {error_message}", exc_info=exception)
+        logger.error(f"Similarity indexing error: {error_message}")
 
     def _on_sprite_changed(self, index: int):
         """Handle sprite selection change"""
@@ -981,10 +754,12 @@ class ROMExtractionPanel(QWidget):
         self._check_extraction_ready()
         self.rom_file_widget.set_info_text("No ROM loaded")
 
-    # Preview functionality removed - now handled in manual offset dialog
+    # ========== Sprite Scanning ==========
 
     def _find_sprites(self):
         """Open dialog to scan for sprite offsets"""
+        from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
+
         if not self.rom_path:
             return
 
@@ -1083,6 +858,8 @@ class ROMExtractionPanel(QWidget):
         Args:
             dialog: The scan dialog containing UI elements
         """
+        from ui.common import WorkerManager
+
         # Clean up any existing scan worker
         WorkerManager.cleanup_worker(self.scan_worker)
 
@@ -1117,6 +894,7 @@ class ROMExtractionPanel(QWidget):
         Returns:
             True to use cache, False to start fresh, None if cancelled
         """
+        from ui.dialogs import ResumeScanDialog  # Lazy import to avoid cross-UI coupling
         from core.di_container import inject  # Delayed import
         from core.protocols.manager_protocols import ROMCacheProtocol
         rom_cache = inject(ROMCacheProtocol)
@@ -1143,7 +921,7 @@ class ROMExtractionPanel(QWidget):
                 self._update_cache_status(dialog, "fresh", "Starting fresh scan (ignoring cache)")
                 return False
             # RESUME
-            self._update_cache_status(dialog, "resuming", "📊 Resuming from cached progress...")
+            self._update_cache_status(dialog, "resuming", "\U0001F4CA Resuming from cached progress...")
             return True
         self._update_cache_status(dialog, "fresh", "No cache found - starting fresh scan")
         return True
@@ -1182,11 +960,6 @@ class ROMExtractionPanel(QWidget):
             self.scan_worker.cache_progress.connect(
                 lambda progress: self._on_cache_progress(dialog, progress)
             )
-
-        # Connect to similarity indexing if available
-        if self.similarity_indexing_worker is not None and self.scan_worker:
-            self.scan_worker.sprite_found.connect(self.similarity_indexing_worker.on_sprite_found)
-            self.scan_worker.finished.connect(self.similarity_indexing_worker.on_scan_finished)
 
     def _on_scan_progress(self, dialog: ScanDialog, current: int, total: int) -> None:
         """Handle scan progress update."""
@@ -1257,7 +1030,7 @@ class ROMExtractionPanel(QWidget):
 
     def _save_scan_results_to_cache(self, dialog: ScanDialog, found_offsets: list[Any]) -> None:
         """Save scan results to cache."""
-        self._update_cache_status(dialog, "saving", "💾 Saving results to cache...")
+        self._update_cache_status(dialog, "saving", "\U0001F4BE Saving results to cache...")
         # Defer actual save to next event loop iteration to allow UI update
         QTimer.singleShot(0, lambda: self._do_cache_save(dialog, found_offsets))
 
@@ -1276,22 +1049,22 @@ class ROMExtractionPanel(QWidget):
         # Save to cache
         if dialog.rom_cache and dialog.rom_cache.save_sprite_locations(self.rom_path, sprite_locations):
             self._update_cache_status(dialog, "saved",
-                                     f"✅ Saved {len(found_offsets)} sprites to cache")
+                                     f"\u2705 Saved {len(found_offsets)} sprites to cache")
             # Update results text
             current_text = dialog.results_text.toPlainText()
             dialog.results_text.setPlainText(
-                current_text + "\n✅ Results saved to cache for faster future scans.\n"
+                current_text + "\n\u2705 Results saved to cache for faster future scans.\n"
             )
         else:
-            dialog.cache_status_label.setText("⚠️ Could not save to cache")
+            dialog.cache_status_label.setText("\u26A0\uFE0F Could not save to cache")
             current_text = dialog.results_text.toPlainText()
             dialog.results_text.setPlainText(
-                current_text + "\n⚠️ Could not save results to cache.\n"
+                current_text + "\n\u26A0\uFE0F Could not save results to cache.\n"
             )
 
     def _on_cache_status(self, dialog: ScanDialog, status: str) -> None:
         """Handle cache status update."""
-        dialog.cache_status_label.setText(f"💾 {status}")
+        dialog.cache_status_label.setText(f"\U0001F4BE {status}")
 
         # Update style based on status
         if "Saving" in status:
@@ -1306,7 +1079,7 @@ class ROMExtractionPanel(QWidget):
     def _on_cache_progress(self, dialog: ScanDialog, progress: int) -> None:
         """Handle cache progress update."""
         if progress > 0:
-            dialog.cache_status_label.setText(f"💾 Saving progress ({progress}%)...")
+            dialog.cache_status_label.setText(f"\U0001F4BE Saving progress ({progress}%)...")
 
     def _connect_dialog_signals(self, dialog: ScanDialog, context: ScanContext) -> None:
         """Connect dialog button signals.
@@ -1333,16 +1106,11 @@ class ROMExtractionPanel(QWidget):
 
     def _on_dialog_finished(self, dialog: ScanDialog, result: int, context: ScanContext) -> None:
         """Handle dialog close."""
+        from ui.common import WorkerManager
+
         # Disconnect signals BEFORE cleanup to prevent crashes from queued signals
         if self.scan_worker:
             self.scan_worker.blockSignals(True)
-            # Disconnect cross-worker signals
-            if self.similarity_indexing_worker is not None:
-                try:
-                    self.scan_worker.sprite_found.disconnect(self.similarity_indexing_worker.on_sprite_found)
-                    self.scan_worker.finished.disconnect(self.similarity_indexing_worker.on_scan_finished)
-                except (RuntimeError, TypeError):
-                    pass  # Already disconnected
             # Disconnect lambda signals to prevent accessing deleted dialog
             try:
                 self.scan_worker.progress_detailed.disconnect()
@@ -1384,7 +1152,7 @@ class ROMExtractionPanel(QWidget):
         self._add_scanner_section_separator()
 
         # Add new sprite with cache indicator
-        self.sprite_selector_widget.add_sprite(f"{display_name} 💾", (sprite_name, offset))
+        self.sprite_selector_widget.add_sprite(f"{display_name} \U0001F4BE", (sprite_name, offset))
         self.sprite_selector_widget.set_current_index(self.sprite_selector_widget.count() - 1)
 
         logger.info(f"User selected custom sprite offset: 0x{offset:X}")
@@ -1419,12 +1187,10 @@ class ROMExtractionPanel(QWidget):
             # Preview now handled in manual offset dialog
             pass
 
-    # Manual preview functionality removed - now handled in manual offset dialog
-
     def _find_next_sprite(self):
         """Find next valid sprite offset - now handled by dialog"""
         # Open dialog if not already open
-        if ManualOffsetDialogSingleton.is_dialog_open():
+        if self._offset_dialog_manager.is_open():
             # Dialog will handle the search
             pass
         else:
@@ -1433,7 +1199,7 @@ class ROMExtractionPanel(QWidget):
     def _find_prev_sprite(self):
         """Find previous valid sprite offset - now handled by dialog"""
         # Open dialog if not already open
-        if ManualOffsetDialogSingleton.is_dialog_open():
+        if self._offset_dialog_manager.is_open():
             # Dialog will handle the search
             pass
         else:
@@ -1444,7 +1210,7 @@ class ROMExtractionPanel(QWidget):
         self._manual_offset = offset
         logger.debug(f"Found sprite at 0x{offset:06X} (quality: {quality:.2f})")
         # Update dialog if open
-        current_dialog = ManualOffsetDialogSingleton.get_current_dialog()
+        current_dialog = self._offset_dialog_manager.get_current_dialog()
         if current_dialog is not None:
             current_dialog.set_offset(offset)
             current_dialog.add_found_sprite(offset, quality)
@@ -1493,32 +1259,20 @@ class ROMExtractionPanel(QWidget):
         """Clean up any running worker threads"""
         logger.debug("Cleaning up ROM extraction panel workers")
 
-        # List of all worker attributes to clean up
-        worker_attrs = [
-            'search_worker',
-            'scan_worker',
-            'similarity_indexing_worker',
-            '_header_loader',
-            '_sprite_location_loader',
-        ]
+        # Use orchestrator cleanup
+        self._worker_orchestrator.cleanup()
 
-        # Clean up each worker
-        for attr_name in worker_attrs:
-            worker = getattr(self, attr_name, None)
-            if worker is not None:
-                logger.debug(f"Cleaning up {attr_name}")
-                try:
-                    # First try to cancel if it's a BaseWorker
-                    if hasattr(worker, 'cancel'):
-                        worker.cancel()
-
-                    # Use WorkerManager for thorough cleanup
-                    WorkerManager.cleanup_worker(worker)
-                except Exception as e:
-                    logger.warning(f"Error cleaning up {attr_name}: {e}")
-                finally:
-                    # Always clear the reference
-                    setattr(self, attr_name, None)
+        # Clean up scan worker (still managed locally)
+        if self.scan_worker is not None:
+            from ui.common import WorkerManager
+            try:
+                if hasattr(self.scan_worker, 'cancel'):
+                    self.scan_worker.cancel()
+                WorkerManager.cleanup_worker(self.scan_worker)
+            except Exception as e:
+                logger.warning(f"Error cleaning up scan_worker: {e}")
+            finally:
+                self.scan_worker = None
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:
@@ -1526,10 +1280,8 @@ class ROMExtractionPanel(QWidget):
         # Clean up workers before closing
         self._cleanup_workers()
 
-        # Close manual offset dialog if it exists (singleton pattern)
-        current_dialog = ManualOffsetDialogSingleton.get_current_dialog()
-        if current_dialog is not None:
-            current_dialog.close()
+        # Close manual offset dialog via manager
+        self._offset_dialog_manager.close()
 
         # Call parent implementation
         if a0 is not None:
@@ -1549,10 +1301,3 @@ class ROMExtractionPanel(QWidget):
         - Calling isRunning() on a deleted worker segfaults
         """
         pass
-
-class ScanContext:
-    """Context object for sharing data between scan event handlers."""
-
-    def __init__(self):
-        self.found_offsets: list[dict[str, Any]] = []
-        self.selected_offset: int | None = None

@@ -23,43 +23,35 @@ pytestmark = [
     pytest.mark.signals_slots,
 ]
 
-class SyncExtractionWorker(VRAMExtractionWorker):
-    """Test-specific ExtractionWorker that runs synchronously"""
+class SyncWorkerMixin:
+    """Mixin for test workers that run synchronously instead of in a thread.
+
+    Provides common overrides for QThread methods to enable synchronous
+    execution in tests. Classes using this mixin must have a run() method.
+    """
 
     def start(self) -> None:
-        """Override start to run synchronously for tests"""
-        # Don't start a thread, just run directly
-        self.run()
+        """Override start to run synchronously for tests."""
+        self.run()  # type: ignore[attr-defined]
 
     def isRunning(self) -> bool:
-        """Override for test compatibility"""
+        """Override for test compatibility - always returns False."""
         return False
 
     def quit(self) -> None:
-        """Override for test compatibility"""
+        """Override for test compatibility - no-op."""
 
     def wait(self, timeout: int = 0) -> bool:
-        """Override for test compatibility"""
+        """Override for test compatibility - always returns True."""
         return True
 
-class SyncROMExtractionWorker(ROMExtractionWorker):
-    """Test-specific ROMExtractionWorker that runs synchronously"""
 
-    def start(self) -> None:
-        """Override start to run synchronously for tests"""
-        # Don't start a thread, just run directly
-        self.run()
+class SyncExtractionWorker(SyncWorkerMixin, VRAMExtractionWorker):
+    """Test-specific ExtractionWorker that runs synchronously."""
 
-    def isRunning(self) -> bool:
-        """Override for test compatibility"""
-        return False
 
-    def quit(self) -> None:
-        """Override for test compatibility"""
-
-    def wait(self, timeout: int = 0) -> bool:
-        """Override for test compatibility"""
-        return True
+class SyncROMExtractionWorker(SyncWorkerMixin, ROMExtractionWorker):
+    """Test-specific ROMExtractionWorker that runs synchronously."""
 
 class SyncExtractionController:
     """Test-specific controller that uses synchronous workers"""

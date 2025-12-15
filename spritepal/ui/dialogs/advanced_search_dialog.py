@@ -985,8 +985,7 @@ class AdvancedSearchDialog(QDialog):
 
         # Adaptive stepping
         self.adaptive_check = QCheckBox("Adaptive Step Sizing")
-        if self.adaptive_check:
-            self.adaptive_check.setChecked(True)
+        self.adaptive_check.setChecked(True)
         self.adaptive_check.setToolTip(TOOLTIPS["adaptive_stepping"])
         perf_layout.addWidget(self.adaptive_check, 1, 0, 1, 2)
 
@@ -1027,8 +1026,7 @@ class AdvancedSearchDialog(QDialog):
         self.ref_preview_label = QLabel("No reference sprite selected")
         self.ref_preview_label.setMinimumHeight(128)
         self.ref_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if self.ref_preview_label:
-            self.ref_preview_label.setStyleSheet(
+        self.ref_preview_label.setStyleSheet(
             f"border: 1px solid {COLORS['border']}; background-color: {COLORS['background']};"
         )
         ref_layout.addWidget(self.ref_preview_label)

@@ -343,10 +343,43 @@ All timeouts scale with `PYTEST_TIMEOUT_MULTIPLIER` environment variable.
 
 ## Documentation
 
+- **[Marker Guide](MARKER_GUIDE.md)**: Comprehensive marker reference with usage counts and examples
 - **[Real Component Testing Guide](../docs/REAL_COMPONENT_TESTING_GUIDE.md)**: Comprehensive patterns and migration guide
 - **[Headless Testing Guide](HEADLESS_TESTING.md)**: CI/CD setup, offscreen mode, and troubleshooting
 - **[Testing Examples](examples/)**: Complete code examples for all patterns
 - **[Infrastructure Guide](infrastructure/REAL_COMPONENT_TESTING_GUIDE.md)**: Technical implementation details
+
+## Recent Test Suite Improvements
+
+### Isolation & Parallelism (December 2025)
+
+The test suite has been significantly improved for better isolation and parallel execution:
+
+**Isolation Fixes:**
+- `ManagerRegistry.reset_for_tests()` now properly resets singleton state
+- Added missing singleton resets (PreviewGenerator, SignalRegistry, WorkerManager)
+- Session manager state validated before/after tests with `shared_state_safe` marker
+- Class-scoped fixtures now auto-reset between tests via `reset_class_state` (autouse)
+
+**Parallelism:**
+- xdist default inverted: tests run in parallel unless using shared fixtures
+- Tests with `session_managers`, `class_managers`, or `rom_cache` auto-grouped to serial
+- Other tests can run with `-n auto` for parallel execution
+
+**Race Condition Fixes:**
+- Signal-before-waitSignal patterns fixed (use context manager form)
+- Hardcoded timeouts replaced with semantic helpers (`worker_timeout()`, etc.)
+- `time.sleep()` loops replaced with condition-based polling
+
+**Performance:**
+- Thread-leak checker now opt-in (only activates for Qt/worker tests)
+- Headless fallback fixed: offscreen Qt is NOT treated as headless
+- Real HAL binaries used when `@pytest.mark.real_hal` is set
+
+**Deprecated Fixtures:**
+- `setup_managers` → use `isolated_managers` instead
+- `class_managers` → use `isolated_managers` instead
+- Both emit DeprecationWarning when used
 
 ## Success Metrics
 

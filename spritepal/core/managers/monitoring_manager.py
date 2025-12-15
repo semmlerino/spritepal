@@ -827,6 +827,8 @@ class MonitoringManager(BaseManager):
         """Cleanup resources."""
         if self._health_timer:
             self._health_timer.cancel()
+            # Wait for timer thread to actually exit to prevent thread leak detection
+            self._health_timer.join(timeout=1.0)
             self._health_timer = None
 
         # Clear collections

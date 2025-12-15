@@ -8,7 +8,6 @@ functionality is tested here.
 from __future__ import annotations
 
 import pytest
-from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QLabel, QVBoxLayout
 
 from ui.common.collapsible_group_box import CollapsibleGroupBox
@@ -36,7 +35,14 @@ class TestCollapsibleGroupBox:
         assert widget.is_collapsed() is False  # Default expanded
 
     def test_collapse_expand_functionality(self, qtbot):
-        """Test basic collapse/expand functionality"""
+        """Test basic collapse/expand functionality.
+
+        Note: We verify the logical state change only, not the animation.
+        The set_collapsed() method immediately updates _is_collapsed state,
+        so no waiting is needed. Animation completion is visual-only and
+        testing it would require entering Qt's event loop, which can cause
+        crashes with background threads in CI environments.
+        """
         widget = CollapsibleGroupBox("Test")
         qtbot.addWidget(widget)
 
@@ -46,12 +52,10 @@ class TestCollapsibleGroupBox:
         layout.addWidget(content)
         widget.setLayout(layout)
 
-        # Test collapse
+        # Test collapse - state changes immediately, no need to wait for animation
         widget.set_collapsed(True)
-        QTest.qWait(200)  # Wait for animation
         assert widget.is_collapsed() is True
 
-        # Test expand
+        # Test expand - state changes immediately, no need to wait for animation
         widget.set_collapsed(False)
-        QTest.qWait(200)  # Wait for animation
         assert widget.is_collapsed() is False

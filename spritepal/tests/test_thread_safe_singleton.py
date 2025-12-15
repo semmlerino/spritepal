@@ -356,8 +356,18 @@ class TestRealWorldScenarios:
 
 # Integration tests with real singleton classes
 
+@pytest.mark.skip(
+    reason="ManualOffsetDialogSingleton was refactored to OffsetDialogManager. "
+    "Use ui.rom_extraction.OffsetDialogManager instead."
+)
+@pytest.mark.allows_registry_state  # Skip marker doesn't prevent fixture checks
 class TestManualOffsetDialogSingletonIntegration:
-    """Integration tests for the fixed ManualOffsetDialogSingleton."""
+    """Integration tests for the fixed ManualOffsetDialogSingleton.
+
+    NOTE: This class is skipped because ManualOffsetDialogSingleton was
+    refactored to OffsetDialogManager in ui/rom_extraction/offset_dialog_manager.py.
+    The new API has different semantics (instance-based vs static singleton).
+    """
 
     @pytest.mark.integration
     def test_dialog_singleton_thread_safety(self):

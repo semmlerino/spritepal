@@ -7,7 +7,10 @@ import logging
 import threading
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
+
+# Type variable for generic _ensure_component method
+T = TypeVar("T")
 
 from PySide6.QtCore import QObject, Signal
 
@@ -267,73 +270,95 @@ class BaseManager(QObject):
         if max_val is not None and value > max_val:
             raise ValidationError(f"{name} must be <= {max_val}, got {value}")
 
-    def _handle_file_io_error(self, error: Exception, operation: str,
-                             context: str = "") -> None:
-        """
-        Handle file I/O related errors with standardized logging and re-raising
+    def _ensure_component(
+        self,
+        component: T | None,
+        name: str,
+        error_type: type[Exception] = RuntimeError,
+    ) -> T:
+        """Ensure a component is initialized and return it.
+
+        This is a generic helper for the common pattern of checking if a
+        component is None and raising an error if so.
 
         Args:
-            error: The original exception (OSError, IOError, PermissionError)
-            operation: Operation name for context
-            context: Additional context for the error message
+            component: The component to check (may be None)
+            name: Human-readable name for error messages
+            error_type: Exception type to raise if component is None
+
+        Returns:
+            The component if it's not None
 
         Raises:
-            Exception: Re-raises the exception with enhanced error message
+            error_type: If component is None
+
+        Example:
+            sprite_extractor = self._ensure_component(
+                self._sprite_extractor,
+                "Sprite extractor",
+                ExtractionError
+            )
         """
-        context_suffix = f" {context}" if context else ""
-        enhanced_msg = f"File I/O error during {operation}{context_suffix}: {error!s}"
+        if component is None:
+            raise error_type(f"{name} not initialized")
+        return component
 
-        # Create exception of the same type with enhanced message
-        enhanced_error = type(error)(enhanced_msg)
-        enhanced_error.__cause__ = error
+    def _handle_categorized_error(
+        self,
+        error: Exception,
+        operation: str,
+        category: str,
+        context: str = "",
+        error_class: type[Exception] | None = None,
+    ) -> None:
+        """Handle errors with standardized logging and re-raising.
 
-        self._handle_error(enhanced_error, operation)
-        raise enhanced_error
-
-    def _handle_data_format_error(self, error: Exception, operation: str,
-                                 context: str = "") -> None:
-        """
-        Handle data format related errors with standardized logging and re-raising
-
-        Args:
-            error: The original exception (ValueError, TypeError, json.JSONDecodeError)
-            operation: Operation name for context
-            context: Additional context for the error message
-
-        Raises:
-            Exception: Re-raises the exception with enhanced error message
-        """
-        context_suffix = f" {context}" if context else ""
-        enhanced_msg = f"Data format error during {operation}{context_suffix}: {error!s}"
-
-        # Create exception of the same type with enhanced message
-        enhanced_error = type(error)(enhanced_msg)
-        enhanced_error.__cause__ = error
-
-        self._handle_error(enhanced_error, operation)
-        raise enhanced_error
-
-    def _handle_operation_error(self, error: Exception, operation: str,
-                               error_class: type[Exception],
-                               context: str = "") -> None:
-        """
-        Handle operation-specific errors with standardized logging and re-raising
+        This is a unified error handler that replaces the separate
+        _handle_file_io_error, _handle_data_format_error, and
+        _handle_operation_error methods.
 
         Args:
             error: The original exception
             operation: Operation name for context
-            error_class: Exception class to raise (e.g., ExtractionError, InjectionError)
+            category: Error category for the message (e.g., "File I/O", "Data format")
             context: Additional context for the error message
+            error_class: Exception class to raise. If None, uses original error type.
 
         Raises:
-            error_class: Re-raises as the specified exception type
+            Exception: Re-raises with enhanced error message
         """
         context_suffix = f" {context}" if context else ""
-        enhanced_msg = f"{operation.title()} failed{context_suffix}: {error!s}"
+        enhanced_msg = f"{category} error during {operation}{context_suffix}: {error!s}"
 
-        # Create new exception of specified type
-        enhanced_error = error_class(enhanced_msg)
+        # Use specified error class or keep original type
+        exc_class = error_class if error_class is not None else type(error)
+        enhanced_error = exc_class(enhanced_msg)
         enhanced_error.__cause__ = error
 
         self._handle_error(enhanced_error, operation)
         raise enhanced_error
+
+    # Convenience wrappers for backwards compatibility
+    def _handle_file_io_error(
+        self, error: Exception, operation: str, context: str = ""
+    ) -> None:
+        """Handle file I/O errors. Wrapper for _handle_categorized_error."""
+        self._handle_categorized_error(error, operation, "File I/O", context)
+
+    def _handle_data_format_error(
+        self, error: Exception, operation: str, context: str = ""
+    ) -> None:
+        """Handle data format errors. Wrapper for _handle_categorized_error."""
+        self._handle_categorized_error(error, operation, "Data format", context)
+
+    def _handle_operation_error(
+        self,
+        error: Exception,
+        operation: str,
+        error_class: type[Exception],
+        context: str = "",
+    ) -> None:
+        """Handle operation-specific errors. Wrapper for _handle_categorized_error."""
+        self._handle_categorized_error(
+            error, operation, operation.title(), context, error_class
+        )

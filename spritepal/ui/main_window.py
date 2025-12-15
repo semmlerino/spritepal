@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (
 )
 
 # Session manager accessed via DI: inject(SessionManagerProtocol)
-from ui.dialogs import SettingsDialog, UserErrorDialog
+# Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
     KeyboardShortcutHandler,
@@ -360,6 +360,8 @@ class MainWindow(QMainWindow):
 
     def show_settings(self) -> None:
         """Show the settings dialog"""
+        from ui.dialogs import SettingsDialog  # Lazy import to avoid cross-UI coupling
+
         dialog = SettingsDialog(self, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         dialog.settings_changed.connect(self._on_settings_changed)
         dialog.cache_cleared.connect(self._on_cache_cleared)
@@ -367,6 +369,8 @@ class MainWindow(QMainWindow):
 
     def show_cache_manager(self) -> None:
         """Show the cache manager dialog"""
+        from ui.dialogs import SettingsDialog  # Lazy import to avoid cross-UI coupling
+
         dialog = SettingsDialog(self, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         if dialog.tab_widget:
             dialog.tab_widget.setCurrentIndex(1)  # Switch to cache tab
@@ -708,6 +712,8 @@ class MainWindow(QMainWindow):
 
     def extraction_failed(self, error_message: str) -> None:
         """Called when extraction fails"""
+        from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
+
         self.toolbar_manager.set_extract_enabled(True)
         self.status_bar_manager.show_message("Extraction failed")
 

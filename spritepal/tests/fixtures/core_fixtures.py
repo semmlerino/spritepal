@@ -10,7 +10,7 @@ Key fixtures:
     - session_managers: Session-scoped shared managers (fastest, state persists)
     - class_managers: Class-scoped managers (shared within test class)
     - isolated_managers: Function-scoped isolated managers (full isolation)
-    - fast_managers: Convenience alias for session_managers
+    - managers: Convenience fixture returning ManagerRegistry (depends on session_managers)
     - reset_manager_state: Reset caches without re-initialization
     - detect_manager_pollution: Autouse fixture for state leak detection
     - setup_managers: Per-test manager initialization
@@ -21,7 +21,7 @@ Fixture Selection Guide:
     | Fast tests, shared state OK | session_managers   | isolated_managers|
     | Tests in same class share   | class_managers     | setup_managers   |
     | Full isolation between tests| isolated_managers  | session_managers |
-    | Performance-focused         | fast_managers      | setup_managers   |
+    | Access to ManagerRegistry   | managers           | direct import    |
     | Clean caches only           | reset_manager_state| isolated_managers|
 
 Escape hatches:
@@ -50,6 +50,7 @@ if TYPE_CHECKING:
 
     from core.managers.extraction_manager import ExtractionManager
     from core.managers.injection_manager import InjectionManager
+    from core.managers.registry import ManagerRegistry
     from core.managers.session_manager import SessionManager
     from tests.infrastructure.test_protocols import MockMainWindowProtocol
     from utils.rom_cache import ROMCache
@@ -97,6 +98,71 @@ def is_session_managers_active() -> bool:
         True if session_managers fixture has initialized managers
     """
     return _session_state.is_initialized
+
+
+def reset_all_singletons() -> None:
+    """Reset all singleton classes for test isolation.
+
+    This is the single source of truth for resetting test state.
+    Call this instead of resetting individual singletons scattered across tests.
+
+    Resets:
+        - ManagerRegistry (core managers)
+        - HALProcessPool (real HAL compression)
+        - MockHALProcessPool (mock HAL compression)
+        - DataRepository (test data cleanup)
+        - PreviewGenerator (preview caching)
+        - SignalRegistry (signal tracking)
+        - WorkerManager (thread registry)
+    """
+    # Reset ManagerRegistry
+    with contextlib.suppress(Exception):
+        from core.managers.registry import ManagerRegistry
+        ManagerRegistry.reset_for_tests()
+
+    # Reset real HAL process pool
+    with contextlib.suppress(Exception):
+        from core.hal_compression import HALProcessPool
+        HALProcessPool.reset_for_tests()
+
+    # Reset mock HAL process pool
+    with contextlib.suppress(Exception):
+        from tests.infrastructure.mock_hal import MockHALProcessPool
+        MockHALProcessPool.reset_singleton()
+
+    # Clean up DataRepository
+    with contextlib.suppress(Exception):
+        from tests.infrastructure.test_data_repository import cleanup_test_data_repository
+        cleanup_test_data_repository()
+
+    # Reset PreviewGenerator singleton
+    with contextlib.suppress(Exception):
+        from core.services.preview_generator import cleanup_preview_generator
+        cleanup_preview_generator()
+
+    # Reset SignalRegistry singleton
+    with contextlib.suppress(Exception):
+        from utils.signal_registry import SignalRegistry
+        SignalRegistry.reset_instance()
+
+    # Clear WorkerManager thread registry
+    with contextlib.suppress(Exception):
+        from core.services.worker_lifecycle import WorkerManager
+        WorkerManager._worker_registry.clear()
+
+
+def reset_hal_singletons_only() -> None:
+    """Reset only HAL-related singletons.
+
+    Use this for HAL-specific test isolation. For full reset, use reset_all_singletons().
+    """
+    with contextlib.suppress(Exception):
+        from core.hal_compression import HALProcessPool
+        HALProcessPool.reset_singleton()
+
+    with contextlib.suppress(Exception):
+        from tests.infrastructure.mock_hal import MockHALProcessPool
+        MockHALProcessPool.reset_singleton()
 
 
 def _reset_manager_caches(registry: Any) -> None:
@@ -317,7 +383,7 @@ def detect_manager_pollution(request: FixtureRequest) -> Generator[None, None, N
     # Include ALL fixtures that manage ManagerRegistry lifecycle
     manager_fixtures = {
         'session_managers', 'class_managers', 'isolated_managers',
-        'fast_managers', 'setup_managers', 'managers_initialized'
+        'managers', 'setup_managers', 'managers_initialized'
     }
     uses_manager_fixture = bool(manager_fixtures & set(fixture_names))
 
@@ -377,9 +443,9 @@ def detect_session_manager_cleanup(request: FixtureRequest) -> Generator[None, N
         yield
         return
 
-    # Check if test uses session_managers fixture
+    # Check if test uses session_managers fixture (directly or via managers)
     fixture_names = getattr(request, 'fixturenames', [])
-    uses_session_managers = 'session_managers' in fixture_names or 'fast_managers' in fixture_names
+    uses_session_managers = 'session_managers' in fixture_names or 'managers' in fixture_names
 
     if uses_session_managers and _session_state.is_initialized:
         # Check if managers got cleaned up mid-session
@@ -397,42 +463,11 @@ def detect_session_manager_cleanup(request: FixtureRequest) -> Generator[None, N
 
 
 @pytest.fixture
-def fast_managers(session_managers: None) -> Iterator[None]:
-    """
-    Fast manager access using session-scoped managers.
-
-    This fixture provides manager access without per-test initialization overhead.
-    Tests can use this instead of setup_managers for better performance when
-    they don't need isolated manager state.
-
-    NOTE: This fixture no longer silently re-initializes managers.
-    If managers are not initialized, something is wrong with the test order.
-
-    Usage:
-        def test_something(fast_managers):
-            # Uses shared session managers - much faster
-            pass
-    """
-    from core.managers.registry import ManagerRegistry
-
-    # Verify session managers are properly initialized
-    if not ManagerRegistry().is_initialized():
-        pytest.fail(
-            "fast_managers: Session managers are not initialized. "
-            "This indicates a test pollution issue - a prior test may have "
-            "called cleanup_managers() while using session_managers. "
-            "Fix: Find the offending test and use isolated_managers instead."
-        )
-
-    yield
-
-
-@pytest.fixture
-def managers(fast_managers: None) -> Any:
+def managers(session_managers: None) -> "ManagerRegistry":
     """
     Convenience fixture that provides access to the ManagerRegistry.
 
-    This fixture depends on fast_managers (shared session state) and returns
+    This fixture depends on session_managers (shared session state) and returns
     the ManagerRegistry instance for easy access in tests.
 
     Usage:
@@ -440,7 +475,17 @@ def managers(fast_managers: None) -> Any:
             extraction = managers.get_extraction_manager()
     """
     from core.managers.registry import ManagerRegistry
-    return ManagerRegistry()
+
+    # Verify session managers are properly initialized
+    registry = ManagerRegistry()
+    if not registry.is_initialized():
+        pytest.fail(
+            "managers: Session managers are not initialized. "
+            "This indicates a test pollution issue - a prior test may have "
+            "called cleanup_managers() while using session_managers. "
+            "Fix: Find the offending test and use isolated_managers instead."
+        )
+    return registry
 
 
 @pytest.fixture
@@ -495,7 +540,7 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
         return
 
     fixture_names = getattr(request, 'fixturenames', [])
-    uses_session = 'session_managers' in fixture_names or 'fast_managers' in fixture_names
+    uses_session = 'session_managers' in fixture_names or 'managers' in fixture_names
 
     if not uses_session or not _session_state.is_initialized:
         yield
@@ -517,23 +562,30 @@ def setup_managers(request: FixtureRequest, tmp_path: Path) -> Iterator[None]:
     """
     Setup managers for tests requiring per-test isolation.
 
+    .. deprecated::
+        Use ``isolated_managers`` instead. This fixture will be removed in a future release.
+        ``isolated_managers`` provides the same per-test isolation with cleaner semantics.
+
     This fixture ensures proper manager initialization and cleanup
     for every test, replacing duplicated setup across test files.
-    
+
     IMPORTANT: If session_managers is active in the session, this fixture
     yields without initializing (session_managers owns the registry).
     It only cleans up if it was the one that initialized.
-
-    For better performance, consider using 'fast_managers' fixture instead
-    if your test doesn't require isolated manager state.
     """
+    import warnings
+    warnings.warn(
+        "setup_managers is deprecated. Use isolated_managers instead for per-test isolation.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Skip manager setup if test is marked with no_manager_setup
     if request.node.get_closest_marker("no_manager_setup"):
         yield
         return
 
-    # Skip if test uses session managers (via fast_managers fixture)
-    if 'session_managers' in request.fixturenames or 'fast_managers' in request.fixturenames:
+    # Skip if test uses session managers (directly or via managers fixture)
+    if 'session_managers' in request.fixturenames or 'managers' in request.fixturenames:
         yield
         return
 
@@ -584,30 +636,23 @@ def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     """
     Class-scoped managers for test classes with multiple related tests.
 
-    This fixture initializes managers once per test class and cleans them up
-    when the class finishes. Use this when:
-    - Multiple tests in a class need manager access
-    - Tests don't need full isolation between each other
-    - You want faster execution than per-test setup
+    .. deprecated::
+        Use ``isolated_managers`` instead. This fixture will be removed in a future release.
+        Class-scoped fixtures cause state leakage between tests. ``isolated_managers``
+        provides proper per-test isolation with automatic reset via ``reset_class_state``.
 
-    If session_managers is already active, this fixture is a no-op to avoid
-    conflicting cleanup.
+    This fixture initializes managers once per test class and cleans them up
+    when the class finishes.
 
     Note: State can persist between tests in the same class.
     For full isolation, use isolated_managers instead.
-
-    Usage:
-        @pytest.mark.usefixtures("class_managers")
-        class TestMyComponent:
-            def test_something(self):
-                # Managers already initialized
-                pass
-
-        # Or explicitly in each test:
-        class TestMyComponent:
-            def test_something(self, class_managers):
-                pass
     """
+    import warnings
+    warnings.warn(
+        "class_managers is deprecated. Use isolated_managers instead for per-test isolation.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     from PySide6.QtWidgets import QApplication
 
     from core.managers import cleanup_managers, initialize_managers

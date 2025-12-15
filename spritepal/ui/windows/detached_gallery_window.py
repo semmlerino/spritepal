@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 from ui.common import WorkerManager
-from ui.dialogs import UserErrorDialog
+# Dialog imports moved to lazy imports in methods that use them (see _set_rom_file, _perform_extraction)
 from ui.rom_extraction.workers import SpriteScanWorker
 from ui.styles.theme import COLORS
 from ui.widgets.fullscreen_sprite_viewer import FullscreenSpriteViewer
@@ -78,6 +78,7 @@ class DetachedGalleryWindow(QMainWindow):
         self.thumbnail_controller: ThumbnailWorkerController | None = None
         self.scanning: bool = False
         self.scan_timeout_timer: QTimer | None = None
+        self._thumbnail_generation_timer: QTimer | None = None  # Timer for delayed thumbnail generation
 
         # Core managers (B.3: Using injected manager)
         self.extraction_manager = extraction_manager
@@ -665,6 +666,8 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _set_rom_file(self, filename: str):
         """Set the ROM file and update UI."""
+        from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
+
         try:
             self.rom_path = filename
 
@@ -721,8 +724,15 @@ class DetachedGalleryWindow(QMainWindow):
                 if self.gallery_widget:
                     self.gallery_widget.set_sprites(self.sprites_data)
 
-                # Generate thumbnails automatically
-                QTimer.singleShot(500, self._generate_thumbnails)
+                # Generate thumbnails automatically (use trackable timer for cleanup)
+                # Cancel any existing timer first
+                if self._thumbnail_generation_timer is not None:
+                    self._thumbnail_generation_timer.stop()
+                    self._thumbnail_generation_timer = None
+                self._thumbnail_generation_timer = QTimer(self)
+                self._thumbnail_generation_timer.setSingleShot(True)
+                self._thumbnail_generation_timer.timeout.connect(self._generate_thumbnails)
+                self._thumbnail_generation_timer.start(500)
 
                 logger.info(f"Loaded {len(self.sprites_data)} cached sprites")
             else:
@@ -1044,6 +1054,17 @@ class DetachedGalleryWindow(QMainWindow):
                 logger.error(f"Error cleaning up scan timeout timer: {e}")
                 self.scan_timeout_timer = None
 
+        # Clean up thumbnail generation timer to prevent delayed thumbnail generation
+        # after window closes (this timer is set by _load_cached_sprites)
+        if self._thumbnail_generation_timer is not None:
+            logger.debug("Cleaning up thumbnail generation timer")
+            try:
+                self._thumbnail_generation_timer.stop()
+                self._thumbnail_generation_timer = None
+            except Exception as e:
+                logger.error(f"Error cleaning up thumbnail generation timer: {e}")
+                self._thumbnail_generation_timer = None
+
         if workers_cleaned > 0:
             logger.info(f"Cleaned up {workers_cleaned} existing workers to prevent thread leaks and signal crashes")
         else:
@@ -1126,6 +1147,17 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _generate_thumbnails(self):
         """Generate actual thumbnails from ROM data for the found sprites."""
+        # Guard against starting thumbnail generation when window is closing
+        # This can happen if _load_cached_sprites scheduled a QTimer.singleShot
+        # and the window is closed before the timer fires
+        try:
+            from shiboken6 import isValid
+            if not isValid(self):
+                logger.debug("Skipping thumbnail generation - window already destroyed")
+                return
+        except (ImportError, RuntimeError):
+            pass
+
         if not self.gallery_widget or not self.sprites_data or not self.rom_path:
             logger.warning("Cannot generate thumbnails: missing data")
             return
@@ -1261,6 +1293,8 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _perform_extraction(self, offset: int, output_path: str):
         """Perform the sprite extraction."""
+        from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
+
         try:
             self.status_bar.showMessage(f"Extracting sprite at 0x{offset:06X}...")
 

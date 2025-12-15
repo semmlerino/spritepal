@@ -179,7 +179,8 @@ def rom_extraction_panel(qtbot, managers_initialized):
     """
     from core.di_container import inject
     from core.protocols.manager_protocols import ExtractionManagerProtocol
-    from ui.rom_extraction_panel import ManualOffsetDialogSingleton, ROMExtractionPanel
+    from ui.rom_extraction.offset_dialog_manager import _ManualOffsetDialogSingleton
+    from ui.rom_extraction_panel import ROMExtractionPanel
 
     extraction_manager = inject(ExtractionManagerProtocol)
     panel = ROMExtractionPanel(extraction_manager=extraction_manager)
@@ -190,7 +191,7 @@ def rom_extraction_panel(qtbot, managers_initialized):
 
     # Cleanup: Reset the singleton to prevent test pollution
     # This is critical for tests that call panel._open_manual_offset_dialog()
-    ManualOffsetDialogSingleton.reset()
+    _ManualOffsetDialogSingleton.reset()
 
 
 @pytest.fixture

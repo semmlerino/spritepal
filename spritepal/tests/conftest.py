@@ -36,7 +36,7 @@ instantiations by 68.6% based on usage analysis:
 Class-scoped and module-scoped fixtures include automatic state reset
 mechanisms to ensure test isolation:
 
-- `reset_class_state`: Resets all class-scoped mock fixtures (requires @pytest.mark.usefixtures)
+- `reset_class_state`: Auto-resets all class-scoped fixtures (autouse, runs automatically)
 
 ## Scope Selection Guidelines
 
@@ -267,18 +267,19 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     if not worker_count or worker_count == "0":
         return
 
-    # Auto-group tests that aren't safe for parallel execution
+    # Auto-group tests that NEED serial execution
+    # INVERTED DEFAULT: Tests run parallel by default, only serialize when needed
     serial_group = pytest.mark.xdist_group("serial")
 
-    # Fixtures that indicate shared mutable state
-    shared_fixtures = {"session_managers", "class_managers", "fast_managers", "rom_cache"}
+    # Fixtures that indicate shared mutable state requiring serialization
+    shared_fixtures = {"session_managers", "class_managers", "managers", "rom_cache"}
 
     for item in items:
-        # Tests with parallel_safe can run on any worker
-        if item.get_closest_marker("parallel_safe"):
+        # Skip tests already marked with xdist_group
+        if item.get_closest_marker("xdist_group"):
             continue
 
-        # Tests with serial marker get grouped together
+        # Tests with explicit serial marker get grouped
         if item.get_closest_marker("serial"):
             item.add_marker(serial_group)
             continue
@@ -289,35 +290,17 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
             item.add_marker(serial_group)
             continue
 
-        # All other unmarked tests also go to serial (safe default)
-        item.add_marker(serial_group)
+        # All other tests can run in parallel by default (no marker added)
 
 
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
     """Clean up all singletons at session end to prevent state pollution.
 
-    This hook ensures:
-    1. ManagerRegistry singleton is fully reset
-    2. DataRepository temp files are cleaned up
-    3. HAL process pool singleton is reset
-
-    Without this, state can leak between test runs or cause errors
-    in subsequent test sessions.
+    Uses the centralized reset_all_singletons() helper to ensure consistent
+    cleanup across the test suite.
     """
-    # 1. Reset ManagerRegistry singleton completely using official API
-    with contextlib.suppress(Exception):
-        from core.managers.registry import ManagerRegistry
-        ManagerRegistry.reset_for_tests()
-
-    # 2. Clean up DataRepository (temp files and singleton)
-    with contextlib.suppress(Exception):
-        from tests.infrastructure.test_data_repository import cleanup_test_data_repository
-        cleanup_test_data_repository()
-
-    # 3. Reset HAL singleton using official API
-    with contextlib.suppress(Exception):
-        from core.hal_compression import HALProcessPool
-        HALProcessPool.reset_for_tests()
+    from tests.fixtures.core_fixtures import reset_all_singletons
+    reset_all_singletons()
 
 
 def pytest_runtest_setup(item: Any) -> None:
@@ -641,23 +624,18 @@ def skip_requires_display(request: FixtureRequest):
 # Class-scoped State Reset Fixtures
 # ============================================================================
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="function", autouse=True)
 def reset_class_state(
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
-    """Reset state for class-scoped fixtures between tests.
+    """Auto-reset state for class-scoped fixtures between tests.
 
-    This fixture ensures proper state isolation for performance-optimized
-    class-scoped fixtures. Request it explicitly in test classes that need
-    fixture state reset between tests.
+    This autouse fixture ensures proper state isolation for performance-optimized
+    class-scoped fixtures. It automatically runs when any class-scoped fixture
+    is used, resetting state after each test.
 
     NOTE: This is function-scoped so it runs AFTER each test to reset
     class-scoped fixture state before the next test runs.
-
-    Usage:
-        @pytest.mark.usefixtures("reset_class_state")
-        class TestExtractionPanel:
-            pass
 
     IMPORTANT: reset_mock() only clears call history. We must also clear:
     - return_value (if manually configured)
@@ -668,42 +646,48 @@ def reset_class_state(
     yield
 
     # Reset fixtures AFTER each test for the next one
-    fixture_names = getattr(request, 'fixturenames', [])
+    fixture_names = set(getattr(request, 'fixturenames', []))
 
-    # Reset fixtures dynamically based on what's actually used
-    fixtures_to_reset = [
+    # Class-scoped fixtures that need reset between tests
+    fixtures_to_reset = {
         'real_extraction_manager',  # Real component - uses reset_state() or clear()
         'real_session_manager',     # Real component - uses reset_state() or clear()
         'rom_cache',
         'mock_settings_manager',
         'main_window',
-    ]
+        'fast_mock_main_window',
+        'mock_controller',
+    }
 
-    for fixture_name in fixtures_to_reset:
-        if fixture_name in fixture_names:
-            try:
-                fixture_value = request.getfixturevalue(fixture_name)
-                if isinstance(fixture_value, Mock):
-                    # Full reset: clear call history AND configured values
-                    fixture_value.reset_mock(return_value=True, side_effect=True)
-                elif hasattr(fixture_value, 'reset_state'):
-                    # Real component with explicit reset method
-                    fixture_value.reset_state()
-                elif hasattr(fixture_value, 'clear_cache'):
-                    # ROMCache and similar use clear_cache() method
-                    fixture_value.clear_cache()
-                elif hasattr(fixture_value, 'clear'):
-                    # Generic clear for collections
-                    fixture_value.clear()
-            except pytest.FixtureLookupError:
-                pass  # Fixture not available in this context
-            except Exception as e:
-                # Log reset failures but don't fail the test
-                # Reset is best-effort to improve isolation
-                import logging
-                logging.getLogger(__name__).warning(
-                    f"Failed to reset fixture {fixture_name}: {e}"
-                )
+    # Only run reset logic if test uses class-scoped fixtures
+    used_class_fixtures = fixtures_to_reset & fixture_names
+    if not used_class_fixtures:
+        return
+
+    for fixture_name in used_class_fixtures:
+        try:
+            fixture_value = request.getfixturevalue(fixture_name)
+            if isinstance(fixture_value, Mock):
+                # Full reset: clear call history AND configured values
+                fixture_value.reset_mock(return_value=True, side_effect=True)
+            elif hasattr(fixture_value, 'reset_state'):
+                # Real component with explicit reset method
+                fixture_value.reset_state()
+            elif hasattr(fixture_value, 'clear_cache'):
+                # ROMCache and similar use clear_cache() method
+                fixture_value.clear_cache()
+            elif hasattr(fixture_value, 'clear'):
+                # Generic clear for collections
+                fixture_value.clear()
+        except pytest.FixtureLookupError:
+            pass  # Fixture not available in this context
+        except Exception as e:
+            # Log reset failures but don't fail the test
+            # Reset is best-effort to improve isolation
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Failed to reset fixture {fixture_name}: {e}"
+            )
 
 
 @pytest.fixture
@@ -766,7 +750,7 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
     The check runs automatically for all parallel_safe tests.
 
     Requirements for parallel_safe tests:
-    1. Must use isolated_managers (not session_managers, class_managers, fast_managers)
+    1. Must use isolated_managers (not session_managers, class_managers, managers)
     2. Should use tmp_path for any file operations
     3. Must not depend on test execution order
 
@@ -786,7 +770,7 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
     shared_mutable_fixtures = {
         'session_managers',  # Session-scoped, shares state across all tests in session
         'class_managers',    # Class-scoped, shares state within test class
-        'fast_managers',     # Alias for session_managers
+        'managers',          # Depends on session_managers
         'rom_cache',         # Class-scoped cache that could be shared
     }
 
@@ -815,6 +799,46 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
     yield
 
 
+def _hash_manager_state() -> str:
+    """Hash key manager state for drift detection.
+
+    Returns a hash of manager state that would indicate test pollution.
+    Uses a simple approach: check cache sizes and key state attributes.
+    """
+    import hashlib
+
+    state_parts: list[str] = []
+    try:
+        from core.managers.registry import ManagerRegistry
+        registry = ManagerRegistry()
+
+        # Check extraction manager state
+        ext_mgr = getattr(registry, 'extraction_manager', None)
+        if ext_mgr:
+            # Check cache sizes and key attributes
+            cache_size = len(getattr(ext_mgr, '_cache', {}))
+            state_parts.append(f"ext_cache:{cache_size}")
+
+        # Check session manager state
+        sess_mgr = getattr(registry, 'session_manager', None)
+        if sess_mgr:
+            # Check session data
+            session_count = len(getattr(sess_mgr, '_sessions', {}))
+            state_parts.append(f"sess_count:{session_count}")
+
+        # Check injection manager state
+        inj_mgr = getattr(registry, 'injection_manager', None)
+        if inj_mgr:
+            cache_size = len(getattr(inj_mgr, '_cache', {}))
+            state_parts.append(f"inj_cache:{cache_size}")
+
+    except Exception:
+        pass  # If we can't hash state, skip validation
+
+    state_str = "|".join(sorted(state_parts)) if state_parts else "empty"
+    return hashlib.md5(state_str.encode()).hexdigest()
+
+
 @pytest.fixture(autouse=True)
 def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, None]:
     """Enforce that session_managers usage requires @pytest.mark.shared_state_safe.
@@ -822,6 +846,9 @@ def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, 
     This fixture validates at test execution time that any test using session_managers
     has the shared_state_safe marker, ensuring developers consciously acknowledge
     they're using shared state.
+
+    Additionally, it validates that manager state doesn't drift during the test,
+    catching tests that claim to be stateless but actually modify shared state.
 
     The marker requirement ensures:
     1. Developers understand session_managers shares state across tests
@@ -843,7 +870,22 @@ def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, 
             "  2. Use isolated_managers instead (recommended for most tests)"
         )
 
+    # Capture state before test
+    before_hash = _hash_manager_state()
+
     yield
+
+    # Validate state unchanged after test
+    after_hash = _hash_manager_state()
+    if before_hash != after_hash:
+        pytest.fail(
+            f"Test '{request.node.name}' modified session manager state despite "
+            "@pytest.mark.shared_state_safe marker.\n"
+            f"  State hash changed: {before_hash[:8]}... -> {after_hash[:8]}...\n"
+            "  Either:\n"
+            "    1. Fix the test to not modify shared state, or\n"
+            "    2. Use isolated_managers instead"
+        )
 
 
 # ===========================================================================================

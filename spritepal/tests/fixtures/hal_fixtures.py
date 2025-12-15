@@ -21,7 +21,10 @@ Fixtures:
 from __future__ import annotations
 
 import contextlib
+import os
+import shutil
 from collections.abc import Generator
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -33,9 +36,55 @@ from tests.infrastructure.mock_hal import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest import FixtureRequest
+
+
+def _find_real_hal_binaries() -> tuple[str, str] | None:
+    """Try to find real exhal/inhal binaries.
+
+    Looks for binaries in:
+    1. Environment variables (SPRITEPAL_EXHAL_PATH, SPRITEPAL_INHAL_PATH)
+    2. System PATH via shutil.which()
+    3. Common locations relative to project root
+
+    Returns tuple of (exhal_path, inhal_path) or None if not found.
+    """
+    # Try environment variables first
+    exhal_path = os.environ.get("SPRITEPAL_EXHAL_PATH")
+    inhal_path = os.environ.get("SPRITEPAL_INHAL_PATH")
+
+    if exhal_path and inhal_path:
+        if Path(exhal_path).exists() and Path(inhal_path).exists():
+            return (exhal_path, inhal_path)
+
+    # Try system PATH
+    exhal_path = shutil.which("exhal")
+    inhal_path = shutil.which("inhal")
+
+    if exhal_path and inhal_path:
+        return (exhal_path, inhal_path)
+
+    # Try common locations relative to project
+    project_root = Path(__file__).parent.parent.parent.parent  # exhal-master
+    common_locations = [
+        project_root / "bin",
+        project_root,
+        Path.home() / ".local" / "bin",
+    ]
+
+    for loc in common_locations:
+        exhal_candidate = loc / "exhal"
+        inhal_candidate = loc / "inhal"
+        # Also check for Windows executables
+        if not exhal_candidate.exists():
+            exhal_candidate = loc / "exhal.exe"
+        if not inhal_candidate.exists():
+            inhal_candidate = loc / "inhal.exe"
+
+        if exhal_candidate.exists() and inhal_candidate.exists():
+            return (str(exhal_candidate), str(inhal_candidate))
+
+    return None
 
 
 @pytest.fixture(autouse=True)
@@ -61,12 +110,9 @@ def reset_hal_singletons(request: FixtureRequest) -> Generator[None, None, None]
     # Let the test run
     yield
 
-    # Reset both real and mock HAL singletons after each test
-    with contextlib.suppress(Exception):
-        MockHALProcessPool.reset_singleton()
-    with contextlib.suppress(Exception):
-        from core.hal_compression import HALProcessPool
-        HALProcessPool.reset_singleton()
+    # Reset HAL singletons using centralized helper
+    from tests.fixtures.core_fixtures import reset_hal_singletons_only
+    reset_hal_singletons_only()
 
 
 @pytest.fixture
@@ -79,8 +125,10 @@ def hal_pool(request: FixtureRequest, tmp_path: Path) -> Generator[MockHALProces
     2. `@pytest.mark.real_hal` marker on test gets real HAL
     3. Default: mock HAL implementation (fast, no external dependencies)
 
-    Tests marked with @pytest.mark.real_hal will get the real pool.
-    All other tests get the fast mock implementation.
+    When real HAL is requested:
+    - First tries to find real exhal/inhal binaries
+    - If not found, skips the test with informative message
+    - Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH to specify binary locations
     """
     # Check CLI option first, then marker
     use_real = (
@@ -92,12 +140,20 @@ def hal_pool(request: FixtureRequest, tmp_path: Path) -> Generator[MockHALProces
         # Use real HAL process pool
         from core.hal_compression import HALProcessPool
 
+        # Try to find real binaries first
+        real_binaries = _find_real_hal_binaries()
+        if real_binaries is None:
+            pytest.skip(
+                "Real HAL binaries not found. "
+                "Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH, "
+                "or install exhal/inhal to PATH."
+            )
+
+        exhal_path, inhal_path = real_binaries
+
         # Reset singleton before test
         HALProcessPool.reset_singleton()
         pool = HALProcessPool()
-
-        # Create real or mock tools
-        exhal_path, inhal_path = create_mock_hal_tools(tmp_path)
         pool.initialize(exhal_path, inhal_path)
 
         yield pool  # type: ignore[misc]
@@ -130,8 +186,10 @@ def hal_compressor(request: FixtureRequest, tmp_path: Path) -> Generator[MockHAL
     2. `@pytest.mark.real_hal` marker on test gets real HAL
     3. Default: mock HAL implementation (fast, no external dependencies)
 
-    Tests marked with @pytest.mark.real_hal will get the real compressor.
-    All other tests get the fast mock implementation.
+    When real HAL is requested:
+    - First tries to find real exhal/inhal binaries
+    - If not found, skips the test with informative message
+    - Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH to specify binary locations
     """
     # Check CLI option first, then marker
     use_real = (
@@ -143,8 +201,16 @@ def hal_compressor(request: FixtureRequest, tmp_path: Path) -> Generator[MockHAL
         # Use real HAL compressor
         from core.hal_compression import HALCompressor
 
-        # Create mock tools for testing
-        exhal_path, inhal_path = create_mock_hal_tools(tmp_path)
+        # Try to find real binaries first
+        real_binaries = _find_real_hal_binaries()
+        if real_binaries is None:
+            pytest.skip(
+                "Real HAL binaries not found. "
+                "Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH, "
+                "or install exhal/inhal to PATH."
+            )
+
+        exhal_path, inhal_path = real_binaries
         compressor = HALCompressor(exhal_path, inhal_path, use_pool=True)
 
         yield compressor  # type: ignore[misc]

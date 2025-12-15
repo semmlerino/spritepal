@@ -288,8 +288,8 @@ class TestComposedDialogEssentialIntegration:
             assert cleanup_tracking['button'] is True
 
     @pytest.mark.xfail(
-        reason="Test creates subclass inheriting real QDialog but patches Qt; causes crash or teardown error",
-        strict=False,  # May pass if QApplication exists from other tests
+        reason="Test creates subclass inheriting real QDialog but patches Qt; may crash in isolation",
+        strict=False,  # Passes when QApplication exists from other tests in full suite
     )
     def test_subclass_customization_workflow(self):
         """Test dialog subclass customization works correctly."""
@@ -415,8 +415,8 @@ class TestComposedDialogEssentialIntegration:
         pytest.param(
             "duplicate_component_registration",
             marks=pytest.mark.xfail(
-                reason="Creates ComposedDialog (real QDialog inheritance) with Qt patches; causes teardown error",
-                strict=False,  # May pass if QApplication exists from other tests
+                reason="Creates ComposedDialog with Qt patches; may crash in isolation",
+                strict=False,  # Passes when QApplication exists from other tests in full suite
             )
         ),
     ])

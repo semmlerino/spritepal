@@ -13,6 +13,7 @@ import pytest
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QApplication
 
+from tests.fixtures.qt_fixtures import ensure_headless_qt
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
 from ui.row_arrangement_dialog import RowArrangementDialog
@@ -27,13 +28,6 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.rom_data,
 ]
-
-def ensure_headless_qt():
-    """Ensure Qt is running in headless mode for testing"""
-    import os
-    # Set environment variables for headless testing
-    os.environ["QT_QPA_PLATFORM"] = "offscreen"
-    os.environ["QT_QUICK_BACKEND"] = "software"
 
 class DialogHelper(QObject):
     """Helper for dialog integration testing with real dialogs"""

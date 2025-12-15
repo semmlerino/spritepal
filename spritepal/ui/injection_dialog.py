@@ -4,6 +4,7 @@ Allows users to configure sprite injection parameters
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
@@ -175,71 +176,47 @@ class InjectionDialog(TabbedDialog):
             self._load_sprite_preview()
             self._validate_sprite()
 
-    def _create_vram_tab(self) -> QWidget:
-        """Create VRAM injection tab with splitter layout"""
-        # Create main container for tab
+
+    def _create_splitter_tab(
+        self, add_controls_method: Callable[[QVBoxLayout], None]
+    ) -> QWidget:
+        """Create a tab with splitter layout for left controls and right preview.
+
+        Args:
+            add_controls_method: Method to call to add mode-specific controls to the layout
+
+        Returns:
+            The tab container widget
+        """
         container = QWidget(self)
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Sprite selector is now at dialog level, not in tab
-
-        # Create splitter for controls and preview
         splitter = StyledSplitter(Qt.Orientation.Horizontal)
 
-        # Create left panel for controls
         left_widget = QWidget(self)
         layout = QVBoxLayout(left_widget)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Add VRAM-specific controls
-        self._add_vram_controls(layout)
+        add_controls_method(layout)
 
-        # Add left panel to splitter with 30% width
         splitter.add_widget(left_widget, stretch_factor=30)
 
-        # Add shared preview widget to splitter with 70% width
         if self.preview_widget:
             splitter.add_widget(self.preview_widget, stretch_factor=70)
 
-        # Set initial splitter sizes (30/70 ratio)
-        splitter.setSizes([400, 1000])  # Proportional to 1400px total width
+        splitter.setSizes([400, 1000])
 
         container_layout.addWidget(splitter)
         return container
+
+    def _create_vram_tab(self) -> QWidget:
+        """Create VRAM injection tab with splitter layout"""
+        return self._create_splitter_tab(self._add_vram_controls)
 
     def _create_rom_tab(self) -> QWidget:
         """Create ROM injection tab with splitter layout"""
-        # Create main container for tab
-        container = QWidget(self)
-        container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Sprite selector is now at dialog level, not in tab
-
-        # Create splitter for controls and preview
-        splitter = StyledSplitter(Qt.Orientation.Horizontal)
-
-        # Create left panel for controls
-        left_widget = QWidget(self)
-        layout = QVBoxLayout(left_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Add ROM-specific controls
-        self._add_rom_controls(layout)
-
-        # Add left panel to splitter with 30% width
-        splitter.add_widget(left_widget, stretch_factor=30)
-
-        # Add shared preview widget to splitter with 70% width
-        if self.preview_widget:
-            splitter.add_widget(self.preview_widget, stretch_factor=70)
-
-        # Set initial splitter sizes (30/70 ratio)
-        splitter.setSizes([400, 1000])  # Proportional to 1400px total width
-
-        container_layout.addWidget(splitter)
-        return container
+        return self._create_splitter_tab(self._add_rom_controls)
 
     def _setup_keyboard_shortcuts(self) -> None:
         """Setup keyboard shortcuts for the dialog"""

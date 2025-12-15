@@ -122,9 +122,38 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
 
     def teardown_method(self):
         """Clean up after each test."""
+        from PySide6.QtWidgets import QApplication
+        from ui.common import WorkerManager
+
         if self.window:
+            # Call close to trigger closeEvent and worker cleanup
             self.window.close()
+
+            # Process events to ensure closeEvent handlers run
+            QApplication.processEvents()
+
+            # Wait for workers to stop using condition-based polling
+            # (more efficient than fixed sleep loop - exits early when workers done)
+            import time
+            from tests.fixtures.timeouts import cleanup_timeout
+
+            timeout_ms = cleanup_timeout()
+            poll_interval_ms = 50  # Check every 50ms instead of 100ms sleep
+            elapsed = 0
+            while elapsed < timeout_ms and WorkerManager.get_running_worker_count() > 0:
+                QApplication.processEvents()
+                time.sleep(poll_interval_ms / 1000.0)  # sleep-ok: polling for worker completion
+                elapsed += poll_interval_ms
+
+            # Schedule window deletion
+            self.window.deleteLater()
+            QApplication.processEvents()
+
             self.window = None
+
+        # Clean up any remaining workers
+        WorkerManager.cleanup_all()
+
         super().teardown_method()
 
     def test_window_initialization_and_cleanup(self, mock_extraction_manager):

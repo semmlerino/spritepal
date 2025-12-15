@@ -50,7 +50,7 @@ pytestmark = [
 ]
 @pytest.mark.mock_dialogs
 @pytest.mark.shared_state_safe
-@pytest.mark.skip_thread_cleanup(reason="Uses fast_managers which spawns threads; cleanup handled by manager lifecycle")
+@pytest.mark.skip_thread_cleanup(reason="Uses session_managers which spawns threads; cleanup handled by manager lifecycle")
 class TestDialogInitialization:
     """Test that all dialogs can be initialized without errors"""
 
@@ -90,9 +90,10 @@ class TestDialogInitialization:
                 sys.modules[name] = original
 
     @pytest.fixture
-    def managers(self, fast_managers):
+    def managers(self, session_managers):
         """Provide managers fixture for dialog tests"""
-        return fast_managers
+        from core.managers.registry import ManagerRegistry
+        return ManagerRegistry()
 
     def test_manual_offset_dialog_initialization(self, qapp, managers):
         """Test ManualOffsetDialog can be created without initialization errors"""

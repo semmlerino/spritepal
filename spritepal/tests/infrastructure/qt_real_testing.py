@@ -220,6 +220,8 @@ class EventLoopHelper:
             duration_ms: Duration in milliseconds (0 = process pending only)
             max_iterations: Maximum iterations to prevent infinite loops
         """
+        import time
+
         app = QApplication.instance()
         if not app:
             return
@@ -231,12 +233,16 @@ class EventLoopHelper:
                     break
                 app.processEvents()
         else:
-            # Process events for specified duration
-            timer = QTimer()
-            timer.setSingleShot(True)
-            timer.timeout.connect(app.quit)
-            timer.start(duration_ms)
-            app.exec()
+            # Process events for specified duration using polling loop
+            # IMPORTANT: Do NOT use app.exec() here - it creates a nested event loop
+            # which conflicts with background QThreads and causes crashes.
+            start_time = time.monotonic()
+            end_time = start_time + (duration_ms / 1000.0)
+
+            while time.monotonic() < end_time:
+                app.processEvents()
+                # Small sleep to prevent CPU spinning
+                time.sleep(0.01)  # 10ms sleep between iterations
 
     @staticmethod
     @contextmanager

@@ -3,7 +3,6 @@ Helper for testing real preview functionality without extensive mocking
 """
 from __future__ import annotations
 
-import os
 import tempfile
 import time
 from pathlib import Path
@@ -12,14 +11,12 @@ from typing import Any
 import pytest
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication
 
+from tests.fixtures.qt_fixtures import ensure_headless_qt
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
-# Ensure headless Qt environment
 # Serial execution required: QApplication management
 pytestmark = [
-
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.ci_safe,
@@ -27,16 +24,6 @@ pytestmark = [
     pytest.mark.requires_display,
     pytest.mark.signals_slots,
 ]
-
-def ensure_headless_qt():
-    """Ensure Qt is running in headless mode for testing"""
-    os.environ["QT_QPA_PLATFORM"] = "offscreen"
-    os.environ["QT_QUICK_BACKEND"] = "software"
-
-    # Ensure QApplication exists
-    if not QApplication.instance():
-        return QApplication([])
-    return QApplication.instance()
 
 class ExtractionPanelHelper(QObject):
     """Helper for real ExtractionPanel functionality without Qt widgets"""

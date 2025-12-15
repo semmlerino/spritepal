@@ -44,17 +44,24 @@ def _get_qt_mocks():
         }
 
 def _is_headless_environment() -> bool:
-    """Detect if we're in a headless environment where Qt is not available."""
-    if os.environ.get("CI"):
-        return True
-    if not os.environ.get("DISPLAY") and os.name != "nt":  # Unix without DISPLAY
-        return True
+    """Detect if Qt is truly unavailable (not just CI/no-DISPLAY).
+
+    Offscreen Qt rendering is fully functional and should NOT be treated as
+    headless. Only fall back to mocks if Qt actually fails to initialize.
+    """
+    # If offscreen mode is configured, Qt is available via software rendering
+    if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+        return False  # Offscreen Qt works - use real components
+
+    # Try to actually initialize Qt - this is the authoritative check
     try:
-        # Try to import Qt and create a minimal test
         from PySide6.QtWidgets import QApplication
         app = QApplication.instance() or QApplication([])
-        return not app.primaryScreen()
+        # In offscreen mode, primaryScreen() may return None but Qt still works
+        # So we only return True (headless) if Qt import/init itself fails
+        return False
     except Exception:
+        # Qt genuinely unavailable - use mock fallback
         return True
 
 def _get_real_factory():

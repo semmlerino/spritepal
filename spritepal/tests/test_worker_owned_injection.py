@@ -214,17 +214,20 @@ class TestWorkerOwnedInjectionPattern:
         worker1 = WorkerOwnedVRAMInjectionWorker(params1)
         worker2 = WorkerOwnedVRAMInjectionWorker(params2)
 
+        from tests.fixtures.timeouts import worker_timeout
+
         # Set up error spies
         error_spy1 = QSignalSpy(worker1.error)
         error_spy2 = QSignalSpy(worker2.error)
 
-        # Start operations directly (avoiding outer thread creation to prevent crash)
-        worker1.perform_operation()
-        worker2.perform_operation()
-
-        # Wait for completion using Qt-safe waits on the worker's signals
-        qtbot.waitSignal(worker1.operation_finished, timeout=5000)
-        qtbot.waitSignal(worker2.operation_finished, timeout=5000)
+        # Start operations and wait for completion using context manager to avoid race
+        # where signal fires before waitSignal is registered
+        with qtbot.waitSignals(
+            [worker1.operation_finished, worker2.operation_finished],
+            timeout=worker_timeout()
+        ):
+            worker1.perform_operation()
+            worker2.perform_operation()
 
         # The core test: verify no Qt lifecycle errors occurred (architectural success)
         for error_spy, worker_name in [(error_spy1, "Worker1"), (error_spy2, "Worker2")]:
