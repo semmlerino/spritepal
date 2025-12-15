@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import QWidget
 
 from core.di_container import inject
+from core.protocols.dialog_protocols import ManualOffsetDialogFactoryProtocol
 from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
 
 if TYPE_CHECKING:
@@ -44,14 +45,14 @@ class ManualOffsetDialogFactory:
         )
 
 # Optional: A global accessor for the factory, if needed in some non-DI contexts
-_manual_offset_dialog_factory: ManualOffsetDialogFactory | None = None
+_manual_offset_dialog_factory: ManualOffsetDialogFactoryProtocol | None = None
 
-def get_manual_offset_dialog_factory() -> ManualOffsetDialogFactory:
+def get_manual_offset_dialog_factory() -> ManualOffsetDialogFactoryProtocol:
     """
     Provides a global accessor for the ManualOffsetDialogFactory.
     This should primarily be used in legacy code or if injection is not feasible.
     """
     global _manual_offset_dialog_factory
     if _manual_offset_dialog_factory is None:
-        _manual_offset_dialog_factory = inject(ManualOffsetDialogFactory)
+        _manual_offset_dialog_factory = inject(ManualOffsetDialogFactoryProtocol)
     return _manual_offset_dialog_factory

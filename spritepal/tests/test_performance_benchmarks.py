@@ -160,7 +160,7 @@ class TestAsyncROMCachePerformance:
                 {"width": sprite["width"], "height": sprite["height"]}
             )
 
-        time.sleep(1.0)  # Allow saves to complete
+        time.sleep(1.0)  # sleep-ok: benchmark cooldown
 
         # Measure concurrent access performance
         start_time = time.perf_counter()
@@ -423,7 +423,7 @@ class TestPreviewOrchestratorPerformance:
                 request_times.append(request_time)
 
                 # Small delay to simulate realistic usage
-                time.sleep(0.001)
+                time.sleep(0.001)  # sleep-ok: benchmark timing
 
             return request_times
 
@@ -487,7 +487,7 @@ class TestSmartPreviewCoordinatorPerformance:
             response_times.append(update_time)
 
             # Simulate real-time timing
-            time.sleep(max(0, update_interval - update_time))
+            time.sleep(max(0, update_interval - update_time))  # sleep-ok: benchmark timing
 
         total_time = time.perf_counter() - start_time
         avg_response = sum(response_times) / len(response_times)
@@ -518,12 +518,12 @@ class TestSmartPreviewCoordinatorPerformance:
             request_ids.append(request_id)
 
             # Rapid updates (5ms apart - should trigger debouncing)
-            time.sleep(0.005)
+            time.sleep(0.005)  # sleep-ok: benchmark timing
 
         submission_time = time.perf_counter() - start_time
 
         # Wait for debouncing to settle
-        time.sleep(debounce_window * 2)
+        time.sleep(debounce_window * 2)  # sleep-ok: benchmark timing
 
         # Should handle rapid updates efficiently due to debouncing
         assert submission_time < 1.0, f"Rapid update submission too slow: {submission_time:.3f}s"
@@ -783,7 +783,7 @@ class TestEndToEndPerformance:
             sleep_time = max(0, target_time - elapsed_since_start)
 
             if sleep_time > 0:
-                time.sleep(sleep_time)
+                time.sleep(sleep_time)  # sleep-ok: benchmark timing
 
         time.perf_counter() - start_time
 

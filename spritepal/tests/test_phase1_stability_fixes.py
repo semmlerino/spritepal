@@ -40,7 +40,6 @@ from core.managers.base_manager import BaseManager
 from core.managers.registry import ManagerRegistry
 from ui.common import WorkerManager
 
-
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
@@ -166,6 +165,8 @@ class TestWorkerCancellationStability:
 
     def test_worker_manager_timeout_handling(self):
         """Test WorkerManager timeout handling logic."""
+        from unittest.mock import call
+
         # Test the static methods directly without requiring Qt
 
         # Create a mock worker that simulates different behaviors
@@ -173,6 +174,7 @@ class TestWorkerCancellationStability:
         mock_worker.__class__.__name__ = "TestWorker"
         mock_worker.isRunning.return_value = True
         mock_worker.wait.return_value = True  # Simulates successful shutdown
+        mock_worker.isFinished.return_value = True  # Worker has finished
         mock_worker.deleteLater.return_value = None
 
         # Test cleanup with responsive worker
@@ -181,7 +183,10 @@ class TestWorkerCancellationStability:
         # Verify expected calls were made
         mock_worker.requestInterruption.assert_called_once()
         mock_worker.quit.assert_called_once()
-        mock_worker.wait.assert_called_once_with(1000)
+        # Implementation calls wait(timeout) for shutdown, then wait(50) for extra cleanup
+        # when isFinished() returns True (two-stage wait for complete thread cleanup)
+        assert mock_worker.wait.call_count == 2
+        mock_worker.wait.assert_has_calls([call(1000), call(50)])
         mock_worker.deleteLater.assert_called_once()
 
     def test_worker_manager_unresponsive_handling(self):
@@ -263,7 +268,7 @@ class TestTOCTOURaceConditionStability:
                 """Thread-safe operation using manager's built-in locking."""
                 def _do_operation():
                     # Simulate work
-                    time.sleep(0.01)
+                    time.sleep(0.01)  # sleep-ok: race condition test
                     self.operation_count += 1
                     self.operation_results.append(f"operation_{operation_id}")
                     return f"result_{operation_id}"
@@ -371,7 +376,7 @@ class TestTOCTOURaceConditionStability:
                     for _i in range(50):
                         if not self.is_initialized():
                             return False
-                        time.sleep(0.001)
+                        time.sleep(0.001)  # sleep-ok: race condition test
                     return True
                 finally:
                     self._finish_operation("long_op")
@@ -392,7 +397,7 @@ class TestTOCTOURaceConditionStability:
         thread.start()
 
         # While operation is running, verify manager state
-        time.sleep(0.01)  # Let operation start
+        time.sleep(0.01)  # sleep-ok: thread interleaving
         assert manager.has_active_operations(), "Manager should have active operations"
         assert manager.is_operation_active("long_op"), "Specific operation should be active"
 
@@ -596,7 +601,7 @@ class TestBaseManagerStability:
                 """Thread-safe counter increment."""
                 with self._lock:
                     current = self.shared_counter
-                    time.sleep(0.001)  # Simulate work that could cause race condition
+                    time.sleep(0.001)  # sleep-ok: race condition test
                     self.shared_counter = current + 1
 
         manager = TestManager()
@@ -634,7 +639,7 @@ class TestBaseManagerStability:
             def test_operation(self, op_id):
                 if self._start_operation(f"op_{op_id}"):
                     try:
-                        time.sleep(0.01)  # Simulate work
+                        time.sleep(0.01)  # sleep-ok: race condition test
                         return True
                     finally:
                         self._finish_operation(f"op_{op_id}")

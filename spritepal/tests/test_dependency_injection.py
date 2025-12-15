@@ -201,30 +201,37 @@ class TestGlobalAccessorIntegration:
         assert extraction_manager is not None
         assert session_manager is not None
 
+@pytest.mark.gui
 class TestInjectableClasses:
-    """Test the injectable base classes."""
+    """Test the injectable base classes.
 
-    def test_injectable_dialog_with_context(self, manager_context_factory):
+    These tests create real Qt widgets (QDialog, QWidget) so they require
+    a Qt display environment, qtbot fixture, and must be marked as GUI tests.
+    """
+
+    def test_injectable_dialog_with_context(self, qtbot, manager_context_factory):
         """Test InjectableDialog with context."""
         mock_injection = Mock()
         mock_injection.is_initialized.return_value = True
 
         with manager_context_factory({"injection": mock_injection}):
             dialog = InjectableDialog()
+            qtbot.addWidget(dialog)  # Register widget for cleanup
 
             assert dialog.get_injection_manager() is mock_injection
 
-    def test_injectable_widget_with_explicit_context(self):
+    def test_injectable_widget_with_explicit_context(self, qtbot):
         """Test InjectableWidget with explicit context."""
         mock_extraction = Mock()
         mock_extraction.is_initialized.return_value = True
 
         context = ManagerContext({"extraction": mock_extraction}, name="explicit")
         widget = InjectableWidget(manager_context=context)
+        qtbot.addWidget(widget)  # Register widget for cleanup
 
         assert widget.get_extraction_manager() is mock_extraction
 
-    def test_injectable_with_direct_provider(self):
+    def test_injectable_with_direct_provider(self, qtbot):
         """Test injectable classes with DirectManagerProvider."""
         mock_injection = Mock()
         mock_session = Mock()
@@ -235,11 +242,12 @@ class TestInjectableClasses:
         )
 
         dialog = InjectableDialog(manager_provider=provider)
+        qtbot.addWidget(dialog)  # Register widget for cleanup
 
         assert dialog.get_injection_manager() is mock_injection
         assert dialog.get_session_manager() is mock_session
 
-    def test_injection_mixin(self, manager_context_factory):
+    def test_injection_mixin(self, qtbot, manager_context_factory):
         """Test InjectionMixin functionality."""
         from PySide6.QtWidgets import QWidget
 
@@ -253,6 +261,7 @@ class TestInjectableClasses:
 
         with manager_context_factory({"injection": mock_injection}):
             widget = TestWidget()
+            qtbot.addWidget(widget)  # Register widget for cleanup
             assert widget.get_injection_manager() is mock_injection
 
 class TestThreadSafety:
@@ -269,7 +278,7 @@ class TestThreadSafety:
 
             with manager_context({"injection": mock_injection}, name=f"thread_{thread_id}"):
                 # Small delay to ensure threads are running concurrently
-                time.sleep(0.1)
+                time.sleep(0.1)  # sleep-ok: thread interleaving
 
                 # Use context to get manager (replaces deprecated get_injection_manager)
                 ctx = get_current_context()
@@ -305,7 +314,7 @@ class TestThreadSafety:
 
             with manager_context({"injection": mock_injection}):
                 barrier.wait()  # Synchronize with thread2
-                time.sleep(0.1)  # Let thread2 set its context
+                time.sleep(0.1)  # sleep-ok: thread interleaving
 
                 # Should still have thread1's manager
                 ctx = get_current_context()

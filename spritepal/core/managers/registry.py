@@ -4,7 +4,7 @@ Registry for accessing manager instances
 from __future__ import annotations
 
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtWidgets import QApplication
 
@@ -27,7 +27,56 @@ from .monitoring_manager import MonitoringManager
 from .session_manager import SessionManager
 from .ui_coordinator_manager import UICoordinatorManager
 
+if TYPE_CHECKING:
+    from .base_manager import BaseManager
+
 # NavigationManager import deferred to avoid circular imports
+
+
+def _topological_sort(
+    manager_classes: list[type["BaseManager"]],
+) -> list[type["BaseManager"]]:
+    """
+    Sort manager classes by their declared dependencies using Kahn's algorithm.
+
+    Each manager class should have a DEPENDS_ON class variable listing its dependencies.
+    Returns classes in initialization order (dependencies first).
+
+    Raises:
+        ManagerError: If circular dependencies are detected
+    """
+    # Build adjacency list and in-degree count
+    in_degree: dict[type, int] = {cls: 0 for cls in manager_classes}
+    dependents: dict[type, list[type]] = {cls: [] for cls in manager_classes}
+    class_set = set(manager_classes)
+
+    for cls in manager_classes:
+        for dep in getattr(cls, "DEPENDS_ON", []):
+            if dep in class_set:
+                in_degree[cls] += 1
+                dependents[dep].append(cls)
+
+    # Start with classes that have no dependencies
+    queue = [cls for cls in manager_classes if in_degree[cls] == 0]
+    result: list[type["BaseManager"]] = []
+
+    while queue:
+        # Sort for deterministic order when multiple options exist
+        queue.sort(key=lambda c: c.__name__)
+        cls = queue.pop(0)
+        result.append(cls)
+
+        for dependent in dependents[cls]:
+            in_degree[dependent] -= 1
+            if in_degree[dependent] == 0:
+                queue.append(dependent)
+
+    if len(result) != len(manager_classes):
+        # Circular dependency detected
+        remaining = [c.__name__ for c in manager_classes if c not in result]
+        raise ManagerError(f"Circular dependency detected among: {remaining}")
+
+    return result
 
 class ManagerRegistry:
     """Singleton registry for manager instances with memory leak prevention"""
@@ -35,6 +84,15 @@ class ManagerRegistry:
     _instance: ManagerRegistry | None = None
     _lock: threading.RLock = threading.RLock()  # RLock for reentrant locking
     _cleanup_registered: bool = False
+
+    # List of manager classes in initialization order (topological sort validates this)
+    # When no DEPENDS_ON is declared, alphabetical order by class name is used.
+    MANAGED_CLASSES: list[type] = [
+        ApplicationStateManager,
+        CoreOperationsManager,
+        MonitoringManager,
+        UICoordinatorManager,
+    ]
 
     def __new__(cls) -> ManagerRegistry:
         """Ensure only one instance exists"""
@@ -81,28 +139,61 @@ class ManagerRegistry:
             except Exception as e:
                 self._logger.debug(f"Could not register Qt cleanup: {e}")
 
-    # WARNING: SPOOKY ACTION AT A DISTANCE
-    # Manager initialization order matters! Some managers depend on others being
-    # registered in the DI container. Changing the order below can cause:
-    # - inject() calls to fail during __init__
-    # - Signals to connect to None
-    # - Subtle test failures due to missing dependencies
-    # Current order: ApplicationStateManager → CoreOperationsManager → UICoordinatorManager
-    # If adding a new manager, trace its dependencies carefully!
+    @classmethod
+    def validate_initialization_order(cls) -> bool:
+        """
+        Validate that MANAGED_CLASSES order matches topological sort of dependencies.
+
+        Call this in tests or during development to ensure the hardcoded order
+        is consistent with declared DEPENDS_ON attributes.
+
+        Returns:
+            True if order is valid
+
+        Raises:
+            ManagerError: If order doesn't match or circular dependency detected
+        """
+        expected_order = _topological_sort(cls.MANAGED_CLASSES)
+        if expected_order != cls.MANAGED_CLASSES:
+            expected_names = [c.__name__ for c in expected_order]
+            actual_names = [c.__name__ for c in cls.MANAGED_CLASSES]
+            raise ManagerError(
+                f"MANAGED_CLASSES order doesn't match dependencies.\n"
+                f"  Expected: {expected_names}\n"
+                f"  Actual: {actual_names}"
+            )
+        return True
+
+    # Manager initialization order is determined by declared dependencies.
+    # Each manager class should have a DEPENDS_ON class variable listing its dependencies.
+    # The _topological_sort() function computes a safe initialization order.
+    #
+    # To add a new manager:
+    # 1. Declare DEPENDS_ON in your manager class (list of manager types it requires)
+    # 2. Add the manager class to MANAGED_CLASSES below
+    # 3. Add initialization code in initialize_managers() following the pattern
+    #
+    # Current order: ApplicationStateManager → CoreOperationsManager → MonitoringManager → UICoordinatorManager
+    #
+    # Use _validate_initialization_order() to verify the hardcoded order matches
+    # what topological sort would produce.
     def initialize_managers(
         self,
         app_name: str = "SpritePal",
         settings_path: Any = None,
-        use_consolidated: bool = True,
         configuration_service: Any = None,
     ) -> None:
         """
-        Initialize all managers with proper error handling and cleanup
+        Initialize all managers with proper error handling and cleanup.
+
+        Uses the consolidated manager architecture where:
+        - ApplicationStateManager handles session, settings, state, and history
+        - CoreOperationsManager handles extraction and injection operations
+        - Adapters provide backward-compatible interfaces (SessionManager, etc.)
 
         Args:
             app_name: Application name for settings
             settings_path: Optional custom settings path (for testing)
-            use_consolidated: Whether to use consolidated managers (default: True)
             configuration_service: Optional pre-created ConfigurationService instance
 
         Raises:
@@ -114,15 +205,12 @@ class ManagerRegistry:
                 self._logger.debug("Managers already initialized, skipping")
                 return
 
-            self._logger.info(f"Initializing managers (consolidated={use_consolidated})...")
+            self._logger.info("Initializing managers with consolidated architecture...")
 
             # Configure the DI container first to register all protocols
             # Pass configuration_service so it gets registered in the container
             from core.di_container import configure_container
-            configure_container(
-                use_consolidated=use_consolidated,
-                configuration_service=configuration_service,
-            )
+            configure_container(configuration_service=configuration_service)
 
             # Get Qt application instance for proper parent management
             app = QApplication.instance()
@@ -139,60 +227,29 @@ class ManagerRegistry:
             created_managers = []
 
             try:
-                if use_consolidated:
-                    # Use new consolidated managers
-                    self._logger.debug("Creating ApplicationStateManager...")
-                    state_manager = ApplicationStateManager(app_name, settings_path, parent=qt_parent)
-                    self._managers["state"] = state_manager
-                    created_managers.append("state")
+                # Create consolidated managers
+                # ApplicationStateManager handles session, settings, state, and history
+                self._logger.debug("Creating ApplicationStateManager...")
+                state_manager = ApplicationStateManager(app_name, settings_path, parent=qt_parent)
+                self._managers["state"] = state_manager
+                created_managers.append("state")
 
-                    # Register adapters for backward compatibility
-                    self._managers["session"] = state_manager.get_session_adapter()
-                    self._logger.debug("ApplicationStateManager created successfully")
+                # Register adapters for backward compatibility
+                self._managers["session"] = state_manager.get_session_adapter()
+                self._logger.debug("ApplicationStateManager created successfully")
 
-                    # Create CoreOperationsManager
-                    self._logger.debug("Creating CoreOperationsManager...")
-                    core_manager = CoreOperationsManager(parent=qt_parent)
-                    self._managers["core_operations"] = core_manager
-                    created_managers.append("core_operations")
+                # CoreOperationsManager handles extraction and injection operations
+                self._logger.debug("Creating CoreOperationsManager...")
+                core_manager = CoreOperationsManager(parent=qt_parent)
+                self._managers["core_operations"] = core_manager
+                created_managers.append("core_operations")
 
-                    # Register adapters
-                    self._managers["extraction"] = core_manager.get_extraction_adapter()
-                    self._managers["injection"] = core_manager.get_injection_adapter()
-                    self._logger.debug("CoreOperationsManager created successfully")
+                # Register adapters for backward compatibility
+                self._managers["extraction"] = core_manager.get_extraction_adapter()
+                self._managers["injection"] = core_manager.get_injection_adapter()
+                self._logger.debug("CoreOperationsManager created successfully")
 
-                    # Create UICoordinatorManager
-                    self._logger.debug("Creating UICoordinatorManager...")
-                    ui_manager = UICoordinatorManager(parent=qt_parent)
-                    self._managers["ui_coordinator"] = ui_manager
-                    created_managers.append("ui_coordinator")
-                    self._logger.debug("UICoordinatorManager created successfully")
-
-                else:
-                    # Use original managers for backward compatibility
-                    # Initialize session manager first as others may depend on it
-                    # SessionManager inherits from BaseManager (QObject), so it can take a parent
-                    self._logger.debug("Creating SessionManager...")
-                    session_manager = SessionManager(app_name, settings_path)
-                    session_manager.setParent(qt_parent)  # Set parent after creation
-                    self._managers["session"] = session_manager
-                    created_managers.append("session")
-                    self._logger.debug("SessionManager created successfully")
-
-                    # Initialize Qt-based managers with proper parent to prevent lifecycle issues
-                    self._logger.debug("Creating ExtractionManager...")
-                    extraction_manager = ExtractionManager(parent=qt_parent)
-                    self._managers["extraction"] = extraction_manager
-                    created_managers.append("extraction")
-                    self._logger.debug("ExtractionManager created successfully")
-
-                    self._logger.debug("Creating InjectionManager...")
-                    injection_manager = InjectionManager(parent=qt_parent)
-                    self._managers["injection"] = injection_manager
-                    created_managers.append("injection")
-                    self._logger.debug("InjectionManager created successfully")
-
-                # Initialize MonitoringManager
+                # MonitoringManager for performance and health monitoring
                 self._logger.debug("Creating MonitoringManager...")
                 monitoring_manager = MonitoringManager(parent=qt_parent)
                 self._managers["monitoring"] = monitoring_manager
@@ -206,6 +263,13 @@ class ManagerRegistry:
                     monitoring_manager.register_manager_monitoring(self._managers["injection"])
                 if "session" in self._managers:
                     monitoring_manager.register_manager_monitoring(self._managers["session"])
+
+                # UICoordinatorManager handles UI coordination
+                self._logger.debug("Creating UICoordinatorManager...")
+                ui_manager = UICoordinatorManager(parent=qt_parent)
+                self._managers["ui_coordinator"] = ui_manager
+                created_managers.append("ui_coordinator")
+                self._logger.debug("UICoordinatorManager created successfully")
 
                 # Future managers will be added here
 
@@ -522,20 +586,21 @@ def _ensure_registry() -> ManagerRegistry:
 def initialize_managers(
     app_name: str = "SpritePal",
     settings_path: Any = None,
-    use_consolidated: bool = True,
     configuration_service: Any = None,
 ) -> None:
     """
-    Initialize all managers
+    Initialize all managers with consolidated architecture.
+
+    Uses ApplicationStateManager + CoreOperationsManager with backward-compatible
+    adapters for SessionManager, ExtractionManager, and InjectionManager.
 
     Args:
         app_name: Application name for settings
         settings_path: Optional custom settings path (for testing)
-        use_consolidated: Whether to use consolidated managers (default: True)
         configuration_service: Optional pre-created ConfigurationService instance
     """
     _ensure_registry().initialize_managers(
-        app_name, settings_path, use_consolidated, configuration_service
+        app_name, settings_path, configuration_service
     )
 
 def cleanup_managers() -> None:

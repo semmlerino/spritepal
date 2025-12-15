@@ -14,40 +14,6 @@ from types import TracebackType
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-def _configure_composed_dialogs_early():
-    """Configure composed dialogs VERY EARLY - before any UI imports."""
-    try:
-        import json
-
-        # Use ConfigurationService to resolve settings file path
-        # This ensures consistent path resolution regardless of CWD
-        from core.configuration_service import ConfigurationService
-
-        config_service = ConfigurationService()
-        settings_file = config_service.settings_file
-
-        if settings_file.exists():
-            with settings_file.open("r") as f:
-                settings = json.load(f)
-
-            # Check experimental settings for composed dialogs
-            use_composed = settings.get("experimental", {}).get("use_composed_dialogs", False)
-
-            if use_composed:
-                os.environ["SPRITEPAL_USE_COMPOSED_DIALOGS"] = "1"
-            else:
-                os.environ["SPRITEPAL_USE_COMPOSED_DIALOGS"] = "0"
-        else:
-            # Default to legacy if no settings file
-            os.environ["SPRITEPAL_USE_COMPOSED_DIALOGS"] = "0"
-
-    except Exception:
-        # Fallback to legacy on any error
-        os.environ["SPRITEPAL_USE_COMPOSED_DIALOGS"] = "0"
-
-# Configure composed dialogs VERY EARLY - before any UI imports
-_configure_composed_dialogs_early()
-
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
@@ -472,8 +438,6 @@ def main():
     logger.info(f"Platform: {sys.platform}")
     logger.info(f"App root: {config_service.app_root}")
     logger.info(f"Settings file: {config_service.settings_file}")
-
-    # Composed dialogs already configured early
 
     # Install global exception handler to catch unhandled crashes
     sys.excepthook = handle_exception

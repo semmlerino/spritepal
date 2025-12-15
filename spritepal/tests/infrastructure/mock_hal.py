@@ -107,7 +107,7 @@ class MockHALProcessPool:
 
         # Simulate processing delay if configured
         if self._mock_delay > 0:
-            time.sleep(self._mock_delay)
+            time.sleep(self._mock_delay)  # sleep-ok: simulated processing delay
 
         # Check for configured failures
         if request.request_id in self._mock_failures:

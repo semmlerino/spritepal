@@ -108,6 +108,7 @@ class SignalRecorder(QObject):
         return len(self.emissions)
 
 @pytest.mark.gui
+@pytest.mark.usefixtures("session_managers")
 class TestDialogSignalConnections:
     """Test UnifiedManualOffsetDialog signal connections."""
 
@@ -203,6 +204,7 @@ class TestDialogSignalConnections:
         assert recorder.count('sprite_found') == 1
 
 @pytest.mark.gui
+@pytest.mark.usefixtures("session_managers")
 @skip_in_offscreen
 class TestThreadSafetyAndTiming:
     """Test thread safety and timing of signal emissions."""
@@ -342,6 +344,7 @@ class TestThreadSafetyAndTiming:
         assert received_count == emission_count
 
 @pytest.mark.gui
+@pytest.mark.usefixtures("session_managers")
 @skip_in_offscreen
 class TestSignalBlockingAndError:
     """Test signal blocking and error conditions."""

@@ -139,8 +139,13 @@ class CallbackSignal:
     def __init__(self, callbacks: list[Callable]):
         self.callbacks = callbacks
 
-    def connect(self, callback: Callable) -> None:
-        """Connect a callback."""
+    def connect(self, callback: Callable, connection_type: Any = None) -> None:
+        """Connect a callback.
+
+        Args:
+            callback: The callback function to connect
+            connection_type: Optional Qt.ConnectionType (ignored, for API compatibility)
+        """
         if callback not in self.callbacks:
             self.callbacks.append(callback)
 

@@ -24,14 +24,29 @@ class RangeScanWorker(BaseWorker):
     """Worker thread for comprehensive scanning of ROM ranges to find all sprites"""
 
     # Custom signals (BaseWorker provides progress, error, warning, operation_finished)
-    sprite_found = Signal(int, float)  # offset, quality
-    progress_update = Signal(int, int)  # current_offset, progress_percentage
-    scan_complete = Signal(bool)  # success
-    scan_paused = Signal()  # scan was paused
-    scan_resumed = Signal()  # scan was resumed
-    scan_stopped = Signal()  # scan was stopped
-    cache_status = Signal(str)  # cache status message
-    cache_progress_saved = Signal(int, int, int)  # current_offset, total_sprites_found, progress_percentage
+    sprite_found = Signal(int, float)
+    """Emitted when a sprite is found. Args: offset (int), quality_score (float 0.0-1.0)."""
+
+    progress_update = Signal(int, int)
+    """Emitted with scan progress. Args: current_offset (int), progress_percentage (0-100)."""
+
+    scan_complete = Signal(bool)
+    """Emitted when scan completes. Args: success (bool)."""
+
+    scan_paused = Signal()
+    """Emitted when scan is paused."""
+
+    scan_resumed = Signal()
+    """Emitted when scan resumes after pause."""
+
+    scan_stopped = Signal()
+    """Emitted when scan is stopped by user."""
+
+    cache_status = Signal(str)
+    """Emitted with cache status updates. Args: status_message."""
+
+    cache_progress_saved = Signal(int, int, int)
+    """Emitted when cache progress is saved. Args: current_offset, sprites_found, progress_percent."""
 
     def __init__(self, rom_path: str, start_offset: int, end_offset: int,
                  step_size: int, extractor: ROMExtractor, parent: QObject | None = None,

@@ -39,8 +39,11 @@ class SpriteSearchWorker(BaseWorker):
     """
 
     # Signals
-    sprite_found = Signal(int, float)  # offset, quality
-    search_complete = Signal(bool)  # True if sprite found
+    sprite_found = Signal(int, float)
+    """Emitted when a sprite is found. Args: offset (int), quality_score (float 0.0-1.0)."""
+
+    search_complete = Signal(bool)
+    """Emitted when search completes. Args: found (True if sprite was found)."""
 
     # Note: progress signal is already defined in BaseWorker as Signal(int, str)
     # We'll override emit_progress to convert our (current, total) to (percent, message)

@@ -69,6 +69,7 @@ class SimpleReceiver(QObject):
         self.received_data.clear()
 
 @pytest.mark.headless
+@pytest.mark.usefixtures("session_managers")
 class TestBasicSignalSlot:
     """Test basic signal/slot functionality."""
 

@@ -258,12 +258,15 @@ class TestRealMainWindowStateIntegration:
             assert len(editor_signal_args) == 1, "Signal should have one argument"
             assert "signal_test_sprites.png" in str(editor_signal_args[0]), "Signal should contain real file path"
 
-            # Test other real button signals
-            QTest.mouseClick(main_window.arrange_rows_button, Qt.MouseButton.LeftButton)
+            # Test arrange signals via menu actions
+            # Note: arrange_rows_button and arrange_grid_button both delegate to a single
+            # dropdown button with a menu. The signals are connected to menu actions,
+            # not the button's clicked signal. Trigger the actions directly.
+            main_window.toolbar_manager.arrange_rows_action.trigger()
             self.qt_app.processEvents()
             assert rows_spy.count() == 1, "Arrange rows signal should be emitted"
 
-            QTest.mouseClick(main_window.arrange_grid_button, Qt.MouseButton.LeftButton)
+            main_window.toolbar_manager.arrange_grid_action.trigger()
             self.qt_app.processEvents()
             assert grid_spy.count() == 1, "Grid arrange signal should be emitted"
 

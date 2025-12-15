@@ -180,7 +180,6 @@ def reset_container() -> None:
     _container.clear()
 
 def configure_container(
-    use_consolidated: bool = True,
     configuration_service: Any = None,
 ) -> None:
     """
@@ -189,8 +188,12 @@ def configure_container(
     This function sets up all the necessary bindings for the application.
     It should be called during application initialization.
 
+    The container uses the consolidated manager architecture where:
+    - ApplicationStateManager handles session, settings, state, and history
+    - CoreOperationsManager handles extraction and injection operations
+    - Adapters provide backward-compatible interfaces (SessionManager, etc.)
+
     Args:
-        use_consolidated: Whether to use consolidated managers (default: True)
         configuration_service: Optional pre-created ConfigurationService instance.
                               If not provided, one will be created automatically.
     """
@@ -213,45 +216,28 @@ def configure_container(
         # Create default ConfigurationService
         register_singleton(ConfigurationServiceProtocol, ConfigurationService())
 
-    # Register SessionManager, ExtractionManager, InjectionManager
+    # Register consolidated managers with adapters
+    # ApplicationStateManager handles session, settings, state, and history
+    # CoreOperationsManager handles extraction and injection operations
+    register_factory(
+        ApplicationStateManagerProtocol,
+        lambda: _get_application_state_manager()
+    )
 
-    if use_consolidated:
-        # Register consolidated managers with adapters
-        register_factory(
-            ApplicationStateManagerProtocol,
-            lambda: _get_application_state_manager()
-        )
+    register_factory(
+        SessionManagerProtocol,
+        lambda: _get_consolidated_session_adapter()
+    )
 
-        register_factory(
-            SessionManagerProtocol,
-            lambda: _get_consolidated_session_adapter()
-        )
+    register_factory(
+        ExtractionManagerProtocol,
+        lambda: _get_consolidated_extraction_adapter()
+    )
 
-        register_factory(
-            ExtractionManagerProtocol,
-            lambda: _get_consolidated_extraction_adapter()
-        )
-
-        register_factory(
-            InjectionManagerProtocol,
-            lambda: _get_consolidated_injection_adapter()
-        )
-    else:
-        # Register original managers
-        register_factory(
-            SessionManagerProtocol,
-            lambda: _get_or_create_session_manager()
-        )
-
-        register_factory(
-            ExtractionManagerProtocol,
-            lambda: _get_or_create_extraction_manager()
-        )
-
-        register_factory(
-            InjectionManagerProtocol,
-            lambda: _get_or_create_injection_manager()
-        )
+    register_factory(
+        InjectionManagerProtocol,
+        lambda: _get_consolidated_injection_adapter()
+    )
 
     # Register SettingsManager
     register_factory(
@@ -298,8 +284,10 @@ def configure_container(
         lambda: VRAMService()
     )
 
-    # Register ManualOffsetDialogFactory with lazy import to avoid layer violation
-    # The factory creates UI objects so it lives in ui/, but we defer the import
+    # Register ManualOffsetDialogFactory via protocol to avoid layer violation
+    # The factory creates UI objects so it lives in ui/, but we register by protocol
+    from core.protocols.dialog_protocols import ManualOffsetDialogFactoryProtocol
+
     def _create_manual_offset_dialog_factory():
         from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
         return ManualOffsetDialogFactory(
@@ -309,10 +297,7 @@ def configure_container(
             rom_extractor=inject(ROMExtractorProtocol)
         )
 
-    # Import the class reference for registration (TYPE_CHECKING would be better but
-    # we need the actual class for the container key)
-    from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
-    register_factory(ManualOffsetDialogFactory, _create_manual_offset_dialog_factory)
+    register_factory(ManualOffsetDialogFactoryProtocol, _create_manual_offset_dialog_factory)
 
     # Register DialogFactory for controller dialog creation with lazy import
     from core.protocols.dialog_protocols import DialogFactoryProtocol
@@ -323,7 +308,7 @@ def configure_container(
 
     register_factory(DialogFactoryProtocol, _create_controller_dialog_factory)
 
-    logger.info(f"DI container configured (consolidated={use_consolidated})")
+    logger.info("DI container configured with consolidated manager architecture")
 
 # Helper functions for lazy manager creation
 def _get_application_state_manager():
@@ -346,20 +331,6 @@ def _get_consolidated_injection_adapter():
     from core.managers.registry import ManagerRegistry
     return ManagerRegistry().get_core_operations_manager().get_injection_adapter()
 
-def _get_or_create_session_manager():
-    """Get or create session manager."""
-    from core.managers.registry import ManagerRegistry
-    return ManagerRegistry().get_session_manager()
-
-def _get_or_create_extraction_manager():
-    """Get or create extraction manager."""
-    from core.managers.registry import ManagerRegistry
-    return ManagerRegistry().get_extraction_manager()
-
-def _get_or_create_injection_manager():
-    """Get or create injection manager."""
-    from core.managers.registry import ManagerRegistry
-    return ManagerRegistry().get_injection_manager()
 
 # Example usage with protocols
 if __name__ == "__main__":

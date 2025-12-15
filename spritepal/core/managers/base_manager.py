@@ -29,12 +29,27 @@ from .exceptions import ValidationError
 class BaseManager(QObject):
     """Abstract base class for all manager classes"""
 
+    # Dependency declaration for initialization ordering.
+    # Subclasses should override this to declare which manager types they depend on.
+    # The registry uses topological sort to determine safe initialization order.
+    # Example: DEPENDS_ON: ClassVar[list[type[BaseManager]]] = [ApplicationStateManager]
+    DEPENDS_ON: list[type["BaseManager"]] = []
+
     # Common signals that all managers can emit
-    error_occurred = Signal(str)  # Error message
-    warning_occurred = Signal(str)  # Warning message
-    operation_started = Signal(str)  # Operation name
-    operation_finished = Signal(str)  # Operation name
-    progress_updated = Signal(str, int, int)  # Operation name, current, total
+    error_occurred = Signal(str)
+    """Emitted on error. Args: error_message."""
+
+    warning_occurred = Signal(str)
+    """Emitted on warning. Args: warning_message."""
+
+    operation_started = Signal(str)
+    """Emitted when operation starts. Args: operation_name."""
+
+    operation_finished = Signal(str)
+    """Emitted when operation finishes. Args: operation_name."""
+
+    progress_updated = Signal(str, int, int)
+    """Emitted with progress. Args: operation_name, current, total."""
 
     def __init__(self, name: str | None = None, parent: QObject | None = None) -> None:
         """

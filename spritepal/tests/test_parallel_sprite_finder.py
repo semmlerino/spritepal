@@ -485,7 +485,7 @@ class TestParallelPerformance:
 
         # Mock sprite finders to simulate work
         def slow_mock_find_sprite(data, offset):
-            time.sleep(0.001)  # Simulate processing time
+            time.sleep(0.001)  # sleep-ok: simulated processing delay
 
         for sprite_finder in parallel_finder.sprite_finders:
             sprite_finder.find_sprite_at_offset = Mock(side_effect=slow_mock_find_sprite)

@@ -464,7 +464,7 @@ class TestRaceConditionPrevention:
         def clearer():
             try:
                 for _ in range(100):
-                    time.sleep(0.001)  # Small delay to trigger race
+                    time.sleep(0.001)  # sleep-ok: race condition test
                     cache.clear()
             except Exception as e:
                 race_errors.append(str(e))
@@ -497,7 +497,7 @@ class TestRaceConditionPrevention:
 
             def cleanup_attempt():
                 try:
-                    time.sleep(0.01)  # Small delay
+                    time.sleep(0.01)  # sleep-ok: race condition test
                     worker.cleanup()
                 except Exception as e:
                     cleanup_errors.append(str(e))

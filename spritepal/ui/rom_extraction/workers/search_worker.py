@@ -20,10 +20,17 @@ logger = get_logger(__name__)
 class SpriteSearchWorker(QThread):
     """Worker thread for searching next/previous valid sprite"""
 
-    sprite_found = Signal(int, float)  # offset, quality
-    search_complete = Signal(bool)  # found
-    error = Signal(str, Exception)  # error message, exception
-    progress = Signal(int, int)  # current, total
+    sprite_found = Signal(int, float)
+    """Emitted when a sprite is found. Args: offset (int), quality_score (float 0.0-1.0)."""
+
+    search_complete = Signal(bool)
+    """Emitted when search completes. Args: found (True if sprite found)."""
+
+    error = Signal(str, Exception)
+    """Emitted on error. Args: error_message, exception_object."""
+
+    progress = Signal(int, int)
+    """Emitted with search progress. Args: current_offset, total_offsets."""
 
     def __init__(self, rom_path: str, start_offset: int, end_offset: int,
                  direction: int, extractor: ROMExtractorProtocol, parent: QThread | None = None):

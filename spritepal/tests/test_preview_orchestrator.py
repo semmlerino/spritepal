@@ -157,7 +157,7 @@ class TestPreviewRequest:
         """Test FIFO ordering for same priority requests"""
         # Create requests with same priority but different timestamps
         early_request = PreviewRequest(priority=Priority.NORMAL)
-        time.sleep(0.001)  # Ensure different timestamps
+        time.sleep(0.001)  # sleep-ok: ensure different timestamps
         late_request = PreviewRequest(priority=Priority.NORMAL)
 
         # Earlier request should come first

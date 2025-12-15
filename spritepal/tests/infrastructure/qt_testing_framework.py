@@ -452,7 +452,7 @@ class TimerTestContext:
             if current_thread:
                 current_thread.msleep(10)
             else:
-                time.sleep(0.01)  # Fallback for non-Qt threads
+                time.sleep(0.01)  # sleep-ok: non-Qt fallback
 
         self.timer.stop()
         return self.callback_count

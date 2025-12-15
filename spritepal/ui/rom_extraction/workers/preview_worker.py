@@ -22,10 +22,11 @@ class SpritePreviewWorker(BaseWorker):
     """Worker thread for loading sprite previews"""
 
     # Custom signals (BaseWorker provides progress, error, warning, operation_finished)
-    preview_ready = Signal(
-        bytes, int, int, str
-    )  # tile_data, width, height, sprite_name
-    preview_error = Signal(str)  # error message
+    preview_ready = Signal(bytes, int, int, str)
+    """Emitted when preview is ready. Args: tile_data (bytes), width (pixels), height (pixels), sprite_name."""
+
+    preview_error = Signal(str)
+    """Emitted on preview error. Args: error_message."""
 
     def __init__(self, rom_path: str, offset: int, sprite_name: str, extractor: ROMExtractorProtocol, sprite_config: Any = None, parent: QObject | None = None):
         super().__init__(parent)

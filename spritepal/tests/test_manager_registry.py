@@ -142,6 +142,11 @@ class TestManagerRegistry:
 
     def test_double_initialization(self):
         """Test that double initialization doesn't create new instances"""
+        from tests.fixtures.core_fixtures import is_session_managers_active
+
+        if is_session_managers_active():
+            pytest.skip("Cannot test double initialization while session_managers is active")
+
         # First initialization
         initialize_managers()
         session_mgr1 = get_session_manager()

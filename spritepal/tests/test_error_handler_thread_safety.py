@@ -113,7 +113,7 @@ class TestErrorHandlerThreadSafety:
             """Create singleton with artificial delay to increase race condition probability"""
             try:
                 # Add small delay to increase chance of race condition
-                time.sleep(delay_ms / 1000.0)
+                time.sleep(delay_ms / 1000.0)  # sleep-ok: race condition test
                 handler = get_error_handler()
                 creation_order.append(threading.current_thread().ident)
                 return handler

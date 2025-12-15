@@ -13,10 +13,10 @@
     "extraction_mode": 0
   },
   "ui": {
-    "window_width": 1000,
-    "window_height": 650,
-    "window_x": 0,
-    "window_y": 0,
+    "window_width": 1138,
+    "window_height": 711,
+    "window_x": 354,
+    "window_y": 155,
     "restore_position": false,
     "theme": "dark",
     "window_maximized": false,

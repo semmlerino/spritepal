@@ -723,7 +723,7 @@ class RealComponentFactory:
         # Python's threading.active_count() may still see threads being destroyed
         try:
             import time
-            time.sleep(0.15)  # 150ms for thread termination (increased from 100ms)
+            time.sleep(0.15)  # sleep-ok: OS thread teardown after gc.collect()
         except Exception as e:
             warnings.warn(
                 f"Failed to wait for thread cleanup: {e}",

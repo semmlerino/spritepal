@@ -6,21 +6,25 @@ problematic patterns in test code that are known to cause flaky tests,
 crashes, or maintenance issues.
 
 Usage:
-    # Check specific files
-    python check_test_patterns.py tests/test_foo.py tests/test_bar.py
+    # Check all test files (default when paths omitted)
+    python -m tests.infrastructure.check_test_patterns
+
+    # Check specific directories or files
+    python -m tests.infrastructure.check_test_patterns --paths tests/integration tests/fixtures/qt_fixtures.py
 
     # Use with pre-commit (in .pre-commit-config.yaml):
     - repo: local
       hooks:
         - id: check-test-patterns
           name: Check test anti-patterns
-          entry: python tests/infrastructure/check_test_patterns.py
+          entry: python -m tests.infrastructure.check_test_patterns --paths tests
           language: python
           types: [python]
           files: "^tests/.*\\\\.py$"
 """
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -37,8 +41,13 @@ class AntiPattern(NamedTuple):
 # Anti-patterns that indicate problematic test code
 ANTI_PATTERNS: list[AntiPattern] = [
     AntiPattern(
-        r'time\.sleep\(\d+\)',
-        'Use qtbot.wait() or qtbot.waitSignal() instead of time.sleep() in Qt tests',
+        r'time\.sleep\([^)]+\)',
+        'Prefer qtbot.wait() in Qt tests; allowlist with "# sleep-ok: reason" if intentional',
+        'warning'
+    ),
+    AntiPattern(
+        r'from time import sleep',
+        'Import time module instead; bare sleep() is harder to grep for',
         'warning'
     ),
     AntiPattern(
@@ -79,6 +88,29 @@ ANTI_PATTERNS: list[AntiPattern] = [
 ]
 
 
+def _iter_python_files(paths: list[Path]) -> list[Path]:
+    """Expand files/directories into unique Python file paths."""
+    seen: set[Path] = set()
+    expanded: list[Path] = []
+
+    for path in paths:
+        if not path.exists():
+            print(f"File not found: {path}", file=sys.stderr)
+            continue
+
+        if path.is_dir():
+            for py_file in path.rglob("*.py"):
+                if py_file not in seen:
+                    seen.add(py_file)
+                    expanded.append(py_file)
+        elif path.suffix == ".py":
+            if path not in seen:
+                seen.add(path)
+                expanded.append(path)
+
+    return expanded
+
+
 def check_file(file_path: Path) -> list[tuple[int, str, str, str]]:
     """Check a file for anti-patterns.
 
@@ -110,6 +142,10 @@ def check_file(file_path: Path) -> list[tuple[int, str, str, str]]:
             if stripped.startswith('#'):
                 continue
 
+            # Skip if explicitly allowlisted
+            if '# sleep-ok' in line:
+                continue
+
             issues.append((
                 line_num,
                 anti_pattern.severity,
@@ -120,17 +156,44 @@ def check_file(file_path: Path) -> list[tuple[int, str, str, str]]:
     return issues
 
 
-def main() -> int:
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    """Parse CLI arguments for the checker."""
+    parser = argparse.ArgumentParser(
+        description="Check test files for common anti-patterns.",
+    )
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        help="Files or directories to scan (defaults to tests/ when omitted).",
+    )
+    parser.add_argument(
+        "--paths",
+        dest="paths_flag",
+        nargs="+",
+        help="Files or directories to scan (explicit flag form).",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with code 1 if any issues found (warnings or errors). Default: only errors fail.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
     """Main entry point.
 
     Returns:
         Exit code: 0 if no errors, 1 if errors found
     """
-    if len(sys.argv) < 2:
-        print("Usage: check_test_patterns.py <file1.py> [file2.py ...]", file=sys.stderr)
-        return 1
+    args = _parse_args(argv or sys.argv[1:])
+    raw_paths = args.paths_flag or args.paths or ["tests"]
+    files = _iter_python_files([Path(p) for p in raw_paths])
 
-    files = [Path(f) for f in sys.argv[1:]]
+    if not files:
+        print("No Python files found to scan.", file=sys.stderr)
+        return 0
+
     all_issues: list[tuple[Path, int, str, str, str]] = []
     has_errors = False
 
@@ -159,7 +222,11 @@ def main() -> int:
             print()
 
         print(f"Total: {len(all_issues)} issue(s) found")
-        return 1 if has_errors else 0
+        if has_errors:
+            return 1
+        if args.strict:
+            return 1
+        return 0
 
     return 0
 

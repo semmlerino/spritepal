@@ -203,6 +203,122 @@ Real component testing performance (vs mocks):
 
 **Trade-off**: Slightly slower execution for dramatically improved test value and maintainability.
 
+## Fixture Quick Reference
+
+### Decision Tree
+
+```
+What does your test need?
+
+┌─ Managers (ExtractionManager, SessionManager, etc.)
+│  └─ Use `isolated_managers` fixture
+│     └─ Need shared state for performance?
+│        └─ Add @pytest.mark.shared_state_safe + use `session_managers`
+│
+├─ Qt widgets (buttons, dialogs, windows)
+│  └─ Add @pytest.mark.gui
+│     └─ Run with: QT_QPA_PLATFORM=offscreen uv run pytest ...
+│
+├─ HAL compression/decompression
+│  └─ Default: `hal_pool` gives MockHAL (fast)
+│     └─ Need real compression? Add @pytest.mark.real_hal
+│
+├─ Wait for signals
+│  └─ Use qtbot.waitSignal() with timeout functions
+│     └─ NEVER time.sleep()
+│
+└─ Images in worker threads
+   └─ Use ThreadSafeTestImage, NOT QPixmap
+```
+
+### Common Fixture Patterns
+
+**Basic test with managers:**
+```python
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
+
+def test_extraction_validates_params(isolated_managers):
+    manager = inject(ExtractionManagerProtocol)
+    result = manager.validate_extraction_params({"path": "/test"})
+    assert isinstance(result, bool)
+```
+
+**Qt widget test:**
+```python
+@pytest.mark.gui
+def test_button_click(qtbot, isolated_managers):
+    widget = MyWidget()
+    qtbot.addWidget(widget)
+    qtbot.mouseClick(widget.button, Qt.LeftButton)
+    assert widget.clicked_count == 1
+```
+
+**Signal wait test:**
+```python
+from tests.fixtures.timeouts import worker_timeout
+
+@pytest.mark.gui
+def test_worker_completes(qtbot, isolated_managers):
+    worker = MyWorker()
+    with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
+        worker.start()
+```
+
+**Thread-safe image test:**
+```python
+from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
+
+def test_worker_with_image():
+    # QPixmap in worker thread = CRASH
+    image = ThreadSafeTestImage.create(100, 100)
+    worker = ImageWorker(image)
+    worker.process()
+```
+
+### Fixture Reference
+
+| Fixture | Scope | When to Use |
+|---------|-------|-------------|
+| `isolated_managers` | function | **Default choice** - clean state each test |
+| `session_managers` | session | Performance-critical + `@pytest.mark.shared_state_safe` |
+| `hal_pool` | function | HAL operations (mock by default) |
+| `qtbot` | function | Qt widget testing |
+| `cleanup_singleton` | function | Reset singleton dialogs |
+
+### Timeout Functions
+
+Always use semantic timeouts from `tests/fixtures/timeouts.py`:
+```python
+from tests.fixtures.timeouts import signal_timeout, worker_timeout, ui_timeout
+
+timeout=signal_timeout()  # ~1000ms - fast signals
+timeout=worker_timeout()  # ~5000ms - background workers
+timeout=ui_timeout()      # ~2000ms - UI interactions
+```
+
+All timeouts scale with `PYTEST_TIMEOUT_MULTIPLIER` environment variable.
+
+### Test Markers
+
+| Marker | Meaning |
+|--------|---------|
+| `@pytest.mark.gui` | Uses Qt widgets (requires `QT_QPA_PLATFORM=offscreen`) |
+| `@pytest.mark.headless` | No display needed |
+| `@pytest.mark.real_hal` | Use real HAL (requires `exhal` binary) |
+| `@pytest.mark.shared_state_safe` | Test won't pollute state (required with `session_managers`) |
+
+### Anti-Patterns
+
+| Wrong | Right |
+|-------|-------|
+| `time.sleep(1)` | `qtbot.wait(1000)` |
+| `timeout=5000` | `timeout=worker_timeout()` |
+| `QPixmap` in worker | `ThreadSafeTestImage` |
+| `session_managers` alone | + `@pytest.mark.shared_state_safe` |
+
+---
+
 ## Test Guidelines
 
 ### Real Component Testing Principles

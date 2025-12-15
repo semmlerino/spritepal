@@ -64,11 +64,29 @@ class TestDialogInitialization:
     @pytest.fixture(scope="class", autouse=True)
     def patch_dialogs(self):
         """Patch dialog imports for this test class"""
+        import sys
+
+        # Save original modules before patching
+        patched_modules = [
+            'ui.dialogs.manual_offset_unified_integrated',
+            'ui.dialogs.settings_dialog',
+            'ui.dialogs.grid_arrangement_dialog',
+            'ui.dialogs.row_arrangement_dialog',
+            'ui.dialogs.advanced_search_dialog',
+            'ui.dialogs.resume_scan_dialog',
+            'ui.dialogs.user_error_dialog',
+        ]
+        original_modules = {name: sys.modules.get(name) for name in patched_modules}
+
         patch_dialog_imports()
-        # Note: We don't undo the patch because sys.modules is global and hard to restore perfectly
-        # without affecting other tests if running in same process. 
-        # But this is a class-scoped fixture so it runs once.
         yield
+
+        # Restore original modules after test class finishes
+        for name, original in original_modules.items():
+            if original is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = original
 
     @pytest.fixture
     def managers(self, fast_managers):

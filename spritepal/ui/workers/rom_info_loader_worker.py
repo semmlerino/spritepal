@@ -35,8 +35,11 @@ class ROMInfoLoaderWorker(BaseWorker):
     """
 
     # Custom signals for ROM info loading
-    rom_info_loaded = Signal(dict)  # ROM header info and metadata
-    sprite_locations_loaded = Signal(dict)  # Dict of sprite name -> pointer
+    rom_info_loaded = Signal(dict)
+    """Emitted when ROM info is loaded. Args: info_dict (with 'title', 'rom_type', etc.)."""
+
+    sprite_locations_loaded = Signal(dict)
+    """Emitted when sprite locations loaded. Args: locations (dict[sprite_name, pointer])."""
 
     def __init__(
         self,

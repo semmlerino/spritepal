@@ -247,6 +247,7 @@ class WorkerContainer(QWidget):
 
 @pytest.mark.integration
 @pytest.mark.gui
+@pytest.mark.usefixtures("managers_initialized")
 class TestSimplePreviewWorker:
     """Test SimplePreviewWorker with real ROM data.
 
@@ -357,6 +358,7 @@ class TestSimplePreviewWorker:
 
 @pytest.mark.integration
 @pytest.mark.gui  # Uses Qt coordinator which can segfault in headless mode
+@pytest.mark.usefixtures("session_managers")
 class TestPreviewCaching:
     """Test preview caching with ROM cache."""
 

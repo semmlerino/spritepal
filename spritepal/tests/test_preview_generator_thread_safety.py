@@ -13,7 +13,6 @@ import concurrent.futures
 import os
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-
 import threading
 import time
 from unittest.mock import MagicMock, patch
@@ -121,7 +120,7 @@ class TestPreviewGeneratorThreadSafety:
                     )
                     cache.put(key, result)
                     # Small delay to increase contention
-                    time.sleep(0.0001)
+                    time.sleep(0.0001)  # sleep-ok: thread interleaving
             except Exception as e:
                 errors.append(e)
 

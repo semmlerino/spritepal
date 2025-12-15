@@ -84,30 +84,7 @@ def get_main_thread():
     app = QApplication.instance()
     return app.thread() if app else None
 
-# Smart DialogBase selection based on environment
-def _get_dialog_base_class():
-    """Get the appropriate DialogBase class based on environment settings."""
-    import os
-
-    flag_value = os.environ.get('SPRITEPAL_USE_COMPOSED_DIALOGS', '0').lower()
-    use_composed = flag_value in ('1', 'true', 'yes', 'on')
-
-
-    if use_composed:
-        try:
-            from ui.components.base.composed.migration_adapter import (
-                DialogBaseMigrationAdapter,
-            )
-            return DialogBaseMigrationAdapter
-        except Exception:
-            # Fallback to legacy on any import error
-            from ui.components import DialogBase
-            return DialogBase
-    else:
-        from ui.components import DialogBase
-        return DialogBase
-
-DialogBase = _get_dialog_base_class()
+from ui.components import DialogBase
 from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.dialogs.services import ViewStateManager

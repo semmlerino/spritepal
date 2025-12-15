@@ -94,7 +94,7 @@ class SignalCapture(QObject):
             if current_thread:
                 current_thread.msleep(10)
             else:
-                time.sleep(0.01)  # Fallback for non-Qt threads
+                time.sleep(0.01)  # sleep-ok: non-Qt fallback
         return False
 
 class TestQtSignalArchitecture:
@@ -298,7 +298,7 @@ class TestQtSignalArchitecture:
         def worker(thread_id):
             for i in range(emissions_per_thread):
                 manager.extraction_progress.emit(f"Thread {thread_id} - Message {i}")
-                time.sleep(0.001)  # Small delay to encourage interleaving
+                time.sleep(0.001)  # sleep-ok: thread interleaving
 
         # Start multiple threads
         threads = []
@@ -324,7 +324,7 @@ class TestQtSignalArchitecture:
             if current_thread:
                 current_thread.msleep(10)
             else:
-                time.sleep(0.01)
+                time.sleep(0.01)  # sleep-ok: non-Qt fallback
 
         assert len(signal_capture.captured_signals) == expected_count
 
@@ -582,7 +582,7 @@ class TestPerformanceImpact:
             if current_thread:
                 current_thread.msleep(1)
             else:
-                time.sleep(0.001)
+                time.sleep(0.001)  # sleep-ok: non-Qt fallback
 
         # Analyze delivery times
         if delivery_times:

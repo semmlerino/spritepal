@@ -161,17 +161,23 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
     """
 
     # Standard signals all workers must have
-    progress = Signal(int, str)  # percent (0-100), message
-    error = Signal(str, Exception)  # message, exception
-    warning = Signal(str)  # warning message
+    progress = Signal(int, str)
+    """Emitted to report progress. Args: percent (0-100), message."""
+
+    error = Signal(str, Exception)
+    """Emitted on error. Args: error_message, exception_object."""
+
+    warning = Signal(str)
+    """Emitted for warnings. Args: warning_message."""
 
     # Standard finished signal - use this instead of QThread.finished
-    operation_finished = Signal(bool, str)  # success, message
+    operation_finished = Signal(bool, str)
+    """Emitted when operation completes. Args: success (bool), result_message."""
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._is_cancelled = False
         self._is_paused = False
+        self._cancellation_requested = False  # Persists after thread stops
         self._operation_name = self.__class__.__name__
         self._signal_connections: list[QMetaObject.Connection] = []
 
@@ -201,9 +207,14 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
         return connection
 
     def cancel(self) -> None:
-        """Request cancellation of the operation."""
+        """Request cancellation of the operation.
+
+        Uses Qt's built-in interruption mechanism (requestInterruption).
+        Check cancellation status via is_cancelled property or check_cancellation().
+        """
         logger.debug(f"{self._operation_name}: Cancellation requested")
-        self._is_cancelled = True
+        self._cancellation_requested = True
+        self.requestInterruption()
 
     def pause(self) -> None:
         """Request pause of the operation."""
@@ -217,8 +228,18 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
 
     @property
     def is_cancelled(self) -> bool:
-        """Check if cancellation was requested."""
-        return self._is_cancelled
+        """Check if cancellation was requested via any mechanism.
+
+        Returns True if cancel() was called OR if Qt's requestInterruption() was called.
+        This value persists even after the thread has stopped.
+        """
+        return self._cancellation_requested or self.isInterruptionRequested()
+
+    # Backward compatibility alias
+    @property
+    def _is_cancelled(self) -> bool:
+        """Deprecated: Use is_cancelled property instead."""
+        return self._cancellation_requested or self.isInterruptionRequested()
 
     @property
     def is_paused(self) -> bool:
@@ -264,40 +285,26 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
 
     def check_cancellation(self) -> None:
         """
-        Check if operation was cancelled and exit if so.
+        Check if operation was cancelled and raise if so.
 
-        This method checks both the internal cancellation flag and Qt's
-        built-in interruption mechanism for maximum compatibility.
-
+        Uses Qt's built-in interruption mechanism via isInterruptionRequested().
         Call this periodically in long-running operations.
 
         Raises:
-            InterruptedError: If operation was cancelled via any mechanism
+            InterruptedError: If operation was cancelled
         """
-        # Check internal cancellation flag (BaseWorker pattern)
-        if self._is_cancelled:
-            raise InterruptedError("Operation was cancelled")
-
-        # Check Qt's built-in interruption mechanism
         if self.isInterruptionRequested():
-            logger.debug(f"{self._operation_name}: Qt interruption detected")
-            self._is_cancelled = True  # Update internal state for consistency
-            raise InterruptedError("Operation was interrupted via Qt mechanism")
+            raise InterruptedError("Operation was cancelled")
 
     def wait_if_paused(self) -> None:
         """
         Wait while operation is paused.
 
-        Also respects Qt's interruption mechanism and cancellation flags.
+        Also respects cancellation - exits if cancelled during pause.
         Call this periodically in long-running operations.
         """
-        while self._is_paused and not self._is_cancelled and not self.isInterruptionRequested():
+        while self._is_paused and not self.isInterruptionRequested():
             self.msleep(int(SLEEP_WORKER * 1000))  # Sleep 100ms
-
-        # If we exited due to Qt interruption, update internal state
-        if self.isInterruptionRequested() and not self._is_cancelled:
-            logger.debug(f"{self._operation_name}: Qt interruption detected during pause")
-            self._is_cancelled = True
 
     @override
     @abstractmethod
@@ -320,13 +327,26 @@ class ManagedWorker(BaseWorker):
     """
 
     # Additional signals for specialized worker operations
-    preview_ready = Signal(object, int)  # PIL Image, tile_count
-    preview_image_ready = Signal(object)  # PIL Image
-    injection_finished = Signal(bool)  # success
-    progress_percent = Signal(int)  # percentage (0-100)
-    compression_info = Signal(str)  # compression info string
-    palettes_ready = Signal(object)  # Palette data
-    active_palettes_ready = Signal(object)  # Active palette indices
+    preview_ready = Signal(object, int)
+    """Emitted when preview is ready. Args: pil_image (PIL.Image), tile_count (int)."""
+
+    preview_image_ready = Signal(object)
+    """Emitted when preview image is ready. Args: pil_image (PIL.Image)."""
+
+    injection_finished = Signal(bool)
+    """Emitted when injection completes. Args: success (bool)."""
+
+    progress_percent = Signal(int)
+    """Emitted for progress updates. Args: percentage (0-100)."""
+
+    compression_info = Signal(str)
+    """Emitted with compression info. Args: info_string."""
+
+    palettes_ready = Signal(object)
+    """Emitted when palettes extracted. Args: palette_data (list[list[tuple]])."""
+
+    active_palettes_ready = Signal(object)
+    """Emitted when active palette indices ready. Args: palette_indices (list[int])."""
 
     def __init__(
         self,

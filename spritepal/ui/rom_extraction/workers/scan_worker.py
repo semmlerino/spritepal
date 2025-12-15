@@ -23,13 +23,21 @@ class SpriteScanWorker(BaseWorker):
     """Worker thread for scanning ROM for sprite offsets"""
 
     # Custom signals (BaseWorker provides progress, error, warning, operation_finished)
-    sprite_found = Signal(dict)  # sprite info
-    finished = Signal()  # Legacy compatibility - maps to operation_finished
-    cache_status = Signal(str)  # cache status message
-    cache_progress = Signal(int)  # cache save progress 0-100
+    sprite_found = Signal(dict)
+    """Emitted when a valid sprite is found. Args: sprite_info (dict with 'offset', 'quality' keys)."""
+
+    finished = Signal()
+    """Legacy compatibility signal - emitted when scan completes."""
+
+    cache_status = Signal(str)
+    """Emitted with cache status updates. Args: status_message."""
+
+    cache_progress = Signal(int)
+    """Emitted during cache save. Args: progress_percent (0-100)."""
 
     # For compatibility with existing code that expects (current, total) progress
-    progress_detailed = Signal(int, int)  # current, total
+    progress_detailed = Signal(int, int)
+    """Emitted with detailed progress. Args: current_offset, total_offsets."""
 
     def __init__(self, rom_path: str, extractor: Any, use_cache: bool = True,
                  start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None,

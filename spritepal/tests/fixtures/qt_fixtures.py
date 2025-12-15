@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import warnings
 from collections.abc import Generator, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -257,6 +258,8 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     import time
 
     markers = [m.name for m in request.node.iter_markers()]
+    leak_mode = request.config.getoption("--leak-mode")
+    allow_leaks = leak_mode == "warn" or "allows_resource_leaks" in markers
 
     # Opt-OUT: Skip if explicitly marked
     if 'skip_thread_cleanup' in markers or 'no_manager_setup' in markers or 'no_qt' in markers:
@@ -349,10 +352,10 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
             if current_thread:
                 current_thread.msleep(poll_interval_ms)
             else:
-                time.sleep(poll_interval_ms / 1000.0)
+                time.sleep(poll_interval_ms / 1000.0)  # sleep-ok: non-Qt fallback
         else:
             # Non-Qt test: just sleep
-            time.sleep(poll_interval_ms / 1000.0)
+            time.sleep(poll_interval_ms / 1000.0)  # sleep-ok: non-Qt fallback
 
         elapsed += poll_interval_ms
 
@@ -385,7 +388,11 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         msg_lines.append("Fix: Ensure all workers are properly stopped and joined.")
         msg_lines.append("Use @pytest.mark.skip_thread_cleanup(reason='...') to opt out if truly needed.")
 
-        pytest.fail("\n".join(msg_lines))
+        message = "\n".join(msg_lines)
+        if allow_leaks:
+            warnings.warn(message, ResourceWarning, stacklevel=2)
+        else:
+            pytest.fail(message)
 
     # PHASE 4: Garbage collection (ALWAYS run for all tests)
     if IS_HEADLESS:

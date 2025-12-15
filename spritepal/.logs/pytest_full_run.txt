@@ -1,0 +1,410 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0
+PySide6 6.10.1 -- Qt runtime 6.10.1 -- Qt compiled 6.10.1
+rootdir: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+configfile: pyproject.toml
+plugins: cov-7.0.0, mock-3.15.1, qt-4.5.0, timeout-2.4.0
+timeout: 30.0s
+timeout method: thread
+timeout func_only: False
+collected 1992 items / 2 skipped
+
+tests/controllers/test_extraction_controller_canonical.py .............. [  0%]
+............                                                             [  1%]
+tests/integration/test_batch_thumbnail_worker_integration.py sssssssssss [  1%]
+sss....                                                                  [  2%]
+tests/integration/test_complete_ui_workflows_comprehensive.py .......... [  2%]
+.                                                                        [  2%]
+tests/integration/test_core_operations_manager_integration.py .......    [  3%]
+tests/integration/test_edge_cases_integration.py ....................... [  4%]
+.......                                                                  [  4%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py ......... [  5%]
+...                                                                      [  5%]
+tests/integration/test_gallery_window_integration.py ................    [  6%]
+tests/integration/test_injection_workflow_integration.py ............... [  6%]
+........                                                                 [  7%]
+tests/integration/test_integration_manual_offset.py ...........          [  7%]
+tests/integration/test_integration_preview_system.py .......s            [  8%]
+tests/integration/test_integration_sprite_finder.py ........             [  8%]
+tests/integration/test_memory_management_integration.py ...ssss.....     [  9%]
+tests/integration/test_qt_signal_slot_integration.py ...sssssssss        [  9%]
+tests/integration/test_signal_basics.py ..........                       [ 10%]
+tests/integration/test_sprite_gallery_integration.py .........           [ 10%]
+tests/integration/test_worker_lifecycle_management_integration.py ...... [ 10%]
+.......                                                                  [ 11%]
+tests/test_async_rom_cache.py sssssssssssssssssssssss                    [ 12%]
+tests/test_base_manager.py sssssssssss                                   [ 13%]
+tests/test_circular_dependency_fix.py ....                               [ 13%]
+tests/test_collapsible_group_box.py ..                                   [ 13%]
+tests/test_complete_ui_workflows_integration.py sssssss                  [ 13%]
+tests/test_complete_user_workflow_integration.py ...........             [ 14%]
+tests/test_comprehensive_dialog_migrations.py ..............             [ 14%]
+tests/test_comprehensive_typing_example.py ....................          [ 15%]
+tests/test_console_error_handler.py ..........                           [ 16%]
+tests/test_constants.py ......                                           [ 16%]
+tests/test_constants_validation.py ......................                [ 17%]
+tests/test_controller_dependency_injection.py ..                         [ 17%]
+tests/test_controller_fix_validation.py xxx                              [ 18%]
+tests/test_controller_real.py ssssssssssssss                             [ 18%]
+tests/test_controller_real_managers.py ......                            [ 19%]
+tests/test_cross_dialog_integration_real.py ssssss                       [ 19%]
+tests/test_dark_theme_accessibility.py ................................. [ 21%]
+.......                                                                  [ 21%]
+tests/test_dark_theme_colors.py ...........................              [ 22%]
+tests/test_dark_theme_components.py .................................... [ 24%]
+.........................................                                [ 26%]
+tests/test_dark_theme_integration.py ...................                 [ 27%]
+tests/test_decomp.py s                                                   [ 27%]
+tests/test_dependency_injection.py .........................             [ 28%]
+tests/test_di_migration_readiness.py ..............                      [ 29%]
+tests/test_dialog_initialization.py .........                            [ 30%]
+tests/test_dialog_instantiation.py ..s......                             [ 30%]
+tests/test_dialog_lifecycle.py ssss                                      [ 30%]
+tests/test_dialog_real_integration.py sssssssssss                        [ 31%]
+tests/test_division_by_zero_comprehensive.py ..........                  [ 31%]
+tests/test_drag_drop_integration.py ............                         [ 32%]
+tests/test_error_handler.py ssss                                         [ 32%]
+tests/test_error_handler_thread_safety.py ......                         [ 32%]
+tests/test_exceptions.py .............                                   [ 33%]
+tests/test_extraction_manager.py ...................................     [ 35%]
+tests/test_extractor.py ..........                                       [ 35%]
+tests/test_file_validator_integration.py ...                             [ 35%]
+tests/test_file_validator_refactored.py ................................ [ 37%]
+....                                                                     [ 37%]
+tests/test_fixture_managers.py ......                                    [ 38%]
+tests/test_grid_image_processor.py ................................      [ 39%]
+tests/test_grid_preview_generator.py .............................       [ 41%]
+tests/test_hal_compression.py .......................                    [ 42%]
+tests/test_hal_compression_detection.py .............                    [ 42%]
+tests/test_hal_mock_verification.py s.s                                  [ 43%]
+tests/test_hal_mocking_performance.py ...........                        [ 43%]
+tests/test_image_utils.py ssssssssss...........                          [ 44%]
+tests/test_image_utils_mocked.py ............                            [ 45%]
+tests/test_infrastructure_fixed.py ....                                  [ 45%]
+tests/test_infrastructure_verification.py ssssss                         [ 45%]
+tests/test_injection_manager.py ssssssssssssssssssssssssssssssss         [ 47%]
+tests/test_injection_manager_real_conversion.py ..                       [ 47%]
+tests/test_injection_manager_refactored.py sssssssssss                   [ 48%]
+tests/test_integration.py ....                                           [ 48%]
+tests/test_integration_headless.py ...                                   [ 48%]
+tests/test_integration_mock.py ..                                        [ 48%]
+tests/test_logging_config.py ..........................                  [ 49%]
+tests/test_main_window_helper_validation.py ......                       [ 50%]
+tests/test_main_window_state_integration_real.py ..F..........           [ 50%]
+tests/test_manager_integration_real_tdd.py sssssss                       [ 51%]
+tests/test_manager_lifecycle_debug.py sss                                [ 51%]
+tests/test_manager_registry.py .ssssss                                   [ 51%]
+tests/test_manager_workflows.py ...                                      [ 51%]
+tests/test_memory_leak_detection.py ..........                           [ 52%]
+tests/test_minimal.py ..                                                 [ 52%]
+tests/test_monitoring_system.py ...............................ss...     [ 54%]
+tests/test_palette_colorizer_enhanced.py .......................         [ 55%]
+tests/test_palette_fix.py .                                              [ 55%]
+tests/test_palette_manager.py ...........                                [ 55%]
+tests/test_palette_manager_extended.py ..............                    [ 56%]
+tests/test_parallel_sprite_finder.py ........................            [ 57%]
+tests/test_phase1_stability_fixes.py ......s........                     [ 58%]
+tests/test_png_round_trip.py .....                                       [ 58%]
+tests/test_preview_generator.py .........................                [ 60%]
+tests/test_preview_generator_thread_safety.py ...                        [ 60%]
+tests/test_preview_orchestrator.py sssssssssssssssssssssssssssssssss     [ 61%]
+tests/test_qt_infrastructure.py ssssssssssss                             [ 62%]
+tests/test_qt_signal_architecture.py ssssssssssssss                      [ 63%]
+tests/test_qt_threading_patterns.py .............                        [ 63%]
+tests/test_real_components_example.py ...........                        [ 64%]
+tests/test_realtime_preview_integration.py ..............                [ 65%]
+tests/test_recent_ui_improvements_integration.py xxx...xx..............  [ 66%]
+tests/test_rom_cache.py .....................................            [ 68%]
+tests/test_rom_extraction_crash_fixes.py .............                   [ 68%]
+tests/test_rom_extractor.py .....................                        [ 69%]
+tests/test_rom_extractor_advanced.py ...............................     [ 71%]
+tests/test_rom_extractor_sprite_detection.py ............                [ 71%]
+tests/test_rom_injection.py ...s.                                        [ 72%]
+tests/test_rom_injection_settings.py .......                             [ 72%]
+tests/test_rom_palette_extraction.py .....                               [ 72%]
+tests/test_rom_scanning_comprehensive.py ...............                 [ 73%]
+tests/test_rom_validator.py ......................                       [ 74%]
+tests/test_row_arrangement_components.py .........................       [ 75%]
+tests/test_row_arrangement_dialog_migration.py sssssss                   [ 76%]
+tests/test_search_worker_simple.py ..                                    [ 76%]
+tests/test_session_fixtures_examples.py .................                [ 77%]
+tests/test_session_manager.py .........................                  [ 78%]
+tests/test_settings_integration.py ...........                           [ 79%]
+tests/test_settings_manager.py ................                          [ 79%]
+tests/test_smart_preview.py .................                            [ 80%]
+tests/test_sprite_finder.py ...........                                  [ 81%]
+tests/test_sprite_finder_refactored.py ........                          [ 81%]
+tests/test_sprite_preview_widget.py sssss                                [ 81%]
+tests/test_sprite_regions.py ........................                    [ 83%]
+tests/test_sprite_validator.py .........                                 [ 83%]
+tests/test_sprite_visual_validator.py .................                  [ 84%]
+tests/test_thread_safe_singleton.py sssssssssssss                        [ 85%]
+tests/test_thread_safe_test_image.py .........................           [ 86%]
+tests/test_thread_safety_comprehensive.py ..............                 [ 86%]
+tests/test_ui_components.py sssssssssssss                                [ 87%]
+tests/test_ui_components_fixed.py ss                                     [ 87%]
+tests/test_ui_components_mock.py ssssssssssss                            [ 88%]
+tests/test_ui_qt_safety.py ssssssssssssss                                [ 89%]
+tests/test_ui_styling_system.py ..............                           [ 89%]
+tests/test_validation.py ...............................                 [ 91%]
+tests/test_worker_base.py sssssssssssss                                  [ 91%]
+tests/test_worker_extraction.py sssssssssss                              [ 92%]
+tests/test_worker_extraction_refactored.py ssssssssssss                  [ 93%]
+tests/test_worker_helper_validation.py ....                              [ 93%]
+tests/test_worker_manager.py ss                                          [ 93%]
+tests/test_worker_manager_refactored.py ssssssssssss                     [ 94%]
+tests/test_worker_owned_injection.py sssss                               [ 94%]
+tests/test_worker_specialized.py sssssssssss                             [ 94%]
+tests/test_zoomable_preview.py .........................                 [ 96%]
+tests/ui_tests/components/base/composed/test_architecture_simple.py .... [ 96%]
+.                                                                        [ 96%]
+tests/ui_tests/components/base/composed/test_composed_dialog_basic.py .. [ 96%]
+.............                                                            [ 97%]
+tests/ui_tests/components/base/composed/test_composed_dialog_essential.py . [ 97%]
+........                                                                 [ 97%]
+tests/ui_tests/components/base/composed/test_composed_dialog_integration.py . [ 97%]
+......................                                                   [ 98%]
+tests/ui_tests/components/base/composed/test_composed_dialog_mocked.py . [ 98%]
+.............                                                            [ 99%]
+tests/ui_tests/components/base/composed/test_message_dialog_manager.py . [ 99%]
+...........                                                              [100%]
+
+=================================== FAILURES ===================================
+_ TestRealMainWindowStateIntegration.test_real_signal_propagation_vs_mocked_signals _
+tests/test_main_window_state_integration_real.py:264: in test_real_signal_propagation_vs_mocked_signals
+    assert rows_spy.count() == 1, "Arrange rows signal should be emitted"
+E   AssertionError: Arrange rows signal should be emitted
+E   assert 0 == 1
+E    +  where 0 = <built-in method count of PySide6.QtTest.QSignalSpy object at 0x7effae5c0d80>()
+E    +    where <built-in method count of PySide6.QtTest.QSignalSpy object at 0x7effae5c0d80> = <PySide6.QtTest.QSignalSpy object at 0x7effae5c0d80>.count
+----------------------------- Captured Qt messages -----------------------------
+QtWarningMsg: This plugin does not support propagateSizeHints()
+QtWarningMsg: This plugin does not support raise()
+QtWarningMsg: This plugin does not support grabbing the keyboard
+---------------------------- Captured stderr setup -----------------------------
+INFO - spritepal.managers.MonitoringManager - MonitoringManager cleaned up
+INFO - spritepal.managers.UICoordinatorManager - UICoordinatorManager cleaned up
+INFO - spritepal.managers.CoreOperationsManager - CoreOperationsManager cleaned up
+INFO - spritepal.managers.ApplicationStateManager - ApplicationStateManager cleaned up
+INFO - spritepal.ManagerRegistry - ManagerRegistry initialized
+INFO - spritepal.ManagerRegistry - Initializing managers (consolidated=True)...
+INFO - spritepal.managers.ApplicationStateManager - ApplicationStateManager initialized successfully
+INFO - spritepal.core.hal_compression - Initializing HAL compressor
+INFO - spritepal.core.hal_compression - Searching for exhal tool
+INFO - spritepal.core.hal_compression - Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO - spritepal.core.hal_compression - Searching for inhal tool
+INFO - spritepal.core.hal_compression - Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HALProcessPool singleton initialized
+INFO - spritepal.core.hal_compression - Starting HAL process pool with 4 workers
+INFO - spritepal.core.hal_compression - HAL process pool initialized successfully
+INFO - spritepal.core.hal_compression - HAL process pool enabled for enhanced performance
+INFO - spritepal.core.hal_compression - Initializing HAL compressor
+INFO - spritepal.core.hal_compression - Searching for exhal tool
+INFO - spritepal.core.hal_compression - Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO - spritepal.core.hal_compression - Searching for inhal tool
+INFO - spritepal.core.hal_compression - Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL process pool enabled for enhanced performance
+INFO - spritepal.core.sprite_config_loader - Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+INFO - spritepal.core.default_palette_loader - Loaded default palettes: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/default_palettes.json
+INFO - spritepal.core.sprite_config_loader - Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+INFO - spritepal.core.rom_extractor - ROMExtractor initialized with HAL compression and palette extraction support
+INFO - spritepal.services.ROMService - ROMService initialized
+INFO - spritepal.services.VRAMService - VRAMService initialized
+INFO - spritepal.managers.CoreOperationsManager - CoreOperationsManager initialized successfully
+INFO - spritepal.managers.UICoordinatorManager - UICoordinatorManager initialized successfully
+INFO - spritepal.managers.MonitoringManager - Initializing MonitoringManager...
+INFO - spritepal.managers.MonitoringManager - MonitoringManager initialized successfully
+INFO - spritepal.ManagerRegistry - All managers initialized successfully
+------------------------------ Captured log setup ------------------------------
+INFO     spritepal.managers.MonitoringManager:monitoring_manager.py:840 MonitoringManager cleaned up
+INFO     spritepal.managers.UICoordinatorManager:ui_coordinator_manager.py:132 UICoordinatorManager cleaned up
+INFO     spritepal.managers.CoreOperationsManager:core_operations_manager.py:122 CoreOperationsManager cleaned up
+INFO     spritepal.managers.ApplicationStateManager:application_state_manager.py:230 ApplicationStateManager cleaned up
+INFO     spritepal.ManagerRegistry:registry.py:62 ManagerRegistry initialized
+INFO     spritepal.ManagerRegistry:registry.py:117 Initializing managers (consolidated=True)...
+DEBUG    spritepal.ManagerRegistry:registry.py:134 Using QApplication as Qt parent for managers
+DEBUG    spritepal.ManagerRegistry:registry.py:80 Registered cleanup with QApplication.aboutToQuit
+DEBUG    spritepal.ManagerRegistry:registry.py:144 Creating ApplicationStateManager...
+INFO     spritepal.managers.ApplicationStateManager:application_state_manager.py:211 ApplicationStateManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:151 ApplicationStateManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:154 Creating CoreOperationsManager...
+DEBUG    spritepal.core.extractor:extractor.py:38 SpriteExtractor initialized: offset=0xC000, size=16384, tiles_per_row=16
+DEBUG    spritepal.core.rom_extractor:rom_extractor.py:68 Initializing ROMExtractor
+INFO     spritepal.core.hal_compression:hal_compression.py:882 Initializing HAL compressor
+INFO     spritepal.core.hal_compression:hal_compression.py:909 Searching for exhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:925 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:949 Searching 8 locations for exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:956 Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:909 Searching for inhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:925 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:949 Searching 8 locations for inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:956 Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:886 HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:349 HALProcessPool singleton initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:394 Starting HAL process pool with 4 workers
+DEBUG    spritepal.core.hal_compression:hal_compression.py:405 Started worker process 1/4: PID 224983
+DEBUG    spritepal.core.hal_compression:hal_compression.py:405 Started worker process 2/4: PID 224984
+DEBUG    spritepal.core.hal_compression:hal_compression.py:405 Started worker process 3/4: PID 224985
+DEBUG    spritepal.core.hal_compression:hal_compression.py:405 Started worker process 4/4: PID 224986
+DEBUG    spritepal.core.hal_compression:hal_compression.py:455 Connected HAL pool cleanup to QApplication.aboutToQuit signal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:428 Pool communication test successful
+INFO     spritepal.core.hal_compression:hal_compression.py:435 HAL process pool initialized successfully
+INFO     spritepal.core.hal_compression:hal_compression.py:897 HAL process pool enabled for enhanced performance
+DEBUG    spritepal.core.injector:injector.py:67 SpriteInjector initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:882 Initializing HAL compressor
+INFO     spritepal.core.hal_compression:hal_compression.py:909 Searching for exhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:925 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:949 Searching 8 locations for exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:956 Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:909 Searching for inhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:925 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:949 Searching 8 locations for inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:956 Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:886 HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:378 Pool already initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:897 HAL process pool enabled for enhanced performance
+INFO     spritepal.core.sprite_config_loader:sprite_config_loader.py:56 Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+DEBUG    spritepal.core.rom_injector:rom_injector.py:62 ROMInjector initialized with HAL compression support
+INFO     spritepal.core.default_palette_loader:default_palette_loader.py:43 Loaded default palettes: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/default_palettes.json
+INFO     spritepal.core.sprite_config_loader:sprite_config_loader.py:56 Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+DEBUG    spritepal.utils.rom_cache:rom_cache.py:94 ROM cache directory: /home/gabrielh/.spritepal_rom_cache
+INFO     spritepal.core.rom_extractor:rom_extractor.py:82 ROMExtractor initialized with HAL compression and palette extraction support
+INFO     spritepal.services.ROMService:rom_service.py:87 ROMService initialized
+INFO     spritepal.services.VRAMService:vram_service.py:74 VRAMService initialized
+INFO     spritepal.managers.CoreOperationsManager:core_operations_manager.py:101 CoreOperationsManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:162 CoreOperationsManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:165 Creating UICoordinatorManager...
+INFO     spritepal.managers.UICoordinatorManager:ui_coordinator_manager.py:116 UICoordinatorManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:169 UICoordinatorManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:196 Creating MonitoringManager...
+INFO     spritepal.managers.MonitoringManager:monitoring_manager.py:517 Initializing MonitoringManager...
+DEBUG    spritepal.managers.MonitoringManager:monitoring_manager.py:562 Health monitoring started with 60000ms interval
+INFO     spritepal.managers.MonitoringManager:monitoring_manager.py:536 MonitoringManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:200 MonitoringManager created successfully
+DEBUG    spritepal.managers.MonitoringManager:monitoring_manager.py:824 Registered ExtractionAdapter for monitoring
+DEBUG    spritepal.managers.MonitoringManager:monitoring_manager.py:824 Registered InjectionAdapter for monitoring
+DEBUG    spritepal.managers.MonitoringManager:monitoring_manager.py:824 Registered SessionAdapter for monitoring
+INFO     spritepal.ManagerRegistry:registry.py:212 All managers initialized successfully
+----------------------------- Captured stdout call -----------------------------
+Editor button enabled: True
+Editor button text: Open Editor
+MainWindow._output_path: 'signal_test_sprites'
+Editor spy captured 1 signals
+----------------------------- Captured stderr call -----------------------------
+INFO - spritepal.managers.ApplicationStateManager - Settings saved successfully
+------------------------------ Captured log call -------------------------------
+DEBUG    spritepal.ui.rom_extraction_panel:rom_extraction_panel.py:475 No last used ROM in settings
+INFO     spritepal.managers.ApplicationStateManager:application_state_manager.py:329 Settings saved successfully
+--------------------------- Captured stderr teardown ---------------------------
+INFO - spritepal.managers.MonitoringManager - MonitoringManager cleaned up
+INFO - spritepal.managers.UICoordinatorManager - UICoordinatorManager cleaned up
+INFO - spritepal.managers.CoreOperationsManager - CoreOperationsManager cleaned up
+INFO - spritepal.managers.ApplicationStateManager - ApplicationStateManager cleaned up
+INFO - spritepal.ManagerRegistry - Initializing managers (consolidated=True)...
+INFO - spritepal.managers.ApplicationStateManager - Settings loaded successfully
+INFO - spritepal.managers.ApplicationStateManager - ApplicationStateManager initialized successfully
+INFO - spritepal.core.hal_compression - Initializing HAL compressor
+INFO - spritepal.core.hal_compression - Searching for exhal tool
+INFO - spritepal.core.hal_compression - Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO - spritepal.core.hal_compression - Searching for inhal tool
+INFO - spritepal.core.hal_compression - Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL process pool enabled for enhanced performance
+INFO - spritepal.core.hal_compression - Initializing HAL compressor
+INFO - spritepal.core.hal_compression - Searching for exhal tool
+INFO - spritepal.core.hal_compression - Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO - spritepal.core.hal_compression - Searching for inhal tool
+INFO - spritepal.core.hal_compression - Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL process pool enabled for enhanced performance
+INFO - spritepal.core.sprite_config_loader - Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+INFO - spritepal.core.default_palette_loader - Loaded default palettes: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/default_palettes.json
+INFO - spritepal.core.sprite_config_loader - Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+INFO - spritepal.core.rom_extractor - ROMExtractor initialized with HAL compression and palette extraction support
+INFO - spritepal.services.ROMService - ROMService initialized
+INFO - spritepal.services.VRAMService - VRAMService initialized
+INFO - spritepal.managers.CoreOperationsManager - CoreOperationsManager initialized successfully
+INFO - spritepal.managers.UICoordinatorManager - UICoordinatorManager initialized successfully
+INFO - spritepal.managers.MonitoringManager - Initializing MonitoringManager...
+INFO - spritepal.managers.MonitoringManager - MonitoringManager initialized successfully
+INFO - spritepal.ManagerRegistry - All managers initialized successfully
+---------------------------- Captured log teardown -----------------------------
+DEBUG    spritepal.core.services.worker_lifecycle:worker_lifecycle.py:389 cleanup_all: Starting cleanup (registry size: 0)
+DEBUG    spritepal.core.services.worker_lifecycle:worker_lifecycle.py:394 cleanup_all: Found 0 registered workers
+DEBUG    spritepal.core.services.worker_lifecycle:worker_lifecycle.py:453 cleanup_all: Processed Qt events for cleanup completion
+DEBUG    spritepal.core.services.worker_lifecycle:worker_lifecycle.py:461 cleanup_all: Forced garbage collection
+DEBUG    spritepal.core.services.worker_lifecycle:worker_lifecycle.py:471 cleanup_all: Waited for OS thread cleanup
+DEBUG    spritepal.core.services.worker_lifecycle:worker_lifecycle.py:478 cleanup_all: No workers needed cleanup
+INFO     spritepal.managers.MonitoringManager:monitoring_manager.py:840 MonitoringManager cleaned up
+INFO     spritepal.managers.UICoordinatorManager:ui_coordinator_manager.py:132 UICoordinatorManager cleaned up
+INFO     spritepal.managers.CoreOperationsManager:core_operations_manager.py:122 CoreOperationsManager cleaned up
+INFO     spritepal.managers.ApplicationStateManager:application_state_manager.py:230 ApplicationStateManager cleaned up
+INFO     spritepal.ManagerRegistry:registry.py:117 Initializing managers (consolidated=True)...
+DEBUG    spritepal.ManagerRegistry:registry.py:134 Using QApplication as Qt parent for managers
+DEBUG    spritepal.ManagerRegistry:registry.py:144 Creating ApplicationStateManager...
+INFO     spritepal.managers.ApplicationStateManager:application_state_manager.py:343 Settings loaded successfully
+INFO     spritepal.managers.ApplicationStateManager:application_state_manager.py:211 ApplicationStateManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:151 ApplicationStateManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:154 Creating CoreOperationsManager...
+DEBUG    spritepal.core.extractor:extractor.py:38 SpriteExtractor initialized: offset=0xC000, size=16384, tiles_per_row=16
+DEBUG    spritepal.core.rom_extractor:rom_extractor.py:68 Initializing ROMExtractor
+INFO     spritepal.core.hal_compression:hal_compression.py:882 Initializing HAL compressor
+INFO     spritepal.core.hal_compression:hal_compression.py:909 Searching for exhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:925 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:949 Searching 8 locations for exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:956 Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:909 Searching for inhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:925 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:949 Searching 8 locations for inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:956 Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:886 HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:378 Pool already initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:897 HAL process pool enabled for enhanced performance
+DEBUG    spritepal.core.injector:injector.py:67 SpriteInjector initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:882 Initializing HAL compressor
+INFO     spritepal.core.hal_compression:hal_compression.py:909 Searching for exhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:925 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:949 Searching 8 locations for exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:956 Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:909 Searching for inhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:925 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:949 Searching 8 locations for inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:956 Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:886 HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:378 Pool already initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:897 HAL process pool enabled for enhanced performance
+INFO     spritepal.core.sprite_config_loader:sprite_config_loader.py:56 Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+DEBUG    spritepal.core.rom_injector:rom_injector.py:62 ROMInjector initialized with HAL compression support
+INFO     spritepal.core.default_palette_loader:default_palette_loader.py:43 Loaded default palettes: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/default_palettes.json
+INFO     spritepal.core.sprite_config_loader:sprite_config_loader.py:56 Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+DEBUG    spritepal.utils.rom_cache:rom_cache.py:94 ROM cache directory: /home/gabrielh/.spritepal_rom_cache
+INFO     spritepal.core.rom_extractor:rom_extractor.py:82 ROMExtractor initialized with HAL compression and palette extraction support
+INFO     spritepal.services.ROMService:rom_service.py:87 ROMService initialized
+INFO     spritepal.services.VRAMService:vram_service.py:74 VRAMService initialized
+INFO     spritepal.managers.CoreOperationsManager:core_operations_manager.py:101 CoreOperationsManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:162 CoreOperationsManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:165 Creating UICoordinatorManager...
+INFO     spritepal.managers.UICoordinatorManager:ui_coordinator_manager.py:116 UICoordinatorManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:169 UICoordinatorManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:196 Creating MonitoringManager...
+INFO     spritepal.managers.MonitoringManager:monitoring_manager.py:517 Initializing MonitoringManager...
+DEBUG    spritepal.managers.MonitoringManager:monitoring_manager.py:562 Health monitoring started with 60000ms interval
+INFO     spritepal.managers.MonitoringManager:monitoring_manager.py:536 MonitoringManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:200 MonitoringManager created successfully
+DEBUG    spritepal.managers.MonitoringManager:monitoring_manager.py:824 Registered ExtractionAdapter for monitoring
+DEBUG    spritepal.managers.MonitoringManager:monitoring_manager.py:824 Registered InjectionAdapter for monitoring
+DEBUG    spritepal.managers.MonitoringManager:monitoring_manager.py:824 Registered SessionAdapter for monitoring
+INFO     spritepal.ManagerRegistry:registry.py:212 All managers initialized successfully
+DEBUG    spritepal.core.hal_compression:hal_compression.py:854 HAL process pool singleton resetINFO - spritepal.ManagerRegistry - ManagerRegistry initialized
+
+=============================== warnings summary ===============================
+tests/fixtures/test_data_factory.py:20
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tests/fixtures/test_data_factory.py:20: PytestCollectionWarning: cannot collect test class 'TestDataPaths' because it has a __init__ constructor (from: tests/fixtures/test_data_factory.py)
+    @dataclass
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_main_window_state_integration_real.py::TestRealMainWindowStateIntegration::test_real_signal_propagation_vs_mocked_signals
+= 1 failed, 1601 passed, 384 skipped, 8 xfailed, 1 warning in 350.98s (0:05:50) =

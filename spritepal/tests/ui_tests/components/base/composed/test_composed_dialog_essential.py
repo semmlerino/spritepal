@@ -108,7 +108,7 @@ class TestComposedDialogEssentialIntegration:
                 assert len(cleanup_called) == 5
                 mock_parent_close.assert_called_once_with(mock_close_event)
 
-    def test_selective_component_creation_scenarios(self):
+    def test_selective_component_creation_scenarios(self, qtbot):
         """Test various component configuration scenarios."""
 
         test_scenarios = [
@@ -146,6 +146,7 @@ class TestComposedDialogEssentialIntegration:
                 QStatusBar=MagicMock
             ):
                 dialog = ComposedDialog(**config)
+                qtbot.addWidget(dialog)
 
                 # Add always-present components to expectation
                 full_expected_components = expected_components + ["dialog_signals", "qt_dialog_signals"]

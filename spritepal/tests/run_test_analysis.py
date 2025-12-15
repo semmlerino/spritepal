@@ -142,7 +142,7 @@ def main():
                   f"Skipped: {stats['skipped']}, Errors: {stats['error']}")
 
         # Small delay between batches
-        time.sleep(0.5)
+        time.sleep(0.5)  # sleep-ok: test analysis tooling
 
     # Calculate totals
     total_stats["total"] = total_stats["passed"] + total_stats["failed"] + total_stats["skipped"] + total_stats["error"]

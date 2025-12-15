@@ -46,6 +46,35 @@ class InjectionDialogProtocol(Protocol):
         ...
 
 
+class ManualOffsetDialogProtocol(Protocol):
+    """Protocol for the manual offset browser dialog."""
+
+    def exec(self) -> int:
+        """Execute the dialog modally and return result code."""
+        ...
+
+
+class ManualOffsetDialogFactoryProtocol(Protocol):
+    """
+    Protocol for creating ManualOffsetDialog instances.
+
+    This factory allows retrieval of the dialog factory without
+    importing the concrete UI class, maintaining layer separation.
+    """
+
+    def create(self, parent: QWidget | None = None) -> ManualOffsetDialogProtocol:
+        """
+        Create a manual offset dialog.
+
+        Args:
+            parent: Parent widget
+
+        Returns:
+            A dialog implementing ManualOffsetDialogProtocol
+        """
+        ...
+
+
 class DialogFactoryProtocol(Protocol):
     """
     Protocol for creating dialog instances.

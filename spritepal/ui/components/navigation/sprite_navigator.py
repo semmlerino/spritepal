@@ -32,11 +32,11 @@ from PySide6.QtWidgets import (
 from typing_extensions import override
 
 from ui.common import WorkerManager
-from ui.styles.theme import COLORS
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.components.navigation.region_jump_widget import RegionJumpWidget
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.rom_extraction.workers import SpritePreviewWorker
+from ui.styles.theme import COLORS
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 from utils.logging_config import get_logger
 

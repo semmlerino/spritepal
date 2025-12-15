@@ -59,11 +59,16 @@ class DummyWorker:
     """Reusable dummy worker for cleanup testing - prevents duplication.
 
     Must implement all methods that WorkerManager.cleanup_worker() expects:
+    - blockSignals(bool): Block/unblock Qt signals
     - isRunning(): Return False to indicate worker is not running
     - isFinished(): Return True to indicate worker has finished
     - wait(timeout=None): No-op, return True for immediate success
     - deleteLater(): No-op for cleanup scheduling
     """
+    def blockSignals(self, block: bool) -> bool:  # noqa: ARG002
+        """Simulate Qt signal blocking. Returns previous state."""
+        return False
+
     def isRunning(self) -> bool:
         return False
 

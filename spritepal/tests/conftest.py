@@ -124,6 +124,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "shared_state_safe: Mark test as verified safe for use with session_managers (required for session_managers usage)"
+    )
+    config.addinivalue_line(
+        "markers",
         "skip_qpixmap_guard: Skip QPixmap threading guard for tests with special QPixmap needs"
     )
     config.addinivalue_line(
@@ -153,6 +157,12 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "allows_resource_leaks: Allow test to have resource leaks without failure"
+    )
+
+    # Make implicit RealComponentFactory warnings visible when we add them
+    config.addinivalue_line(
+        "filterwarnings",
+        "default:RealComponentFactory.*implicit init"
     )
 
     # Install QPixmap guard early - catches most cases since qt_app imports Qt early
@@ -192,11 +202,22 @@ def _install_qpixmap_guard_early() -> None:
 
 def pytest_addoption(parser: Any) -> None:
     """Add custom command line options for SpritePal tests."""
+    default_leak_mode = os.environ.get("SPRITEPAL_LEAK_MODE", "fail").lower()
+    if default_leak_mode not in {"fail", "warn"}:
+        default_leak_mode = "fail"
+
     parser.addoption(
         "--use-real-hal",
         action="store_true",
         default=False,
         help="Use real HAL process pool instead of mocks (slower)"
+    )
+    parser.addoption(
+        "--leak-mode",
+        action="store",
+        choices=["fail", "warn"],
+        default=default_leak_mode,
+        help="Leak policy: fail (default) or warn for resource/thread leaks; override with SPRITEPAL_LEAK_MODE."
     )
     # NOTE: --run-segfault-tests option removed - segfault-prone tests have been deleted
 
@@ -250,6 +271,61 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
     with contextlib.suppress(Exception):
         from core.hal_compression import HALProcessPool
         HALProcessPool.reset_for_tests()
+
+
+def pytest_runtest_setup(item: Any) -> None:
+    """Record registry state before test runs."""
+    try:
+        from core.managers.registry import ManagerRegistry
+        # Store whether registry was clean BEFORE the test
+        item._registry_was_clean = ManagerRegistry.is_clean()
+    except ImportError:
+        item._registry_was_clean = True  # Assume clean if can't check
+
+
+def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
+    """Enforce ManagerRegistry cleanup after each test.
+
+    This hook converts documentation ("use isolated_managers") into runtime
+    enforcement. Tests that DIRTY the registry (change it from clean to dirty)
+    without using a manager fixture will fail.
+
+    This catches:
+    - Tests that initialize managers without cleanup fixtures
+    - Accidental state pollution between tests
+
+    This does NOT catch:
+    - Tests that inherit dirty state from previous tests (use isolated_managers to fix)
+    - Tests explicitly marked to allow registry state
+    """
+    # Skip enforcement for tests that opt out
+    if item.get_closest_marker("allows_registry_state"):
+        return
+    if item.get_closest_marker("shared_state_ok"):
+        return
+
+    # Only check tests that didn't use manager fixtures
+    fixture_names = getattr(item, 'fixturenames', [])
+    cleanup_fixtures = {'isolated_managers', 'setup_managers', 'session_managers'}
+    if cleanup_fixtures.intersection(fixture_names):
+        return  # Test uses a fixture that manages registry lifecycle
+
+    # Check if THIS test dirtied the registry
+    try:
+        from core.managers.registry import ManagerRegistry
+
+        was_clean = getattr(item, '_registry_was_clean', True)
+        is_clean_now = ManagerRegistry.is_clean()
+
+        # Only fail if the test changed state from clean to dirty
+        if was_clean and not is_clean_now:
+            pytest.fail(
+                f"Test '{item.name}' initialized ManagerRegistry without a manager fixture.\n"
+                "Fix: Use isolated_managers fixture, or add "
+                "@pytest.mark.allows_registry_state if intentional."
+            )
+    except ImportError:
+        pass  # ManagerRegistry not available, skip check
 
 
 # ============================================================================

@@ -86,18 +86,14 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
 
     This singleton uses proper thread synchronization and Qt thread affinity checking
     to prevent crashes when accessed from worker threads.
+
+    Signal tracking is done per-instance (not class-level) to avoid stale flag bugs
+    when dialogs are destroyed externally. Each instance tracks its own _signals_connected
+    attribute, so new instances naturally have no signals connected yet.
     """
-    # WARNING: SPOOKY ACTION AT A DISTANCE
-    # These class-level variables are SHARED across ALL uses of this singleton.
-    # _signals_connected especially can cause issues:
-    # - If dialog closes but _signals_connected stays True, new dialogs won't reconnect signals
-    # - If dialog is destroyed externally, flag state becomes stale
-    # - The reset() method must clear ALL flags to avoid signal reconnection bugs
-    # Any code that modifies dialog lifecycle must check/reset these flags.
     _instance: UnifiedManualOffsetDialog | None = None
     _creator_panel: ROMExtractionPanel | None = None
     _destroyed: bool = False  # Track if the dialog has been destroyed
-    _signals_connected: bool = False  # Track if signals are connected
     _lock = threading.Lock()
 
     @classmethod
@@ -109,23 +105,29 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
 
         logger.debug("Creating new ManualOffsetDialog singleton instance")
 
-        # Reset flags when creating new instance
+        # Reset destroyed flag when creating new instance
         cls._destroyed = False
-        cls._signals_connected = False
 
         # Create new instance with None as parent to avoid widget hierarchy contamination
         instance = UnifiedManualOffsetDialog(None)
         cls._creator_panel = creator_panel
 
         # Connect signals immediately (not deferred) to avoid race conditions
+        # Signal tracking is per-instance, so new instances naturally need signals connected
         cls._connect_signals(instance)
 
         return instance
 
     @classmethod
     def _connect_signals(cls, instance: UnifiedManualOffsetDialog) -> None:
-        """Connect cleanup signals to the dialog instance."""
-        if cls._signals_connected:
+        """Connect cleanup signals to the dialog instance.
+
+        Signal tracking is per-instance to avoid stale flag bugs when dialogs
+        are destroyed externally. Each instance tracks its own _signals_connected
+        attribute.
+        """
+        # Check instance-level flag (not class-level) to avoid stale state bugs
+        if getattr(instance, '_signals_connected', False):
             return
 
         try:
@@ -142,7 +144,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
                     qt_signal_manager.destroyed.connect(
                         cls._on_dialog_destroyed, Qt.ConnectionType.UniqueConnection
                     )
-                    cls._signals_connected = True
+                    instance._signals_connected = True  # type: ignore[attr-defined]
                     logger.debug("Signals connected via QtDialogSignalManager")
                     return
 
@@ -156,7 +158,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
             instance.destroyed.connect(
                 cls._on_dialog_destroyed, Qt.ConnectionType.UniqueConnection
             )
-            cls._signals_connected = True
+            instance._signals_connected = True  # type: ignore[attr-defined]
             logger.debug("Signals connected directly to dialog")
 
         except Exception as e:
@@ -216,9 +218,13 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
     @classmethod
     @override
     def reset(cls):
-        """Reset the singleton instance and all associated state."""
+        """Reset the singleton instance and all associated state.
+
+        Note: _signals_connected is tracked per-instance, not class-level,
+        so it doesn't need to be reset here. New instances naturally have
+        no signals connected yet.
+        """
         cls._destroyed = False
-        cls._signals_connected = False
         super().reset()
 
     @classmethod

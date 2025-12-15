@@ -39,9 +39,14 @@ class SimilarityIndexingWorker(BaseWorker):
     """
 
     # Additional signals specific to similarity indexing
-    sprite_indexed = Signal(int)  # offset of indexed sprite
-    index_saved = Signal(str)  # path where index was saved
-    index_loaded = Signal(int)  # number of sprites loaded from index
+    sprite_indexed = Signal(int)
+    """Emitted when a sprite is indexed. Args: offset (int)."""
+
+    index_saved = Signal(str)
+    """Emitted when index is saved to disk. Args: save_path."""
+
+    index_loaded = Signal(int)
+    """Emitted when index is loaded from cache. Args: sprite_count (int)."""
 
     def __init__(self, rom_path: str, parent: QObject | None = None,
                  settings_manager: SettingsManagerProtocol | None = None):

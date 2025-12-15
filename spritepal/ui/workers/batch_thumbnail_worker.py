@@ -133,11 +133,20 @@ class BatchThumbnailWorker(QObject):
     """
 
     # Signals - Use QImage instead of QPixmap for thread safety
-    thumbnail_ready = Signal(int, QImage)  # offset, qimage (thread-safe)
-    progress = Signal(int, int)  # current, total
+    thumbnail_ready = Signal(int, QImage)
+    """Emitted when thumbnail is ready. Args: offset (int), qimage (QImage, thread-safe)."""
+
+    progress = Signal(int, int)
+    """Emitted with generation progress. Args: completed_count, total_count."""
+
     error = Signal(str)
+    """Emitted on error. Args: error_message."""
+
     started = Signal()
+    """Emitted when worker starts processing."""
+
     finished = Signal()
+    """Emitted when worker finishes all requests."""
 
     def __init__(
         self,
@@ -793,9 +802,14 @@ class ThumbnailWorkerController(QObject):
     """
 
     # Forward signals from worker
-    thumbnail_ready = Signal(int, QPixmap)  # Convert QImage back to QPixmap in main thread
+    thumbnail_ready = Signal(int, QPixmap)
+    """Forwarded from worker. Args: offset (int), pixmap (QPixmap, converted from QImage)."""
+
     progress = Signal(int, int)
+    """Forwarded from worker. Args: completed_count, total_count."""
+
     error = Signal(str)
+    """Forwarded from worker. Args: error_message."""
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)

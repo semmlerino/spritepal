@@ -30,7 +30,7 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.dialog,
     pytest.mark.gui,
-    pytest.mark.requires_display,
+    # NOTE: Removed requires_display - these singleton tests work fine in offscreen mode
     pytest.mark.worker_threads,
 ]
 class MockClass:
@@ -391,6 +391,56 @@ class TestManualOffsetDialogSingletonIntegration:
         else:
             # Should be a controlled error, not a crash
             assert "thread" in result_value.lower()
+
+    @pytest.mark.gui
+    @pytest.mark.integration
+    @pytest.mark.usefixtures("setup_managers")
+    def test_dialog_instance_level_signal_tracking(self, qtbot):
+        """Test that signal tracking is per-instance, not class-level.
+
+        This test verifies the fix for the "spooky action at a distance" bug where
+        class-level _signals_connected tracking could cause new dialogs to not
+        get signals connected if a previous dialog was destroyed externally.
+        """
+        from ui.rom_extraction_panel import ManualOffsetDialogSingleton
+
+        # Start with clean state
+        ManualOffsetDialogSingleton.reset()
+
+        # Create first dialog instance manually (bypassing get_dialog to test directly)
+        from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
+
+        dialog1 = UnifiedManualOffsetDialog(None)
+        # Don't use qtbot.addWidget for dialog1 since we'll be deleting it manually
+
+        # Connect signals using the singleton's method
+        ManualOffsetDialogSingleton._connect_signals(dialog1)
+
+        # Verify signals were connected (instance should have _signals_connected attribute)
+        assert getattr(dialog1, '_signals_connected', False) is True
+
+        # Now simulate external destruction without going through normal cleanup
+        # (This is the bug scenario - dialog destroyed but singleton state not updated)
+        dialog1.deleteLater()
+        qtbot.wait(100)  # Allow Qt to process deletion
+
+        # Create a new dialog - it should get signals connected regardless of
+        # what happened to the first dialog
+        dialog2 = UnifiedManualOffsetDialog(None)
+        qtbot.addWidget(dialog2)  # Register for cleanup
+
+        # New instance should not have _signals_connected yet
+        assert getattr(dialog2, '_signals_connected', False) is False
+
+        # Connect signals to new instance
+        ManualOffsetDialogSingleton._connect_signals(dialog2)
+
+        # Verify signals were connected to the new instance
+        assert getattr(dialog2, '_signals_connected', False) is True
+
+        # Cleanup
+        ManualOffsetDialogSingleton.reset()
+
 
 @pytest.mark.usefixtures("class_managers")
 class TestSettingsManagerSingletonIntegration:

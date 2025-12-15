@@ -114,7 +114,7 @@ class TestQThreadPatterns:
                         break
                     thread_capture.capture(f'worker_progress_{i}')
                     self.progress.emit(i)
-                    time.sleep(0.01)
+                    time.sleep(0.01)  # sleep-ok: thread interleaving
 
                 thread_capture.capture('worker_finish')
                 self.finished.emit()
@@ -156,7 +156,7 @@ class TestQThreadPatterns:
         start_time = time.time()
         while not finished_received and time.time() - start_time < 2.0:
             app.processEvents()
-            time.sleep(0.01)
+            time.sleep(0.01)  # sleep-ok: thread interleaving
 
         # Ensure thread finishes
         thread.quit()
@@ -191,7 +191,7 @@ class TestQThreadPatterns:
                 for i in range(5):
                     thread_capture.capture(f'subclass_progress_{i}')
                     self.progress.emit(i)
-                    time.sleep(0.01)
+                    time.sleep(0.01)  # sleep-ok: thread interleaving
 
         # Create and start thread
         thread = WorkerThread()
@@ -590,7 +590,7 @@ class TestSynchronizationPatterns:
 
             def do_work(self, data):
                 # Simulate work
-                time.sleep(0.01)
+                time.sleep(0.01)  # sleep-ok: thread interleaving
                 result = f"Worker {self.worker_id} processed {data}"
 
                 # Report completion
@@ -662,7 +662,7 @@ class TestWorkerLifecycle:
                     if self._is_cancelled:
                         break
                     self.progress.emit(i)
-                    time.sleep(0.02)
+                    time.sleep(0.02)  # sleep-ok: thread interleaving
                 self.finished.emit()
 
         # Create worker
@@ -683,7 +683,7 @@ class TestWorkerLifecycle:
         worker.start()
 
         # Wait a short bit then cleanup via WorkerManager (worker should still be running)
-        time.sleep(0.05)
+        time.sleep(0.05)  # sleep-ok: thread interleaving
         WorkerManager.cleanup_worker(worker, timeout=1000)
 
         # Verify cancel was called (WorkerManager calls cancel if available)
@@ -759,7 +759,7 @@ class TestRealWorldScenarios:
                 # Emit updates from worker thread
                 for i in range(3):
                     self.updater.update_gui.emit(f"Update {i}")
-                    time.sleep(0.01)
+                    time.sleep(0.01)  # sleep-ok: thread interleaving
 
         # Create updater and worker
         updater = GUIUpdater()
@@ -794,7 +794,7 @@ class TestRealWorldScenarios:
             def process_chunk(self, chunk_id, data):
                 # Simulate processing
                 result = [x * 2 for x in data]
-                time.sleep(0.01)
+                time.sleep(0.01)  # sleep-ok: thread interleaving
 
                 # Store result thread-safely
                 with QMutexLocker(self.mutex):

@@ -45,10 +45,8 @@ uv run basedpyright core ui utils
 # Tests - routine run (stop on first failure, short tracebacks)
 QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=1 --tb=short
 
-# Tests - full suite with log file (PREFERRED for long runs)
-# Prevents hangs from output buffering and allows progress monitoring
-QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=5 --tb=short -q > /tmp/pytest_output.log 2>&1 &
-# Then check progress with: tail -50 /tmp/pytest_output.log
+# Tests - full suite (increase maxfail for broader coverage)
+QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=5 --tb=short -q
 
 # Tests - specific subsets
 QT_QPA_PLATFORM=offscreen uv run pytest tests -m "headless and not slow" --maxfail=1  # Fast tests
@@ -62,18 +60,21 @@ QT_QPA_PLATFORM=offscreen uv run pytest tests/path/test_file.py::TestClass::test
 
 ### Real Component Testing (Preferred)
 
-SpritePal uses real components over mocks. **Prefer real components; mock only at true system boundaries** (HAL subprocess, file I/O, clipboard, network).
+SpritePal uses real components over mocks. **Prefer real components; mock only at true system boundaries** (file I/O, clipboard, network). HAL is mock-by-default because the real `exhal` binary is slow and may not be available.
 
 ```python
-from spritepal.tests.infrastructure.real_component_factory import RealComponentFactory
-from spritepal.core.extraction_params import ExtractionParams
+from tests.infrastructure.real_component_factory import RealComponentFactory
 
 def test_extraction_workflow():
     with RealComponentFactory() as factory:
         manager = factory.create_extraction_manager(with_test_data=True)
-        params = ExtractionParams(offset=0x1000, width=16, height=16)
+        params = {
+            "vram_path": "/path/to/vram.bin",
+            "cgram_path": "/path/to/cgram.bin",
+            "output_base": "test_sprite",
+        }
         result = manager.validate_extraction_params(params)
-        assert isinstance(result, bool)  # Real behavior
+        assert result is True  # Real validation behavior
 ```
 
 ### Critical Crash Prevention
@@ -94,20 +95,31 @@ class MockDialog(QDialog):  # Don't do this!
 
 **Mock at import location, not definition**:
 ```python
-@patch('ui.rom_extraction_panel.UnifiedManualOffsetDialog')  # Correct
+@patch('spritepal.ui.rom_extraction_panel.UnifiedManualOffsetDialog')  # Correct
 ```
 
 ### Signal Testing
 ```python
+from tests.fixtures.timeouts import worker_timeout, signal_timeout
+
+# Simple case: signal emits after start() returns
 def test_async_operation(qtbot, worker):
     worker.start()
-    qtbot.waitSignal(worker.finished, timeout=5000)
+    qtbot.waitSignal(worker.finished, timeout=worker_timeout())
 
-# For multiple signals (finished OR failed):
+# Use context manager when signal may emit BEFORE start() returns
+# (e.g., very fast operations or synchronous signals)
+def test_fast_operation(qtbot, worker):
+    with qtbot.waitSignal(worker.finished, timeout=signal_timeout()):
+        worker.start()
+
+# Multiple signals (finished OR failed) - wait for any one:
 def test_async_with_failure_case(qtbot, worker):
-    with qtbot.waitSignals([worker.finished, worker.failed], timeout=5000):
+    with qtbot.waitSignals([worker.finished, worker.failed], timeout=worker_timeout(), raising=False):
         worker.start()
 ```
+
+**Never use hardcoded timeout values** like `timeout=5000`. Use semantic timeouts from `tests/fixtures/timeouts.py` which scale with `PYTEST_TIMEOUT_MULTIPLIER`.
 
 ### Test Markers
 - `@pytest.mark.gui` - Uses real Qt widgets (run with `QT_QPA_PLATFORM=offscreen`)
@@ -124,18 +136,34 @@ Test fixtures are organized into modular files for maintainability:
 ```
 tests/
 ├── conftest.py                  # Coordinator - imports from modular files
-└── fixtures/
-    ├── qt_fixtures.py           # Qt app, main window, qtbot
-    ├── core_fixtures.py         # Manager fixtures, DI fixtures, state management
-    └── hal_fixtures.py          # HAL compression mock/real fixtures
+├── fixtures/
+│   ├── qt_fixtures.py           # Qt app, main window, qtbot, cleanup_singleton
+│   ├── qt_waits.py              # wait_for_condition, wait_for helpers
+│   ├── qt_mocks.py              # MockDialog, MockQWidget, etc.
+│   ├── timeouts.py              # Semantic timeouts (worker_timeout, signal_timeout, etc.)
+│   ├── core_fixtures.py         # Manager fixtures, DI fixtures, state management
+│   ├── hal_fixtures.py          # HAL compression mock/real fixtures
+│   └── test_*_helper.py         # Component-specific test helpers
+└── infrastructure/
+    ├── real_component_factory.py    # RealComponentFactory
+    └── thread_safe_test_image.py    # ThreadSafeTestImage for worker threads
+```
+
+**Common imports for tests:**
+```python
+from tests.fixtures.qt_waits import wait_for_condition, wait_for
+from tests.fixtures.qt_mocks import MockDialog
+from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout
+from tests.infrastructure.real_component_factory import RealComponentFactory
+from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 ```
 
 ### Test Fixture Selection Guide
 
 | Need | Use | NOT |
 |------|-----|-----|
-| Fast tests, shared state OK | `session_managers` | `setup_managers` |
-| Isolated manager state | `isolated_managers` | `session_managers` |
+| **Default for all tests** | `isolated_managers` | `session_managers` |
+| Proven-safe shared state | `session_managers` + `@pytest.mark.shared_state_safe` | bare `session_managers` |
 | Real component testing | `RealComponentFactory` | `Mock()` + `cast()` |
 | Qt images in worker thread | `ThreadSafeTestImage` | `QPixmap` |
 | Singleton dialog cleanup | `cleanup_singleton` | Own cleanup fixture |
@@ -143,17 +171,26 @@ tests/
 | HAL with mocks (fast) | `hal_pool` (default) | Real HAL |
 | HAL with real impl | `@pytest.mark.real_hal` | Mock HAL |
 
+**Why `isolated_managers` is the default:** `session_managers` persists state across ALL tests in a session. This causes order-dependent failures when tests assume clean state. Only use `session_managers` for tests explicitly verified to be stateless.
+
 **Manager Fixture Isolation Levels:**
 
 | Fixture | Scope | Reset Between Tests | Use When |
 |---------|-------|---------------------|----------|
-| `session_managers` | Session | NO | Fast tests OK with shared state; state persists across ALL tests |
-| `isolated_managers` | Function | YES (full cleanup) | Tests that modify manager state or need clean slate |
-| `setup_managers` | Function | YES | Default fixture with conditional setup |
-| `fast_managers` | Function (backed by session) | NO | Performance-focused tests (alias for session_managers) |
+| `isolated_managers` | Function | YES (full cleanup) | **Default choice** - tests that need predictable state |
+| `setup_managers` | Function | YES | Alternative default with conditional setup |
+| `session_managers` | Session | NO | **Unsafe** - only with `@pytest.mark.shared_state_safe` |
+| `fast_managers` | Function (backed by session) | NO | **Unsafe** - alias for session_managers |
 | `reset_manager_state` | Function | YES (caches only) | Need clean counters without full isolation |
 
+**Mixing session + isolated fixtures:** If a module already activated `session_managers`, `isolated_managers` will temporarily pause the session managers and restore them (with the original settings path) after the test. Prefer keeping suites consistent (all isolated or all session-backed), but this safety net prevents cross-test pollution when you must mix.
+
 **HAL Fixtures:**
+
+HAL (compression/decompression) is **mock-by-default** because:
+- Real HAL requires the external `exhal` binary which may not be available
+- Mock HAL is ~100x faster (~1ms vs ~100ms per operation)
+- Use `@pytest.mark.real_hal` only for integration tests validating actual compression
 
 | Fixture | Default Behavior | With `--use-real-hal` or `@pytest.mark.real_hal` |
 |---------|------------------|--------------------------------------------------|
@@ -167,47 +204,107 @@ tests/
 | Marker | Effect |
 |--------|--------|
 | `@pytest.mark.allows_registry_state` | Skip pollution detection for this test |
+| `@pytest.mark.shared_state_safe` | Required when using `session_managers` (certifies test is stateless) |
 | `@pytest.mark.no_manager_setup` | Skip setup_managers fixture |
 | `@pytest.mark.real_hal` | Use real HAL implementation |
 
-**IMPORTANT**: `session_managers` is NOT reset between tests - manager state (caches, settings, active operations) persists across the entire test session. Use `isolated_managers` when:
-- Your test modifies ManagerRegistry state
-- Your test needs predictable initial state
-- Your test could pollute state for other tests
-
-The `isolated_managers` fixture has an explicit guard that fails if ManagerRegistry is already initialized (detects test pollution).
+The `isolated_managers` fixture now pauses active `session_managers` during the test and restores them afterward; it still fails if it cannot restore or if it detects unmanaged registry pollution.
 
 **Common Mistakes to Avoid:**
 - `QPixmap` in worker threads causes fatal crashes - use `ThreadSafeTestImage`
+- Hardcoded timeout values like `timeout=5000` - use `worker_timeout()` from `timeouts.py`
 - Hardcoded thread counts - capture baseline at test start
 - `time.sleep()` in Qt tests - use `qtbot.wait()` or `waitSignal()`
 - Inheriting `QDialog` in mocks - causes metaclass crashes
 - Missing singleton cleanup - use `cleanup_singleton` fixture
+- Using `session_managers` without `@pytest.mark.shared_state_safe`
 
-**Environment Variables** (implemented in `spritepal/tests/conftest.py`):
+### Wait Helper Usage
+
+| Need | Use | NOT |
+|------|-----|-----|
+| Wait for condition | `wait_for_condition(qtbot, cond, timeout)` from `qt_waits.py` | `time.sleep()` |
+| Wait fixed time | `qtbot.wait(ms)` or `wait_for(qtbot, ms)` | `time.sleep()` |
+| Wait for signal | `qtbot.waitSignal(signal, timeout)` | Custom wait loops |
+| Wait for thread exit | `thread.wait(timeout)` for QThread | `time.sleep()` + `isRunning()` |
+
+**Intentional sleeps:** If `time.sleep()` is truly needed (thread interleaving tests, OS cleanup), annotate with `# sleep-ok: <reason>`.
+
+**Environment Variables** (set externally, read by `tests/conftest.py`):
 - `PYTEST_TIMEOUT_MULTIPLIER=2.0` - Scale all timeouts (useful for slow CI)
+- `QT_QPA_PLATFORM=offscreen` - Required for headless Qt testing
 
 ## Project Architecture
 
 ```
 spritepal/
-├── core/              # Business logic (managers, extractors)
-├── ui/                # Qt UI components
-│   ├── components/    # Reusable widgets
-│   ├── dialogs/       # Dialog windows
-│   ├── panels/        # Panel widgets
-│   └── windows/       # Main/detached windows
+├── core/                  # Business logic
+│   ├── managers/          # Manager classes (extraction, injection, session, etc.)
+│   ├── protocols/         # Protocol definitions for type safety
+│   └── *.py               # Core logic (extractor, validator, etc.)
+├── ui/                    # Qt UI components
+│   ├── components/        # Reusable widgets
+│   ├── dialogs/           # Dialog windows
+│   ├── widgets/           # Widget classes
+│   ├── windows/           # Main/detached windows
+│   ├── workers/           # Background workers
+│   └── *.py               # Panel files (rom_extraction_panel.py, etc.)
 ├── tests/
-│   ├── infrastructure/  # RealComponentFactory, test contexts
-│   └── examples/        # Pattern examples
-└── utils/             # Shared utilities
+│   ├── fixtures/          # Test fixtures (qt_fixtures, core_fixtures, etc.)
+│   ├── infrastructure/    # RealComponentFactory, test contexts
+│   └── *.py               # Test files
+└── utils/                 # Shared utilities
 ```
 
 ### Import Rules (see docs/architecture.md)
-- **UI** imports from: core/, managers/, utils/
-- **Managers** import from: core/, utils/
-- **Core** imports from: utils/
+- **UI** imports from: `core/` (including `core/managers/`), `utils/`
+- **Core** imports from: `utils/`
 - **Utils** imports from: Python stdlib only
+
+Note: Managers live at `core/managers/`, not a top-level `managers/` directory.
+
+### Manager Architecture (Consolidated)
+
+SpritePal uses a **consolidated manager architecture** with backward-compatible adapters:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    DI Container (inject())                   │
+│  - Protocol-based dependency resolution                      │
+│  - Thread-safe singleton/factory management                  │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+        ┌─────────────┴─────────────┐
+        │                           │
+        ▼                           ▼
+┌──────────────────────┐   ┌────────────────────────┐
+│ ApplicationStateManager │ │ CoreOperationsManager  │
+│ - Session state         │   │ - Extraction operations │
+│ - Settings persistence  │   │ - Injection operations  │
+│ - History management    │   │ - Palette management    │
+│ - Workflow state        │   │                        │
+│                        │   │                        │
+│ Adapters:              │   │ Adapters:              │
+│ └─ SessionManager      │   │ ├─ ExtractionManager   │
+│                        │   │ └─ InjectionManager    │
+└──────────────────────┘   └────────────────────────┘
+```
+
+**Key Points:**
+- Use `inject(ExtractionManagerProtocol)` to get managers - never instantiate directly
+- Adapters (SessionManager, ExtractionManager, InjectionManager) provide backward-compatible interfaces
+- All managers registered via `initialize_managers()` at app startup
+- Cleanup via `cleanup_managers()` at app exit
+
+**Example Usage:**
+```python
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
+
+# Get manager instance via DI
+extraction_manager = inject(ExtractionManagerProtocol)
+result = extraction_manager.extract_from_rom(params)
+```
 
 ### Circular Import Resolution
 ```python
@@ -257,20 +354,11 @@ class MyDialog(DialogBase):
         self.my_widget = QPushButton("Click me")
 ```
 
-## Mesen2/Sprite Finding (Active Work)
+## Background Context
 
-Current focus: Finding and extracting SNES sprites using Mesen2 emulator.
-
-Key documentation:
-- `NEXT_STEPS_PLAN.md` - Current sprite finding strategy
-- `MESEN2_LUA_API_LEARNINGS_DO_NOT_DELETE.md` - Lua scripting knowledge
-- `SPRITE_LEARNINGS_DO_NOT_DELETE.md` - ROM extraction patterns
-
-## Historical Documentation
-
-Completed phase reports and one-time fix summaries are archived in:
-`docs/archive/` (phase_reports/, migration_reports/, fix_summaries/, analysis_docs/)
+For Mesen2 integration, sprite finding research, and historical documentation,
+see `DEV_NOTES.md`. This file contains only operational development guidelines.
 
 ---
 
-*Last updated: December 2025*
+*Last updated: January 6, 2026*
