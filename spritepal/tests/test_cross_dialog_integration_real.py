@@ -52,6 +52,7 @@ pytestmark = [
     pytest.mark.requires_display,
     pytest.mark.signals_slots,
     pytest.mark.usefixtures("session_managers"),
+    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Dialog tests may spawn worker threads via managers")
 ]
 @pytest.mark.gui

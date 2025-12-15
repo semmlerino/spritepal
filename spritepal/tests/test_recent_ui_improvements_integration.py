@@ -135,6 +135,7 @@ class TestSpritePalAppDarkThemeIntegration:
         assert min_size.width() >= expected_size.width(), f"Window width should be at least {expected_size.width()}, got {min_size.width()}"
         assert min_size.height() >= expected_size.height(), f"Window height should be at least {expected_size.height()}, got {min_size.height()}"
 
+@pytest.mark.skip_thread_cleanup(reason="Creates real MainWindow which spawns background threads")
 class TestMainWindowIntegration:
     """Test MainWindow integration with new size and dark theme."""
 

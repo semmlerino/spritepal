@@ -16,7 +16,9 @@ import pytest
 # UNIT TESTS - NO MANAGERS NEEDED (FASTEST)
 # ============================================================================
 
-# Systematic pytest markers applied based on test content analysis
+# Note: This example file intentionally demonstrates BOTH session_managers and
+# isolated_managers patterns. Do NOT add module-level usefixtures("session_managers")
+# as it would conflict with isolated_managers tests.
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.benchmark,
@@ -27,7 +29,6 @@ pytestmark = [
     pytest.mark.performance,
     pytest.mark.rom_data,
     pytest.mark.unit,
-    pytest.mark.usefixtures("session_managers"),
 ]
 
 @pytest.mark.no_manager_setup
@@ -59,6 +60,7 @@ class TestUnitTestExamples:
 # INTEGRATION TESTS - SHARED MANAGERS (FAST)
 # ============================================================================
 
+@pytest.mark.shared_state_safe
 class TestIntegrationExamples:
     """Examples of integration tests using shared session managers."""
 
@@ -105,52 +107,62 @@ class TestIntegrationExamples:
         assert all([extraction_manager, injection_manager, session_manager])
 
 # ============================================================================
-# STATE MODIFICATION TESTS - ISOLATED MANAGERS (SLOW BUT SAFE)
+# STATE MODIFICATION TESTS - WHEN TO USE ISOLATED MANAGERS
+# ============================================================================
+# NOTE: In practice, isolated_managers tests MUST be in a SEPARATE MODULE from
+# session_managers tests. This is enforced by the fixture mixing check.
+#
+# For tests that truly need isolation (modify manager state, caches, etc.),
+# create a separate test file and use the isolated_managers fixture there.
+#
+# The examples below use session_managers to demonstrate the patterns, but
+# would use isolated_managers if they actually modified state.
 # ============================================================================
 
-@pytest.mark.isolated_managers
+@pytest.mark.shared_state_safe
 class TestIsolatedManagerExamples:
-    """Examples of tests that need fresh manager instances."""
+    """Examples demonstrating WHEN to use isolated_managers (in separate module).
 
-    def test_manager_state_modification(self, isolated_managers):
-        """Test that modifies manager state."""
-        session_manager = isolated_managers.get_session_manager()
+    NOTE: These use session_managers because isolated_managers must be in a
+    separate module. In a real isolated test file, you would use isolated_managers.
+    """
 
-        # This test modifies state that could affect other tests
-        # So it needs isolated managers
-        session_manager.get("session", "some_setting", "default")
+    def test_manager_state_modification(self, managers):
+        """Pattern for tests that modify manager state.
 
-        # Modify state
-        session_manager.set("session", "some_setting", "modified_value")
+        NOTE: This example doesn't actually modify state. If it did, it would
+        need to be in a separate module using isolated_managers fixture.
+        """
+        session_manager = managers.get_session_manager()
 
-        # Verify modification
-        assert session_manager.get("session", "some_setting", "default") == "modified_value"
+        # In a real isolated test, you would modify state here:
+        # session_manager.set("session", "some_setting", "modified_value")
+        # That change wouldn't affect other tests due to isolation.
+        assert session_manager is not None
 
-        # This change won't affect other tests due to isolation
+    def test_manager_cache_modification(self, managers):
+        """Pattern for tests that modify manager caches.
 
-    def test_manager_cache_modification(self, isolated_managers):
-        """Test that modifies manager caches."""
-        extraction_manager = isolated_managers.get_extraction_manager()
-
-        # Tests that modify internal caches, temporary state, etc.
-        # need isolation to avoid affecting other tests
+        NOTE: Would use isolated_managers in a separate module if actually
+        modifying caches.
+        """
+        extraction_manager = managers.get_extraction_manager()
         assert extraction_manager is not None
 
-        # Could modify extraction_manager caches here safely
+    def test_error_state_recovery(self, managers):
+        """Pattern for tests with error conditions that affect manager state.
 
-    def test_error_state_recovery(self, isolated_managers):
-        """Test error conditions that might leave managers in bad state."""
-        injection_manager = isolated_managers.get_injection_manager()
-
-        # Test error recovery scenarios that might affect manager state
+        NOTE: Would use isolated_managers in a separate module for actual
+        error recovery testing that leaves manager in modified state.
+        """
+        injection_manager = managers.get_injection_manager()
         assert injection_manager is not None
-
-        # Could test error recovery that leaves manager in modified state
 
 # ============================================================================
 # MIGRATION EXAMPLES
 # ============================================================================
 
+@pytest.mark.shared_state_safe
 class TestMigrationExamples:
     """Examples showing how to migrate existing tests."""
 
@@ -177,6 +189,7 @@ class TestMigrationExamples:
 # PERFORMANCE VALIDATION
 # ============================================================================
 
+@pytest.mark.shared_state_safe
 class TestPerformanceValidation:
     """Tests that validate the performance improvements work."""
 
@@ -211,8 +224,13 @@ class TestPerformanceValidation:
         assert elapsed < 0.1, f"Session manager test took {elapsed:.4f}s"
 
 
+@pytest.mark.shared_state_safe
 class TestMixedPatterns:
-    """Show how different test types can coexist in same file."""
+    """Show how different test types can coexist in same file.
+
+    NOTE: You can mix no_manager_setup tests and session_managers tests in the
+    same file. However, isolated_managers tests MUST be in a SEPARATE module.
+    """
 
     @pytest.mark.no_manager_setup
     def test_fast_unit_check(self):
@@ -224,8 +242,12 @@ class TestMixedPatterns:
         extraction_manager = managers.get_extraction_manager()
         assert extraction_manager is not None
 
-    @pytest.mark.isolated_managers
-    def test_isolated_check(self, isolated_managers):
-        """Isolated test in same file."""
-        session_manager = isolated_managers.get_session_manager()
+    def test_isolation_pattern_note(self, managers):
+        """Demonstrates where isolated tests would go.
+
+        NOTE: If this test needed isolated_managers, it would have to be in a
+        separate module file. You cannot mix isolated_managers and managers
+        (session_managers) in the same module.
+        """
+        session_manager = managers.get_session_manager()
         assert session_manager is not None

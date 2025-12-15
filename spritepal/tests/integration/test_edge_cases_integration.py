@@ -36,6 +36,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.ci_safe,
     pytest.mark.usefixtures("session_managers"),
+    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
 ]
 

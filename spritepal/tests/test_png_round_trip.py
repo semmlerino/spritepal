@@ -16,6 +16,7 @@ from core.rom_extractor import ROMExtractor
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.file_io,
     pytest.mark.headless,

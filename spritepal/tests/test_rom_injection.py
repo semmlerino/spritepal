@@ -148,6 +148,7 @@ class TestROMInjector(unittest.TestCase):
 
 @pytest.mark.gui
 @pytest.mark.usefixtures("setup_managers")
+@pytest.mark.skip_thread_cleanup(reason="InjectionDialog may spawn background threads")
 class TestROMInjectionDialog(unittest.TestCase):
     """Test ROM injection dialog (requires Qt)"""
 

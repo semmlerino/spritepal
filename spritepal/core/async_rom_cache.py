@@ -171,10 +171,15 @@ class AsyncROMCache(QObject):
         super().__init__()
 
         # Determine cache directory
+        # Priority: rom_cache setting > env var (test isolation) > default
         if rom_cache and hasattr(rom_cache, "cache_dir"):
             self.cache_dir = Path(rom_cache.cache_dir)
         else:
-            self.cache_dir = Path.home() / ".spritepal_cache"
+            env_cache_dir = os.environ.get("SPRITEPAL_CACHE_DIR")
+            if env_cache_dir:
+                self.cache_dir = Path(env_cache_dir)
+            else:
+                self.cache_dir = Path.home() / ".spritepal_cache"
 
         # Ensure cache directory exists
         self.cache_dir.mkdir(parents=True, exist_ok=True)

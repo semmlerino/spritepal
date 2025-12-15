@@ -47,7 +47,7 @@ class ROMCache:
             self._cache_enabled = self.settings_manager.get_cache_enabled()
             if not self._cache_enabled:
                 logger.info("ROM caching is disabled in settings")
-                self.cache_dir = Path.home() / self.CACHE_DIR_NAME  # Still set for compatibility
+                self.cache_dir = self._resolve_cache_dir()  # Still set for compatibility
                 return
         else:
             self._cache_enabled = True  # Default to enabled if no settings
@@ -61,9 +61,9 @@ class ROMCache:
             if custom_location:
                 self.cache_dir = Path(custom_location)
             else:
-                self.cache_dir = Path.home() / self.CACHE_DIR_NAME
+                self.cache_dir = self._resolve_cache_dir()
         else:
-            self.cache_dir = Path.home() / self.CACHE_DIR_NAME
+            self.cache_dir = self._resolve_cache_dir()
 
         # Create cache directory if it doesn't exist, with error handling
         if self._cache_enabled:
@@ -80,6 +80,13 @@ class ROMCache:
                 except (OSError, PermissionError):
                     logger.exception("Failed to prepare fallback cache directory")
                     self._cache_enabled = False
+
+    def _resolve_cache_dir(self) -> Path:
+        """Resolve cache directory, checking env var for test isolation."""
+        env_cache_dir = os.environ.get("SPRITEPAL_CACHE_DIR")
+        if env_cache_dir:
+            return Path(env_cache_dir)
+        return Path.home() / self.CACHE_DIR_NAME
 
     @property
     def cache_enabled(self) -> bool:

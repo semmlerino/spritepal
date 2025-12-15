@@ -774,6 +774,7 @@ def mock_rom_cache(rom_cache: ROMCache) -> ROMCache:
 @pytest.fixture(scope="class")
 def mock_settings_manager(
     request: FixtureRequest,
+    tmp_path_factory: TempPathFactory,
 ) -> Mock:
     """Class-scoped mock settings manager for performance optimization.
 
@@ -781,6 +782,7 @@ def mock_settings_manager(
     from 44 to ~10 (77% reduction).
 
     Provides a mock settings manager with common configuration methods.
+    Uses tmp_path_factory for worker-isolated temp directories under xdist.
     """
     manager = Mock()
 
@@ -791,8 +793,8 @@ def mock_settings_manager(
     manager.load_settings = Mock()
     manager.reset_to_defaults = Mock()
 
-    # Use platform-neutral temp directory
-    temp_output = str(Path(tempfile.gettempdir()) / "test_output")
+    # Use tmp_path_factory for worker-isolated temp directory (xdist-safe)
+    temp_output = str(tmp_path_factory.mktemp("mock_settings") / "test_output")
 
     # Add common settings with default values
     manager.get_setting.side_effect = lambda key, default=None: {

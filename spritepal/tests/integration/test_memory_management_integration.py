@@ -167,6 +167,7 @@ class MockThumbnailCache:
 @pytest.mark.gui
 @pytest.mark.integration
 @pytest.mark.usefixtures("session_managers")
+@pytest.mark.shared_state_safe
 class TestMemoryManagementIntegration(QtTestCase):
     """Integration tests for memory management."""
 

@@ -41,6 +41,7 @@ pytestmark = [
     pytest.mark.signals_slots,
     pytest.mark.slow,
     pytest.mark.usefixtures("session_managers"),  # DI system initialization
+    pytest.mark.shared_state_safe,
 ]
 class TestLRUCache:
     """Test the LRU cache implementation."""

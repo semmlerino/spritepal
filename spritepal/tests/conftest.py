@@ -224,15 +224,21 @@ def pytest_addoption(parser: Any) -> None:
 
 
 def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
-    """Validate marker usage during test collection.
+    """Validate marker usage and auto-group tests for xdist during collection.
 
-    Enforces that skip_thread_cleanup markers have a reason argument to prevent
-    mass opt-out from thread leak detection without documentation.
+    This hook performs two functions:
+    1. Validates that skip_thread_cleanup markers have a reason argument
+    2. Auto-groups non-parallel_safe tests to a single 'serial' worker under xdist
+
+    The xdist auto-grouping ensures that:
+    - Tests marked @pytest.mark.parallel_safe run on any worker (true parallelism)
+    - All other tests get grouped to a single 'serial' worker to prevent interference
 
     Args:
         config: pytest config object (required by hook signature)
         items: list of test items being collected
     """
+    # === Validate skip_thread_cleanup markers ===
     for item in items:
         marker = item.get_closest_marker("skip_thread_cleanup")
         if marker is not None:
@@ -245,6 +251,46 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
                     "cleanup should be skipped for this test.\n"
                     "Example: @pytest.mark.skip_thread_cleanup(reason='Uses session_managers which owns threads')"
                 )
+
+    # === Auto-group non-parallel_safe tests for xdist ===
+    # Only apply when xdist plugin is active and -n option is used
+    if not config.pluginmanager.has_plugin("xdist"):
+        return
+
+    # Check if -n option is being used (workers > 0)
+    try:
+        worker_count = config.getoption("-n", default=None)
+    except ValueError:
+        # Option not registered (xdist not properly loaded)
+        return
+
+    if not worker_count or worker_count == "0":
+        return
+
+    # Auto-group tests that aren't safe for parallel execution
+    serial_group = pytest.mark.xdist_group("serial")
+
+    # Fixtures that indicate shared mutable state
+    shared_fixtures = {"session_managers", "class_managers", "fast_managers", "rom_cache"}
+
+    for item in items:
+        # Tests with parallel_safe can run on any worker
+        if item.get_closest_marker("parallel_safe"):
+            continue
+
+        # Tests with serial marker get grouped together
+        if item.get_closest_marker("serial"):
+            item.add_marker(serial_group)
+            continue
+
+        # Tests using shared fixtures get grouped to serial
+        item_fixtures = set(getattr(item, "fixturenames", []))
+        if shared_fixtures & item_fixtures:
+            item.add_marker(serial_group)
+            continue
+
+        # All other unmarked tests also go to serial (safe default)
+        item.add_marker(serial_group)
 
 
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:

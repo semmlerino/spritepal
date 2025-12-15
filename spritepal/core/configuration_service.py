@@ -7,6 +7,7 @@ inconsistent behavior depending on how the application was launched.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, override
@@ -86,12 +87,29 @@ class ConfigurationService:
         self._base_paths = self._compute_base_paths()
 
     def _compute_base_paths(self) -> ApplicationPaths:
-        """Compute all base paths from app_root."""
+        """Compute all base paths from app_root.
+
+        Environment variables take precedence for test isolation (set by xdist fixtures):
+        - SPRITEPAL_SETTINGS_DIR: Override for settings file directory
+        - SPRITEPAL_CACHE_DIR: Override for cache directory
+        - SPRITEPAL_LOG_DIR: Override for log directory
+        """
+        # Check for test isolation overrides
+        settings_dir = os.environ.get("SPRITEPAL_SETTINGS_DIR")
+        cache_dir = os.environ.get("SPRITEPAL_CACHE_DIR")
+        log_dir = os.environ.get("SPRITEPAL_LOG_DIR")
+
         return ApplicationPaths(
             app_root=self._app_root,
-            settings_file=self._app_root / self.SETTINGS_FILENAME,
-            log_directory=Path.home() / self.LOG_DIR_NAME,
-            cache_directory=Path.home() / self.CACHE_DIR_NAME,
+            settings_file=(
+                Path(settings_dir) / self.SETTINGS_FILENAME
+                if settings_dir
+                else self._app_root / self.SETTINGS_FILENAME
+            ),
+            log_directory=Path(log_dir) if log_dir else Path.home() / self.LOG_DIR_NAME,
+            cache_directory=(
+                Path(cache_dir) if cache_dir else Path.home() / self.CACHE_DIR_NAME
+            ),
             config_directory=self._app_root / self.CONFIG_DIR_NAME,
             default_dumps_directory=Path.home() / self.DEFAULT_DUMPS_SUBPATH,
         )

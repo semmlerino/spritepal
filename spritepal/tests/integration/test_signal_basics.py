@@ -14,7 +14,8 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup(reason="Integration tests involve managers that spawn threads")
+    pytest.mark.skip_thread_cleanup(reason="Integration tests involve managers that spawn threads"),
+    pytest.mark.shared_state_safe,
 ]
 
 class SimpleEmitter(QObject):
@@ -70,6 +71,7 @@ class SimpleReceiver(QObject):
 
 @pytest.mark.headless
 @pytest.mark.usefixtures("session_managers")
+@pytest.mark.shared_state_safe
 class TestBasicSignalSlot:
     """Test basic signal/slot functionality."""
 

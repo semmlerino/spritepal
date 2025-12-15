@@ -49,6 +49,7 @@ configure_qt_for_environment()
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Integration tests involve managers that spawn threads"),
+    pytest.mark.shared_state_safe,
 ]
 
 class WorkerThreadWrapper:
@@ -192,6 +193,7 @@ def mock_tile_renderer():
 @pytest.mark.gui
 @pytest.mark.integration
 @pytest.mark.usefixtures("session_managers")
+@pytest.mark.shared_state_safe
 @requires_real_qt
 @skip_if_wsl("Qt threading has known issues in WSL environments")
 class TestBatchThumbnailWorkerIntegration(QtTestCase):
@@ -502,6 +504,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
 @pytest.mark.integration
 @pytest.mark.performance
 @pytest.mark.usefixtures("session_managers")
+@pytest.mark.shared_state_safe
 @requires_real_qt
 @skip_if_wsl("Performance tests require stable Qt threading")
 class TestBatchThumbnailWorkerPerformance(QtTestCase):
@@ -579,6 +582,7 @@ class TestBatchThumbnailWorkerPerformance(QtTestCase):
 @pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.usefixtures("session_managers")
+@pytest.mark.shared_state_safe
 @requires_real_qt
 @skip_if_wsl("Thread safety tests require stable Qt threading")
 class TestBatchThumbnailWorkerThreadSafety(QtTestCase):

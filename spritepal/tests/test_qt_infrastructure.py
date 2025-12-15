@@ -16,6 +16,7 @@ pytest_plugins = ["pytestqt"]
 # Qt infrastructure tests must run serially to avoid QApplication conflicts
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
+    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.serial,
     pytest.mark.qt_application,

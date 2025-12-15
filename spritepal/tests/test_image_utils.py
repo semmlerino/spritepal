@@ -43,6 +43,7 @@ def is_headless_environment():
 
 @pytest.mark.gui
 @pytest.mark.usefixtures("session_managers")
+@pytest.mark.shared_state_safe
 @pytest.mark.skipif(not QT_AVAILABLE, reason="Qt not available")
 @pytest.mark.skipif(
     is_headless_environment(), reason="GUI tests skipped in headless environment"

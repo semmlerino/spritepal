@@ -19,6 +19,7 @@ pytestmark = [
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
     pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.shared_state_safe,
 ]
 
 @pytest.fixture

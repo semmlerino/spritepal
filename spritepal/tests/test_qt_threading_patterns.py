@@ -34,6 +34,7 @@ from ui.common import WorkerManager
 
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
+    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.serial,
     pytest.mark.qt_application,

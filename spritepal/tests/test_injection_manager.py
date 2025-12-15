@@ -34,6 +34,7 @@ from tests.fixtures.test_worker_helper import WorkerHelper
 # Serial execution required: Thread safety concerns
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
+    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.serial,
     pytest.mark.thread_safety,

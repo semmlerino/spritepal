@@ -29,6 +29,7 @@ pytestmark = [
 
 @pytest.mark.integration
 @pytest.mark.usefixtures("session_managers")
+@pytest.mark.shared_state_safe
 class TestSpriteFinder:
     """Test sprite finder with real ROM data and HAL compression."""
 

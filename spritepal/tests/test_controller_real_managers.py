@@ -19,7 +19,6 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: Real Qt components
 pytestmark = [
-
     pytest.mark.serial,
     pytest.mark.ci_safe,
     pytest.mark.dialog,
@@ -27,6 +26,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.mock_dialogs,
     pytest.mark.unit,
+    pytest.mark.skip_thread_cleanup(reason="RealComponentFactory creates MainWindow with background threads"),
 ]
 
 class TestControllerWithRealManagers:

@@ -49,6 +49,7 @@ pytestmark = [
     pytest.mark.headless,
 ]
 @pytest.mark.mock_dialogs
+@pytest.mark.shared_state_safe
 @pytest.mark.skip_thread_cleanup(reason="Uses fast_managers which spawns threads; cleanup handled by manager lifecycle")
 class TestDialogInitialization:
     """Test that all dialogs can be initialized without errors"""

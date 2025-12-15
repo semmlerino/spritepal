@@ -29,6 +29,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.worker_threads,
     pytest.mark.usefixtures("session_managers"),  # DI system initialization
+    pytest.mark.shared_state_safe,
 ]
 
 from core.services.preview_generator import (

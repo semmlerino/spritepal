@@ -21,6 +21,7 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.slow,
     pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.shared_state_safe,
 ]
 
 class TestROMExtractorScanMethods:

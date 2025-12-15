@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QWidget
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Integration tests involve managers that spawn threads"),
+    pytest.mark.shared_state_safe,
 ]
 
 from core.managers import ExtractionManager

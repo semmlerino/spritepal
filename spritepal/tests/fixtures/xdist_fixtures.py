@@ -123,6 +123,7 @@ def configure_worker_environment(worker_temp_root: Path) -> Iterator[None]:
     Environment variables set:
     - SPRITEPAL_SETTINGS_DIR: Worker-specific settings directory
     - SPRITEPAL_CACHE_DIR: Worker-specific cache directory
+    - SPRITEPAL_LOG_DIR: Worker-specific log directory
     - SPRITEPAL_WORKER_ID: Current worker ID (for debugging)
     """
     worker_id = get_xdist_worker_id()
@@ -131,12 +132,15 @@ def configure_worker_environment(worker_temp_root: Path) -> Iterator[None]:
         # Set worker-specific environment for isolation
         settings_dir = worker_temp_root / "settings"
         cache_dir = worker_temp_root / "cache"
+        log_dir = worker_temp_root / "logs"
 
         settings_dir.mkdir(exist_ok=True)
         cache_dir.mkdir(exist_ok=True)
+        log_dir.mkdir(exist_ok=True)
 
         os.environ["SPRITEPAL_SETTINGS_DIR"] = str(settings_dir)
         os.environ["SPRITEPAL_CACHE_DIR"] = str(cache_dir)
+        os.environ["SPRITEPAL_LOG_DIR"] = str(log_dir)
         os.environ["SPRITEPAL_WORKER_ID"] = worker_id
 
     yield
@@ -145,6 +149,7 @@ def configure_worker_environment(worker_temp_root: Path) -> Iterator[None]:
     if worker_id:
         os.environ.pop("SPRITEPAL_SETTINGS_DIR", None)
         os.environ.pop("SPRITEPAL_CACHE_DIR", None)
+        os.environ.pop("SPRITEPAL_LOG_DIR", None)
         os.environ.pop("SPRITEPAL_WORKER_ID", None)
 
 

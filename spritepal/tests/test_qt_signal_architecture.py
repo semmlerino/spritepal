@@ -37,6 +37,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),  # Initialize DI container
+    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.serial,
     pytest.mark.qt_application,
