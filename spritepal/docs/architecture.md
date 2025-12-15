@@ -358,23 +358,37 @@ manager = inject(ExtractionManagerProtocol)
 
 The ManagerRegistry is a **singleton** that:
 1. Creates all manager instances at startup
-2. Configures the DIContainer (calls `configure_container()` internally)
+2. Configures the DIContainer (registers services and managers)
 3. Handles cleanup at shutdown
 
-**Flow:**
+**Initialization Flow:**
 ```
 Application Start
        ↓
 ManagerRegistry.initialize_managers()
        ↓
-├── Creates ApplicationStateManager, CoreOperationsManager, etc.
-├── Calls configure_container() to register protocols
-└── Stores managers for lifecycle management
+1. configure_container()           → Registers services (ConfigurationService,
+   │                                  SettingsManager, ROMCache, etc.)
+   ↓
+2. Create ApplicationStateManager  → Registers SessionManagerProtocol,
+   │                                  ApplicationStateManagerProtocol
+   ↓
+3. Create CoreOperationsManager    → Can now use inject(SessionManagerProtocol)
+   │                                  via ROMCache → SettingsManager chain
+   ↓
+4. register_managers()             → Registers ExtractionManagerProtocol,
+   │                                  InjectionManagerProtocol
+   ↓
+5. Create MonitoringManager
        ↓
 Application Code: inject(ExtractionManagerProtocol)
        ↓
 DIContainer returns the registered implementation
 ```
+
+**Why this order matters:** CoreOperationsManager creates ROMExtractor, which needs
+ROMCache, which needs SettingsManager, which needs SessionManager. If SessionManager
+isn't registered before CoreOperationsManager is created, the DI chain fails.
 
 ### Quick Reference
 
@@ -423,3 +437,75 @@ manager = ExtractionManager()
 # GOOD - loose coupling via protocol
 manager = inject(ExtractionManagerProtocol)
 ```
+
+---
+
+## Manager Adapter Pattern
+
+SpritePal uses an adapter pattern to maintain backward compatibility during the
+consolidation of managers into fewer, more cohesive classes.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            DI Container (inject() via protocols)            │
+│  inject(ExtractionManagerProtocol) → ExtractionAdapter      │
+│  inject(InjectionManagerProtocol)  → InjectionAdapter       │
+│  inject(SessionManagerProtocol)    → SessionAdapter         │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│               Consolidated Managers                          │
+│  CoreOperationsManager:                                      │
+│    - Owns ROMService, VRAMService, ROMExtractor             │
+│    - Owns all extraction/injection business logic            │
+│    - ExtractionAdapter and InjectionAdapter delegate here   │
+│                                                              │
+│  ApplicationStateManager:                                    │
+│    - Owns session, settings, state, history                  │
+│    - SessionAdapter delegates here                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Rules
+
+1. **Adapters delegate everything**: Adapters must not create their own service
+   instances. All operations go through the consolidated manager.
+
+2. **Signals forward, don't duplicate**: Adapters forward signals from
+   consolidated managers. They don't emit their own copies of signals.
+
+3. **Deprecated base classes**: `ExtractionManager`, `InjectionManager`,
+   `SessionManager` exist only as base classes for adapters. Do not instantiate
+   them directly—use `inject()` with the protocol instead.
+
+### Example: ExtractionAdapter
+
+```python
+class ExtractionAdapter(ExtractionManager):
+    """Thin wrapper that delegates to CoreOperationsManager."""
+
+    def __init__(self, core_manager: CoreOperationsManager):
+        self._core = core_manager
+        # Forward signals from core manager
+        core_manager.extraction_progress.connect(self.extraction_progress.emit)
+
+    @property
+    def _rom_service(self) -> ROMService:
+        # Delegate to core manager's service
+        return self._core.rom_service
+
+    def extract_from_rom(self, params: dict) -> dict:
+        # Delegate operation to core manager
+        return self._core.extract_from_rom(params)
+```
+
+### Why Adapters?
+
+The adapter pattern allows:
+- **Backward compatibility**: Existing code using `ExtractionManagerProtocol` continues to work
+- **Single source of truth**: All business logic lives in consolidated managers
+- **Gradual migration**: New code can use consolidated managers directly if needed
+- **Reduced duplication**: Services are created once, not per-adapter

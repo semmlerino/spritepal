@@ -183,15 +183,15 @@ def configure_container(
     configuration_service: Any = None,
 ) -> None:
     """
-    Configure the DI container with application dependencies.
+    Configure the DI container with non-manager dependencies.
 
-    This function sets up all the necessary bindings for the application.
-    It should be called during application initialization.
+    This function sets up service bindings. Manager bindings are registered
+    separately by ManagerRegistry.initialize_managers() after managers are created.
 
-    The container uses the consolidated manager architecture where:
-    - ApplicationStateManager handles session, settings, state, and history
-    - CoreOperationsManager handles extraction and injection operations
-    - Adapters provide backward-compatible interfaces (SessionManager, etc.)
+    INITIALIZATION ORDER (enforced by ManagerRegistry):
+    1. configure_container() - registers services and factories
+    2. ManagerRegistry creates managers
+    3. register_managers() - registers manager protocols with actual instances
 
     Args:
         configuration_service: Optional pre-created ConfigurationService instance.
@@ -201,11 +201,7 @@ def configure_container(
     # Register ConfigurationService FIRST - it's needed by other managers
     from core.configuration_service import ConfigurationService
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
         ConfigurationServiceProtocol,
-        ExtractionManagerProtocol,
-        InjectionManagerProtocol,
-        SessionManagerProtocol,
         SettingsManagerProtocol,
     )
     from utils.settings_manager import SettingsManager
@@ -216,33 +212,19 @@ def configure_container(
         # Create default ConfigurationService
         register_singleton(ConfigurationServiceProtocol, ConfigurationService())
 
-    # Register consolidated managers with adapters
-    # ApplicationStateManager handles session, settings, state, and history
-    # CoreOperationsManager handles extraction and injection operations
-    register_factory(
-        ApplicationStateManagerProtocol,
-        lambda: _get_application_state_manager()
-    )
+    # NOTE: Manager protocols (SessionManagerProtocol, ExtractionManagerProtocol, etc.)
+    # are registered by register_managers() AFTER managers are created.
+    # This avoids circular dependency between DI container and ManagerRegistry.
 
-    register_factory(
-        SessionManagerProtocol,
-        lambda: _get_consolidated_session_adapter()
-    )
-
-    register_factory(
-        ExtractionManagerProtocol,
-        lambda: _get_consolidated_extraction_adapter()
-    )
-
-    register_factory(
-        InjectionManagerProtocol,
-        lambda: _get_consolidated_injection_adapter()
-    )
-
-    # Register SettingsManager
+    # Register SettingsManager (depends on SessionManagerProtocol, so use factory)
     register_factory(
         SettingsManagerProtocol,
-        lambda: SettingsManager(app_name="SpritePal", session_manager=inject(SessionManagerProtocol))
+        lambda: SettingsManager(
+            app_name="SpritePal",
+            session_manager=inject(
+                __import__('core.protocols.manager_protocols', fromlist=['SessionManagerProtocol']).SessionManagerProtocol
+            )
+        )
     )
 
     # Import ROMCache and its Protocol
@@ -287,6 +269,7 @@ def configure_container(
     # Register ManualOffsetDialogFactory via protocol to avoid layer violation
     # The factory creates UI objects so it lives in ui/, but we register by protocol
     from core.protocols.dialog_protocols import ManualOffsetDialogFactoryProtocol
+    from core.protocols.manager_protocols import ExtractionManagerProtocol
 
     def _create_manual_offset_dialog_factory():
         from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
@@ -308,28 +291,40 @@ def configure_container(
 
     register_factory(DialogFactoryProtocol, _create_controller_dialog_factory)
 
-    logger.info("DI container configured with consolidated manager architecture")
+    logger.info("DI container configured (services registered, managers pending)")
 
-# Helper functions for lazy manager creation
-def _get_application_state_manager():
-    """Get ApplicationStateManager from registry."""
-    from core.managers.registry import ManagerRegistry
-    return ManagerRegistry().get_application_state_manager()
 
-def _get_consolidated_session_adapter():
-    """Get session adapter from consolidated ApplicationStateManager."""
-    from core.managers.registry import ManagerRegistry
-    return ManagerRegistry().get_application_state_manager().get_session_adapter()
+def register_managers(
+    extraction_adapter: Any,
+    injection_adapter: Any,
+) -> None:
+    """
+    Register extraction and injection manager instances with the DI container.
 
-def _get_consolidated_extraction_adapter():
-    """Get extraction adapter from consolidated CoreOperationsManager."""
-    from core.managers.registry import ManagerRegistry
-    return ManagerRegistry().get_core_operations_manager().get_extraction_adapter()
+    NOTE: SessionManagerProtocol and ApplicationStateManagerProtocol are registered
+    earlier in initialize_managers() because other services depend on them during
+    CoreOperationsManager initialization.
 
-def _get_consolidated_injection_adapter():
-    """Get injection adapter from consolidated CoreOperationsManager."""
-    from core.managers.registry import ManagerRegistry
-    return ManagerRegistry().get_core_operations_manager().get_injection_adapter()
+    INITIALIZATION ORDER:
+    1. configure_container() - registers services and factories
+    2. ApplicationStateManager created, SessionManagerProtocol registered
+    3. CoreOperationsManager created (depends on SessionManager via DI chain)
+    4. register_managers() - registers ExtractionManager, InjectionManager (THIS FUNCTION)
+
+    Args:
+        extraction_adapter: ExtractionAdapter instance from CoreOperationsManager
+        injection_adapter: InjectionAdapter instance from CoreOperationsManager
+    """
+    from core.protocols.manager_protocols import (
+        ExtractionManagerProtocol,
+        InjectionManagerProtocol,
+    )
+
+    # Register as singletons - these are the actual instances, not factories
+    register_singleton(ExtractionManagerProtocol, extraction_adapter)
+    register_singleton(InjectionManagerProtocol, injection_adapter)
+
+    logger.info("Extraction and injection protocols registered with DI container")
 
 
 # Example usage with protocols

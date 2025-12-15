@@ -237,6 +237,17 @@ class ManagerRegistry:
                 self._managers["session"] = state_manager.get_session_adapter()
                 self._logger.debug("ApplicationStateManager created successfully")
 
+                # Register SessionManager immediately - other managers depend on it via DI
+                # (e.g., ROMCache → SettingsManager → SessionManager)
+                from core.di_container import register_singleton
+                from core.protocols.manager_protocols import (
+                    ApplicationStateManagerProtocol,
+                    SessionManagerProtocol,
+                )
+                register_singleton(ApplicationStateManagerProtocol, state_manager)
+                register_singleton(SessionManagerProtocol, self._managers["session"])
+                self._logger.debug("Session protocols registered for downstream dependencies")
+
                 # CoreOperationsManager handles extraction and injection operations
                 self._logger.debug("Creating CoreOperationsManager...")
                 core_manager = CoreOperationsManager(parent=qt_parent)
@@ -263,7 +274,14 @@ class ManagerRegistry:
                 if "session" in self._managers:
                     monitoring_manager.register_manager_monitoring(self._managers["session"])
 
-                # Future managers will be added here
+                # Register remaining manager protocols with DI container
+                # (SessionManager and ApplicationStateManager already registered above)
+                from core.di_container import register_managers
+                register_managers(
+                    extraction_adapter=self._managers["extraction"],
+                    injection_adapter=self._managers["injection"],
+                )
+                self._logger.debug("All manager protocols registered with DI container")
 
                 self._logger.info("All managers initialized successfully")
 
