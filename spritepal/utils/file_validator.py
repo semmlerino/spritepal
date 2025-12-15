@@ -766,7 +766,7 @@ def atomic_write(path: Path | str, data: bytes) -> None:
         temp_path.replace(path)
         logger.debug(f"Atomically wrote {len(data)} bytes to {path}")
 
-    except BaseException:
+    except Exception:
         # Clean up temp file on any failure
         temp_path.unlink(missing_ok=True)
         raise

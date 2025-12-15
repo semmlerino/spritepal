@@ -5,7 +5,6 @@ Interfaces with exhal/inhal C tools for ROM sprite injection.
 from __future__ import annotations
 
 import atexit
-import builtins
 import contextlib
 import gc
 import multiprocessing as mp
@@ -1147,7 +1146,7 @@ class HALCompressor:
         finally:
             # Clean up temp file if we created one
             if output_path and output_path.startswith(tempfile.gettempdir()):
-                with contextlib.suppress(builtins.BaseException):
+                with contextlib.suppress(Exception):
                     Path(output_path).unlink()
 
     def compress_to_file(
@@ -1207,7 +1206,7 @@ class HALCompressor:
 
         finally:
             # Clean up temp file
-            with contextlib.suppress(builtins.BaseException):
+            with contextlib.suppress(Exception):
                 Path(tmp_path).unlink()
 
     def compress_to_rom(
@@ -1303,7 +1302,7 @@ class HALCompressor:
 
         finally:
             # Clean up temp file
-            with contextlib.suppress(builtins.BaseException):
+            with contextlib.suppress(Exception):
                 Path(tmp_path).unlink()
 
     def test_tools(self) -> tuple[bool, str]:
