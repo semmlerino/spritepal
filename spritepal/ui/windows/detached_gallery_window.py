@@ -688,7 +688,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         except Exception as e:
             logger.error(f"Error loading ROM: {e}")
-            UserErrorDialog.show_error(
+            UserErrorDialog.display_error(
                 self,
                 "Error Loading ROM",
                 f"Could not load ROM file: {e}"
@@ -1302,7 +1302,7 @@ class DetachedGalleryWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Error extracting sprite: {e}")
             self.status_bar.showMessage("Extraction error")
-            UserErrorDialog.show_error(
+            UserErrorDialog.display_error(
                 self,
                 "Extraction Error",
                 f"Could not extract sprite: {e}"

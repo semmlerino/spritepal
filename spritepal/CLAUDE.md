@@ -125,9 +125,51 @@ def test_async_with_failure_case(qtbot, worker):
 - `@pytest.mark.gui` - Uses real Qt widgets (run with `QT_QPA_PLATFORM=offscreen`)
 - `@pytest.mark.headless` - No display required (can use real components if no rendering)
 - `@pytest.mark.serial` - No parallel execution
+- `@pytest.mark.parallel_safe` - Can run in parallel with pytest-xdist
 
 **IMPORTANT**: Always run tests with `QT_QPA_PLATFORM=offscreen` to avoid display dependencies.
 Do NOT use pytest-xvfb - it causes hangs in WSL2 and some CI environments.
+
+### Parallel Test Execution (pytest-xdist)
+
+SpritePal supports parallel test execution using pytest-xdist with a conservative opt-in approach.
+
+**Running Tests:**
+```bash
+# Serial execution (default, safe for all tests)
+QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=3
+
+# Parallel execution for marked tests only
+QT_QPA_PLATFORM=offscreen uv run pytest tests -m "parallel_safe" -n auto --maxfail=3
+
+# Run both: serial first, then parallel
+./scripts/run_tests_parallel.sh
+```
+
+**Marking Tests as Parallel-Safe:**
+
+Tests must meet ALL these criteria to be marked `@pytest.mark.parallel_safe`:
+
+1. Uses `isolated_managers` fixture (NOT `session_managers`)
+2. Uses `tmp_path` for any file operations (NOT hardcoded paths)
+3. Does not modify module-level globals
+4. Does not depend on test execution order
+
+```python
+@pytest.mark.parallel_safe
+def test_extraction_logic(isolated_managers, tmp_path):
+    """This test is safe for parallel execution."""
+    settings_path = tmp_path / "settings.json"
+    # ... test code using isolated managers ...
+```
+
+**Validation:** The `check_parallel_isolation` fixture automatically validates that
+`parallel_safe` tests don't use incompatible fixtures like `session_managers`.
+
+**Common Mistakes:**
+- Using `session_managers` with `parallel_safe` - causes fixture conflicts
+- Hardcoded `/tmp/test_output` paths - use `tmp_path` fixture instead
+- Relying on singleton state from previous tests
 
 ### Modular Fixture Architecture
 
@@ -143,6 +185,7 @@ tests/
 │   ├── timeouts.py              # Semantic timeouts (worker_timeout, signal_timeout, etc.)
 │   ├── core_fixtures.py         # Manager fixtures, DI fixtures, state management
 │   ├── hal_fixtures.py          # HAL compression mock/real fixtures
+│   ├── xdist_fixtures.py        # Parallel testing support (pytest-xdist)
 │   └── test_*_helper.py         # Component-specific test helpers
 └── infrastructure/
     ├── real_component_factory.py    # RealComponentFactory

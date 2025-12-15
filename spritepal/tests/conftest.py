@@ -90,6 +90,7 @@ pytest_plugins = [
     "tests.fixtures.qt_fixtures",
     "tests.fixtures.core_fixtures",
     "tests.fixtures.hal_fixtures",
+    "tests.fixtures.xdist_fixtures",  # Parallel test execution support
 ]
 
 
@@ -708,30 +709,39 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
                         )
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, None]:
     """Enforce that parallel-safe tests don't use shared mutable state.
 
-    This fixture checks that tests marked with @pytest.mark.parallel_safe
-    don't use session-scoped fixtures that could cause race conditions
-    when running tests in parallel.
+    This fixture automatically checks that tests marked with @pytest.mark.parallel_safe
+    don't use session-scoped or class-scoped fixtures that could cause race conditions
+    when running tests in parallel with pytest-xdist.
+
+    The check runs automatically for all parallel_safe tests.
+
+    Requirements for parallel_safe tests:
+    1. Must use isolated_managers (not session_managers, class_managers, fast_managers)
+    2. Should use tmp_path for any file operations
+    3. Must not depend on test execution order
 
     Usage:
         @pytest.mark.parallel_safe
-        def test_can_run_in_parallel(check_parallel_isolation):
-            # This test will fail if it uses shared fixtures
+        def test_can_run_in_parallel(isolated_managers, tmp_path):
+            # This test is validated automatically
             ...
     """
-    # Check if test is marked as parallel_safe
+    # Only validate tests marked as parallel_safe
     if not request.node.get_closest_marker('parallel_safe'):
         yield
         return
 
-    # List of fixtures that have mutable shared state
-    # NOTE: mock_manager_registry was removed - it's now function-scoped (see fixture definition)
+    # Fixtures that have mutable shared state and are unsafe for parallel execution
+    # These are session-scoped or class-scoped fixtures that persist across tests
     shared_mutable_fixtures = {
-        'session_managers',
-        'rom_cache',  # Class-scoped, could be shared
+        'session_managers',  # Session-scoped, shares state across all tests in session
+        'class_managers',    # Class-scoped, shares state within test class
+        'fast_managers',     # Alias for session_managers
+        'rom_cache',         # Class-scoped cache that could be shared
     }
 
     # Check if test uses any shared mutable fixtures
@@ -740,10 +750,21 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
 
     if conflicting:
         pytest.fail(
-            f"Test '{request.node.name}' is marked parallel_safe but uses "
+            f"Test '{request.node.name}' is marked @pytest.mark.parallel_safe but uses "
             f"shared mutable fixtures: {conflicting}. "
-            "Use isolated_managers or function-scoped fixtures instead."
+            "Use isolated_managers and tmp_path for parallel-safe tests."
         )
+
+    # Validate that isolated_managers is used (recommended for parallel tests)
+    if 'isolated_managers' not in fixture_names:
+        # Check if it might be using managers at all
+        manager_related = {'setup_managers', 'managers_initialized'}
+        if manager_related & fixture_names:
+            pytest.fail(
+                f"Test '{request.node.name}' is marked @pytest.mark.parallel_safe but uses "
+                f"manager fixtures other than isolated_managers. "
+                "Use isolated_managers for parallel-safe tests."
+            )
 
     yield
 

@@ -5,7 +5,7 @@ Reusable dialog architecture components for consistent UI development.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QSplitter, QTabWidget, QWidget
@@ -73,6 +73,7 @@ class TabbedDialog(DialogBase):
             **kwargs
         )
 
+    @override
     def _setup_ui(self) -> None:
         """Set up the tabbed UI structure."""
         # Create main tab widget and replace content widget
@@ -99,6 +100,7 @@ class TabbedDialog(DialogBase):
         # Also update private reference for DialogBase compatibility
         self._tab_widget = self._main_tab_widget
 
+    @override
     def add_tab(self, widget: QWidget, label: str) -> None:
         """
         Add a tab to the dialog.
@@ -138,6 +140,7 @@ class TabbedDialog(DialogBase):
         if self._main_tab_widget is not None:
             self._main_tab_widget.removeTab(index)
 
+    @override
     def set_current_tab(self, index: int) -> None:
         """
         Set the current tab.
@@ -148,6 +151,7 @@ class TabbedDialog(DialogBase):
         if self._main_tab_widget is not None:
             self._main_tab_widget.setCurrentIndex(index)
 
+    @override
     def get_current_tab_index(self) -> int:
         """
         Get the current tab index.
@@ -214,6 +218,7 @@ class SplitterDialog(DialogBase):
             **kwargs
         )
 
+    @override
     def _setup_ui(self) -> None:
         """Set up the splitter UI structure."""
         # Create main splitter and replace content widget
@@ -275,6 +280,7 @@ class SplitterDialog(DialogBase):
         if self._main_splitter is not None:
             self._main_splitter.setSizes(sizes)
 
+    @override
     def add_panel(self, widget: QWidget, stretch_factor: int = 1) -> None:
         """
         Add a panel to the splitter (alias for add_pane for compatibility).

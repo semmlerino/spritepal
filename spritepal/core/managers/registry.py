@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 
 
 def _topological_sort(
-    manager_classes: list[type["BaseManager"]],
-) -> list[type["BaseManager"]]:
+    manager_classes: list[type[BaseManager]],
+) -> list[type[BaseManager]]:
     """
     Sort manager classes by their declared dependencies using Kahn's algorithm.
 
@@ -47,7 +47,7 @@ def _topological_sort(
         ManagerError: If circular dependencies are detected
     """
     # Build adjacency list and in-degree count
-    in_degree: dict[type, int] = {cls: 0 for cls in manager_classes}
+    in_degree: dict[type, int] = dict.fromkeys(manager_classes, 0)
     dependents: dict[type, list[type]] = {cls: [] for cls in manager_classes}
     class_set = set(manager_classes)
 
@@ -59,7 +59,7 @@ def _topological_sort(
 
     # Start with classes that have no dependencies
     queue = [cls for cls in manager_classes if in_degree[cls] == 0]
-    result: list[type["BaseManager"]] = []
+    result: list[type[BaseManager]] = []
 
     while queue:
         # Sort for deterministic order when multiple options exist

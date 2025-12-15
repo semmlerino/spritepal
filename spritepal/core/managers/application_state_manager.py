@@ -8,10 +8,7 @@ into a single cohesive unit while maintaining backward compatibility.
 from __future__ import annotations
 
 import json
-import pickle
-import sys
 import threading
-import time
 from collections import OrderedDict
 from datetime import UTC, datetime
 from enum import Enum, auto
@@ -21,6 +18,8 @@ from typing import Any, ClassVar, TypeVar
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
 from typing_extensions import override
+
+from utils.state_manager import StateEntry, StateSnapshot
 
 from .base_manager import BaseManager
 from .exceptions import SessionError
@@ -921,48 +920,6 @@ class ApplicationStateManager(BaseManager):
         """
         self.preview_ready.emit(offset, image)
 
-
-class StateEntry:
-    """Wrapper for runtime state values with metadata."""
-
-    def __init__(self, value: Any, ttl_seconds: float | None = None):
-        self.value = value
-        self.created_at = time.time()
-        self.accessed_at = time.time()
-        self.ttl_seconds = ttl_seconds
-        self.access_count = 0
-
-        # Track size for memory management
-        try:
-            self.size_bytes = len(pickle.dumps(value))
-        except (TypeError, pickle.PicklingError):
-            self.size_bytes = sys.getsizeof(value)
-
-    def is_expired(self) -> bool:
-        """Check if entry has expired."""
-        if self.ttl_seconds is None:
-            return False
-        return time.time() - self.created_at > self.ttl_seconds
-
-    def touch(self) -> None:
-        """Update access time."""
-        self.accessed_at = time.time()
-        self.access_count += 1
-
-class StateSnapshot:
-    """Immutable snapshot of state at a point in time."""
-
-    def __init__(self, states: dict[str, Any], namespace: str | None = None):
-        import uuid
-        self.id = str(uuid.uuid4())
-        self.timestamp = time.time()
-        self.namespace = namespace
-
-        # Deep copy the states
-        try:
-            self.states = pickle.loads(pickle.dumps(states))
-        except (TypeError, pickle.PicklingError):
-            self.states = states.copy()
 
 class SessionAdapter(SessionManager):
     """Adapter providing SessionManager interface."""

@@ -5,7 +5,7 @@ Shows similar sprites with thumbnails, similarity scores, and allows navigation.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from typing_extensions import override
 
 from core.visual_similarity_search import SimilarityMatch
 from ui.components import BaseDialog
@@ -151,6 +150,7 @@ class SimilarityResultsDialog(BaseDialog):
             with_button_box=False  # We'll create our own close button
         )
 
+    @override
     def _setup_ui(self):
         """Setup the dialog UI - called by BaseDialog."""
         layout = QVBoxLayout()

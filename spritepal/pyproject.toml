@@ -15,7 +15,7 @@
 name = "spritepal"
 version = "0.1.0"
 description = "SNES sprite extraction and editing tool"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "PySide6>=6.5.0",
     "Pillow>=9.0.0",
@@ -30,6 +30,7 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "pytest-timeout>=2.0.0",
+    "pytest-xdist>=3.5.0",  # Parallel test execution
     "ruff>=0.1.0",
     "basedpyright>=1.8.0",
 ]
@@ -46,7 +47,7 @@ packages = ["core", "ui", "utils"]
 # ============================================================================
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py312"
 
 exclude = [
     ".git",
@@ -300,7 +301,7 @@ exclude = [
     "mesen2_integration",
     "scripts",
 ]
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 pythonPlatform = "All"
 
 # Point to the local venv so basedpyright can find PySide6 stubs

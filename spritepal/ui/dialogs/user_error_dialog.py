@@ -207,11 +207,11 @@ class UserErrorDialog(BaseDialog):
         }
 
     @staticmethod
-    def show_error(
+    def display_error(
         parent: QWidget | None,
         error_message: str,
         technical_details: str | None = None
     ) -> None:
-        """Convenience method to show error dialog"""
+        """Convenience method to show error dialog (static factory method)."""
         dialog = UserErrorDialog(error_message, technical_details, parent)
         dialog.exec()

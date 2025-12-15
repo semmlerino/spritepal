@@ -5,9 +5,8 @@ Provides user interface for configuring application preferences
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
-# from typing_extensions import override
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -100,6 +99,7 @@ class SettingsDialog(BaseDialog):
         self._load_settings()
         self._update_cache_stats()
 
+    @override
     def _setup_ui(self):
         """Set up the settings dialog UI"""
         # Create tab widget
@@ -505,6 +505,7 @@ class SettingsDialog(BaseDialog):
                     f"Failed to clear cache: {e!s}"
                 )
 
+    @override
     def accept(self):
         """Handle dialog acceptance"""
         # Check if settings have changed

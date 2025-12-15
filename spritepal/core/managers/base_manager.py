@@ -33,7 +33,7 @@ class BaseManager(QObject):
     # Subclasses should override this to declare which manager types they depend on.
     # The registry uses topological sort to determine safe initialization order.
     # Example: DEPENDS_ON: ClassVar[list[type[BaseManager]]] = [ApplicationStateManager]
-    DEPENDS_ON: list[type["BaseManager"]] = []
+    DEPENDS_ON: list[type[BaseManager]] = []
 
     # Common signals that all managers can emit
     error_occurred = Signal(str)

@@ -4,8 +4,19 @@ from __future__ import annotations
 """
 Parallel test runner for SpritePal test suite.
 
-This script provides optimized test execution by running safe tests in parallel
-and thread-unsafe tests serially, with proper reporting and error handling.
+This script provides optimized test execution using a conservative opt-in approach:
+- Only tests marked @pytest.mark.parallel_safe run in parallel with pytest-xdist
+- All other tests run serially for maximum safety
+
+Usage:
+    # Run both serial and parallel tests
+    QT_QPA_PLATFORM=offscreen python scripts/run_parallel_tests.py
+
+    # Run only parallel-safe tests in parallel
+    QT_QPA_PLATFORM=offscreen python scripts/run_parallel_tests.py --parallel-only
+
+    # Run only serial tests
+    QT_QPA_PLATFORM=offscreen python scripts/run_parallel_tests.py --serial-only
 """
 
 import argparse
@@ -57,47 +68,40 @@ def run_command(cmd: list[str], description: str, timeout: int = 300) -> tuple[b
         print(f"\n{description} ERROR after {duration:.1f}s: {e}")
         return False, str(e)
 
-def get_test_counts() -> tuple[int, int]:
-    """Get counts of parallel vs serial tests."""
+def get_test_counts() -> tuple[int | str, int | str]:
+    """Get counts of parallel_safe vs other tests."""
     try:
         # Count all tests
         result = subprocess.run([
             "pytest", "--collect-only", "-q", "tests/"
         ], capture_output=True, text=True, timeout=60)
 
-        if result.returncode != 0:
-            print("Warning: Could not count total tests")
-            total_tests = "unknown"
-        else:
+        total_tests: int | str = "unknown"
+        if result.returncode == 0:
             lines = result.stdout.split('\n')
             for line in lines:
-                if 'tests collected' in line:
+                if 'tests collected' in line or 'test collected' in line:
                     total_tests = int(line.split()[0])
                     break
-            else:
-                total_tests = "unknown"
 
-        # Count serial tests
+        # Count parallel_safe tests (these will run in parallel)
         result = subprocess.run([
-            "pytest", "--collect-only", "-q", "-m", "serial", "tests/"
+            "pytest", "--collect-only", "-q", "-m", "parallel_safe", "tests/"
         ], capture_output=True, text=True, timeout=60)
 
-        if result.returncode != 0:
-            print("Warning: Could not count serial tests")
-            serial_tests = "unknown"
-        else:
+        parallel_tests: int | str = 0
+        if result.returncode == 0:
             lines = result.stdout.split('\n')
             for line in lines:
-                if 'tests collected' in line:
-                    serial_tests = int(line.split()[0])
+                if 'tests collected' in line or 'test collected' in line:
+                    parallel_tests = int(line.split()[0])
                     break
-            else:
-                serial_tests = 0
 
-        if isinstance(total_tests, int) and isinstance(serial_tests, int):
-            parallel_tests = total_tests - serial_tests
+        # Serial tests = all tests minus parallel_safe tests
+        if isinstance(total_tests, int) and isinstance(parallel_tests, int):
+            serial_tests = total_tests - parallel_tests
         else:
-            parallel_tests = "unknown"
+            serial_tests = "unknown"
 
         return parallel_tests, serial_tests
 
@@ -106,13 +110,22 @@ def get_test_counts() -> tuple[int, int]:
         return "unknown", "unknown"
 
 def main():
-    parser = argparse.ArgumentParser(description="Run SpritePal tests with optimal parallel/serial execution")
-    parser.add_argument("--parallel-only", action="store_true", help="Run only parallel-safe tests")
-    parser.add_argument("--serial-only", action="store_true", help="Run only serial tests")
-    parser.add_argument("--workers", "-n", type=int, default=4, help="Number of parallel workers (default: 4)")
-    parser.add_argument("--timeout", type=int, default=600, help="Timeout per test phase in seconds (default: 600)")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
-    parser.add_argument("--maxfail", type=int, default=5, help="Stop after N failures (default: 5)")
+    parser = argparse.ArgumentParser(
+        description="Run SpritePal tests with conservative parallel execution",
+        epilog="Uses opt-in approach: only @pytest.mark.parallel_safe tests run in parallel."
+    )
+    parser.add_argument("--parallel-only", action="store_true",
+                        help="Run only parallel-safe tests (with xdist)")
+    parser.add_argument("--serial-only", action="store_true",
+                        help="Run only serial tests (not parallel_safe)")
+    parser.add_argument("--workers", "-n", type=str, default="auto",
+                        help="Number of parallel workers (default: auto)")
+    parser.add_argument("--timeout", type=int, default=600,
+                        help="Timeout per test phase in seconds (default: 600)")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="Verbose output")
+    parser.add_argument("--maxfail", type=int, default=5,
+                        help="Stop after N failures (default: 5)")
     parser.add_argument("tests", nargs="*", help="Specific test files to run")
 
     args = parser.parse_args()
@@ -120,11 +133,13 @@ def main():
     # Get test counts
     parallel_count, serial_count = get_test_counts()
 
-    print("SpritePal Parallel Test Runner")
-    print(f"Parallel tests: {parallel_count}")
-    print(f"Serial tests: {serial_count}")
+    print("SpritePal Conservative Parallel Test Runner")
+    print("-" * 50)
+    print(f"Parallel-safe tests: {parallel_count} (will run with xdist)")
+    print(f"Serial tests: {serial_count} (will run sequentially)")
     print(f"Workers: {args.workers}")
     print(f"Timeout: {args.timeout}s per phase")
+    print("-" * 50)
 
     # Base command components
     base_pytest = ["pytest"]
@@ -136,7 +151,6 @@ def main():
     base_pytest.extend([
         "--tb=short",
         f"--maxfail={args.maxfail}",
-        "--disable-warnings"
     ])
 
     # Determine test paths
@@ -144,9 +158,29 @@ def main():
 
     results = []
 
+    # CONSERVATIVE APPROACH: Run serial tests first (all non-parallel_safe tests)
+    if not args.parallel_only:
+        serial_cmd = [*base_pytest, "-m", "not parallel_safe", *test_paths]
+
+        serial_success, serial_output = run_command(
+            serial_cmd,
+            f"Serial tests ({serial_count} tests, not parallel_safe)",
+            args.timeout
+        )
+        results.append(("Serial", serial_success, serial_output))
+
+        if not serial_success and not args.serial_only:
+            print("\n⚠️  Serial tests failed, but continuing with parallel tests...")
+
+    # Then run parallel_safe tests with xdist
     if not args.serial_only:
-        # Run parallel tests
-        parallel_cmd = [*base_pytest, f"-n{args.workers}", "--dist=worksteal", "-m", "not serial", *test_paths]
+        parallel_cmd = [
+            *base_pytest,
+            f"-n{args.workers}",
+            "--dist=worksteal",
+            "-m", "parallel_safe",
+            *test_paths
+        ]
 
         parallel_success, parallel_output = run_command(
             parallel_cmd,
@@ -154,20 +188,6 @@ def main():
             args.timeout
         )
         results.append(("Parallel", parallel_success, parallel_output))
-
-        if not parallel_success and not args.parallel_only:
-            print("\n⚠️  Parallel tests failed, but continuing with serial tests...")
-
-    if not args.parallel_only:
-        # Run serial tests
-        serial_cmd = [*base_pytest, "-m", "serial", *test_paths]
-
-        serial_success, serial_output = run_command(
-            serial_cmd,
-            f"Serial tests ({serial_count} tests)",
-            args.timeout
-        )
-        results.append(("Serial", serial_success, serial_output))
 
     # Summary
     print(f"\n{'='*60}")

@@ -144,7 +144,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
                     qt_signal_manager.destroyed.connect(
                         cls._on_dialog_destroyed, Qt.ConnectionType.UniqueConnection
                     )
-                    instance._signals_connected = True  # type: ignore[attr-defined]
+                    instance._signals_connected = True
                     logger.debug("Signals connected via QtDialogSignalManager")
                     return
 
@@ -158,7 +158,7 @@ class ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDial
             instance.destroyed.connect(
                 cls._on_dialog_destroyed, Qt.ConnectionType.UniqueConnection
             )
-            instance._signals_connected = True  # type: ignore[attr-defined]
+            instance._signals_connected = True
             logger.debug("Signals connected directly to dialog")
 
         except Exception as e:
@@ -607,7 +607,7 @@ class ROMExtractionPanel(QWidget):
         logger.debug("[DEBUG] _open_manual_offset_dialog called")
 
         if not self.rom_path:
-            UserErrorDialog.show_error(
+            UserErrorDialog.display_error(
                 self,
                 "Please load a ROM file first",
                 "A ROM must be loaded before using manual offset control."
@@ -1021,7 +1021,7 @@ class ROMExtractionPanel(QWidget):
         except Exception as e:
             logger.exception("Error in sprite scanning")
             self.state_manager.finish_scanning(success=False, error=str(e))
-            UserErrorDialog.show_error(
+            UserErrorDialog.display_error(
                 self,
                 "Failed to scan for sprites",
                 f"Technical details: {e!s}"

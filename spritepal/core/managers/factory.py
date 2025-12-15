@@ -6,7 +6,6 @@ Qt's object lifecycle and enabling both singleton and per-worker patterns.
 """
 from __future__ import annotations
 
-import threading
 from typing import TYPE_CHECKING, Protocol
 
 from PySide6.QtCore import QObject
@@ -122,113 +121,6 @@ class StandardManagerFactory:
         self._logger.debug(f"Created InjectionManager with parent: {qt_parent}")
         return manager
 
-class SingletonManagerFactory:
-    """
-    Manager factory that returns singleton instances from the global registry.
-
-    This provides backward compatibility with the existing global registry pattern
-    while maintaining the factory interface.
-    """
-
-    def __init__(self) -> None:
-        self._logger: logging.Logger = get_logger(f"{__name__}.SingletonManagerFactory")
-
-    def create_extraction_manager(self, parent: QObject | None = None) -> ExtractionManager:
-        """
-        Get the singleton ExtractionManager from global registry.
-
-        Args:
-            parent: Ignored for singleton pattern
-
-        Returns:
-            Singleton ExtractionManager instance
-        """
-        # Use DI container to get singleton instance
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ExtractionManagerProtocol
-
-        if parent is not None:
-            self._logger.warning(
-                "Parent parameter ignored for singleton factory - "
-                "use StandardManagerFactory for per-instance parents"
-            )
-
-        manager: ExtractionManager = inject(ExtractionManagerProtocol)  # type: ignore[assignment]
-        self._logger.debug("Returned singleton ExtractionManager")
-        return manager
-
-    def create_injection_manager(self, parent: QObject | None = None) -> InjectionManager:
-        """
-        Get the singleton InjectionManager from global registry.
-
-        Args:
-            parent: Ignored for singleton pattern
-
-        Returns:
-            Singleton InjectionManager instance
-        """
-        # Use DI container to get singleton instance
-        from core.di_container import inject
-        from core.protocols.manager_protocols import InjectionManagerProtocol
-
-        if parent is not None:
-            self._logger.warning(
-                "Parent parameter ignored for singleton factory - "
-                "use StandardManagerFactory for per-instance parents"
-            )
-
-        manager: InjectionManager = inject(InjectionManagerProtocol)  # type: ignore[assignment]
-        self._logger.debug("Returned singleton InjectionManager")
-        return manager
-
-class _DefaultFactoryHolder:
-    """Holds the default factory instance without using global keyword."""
-    _instance: ManagerFactory | None = None
-    _lock = threading.Lock()
-
-    @classmethod
-    def get(cls) -> ManagerFactory:
-        """Get the default factory instance."""
-        # Fast path - check without lock
-        if cls._instance is not None:
-            return cls._instance
-
-        # Slow path - create with lock
-        with cls._lock:
-            # Double-check pattern
-            if cls._instance is None:
-                # Default to singleton pattern for backward compatibility
-                cls._instance = SingletonManagerFactory()
-                logger.debug("Created default SingletonManagerFactory")
-
-            return cls._instance
-
-    @classmethod
-    def set(cls, factory: ManagerFactory) -> None:
-        """Set the default factory instance."""
-        with cls._lock:
-            cls._instance = factory
-            logger.info(f"Set default factory to: {type(factory).__name__}")
-
-def get_default_factory() -> ManagerFactory:
-    """
-    Get the default manager factory instance.
-
-    Returns:
-        Default ManagerFactory instance
-    """
-    return _DefaultFactoryHolder.get()
-
-def set_default_factory(factory: ManagerFactory) -> None:
-    """
-    Set the default manager factory instance.
-
-    This allows switching between singleton and per-instance patterns globally.
-
-    Args:
-        factory: ManagerFactory implementation to use as default
-    """
-    _DefaultFactoryHolder.set(factory)
 
 def create_per_worker_factory(worker: QObject) -> ManagerFactory:
     """

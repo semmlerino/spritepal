@@ -366,8 +366,17 @@ def detect_session_manager_cleanup(request: FixtureRequest) -> Generator[None, N
 
     Previously this fixture would silently restore managers, masking the bug.
     Now it fails immediately so the test can be fixed properly.
+
+    Note: Under xdist, parallel_safe tests use isolated_managers and don't
+    share session state, so this check is skipped for them.
     """
     from core.managers.registry import ManagerRegistry
+    from tests.fixtures.xdist_fixtures import is_xdist_worker
+
+    # Skip check for parallel_safe tests under xdist - they use isolated_managers
+    if is_xdist_worker() and request.node.get_closest_marker("parallel_safe"):
+        yield
+        return
 
     # Check if test uses session_managers fixture
     fixture_names = getattr(request, 'fixturenames', [])

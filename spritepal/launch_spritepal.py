@@ -6,7 +6,6 @@ SpritePal - Modern Sprite Extraction Tool
 Simplifies sprite extraction with automatic palette association
 """
 
-import os
 import sys
 from pathlib import Path
 from types import TracebackType

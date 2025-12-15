@@ -319,7 +319,7 @@ class TestRealMainWindowStateIntegration:
             assert "create_metadata" in params, "Should have metadata parameter"
             assert params["create_metadata"] is False, "Should have real metadata checkbox state"
 
-    @patch("ui.main_window.UserErrorDialog.show_error")
+    @patch("ui.main_window.UserErrorDialog.display_error")
     def test_real_error_state_recovery_vs_mocked_error_handling(self, mock_show_error):
         """
         Test real error state recovery vs mocked error simulation.

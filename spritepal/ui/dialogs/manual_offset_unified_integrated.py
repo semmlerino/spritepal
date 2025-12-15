@@ -18,7 +18,7 @@ import contextlib
 import time
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 with contextlib.suppress(ImportError):
     pass
@@ -105,7 +105,7 @@ from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmart
 
 # SimpleBrowseTab, SimpleSmartTab, SimpleHistoryTab removed - now imported from ui.tabs.manual_offset
 
-class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
+class UnifiedManualOffsetDialog(DialogBase):
     """
     Unified Manual Offset Dialog combining simplified architecture with tab-based navigation.
 
@@ -246,6 +246,7 @@ class UnifiedManualOffsetDialog(DialogBase):  # type: ignore[misc]
         with contextlib.suppress(BaseException):
             logger.debug(f"Dialog {self._debug_id} being destroyed")
 
+    @override
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""
         try:
@@ -1383,6 +1384,7 @@ Cache Misses: {session_stats['misses']}"""
 
     # Event handlers
 
+    @override
     def keyPressEvent(self, event: QKeyEvent | None) -> None:
         """Handle keyboard shortcuts."""
         if event:
@@ -1414,6 +1416,7 @@ Cache Misses: {session_stats['misses']}"""
 
         super().keyPressEvent(event)
 
+    @override
     def closeEvent(self, event: QCloseEvent | None) -> None:
         """Handle close event."""
         logger.debug(f"Dialog {self._debug_id} closing")
@@ -1421,6 +1424,7 @@ Cache Misses: {session_stats['misses']}"""
         if event:
             super().closeEvent(event)
 
+    @override
     def hideEvent(self, event: QHideEvent | None) -> None:
         """Handle hide event."""
         logger.debug(f"Dialog {self._debug_id} hiding")
@@ -1430,6 +1434,7 @@ Cache Misses: {session_stats['misses']}"""
         if event:
             super().hideEvent(event)
 
+    @override
     def showEvent(self, event: Any) -> None:
         """Handle show event - set up initial splitter sizes here."""
         logger.debug(f"Dialog {self._debug_id} showing")
@@ -1457,6 +1462,7 @@ Cache Misses: {session_stats['misses']}"""
         """Create a styled section title label - delegated to layout manager."""
         return self.layout_manager.create_section_title(text)
 
+    @override
     def resizeEvent(self, event: Any) -> None:
         """Handle resize event - adjust splitter proportionally."""
         super().resizeEvent(event)
@@ -1465,6 +1471,7 @@ Cache Misses: {session_stats['misses']}"""
         if self.isVisible():
             self.layout_manager.handle_resize(event.size().width())
 
+    @override
     def moveEvent(self, event: Any) -> None:
         """Handle dialog move event - constrain to screen bounds"""
         super().moveEvent(event)

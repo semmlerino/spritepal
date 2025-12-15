@@ -710,7 +710,7 @@ class MainWindow(QMainWindow):
         self.toolbar_manager.set_extract_enabled(True)
         self.status_bar_manager.show_message("Extraction failed")
 
-        UserErrorDialog.show_error(
+        UserErrorDialog.display_error(
             self,
             error_message,
             error_message  # Pass full error as technical details
