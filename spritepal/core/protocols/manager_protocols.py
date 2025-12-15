@@ -296,6 +296,25 @@ class SessionManagerProtocol(Protocol):
         """
         ...
 
+    def get_window_geometry(self) -> dict[str, int]:
+        """
+        Get saved window geometry.
+
+        Returns:
+            Dictionary with width, height, x, y
+        """
+        ...
+
+    def update_window_state(self, geometry: dict[str, int | float]) -> None:
+        """
+        Update window geometry in settings.
+
+        Args:
+            geometry: Dictionary with width, height, x, y
+        """
+        ...
+
+
 class ContextManagerProtocol(Protocol):
     """Protocol for context manager."""
 
