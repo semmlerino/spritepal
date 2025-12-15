@@ -29,10 +29,12 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-try:
+import sys
+
+if sys.version_info >= (3, 12):
     from typing import override
-except ImportError:
-    from typing import override
+else:
+    from typing_extensions import override
 
 from PySide6.QtCore import QObject, QThread, Signal
 

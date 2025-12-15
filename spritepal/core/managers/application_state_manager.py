@@ -13,7 +13,8 @@ from collections import OrderedDict
 from datetime import UTC, datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, ClassVar, TypeVar, override
+from types import MappingProxyType
+from typing import Any, ClassVar, Mapping, Sequence, TypeVar, override
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
@@ -546,10 +547,10 @@ class ApplicationStateManager(BaseManager):
 
             return True
 
-    def get_sprite_history(self) -> list[dict[str, Any]]:
-        """Get full sprite history."""
+    def get_sprite_history(self) -> Sequence[dict[str, Any]]:
+        """Get full sprite history (read-only snapshot)."""
         with self._lock:
-            return self._sprite_history.copy()
+            return tuple(self._sprite_history)
 
     def clear_sprite_history(self) -> None:
         """Clear sprite history."""
@@ -747,14 +748,14 @@ class ApplicationStateManager(BaseManager):
             stats_copy = self._cache_session_stats.copy()
         self.cache_stats_updated.emit(stats_copy)
 
-    def get_cache_session_stats(self) -> dict[str, int]:
-        """Get current cache session statistics.
+    def get_cache_session_stats(self) -> Mapping[str, int]:
+        """Get current cache session statistics (read-only view).
 
         Returns:
-            Dictionary with 'hits', 'misses', and 'total_requests' counts
+            Read-only dict with 'hits', 'misses', and 'total_requests' counts
         """
         with self._cache_stats_lock:
-            return self._cache_session_stats.copy()
+            return MappingProxyType(self._cache_session_stats.copy())
 
     def reset_cache_session_stats(self) -> None:
         """Reset cache session statistics to zero."""
@@ -799,14 +800,14 @@ class ApplicationStateManager(BaseManager):
         with self._cache_stats_lock:
             return offset in self._preloaded_offsets
 
-    def get_preloaded_offsets(self) -> set[int]:
-        """Get set of all preloaded offsets.
+    def get_preloaded_offsets(self) -> frozenset[int]:
+        """Get set of all preloaded offsets (immutable snapshot).
 
         Returns:
-            Copy of the preloaded offsets set
+            Immutable frozenset of preloaded offsets
         """
         with self._cache_stats_lock:
-            return self._preloaded_offsets.copy()
+            return frozenset(self._preloaded_offsets)
 
     def clear_preloaded_offsets(self) -> None:
         """Clear the preloaded offsets tracking."""

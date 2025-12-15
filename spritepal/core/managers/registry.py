@@ -309,17 +309,6 @@ class ManagerRegistry:
             except Exception as e:
                 safe_debug(self._logger, f"Error clearing DI container: {e}")
 
-            # Clear context references to break circular dependencies
-            try:
-                from .context import _context_manager
-                if _context_manager is not None:
-                    _context_manager.set_current_context(None)
-                    safe_debug(self._logger, "Cleared context manager references")
-                else:
-                    safe_debug(self._logger, "Context manager already cleaned up")
-            except Exception as e:
-                safe_debug(self._logger, f"Error clearing context references: {e}")
-
             safe_info(self._logger, "All managers cleaned up")
 
     def get_session_manager(self) -> SessionManager:

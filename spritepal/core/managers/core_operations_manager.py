@@ -415,14 +415,6 @@ class ExtractionAdapter(ExtractionManager):
         """Delegate reset to core manager."""
         self._core.reset_state(full_reset)
 
-    def extract_active_palettes(self, *args: Any, **kwargs: Any) -> None:
-        """Extract active palettes from OAM data."""
-        # Implement palette extraction logic
-        args[0]
-        # This is a simplified implementation
-        # The full implementation would analyze OAM data
-        active_palettes = list(range(8, 16))  # Sprite palettes
-        self._core.active_palettes_found.emit(active_palettes)
 
 class InjectionAdapter(InjectionManager):
     """

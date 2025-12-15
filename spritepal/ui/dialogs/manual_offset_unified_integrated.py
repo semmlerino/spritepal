@@ -240,12 +240,6 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # DialogSignalManager handles custom signals to avoid Qt metaclass issues
 
-
-    def __del__(self):
-        """Destructor for tracking dialog destruction."""
-        with contextlib.suppress(BaseException):
-            logger.debug(f"Dialog {self._debug_id} being destroyed")
-
     @override
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""

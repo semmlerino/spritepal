@@ -163,20 +163,15 @@ def controller(main_window, managers):
 Use context managers for thread-local dependency injection:
 
 ```python
-@pytest.fixture
-def manager_context_factory():
-    """Factory for manager contexts"""
-    def _create_context(managers):
-        from core.managers.context import manager_context
-        return manager_context(managers)
-    return _create_context
+from tests.infrastructure.manager_test_context import manager_context
 
-def test_worker_with_context(manager_context_factory, real_extraction_manager):
+def test_worker_with_context():
     # Worker needs manager in context
-    with manager_context_factory({"extraction": real_extraction_manager}):
+    with manager_context("extraction") as ctx:
+        extraction_manager = ctx.get_extraction_manager()
         worker = VRAMExtractionWorker(params)
-        # Worker can now find manager via get_extraction_manager()
-        assert worker.manager is not None
+        # Worker can now find manager via context
+        assert extraction_manager is not None
 ```
 
 ## Signal Testing
@@ -432,8 +427,11 @@ def test_worker_interruption(qtbot, worker):
 ### Worker with Manager Context
 
 ```python
-def test_worker_with_manager(manager_context_factory, real_manager):
-    with manager_context_factory({"extraction": real_manager}):
+from tests.infrastructure.manager_test_context import manager_context
+
+def test_worker_with_manager():
+    with manager_context("extraction") as ctx:
+        extraction_mgr = ctx.get_extraction_manager()
         worker = ExtractionWorker(params)
         # Worker finds manager through context
         worker.start()

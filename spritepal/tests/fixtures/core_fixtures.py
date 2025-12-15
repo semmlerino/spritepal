@@ -874,7 +874,7 @@ def mock_controller(fast_mock_main_window: MockMainWindowProtocol) -> Mock:
 # ============================================================================
 
 @pytest.fixture
-def manager_context_factory() -> Callable[[dict[str, Any] | list[str] | None, str], ContextManager[Any]]:
+def manager_context_factory() -> Callable[..., ContextManager[Any]]:
     """
     Factory for creating manager contexts for dependency injection tests.
 
@@ -883,84 +883,89 @@ def manager_context_factory() -> Callable[[dict[str, Any] | list[str] | None, st
 
     Usage:
         def test_my_dialog(manager_context_factory):
-            mock_injection = Mock()
-            with manager_context_factory({"injection": mock_injection}):
+            with manager_context_factory():
                 dialog = InjectionDialog()
-                # dialog will use mock_injection
+                # dialog will use real managers from context
     """
-    from core.managers.context import manager_context
-    from tests.infrastructure.test_manager_factory import ManagerFactory
+    from tests.infrastructure.manager_test_context import (
+        ManagerTestContext,
+        manager_context,
+    )
 
     def _create_context(
         managers: dict[str, Any] | list[str] | None = None,
         name: str = "test_context"
-    ) -> ContextManager[Any]:
+    ) -> ContextManager[ManagerTestContext]:
         """
         Create a manager context for testing.
 
         Args:
-            managers: Dict of manager instances, or list of manager names
-            name: Context name for debugging
+            managers: Dict of manager instances (ignored - uses real managers),
+                     or list of manager type names ("extraction", "injection", "session")
+            name: Context name for debugging (unused, kept for compatibility)
 
         Returns:
             Context manager for use in with statements
         """
+        # Determine which managers to initialize
         if managers is None:
-            # Create complete test context
-            context_managers = {
-                "extraction": ManagerFactory.create_test_extraction_manager(),
-                "injection": ManagerFactory.create_test_injection_manager(),
-                "session": ManagerFactory.create_test_session_manager(),
-            }
+            # Create complete test context with all managers
+            manager_types = ("extraction", "injection", "session")
         elif isinstance(managers, list):
-            # Create context with specific managers
-            context_managers = {}
-            for manager_name in managers:
-                if manager_name == "extraction":
-                    context_managers[manager_name] = ManagerFactory.create_test_extraction_manager()
-                elif manager_name == "injection":
-                    context_managers[manager_name] = ManagerFactory.create_test_injection_manager()
-                elif manager_name == "session":
-                    context_managers[manager_name] = ManagerFactory.create_test_session_manager()
+            # Use specified manager types
+            manager_types = tuple(managers)
+        elif isinstance(managers, dict):
+            # Dict provided - extract keys as manager types
+            # Note: Actual instances are ignored; we use real managers
+            manager_types = tuple(managers.keys())
         else:
-            # Use provided manager dict
-            context_managers = managers
+            manager_types = ("extraction", "injection", "session")
 
-        return manager_context(context_managers, name=name)
+        return manager_context(*manager_types)
 
     return _create_context
 
 
 @pytest.fixture
-def test_injection_manager() -> Mock:
+def test_injection_manager():
     """Provide a test injection manager instance."""
-    from tests.infrastructure.test_manager_factory import ManagerFactory
-    return ManagerFactory.create_test_injection_manager()
+    from tests.infrastructure.manager_test_context import manager_context
+
+    with manager_context("injection") as ctx:
+        yield ctx.get_injection_manager()
 
 
 @pytest.fixture
-def test_extraction_manager() -> Mock:
+def test_extraction_manager():
     """Provide a test extraction manager instance."""
-    from tests.infrastructure.test_manager_factory import ManagerFactory
-    return ManagerFactory.create_test_extraction_manager()
+    from tests.infrastructure.manager_test_context import manager_context
+
+    with manager_context("extraction") as ctx:
+        yield ctx.get_extraction_manager()
 
 
 @pytest.fixture
-def test_session_manager() -> Mock:
+def test_session_manager():
     """Provide a test session manager instance."""
-    from tests.infrastructure.test_manager_factory import ManagerFactory
-    return ManagerFactory.create_test_session_manager()
+    from tests.infrastructure.manager_test_context import manager_context
+
+    with manager_context("session") as ctx:
+        yield ctx.get_session_manager()
 
 
 @pytest.fixture
-def complete_test_context() -> Any:
+def complete_test_context():
     """Provide a complete test context with all managers configured."""
-    from tests.infrastructure.test_manager_factory import ManagerFactory
-    return ManagerFactory.create_complete_test_context()
+    from tests.infrastructure.manager_test_context import manager_context
+
+    with manager_context("extraction", "injection", "session") as ctx:
+        yield ctx
 
 
 @pytest.fixture
-def minimal_injection_context() -> Any:
+def minimal_injection_context():
     """Provide a minimal context with just injection manager for dialog tests."""
-    from tests.infrastructure.test_manager_factory import ManagerFactory
-    return ManagerFactory.create_minimal_test_context(["injection"], name="dialog_test")
+    from tests.infrastructure.manager_test_context import manager_context
+
+    with manager_context("injection") as ctx:
+        yield ctx

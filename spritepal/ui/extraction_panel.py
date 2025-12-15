@@ -925,12 +925,3 @@ class ExtractionPanel(QGroupBox):
             return
 
         super().keyPressEvent(event)
-
-    def __del__(self) -> None:
-        """Destructor to ensure timer is stopped even if cleanup fails."""
-        try:
-            if hasattr(self, "_offset_timer"):
-                self._offset_timer.stop()
-        except (RuntimeError, AttributeError):
-            # Widget may already be deleted
-            pass

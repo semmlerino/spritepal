@@ -23,14 +23,7 @@ See Also:
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, override
-
-if TYPE_CHECKING:
-    from core.extractor import SpriteExtractor
-    from core.palette_manager import PaletteManager
-    from core.rom_extractor import ROMExtractor
-    from core.services.rom_service import ROMService
-    from core.services.vram_service import VRAMService
+from typing import Any, override
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal

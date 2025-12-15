@@ -455,10 +455,10 @@ class TestManagerContextIntegration:
             qtbot.addWidget(injection_dialog)
 
             # Verify dialog can access required managers
-            injection_manager = context.get_manager("injection", object)
+            injection_manager = context.get_manager("injection")
             assert injection_manager is not None
 
-            session_manager = context.get_manager("session", object)
+            session_manager = context.get_manager("session")
             assert session_manager is not None
 
             # Clean up
@@ -472,7 +472,7 @@ class TestManagerContextIntegration:
             qtbot.addWidget(dialog1)
 
             # Verify context1 managers
-            manager1 = ctx1.get_manager("injection", object)
+            manager1 = ctx1.get_manager("injection")
             assert manager1 is not None
 
             dialog1.close()
@@ -483,7 +483,7 @@ class TestManagerContextIntegration:
             qtbot.addWidget(dialog2)
 
             # Verify context2 managers are different instances
-            manager2 = ctx2.get_manager("injection", object)
+            manager2 = ctx2.get_manager("injection")
             assert manager2 is not None
             assert manager2 is not manager1  # Should be different instances
 
@@ -496,7 +496,7 @@ class TestManagerContextIntegration:
             dialog1 = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
             qtbot.addWidget(dialog1)
 
-            injection_manager = context.get_manager("injection", object)
+            injection_manager = context.get_manager("injection")
             injection_manager.test_value = "test_state"
 
             dialog1.close()
@@ -506,7 +506,7 @@ class TestManagerContextIntegration:
             qtbot.addWidget(dialog2)
 
             # Manager state should persist
-            same_manager = context.get_manager("injection", object)
+            same_manager = context.get_manager("injection")
             assert same_manager is injection_manager
             assert hasattr(same_manager, 'test_value')
             assert same_manager.test_value == "test_state"

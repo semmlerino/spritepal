@@ -102,10 +102,6 @@ class SearchWorker(QThread):
         from core.services.worker_lifecycle import WorkerManager
         WorkerManager._register_worker(self)
 
-    def __del__(self):
-        """Ensure proper cleanup of resources."""
-        self._cleanup_finder()
-
     @handle_worker_errors("search operation")
     @override
     def run(self):

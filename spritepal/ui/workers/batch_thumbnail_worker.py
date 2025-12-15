@@ -193,10 +193,6 @@ class BatchThumbnailWorker(QObject):
         # Cleanup tracking for idempotent cleanup
         self._cleanup_called = False  # Optimal for I/O + CPU bound tasks
 
-    def __del__(self) -> None:
-        """Ensure cleanup when object is garbage collected."""
-        self.cleanup()
-
     def queue_thumbnail(
         self,
         offset: int,
@@ -833,10 +829,6 @@ class ThumbnailWorkerController(QObject):
         self.worker: BatchThumbnailWorker | None = None
         self._thread: QThread | None = None
         self._cleanup_called = False
-
-    def __del__(self) -> None:
-        """Ensure cleanup when object is garbage collected."""
-        self.cleanup()
 
     def start_worker(self, rom_path: str, rom_extractor: ROMExtractor | None = None) -> None:
         """Start worker with proper thread management."""
