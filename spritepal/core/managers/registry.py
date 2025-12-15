@@ -4,6 +4,7 @@ Registry for accessing manager instances
 from __future__ import annotations
 
 import threading
+import warnings
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtWidgets import QApplication
@@ -334,7 +335,8 @@ class ManagerRegistry:
         """
         Get the session manager instance.
 
-        Delegates to DI container for consistent dependency resolution.
+        .. deprecated::
+            Use ``inject(SessionManagerProtocol)`` from ``core.di_container`` instead.
 
         Returns:
             SessionManager instance
@@ -342,6 +344,12 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
+        warnings.warn(
+            "ManagerRegistry.get_session_manager() is deprecated. "
+            "Use inject(SessionManagerProtocol) from core.di_container instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         from core.di_container import inject
         from core.protocols.manager_protocols import SessionManagerProtocol
         try:
@@ -353,7 +361,8 @@ class ManagerRegistry:
         """
         Get the extraction manager instance.
 
-        Delegates to DI container for consistent dependency resolution.
+        .. deprecated::
+            Use ``inject(ExtractionManagerProtocol)`` from ``core.di_container`` instead.
 
         Returns:
             ExtractionManager instance
@@ -361,6 +370,12 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
+        warnings.warn(
+            "ManagerRegistry.get_extraction_manager() is deprecated. "
+            "Use inject(ExtractionManagerProtocol) from core.di_container instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         from core.di_container import inject
         from core.protocols.manager_protocols import ExtractionManagerProtocol
         try:
@@ -372,7 +387,8 @@ class ManagerRegistry:
         """
         Get the injection manager instance.
 
-        Delegates to DI container for consistent dependency resolution.
+        .. deprecated::
+            Use ``inject(InjectionManagerProtocol)`` from ``core.di_container`` instead.
 
         Returns:
             InjectionManager instance
@@ -380,6 +396,12 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
+        warnings.warn(
+            "ManagerRegistry.get_injection_manager() is deprecated. "
+            "Use inject(InjectionManagerProtocol) from core.di_container instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         from core.di_container import inject
         from core.protocols.manager_protocols import InjectionManagerProtocol
         try:

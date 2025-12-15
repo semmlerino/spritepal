@@ -37,9 +37,14 @@ class ROMInjectionWorker(QThread):
         metadata_path: str | None = None,
     ):
         super().__init__()
+        # Resolve paths at construction time to prevent TOCTOU vulnerabilities
+        # Store both original and resolved paths for logging/error messages
         self.sprite_path: str = sprite_path
         self.rom_input: str = rom_input
         self.rom_output: str = rom_output
+        self._resolved_sprite_path: Path = Path(sprite_path).resolve()
+        self._resolved_rom_input: Path = Path(rom_input).resolve()
+        self._resolved_rom_output: Path = Path(rom_output).resolve() if rom_output else Path()
         self.sprite_offset: int = sprite_offset
         self.fast_compression: bool = fast_compression
         self.metadata_path: str | None = metadata_path
@@ -145,8 +150,22 @@ class ROMInjectionWorker(QThread):
                 actual_offset += header_offset
                 logger.debug(f"Adjusted offset for header: 0x{actual_offset:X}")
 
+            # Re-validate paths immediately before injection (TOCTOU protection)
+            # Paths could have been deleted/moved since initial validation
+            if not self._resolved_rom_input.exists():
+                self.injection_finished.emit(
+                    False,
+                    f"ROM file no longer accessible: {self._resolved_rom_input}"
+                )
+                return
+            if not self._resolved_rom_output.parent.exists():
+                self.injection_finished.emit(
+                    False,
+                    f"Output directory no longer accessible: {self._resolved_rom_output.parent}"
+                )
+                return
+
             # inject_sprite_to_rom handles: compression, backup, PNG-to-4bpp, checksum
-            # Note: rom_output is validated at start of run() - no fallback needed
             success, message = self.injector.inject_sprite_to_rom(
                 sprite_path=self.sprite_path,
                 rom_path=self.rom_input,

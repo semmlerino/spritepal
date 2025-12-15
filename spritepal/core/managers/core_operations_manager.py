@@ -241,9 +241,8 @@ class CoreOperationsManager(BaseManager):
             params.get("metadata_path")
         )
 
-        # Connect signals
+        # Connect signals - business logic only, cleanup happens in _on_injection_finished
         worker.progress.connect(lambda msg: self.injection_progress.emit(msg))
-        worker.finished.connect(self._cleanup_current_worker)  # Ensure cleanup on finish (before emitting completion)
         worker.finished.connect(lambda: self._on_injection_finished(True, "VRAM injection completed"))
         worker.error.connect(lambda msg: self._on_injection_finished(False, msg))
 
@@ -269,9 +268,8 @@ class CoreOperationsManager(BaseManager):
             params.get("metadata_path")
         )
 
-        # Connect signals
+        # Connect signals - business logic only, cleanup happens in _on_injection_finished
         worker.progress.connect(lambda msg: self.injection_progress.emit(msg))
-        worker.finished.connect(self._cleanup_current_worker)  # Ensure cleanup on finish (before emitting completion)
         worker.finished.connect(lambda: self._on_injection_finished(True, "ROM injection completed"))
         worker.error.connect(lambda msg: self._on_injection_finished(False, msg))  # type: ignore[attr-defined]
         worker.compression_info.connect(self.compression_info.emit)
@@ -283,11 +281,16 @@ class CoreOperationsManager(BaseManager):
         return True
 
     def _on_injection_finished(self, success: bool, message: str) -> None:
-        """Handle injection completion."""
+        """Handle injection completion.
+
+        Signal emission order is critical: emit all business signals BEFORE cleanup
+        to prevent race conditions where handlers try to access the worker.
+        """
         self.injection_finished.emit(success, message)
         self.operation_completed.emit("injection", success, message)
         self._finish_operation("injection")
-        # self._current_worker = None  # Moved to _cleanup_current_worker to prevent premature cleanup
+        # Cleanup AFTER all business signals have been emitted
+        self._cleanup_current_worker()
 
     def _cleanup_current_worker(self) -> None:
         """Clean up current worker reference after thread finishes."""

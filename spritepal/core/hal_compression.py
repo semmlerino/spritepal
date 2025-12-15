@@ -410,26 +410,49 @@ class HALProcessPool:
                 # Create weak references to processes for better cleanup tracking
                 self._process_refs = [weakref.ref(p) for p in self._processes]
 
-                # Test pool with a simple operation
-                test_request = HALRequest(
-                    operation="decompress",
-                    rom_path="",  # Will fail but tests communication
-                    offset=0,
-                    request_id="test"
-                )
-                if self._request_queue is not None:
-                    self._request_queue.put(test_request)
-                else:
-                    raise HALPoolError("Request queue not initialized")
+                # Test ALL workers with individual test requests
+                # This ensures every worker in the pool is responsive, not just one
+                test_requests = [
+                    HALRequest(
+                        operation="decompress",
+                        rom_path="",  # Will fail but tests communication
+                        offset=0,
+                        request_id=f"init_test_{i}"
+                    )
+                    for i in range(pool_size)
+                ]
 
-                try:
-                    if self._result_queue is not None:
-                        self._result_queue.get(timeout=2.0)
-                        logger.debug("Pool communication test successful")
-                    else:
-                        raise HALPoolError("Result queue not initialized")
-                except queue.Empty:
-                    raise HALPoolError("Pool communication test failed - no response from workers") from None
+                if self._request_queue is None:
+                    raise HALPoolError("Request queue not initialized")
+                if self._result_queue is None:
+                    raise HALPoolError("Result queue not initialized")
+
+                # Submit test requests to all workers
+                for test_req in test_requests:
+                    self._request_queue.put(test_req)
+
+                # Wait for ALL workers to respond
+                per_worker_timeout = 2.0
+                responses_received = 0
+                for _ in range(pool_size):
+                    try:
+                        self._result_queue.get(timeout=per_worker_timeout)
+                        responses_received += 1
+                    except queue.Empty:
+                        # Worker didn't respond in time, continue to check others
+                        break
+
+                if responses_received == 0:
+                    raise HALPoolError("Pool communication test failed - no workers responded")
+                elif responses_received < pool_size:
+                    # Partial pool - some workers are non-responsive
+                    safe_warning(
+                        logger,
+                        f"HAL pool partially initialized: {responses_received}/{pool_size} workers responded. "
+                        "Some operations may be slower or hang."
+                    )
+                else:
+                    logger.debug(f"Pool communication test successful - all {pool_size} workers responded")
 
                 self._pool_initialized = True  # Mark as initialized
                 logger.info("HAL process pool initialized successfully")
@@ -525,6 +548,32 @@ class HALProcessPool:
             return []
 
         try:
+            # Validate unique request IDs to prevent result collisions
+            # HALRequest is a NamedTuple (immutable), so we need to create new instances
+            request_ids = [req.request_id for req in requests]
+            non_none_ids = [rid for rid in request_ids if rid is not None]
+            if len(set(non_none_ids)) != len(non_none_ids):
+                safe_warning(
+                    logger,
+                    "Non-unique request IDs detected in batch - reassigning unique IDs"
+                )
+                # Create new requests with unique IDs to prevent result collision
+                requests = [
+                    req._replace(request_id=f"batch_{id(req)}_{i}")
+                    for i, req in enumerate(requests)
+                ]
+            elif None in request_ids:
+                safe_warning(
+                    logger,
+                    "None request_id detected in batch - assigning unique IDs"
+                )
+                # Create new requests for those with None IDs
+                requests = [
+                    req._replace(request_id=f"batch_none_{id(req)}_{i}")
+                    if req.request_id is None else req
+                    for i, req in enumerate(requests)
+                ]
+
             # Submit all requests
             for req in requests:
                 if self._request_queue is not None:
@@ -666,13 +715,22 @@ class HALProcessPool:
                         except Exception as e:
                             safe_debug(logger, f"Manager shutdown error: {e}")
 
+                    # Use non-daemon thread for proper cleanup tracking
+                    # Daemon threads are killed on exit, potentially leaving resources leaked
                     shutdown_thread = threading.Thread(target=shutdown_manager)
-                    shutdown_thread.daemon = True
+                    shutdown_thread.daemon = False
                     shutdown_thread.start()
-                    shutdown_thread.join(timeout=1.0)  # Give manager 1 second to shutdown
 
+                    # Escalating wait: 1s initial, then 2s additional if needed
+                    shutdown_thread.join(timeout=1.0)
                     if shutdown_thread.is_alive():
-                        safe_debug(logger, "Manager shutdown timed out")
+                        safe_debug(logger, "Manager shutdown taking longer, waiting additional 2s")
+                        shutdown_thread.join(timeout=2.0)
+                        if shutdown_thread.is_alive():
+                            safe_warning(
+                                logger,
+                                "Manager shutdown did not complete in 3s - forcing cleanup"
+                            )
                 except Exception as e:
                     safe_debug(logger, f"Error during manager shutdown: {e}")
                 finally:

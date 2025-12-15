@@ -136,8 +136,19 @@ class InjectionManager(BaseManager):
             # Validate parameters
             self.validate_injection_params(params)
 
-            # Stop any existing worker
-            WorkerManager.cleanup_worker(self._current_worker, timeout=1000)
+            # Stop any existing worker with mode-appropriate timeout
+            # ROM operations involve compression and take longer to gracefully stop
+            cleanup_timeout = 5000 if params.get("mode") == "rom" else 2000
+            if self._current_worker is not None:
+                WorkerManager.cleanup_worker(self._current_worker, timeout=cleanup_timeout)
+                # Verify cleanup succeeded before proceeding
+                if self._current_worker.isRunning():
+                    self._logger.warning(
+                        f"Previous worker still running after {cleanup_timeout}ms cleanup timeout. "
+                        "Declining to start new injection to prevent data corruption."
+                    )
+                    self._finish_operation(operation)
+                    return False
             self._current_worker = None
 
             # Create appropriate worker based on mode

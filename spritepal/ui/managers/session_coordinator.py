@@ -11,8 +11,10 @@ from PySide6.QtCore import QObject
 # SessionManager accessed via DI: inject(SessionManagerProtocol)
 
 if TYPE_CHECKING:
-    from core.managers.session_manager import SessionManager
-    from core.protocols.manager_protocols import SettingsManagerProtocol
+    from core.protocols.manager_protocols import (
+        SessionManagerProtocol,
+        SettingsManagerProtocol,
+    )
     from ui.extraction_panel import ExtractionPanel
     from ui.main_window import MainWindow
     from ui.managers.output_settings_manager import OutputSettingsManager
@@ -26,7 +28,7 @@ class SessionCoordinator(QObject):
         extraction_panel: ExtractionPanel,
         output_settings_manager: OutputSettingsManager,
         settings_manager: SettingsManagerProtocol,
-        session_manager: SessionManager,
+        session_manager: SessionManagerProtocol,
     ) -> None:
         """Initialize session coordinator
 
@@ -35,7 +37,7 @@ class SessionCoordinator(QObject):
             extraction_panel: Extraction panel for file path save/restore
             output_settings_manager: Output settings for save/restore
             settings_manager: Injected SettingsManagerProtocol instance
-            session_manager: Injected SessionManager instance
+            session_manager: Injected SessionManagerProtocol instance
         """
         super().__init__()
 

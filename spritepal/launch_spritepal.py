@@ -81,7 +81,7 @@ class SpritePalApp(QApplication):
         self.main_window = MainWindow(
             settings_manager=inject(SettingsManagerProtocol),
             rom_cache=inject(ROMCacheProtocol),
-            session_manager=inject(SessionManagerProtocol),  # type: ignore[arg-type]  # Protocol vs concrete type mismatch (pre-existing)
+            session_manager=inject(SessionManagerProtocol),
         )
 
     def _apply_dark_theme(self):

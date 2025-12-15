@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 if TYPE_CHECKING:
     from core.controller import ExtractionController
-    from core.managers.session_manager import SessionManager
     from core.protocols.manager_protocols import (
         ROMCacheProtocol,
+        SessionManagerProtocol,
         SettingsManagerProtocol,
     )
 
@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
         self,
         settings_manager: SettingsManagerProtocol,
         rom_cache: ROMCacheProtocol,
-        session_manager: SessionManager,
+        session_manager: SessionManagerProtocol,
     ) -> None:
         super().__init__()
         # Declare instance variables with type hints
