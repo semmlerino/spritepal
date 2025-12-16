@@ -16,6 +16,7 @@ from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.managers import ExtractionManager, InjectionManager
+    from core.rom_extractor import ROMExtractor
 
 logger = get_logger(__name__)
 
@@ -45,7 +46,7 @@ class ROMInfoLoaderWorker(BaseWorker):
         self,
         rom_path: str,
         injection_manager: InjectionManager | None = None,
-        extraction_manager: ExtractionManager | None = None,
+        extraction_manager: ExtractionManager | ROMExtractor | None = None,
         load_header: bool = True,
         load_sprite_locations: bool = True,
     ) -> None:
@@ -55,7 +56,7 @@ class ROMInfoLoaderWorker(BaseWorker):
         Args:
             rom_path: Path to the ROM file to load
             injection_manager: InjectionManager for loading full ROM info (injection dialog)
-            extraction_manager: ExtractionManager for loading sprite locations (extraction panel)
+            extraction_manager: ExtractionManager or ROMExtractor for loading sprite locations
             load_header: Whether to load ROM header info
             load_sprite_locations: Whether to load known sprite locations
         """

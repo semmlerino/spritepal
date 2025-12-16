@@ -11,13 +11,12 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QObject, QThread, Signal
 
 from ui.common import WorkerManager
-from ui.rom_extraction.workers import SpriteScanWorker
 from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
+from ui.workers.sprite_scan_worker import SpriteScanWorker
 from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoaderWorker
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.managers import ExtractionManager
     from core.rom_extractor import ROMExtractor
 
 logger = get_logger(__name__)
@@ -115,13 +114,13 @@ class ROMWorkerOrchestrator(QObject):
     # ========== Sprite Location Loading ==========
 
     def load_sprite_locations(
-        self, rom_path: str, extraction_manager: ExtractionManager
+        self, rom_path: str, extraction_manager: ROMExtractor
     ) -> None:
         """Load known sprite locations from ROM asynchronously.
 
         Args:
             rom_path: Path to the ROM file
-            extraction_manager: ExtractionManager for loading sprite locations
+            extraction_manager: ROMExtractor for loading sprite locations
         """
         self._cleanup_info_worker()
 
@@ -227,16 +226,21 @@ class ROMWorkerOrchestrator(QObject):
         self,
         rom_path: str,
         sprites: list[dict[str, Any]],
-        extractor: ROMExtractor,
     ) -> None:
-        """Start similarity indexing for sprites."""
+        """Start similarity indexing for sprites.
+
+        Args:
+            rom_path: Path to the ROM file
+            sprites: List of sprite info dicts to index
+        """
         self._cleanup_similarity_worker()
 
-        self._similarity_worker = SimilarityIndexingWorker(
-            rom_path=rom_path,
-            sprites=sprites,
-            extractor=extractor,
-        )
+        self._similarity_worker = SimilarityIndexingWorker(rom_path=rom_path)
+
+        # Feed sprites to the worker before starting
+        for sprite_info in sprites:
+            self._similarity_worker.on_sprite_found(sprite_info)
+
         self._similarity_thread = QThread()
         self._similarity_worker.moveToThread(self._similarity_thread)
 

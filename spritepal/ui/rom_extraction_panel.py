@@ -604,7 +604,6 @@ class ROMExtractionPanel(QWidget):
             self._worker_orchestrator.start_similarity_indexing(
                 rom_path=self.rom_path,
                 sprites=[],  # Will be populated by scan
-                extractor=self.rom_extractor,
             )
             logger.info(f"Initialized similarity indexing for ROM: {Path(self.rom_path).name}")
         except Exception as e:
