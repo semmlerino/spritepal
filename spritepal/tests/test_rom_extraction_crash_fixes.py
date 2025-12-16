@@ -30,6 +30,7 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.qt_real,
     pytest.mark.signals_slots,
+    pytest.mark.parallel_safe,
 ]
 
 class TestSignalLoopFixes:
@@ -207,15 +208,13 @@ class TestROMLoadingSafety:
             # Start async ROM loading
             dialog._load_rom_info("/nonexistent/file.sfc")
 
-            # Wait for the worker to complete
-            if dialog._rom_info_loader is not None:
-                # Wait for the operation_finished signal
-                with qtbot.waitSignal(
-                    dialog._rom_info_loader.operation_finished,
-                    timeout=5000,
-                    raising=True
-                ):
-                    pass
+            # Wait for worker to complete using waitUntil (handles fast-completing workers)
+            # The signal may fire before waitSignal is ready, so check worker state instead
+            def worker_done() -> bool:
+                loader = dialog._rom_info_loader
+                return loader is None or not loader.isRunning()
+
+            qtbot.waitUntil(worker_done, timeout=5000)
 
             # Process events to ensure handler runs
             qtbot.wait(100)
@@ -247,14 +246,13 @@ class TestROMLoadingSafety:
                     # Start async ROM loading
                     dialog._load_rom_info(tmp_file.name)
 
-                    # Wait for the worker to complete
-                    if dialog._rom_info_loader is not None:
-                        with qtbot.waitSignal(
-                            dialog._rom_info_loader.operation_finished,
-                            timeout=5000,
-                            raising=True
-                        ):
-                            pass
+                    # Wait for worker to complete using waitUntil (handles fast-completing workers)
+                    # The signal may fire before waitSignal is ready, so check worker state instead
+                    def worker_done() -> bool:
+                        loader = dialog._rom_info_loader
+                        return loader is None or not loader.isRunning()
+
+                    qtbot.waitUntil(worker_done, timeout=5000)
 
                     # Process events to ensure handler runs
                     qtbot.wait(100)

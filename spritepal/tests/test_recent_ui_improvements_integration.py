@@ -56,6 +56,13 @@ def _create_main_window():
         session_manager=inject(SessionManagerProtocol),
     )
 
+pytestmark = [
+    pytest.mark.gui,
+    pytest.mark.integration,
+    pytest.mark.parallel_safe,
+    pytest.mark.usefixtures("isolated_managers"),
+]
+
 # Import manual offset dialog
 try:
     from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog

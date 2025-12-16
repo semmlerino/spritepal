@@ -50,6 +50,12 @@ from core.monitoring import (
 )
 from ui.dialogs.monitoring_dashboard import MonitoringDashboard
 
+pytestmark = [
+    pytest.mark.headless,
+    pytest.mark.integration,
+    pytest.mark.parallel_safe,
+]
+
 
 class TestPerformanceCollector:
     """Test the performance metrics collector."""

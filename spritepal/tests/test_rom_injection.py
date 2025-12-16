@@ -28,6 +28,7 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.mock_only,
     pytest.mark.unit,
+    pytest.mark.parallel_safe,
     pytest.mark.usefixtures("mock_hal"),  # HAL mocking
 ]
 
