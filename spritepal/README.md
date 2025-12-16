@@ -15,10 +15,11 @@ A PySide6-based sprite extraction and editing tool for SNES ROM hacking.
 Launch the UI from the project root (`exhal-master/`):
 
 ```bash
-# Using uv (recommended)
+# Using uv (recommended) - run from spritepal/ directory
+cd spritepal
 uv run python -c "
-from spritepal.ui.main_window import MainWindow
-from spritepal.core.controller import SpritePalController
+from ui.main_window import MainWindow
+from core.controller import SpritePalController
 from PySide6.QtWidgets import QApplication
 import sys
 
@@ -62,7 +63,7 @@ Requires SNES ROM files for testing (e.g., Kirby Super Star). ROM files are not 
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.12+
 - PySide6 >= 6.5.0
 - uv (for development)
 
@@ -81,8 +82,9 @@ pip install -e ".[dev]"
 ## Programmatic Usage
 
 ```python
-from spritepal.core.controller import SpritePalController
-from spritepal.ui.main_window import MainWindow
+# Run from spritepal/ directory
+from core.controller import SpritePalController
+from ui.main_window import MainWindow
 
 controller = SpritePalController()
 window = MainWindow(controller)

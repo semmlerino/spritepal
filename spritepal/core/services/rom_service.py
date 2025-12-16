@@ -148,17 +148,20 @@ class ROMService(QObject):
             # Extract from ROM
             self.extraction_progress.emit(f"Extracting {sprite_name} from ROM...")
 
-            output_file = f"{output_base}.png"
-            result = self._rom_extractor.extract_sprite_from_rom(rom_path, offset, output_file)
+            # Pass output_base (without .png) and sprite_name to extractor
+            # Extractor appends .png internally and returns the actual output path
+            output_path, _extraction_info = self._rom_extractor.extract_sprite_from_rom(
+                rom_path, offset, output_base, sprite_name
+            )
 
-            if result:
+            if output_path:
                 # Create PIL image for preview using context manager to prevent resource leak
-                with Image.open(output_file) as img:
+                with Image.open(output_path) as img:
                     tile_count = (img.width * img.height) // (8 * 8)
                     # Copy image data before context exits (signal receiver needs valid data)
                     img_copy = img.copy()
 
-                extracted_files.append(output_file)
+                extracted_files.append(output_path)
                 self.preview_generated.emit(img_copy, tile_count)
 
                 # Extract palettes if CGRAM provided - catch errors for partial success
@@ -168,7 +171,7 @@ class ROMService(QObject):
                             self._extract_palettes(
                                 cgram_path,
                                 output_base,
-                                output_file,
+                                output_path,
                                 None,
                                 rom_path,
                                 offset,

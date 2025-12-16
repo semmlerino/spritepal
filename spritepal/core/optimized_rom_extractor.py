@@ -14,18 +14,18 @@ import logging
 import time
 from contextlib import suppress
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, override
 
 from PIL import Image
 
 from core.mmap_rom_reader import MemoryMappedROMReader, optimize_rom_operations
 from core.rom_extractor import ROMExtractor
+from core.tile_renderer import TileRenderer
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_TILES_PER_ROW,
     MIN_SPRITE_TILES,
-    TILE_HEIGHT,
-    TILE_WIDTH,
 )
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,13 @@ class OptimizedROMExtractor(ROMExtractor):
             return self._decompression_cache[cache_key]
 
         self._cache_misses += 1
+
+        # Validate offset before decompression
+        if sprite_offset < 0:
+            raise ValueError(f"Invalid negative offset: {sprite_offset}")
+        rom_size = Path(rom_path).stat().st_size
+        if sprite_offset >= rom_size:
+            raise ValueError(f"Offset 0x{sprite_offset:X} exceeds ROM size 0x{rom_size:X}")
 
         # Use memory-mapped reader for efficient access
         reader = self.get_rom_reader(rom_path)
@@ -239,17 +246,22 @@ class OptimizedROMExtractor(ROMExtractor):
             # Extract sprite data
             sprite_data = self.extract_sprite_data(rom_path, offset, config)
 
-            # Convert to image if needed
+            # Convert to image using TileRenderer
             image = None
             if sprite_data:
-                # Simple tile rendering (would use actual tile renderer)
                 tiles_count = len(sprite_data) // BYTES_PER_TILE
                 if tiles_count >= MIN_SPRITE_TILES:
-                    width = DEFAULT_TILES_PER_ROW * TILE_WIDTH
-                    height = ((tiles_count + DEFAULT_TILES_PER_ROW - 1) // DEFAULT_TILES_PER_ROW) * TILE_HEIGHT
+                    width_tiles = DEFAULT_TILES_PER_ROW
+                    height_tiles = (tiles_count + DEFAULT_TILES_PER_ROW - 1) // DEFAULT_TILES_PER_ROW
 
-                    # Create image (simplified - actual implementation would use tile renderer)
-                    image = Image.new('RGBA', (width, height))
+                    # Use TileRenderer for actual 4bpp tile rendering (grayscale)
+                    renderer = TileRenderer()
+                    image = renderer.render_tiles(
+                        sprite_data,
+                        width_tiles=width_tiles,
+                        height_tiles=height_tiles,
+                        palette_index=None  # Grayscale
+                    )
 
             elapsed_ms = (time.perf_counter() - start_time) * 1000
 
