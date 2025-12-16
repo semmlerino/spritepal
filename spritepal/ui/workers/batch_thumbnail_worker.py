@@ -91,6 +91,7 @@ class LRUCache:
             if key in self._cache:
                 # Update existing and move to end
                 self._cache.move_to_end(key)
+                self._cache[key] = value
             else:
                 # Add new item
                 if len(self._cache) >= self.maxsize:

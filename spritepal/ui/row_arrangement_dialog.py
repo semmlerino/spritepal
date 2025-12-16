@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 from typing import override
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QKeyEvent, QPixmap
+from PySide6.QtGui import QCloseEvent, QImage, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -685,3 +685,54 @@ class RowArrangementDialog(SplitterDialog):
             self._cycle_palette()
         elif a0:
             super().keyPressEvent(a0)
+
+    @override
+    def closeEvent(self, a0: QCloseEvent | None) -> None:
+        """Handle dialog close event with proper cleanup."""
+        self._disconnect_signals()
+        if a0:
+            super().closeEvent(a0)
+
+    def _disconnect_signals(self) -> None:
+        """Disconnect all signals to prevent memory leaks."""
+        disconnect_errors = (RuntimeError, TypeError, AttributeError)
+
+        # Disconnect arrangement manager signals
+        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
+            try:
+                self.arrangement_manager.arrangement_changed.disconnect()
+            except disconnect_errors:
+                pass
+
+        # Disconnect colorizer signals
+        if hasattr(self, "colorizer"):
+            for signal_name in ("palette_mode_changed", "palette_index_changed"):
+                try:
+                    getattr(self.colorizer, signal_name).disconnect()
+                except disconnect_errors:
+                    pass
+
+        # Disconnect list widget signals
+        for list_name in ("available_list", "arranged_list"):
+            if hasattr(self, list_name):
+                widget = getattr(self, list_name)
+                for signal_name in ("itemDoubleClicked", "itemSelectionChanged"):
+                    try:
+                        getattr(widget, signal_name).disconnect()
+                    except disconnect_errors:
+                        pass
+                # Disconnect custom signals on arranged_list
+                if list_name == "arranged_list":
+                    for signal_name in ("external_drop", "item_dropped"):
+                        try:
+                            getattr(widget, signal_name).disconnect()
+                        except disconnect_errors:
+                            pass
+
+        # Disconnect button signals
+        for btn_name in ("add_all_btn", "add_selected_btn", "clear_btn", "remove_selected_btn"):
+            if hasattr(self, btn_name):
+                try:
+                    getattr(self, btn_name).clicked.disconnect()
+                except disconnect_errors:
+                    pass

@@ -189,11 +189,8 @@ class ApplicationStateManager(BaseManager):
         self._workflow_lock = threading.RLock()  # Separate lock for workflow transitions
         self._cache_stats_lock = threading.RLock()  # Lock for cache stats
 
-        # Create backward compatibility adapters
+        # Create backward compatibility adapter for session
         self._session_adapter: SessionAdapter | None = None
-        self._settings_adapter: SettingsAdapter | None = None
-        self._state_adapter: StateAdapter | None = None
-        self._history_adapter: HistoryAdapter | None = None
 
         super().__init__("ApplicationStateManager", parent)
 
@@ -212,11 +209,8 @@ class ApplicationStateManager(BaseManager):
                 "temp": {}
             }
 
-            # Create adapters for backward compatibility
+            # Create session adapter for backward compatibility
             self._session_adapter = SessionAdapter(self)
-            self._settings_adapter = SettingsAdapter(self)
-            self._state_adapter = StateAdapter(self)
-            self._history_adapter = HistoryAdapter(self)
 
             self._is_initialized = True
             self._logger.info("ApplicationStateManager initialized successfully")
@@ -834,18 +828,6 @@ class ApplicationStateManager(BaseManager):
             raise SessionError("Session adapter not initialized")
         return self._session_adapter
 
-    def get_settings_adapter(self) -> Any:
-        """Get settings manager adapter for backward compatibility."""
-        return self._settings_adapter
-
-    def get_state_adapter(self) -> Any:
-        """Get state manager adapter for backward compatibility."""
-        return self._state_adapter
-
-    def get_history_adapter(self) -> Any:
-        """Get history manager adapter for backward compatibility."""
-        return self._history_adapter
-
     # ========== Unified State Snapshot ==========
 
     def get_full_state_snapshot(self) -> dict[str, Any]:
@@ -991,78 +973,3 @@ class SessionAdapter(SessionManager):
 
     def update_file_path(self, file_type: str, path: str) -> None:
         self._state_mgr.update_session_file(file_type, path)
-
-class SettingsAdapter:
-    """Adapter providing SettingsManager interface."""
-
-    def __init__(self, state_manager: ApplicationStateManager):
-        self._state_mgr = state_manager
-        self.app_name = state_manager._app_name
-
-    def get(self, category: str, key: str, default: Any = None) -> Any:
-        return self._state_mgr.get_setting(category, key, default)
-
-    def set(self, category: str, key: str, value: Any) -> None:
-        self._state_mgr.set_setting(category, key, value)
-
-    def save_settings(self) -> None:
-        self._state_mgr.save_settings()
-
-    def save(self) -> None:
-        self.save_settings()
-
-    def get_value(self, category: str, key: str, default: Any = None) -> Any:
-        return self.get(category, key, default)
-
-    def set_value(self, category: str, key: str, value: Any) -> None:
-        self.set(category, key, value)
-
-class StateAdapter:
-    """Adapter providing StateManager interface."""
-
-    def __init__(self, state_manager: ApplicationStateManager):
-        self._state_mgr = state_manager
-
-    def get(self, namespace: str, key: str, default: Any = None) -> Any:
-        return self._state_mgr.get_state(namespace, key, default)
-
-    def set(self, namespace: str, key: str, value: Any,
-            ttl_seconds: float | None = None) -> None:
-        self._state_mgr.set_state(namespace, key, value, ttl_seconds)
-
-    def clear(self, namespace: str | None = None) -> None:
-        self._state_mgr.clear_state(namespace)
-
-    def create_snapshot(self, namespace: str | None = None) -> str:
-        return self._state_mgr.create_snapshot(namespace)
-
-    def restore_snapshot(self, snapshot_id: str) -> bool:
-        return self._state_mgr.restore_snapshot(snapshot_id)
-
-class HistoryAdapter:
-    """Adapter providing SpriteHistoryManager interface."""
-
-    def __init__(self, state_manager: ApplicationStateManager):
-        self._state_mgr = state_manager
-        self.MAX_HISTORY = 50
-
-    def add_sprite(self, offset: int, quality: float = 1.0) -> bool:
-        return self._state_mgr.add_sprite_to_history(offset, quality)
-
-    def has_sprite(self, offset: int) -> bool:
-        history = self._state_mgr.get_sprite_history()
-        return any(s["offset"] == offset for s in history)
-
-    def clear_history(self) -> None:
-        self._state_mgr.clear_sprite_history()
-
-    def get_sprites(self) -> list[tuple[int, float]]:
-        history = self._state_mgr.get_sprite_history()
-        return [(s["offset"], s.get("quality", 1.0)) for s in history]
-
-    def get_sprite_info(self, offset: int) -> dict[str, Any] | None:
-        history = self._state_mgr.get_sprite_history()
-        for sprite in history:
-            if sprite["offset"] == offset:
-                return sprite.copy()
-        return None

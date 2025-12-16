@@ -832,17 +832,17 @@ class GridArrangementDialog(SplitterDialog):
         export_shortcut = QShortcut(QKeySequence("Ctrl+E"), self)
         export_shortcut.activated.connect(self._export_arrangement)
 
-        # Ctrl+Z for undo
+        # Ctrl+Z for undo (placeholder - not yet implemented)
         undo_shortcut = QShortcut(QKeySequence("Ctrl+Z"), self)
-        undo_shortcut.activated.connect(lambda: None)  # TODO: Implement undo functionality
+        undo_shortcut.activated.connect(self._on_undo)
 
-        # Ctrl+Y for redo
+        # Ctrl+Y for redo (placeholder - not yet implemented)
         redo_shortcut = QShortcut(QKeySequence("Ctrl+Y"), self)
-        redo_shortcut.activated.connect(lambda: None)  # TODO: Implement redo functionality
+        redo_shortcut.activated.connect(self._on_redo)
 
         # Del for clear selection
         delete_shortcut = QShortcut(QKeySequence("Delete"), self)
-        delete_shortcut.activated.connect(lambda: getattr(getattr(self, 'graphics_view', None), 'clear_selection', lambda: None)())
+        delete_shortcut.activated.connect(self._on_delete_selection)
 
     def _create_selection_mode_group(self, parent: QWidget) -> QGroupBox:
         """Create the selection mode controls group.
@@ -1051,6 +1051,21 @@ class GridArrangementDialog(SplitterDialog):
 
         preview_group.setLayout(preview_layout)
         return preview_group
+
+    def _on_undo(self) -> None:
+        """Handle undo shortcut (placeholder)."""
+        # TODO: Implement undo functionality
+        pass
+
+    def _on_redo(self) -> None:
+        """Handle redo shortcut (placeholder)."""
+        # TODO: Implement redo functionality
+        pass
+
+    def _on_delete_selection(self) -> None:
+        """Handle delete shortcut to clear selection."""
+        if hasattr(self, "grid_view") and self.grid_view:
+            self.grid_view.clear_selection()
 
     def _on_mode_changed(self, button: QRadioButton) -> None:
         """Handle selection mode change"""
@@ -1342,8 +1357,53 @@ class GridArrangementDialog(SplitterDialog):
         if a0:
             super().closeEvent(a0)
 
+    def _disconnect_signals(self) -> None:
+        """Disconnect all signals to prevent memory leaks."""
+        disconnect_errors = (RuntimeError, TypeError, AttributeError)
+
+        # Disconnect arrangement manager signals
+        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
+            try:
+                self.arrangement_manager.arrangement_changed.disconnect()
+            except disconnect_errors:
+                pass
+
+        # Disconnect colorizer signals
+        if hasattr(self, "colorizer"):
+            try:
+                self.colorizer.palette_mode_changed.disconnect()
+            except disconnect_errors:
+                pass
+
+        # Disconnect mode button signals
+        if hasattr(self, "mode_buttons"):
+            try:
+                self.mode_buttons.buttonClicked.disconnect()
+            except disconnect_errors:
+                pass
+
+        # Disconnect grid view signals
+        if hasattr(self, "grid_view"):
+            for signal_name in ("tile_clicked", "tiles_selected", "zoom_changed"):
+                try:
+                    getattr(self.grid_view, signal_name).disconnect()
+                except disconnect_errors:
+                    pass
+
+        # Disconnect button signals
+        for btn_name in ("add_btn", "remove_btn", "create_group_btn", "clear_btn",
+                         "zoom_out_btn", "zoom_in_btn", "zoom_fit_btn", "zoom_reset_btn"):
+            if hasattr(self, btn_name):
+                try:
+                    getattr(self, btn_name).clicked.disconnect()
+                except disconnect_errors:
+                    pass
+
     def _cleanup_resources(self) -> None:
         """Clean up resources to prevent memory leaks"""
+        # Disconnect signals first
+        self._disconnect_signals()
+
         # Clear colorizer cache
         if hasattr(self, "colorizer"):
             self.colorizer.clear_cache()
