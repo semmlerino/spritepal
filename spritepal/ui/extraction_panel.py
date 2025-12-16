@@ -114,13 +114,42 @@ class DropZone(QWidget):
             self.label.setStyleSheet(get_muted_text_style(color_level="light"))
         layout.addWidget(self.label)
 
-        # File path label
+        # File path row with clear button
+        path_row = QHBoxLayout()
+        path_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        path_row.setSpacing(4)
+
         self.path_label = QLabel("")
         self.path_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if self.path_label:
             self.path_label.setStyleSheet(get_link_text_style("extract"))
         self.path_label.setWordWrap(True)
-        layout.addWidget(self.path_label)
+        path_row.addWidget(self.path_label)
+
+        # Clear button - small "×" to clear file selection
+        self.clear_btn = QPushButton("×")
+        self.clear_btn.setFixedSize(20, 20)
+        self.clear_btn.setToolTip("Clear selected file")
+        self.clear_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: none;
+                border-radius: 10px;
+                background-color: {COLORS["text_muted"]};
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS["danger"]};
+            }}
+            """
+        )
+        _ = self.clear_btn.clicked.connect(self.clear)
+        self.clear_btn.setVisible(False)
+        path_row.addWidget(self.clear_btn)
+
+        layout.addLayout(path_row)
 
         # Browse button
         self.browse_button = QPushButton("Browse")
@@ -214,13 +243,18 @@ class DropZone(QWidget):
             if self.label:
                 self.label.setStyleSheet(get_success_text_style())
 
-            # Show filename
+            # Show filename with full path in tooltip
             filename = Path(file_path).name
             if self.path_label:
                 self.path_label.setText(filename)
+                self.path_label.setToolTip(file_path)  # Full path on hover
+
+            # Show clear button
+            if self.clear_btn:
+                self.clear_btn.setVisible(True)
 
             self.file_dropped.emit(file_path)
-            self.update()  # Trigger repaint
+            self.update()  # Trigger repaint  # Trigger repaint
 
     def clear(self):
         """Clear the current file"""
@@ -232,6 +266,12 @@ class DropZone(QWidget):
             self.label.setStyleSheet(get_muted_text_style(color_level="light"))
         if self.path_label:
             self.path_label.setText("")
+            self.path_label.setToolTip("")  # Clear tooltip
+
+        # Hide clear button
+        if self.clear_btn:
+            self.clear_btn.setVisible(False)
+
         self.update()
 
         # Emit file_dropped signal with empty path to trigger UI updates

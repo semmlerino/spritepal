@@ -14,12 +14,13 @@ from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
-from PySide6.QtCore import QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QProgressBar,
@@ -27,6 +28,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpacerItem,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -42,7 +44,6 @@ from core.managers.application_state_manager import ExtractionState
 from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
-    ModeSelectorWidget,
     ROMFileWidget,
     SpriteSelectorWidget,
 )
@@ -50,6 +51,7 @@ from ui.rom_extraction.widgets import (
 # Dialog imports moved to lazy imports in methods that use them (see _on_partial_scan_detected, _open_manual_offset_dialog, _find_sprites, _check_scan_cache)
 from ui.rom_extraction.workers import SpriteScanWorker
 from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
+from ui.styles.theme import COLORS
 from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
     SETTINGS_NS_ROM_INJECTION,
@@ -119,7 +121,7 @@ class ROMExtractionPanel(QWidget):
         self.extraction_manager = extraction_manager
         self.rom_extractor = self.extraction_manager.get_rom_extractor()
         self.rom_size = 0  # Track ROM size for slider limits
-        self._manual_offset_mode = True  # Default to manual offset mode
+        self._manual_offset_mode = False  # Default to preset mode (sprite picker visible)
 
         # State manager for coordinating operations (ApplicationStateManager)
         from core.di_container import inject
@@ -234,32 +236,53 @@ class ROMExtractionPanel(QWidget):
         self.rom_file_widget.partial_scan_detected.connect(self._on_partial_scan_detected)
         layout.addWidget(self.rom_file_widget)
 
+        # Hint label to guide user to output name field (appears when ROM loaded but no output name)
+        self.output_hint_label = QLabel("Set output name below in Output Settings")
+        self.output_hint_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+        self.output_hint_label.setVisible(False)
+        layout.addWidget(self.output_hint_label)
+
     def _add_mode_controls(self, layout: QVBoxLayout):
-        """Add mode selection and sprite selector controls to the layout.
+        """Add sprite selector controls to the layout (always visible, preset mode is default).
 
         Args:
             layout: Layout to add controls to
         """
-        # Mode selector widget
-        self.mode_selector_widget = ModeSelectorWidget()
-        self.mode_selector_widget.mode_changed.connect(self._on_mode_changed)
-        layout.addWidget(self.mode_selector_widget)
-
-        # Sprite selector widget
+        # Sprite selector widget - always visible (preset mode is primary)
         self.sprite_selector_widget = SpriteSelectorWidget()
         self.sprite_selector_widget.sprite_changed.connect(self._on_sprite_changed)
         self.sprite_selector_widget.find_sprites_clicked.connect(self._find_sprites)
-        self.sprite_selector_widget.setVisible(False)  # Hidden by default (manual mode is default)
         layout.addWidget(self.sprite_selector_widget)
 
     def _add_manual_offset_controls(self, layout: QVBoxLayout):
-        """Add manual offset control button to the layout.
+        """Add manual offset control in a collapsible advanced section.
 
         Args:
             layout: Layout to add controls to
         """
-        # Create and style the manual offset button
+        # Create collapsible advanced section
+        advanced_row = QHBoxLayout()
+        advanced_row.setContentsMargins(0, 0, 0, 0)
+
+        self.advanced_toggle = QToolButton()
+        self.advanced_toggle.setText("Advanced: Manual Offset Exploration")
+        self.advanced_toggle.setCheckable(True)
+        self.advanced_toggle.setChecked(False)
+        self.advanced_toggle.setArrowType(Qt.ArrowType.RightArrow)
+        self.advanced_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.advanced_toggle.setStyleSheet(
+            "QToolButton { border: none; padding: 4px; font-weight: bold; }"
+            "QToolButton:hover { background-color: rgba(255, 255, 255, 0.1); }"
+        )
+        self.advanced_toggle.toggled.connect(self._on_advanced_toggled)
+        advanced_row.addWidget(self.advanced_toggle)
+        advanced_row.addStretch()
+
+        layout.addLayout(advanced_row)
+
+        # Create and style the manual offset button (hidden by default)
         self.manual_offset_button = self._create_manual_offset_button()
+        self.manual_offset_button.setVisible(False)  # Hidden until advanced section expanded
         layout.addWidget(self.manual_offset_button)
 
     def _create_manual_offset_button(self) -> QPushButton:
@@ -389,6 +412,13 @@ class ROMExtractionPanel(QWidget):
             # Notify that files changed
             self.files_changed.emit()
 
+            # Auto-fill output name from ROM filename if not already set
+            if not self._get_output_name():
+                rom_stem = Path(filename).stem
+                suggested_name = f"{rom_stem}_sprites"
+                self.output_name_changed.emit(suggested_name)
+                logger.debug(f"Auto-filled output name: {suggested_name}")
+
             logger.info(f"Successfully loaded ROM: {Path(filename).name}")
 
         except Exception:
@@ -470,12 +500,15 @@ class ROMExtractionPanel(QWidget):
     def _on_dialog_offset_changed(self, offset: int):
         """Handle offset changes from the dialog"""
         self._manual_offset = offset
+        self._manual_offset_mode = True  # User chose manual offset mode
+        self._check_extraction_ready()
         # Preview now handled in manual offset dialog
 
     def _on_dialog_sprite_found(self, sprite_data: dict[str, Any]):
         """Handle sprite found signal from dialog"""
         offset = sprite_data.get("offset", 0)
         self._manual_offset = offset
+        self._manual_offset_mode = True  # User chose manual offset mode via dialog
         # Check extraction readiness
         self._check_extraction_ready()
 
@@ -647,6 +680,9 @@ class ROMExtractionPanel(QWidget):
                     sprite_name, offset = data
                     logger.debug(f"Parsed sprite: {sprite_name}, offset: 0x{offset:06X}")
 
+                    # User selected a preset sprite - switch to preset mode
+                    self._manual_offset_mode = False
+
                     self.sprite_selector_widget.set_offset_text(f"0x{offset:06X}")
                     logger.debug("Updated offset label")
 
@@ -676,7 +712,7 @@ class ROMExtractionPanel(QWidget):
             try:
                 self.sprite_selector_widget.set_offset_text("Error")
             except Exception:
-                pass  # Silently ignore errors when trying to clear displays
+                pass  # Silently ignore errors when trying to clear displays  # Silently ignore errors when trying to clear displays
 
     def _check_extraction_ready(self):
         """Check if extraction is ready - override to handle manual mode"""
@@ -691,6 +727,11 @@ class ROMExtractionPanel(QWidget):
             has_output_name = bool(self._get_output_name())
             if not has_output_name:
                 reasons.append("Enter output name")
+
+            # Show/hide output name hint (appears when ROM loaded but no output name)
+            if hasattr(self, "output_hint_label") and self.output_hint_label:
+                show_hint = has_rom and not has_output_name
+                self.output_hint_label.setVisible(show_hint)
 
             if self._manual_offset_mode:
                 # In manual mode, just need ROM and output name
@@ -1172,20 +1213,23 @@ class ROMExtractionPanel(QWidget):
         self.sprite_selector_widget.add_sprite("-- Scanner Results (now cached) --", None)
 
     def _on_mode_changed(self, index: int):
-        """Handle extraction mode change"""
-        self._manual_offset_mode = (index == 1)
+        """Handle extraction mode change (legacy - kept for compatibility)."""
+        # This method is no longer used since we removed the mode combo.
+        # Mode is now determined by whether user selects preset sprite or manual offset.
+        pass
 
-        # Hide inactive mode controls entirely for cleaner UI
-        self.sprite_selector_widget.setVisible(not self._manual_offset_mode)
-        self.manual_offset_button.setVisible(self._manual_offset_mode)
+    def _on_advanced_toggled(self, expanded: bool):
+        """Handle advanced section expand/collapse.
 
-        # Update extraction ready state
-        self._check_extraction_ready()
+        Args:
+            expanded: Whether the advanced section is expanded
+        """
+        # Update arrow direction
+        arrow = Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
+        self.advanced_toggle.setArrowType(arrow)
 
-        # If switching to manual mode with ROM loaded, show current offset preview
-        if self._manual_offset_mode and self.rom_path:
-            # Preview now handled in manual offset dialog
-            pass
+        # Show/hide manual offset button
+        self.manual_offset_button.setVisible(expanded)
 
     def _find_next_sprite(self):
         """Find next valid sprite offset - now handled by dialog"""
@@ -1227,8 +1271,8 @@ class ROMExtractionPanel(QWidget):
             # Re-enable all controls
             if self.rom_file_widget:
                 self.rom_file_widget.setEnabled(True)
-            if self.mode_selector_widget:
-                self.mode_selector_widget.setEnabled(True)
+            if hasattr(self, "advanced_toggle") and self.advanced_toggle:
+                self.advanced_toggle.setEnabled(True)
             self.sprite_selector_widget.set_find_button_enabled(True)
             if self.manual_offset_button:
                 self.manual_offset_button.setEnabled(True)
@@ -1237,8 +1281,8 @@ class ROMExtractionPanel(QWidget):
             # Disable all controls during critical operations
             if self.rom_file_widget:
                 self.rom_file_widget.setEnabled(False)
-            if self.mode_selector_widget:
-                self.mode_selector_widget.setEnabled(False)
+            if hasattr(self, "advanced_toggle") and self.advanced_toggle:
+                self.advanced_toggle.setEnabled(False)
             self.sprite_selector_widget.set_find_button_enabled(False)
             if self.manual_offset_button:
                 self.manual_offset_button.setEnabled(False)

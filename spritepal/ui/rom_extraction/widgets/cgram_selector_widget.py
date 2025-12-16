@@ -31,27 +31,16 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # CGRAM for palettes
-        cgram_group = self._create_group_box("Palette Data ()")
+        # CGRAM for palettes - cleaner title
+        cgram_group = self._create_group_box("Optional Palette Override")
         cgram_layout = QVBoxLayout()
         cgram_layout.setSpacing(SPACING_MEDIUM)
         cgram_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
 
-        # Info label about default palettes
-        info_label = QLabel(
-            "Note: Palettes will be extracted from ROM when available.\n"
-            "Common sprites also have default palettes as fallback.\n"
-            "CGRAM is optional for custom palette overrides."
-        )
-        info_label.setWordWrap(True)
-        info_label.setStyleSheet(
-            f"QLabel {{ color: {COLORS['text_muted']}; font-style: italic; padding: 10px; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
-        )
-        cgram_layout.addWidget(info_label)
-
-        # Add spacing
-        cgram_layout.addSpacing(SPACING_MEDIUM)
+        # Condensed caption instead of dense info box
+        caption = QLabel("Override ROM palettes with custom CGRAM file")
+        caption.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+        cgram_layout.addWidget(caption)
 
         # CGRAM path row
         cgram_row = QHBoxLayout()
@@ -73,6 +62,11 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         self.browse_cgram_btn = QPushButton("Browse...")
         self.browse_cgram_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
         self.browse_cgram_btn.setFixedWidth(BUTTON_MAX_WIDTH)
+        self.browse_cgram_btn.setToolTip(
+            "Palettes are extracted from ROM when available.\n"
+            "Common sprites have default palette fallbacks.\n"
+            "Use CGRAM for custom palette overrides."
+        )
         _ = self.browse_cgram_btn.clicked.connect(self.browse_clicked.emit)
         cgram_row.addWidget(self.browse_cgram_btn)
 

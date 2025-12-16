@@ -231,15 +231,56 @@ class OutputSettingsManager(QObject):
                 self.output_info_label.setText(f"Files to create: {', '.join(files)}")
 
     def set_rom_extraction_mode(self) -> None:
-        """Configure for ROM extraction mode"""
+        """Configure for ROM extraction mode - all outputs enabled and forced on"""
+        # Force checkboxes on and disable them - ROM mode always creates all outputs
+        if hasattr(self, "grayscale_check") and self.grayscale_check:
+            self.grayscale_check.setChecked(True)
+            self.grayscale_check.setEnabled(False)
+            self.grayscale_check.setToolTip(
+                "Palette files are always created in ROM extraction mode."
+            )
+
+        if hasattr(self, "metadata_check") and self.metadata_check:
+            self.metadata_check.setChecked(True)
+            self.metadata_check.setEnabled(False)
+            self.metadata_check.setToolTip(
+                "Metadata is always created in ROM extraction mode."
+            )
+
         if hasattr(self, "output_info_label") and self.output_info_label:
-            if self.output_info_label:
-                self.output_info_label.setText("Files to create: PNG, palette files (.pal.json), metadata.json")
+            self.output_info_label.setText(
+                "ROM extraction always creates: PNG, palette files, metadata"
+            )
+
         if hasattr(self, "output_group") and self.output_group:
-            self.output_group.setTitle("Output Settings (Shared)")
+            self.output_group.setTitle("Output Settings (ROM Mode)")
 
     def set_vram_extraction_mode(self) -> None:
-        """Configure for VRAM extraction mode"""
+        """Configure for VRAM extraction mode - checkboxes enabled for user control"""
+        # Re-enable checkboxes with original tooltips
+        if hasattr(self, "grayscale_check") and self.grayscale_check:
+            self.grayscale_check.setEnabled(True)
+            self.grayscale_check.setToolTip(
+                "Creates 8 separate palette files for applying different color schemes.\n"
+                "Required for palette switching in the editor."
+            )
+
+        if hasattr(self, "metadata_check") and self.metadata_check:
+            self.metadata_check.setEnabled(True)
+            self.metadata_check.setToolTip(
+                "Creates a .metadata.json file that enables palette switching.\n"
+                "Without this, you can only use the default palette."
+            )
+
+        # Update info label to reflect current checkbox state
+        if hasattr(self, "output_info_label") and self.output_info_label:
+            files = ["PNG"]
+            if self.grayscale_check and self.grayscale_check.isChecked():
+                files.append("palette files (.pal.json)")
+            if self.metadata_check and self.metadata_check.isChecked():
+                files.append("metadata.json")
+            self.output_info_label.setText(f"Files to create: {', '.join(files)}")
+
         if hasattr(self, "output_group") and self.output_group:
             self.output_group.setTitle("Output Settings")
 
