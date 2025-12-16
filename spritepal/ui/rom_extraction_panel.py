@@ -62,6 +62,7 @@ logger = get_logger(__name__)
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
+    BUTTON_HEIGHT,
     SPACING_COMPACT_LARGE as SPACING_LARGE,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
@@ -236,9 +237,12 @@ class ROMExtractionPanel(QWidget):
         self.rom_file_widget.partial_scan_detected.connect(self._on_partial_scan_detected)
         layout.addWidget(self.rom_file_widget)
 
-        # Hint label to guide user to output name field (appears when ROM loaded but no output name)
-        self.output_hint_label = QLabel("Set output name below in Output Settings")
-        self.output_hint_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+        # Hint label - shown when ROM loaded but auto-fill failed (rare edge case)
+        # Most times, output name is auto-filled from ROM filename
+        self.output_hint_label = QLabel("↓ Enter output name in the Output Settings section below")
+        self.output_hint_label.setStyleSheet(
+            f"color: {COLORS['warning']}; font-size: 11px; font-style: italic;"
+        )
         self.output_hint_label.setVisible(False)
         layout.addWidget(self.output_hint_label)
 
@@ -292,7 +296,7 @@ class ROMExtractionPanel(QWidget):
             QPushButton: The configured button
         """
         button = QPushButton("Browse Sprites (Ctrl+M)")
-        button.setMinimumHeight(40)  # Reasonable height
+        button.setMinimumHeight(BUTTON_HEIGHT)  # Standard button height
         _ = button.clicked.connect(self._open_manual_offset_dialog)
         button.setVisible(True)  # Always visible (enabled/disabled based on mode)
         button.setToolTip(

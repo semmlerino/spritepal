@@ -120,30 +120,30 @@ class SettingsDialog(BaseDialog):
         widget = QWidget(self)
         layout = QVBoxLayout()
 
-        # Application settings group
-        app_group = QGroupBox("Application Settings", widget)
-        app_layout = QFormLayout()
+        # Single consolidated settings group for better visual balance
+        settings_group = QGroupBox("Preferences", widget)
+        settings_layout = QFormLayout()
+        settings_layout.setVerticalSpacing(12)  # More breathing room
 
-        # Window restore checkbox (label removed - checkbox text is descriptive)
+        # Session behavior section
         self.restore_window_check = QCheckBox("Restore window position on startup", self)
-        app_layout.addRow(self.restore_window_check)
+        settings_layout.addRow(self.restore_window_check)
 
-        # Auto-save session checkbox (label removed - checkbox text is descriptive)
         self.auto_save_session_check = QCheckBox("Automatically save session", self)
-        app_layout.addRow(self.auto_save_session_check)
+        settings_layout.addRow(self.auto_save_session_check)
 
-        app_group.setLayout(app_layout)
-        layout.addWidget(app_group)
+        # Separator line for visual grouping
+        separator = QLabel(self)
+        separator.setFixedHeight(1)
+        separator.setStyleSheet("background-color: #444444; margin: 8px 0px;")
+        settings_layout.addRow(separator)
 
-        # File settings group
-        file_group = QGroupBox("File Settings", widget)
-        file_layout = QFormLayout()
-
-        # Default dumps directory
+        # File paths section
         dumps_layout = QHBoxLayout()
         self.dumps_dir_edit = QLineEdit(self)
         if self.dumps_dir_edit:
             self.dumps_dir_edit.setReadOnly(True)
+            self.dumps_dir_edit.setPlaceholderText("Default location for dump files")
         dumps_layout.addWidget(self.dumps_dir_edit, 1)
 
         self.dumps_dir_button = QPushButton("Browse...", self)
@@ -153,10 +153,10 @@ class SettingsDialog(BaseDialog):
             self.dumps_dir_button.clicked.connect(self._browse_dumps_directory)
         dumps_layout.addWidget(self.dumps_dir_button)
 
-        file_layout.addRow("Default dumps directory:", dumps_layout)
+        settings_layout.addRow("Dumps directory:", dumps_layout)
 
-        file_group.setLayout(file_layout)
-        layout.addWidget(file_group)
+        settings_group.setLayout(settings_layout)
+        layout.addWidget(settings_group)
 
         # Add stretch to push content to top
         layout.addStretch()

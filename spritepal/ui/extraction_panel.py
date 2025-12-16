@@ -58,9 +58,13 @@ from ui.common.spacing_constants import (
     LINE_THICK,
     OFFSET_LABEL_MIN_WIDTH,
     OFFSET_SPINBOX_MIN_WIDTH,
+    SPACING_SMALL,
+    SPACING_TINY,
 )
 from ui.common.timing_constants import REFRESH_RATE_60FPS
 from ui.styles import (
+    get_drop_zone_badge_style,
+    get_drop_zone_style,
     get_error_text_style,
     get_hex_label_style,
     get_link_text_style,
@@ -75,25 +79,26 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 class DropZone(QWidget):
-    """Drag and drop zone for file input"""
+    """Drag and drop zone for file input with visual state feedback"""
 
     file_dropped = Signal(str)
 
-    def __init__(self, file_type: str, parent: Any | None = None, settings_manager: SettingsManagerProtocol | None = None) -> None:
+    def __init__(
+        self,
+        file_type: str,
+        parent: Any | None = None,
+        settings_manager: SettingsManagerProtocol | None = None,
+        required: bool = True,
+    ) -> None:
         super().__init__(parent)
         self.file_type = file_type
         self.file_path = ""
+        self._required = required
         self.setAcceptDrops(True)
         self.setMinimumHeight(DROP_ZONE_MIN_HEIGHT)
-        self.setStyleSheet(
-            f"""
-            DropZone {{
-                border: {BORDER_THICK}px dashed {COLORS["text_muted"]};
-                border-radius: 8px;
-                background-color: {COLORS["input_background"]};
-            }}
-        """
-        )
+
+        # Apply initial styling based on required state
+        self._update_style()
 
         if settings_manager is None:
             # Fallback for environments where DI might not be fully configured
@@ -106,6 +111,19 @@ class DropZone(QWidget):
         # Layout
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(SPACING_TINY)
+
+        # Top row with badge
+        top_row = QHBoxLayout()
+        top_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        top_row.setSpacing(SPACING_SMALL)
+
+        # Status badge (Required/Optional/Loaded)
+        self.status_badge = QLabel("Required" if required else "Optional")
+        self._update_badge_style()
+        top_row.addWidget(self.status_badge)
+
+        layout.addLayout(top_row)
 
         # Icon and label
         self.label = QLabel(f"Drop {file_type} file here")
@@ -117,7 +135,7 @@ class DropZone(QWidget):
         # File path row with clear button
         path_row = QHBoxLayout()
         path_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        path_row.setSpacing(4)
+        path_row.setSpacing(SPACING_TINY)
 
         self.path_label = QLabel("")
         self.path_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -157,6 +175,31 @@ class DropZone(QWidget):
         _ = self.browse_button.clicked.connect(self._browse_file)
         layout.addWidget(self.browse_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+    def _update_style(self) -> None:
+        """Update the drop zone styling based on current state"""
+        if self.file_path:
+            self.setStyleSheet(get_drop_zone_style("loaded"))
+        else:
+            self.setStyleSheet(get_drop_zone_style("empty", required=self._required))
+
+    def _update_badge_style(self) -> None:
+        """Update the badge styling based on current state"""
+        if self.file_path:
+            self.status_badge.setText("✓ Loaded")
+            self.status_badge.setStyleSheet(get_drop_zone_badge_style("loaded"))
+        elif self._required:
+            self.status_badge.setText("Required")
+            self.status_badge.setStyleSheet(get_drop_zone_badge_style("required"))
+        else:
+            self.status_badge.setText("Optional")
+            self.status_badge.setStyleSheet(get_drop_zone_badge_style("optional"))
+
+    def set_required(self, required: bool) -> None:
+        """Update whether this drop zone is required"""
+        self._required = required
+        self._update_style()
+        self._update_badge_style()
+
     @override
     def dragEnterEvent(self, event: QDragEnterEvent | None):
         """Handle drag enter events"""
@@ -164,28 +207,13 @@ class DropZone(QWidget):
             mime_data = event.mimeData()
             if mime_data and mime_data.hasUrls():
                 event.acceptProposedAction()
-                self.setStyleSheet(
-                    f"""
-                    DropZone {{
-                        border: {BORDER_THICK}px solid {COLORS["border_focus"]};
-                        border-radius: 8px;
-                        background-color: {COLORS["panel_background"]};
-                    }}
-                """
-                )
+                self.setStyleSheet(get_drop_zone_style("hover"))
 
     @override
     def dragLeaveEvent(self, event: QDragLeaveEvent | None):
         """Handle drag leave events"""
-        self.setStyleSheet(
-            f"""
-            DropZone {{
-                border: {BORDER_THICK}px dashed {COLORS["text_muted"]};
-                border-radius: 8px;
-                background-color: {COLORS["input_background"]};
-            }}
-        """
-        )
+        # Restore appropriate style based on current state
+        self._update_style()
 
     @override
     def dropEvent(self, event: QDropEvent | None):
@@ -253,8 +281,12 @@ class DropZone(QWidget):
             if self.clear_btn:
                 self.clear_btn.setVisible(True)
 
+            # Update visual state
+            self._update_style()
+            self._update_badge_style()
+
             self.file_dropped.emit(file_path)
-            self.update()  # Trigger repaint  # Trigger repaint
+            self.update()  # Trigger repaint
 
     def clear(self):
         """Clear the current file"""
@@ -271,6 +303,10 @@ class DropZone(QWidget):
         # Hide clear button
         if self.clear_btn:
             self.clear_btn.setVisible(False)
+
+        # Update visual state
+        self._update_style()
+        self._update_badge_style()
 
         self.update()
 
@@ -402,7 +438,7 @@ class ExtractionPanel(QGroupBox):
         # Advanced controls section (hidden by default)
         self.advanced_controls = QWidget(self)
         advanced_layout = QHBoxLayout(self.advanced_controls)
-        advanced_layout.setContentsMargins(0, 4, 0, 0)
+        advanced_layout.setContentsMargins(0, SPACING_TINY, 0, 0)
 
         # Step size selector
         advanced_layout.addWidget(QLabel("Step:"))
@@ -455,13 +491,18 @@ class ExtractionPanel(QGroupBox):
         mode_layout.addStretch()
         layout.addLayout(mode_layout)
 
-        # Drop zones - Required files
-        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager)
+        # Drop zones - with clear required/optional states
+        self.vram_drop = DropZone(
+            "VRAM", settings_manager=self.settings_manager, required=True
+        )
         self.vram_drop.setToolTip("Contains sprite graphics data (required for any extraction)")
         layout.addWidget(self.vram_drop)
 
-        self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager)
-        self.cgram_drop.setToolTip("Contains color palette data (optional - without it, only grayscale extraction is possible)")
+        # CGRAM required in Full Color mode, optional in Grayscale mode
+        self.cgram_drop = DropZone(
+            "CGRAM", settings_manager=self.settings_manager, required=True
+        )
+        self.cgram_drop.setToolTip("Contains color palette data (required for full color, optional for grayscale)")
         layout.addWidget(self.cgram_drop)
 
         # Optional OAM section (collapsed by default)
@@ -475,7 +516,9 @@ class ExtractionPanel(QGroupBox):
         self.oam_toggle.setToolTip("OAM improves palette selection but is not required")
         layout.addWidget(self.oam_toggle)
 
-        self.oam_drop = DropZone("OAM", settings_manager=self.settings_manager)
+        self.oam_drop = DropZone(
+            "OAM", settings_manager=self.settings_manager, required=False
+        )
         self.oam_drop.setToolTip("Shows active sprites and palettes (optional - improves palette selection)")
         self.oam_drop.setVisible(False)
         layout.addWidget(self.oam_drop)
@@ -903,16 +946,21 @@ class ExtractionPanel(QGroupBox):
         """Handle extraction mode change"""
         logger.debug(f"Extraction mode changed to: {self.mode_combo.currentText()}")
 
-        # Update CGRAM drop zone appearance based on mode
-        if index == 1:  # Grayscale Only
-            self.cgram_drop.label.setText("CGRAM (Not required for grayscale)")
-            self.cgram_drop.label.setStyleSheet(get_muted_text_style(color_level="dark"))
+        # Update CGRAM required state based on mode
+        is_grayscale = index == 1
+        self.cgram_drop.set_required(not is_grayscale)
+
+        # Update CGRAM drop zone label based on mode and file state
+        if is_grayscale:
+            if not self.cgram_drop.has_file():
+                self.cgram_drop.label.setText("CGRAM (optional for grayscale)")
+                self.cgram_drop.label.setStyleSheet(get_muted_text_style(color_level="dark"))
         elif self.cgram_drop.has_file():
             self.cgram_drop.label.setText("✓ CGRAM")
             self.cgram_drop.label.setStyleSheet(get_success_text_style())
         else:
             self.cgram_drop.label.setText("Drop CGRAM file here")
-            self.cgram_drop.label.setStyleSheet(get_error_text_style())
+            self.cgram_drop.label.setStyleSheet(get_muted_text_style(color_level="light"))
 
         # Re-check extraction readiness
         self._check_extraction_ready()

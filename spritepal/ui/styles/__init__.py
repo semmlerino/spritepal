@@ -10,6 +10,8 @@ from .components import (
     get_borderless_preview_style,
     get_button_style,
     get_dialog_button_box_style,
+    get_drop_zone_badge_style,
+    get_drop_zone_style,
     get_error_text_style,
     get_extraction_checklist_style,
     get_hex_label_style,
@@ -25,6 +27,7 @@ from .components import (
     get_slider_style,
     get_splitter_style,
     get_status_style,
+    get_step_badge_style,
     get_success_text_style,
 )
 from .theme import (
@@ -42,6 +45,8 @@ __all__ = [
     "get_borderless_preview_style",
     "get_button_style",
     "get_dialog_button_box_style",
+    "get_drop_zone_badge_style",
+    "get_drop_zone_style",
     "get_error_text_style",
     "get_extraction_checklist_style",
     "get_hex_label_style",
@@ -57,6 +62,7 @@ __all__ = [
     "get_slider_style",
     "get_splitter_style",
     "get_status_style",
+    "get_step_badge_style",
     "get_success_text_style",
     "get_theme_style",
 ]

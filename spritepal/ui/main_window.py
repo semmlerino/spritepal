@@ -39,6 +39,10 @@ from PySide6.QtWidgets import (
 
 # Session manager accessed via DI: inject(SessionManagerProtocol)
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
+from ui.common.spacing_constants import (
+    SPACING_COMPACT_SMALL,
+    SPACING_SMALL,
+)
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
     KeyboardShortcutHandler,
@@ -59,8 +63,8 @@ from ui.zoomable_preview import PreviewPanel
 MAIN_WINDOW_MIN_SIZE = (1000, 650)  # Much more compact
 DEFAULT_SPLITTER_RATIO = 0.45  # Give left panel a bit more space
 MIN_PANEL_WIDTH = 380  # Slightly smaller minimum
-LAYOUT_MARGINS = 8  # Tighter margins
-LAYOUT_SPACING = 6  # Tighter spacing
+LAYOUT_MARGINS = SPACING_SMALL  # 8px - standard margins
+LAYOUT_SPACING = SPACING_COMPACT_SMALL  # 6px - compact spacing
 
 class ExtractionParams(TypedDict):
     """Type definition for extraction parameters"""

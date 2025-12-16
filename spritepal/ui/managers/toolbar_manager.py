@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QGridLayout, QLabel, QMenu, QPushButton, QWidget
 
+from ui.common.spacing_constants import BUTTON_HEIGHT
 from ui.styles import get_button_style, get_extraction_checklist_style
 
 
@@ -91,7 +92,7 @@ class ToolbarManager(QObject):
     def _create_extract_button(self, layout: QGridLayout) -> None:
         """Create extract button"""
         self.extract_button = QPushButton("Extract")
-        self.extract_button.setMinimumHeight(35)
+        self.extract_button.setMinimumHeight(BUTTON_HEIGHT)
         self.extract_button.setShortcut(QKeySequence("Ctrl+E"))
         self.extract_button.setToolTip("Extract sprites for editing (Ctrl+E)")
         if self.extract_button:
@@ -101,7 +102,7 @@ class ToolbarManager(QObject):
     def _create_open_editor_button(self, layout: QGridLayout) -> None:
         """Create open editor button"""
         self.open_editor_button = QPushButton("Open Editor")
-        self.open_editor_button.setMinimumHeight(35)
+        self.open_editor_button.setMinimumHeight(BUTTON_HEIGHT)
         if self.open_editor_button:
             self.open_editor_button.setEnabled(False)
         self.open_editor_button.setShortcut(QKeySequence("Ctrl+O"))
@@ -113,7 +114,7 @@ class ToolbarManager(QObject):
     def _create_arrange_button(self, layout: QGridLayout) -> None:
         """Create consolidated arrange button with dropdown menu"""
         self.arrange_button = QPushButton("Arrange...")
-        self.arrange_button.setMinimumHeight(35)
+        self.arrange_button.setMinimumHeight(BUTTON_HEIGHT)
         if self.arrange_button:
             self.arrange_button.setEnabled(False)
         self.arrange_button.setToolTip("Arrange sprites (Ctrl+R for rows, Ctrl+G for grid)")
@@ -137,7 +138,7 @@ class ToolbarManager(QObject):
     def _create_inject_button(self, layout: QGridLayout) -> None:
         """Create inject button"""
         self.inject_button = QPushButton("Inject")
-        self.inject_button.setMinimumHeight(35)
+        self.inject_button.setMinimumHeight(BUTTON_HEIGHT)
         if self.inject_button:
             self.inject_button.setEnabled(False)
         self.inject_button.setShortcut(QKeySequence("Ctrl+I"))

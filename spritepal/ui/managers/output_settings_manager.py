@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.styles import get_muted_text_style
+from ui.styles.theme import COLORS
 
 
 class OutputSettingsActionsProtocol(Protocol):
@@ -82,6 +83,17 @@ class OutputSettingsManager(QObject):
 
         self.output_name_edit = QLineEdit(self.parent_widget)
         self.output_name_edit.setPlaceholderText("e.g., cave_sprites_editor")
+        # Store default style for later restore
+        self._default_output_style = ""
+        self._highlight_output_style = f"""
+            QLineEdit {{
+                border: 2px solid {COLORS["warning"]};
+                background-color: rgba(255, 215, 0, 0.1);
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {COLORS["highlight"]};
+            }}
+        """
         name_layout.addWidget(self.output_name_edit)
 
         self.browse_button = QPushButton("Browse...")
@@ -325,3 +337,21 @@ class OutputSettingsManager(QObject):
         if hasattr(self, "output_name_edit") and self.output_name_edit:
             if self.output_name_edit:
                 self.output_name_edit.clear()
+
+    def set_output_needs_attention(self, needs_attention: bool) -> None:
+        """Highlight or unhighlight the output name field.
+
+        Call this when extraction is blocked waiting for output name.
+
+        Args:
+            needs_attention: True to highlight (warning style), False to restore default
+        """
+        if not hasattr(self, "output_name_edit") or not self.output_name_edit:
+            return
+
+        if needs_attention and not self.output_name_edit.text():
+            # Only highlight if field is actually empty
+            self.output_name_edit.setStyleSheet(self._highlight_output_style)
+        else:
+            # Restore default style
+            self.output_name_edit.setStyleSheet(self._default_output_style)

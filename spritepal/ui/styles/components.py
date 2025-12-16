@@ -897,3 +897,170 @@ def get_extraction_checklist_style() -> str:
         line-height: 1.4;
     }}
     """
+
+
+def get_drop_zone_style(state: str = "empty", required: bool = True) -> str:
+    """
+    Get drop zone styling CSS based on state and requirement.
+
+    Provides distinct visual states for file drop zones to clearly
+    communicate what's needed and what's loaded.
+
+    Args:
+        state: Drop zone state - "empty", "loaded", "hover"
+        required: Whether this drop zone is required for extraction
+
+    Returns:
+        CSS string for drop zone styling
+    """
+    if state == "loaded":
+        # Loaded state - green accent, solid border
+        return f"""
+        DropZone {{
+            border: 2px solid {COLORS["editor"]};
+            border-radius: 8px;
+            background-color: rgba(50, 205, 50, 0.1);
+        }}
+        """
+    if state == "hover":
+        # Hover/drag state - highlight border
+        return f"""
+        DropZone {{
+            border: 2px solid {COLORS["border_focus"]};
+            border-radius: 8px;
+            background-color: {COLORS["panel_background"]};
+        }}
+        """
+    # Empty states
+    if required:
+        # Empty + Required - subtle warning tint
+        return f"""
+        DropZone {{
+            border: 2px dashed {COLORS["warning"]};
+            border-radius: 8px;
+            background-color: rgba(255, 215, 0, 0.05);
+        }}
+        """
+    # Empty + Optional - muted/subtle
+    return f"""
+    DropZone {{
+        border: 2px dashed {COLORS["text_muted"]};
+        border-radius: 8px;
+        background-color: {COLORS["input_background"]};
+    }}
+    """
+
+
+def get_step_badge_style(state: str = "pending") -> str:
+    """
+    Get styling for workflow step badges (numbered step indicators).
+
+    Creates circular badges showing step numbers with visual states
+    to guide users through a multi-step workflow.
+
+    Args:
+        state: Badge state - "pending", "active", "completed"
+
+    Returns:
+        CSS string for step badge styling
+    """
+    styles = {
+        "pending": f"""
+            QLabel {{
+                color: {COLORS["text_muted"]};
+                background-color: {COLORS["dark_gray"]};
+                border: 2px solid {COLORS["text_muted"]};
+                border-radius: 12px;
+                padding: 2px;
+                min-width: 24px;
+                max-width: 24px;
+                min-height: 24px;
+                max-height: 24px;
+                font-weight: bold;
+                font-size: 12px;
+                qproperty-alignment: AlignCenter;
+            }}
+        """,
+        "active": f"""
+            QLabel {{
+                color: {COLORS["white"]};
+                background-color: {COLORS["highlight"]};
+                border: 2px solid {COLORS["highlight_border"]};
+                border-radius: 12px;
+                padding: 2px;
+                min-width: 24px;
+                max-width: 24px;
+                min-height: 24px;
+                max-height: 24px;
+                font-weight: bold;
+                font-size: 12px;
+                qproperty-alignment: AlignCenter;
+            }}
+        """,
+        "completed": f"""
+            QLabel {{
+                color: {COLORS["white"]};
+                background-color: {COLORS["editor"]};
+                border: 2px solid {COLORS["editor"]};
+                border-radius: 12px;
+                padding: 2px;
+                min-width: 24px;
+                max-width: 24px;
+                min-height: 24px;
+                max-height: 24px;
+                font-weight: bold;
+                font-size: 12px;
+                qproperty-alignment: AlignCenter;
+            }}
+        """,
+    }
+    return styles.get(state, styles["pending"])
+
+
+def get_drop_zone_badge_style(badge_type: str = "required") -> str:
+    """
+    Get styling for drop zone badges (Required/Optional/Loaded).
+
+    Creates small badge indicators to clarify drop zone status.
+
+    Args:
+        badge_type: Badge type - "required", "optional", "loaded"
+
+    Returns:
+        CSS string for badge label styling
+    """
+    styles = {
+        "required": f"""
+            QLabel {{
+                color: {COLORS["warning"]};
+                font-size: {FONTS["small_size"]};
+                font-weight: {FONTS["bold_weight"]};
+                background-color: rgba(255, 215, 0, 0.15);
+                border: 1px solid {COLORS["warning"]};
+                border-radius: 3px;
+                padding: 1px 6px;
+            }}
+        """,
+        "optional": f"""
+            QLabel {{
+                color: {COLORS["text_muted"]};
+                font-size: {FONTS["small_size"]};
+                background-color: transparent;
+                border: 1px solid {COLORS["text_muted"]};
+                border-radius: 3px;
+                padding: 1px 6px;
+            }}
+        """,
+        "loaded": f"""
+            QLabel {{
+                color: {COLORS["editor"]};
+                font-size: {FONTS["small_size"]};
+                font-weight: {FONTS["bold_weight"]};
+                background-color: rgba(50, 205, 50, 0.15);
+                border: 1px solid {COLORS["editor"]};
+                border-radius: 3px;
+                padding: 1px 6px;
+            }}
+        """,
+    }
+    return styles.get(badge_type, styles["required"])
