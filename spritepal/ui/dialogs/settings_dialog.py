@@ -124,13 +124,13 @@ class SettingsDialog(BaseDialog):
         app_group = QGroupBox("Application Settings", widget)
         app_layout = QFormLayout()
 
-        # Window restore checkbox
+        # Window restore checkbox (label removed - checkbox text is descriptive)
         self.restore_window_check = QCheckBox("Restore window position on startup", self)
-        app_layout.addRow("Window:", self.restore_window_check)
+        app_layout.addRow(self.restore_window_check)
 
-        # Auto-save session checkbox
+        # Auto-save session checkbox (label removed - checkbox text is descriptive)
         self.auto_save_session_check = QCheckBox("Automatically save session", self)
-        app_layout.addRow("Session:", self.auto_save_session_check)
+        app_layout.addRow(self.auto_save_session_check)
 
         app_group.setLayout(app_layout)
         layout.addWidget(app_group)
@@ -181,7 +181,7 @@ class SettingsDialog(BaseDialog):
             )
         if self.cache_enabled_check:
             self.cache_enabled_check.toggled.connect(self._on_cache_enabled_changed)
-        cache_layout.addRow("Status:", self.cache_enabled_check)
+        cache_layout.addRow(self.cache_enabled_check)  # Label removed - checkbox text is descriptive
 
         # Cache location
         location_layout = QHBoxLayout()
@@ -197,7 +197,7 @@ class SettingsDialog(BaseDialog):
             self.cache_location_button.clicked.connect(self._browse_cache_location)
         location_layout.addWidget(self.cache_location_button)
 
-        cache_layout.addRow("Location:", location_layout)
+        cache_layout.addRow("Cache folder:", location_layout)
 
         # Cache size limit
         size_layout = QHBoxLayout()
@@ -209,7 +209,7 @@ class SettingsDialog(BaseDialog):
         size_layout.addWidget(self.cache_size_spin)
         size_layout.addStretch()
 
-        cache_layout.addRow("Size limit:", size_layout)
+        cache_layout.addRow("Maximum size:", size_layout)
 
         # Cache expiration
         expiry_layout = QHBoxLayout()
@@ -221,14 +221,14 @@ class SettingsDialog(BaseDialog):
         expiry_layout.addWidget(self.cache_expiry_spin)
         expiry_layout.addStretch()
 
-        cache_layout.addRow("Expiration:", expiry_layout)
+        cache_layout.addRow("Delete entries older than:", expiry_layout)
 
-        # Additional options
+        # Additional options (labels removed - checkbox text is descriptive)
         self.auto_cleanup_check = QCheckBox("Automatically clean up old cache entries", self)
-        cache_layout.addRow("Maintenance:", self.auto_cleanup_check)
+        cache_layout.addRow(self.auto_cleanup_check)
 
         self.show_indicators_check = QCheckBox("Show cache indicators in UI", self)
-        cache_layout.addRow("Display:", self.show_indicators_check)
+        cache_layout.addRow(self.show_indicators_check)
 
         cache_group.setLayout(cache_layout)
         layout.addWidget(cache_group)
@@ -241,7 +241,7 @@ class SettingsDialog(BaseDialog):
         self.cache_dir_label = QLabel("N/A", self)
         if self.cache_dir_label:
             self.cache_dir_label.setStyleSheet(get_muted_text_style())
-        stats_layout.addRow("Directory:", self.cache_dir_label)
+        stats_layout.addRow("Cache location:", self.cache_dir_label)
 
         self.cache_files_label = QLabel("0 files", self)
         if self.cache_files_label:
@@ -271,7 +271,7 @@ class SettingsDialog(BaseDialog):
         actions_layout.addWidget(self.clear_cache_button)
 
         actions_layout.addStretch()
-        stats_layout.addRow("Actions:", actions_layout)
+        stats_layout.addRow(actions_layout)  # Label removed - buttons are self-explanatory
 
         stats_group.setLayout(stats_layout)
         layout.addWidget(stats_group)

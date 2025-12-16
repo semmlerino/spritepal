@@ -1138,9 +1138,8 @@ class AdvancedSearchDialog(QDialog):
         options_group.setLayout(options_layout)
         layout.addWidget(options_group)
 
-        # Pattern examples
-        examples_group = QGroupBox("Pattern Examples")
-        examples_layout = QVBoxLayout()
+        # Pattern examples (collapsible - hidden by default to reduce clutter)
+        examples_group = CollapsibleGroupBox("Pattern Examples", collapsed=True)
 
         examples_text = (
             "Hex Pattern Examples:\n"
@@ -1159,9 +1158,8 @@ class AdvancedSearchDialog(QDialog):
         examples_label = QLabel(examples_text)
         examples_label.setWordWrap(True)
         examples_label.setStyleSheet(f"QLabel {{ font-size: 9pt; color: {COLORS['text_muted']}; }}")
-        examples_layout.addWidget(examples_label)
+        examples_group.add_widget(examples_label)
 
-        examples_group.setLayout(examples_layout)
         layout.addWidget(examples_group)
 
         layout.addStretch()
