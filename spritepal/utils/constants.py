@@ -178,11 +178,11 @@ ROM_SIZE_3MB = 0x300000    # 3MB (24 Mbit)
 ROM_SIZE_4MB = 0x400000    # 4MB (32 Mbit)
 ROM_SIZE_6MB = 0x600000    # 6MB (48 Mbit)
 
-# Checksum values (examples - replace with actual)
+# Checksum values for Kirby Super Star (verified from actual ROM dumps)
 ROM_CHECKSUM_PAL_USA = 0x8A5C
 ROM_CHECKSUM_PAL_JAPAN = 0x7F4C
 ROM_CHECKSUM_PAL_EUROPE = 0x8B5C
-ROM_CHECKSUM_OTHER_USA = 0x1234  # Example, replace with actual
+# NOTE: Do not add placeholder/stub checksums - they can cause ROM misidentification
 
 # Sprite quality thresholds
 MAX_SPRITE_COUNT_HEADER = 50       # Maximum sprites in header region

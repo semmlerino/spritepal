@@ -13,7 +13,7 @@ import concurrent.futures
 import logging
 import time
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, override
 
@@ -29,6 +29,156 @@ from utils.constants import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CacheEntry:
+    """Entry in the decompression cache with metadata for LRU and invalidation."""
+
+    data: bytes
+    mtime: float  # File modification time when cached
+    size: int  # Size of data in bytes
+    last_access: float = field(default_factory=time.time)  # For LRU eviction
+
+
+class DecompressionCache:
+    """
+    Thread-safe decompression cache with mtime validation, LRU eviction, and memory limits.
+
+    Features:
+    - mtime validation: Automatically invalidates entries when ROM file changes
+    - LRU eviction: Removes least recently accessed entries when over count limit
+    - Memory limit: Evicts entries to stay under memory budget
+    """
+
+    MAX_ENTRIES = 100
+    MAX_MEMORY_BYTES = 16 * 1024 * 1024  # 16MB
+
+    def __init__(self, max_entries: int = MAX_ENTRIES, max_memory_bytes: int = MAX_MEMORY_BYTES):
+        self._cache: dict[tuple[str, int], CacheEntry] = {}
+        self._total_size = 0
+        self._max_entries = max_entries
+        self._max_memory = max_memory_bytes
+        self._hits = 0
+        self._misses = 0
+
+    def get(self, rom_path: str, offset: int) -> bytes | None:
+        """
+        Get cached data if valid, or None if not cached or stale.
+
+        Validates that file mtime hasn't changed since caching.
+        """
+        key = (rom_path, offset)
+        entry = self._cache.get(key)
+        if entry is None:
+            self._misses += 1
+            return None
+
+        # Validate mtime - invalidate if ROM file has been modified
+        try:
+            current_mtime = Path(rom_path).stat().st_mtime
+            if entry.mtime != current_mtime:
+                logger.debug(
+                    f"Cache invalidated for 0x{offset:X}: "
+                    f"mtime changed ({entry.mtime} -> {current_mtime})"
+                )
+                self._remove(key)
+                self._misses += 1
+                return None
+        except OSError:
+            # File no longer exists or inaccessible
+            self._remove(key)
+            self._misses += 1
+            return None
+
+        # Update last access time for LRU
+        entry.last_access = time.time()
+        self._hits += 1
+        return entry.data
+
+    def put(self, rom_path: str, offset: int, data: bytes) -> None:
+        """
+        Store data in cache, evicting entries as needed to maintain limits.
+        """
+        key = (rom_path, offset)
+        size = len(data)
+
+        # Get current file mtime
+        try:
+            mtime = Path(rom_path).stat().st_mtime
+        except OSError:
+            # Can't cache if we can't get mtime
+            logger.warning(f"Cannot cache entry: unable to stat {rom_path}")
+            return
+
+        # Remove existing entry if present (to update size tracking)
+        if key in self._cache:
+            self._remove(key)
+
+        # Evict until under limits (LRU order)
+        while (
+            len(self._cache) >= self._max_entries
+            or self._total_size + size > self._max_memory
+        ):
+            if not self._cache:
+                break
+            self._evict_lru()
+
+        # Don't cache if single entry exceeds memory limit
+        if size > self._max_memory:
+            logger.warning(
+                f"Entry too large to cache: {size} bytes > {self._max_memory} max"
+            )
+            return
+
+        # Store new entry
+        self._cache[key] = CacheEntry(
+            data=data, mtime=mtime, size=size, last_access=time.time()
+        )
+        self._total_size += size
+
+    def _remove(self, key: tuple[str, int]) -> None:
+        """Remove an entry from cache and update size tracking."""
+        if key in self._cache:
+            self._total_size -= self._cache[key].size
+            del self._cache[key]
+
+    def _evict_lru(self) -> None:
+        """Remove the least recently accessed entry."""
+        if not self._cache:
+            return
+
+        # Find entry with oldest last_access
+        oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k].last_access)
+        logger.debug(
+            f"Evicting LRU cache entry: offset 0x{oldest_key[1]:X}, "
+            f"size {self._cache[oldest_key].size}"
+        )
+        self._remove(oldest_key)
+
+    def clear(self) -> None:
+        """Clear all entries and reset statistics."""
+        self._cache.clear()
+        self._total_size = 0
+        self._hits = 0
+        self._misses = 0
+
+    @property
+    def hits(self) -> int:
+        return self._hits
+
+    @property
+    def misses(self) -> int:
+        return self._misses
+
+    @property
+    def entry_count(self) -> int:
+        return len(self._cache)
+
+    @property
+    def memory_usage(self) -> int:
+        return self._total_size
+
 
 @dataclass
 class ExtractionResult:
@@ -64,9 +214,7 @@ class OptimizedROMExtractor(ROMExtractor):
         self.enable_parallel = enable_parallel
         self.max_workers = max_workers
         self._rom_readers: dict[str, MemoryMappedROMReader] = {}
-        self._decompression_cache: dict[tuple[str, int], bytes] = {}
-        self._cache_hits = 0
-        self._cache_misses = 0
+        self._decompression_cache = DecompressionCache()
 
         logger.info(
             f"Initialized OptimizedROMExtractor "
@@ -107,14 +255,12 @@ class OptimizedROMExtractor(ROMExtractor):
         """
         start_time = time.perf_counter()
 
-        # Check decompression cache
-        cache_key = (rom_path, sprite_offset)
-        if use_cache and cache_key in self._decompression_cache:
-            self._cache_hits += 1
-            logger.debug(f"Cache hit for sprite at 0x{sprite_offset:X}")
-            return self._decompression_cache[cache_key]
-
-        self._cache_misses += 1
+        # Check decompression cache (includes mtime validation)
+        if use_cache:
+            cached = self._decompression_cache.get(rom_path, sprite_offset)
+            if cached is not None:
+                logger.debug(f"Cache hit for sprite at 0x{sprite_offset:X}")
+                return cached
 
         # Validate offset before decompression
         if sprite_offset < 0:
@@ -130,19 +276,16 @@ class OptimizedROMExtractor(ROMExtractor):
         try:
             decompressed = self._decompress_with_mmap(reader, sprite_offset)
 
-            # Cache the result
+            # Cache the result (handles LRU eviction and memory limits internally)
             if use_cache:
-                self._decompression_cache[cache_key] = decompressed
-                # Limit cache size
-                if len(self._decompression_cache) > 100:
-                    # Remove oldest entry (simple FIFO)
-                    oldest_key = next(iter(self._decompression_cache))
-                    del self._decompression_cache[oldest_key]
+                self._decompression_cache.put(rom_path, sprite_offset, decompressed)
 
             elapsed_ms = (time.perf_counter() - start_time) * 1000
+            cache = self._decompression_cache
+            total_requests = cache.hits + cache.misses
             logger.debug(
                 f"Extracted sprite at 0x{sprite_offset:X} in {elapsed_ms:.1f}ms "
-                f"(cache: {self._cache_hits}/{self._cache_hits + self._cache_misses})"
+                f"(cache: {cache.hits}/{total_requests})"
             )
 
             return decompressed
@@ -226,9 +369,12 @@ class OptimizedROMExtractor(ROMExtractor):
 
         # Log statistics
         successful = sum(1 for r in results.values() if r.success)
+        cache = self._decompression_cache
+        total_requests = cache.hits + cache.misses
+        hit_rate = cache.hits / max(total_requests, 1)
         logger.info(
             f"Extracted {successful}/{len(offsets)} sprites successfully "
-            f"(cache hit rate: {self._cache_hits/(self._cache_hits + self._cache_misses + 0.001):.1%})"
+            f"(cache hit rate: {hit_rate:.1%})"
         )
 
         return results
@@ -356,13 +502,15 @@ class OptimizedROMExtractor(ROMExtractor):
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache performance statistics."""
-        total_requests = self._cache_hits + self._cache_misses
+        cache = self._decompression_cache
+        total_requests = cache.hits + cache.misses
 
         return {
-            "cache_hits": self._cache_hits,
-            "cache_misses": self._cache_misses,
-            "hit_rate": self._cache_hits / max(total_requests, 1),
-            "cached_sprites": len(self._decompression_cache),
+            "cache_hits": cache.hits,
+            "cache_misses": cache.misses,
+            "hit_rate": cache.hits / max(total_requests, 1),
+            "cached_sprites": cache.entry_count,
+            "memory_usage_bytes": cache.memory_usage,
             "rom_readers": len(self._rom_readers)
         }
 
@@ -373,9 +521,6 @@ class OptimizedROMExtractor(ROMExtractor):
         # Clear ROM readers dict directly
         # MemoryMappedROMReader uses context manager for mmap access, so no explicit close needed
         self._rom_readers.clear()
-
-        self._cache_hits = 0
-        self._cache_misses = 0
 
         logger.info("Cleared all extractor caches")
 

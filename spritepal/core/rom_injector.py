@@ -282,9 +282,9 @@ class ROMInjector(SpriteInjector):
                         f"The sprite offset 0x{offset:X} is likely incorrect for this ROM version."
                     )
 
-            # Estimate compressed size by searching for next compressed data
-            # This is a heuristic - in practice we'd need better tracking
-            compressed_size = self._estimate_compressed_size(bytes(rom_data), offset)
+            # Parse HAL format to find actual compressed block size
+            # Falls back to conservative heuristic if parsing fails
+            compressed_size = self._parse_hal_compressed_size(bytes(rom_data), offset)
 
             logger.debug(
                 f"Decompressed {original_size} bytes (truncated to {len(decompressed)} bytes), "
@@ -408,20 +408,104 @@ class ROMInjector(SpriteInjector):
 
         return -1
 
-    def _estimate_compressed_size(self, rom_data: bytes, offset: int) -> int:
-        """Estimate size of compressed data (heuristic)"""
-        logger.debug(f"Estimating compressed size at offset 0x{offset:X}")
-        # This is a simplified approach - real implementation would need
-        # to parse the compression format or use known sizes
-        # For now, scan for typical compression end patterns
+    def _parse_hal_compressed_size(self, rom_data: bytes, offset: int) -> int:
+        """
+        Parse HAL compression stream to find actual compressed block size.
+
+        HAL compression format:
+        - Bytes 0-1: Decompressed size (little-endian, 16-bit)
+        - Byte 2+: Compressed command stream
+          - Each command byte's bits indicate literal (0) vs copy (1) for next 8 values
+          - Literals: 1 byte each
+          - Copies: 2 bytes (offset + length, length in high nibble + 3)
+
+        Returns:
+            Actual compressed block size in bytes
+        """
+        logger.debug(f"Parsing HAL compressed size at offset 0x{offset:X}")
+
+        if offset + 2 > len(rom_data):
+            logger.warning(f"Offset 0x{offset:X} too close to ROM end, falling back to heuristic")
+            return self._estimate_compressed_size_conservative(rom_data, offset)
+
+        # Read decompressed size from header (little-endian 16-bit)
+        decompressed_size = int.from_bytes(rom_data[offset : offset + 2], "little")
+
+        # Sanity check - unreasonable values indicate bad offset or non-HAL data
+        if decompressed_size == 0 or decompressed_size > 65536:
+            logger.warning(
+                f"Unusual decompressed size {decompressed_size} at 0x{offset:X}, "
+                "falling back to conservative scan"
+            )
+            return self._estimate_compressed_size_conservative(rom_data, offset)
+
+        # Parse compressed stream to find actual end
+        pos = offset + 2  # Start after header
+        output_size = 0
+        max_pos = min(offset + 0x10000, len(rom_data))  # Cap at 64KB
+
+        try:
+            while pos < max_pos and output_size < decompressed_size:
+                if pos >= len(rom_data):
+                    break
+
+                cmd = rom_data[pos]
+                pos += 1
+
+                # Process 8 values per command byte
+                for bit in range(8):
+                    if output_size >= decompressed_size:
+                        break
+
+                    if cmd & (1 << bit):  # Copy command (backreference)
+                        # Copy: 2 bytes (low byte = offset low, high byte = length<<4 | offset high)
+                        if pos + 2 > len(rom_data):
+                            logger.warning(
+                                f"Truncated copy command at 0x{pos:X}, using position as size"
+                            )
+                            return pos - offset
+                        # Length is encoded in high nibble of second byte + 3
+                        copy_len = ((rom_data[pos + 1] >> 4) & 0x0F) + 3
+                        pos += 2
+                        output_size += copy_len
+                    else:  # Literal byte
+                        if pos >= len(rom_data):
+                            logger.warning(
+                                f"Truncated literal at 0x{pos:X}, using position as size"
+                            )
+                            return pos - offset
+                        pos += 1
+                        output_size += 1
+
+            compressed_size = pos - offset
+            logger.debug(
+                f"HAL parsing complete: compressed={compressed_size} bytes, "
+                f"decompressed={output_size}/{decompressed_size} bytes"
+            )
+            return compressed_size
+
+        except Exception as e:
+            logger.warning(f"HAL parsing failed at 0x{pos:X}: {e}, falling back to heuristic")
+            return self._estimate_compressed_size_conservative(rom_data, offset)
+
+    def _estimate_compressed_size_conservative(self, rom_data: bytes, offset: int) -> int:
+        """
+        Conservative fallback: require longer padding runs to reduce false positives.
+
+        Uses 32-byte runs of 0x00/0xFF instead of 16, reducing the chance that
+        legitimate compressed data containing these patterns triggers early termination.
+        """
+        logger.debug(f"Using conservative size estimation at offset 0x{offset:X}")
         max_size = min(0x10000, len(rom_data) - offset)  # Max 64KB
 
-        # Look for common patterns that indicate end of compressed data
+        # Require 32 consecutive bytes of padding (vs 16 in old heuristic)
+        padding_threshold = 32
         for i in range(32, max_size, 2):
-            # Check for alignment padding (series of 0xFF or 0x00)
-            if rom_data[offset + i : offset + i + 16] == b"\xff" * 16:
+            if rom_data[offset + i : offset + i + padding_threshold] == b"\xff" * padding_threshold:
+                logger.debug(f"Found 0xFF padding at offset+{i}")
                 return i
-            if rom_data[offset + i : offset + i + 16] == b"\x00" * 16:
+            if rom_data[offset + i : offset + i + padding_threshold] == b"\x00" * padding_threshold:
+                logger.debug(f"Found 0x00 padding at offset+{i}")
                 return i
 
         # Default estimate

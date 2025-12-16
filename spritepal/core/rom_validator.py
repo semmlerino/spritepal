@@ -49,15 +49,15 @@ class ROMValidator:
     ]
 
     # Known game titles and their checksums
+    # NOTE: Only include games with verified checksums from actual ROM dumps.
+    # Do not add placeholder/stub values - they can cause ROM misidentification.
     KNOWN_GAMES: ClassVar[dict[str, dict[str, int]]] = {
         "KIRBY SUPER STAR": {
             "USA": ROM_CHECKSUM_PAL_USA,
             "Japan": ROM_CHECKSUM_PAL_JAPAN,
             "Europe": ROM_CHECKSUM_PAL_EUROPE,
         },
-        "KIRBY'S DREAM LAND 3": {
-            "USA": 0x1234,  # Example, replace with actual
-        },
+        # KIRBY'S DREAM LAND 3 removed - no verified ROM checksum available
     }
 
     @classmethod

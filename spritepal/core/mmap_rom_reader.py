@@ -254,12 +254,29 @@ class MemoryMappedROMReader:
 
     def _estimate_compressed_size(self, rom_data: mmap.mmap, offset: int) -> int:
         """
-        Estimate size of compressed data block.
+        STUB: Returns max possible size (64KB or remaining file).
 
-        This is compression-format specific.
-        For HAL compression, we'd need to parse the format.
+        .. deprecated::
+            This stub always returns the maximum possible size, which is wasteful
+            and can cause timeouts on malformed data. Use
+            :meth:`ROMInjector._parse_hal_compressed_size` for accurate HAL
+            compression size determination.
+
+        Args:
+            rom_data: Memory-mapped ROM data
+            offset: Offset to compressed block
+
+        Returns:
+            Maximum possible size (not actual compressed size)
         """
-        # Simplified estimation - would need format-specific implementation
+        import warnings
+
+        warnings.warn(
+            "_estimate_compressed_size is a stub returning max size (64KB). "
+            "Use ROMInjector._parse_hal_compressed_size for accurate HAL parsing.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         max_size = min(0x10000, self.file_size - offset)  # Max 64KB
         return max_size
 
