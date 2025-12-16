@@ -25,7 +25,6 @@ from __future__ import annotations
 import json
 import os
 import time
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
@@ -79,18 +78,15 @@ class InjectionManager(BaseManager):
         Args:
             parent: Optional parent QObject
 
-        .. deprecated::
-            Direct instantiation is deprecated. Use ``inject(InjectionManagerProtocol)``
-            to get the managed InjectionAdapter instance instead.
+        Note:
+            This class should not be instantiated directly. Use dependency injection::
+
+                from core.di_container import inject
+                from core.protocols.manager_protocols import InjectionManagerProtocol
+                injection_mgr = inject(InjectionManagerProtocol)
         """
-        # Emit deprecation warning only for direct instantiation (not adapter subclasses)
-        if type(self).__name__ == "InjectionManager":
-            warnings.warn(
-                "Direct InjectionManager instantiation is deprecated. "
-                "Use inject(InjectionManagerProtocol) from core.di_container instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        # Note: deprecation warning removed - it never fired since InjectionAdapter
+        # is the only subclass and always passes through here
 
         # Declare instance variables with type hints
         self._current_worker: QThread | None = None

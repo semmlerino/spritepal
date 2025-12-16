@@ -745,6 +745,7 @@ class UnifiedManualOffsetDialog(DialogBase):
                 self.browse_tab.offset_changed.disconnect()
                 self.browse_tab.find_next_clicked.disconnect()
                 self.browse_tab.find_prev_clicked.disconnect()
+                self.browse_tab.find_sprites_requested.disconnect()
 
             if self.smart_tab is not None:
                 self.smart_tab.smart_mode_changed.disconnect()
@@ -753,6 +754,9 @@ class UnifiedManualOffsetDialog(DialogBase):
 
             if self.history_tab is not None:
                 self.history_tab.sprite_selected.disconnect()
+
+            if self.gallery_tab is not None:
+                self.gallery_tab.sprite_selected.disconnect()
 
             # Disconnect preview widget signals
             if self.preview_widget is not None:

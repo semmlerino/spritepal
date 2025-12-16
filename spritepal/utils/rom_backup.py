@@ -87,7 +87,7 @@ class ROMBackupManager:
                 backup_path.unlink()
                 logger.info(f"Removed old backup: {backup_path.name}")
 
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             logger.warning(f"Failed to cleanup old backups: {e}")
 
     @classmethod
@@ -121,8 +121,8 @@ class ROMBackupManager:
                     if mtime > latest_mtime:
                         latest_mtime = mtime
                         latest_backup = str(file_path)
-        except Exception:
-            pass
+        except (OSError, PermissionError) as e:
+            logger.debug(f"Error scanning backup directory: {e}")
 
         return latest_backup
 
@@ -206,7 +206,7 @@ class ROMBackupManager:
                             ),
                         }
                     )
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             logger.warning(f"Failed to list backups: {e}")
 
         # Sort by modification time (newest first)

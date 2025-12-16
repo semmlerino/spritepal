@@ -440,8 +440,8 @@ class ROMCache:
                     if cutoff_time is None or cache_file.stat().st_mtime < cutoff_time:
                         cache_file.unlink()
                         removed_count += 1
-                except (OSError, PermissionError):
-                    pass  # Continue with other files
+                except (OSError, PermissionError) as e:
+                    logger.debug(f"Could not delete cache file {cache_file}: {e}")
 
             # Clear hash cache when clearing file cache
             with self._hash_cache_lock:
@@ -666,10 +666,10 @@ class ROMCache:
                     try:
                         cache_file.unlink()
                         removed_count += 1
-                    except (OSError, PermissionError):
-                        pass
-        except (OSError, PermissionError):
-            pass
+                    except (OSError, PermissionError) as e:
+                        logger.debug(f"Could not delete scan cache {cache_file}: {e}")
+        except (OSError, PermissionError) as e:
+            logger.debug(f"Error during scan cache cleanup: {e}")
 
         return removed_count
 
@@ -696,8 +696,8 @@ class ROMCache:
                     try:
                         cache_file.unlink()
                         removed_count += 1
-                    except (OSError, PermissionError):
-                        pass
+                    except (OSError, PermissionError) as e:
+                        logger.debug(f"Could not delete preview cache {cache_file}: {e}")
 
                 # Clear batch preview cache
                 batch_cache = self._get_cache_file_path(rom_hash, "preview_batch")
@@ -705,26 +705,26 @@ class ROMCache:
                     try:
                         batch_cache.unlink()
                         removed_count += 1
-                    except (OSError, PermissionError):
-                        pass
+                    except (OSError, PermissionError) as e:
+                        logger.debug(f"Could not delete batch cache {batch_cache}: {e}")
             else:
                 # Clear all preview caches
                 for cache_file in self.cache_dir.glob("*_preview_*.json"):
                     try:
                         cache_file.unlink()
                         removed_count += 1
-                    except (OSError, PermissionError):
-                        pass
+                    except (OSError, PermissionError) as e:
+                        logger.debug(f"Could not delete preview cache {cache_file}: {e}")
 
                 for cache_file in self.cache_dir.glob("*_preview_batch.json"):
                     try:
                         cache_file.unlink()
                         removed_count += 1
-                    except (OSError, PermissionError):
-                        pass
+                    except (OSError, PermissionError) as e:
+                        logger.debug(f"Could not delete batch cache {cache_file}: {e}")
 
-        except (OSError, PermissionError):
-            pass
+        except (OSError, PermissionError) as e:
+            logger.debug(f"Error during preview cache cleanup: {e}")
 
         return removed_count
 

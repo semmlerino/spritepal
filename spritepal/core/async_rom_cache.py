@@ -80,7 +80,13 @@ class CacheWorker(QObject):
 
                 # Read metadata
                 meta_json = f.read(meta_size)
-                metadata = json.loads(meta_json)
+                try:
+                    metadata = json.loads(meta_json)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Corrupted cache metadata for {cache_key}: {e}")
+                    self.load_error.emit(request_id, "Cache corrupted")
+                    cache_file.unlink(missing_ok=True)
+                    return
 
                 # Read data
                 data = f.read()
@@ -93,7 +99,7 @@ class CacheWorker(QObject):
 
             self.data_loaded.emit(request_id, data, metadata)
 
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             logger.debug(f"Cache load error for {cache_key}: {e}")
             self.load_error.emit(request_id, str(e))
 

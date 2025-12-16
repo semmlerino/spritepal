@@ -22,7 +22,6 @@ See Also:
 """
 from __future__ import annotations
 
-import warnings
 from typing import Any, override
 
 from PIL import Image
@@ -74,18 +73,15 @@ class ExtractionManager(BaseManager):
         Args:
             parent: Optional parent QObject
 
-        .. deprecated::
-            Direct instantiation is deprecated. Use ``inject(ExtractionManagerProtocol)``
-            to get the managed ExtractionAdapter instance instead.
+        Note:
+            This class should not be instantiated directly. Use dependency injection::
+
+                from core.di_container import inject
+                from core.protocols.manager_protocols import ExtractionManagerProtocol
+                extraction_mgr = inject(ExtractionManagerProtocol)
         """
-        # Emit deprecation warning only for direct instantiation (not adapter subclasses)
-        if type(self).__name__ == "ExtractionManager":
-            warnings.warn(
-                "Direct ExtractionManager instantiation is deprecated. "
-                "Use inject(ExtractionManagerProtocol) from core.di_container instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        # Note: deprecation warning removed - it never fired since ExtractionAdapter
+        # is the only subclass and always passes through here
 
         # Declare instance variables with type hints
         self._sprite_extractor: SpriteExtractor | None = None
