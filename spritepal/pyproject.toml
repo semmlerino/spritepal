@@ -446,74 +446,71 @@ filterwarnings = [
 
 # Markers used in the test suite
 markers = [
-    # Primary execution environment markers
-    "gui: GUI tests requiring display/X11 environment",
+    # Environment markers
+    "gui: GUI tests requiring Qt (run with QT_QPA_PLATFORM=offscreen)",
     "headless: Tests that can run without display",
-    "mock_only: Tests using only mocked components",
+    "no_qt: Tests with no Qt dependencies",
+    "requires_display: Tests requiring real display (skipped in offscreen)",
 
     # Test type markers
-    "unit: Unit tests (fast, isolated, no external dependencies)",
-    "integration: Integration tests (may require files, databases, services)",
+    "unit: Unit tests (fast, isolated)",
+    "integration: Integration tests",
     "benchmark: Performance benchmarking tests",
     "performance: Performance tests",
-    "stress: Stress/load testing",
     "slow: Slow tests (>1s execution time)",
 
-    # Qt component markers
+    # Qt markers
     "qt_real: Tests using real Qt components",
     "qt_mock: Tests using mocked Qt components",
     "qt_app: Tests requiring QApplication instance",
-    "qt_application: Tests that require a QApplication instance",
-    "no_qt: Tests with no Qt dependencies",
+    "qt_application: Tests requiring QApplication instance",
     "qt_no_exception_capture: Disable Qt exception capture",
-    "qt_threading: Tests that use Qt threading and need QPixmap guard",
-    "qt_integration: Qt integration tests",
 
-    # Manager markers
-    "no_manager_setup: Tests that skip manager initialization",
-    "isolated_managers: Tests requiring fresh manager instances",
+    # Manager/fixture control markers
+    "no_manager_setup: Skip manager initialization",
+    "shared_state_safe: Test verified safe with session_managers",
+    "allows_registry_state: Allow registry state without manager fixtures",
+    "skip_thread_cleanup: Skip thread cleanup (requires reason)",
+    "skip_qpixmap_guard: Skip QPixmap threading guard",
+    "skip_hal_reset: Skip HAL singleton reset",
+    "skip_session_reset: Skip session manager state reset",
+    "no_hal: Skip HAL-related fixtures",
 
-    # Data and resource markers
-    "real_hal: Tests using real HAL components",
+    # Resource markers
+    "real_hal: Use real HAL components (requires exhal binary)",
     "requires_rom: Tests that require ROM file data",
+    "requires_real_rom: Tests requiring actual Kirby ROM",
     "rom_data: Tests involving ROM data processing",
-    "cache: Tests that interact with the cache",
     "file_io: Tests involving file I/O operations",
-    "memory: Tests that check for memory leaks",
-
-    # UI markers
-    "mock_gui: Tests using mocked GUI components",
-    "mock_dialogs: Tests that mock dialog exec() methods",
-    "no_gui: Tests that should not use GUI components",
-    "dialog: Tests involving dialog components",
-    "widget: Tests involving Qt widgets",
-    "singleton: Tests that test singleton patterns",
-    "signals_slots: Tests involving Qt signals and slots",
-
-    # Stability markers
-    "stability: Stability/regression tests",
-    "thread_safety: Thread safety tests",
+    "cache: Tests that interact with the cache",
 
     # Execution control markers
-    "timeout: Set custom timeout for test",
-    "ci_safe: Tests safe for CI environments",
-    "serial: Tests that must run serially (no parallelization)",
-    "parallel_safe: Tests that can be run in parallel safely",
-    "process_pool: Tests using process pools",
+    "serial: Tests that must run serially",
+    "parallel_safe: Tests safe for pytest-xdist parallel execution",
     "worker_threads: Tests using worker threads",
-    "segfault_prone: Tests prone to segfaults (handle carefully)",
+    "thread_safety: Thread safety tests",
+    "ci_safe: Tests safe for CI environments",
+
+    # UI markers
+    "mock_only: Tests using only mocked components",
+    "mock_gui: Tests using mocked GUI components",
+    "mock_dialogs: Tests that mock dialog exec()",
+    "no_gui: Tests that should not use GUI",
+    "dialog: Tests involving dialog components",
+    "widget: Tests involving Qt widgets",
+    "signals_slots: Tests involving Qt signals and slots",
+    "stability: Stability/regression tests",
     "mock: Tests using mock objects",
 
-    # Platform markers
-    "asyncio: Tests using asyncio functionality",
-    "requires_display: Tests requiring display environment",
-
-    # Legacy/compatibility markers
+    # Migration/legacy markers
+    "di_migration: Tests for dependency injection migration",
+    "phase: Phase-specific tests",
     "phase1_fixes: Tests related to phase 1 stability fixes",
-    "fixture_test: Tests that verify fixtures",
-    "infrastructure: Infrastructure validation tests",
     "validation: Validation tests",
 
-    # Migration markers
-    "di_migration: Tests for dependency injection migration readiness",
+    # Additional markers
+    "memory: Tests that check for memory leaks",
+    "singleton: Tests that test singleton patterns",
+    "process_pool: Tests using process pools",
+    "qt_integration: Qt integration tests",
 ]
