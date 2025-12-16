@@ -318,3 +318,46 @@ def hal_test_data() -> dict[str, bytes]:
         "zeros": b"\x00" * 0x1000,  # 4KB zeros
         "ones": b"\xff" * 0x1000,   # 4KB ones
     }
+
+
+@pytest.fixture
+def hal_golden_data() -> dict[str, dict]:
+    """
+    Provide golden HAL test data with recorded checksums.
+
+    Returns dict mapping test names to:
+    - input_data: bytes
+    - expected_sha256: str (checksum of expected output, if recorded)
+    - expected_size: int (expected output size, if recorded)
+
+    If checksums.json has no entries (not yet regenerated with real HAL),
+    returns empty dict and tests should handle accordingly.
+    """
+    import json
+    from pathlib import Path
+
+    golden_dir = Path(__file__).parent / "golden_data" / "hal"
+    checksums_file = golden_dir / "checksums.json"
+
+    if not checksums_file.exists():
+        return {}
+
+    with open(checksums_file) as f:
+        checksums = json.load(f)
+
+    if not checksums.get("entries"):
+        # No golden data yet - return test patterns without expected checksums
+        return {}
+
+    result: dict[str, dict] = {}
+    for name, entry in checksums["entries"].items():
+        input_file = golden_dir / entry.get("input_file", "")
+        if input_file.exists():
+            result[name] = {
+                "input_data": input_file.read_bytes(),
+                "expected_sha256": entry.get("output_sha256"),
+                "expected_size": entry.get("output_size"),
+                "compression_ratio": entry.get("compression_ratio"),
+            }
+
+    return result

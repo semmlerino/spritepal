@@ -331,6 +331,7 @@ HAL (compression/decompression) is **mock-by-default** because:
 | `@pytest.mark.real_hal` | Use real HAL implementation |
 | `@pytest.mark.skip_thread_cleanup(reason='...')` | Skip thread leak detection (**reason required!**) |
 | `@pytest.mark.no_qt` | Skip all Qt-related fixtures (implies skip_thread_cleanup) |
+| `@pytest.mark.parallel_unsafe` | Force serial execution under xdist (for wrapper fixtures) |
 
 **Important:** `skip_thread_cleanup` **requires** a `reason` argument explaining why thread cleanup is skipped. Tests without a reason will fail with `pytest.UsageError`. Example:
 ```python
@@ -346,6 +347,7 @@ def test_with_owned_threads():
 - Inheriting `QDialog` in mocks - causes metaclass crashes
 - Missing singleton cleanup - use `cleanup_singleton` fixture
 - Using `session_managers` without `@pytest.mark.shared_state_safe`
+- Custom fixtures wrapping `session_managers` without `@pytest.mark.parallel_unsafe` - auto-grouping won't detect the dependency
 
 ### Wait Helper Usage
 

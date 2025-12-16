@@ -172,8 +172,8 @@ class InjectionManager(BaseManager):
         try:
             # Local imports to avoid circular dependency
             from core.services.worker_lifecycle import WorkerManager
+            from core.workers import ROMInjectionParams, ROMInjectionWorker, VRAMInjectionParams
             from core.workers.injection_worker import InjectionWorker
-            from core.workers.rom_injection_worker import ROMInjectionWorker
 
             # Validate parameters
             self.validate_injection_params(params)
@@ -203,14 +203,18 @@ class InjectionManager(BaseManager):
                     params.get("metadata_path")
                 )
             elif params["mode"] == "rom":
-                worker = ROMInjectionWorker(
-                    params["sprite_path"],
-                    params["input_rom"],
-                    params["output_rom"],
-                    params["offset"],
-                    params.get("fast_compression", False),
-                    params.get("metadata_path")
-                )
+                # Create worker parameters for DI-based ROMInjectionWorker
+                rom_params: ROMInjectionParams = {
+                    "mode": "rom",
+                    "sprite_path": params["sprite_path"],
+                    "input_rom": params["input_rom"],
+                    "output_rom": params["output_rom"],
+                    "offset": params["offset"],
+                    "fast_compression": params.get("fast_compression", False),
+                    "metadata_path": params.get("metadata_path"),
+                }
+                # Use DI-based worker (self is the InjectionManager)
+                worker = ROMInjectionWorker(rom_params, self)
             else:
                 _validate_injection_mode(params["mode"])
                 return False  # Unreachable but satisfies type checker

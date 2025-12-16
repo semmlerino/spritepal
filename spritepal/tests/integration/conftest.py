@@ -198,31 +198,16 @@ def rom_extraction_panel(qtbot, managers_initialized):
 def manual_offset_dialog(qtbot, managers_initialized):
     """Create a real manual offset dialog for testing.
 
-    Note: Uses importlib to bypass the global sys.modules patching in conftest_dialog_patch.py
-    that mocks dialogs for headless testing. Integration tests need real dialogs.
+    This fixture provides a real UnifiedManualOffsetDialog instance for integration
+    tests that need to verify actual dialog behavior.
 
     Important: We don't use qtbot.addWidget() because the dialog may be destroyed by
     managers_initialized cleanup before pytest-qt teardown runs, causing
     "Internal C++ object already deleted" errors.
     """
-    import importlib.util
-    from pathlib import Path
-
     import shiboken6
+    from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
 
-    # Get the real module source file path
-    module_path = Path(__file__).parent.parent.parent / "ui" / "dialogs" / "manual_offset_unified_integrated.py"
-
-    # Load the module directly from the file
-    spec = importlib.util.spec_from_file_location(
-        "ui.dialogs.manual_offset_unified_integrated_real",
-        module_path
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    # Get the real dialog class
-    UnifiedManualOffsetDialog = module.UnifiedManualOffsetDialog
     dialog = UnifiedManualOffsetDialog()
     # Don't use qtbot.addWidget() - we manage cleanup ourselves to avoid
     # double-delete when managers_initialized cleanup runs first

@@ -370,24 +370,51 @@ def detect_manager_pollution(request: FixtureRequest) -> Generator[None, None, N
     Tests that simply INHERIT initialized state (from session_managers) are OK.
     The goal is to catch accidental pollution, not punish innocent tests.
 
+    Performance optimization: Only imports ManagerRegistry for tests that use
+    manager-related fixtures, avoiding import overhead for pure unit tests.
+
     Escape hatches:
     - @pytest.mark.allows_registry_state: Skip this check entirely
     """
-    from core.managers.registry import ManagerRegistry
-
     # Skip check if test has escape hatch marker
     if request.node.get_closest_marker("allows_registry_state"):
         yield
         return
 
     # Get list of manager-related fixtures this test uses
-    fixture_names = getattr(request, 'fixturenames', [])
+    fixture_names = set(getattr(request, 'fixturenames', []))
+
+    # Fixtures that indicate manager involvement (direct or indirect)
+    # Check fixture presence BEFORE importing ManagerRegistry to save overhead
+    manager_related_fixtures = {
+        # Direct manager fixtures
+        'session_managers', 'class_managers', 'isolated_managers',
+        'managers', 'setup_managers', 'managers_initialized',
+        # Factory fixtures that may initialize registry
+        'real_factory', 'manager_context', 'manager_context_factory',
+        'real_extraction_manager', 'real_injection_manager', 'real_session_manager',
+        # Context fixtures
+        'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
+        'complete_test_context', 'minimal_injection_context', 'isolated_test_context',
+        # UI fixtures that need managers
+        'mock_main_window', 'mock_extraction_worker', 'main_window',
+    }
+
+    # Skip import entirely for non-manager tests (performance optimization)
+    if not manager_related_fixtures.intersection(fixture_names):
+        yield
+        return
+
+    # Now safe to import - test uses manager-related fixtures
+    from core.managers.registry import ManagerRegistry
+
     # Include ALL fixtures that manage ManagerRegistry lifecycle
     manager_fixtures = {
         'session_managers', 'class_managers', 'isolated_managers',
-        'managers', 'setup_managers', 'managers_initialized'
+        'managers', 'setup_managers', 'managers_initialized',
+        'real_factory', 'manager_context',  # Factory fixtures that use registry
     }
-    uses_manager_fixture = bool(manager_fixtures & set(fixture_names))
+    uses_manager_fixture = bool(manager_fixtures & fixture_names)
 
     # Check state before test
     registry = ManagerRegistry()
@@ -694,8 +721,16 @@ def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
 # ============================================================================
 
 @pytest.fixture
-def real_factory(request: pytest.FixtureRequest) -> Generator[RealComponentFactory, None, None]:
-    """Provide a RealComponentFactory for creating test components."""
+def real_factory(
+    request: pytest.FixtureRequest,
+    isolated_managers: ManagerRegistry,
+) -> Generator[RealComponentFactory, None, None]:
+    """Provide a RealComponentFactory for creating test components.
+
+    Depends on isolated_managers to ensure registry is properly managed.
+    The isolated_managers fixture handles initialization and cleanup,
+    so RealComponentFactory won't need to manage the registry lifecycle.
+    """
     fail_on_leaks = _should_fail_on_leaks(request.config)
     factory = RealComponentFactory(fail_on_leaks=fail_on_leaks)
     yield factory

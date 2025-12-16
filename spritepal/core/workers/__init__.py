@@ -27,7 +27,9 @@ from .extraction import (
     WorkerOwnedVRAMExtractionWorker,
 )
 from .injection import (
+    ROMInjectionParams,
     ROMInjectionWorker,
+    VRAMInjectionParams,
     VRAMInjectionWorker,
     WorkerOwnedROMInjectionWorker,
     WorkerOwnedVRAMInjectionWorker,
@@ -47,12 +49,16 @@ __all__ = [
     "InjectionWorkerBase",
     "ManagedWorker",
     "PreviewWorkerBase",
+    # DI-based workers (new architecture)
     "ROMExtractionWorker",
     "ROMInjectionWorker",
+    "VRAMInjectionWorker",
+    # Parameter types
+    "ROMInjectionParams",
+    "VRAMInjectionParams",
     "ScanWorkerBase",
     # Legacy implementations (singleton managers)
     "VRAMExtractionWorker",
-    "VRAMInjectionWorker",
     "WorkerOwnedROMExtractionWorker",
     "WorkerOwnedROMInjectionWorker",
     # Modern implementations (worker-owned managers)

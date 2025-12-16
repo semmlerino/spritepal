@@ -424,26 +424,9 @@ filterwarnings = [
     "ignore:get_injection_manager.*is deprecated:DeprecationWarning",
     "ignore:get_settings_manager.*is deprecated:DeprecationWarning",
     "ignore:get_rom_cache.*is deprecated:DeprecationWarning",
-    # Worker constructor injection deprecation warnings (B.2 - transitioning to DI)
-    "ignore:VRAMExtractionWorker.*extraction_manager parameter will become required:DeprecationWarning",
-    "ignore:ROMExtractionWorker.*extraction_manager parameter will become required:DeprecationWarning",
-    "ignore:VRAMInjectionWorker.*injection_manager parameter will become required:DeprecationWarning",
-    "ignore:ROMInjectionWorker.*injection_manager parameter will become required:DeprecationWarning",
-    # UI component constructor injection deprecation warnings (B.3 - transitioning to DI)
-    "ignore:InjectionDialog.*injection_manager parameter will become required:DeprecationWarning",
-    "ignore:ROMExtractionPanel.*extraction_manager parameter will become required:DeprecationWarning",
-    "ignore:SessionCoordinator.*session_manager parameter will become required:DeprecationWarning",
-    "ignore:DetachedGalleryWindow.*extraction_manager parameter will become required:DeprecationWarning",
-    # ExtractionController constructor injection deprecation warnings (B.4 - transitioning to DI)
-    "ignore:ExtractionController.*extraction_manager parameter will become required:DeprecationWarning",
-    "ignore:ExtractionController.*session_manager parameter will become required:DeprecationWarning",
-    "ignore:ExtractionController.*injection_manager parameter will become required:DeprecationWarning",
-    "ignore:ExtractionController.*settings_manager parameter will become required:DeprecationWarning",
-    "ignore:ExtractionController.*dialog_factory parameter will become required:DeprecationWarning",
-    # MainWindow constructor injection deprecation warnings (B.5 - transitioning to DI)
-    "ignore:MainWindow.*settings_manager parameter will become required:DeprecationWarning",
-    "ignore:MainWindow.*rom_cache parameter will become required:DeprecationWarning",
-    "ignore:MainWindow.*session_manager parameter will become required:DeprecationWarning",
+    # NOTE: Worker constructor injection warnings (B.2) removed 2025-12-16
+    # NOTE: ROMInjectionWorker migrated from core.workers.rom_injection_worker to core.workers.injection
+    # NOTE: B.3-B.5 UI component migrations completed, all warnings removed 2025-12-16
 ]
 
 # Markers used in the test suite

@@ -33,8 +33,6 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.di_migration,
-    pytest.mark.usefixtures("session_managers"),
-    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="DI tests create real managers which may spawn threads"),
 ]
 
@@ -42,39 +40,39 @@ pytestmark = [
 class TestProtocolInjection:
     """Test that all protocols can be resolved via inject()."""
 
-    def test_container_is_configured(self, session_managers):
+    def test_container_is_configured(self, isolated_managers):
         """Verify DI container is properly configured."""
         container = get_container()
         # Container should have at least SettingsManagerProtocol registered
         assert container.has(SettingsManagerProtocol), "DI container should be configured after manager init"
 
-    def test_inject_settings_manager_protocol(self, session_managers):
+    def test_inject_settings_manager_protocol(self, isolated_managers):
         """Test SettingsManagerProtocol injection."""
         settings = inject(SettingsManagerProtocol)
         assert settings is not None
         assert hasattr(settings, "get")
         assert hasattr(settings, "set")
 
-    def test_inject_session_manager_protocol(self, session_managers):
+    def test_inject_session_manager_protocol(self, isolated_managers):
         """Test SessionManagerProtocol injection."""
         session = inject(SessionManagerProtocol)
         assert session is not None
         # SessionAdapter provides get_session_data
         assert hasattr(session, "get_session_data")
 
-    def test_inject_extraction_manager_protocol(self, session_managers):
+    def test_inject_extraction_manager_protocol(self, isolated_managers):
         """Test ExtractionManagerProtocol injection."""
         extraction = inject(ExtractionManagerProtocol)
         assert extraction is not None
         assert hasattr(extraction, "validate_extraction_params")
 
-    def test_inject_injection_manager_protocol(self, session_managers):
+    def test_inject_injection_manager_protocol(self, isolated_managers):
         """Test InjectionManagerProtocol injection."""
         injection = inject(InjectionManagerProtocol)
         assert injection is not None
         assert hasattr(injection, "start_injection")
 
-    def test_inject_rom_cache_protocol(self, session_managers):
+    def test_inject_rom_cache_protocol(self, isolated_managers):
         """Test ROMCacheProtocol injection."""
         cache = inject(ROMCacheProtocol)
         assert cache is not None
@@ -85,7 +83,7 @@ class TestProtocolInjection:
 class TestPureDIComponentInitialization:
     """Test components can initialize with explicit DI (no fallbacks)."""
 
-    def test_extraction_controller_pure_di(self, session_managers):
+    def test_extraction_controller_pure_di(self, isolated_managers):
         """Test ExtractionController works with all deps passed explicitly."""
         from core.controller import ExtractionController
 
@@ -127,8 +125,12 @@ class TestPureDIComponentInitialization:
         assert controller.injection_manager is injection_mgr
         assert controller.settings_manager is settings_mgr
 
-    def test_main_window_pure_di(self, session_managers, qtbot):
-        """Test MainWindow works with all deps passed explicitly."""
+    def test_main_window_pure_di(self, isolated_managers, qtbot):
+        """Test MainWindow works with all deps passed explicitly.
+
+        Note: Uses isolated_managers because MainWindow saves settings on init,
+        which modifies shared state.
+        """
         from ui.main_window import MainWindow
 
         settings_mgr = inject(SettingsManagerProtocol)
@@ -150,7 +152,7 @@ class TestPureDIComponentInitialization:
             window.close()
             window.deleteLater()
 
-    def test_injection_dialog_pure_di(self, session_managers, qtbot):
+    def test_injection_dialog_pure_di(self, isolated_managers, qtbot):
         """Test InjectionDialog works with injection_manager passed explicitly."""
         from ui.injection_dialog import InjectionDialog
 
@@ -165,7 +167,7 @@ class TestPureDIComponentInitialization:
             dialog.close()
             dialog.deleteLater()
 
-    def test_rom_extraction_panel_pure_di(self, session_managers, qtbot):
+    def test_rom_extraction_panel_pure_di(self, isolated_managers, qtbot):
         """Test ROMExtractionPanel works with extraction_manager passed explicitly."""
         from ui.rom_extraction_panel import ROMExtractionPanel
 
@@ -206,7 +208,7 @@ class TestNoFallbackScenario:
             container._singletons.update(original_singletons)
             container._factories.update(original_factories)
 
-    def test_deprecated_functions_were_removed(self, session_managers):
+    def test_deprecated_functions_were_removed(self, isolated_managers):
         """Verify deprecated convenience functions have been removed from module exports."""
         import core.managers
 
@@ -231,7 +233,7 @@ class TestNoFallbackScenario:
 class TestInjectionManagerDI:
     """Test InjectionManager's internal DI needs."""
 
-    def test_injection_manager_session_access(self, session_managers):
+    def test_injection_manager_session_access(self, isolated_managers):
         """Test InjectionManager can access session manager via DI."""
         injection_mgr = inject(InjectionManagerProtocol)
 
@@ -241,7 +243,7 @@ class TestInjectionManagerDI:
             session = injection_mgr._get_session_manager()
             assert session is not None
 
-    def test_injection_manager_rom_cache_access(self, session_managers):
+    def test_injection_manager_rom_cache_access(self, isolated_managers):
         """Test InjectionManager can access ROM cache via DI."""
         # Use DI to get ROM cache (replaces deprecated get_rom_cache())
         cache = inject(ROMCacheProtocol)

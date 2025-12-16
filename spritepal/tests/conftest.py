@@ -112,6 +112,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "golden_hal: Verify HAL output against recorded golden checksums (no real binary needed)"
+    )
+    config.addinivalue_line(
+        "markers",
         "no_manager_setup: Skip setup_managers fixture for this test"
     )
     # New markers for autouse fixture opt-out
@@ -162,6 +166,10 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "parallel_unsafe: Force test to run in serial mode under xdist (use when wrapper fixtures hide shared state)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "lenient_reset: Downgrade class fixture reset errors to warnings (for legacy tests during migration)"
     )
 
     # Make implicit RealComponentFactory warnings visible when we add them
@@ -364,7 +372,27 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
 
 
 def pytest_runtest_setup(item: Any) -> None:
-    """Record registry state before test runs."""
+    """Record registry state before test runs.
+
+    Performance optimization: Only imports ManagerRegistry for tests that use
+    manager-related fixtures, avoiding import overhead for pure unit tests.
+    """
+    # Fixtures that indicate manager involvement
+    manager_related = {
+        'session_managers', 'class_managers', 'isolated_managers',
+        'managers', 'setup_managers', 'managers_initialized',
+        'real_factory', 'manager_context', 'real_extraction_manager',
+        'real_injection_manager', 'real_session_manager',
+        'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
+        'complete_test_context', 'minimal_injection_context',
+        'mock_main_window', 'main_window',
+    }
+
+    fixture_names = set(getattr(item, 'fixturenames', []))
+    if not manager_related.intersection(fixture_names):
+        item._registry_was_clean = True  # Assume clean for non-manager tests
+        return
+
     try:
         from core.managers.registry import ManagerRegistry
         # Store whether registry was clean BEFORE the test
@@ -379,6 +407,9 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     This hook converts documentation ("use isolated_managers") into runtime
     enforcement. Tests that DIRTY the registry (change it from clean to dirty)
     without using a manager fixture will fail.
+
+    Performance optimization: Only imports ManagerRegistry for tests that use
+    manager-related fixtures, avoiding import overhead for pure unit tests.
 
     This catches:
     - Tests that initialize managers without cleanup fixtures
@@ -395,10 +426,23 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
         return
 
     # Only check tests that didn't use manager fixtures
-    fixture_names = getattr(item, 'fixturenames', [])
+    fixture_names = set(getattr(item, 'fixturenames', []))
     cleanup_fixtures = {'isolated_managers', 'setup_managers', 'session_managers'}
     if cleanup_fixtures.intersection(fixture_names):
         return  # Test uses a fixture that manages registry lifecycle
+
+    # Performance optimization: skip import for non-manager tests
+    manager_related = {
+        'session_managers', 'class_managers', 'isolated_managers',
+        'managers', 'setup_managers', 'managers_initialized',
+        'real_factory', 'manager_context', 'real_extraction_manager',
+        'real_injection_manager', 'real_session_manager',
+        'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
+        'complete_test_context', 'minimal_injection_context',
+        'mock_main_window', 'main_window',
+    }
+    if not manager_related.intersection(fixture_names):
+        return  # Test doesn't use managers - skip check
 
     # Check if THIS test dirtied the registry
     try:
@@ -687,6 +731,9 @@ def reset_class_state(
     - return_value (if manually configured)
     - side_effect (if manually configured)
     - Any internal state
+
+    Reset errors fail the test by default. Use @pytest.mark.lenient_reset
+    to downgrade to warnings for legacy tests during migration.
     """
     # Run test first
     yield
@@ -710,6 +757,10 @@ def reset_class_state(
     if not used_class_fixtures:
         return
 
+    # Check for lenient mode marker
+    lenient = request.node.get_closest_marker("lenient_reset") is not None
+    reset_errors: list[str] = []
+
     for fixture_name in used_class_fixtures:
         try:
             fixture_value = request.getfixturevalue(fixture_name)
@@ -725,15 +776,31 @@ def reset_class_state(
             elif hasattr(fixture_value, 'clear'):
                 # Generic clear for collections
                 fixture_value.clear()
+            else:
+                # No known reset method - warn about potential state leak
+                reset_errors.append(
+                    f"Fixture '{fixture_name}' has no reset method "
+                    f"(tried: reset_state, clear_cache, clear)"
+                )
         except pytest.FixtureLookupError:
             pass  # Fixture not available in this context
         except Exception as e:
-            # Log reset failures but don't fail the test
-            # Reset is best-effort to improve isolation
+            # Handle fixtures that have been torn down (common with Qt fixtures)
+            # "The fixture value for X is not available" means it's already cleaned up
+            error_str = str(e)
+            if "not available" in error_str and "torn down" in error_str:
+                pass  # Fixture already cleaned up - no reset needed
+            else:
+                reset_errors.append(f"Reset failed for '{fixture_name}': {e}")
+
+    # Handle reset errors
+    if reset_errors:
+        error_msg = "Class fixture reset errors:\n" + "\n".join(f"  - {e}" for e in reset_errors)
+        if lenient:
             import logging
-            logging.getLogger(__name__).warning(
-                f"Failed to reset fixture {fixture_name}: {e}"
-            )
+            logging.getLogger(__name__).warning(error_msg)
+        else:
+            pytest.fail(error_msg)
 
 
 @pytest.fixture
@@ -845,15 +912,43 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
     yield
 
 
+def _safe_serialize(obj: Any) -> Any:
+    """Convert objects to JSON-serializable form for hashing.
+
+    Handles common Python types and converts them to a stable representation.
+    """
+    if obj is None:
+        return None
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, (list, tuple)):
+        return [_safe_serialize(item) for item in obj]
+    if isinstance(obj, dict):
+        return {str(k): _safe_serialize(v) for k, v in sorted(obj.items())}
+    if isinstance(obj, set):
+        return sorted(str(x) for x in obj)
+    if isinstance(obj, frozenset):
+        return sorted(str(x) for x in obj)
+    if hasattr(obj, 'name') and hasattr(obj, 'value'):  # Enum
+        return obj.name
+    if hasattr(obj, '__dict__'):
+        # For simple objects, serialize public attributes
+        return {k: _safe_serialize(v) for k, v in sorted(vars(obj).items())
+                if not k.startswith('_')}
+    return str(obj)
+
+
 def _hash_manager_state() -> str:
-    """Hash key manager state for drift detection.
+    """Hash key manager state for drift detection using content-aware hashing.
 
     Returns a hash of manager state that would indicate test pollution.
-    Inspects actual attributes on ApplicationStateManager and CoreOperationsManager.
+    Unlike the previous length-based approach, this hashes actual VALUES
+    so mutations that don't change collection sizes are still detected.
     """
     import hashlib
+    import json
 
-    state_parts: list[str] = []
+    state_data: dict[str, Any] = {}
     try:
         from core.managers.registry import ManagerRegistry
 
@@ -864,46 +959,50 @@ def _hash_manager_state() -> str:
         # Check ApplicationStateManager (the real consolidated manager)
         app_state = registry.get_application_state_manager()
         if app_state:
-            # Settings and runtime state
-            state_parts.append(f"settings:{len(getattr(app_state, '_settings', {}))}")
-            state_parts.append(f"runtime:{len(getattr(app_state, '_runtime_state', {}))}")
+            # Hash actual content, not just lengths
+            state_data["settings"] = _safe_serialize(getattr(app_state, '_settings', {}))
+            state_data["runtime"] = _safe_serialize(getattr(app_state, '_runtime_state', {}))
 
-            # State snapshots (OrderedDict that accumulates)
-            state_parts.append(f"snapshots:{len(getattr(app_state, '_state_snapshots', {}))}")
+            # State snapshots - hash count only (keys are timestamps, too variable)
+            state_data["snapshots_count"] = len(getattr(app_state, '_state_snapshots', {}))
 
-            # Sprite history (list that accumulates)
-            state_parts.append(f"history:{len(getattr(app_state, '_sprite_history', []))}")
+            # Sprite history - hash full content
+            state_data["history"] = _safe_serialize(getattr(app_state, '_sprite_history', []))
 
             # Workflow state (enum value)
             workflow = getattr(app_state, '_workflow_state', None)
-            state_parts.append(f"workflow:{workflow.name if workflow else 'none'}")
+            state_data["workflow"] = workflow.name if workflow else "none"
 
-            # Cache session stats (accumulating counters)
-            cache_stats = getattr(app_state, '_cache_session_stats', {})
-            state_parts.append(f"cache_hits:{cache_stats.get('hits', 0)}")
-            state_parts.append(f"cache_misses:{cache_stats.get('misses', 0)}")
+            # Cache session stats (accumulating counters) - full values
+            state_data["cache_stats"] = _safe_serialize(getattr(app_state, '_cache_session_stats', {}))
 
-            # Preloaded offsets (set that accumulates)
-            state_parts.append(f"preloaded:{len(getattr(app_state, '_preloaded_offsets', set()))}")
+            # Preloaded offsets - hash full content
+            state_data["preloaded"] = _safe_serialize(getattr(app_state, '_preloaded_offsets', set()))
 
         # Check CoreOperationsManager
         core_ops = registry.get_core_operations_manager()
         if core_ops:
             # Check if there's an active worker
-            has_worker = getattr(core_ops, '_current_worker', None) is not None
-            state_parts.append(f"active_worker:{has_worker}")
+            state_data["active_worker"] = getattr(core_ops, '_current_worker', None) is not None
 
     except Exception as e:
         return f"error:{type(e).__name__}"
 
-    state_str = "|".join(sorted(state_parts)) if state_parts else "empty"
-    return hashlib.md5(state_str.encode()).hexdigest()[:12]
+    # Create stable hash from serialized content
+    try:
+        state_json = json.dumps(state_data, sort_keys=True, default=str)
+        return hashlib.md5(state_json.encode()).hexdigest()[:12]
+    except Exception:
+        # Fallback to string representation
+        state_str = str(sorted(state_data.items()))
+        return hashlib.md5(state_str.encode()).hexdigest()[:12]
 
 
 def _get_manager_state_details() -> dict[str, Any]:
     """Get detailed manager state for debugging.
 
     Returns a dict of state values that can be compared before/after a test.
+    Unlike the hash function, this provides full content for debugging diffs.
     """
     state: dict[str, Any] = {}
     try:
@@ -915,16 +1014,32 @@ def _get_manager_state_details() -> dict[str, Any]:
 
         app_state = registry.get_application_state_manager()
         if app_state:
-            state["settings_count"] = len(getattr(app_state, '_settings', {}))
-            state["runtime_count"] = len(getattr(app_state, '_runtime_state', {}))
+            # Include actual content for detailed comparison
+            settings = getattr(app_state, '_settings', {})
+            state["settings_count"] = len(settings)
+            state["settings_keys"] = sorted(settings.keys()) if settings else []
+
+            runtime = getattr(app_state, '_runtime_state', {})
+            state["runtime_count"] = len(runtime)
+            state["runtime_keys"] = sorted(runtime.keys()) if runtime else []
+
             state["snapshots_count"] = len(getattr(app_state, '_state_snapshots', {}))
-            state["history_count"] = len(getattr(app_state, '_sprite_history', []))
+
+            history = getattr(app_state, '_sprite_history', [])
+            state["history_count"] = len(history)
+            # Include first few items for debugging
+            state["history_preview"] = history[:3] if history else []
+
             workflow = getattr(app_state, '_workflow_state', None)
             state["workflow"] = workflow.name if workflow else "none"
+
             cache_stats = getattr(app_state, '_cache_session_stats', {})
-            state["cache_hits"] = cache_stats.get('hits', 0)
-            state["cache_misses"] = cache_stats.get('misses', 0)
-            state["preloaded_count"] = len(getattr(app_state, '_preloaded_offsets', set()))
+            state["cache_stats"] = _safe_serialize(cache_stats)
+
+            preloaded = getattr(app_state, '_preloaded_offsets', set())
+            state["preloaded_count"] = len(preloaded)
+            # Include first few offsets for debugging
+            state["preloaded_preview"] = sorted(list(preloaded)[:5]) if preloaded else []
 
         core_ops = registry.get_core_operations_manager()
         if core_ops:

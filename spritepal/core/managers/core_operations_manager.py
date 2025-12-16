@@ -278,24 +278,31 @@ class CoreOperationsManager(BaseManager):
 
     def _start_rom_injection(self, params: dict[str, Any]) -> bool:
         """Start ROM injection."""
-        from core.workers.rom_injection_worker import ROMInjectionWorker  # Local import
+        from core.workers import ROMInjectionParams, ROMInjectionWorker
 
         self._validate_required(params, ["input_rom", "output_rom", "offset"])
 
-        # Create and start worker
-        worker = ROMInjectionWorker(
-            params["sprite_path"],
-            params["input_rom"],
-            params["output_rom"],
-            params["offset"],
-            params.get("fast_compression", False),
-            params.get("metadata_path")
-        )
+        # Create worker parameters
+        worker_params: ROMInjectionParams = {
+            "mode": "rom",
+            "sprite_path": params["sprite_path"],
+            "input_rom": params["input_rom"],
+            "output_rom": params["output_rom"],
+            "offset": params["offset"],
+            "fast_compression": params.get("fast_compression", False),
+            "metadata_path": params.get("metadata_path"),
+        }
+
+        # Get injection manager for DI-based worker
+        injection_manager = self.get_injection_adapter()
+
+        # Create and start DI-based worker
+        worker = ROMInjectionWorker(worker_params, injection_manager)
 
         # Connect signals - business logic only, cleanup happens in _on_injection_finished
         worker.progress.connect(lambda msg: self.injection_progress.emit(msg))
         worker.finished.connect(lambda: self._on_injection_finished(True, "ROM injection completed"))
-        worker.error.connect(lambda msg: self._on_injection_finished(False, msg))  # type: ignore[attr-defined]
+        worker.error.connect(lambda msg: self._on_injection_finished(False, msg))
         worker.compression_info.connect(self.compression_info.emit)
 
         # Start worker

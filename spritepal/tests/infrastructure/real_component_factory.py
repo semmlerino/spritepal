@@ -142,9 +142,8 @@ class RealComponentFactory:
         if not registry.is_initialized():
             from core.managers import initialize_managers
             initialize_managers("TestApp", settings_path=self._settings_path)
-            # Track that we initialized it (only relevant if manage_registry=True)
-            if self._manage_registry:
-                self._initialized_registry = True
+            # Track that we initialized it so cleanup can reset if needed
+            self._initialized_registry = True
 
     def create_extraction_manager(self, with_test_data: bool = True) -> ExtractionManager:
         """
@@ -730,11 +729,11 @@ class RealComponentFactory:
 
         self._temp_dirs.clear()
 
-        # Step 7: Registry cleanup (if we own it)
-        # Only clean up the registry if:
-        # 1. manage_registry=True was passed to __init__
-        # 2. We were the ones who initialized it
-        if self._manage_registry and self._initialized_registry:
+        # Step 7: Registry cleanup (if we initialized it)
+        # Clean up the registry if we were the ones who initialized it.
+        # Note: With manage_registry=False (default), cleanup will still happen
+        # if WE initialized the registry - this prevents pollution between tests.
+        if self._initialized_registry:
             try:
                 from core.managers.registry import ManagerRegistry
                 registry = ManagerRegistry()
