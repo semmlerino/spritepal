@@ -1,30 +1,14 @@
 """
 Real Component Factory for type-safe testing with actual components.
 
-This module replaces MockFactory with a factory that creates real managers
-and components, providing better integration testing and eliminating unsafe
-type casting throughout the test suite.
+This factory creates real managers and components for integration testing,
+providing proper type safety without unsafe cast() operations.
 
-MIGRATION GUIDE FROM MOCKFACTORY:
----------------------------------
-
-OLD (MockFactory - deprecated):
-    from tests.infrastructure.mock_factory import MockFactory
-from typing import cast
-
-    def test_extraction():
-        # Creates mock with 15+ unsafe cast() operations
-        manager = cast(ExtractionManager, MockFactory.create_extraction_manager())
-        # Type checker can't verify this is safe
-        result = manager.extract_sprites(params)
-
-NEW (RealComponentFactory - recommended):
+USAGE:
     from tests.infrastructure.real_component_factory import RealComponentFactory
 
     def test_extraction(real_factory):  # Use fixture from conftest.py
-        # Creates real manager, properly typed
         manager = real_factory.create_extraction_manager()
-        # Type checker knows this is ExtractionManager
         result = manager.extract_sprites(params)
 
 BENEFITS:
@@ -33,10 +17,6 @@ BENEFITS:
 - Type checker can verify all operations
 - Better integration testing
 - Consistent test data from DataRepository
-
-AUTOMATED MIGRATION:
-Run: python -m tests.infrastructure.migration_helpers report
-to see migration progress and get assistance.
 """
 
 from __future__ import annotations
