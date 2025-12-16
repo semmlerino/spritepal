@@ -65,7 +65,6 @@ from ui.common.timing_constants import REFRESH_RATE_60FPS
 from ui.styles import (
     get_drop_zone_badge_style,
     get_drop_zone_style,
-    get_error_text_style,
     get_hex_label_style,
     get_link_text_style,
     get_muted_text_style,
@@ -144,8 +143,8 @@ class DropZone(QWidget):
         self.path_label.setWordWrap(True)
         path_row.addWidget(self.path_label)
 
-        # Clear button - small "×" to clear file selection
-        self.clear_btn = QPushButton("×")
+        # Clear button - small "×" to clear file selection  # noqa: RUF003
+        self.clear_btn = QPushButton("×")  # noqa: RUF001
         self.clear_btn.setFixedSize(20, 20)
         self.clear_btn.setToolTip("Clear selected file")
         self.clear_btn.setStyleSheet(

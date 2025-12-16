@@ -12,8 +12,8 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from ui.common import WorkerManager
 from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
-from ui.workers.sprite_scan_worker import SpriteScanWorker
 from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoaderWorker
+from ui.workers.sprite_scan_worker import SpriteScanWorker
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
