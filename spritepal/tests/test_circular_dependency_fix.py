@@ -31,7 +31,7 @@ class TestCircularDependencyFix:
         app.quit()
 
     @pytest.fixture
-    def main_window_deps(self, setup_managers):
+    def main_window_deps(self, isolated_managers):
         """Get MainWindow dependencies from DI container."""
         return {
             "settings_manager": inject(SettingsManagerProtocol),

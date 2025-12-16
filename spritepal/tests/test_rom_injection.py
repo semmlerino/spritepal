@@ -147,7 +147,7 @@ class TestROMInjector(unittest.TestCase):
             assert pointer.address is not None
 
 @pytest.mark.gui
-@pytest.mark.usefixtures("setup_managers")
+@pytest.mark.usefixtures("isolated_managers")
 @pytest.mark.skip_thread_cleanup(reason="InjectionDialog may spawn background threads")
 class TestROMInjectionDialog(unittest.TestCase):
     """Test ROM injection dialog (requires Qt)"""

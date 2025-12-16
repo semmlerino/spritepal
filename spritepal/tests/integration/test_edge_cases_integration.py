@@ -10,7 +10,7 @@ REAL COMPONENT TESTING:
 - Uses RealComponentFactory where appropriate
 - Tests actual component behavior with edge case inputs
 
-Uses shared class_managers fixture from core_fixtures.py instead of local setup.
+Uses session_managers fixture from core_fixtures.py with shared_state_safe marker.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ pytestmark = [
 # Fixtures
 # =============================================================================
 
-# Note: Uses shared class_managers fixture - no local setup_managers needed
+# Note: Uses shared session_managers fixture via module-level pytestmark
 
 
 @pytest.fixture
@@ -116,11 +116,10 @@ def malformed_json_file(tmp_path) -> Path:
 # =============================================================================
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestRealComponentFactoryEdgeCases:
     """Test RealComponentFactory with edge case inputs.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_create_rom_cache_with_none_path(self, real_factory, tmp_path):
@@ -157,11 +156,10 @@ class TestRealComponentFactoryEdgeCases:
 # =============================================================================
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestExtractionManagerEdgeCases:
     """Test ExtractionManager with edge case inputs.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_validate_missing_path_types(self, real_factory, tmp_path):
@@ -225,11 +223,10 @@ class TestExtractionManagerEdgeCases:
 # =============================================================================
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerEdgeCases:
     """Test InjectionManager with edge case inputs.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_manager_initialization(self, real_factory):
@@ -286,11 +283,10 @@ class TestInjectionManagerEdgeCases:
 # =============================================================================
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestROMDataEdgeCases:
     """Test ROM data handling edge cases.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_extraction_manager_read_header_valid_rom(self, real_factory, tmp_path, test_rom_data):
@@ -321,11 +317,10 @@ class TestROMDataEdgeCases:
 # =============================================================================
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestThreadSafetyEdgeCases:
     """Test thread safety with edge case scenarios.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_thread_safe_test_image_standard_size(self):
@@ -354,11 +349,10 @@ class TestThreadSafetyEdgeCases:
 # =============================================================================
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestCacheEdgeCases:
     """Test cache operations with edge case inputs.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_rom_cache_with_settings(self, real_factory):
@@ -395,11 +389,10 @@ class TestCacheEdgeCases:
 # =============================================================================
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestWorkflowEdgeCases:
     """Test complete workflows with edge case scenarios.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_manager_double_reset(self, real_factory):
@@ -453,11 +446,10 @@ class TestWorkflowEdgeCases:
 # =============================================================================
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestFileValidationEdgeCases:
     """Test file validation edge cases.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_validate_vram_grayscale_mode_no_cgram(self, real_factory, tmp_path):

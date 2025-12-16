@@ -4,7 +4,7 @@ Test sprite preview widget functionality
 This is a real Qt widget test that requires a GUI environment and tests
 actual widget rendering, pixmap handling, and Qt-specific behavior.
 
-Uses shared class_managers fixture from core_fixtures.py instead of local setup.
+Uses session_managers fixture from core_fixtures.py with shared_state_safe marker.
 """
 from __future__ import annotations
 
@@ -36,14 +36,13 @@ pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
 ]
 
-# Note: Uses shared class_managers fixture - no local setup_managers needed
+# Note: Uses session_managers fixture via module-level pytestmark
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestSpritePreviewWidget:
     """Test the sprite preview widget.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses session_managers fixture via module-level pytestmark.
     """
 
     @pytest.fixture(scope="class")

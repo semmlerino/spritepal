@@ -550,7 +550,7 @@ class TestExtractionParameterValidation:
     """
 
     @pytest.fixture
-    def extraction_manager(self, setup_managers):
+    def extraction_manager(self, isolated_managers):
         """Create ExtractionManager instance with proper DI setup."""
         from core.managers.registry import ManagerRegistry
         registry = ManagerRegistry()
@@ -703,7 +703,7 @@ class TestExtractionErrorPaths:
     """
 
     @pytest.fixture
-    def extraction_manager(self, setup_managers):
+    def extraction_manager(self, isolated_managers):
         """Create ExtractionManager via registry adapter."""
         from core.managers.registry import ManagerRegistry
         registry = ManagerRegistry()

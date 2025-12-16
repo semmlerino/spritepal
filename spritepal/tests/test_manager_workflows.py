@@ -1,7 +1,7 @@
 """
 Integration tests for complete UI → Manager workflows
 
-Uses shared class_managers fixture from core_fixtures.py instead of local setup.
+Uses isolated_managers fixture from core_fixtures.py for test isolation.
 """
 from __future__ import annotations
 
@@ -40,11 +40,10 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.no_qt,
     pytest.mark.rom_data,
-    pytest.mark.usefixtures("class_managers"),  # Use shared class-scoped managers
+    pytest.mark.usefixtures("isolated_managers"),  # Use isolated managers for test independence
 ]
 
 
-@pytest.mark.usefixtures("class_managers")
 class TestManagerCommunication:
     """Test communication patterns between managers"""
 

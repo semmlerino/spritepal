@@ -404,7 +404,7 @@ class TestManualOffsetDialogSingletonIntegration:
 
     @pytest.mark.gui
     @pytest.mark.integration
-    @pytest.mark.usefixtures("setup_managers")
+    @pytest.mark.usefixtures("isolated_managers")
     def test_dialog_instance_level_signal_tracking(self, qtbot):
         """Test that signal tracking is per-instance, not class-level.
 
@@ -452,7 +452,7 @@ class TestManualOffsetDialogSingletonIntegration:
         ManualOffsetDialogSingleton.reset()
 
 
-@pytest.mark.usefixtures("class_managers")
+@pytest.mark.usefixtures("isolated_managers")
 class TestSettingsManagerSingletonIntegration:
     """Integration tests for the fixed SettingsManagerSingleton."""
 

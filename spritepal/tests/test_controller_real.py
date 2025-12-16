@@ -170,10 +170,10 @@ class TestExtractionControllerReal:
         return MockMainWindow()
 
     @pytest.fixture
-    def real_managers(self, setup_managers):
+    def real_managers(self, isolated_managers):
         """Create real managers for the session.
 
-        Depends on setup_managers to ensure global manager registry is initialized,
+        Depends on isolated_managers to ensure global manager registry is initialized,
         since ROMExtractionWorker uses get_extraction_manager() from the registry.
         """
         with RealComponentFactory() as factory:

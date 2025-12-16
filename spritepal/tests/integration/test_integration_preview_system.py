@@ -107,7 +107,7 @@ class TestSimplePreviewCoordinator:
         # Cleanup
         coordinator.cleanup()
 
-    def test_preview_generation_with_real_data(self, test_rom_with_sprites, qtbot, wait_for, setup_managers):
+    def test_preview_generation_with_real_data(self, test_rom_with_sprites, qtbot, wait_for, isolated_managers):
         """Test that preview generates with real tile data."""
         rom_info = test_rom_with_sprites
         rom_path = str(rom_info['path'])

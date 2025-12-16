@@ -4,7 +4,7 @@ Comprehensive Dialog Migration Testing
 This test suite verifies that all migrated dialogs work correctly together
 and maintain full functionality after migration to the new component architecture.
 
-Uses shared class_managers fixture from core_fixtures.py instead of local setup.
+Uses session_managers fixture from core_fixtures.py with shared_state_safe marker.
 """
 from __future__ import annotations
 

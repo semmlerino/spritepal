@@ -14,7 +14,7 @@ from core.rom_extractor import ROMExtractor
 from core.sprite_finder import SpriteFinder
 
 # Integration tests that need real DI setup and real HAL
-# Use setup_managers which respects session_managers if active
+# Uses session_managers with shared_state_safe at class level
 # Don't use mock_hal - these tests verify real decompression behavior
 pytestmark = [
     pytest.mark.integration,
@@ -22,7 +22,6 @@ pytestmark = [
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
     pytest.mark.real_hal,  # These tests need real HAL tools
-    pytest.mark.usefixtures("setup_managers"),  # Respects session_managers if active
     pytest.mark.skip_thread_cleanup(reason="Integration tests involve HAL pool that spawns background threads"),
 ]
 

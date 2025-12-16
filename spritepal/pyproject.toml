@@ -397,6 +397,10 @@ qt_api = "pyside6"
 norecursedirs = [".git", "__pycache__", "*.egg-info", ".pytest_cache", "venv", ".venv"]
 
 # pytest-timeout settings
+# NOTE: This is the GLOBAL test execution timeout (30s per test).
+# This is DIFFERENT from semantic timeouts in tests/fixtures/timeouts.py
+# (worker_timeout, signal_timeout, etc.) which are for Qt signal/event waits.
+# Individual tests needing more time should use @pytest.mark.timeout(60).
 timeout = 30
 timeout_method = "thread"
 

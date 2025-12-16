@@ -45,7 +45,7 @@ class TestControllerWithRealManagers:
         real_extraction_manager,
         real_injection_manager,
         real_session_manager,
-        setup_managers,
+        isolated_managers,
     ):
         """Create controller with real managers."""
         # Create real main window with real components
@@ -166,10 +166,10 @@ class TestRealManagerBenefits:
     """Demonstrate benefits of using real managers in tests."""
 
     @pytest.fixture(autouse=True)
-    def setup_di_container(self, setup_managers):
+    def setup_di_container(self, isolated_managers):
         """Ensure DI container is set up for manager creation.
 
-        Uses setup_managers which respects session_managers if active.
+        Uses isolated_managers for test independence.
         """
         yield
 

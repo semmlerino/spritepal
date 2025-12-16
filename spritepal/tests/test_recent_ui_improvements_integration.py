@@ -140,7 +140,7 @@ class TestMainWindowIntegration:
     """Test MainWindow integration with new size and dark theme."""
 
     @pytest.mark.gui
-    @pytest.mark.usefixtures("setup_managers")
+    @pytest.mark.usefixtures("isolated_managers")
     def test_main_window_size_constants(self, qtbot) -> None:
         """Test that MainWindow uses correct size constants."""
         from ui.main_window import MAIN_WINDOW_MIN_SIZE
@@ -149,7 +149,7 @@ class TestMainWindowIntegration:
         assert MAIN_WINDOW_MIN_SIZE == (1000, 650), f"Expected size (1000, 650), got {MAIN_WINDOW_MIN_SIZE}"
 
     @pytest.mark.gui
-    @pytest.mark.usefixtures("setup_managers")
+    @pytest.mark.usefixtures("isolated_managers")
     def test_main_window_with_dark_theme_styling(self, qtbot) -> None:
         """Test MainWindow with real dark theme styling applied."""
         # Create real MainWindow

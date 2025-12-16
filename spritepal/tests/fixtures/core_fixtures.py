@@ -85,6 +85,8 @@ class SessionState:
 
 # Session state container - SINGLE WRITER: only session_managers fixture modifies this
 # Other fixtures may read _session_state.is_initialized but should NEVER write to it
+# NOTE: Under pytest-xdist, each worker is a separate process with its own _session_state
+# so this is naturally isolated per-worker. The SessionState pattern ensures consistent access.
 _session_state = SessionState()
 
 
@@ -256,7 +258,7 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
 
 
 @pytest.fixture
-def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]:
+def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[ManagerRegistry]:
     """
     Function-scoped managers for tests that need complete isolation.
 

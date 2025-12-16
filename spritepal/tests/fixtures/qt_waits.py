@@ -115,7 +115,7 @@ def wait_for_widget_ready(qtbot: QtBot) -> Callable[..., bool]:
 
 
 @pytest.fixture
-def wait_for_signal_processed(qtbot: QtBot) -> Callable[..., None]:
+def wait_for_signal_processed(qtbot: QtBot) -> Callable[[], None]:
     """
     Helper to wait for signal processing to complete.
 
@@ -126,15 +126,11 @@ def wait_for_signal_processed(qtbot: QtBot) -> Callable[..., None]:
         wait_for_signal_processed()
         # Instead of: slider.setValue(100); qtbot.wait(50)
     """
-    def _wait(timeout: int = 100) -> None:
+    def _wait() -> None:
         """
         Wait for pending signals to be processed.
 
-        Args:
-            timeout: Maximum wait time in milliseconds (unused, kept for API compat)
-
-        Note:
-            Uses processEvents() to ensure all queued signals have been delivered.
+        Uses processEvents() to ensure all queued signals have been delivered.
         """
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()

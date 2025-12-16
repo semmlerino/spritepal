@@ -13,7 +13,7 @@ Benefits of real component testing vs mocking:
 - Ensures proper signal/slot connections
 - Performance and resource management validation
 
-Uses shared class_managers fixture from core_fixtures.py instead of local setup.
+Uses shared session_managers fixture from core_fixtures.py with shared_state_safe marker.
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ pytestmark = [
     pytest.mark.worker_threads,
 ]
 
-# Note: Uses shared class_managers fixture - no local setup_managers needed
+# Note: Uses shared session_managers fixture - no local setup_managers needed
 
 @pytest.fixture
 def injection_manager_real():
@@ -104,7 +104,6 @@ def temp_files_with_real_content(tmp_path):
         "output_dir": str(tmp_path)
     }
 
-@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerInitialization:
     """TDD tests for InjectionManager initialization and lifecycle.
 
@@ -113,7 +112,7 @@ class TestInjectionManagerInitialization:
     2. GREEN: Implement minimal code to pass the test
     3. REFACTOR: Improve implementation while keeping tests green
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_manager_initialization_with_real_components_tdd(self, injection_manager_real):
@@ -176,14 +175,12 @@ class TestInjectionManagerInitialization:
         finally:
             worker_helper.cleanup()
 
-@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerParameterValidation:
     """TDD tests for parameter validation with real file I/O.
 
     These tests replace FileValidator mocking with real file operations
     to test actual validation logic and edge cases.
-
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_validate_vram_injection_params_valid_real_files(self, temp_files_with_real_content):
@@ -413,11 +410,10 @@ class TestInjectionManagerParameterValidation:
         # Metadata file should not exist
         assert not Path(params["metadata_path"]).exists()
 
-@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerWorkflows:
     """Test injection workflow methods.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_start_vram_injection_success(self, tmp_path):
@@ -557,11 +553,10 @@ class TestInjectionManagerWorkflows:
         finally:
             worker_helper.cleanup()
 
-@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerSignalHandling:
     """Test worker signal handling.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_connect_worker_signals_no_worker(self):
@@ -649,11 +644,10 @@ class TestInjectionManagerSignalHandling:
             manager._on_worker_finished(False, "Error message")
             mock_signal.emit.assert_called_once_with(False, "Error message")
 
-@pytest.mark.usefixtures("class_managers")
 class TestInjectionManagerVRAMSuggestion:
     """Test smart VRAM suggestion functionality.
 
-    Uses shared class_managers fixture - no local setup_managers needed.
+    Uses shared session_managers fixture via module-level pytestmark.
     """
 
     def test_get_smart_vram_suggestion_no_strategies_work(self, tmp_path):

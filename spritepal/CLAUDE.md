@@ -33,6 +33,8 @@ All tools run via `uv` from the `spritepal/` directory.
 
 **Defaults configured in `pyproject.toml`.** Qt offscreen mode set automatically in `conftest.py`.
 
+**Note:** If `uv` is not in PATH (common in some CI environments), use the full path: `~/.local/bin/uv run ...`
+
 ```bash
 # Sync dependencies (uv finds workspace root automatically)
 uv sync --extra dev
@@ -151,6 +153,13 @@ qtbot.waitSignal(worker.finished, timeout=worker_timeout())  # May miss signal!
 | `cleanup_timeout()` | 2000 | Thread termination, resource cleanup |
 
 Multipliers: `SHORT=0.5`, `MEDIUM=1.0` (default), `LONG=2.0`
+
+**Important:** These are **functions** from `tests/fixtures/timeouts.py`, not fixtures. Import them explicitly:
+```python
+from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout, LONG
+```
+
+**Note:** The global `timeout = 30` in pyproject.toml (pytest-timeout) is for *test execution time*, not signal waits. These semantic timeout functions are for Qt signal/event waiting within tests.
 
 **Timeout Escalation Policy:**
 - If a test times out in CI but passes locally: **fix the async logic**, don't increase `PYTEST_TIMEOUT_MULTIPLIER`
@@ -272,7 +281,8 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 | Fixture | Replacement | Reason |
 |---------|-------------|--------|
-| `fast_managers` | `isolated_managers` | Hidden session state causes order-dependent failures |
+| `setup_managers` | `isolated_managers` | Deprecated, use `isolated_managers` for per-test isolation |
+| `class_managers` | `isolated_managers` | Class-scoped fixtures cause state leakage between tests |
 
 **⚠️ Do not mix `session_managers` and `isolated_managers` in the same module.** Same-module mixing causes test failures—this is intentional. It indicates a test design problem where some tests expect clean state while others expect shared state. Keep each test module consistent: either all `isolated_managers` or all `session_managers` (with proper markers). Cross-module usage (different files using different fixtures) is handled automatically.
 

@@ -33,10 +33,10 @@ pytestmark = [
 
 
 @pytest.fixture
-def real_factory(tmp_path, setup_managers):
+def real_factory(tmp_path, isolated_managers):
     """Create RealComponentFactory for integration tests.
 
-    Depends on setup_managers to ensure global manager registry is initialized.
+    Depends on isolated_managers to ensure global manager registry is initialized.
     """
     with RealComponentFactory() as factory:
         yield factory
