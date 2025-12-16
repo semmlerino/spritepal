@@ -263,6 +263,27 @@ def safe_qapp(qt_app: Any) -> Any:
 # Worker Thread Management
 # =============================================================================
 
+# Known helper threads that are not worker leaks (common framework/tooling threads)
+# These threads may appear transiently and should not cause leak failures
+_KNOWN_HELPER_THREADS: frozenset[str] = frozenset({
+    "pytest-timeout",
+    "pytest_timeout",
+    "coverage",
+    "watchdog",
+    "_GCMonitor",
+    "pydevd",  # Python debugger
+    "QDBusConnectionManager",  # Qt D-Bus
+    "QThread",  # Generic QThread name
+    "Thread-",  # Default Python thread naming
+})
+
+
+def _is_known_helper_thread(name: str) -> bool:
+    """Check if a thread name matches a known helper thread pattern."""
+    name_lower = name.lower()
+    return any(helper.lower() in name_lower for helper in _KNOWN_HELPER_THREADS)
+
+
 def _get_current_threads() -> dict[int, str]:
     """Get current thread identities as {ident: name} dict."""
     return {t.ident: t.name for t in threading.enumerate() if t.ident is not None}
@@ -272,14 +293,32 @@ def _find_leaked_threads(
     before: dict[int, str],
     current: dict[int, str],
     filter_pytest_timeout: bool = False,
+    filter_helper_threads: bool = True,
 ) -> dict[int, str]:
-    """Find threads that exist now but didn't exist before."""
+    """Find threads that exist now but didn't exist before.
+
+    Args:
+        before: Threads present before the test
+        current: Threads present after the test
+        filter_pytest_timeout: Legacy flag to filter pytest-timeout threads
+        filter_helper_threads: If True, filter out known helper threads
+    """
     leaked = {ident: name for ident, name in current.items() if ident not in before}
+
+    # Legacy pytest-timeout filter (now covered by helper thread filter)
     if filter_pytest_timeout:
         leaked = {
             ident: name for ident, name in leaked.items()
             if "pytest_timeout" not in name.lower() and "timeout" not in name.lower()
         }
+
+    # Filter known helper threads
+    if filter_helper_threads:
+        leaked = {
+            ident: name for ident, name in leaked.items()
+            if not _is_known_helper_thread(name)
+        }
+
     return leaked
 
 

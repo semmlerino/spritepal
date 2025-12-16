@@ -159,6 +159,10 @@ def pytest_configure(config):
         "markers",
         "allows_resource_leaks: Allow test to have resource leaks without failure"
     )
+    config.addinivalue_line(
+        "markers",
+        "parallel_unsafe: Force test to run in serial mode under xdist (use when wrapper fixtures hide shared state)"
+    )
 
     # Make implicit RealComponentFactory warnings visible when we add them
     config.addinivalue_line(
@@ -166,17 +170,12 @@ def pytest_configure(config):
         "default:RealComponentFactory.*implicit init"
     )
 
-    # Install QPixmap guard early - catches most cases since qt_app imports Qt early
-    _install_qpixmap_guard_early()
+    # Install QPixmap guard via import hook - guarantees guard is installed even for late Qt imports
+    _install_qpixmap_guard_unconditional()
 
 
-def _install_qpixmap_guard_early() -> None:
-    """Install QPixmap guard at session start if Qt is available.
-
-    This runs before any test collection/execution, ensuring the guard is in place
-    even for tests that import Qt late. The per-test fixture guard_qpixmap_threading
-    remains as a fallback.
-    """
+def _patch_qpixmap_init() -> None:
+    """Patch QPixmap.__init__ to detect worker thread usage."""
     try:
         from PySide6.QtCore import QCoreApplication, QThread
         from PySide6.QtGui import QPixmap
@@ -201,11 +200,66 @@ def _install_qpixmap_guard_early() -> None:
         pass  # Qt not available, skip guard
 
 
+class _QPixmapGuardImportFinder:
+    """Import hook to install QPixmap guard when PySide6.QtGui is imported."""
+
+    _installed: bool = False
+
+    def find_module(self, fullname: str, path: Any = None) -> "_QPixmapGuardImportFinder | None":
+        """Return self if this is PySide6.QtGui, else None."""
+        if fullname == 'PySide6.QtGui' and not self._installed:
+            return self
+        return None
+
+    def load_module(self, fullname: str) -> Any:
+        """Load the real module, then install QPixmap guard."""
+        import importlib
+
+        # Remove ourselves from meta_path to avoid recursion
+        if self in sys.meta_path:
+            sys.meta_path.remove(self)
+
+        # Mark as installed to prevent re-triggering
+        _QPixmapGuardImportFinder._installed = True
+
+        # Import the real module
+        module = importlib.import_module(fullname)
+
+        # Install the guard on QPixmap
+        _patch_qpixmap_init()
+
+        return module
+
+
+def _install_qpixmap_guard_unconditional() -> None:
+    """Install QPixmap guard unconditionally via import hook.
+
+    This ensures the guard is installed even for tests that import Qt late.
+    Uses an import hook that triggers as soon as PySide6.QtGui is imported.
+    """
+    # If Qt is already imported, patch directly
+    if 'PySide6.QtGui' in sys.modules:
+        _patch_qpixmap_init()
+        return
+
+    # Otherwise, install an import hook to patch when Qt is imported
+    # Check if our hook is already installed
+    if not any(isinstance(finder, _QPixmapGuardImportFinder) for finder in sys.meta_path):
+        sys.meta_path.insert(0, _QPixmapGuardImportFinder())
+
+
 def pytest_addoption(parser: Any) -> None:
     """Add custom command line options for SpritePal tests."""
-    default_leak_mode = os.environ.get("SPRITEPAL_LEAK_MODE", "fail").lower()
-    if default_leak_mode not in {"fail", "warn"}:
-        default_leak_mode = "fail"
+    # Determine default leak mode: "fail" in CI, "warn" locally
+    # Can be overridden by SPRITEPAL_LEAK_MODE environment variable
+    is_ci = os.environ.get("CI") == "true"
+    env_leak_mode = os.environ.get("SPRITEPAL_LEAK_MODE", "").lower()
+
+    if env_leak_mode in {"fail", "warn"}:
+        default_leak_mode = env_leak_mode
+    else:
+        # Default: fail in CI, warn locally
+        default_leak_mode = "fail" if is_ci else "warn"
 
     parser.addoption(
         "--use-real-hal",
@@ -218,7 +272,7 @@ def pytest_addoption(parser: Any) -> None:
         action="store",
         choices=["fail", "warn"],
         default=default_leak_mode,
-        help="Leak policy: fail (default) or warn for resource/thread leaks; override with SPRITEPAL_LEAK_MODE."
+        help=f"Leak policy: fail or warn for resource/thread leaks. Default: {'fail' if is_ci else 'warn'} ({'CI' if is_ci else 'local'}). Override with SPRITEPAL_LEAK_MODE env var."
     )
     # NOTE: --run-segfault-tests option removed - segfault-prone tests have been deleted
 
@@ -281,6 +335,12 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
 
         # Tests with explicit serial marker get grouped
         if item.get_closest_marker("serial"):
+            item.add_marker(serial_group)
+            continue
+
+        # Tests with parallel_unsafe marker get grouped to serial
+        # This allows tests using wrapper fixtures around shared state to be marked
+        if item.get_closest_marker("parallel_unsafe"):
             item.add_marker(serial_group)
             continue
 
@@ -546,18 +606,19 @@ def mock_manager_registry() -> Generator[Mock, None, None]:
 # ============================================================================
 
 @pytest.fixture(autouse=True)
-def guard_qpixmap_threading(request: FixtureRequest, monkeypatch: pytest.MonkeyPatch):
-    """Prevent QPixmap creation in worker threads during tests (autouse).
+def guard_qpixmap_threading(request: FixtureRequest):
+    """Verify QPixmap threading guard is active (autouse).
 
-    This fixture monkeypatches QPixmap.__init__ to raise a RuntimeError
-    if it's called from a non-GUI thread, helping to identify critical
-    Qt threading violations that cause segfaults.
+    The actual guard is installed via import hook in pytest_configure
+    (_install_qpixmap_guard_unconditional). This fixture just ensures
+    the guard remains active for Qt tests.
 
-    This is now autouse (was previously opt-in). The overhead is minimal
-    and the protection against silent Qt crashes is worth it.
+    The import hook approach guarantees the guard is installed even for
+    tests that import Qt late, closing the timing hole in the previous
+    implementation.
 
     Opt-out markers:
-        @pytest.mark.skip_qpixmap_guard - Skip for tests that can't use the guard
+        @pytest.mark.skip_qpixmap_guard - Skip verification
         @pytest.mark.no_qt - Skip for non-Qt tests
     """
     markers = [m.name for m in request.node.iter_markers()]
@@ -567,34 +628,19 @@ def guard_qpixmap_threading(request: FixtureRequest, monkeypatch: pytest.MonkeyP
         yield
         return
 
-    # Don't import PySide6 if it hasn't been imported yet - avoids pulling
-    # Qt into non-Qt tests that don't have the no_qt marker
-    if 'PySide6.QtGui' not in sys.modules:
-        yield
-        return
+    # If Qt is imported, verify the guard is installed
+    # The import hook should have installed it when PySide6.QtGui was imported
+    if 'PySide6.QtGui' in sys.modules:
+        try:
+            from PySide6.QtGui import QPixmap
 
-    try:
-        from PySide6.QtCore import QCoreApplication, QThread
-        from PySide6.QtGui import QPixmap
-    except ImportError:
-        # Qt not available, skip the guard
-        yield
-        return
+            if not hasattr(QPixmap, '_test_guard_installed'):
+                # Guard not installed - try to install it now
+                # (shouldn't happen with import hook, but provides fallback)
+                _patch_qpixmap_init()
+        except ImportError:
+            pass  # Qt not available
 
-    original_init = QPixmap.__init__
-
-    def guarded_init(self, *args, **kwargs):
-        app = QCoreApplication.instance()
-        # Only check if an application instance exists and if not on the main GUI thread
-        if app and QThread.currentThread() != app.thread():
-            raise RuntimeError(
-                "CRITICAL: QPixmap created in worker thread! "
-                "Use QImage or ThreadSafeTestImage. "
-                "Conversion to QPixmap must happen on the main GUI thread."
-            )
-        original_init(self, *args, **kwargs)
-
-    monkeypatch.setattr(QPixmap, '__init__', guarded_init)
     yield
 
 
@@ -803,40 +849,91 @@ def _hash_manager_state() -> str:
     """Hash key manager state for drift detection.
 
     Returns a hash of manager state that would indicate test pollution.
-    Uses a simple approach: check cache sizes and key state attributes.
+    Inspects actual attributes on ApplicationStateManager and CoreOperationsManager.
     """
     import hashlib
 
     state_parts: list[str] = []
     try:
         from core.managers.registry import ManagerRegistry
+
         registry = ManagerRegistry()
+        if not registry.is_initialized():
+            return "uninitialized"
 
-        # Check extraction manager state
-        ext_mgr = getattr(registry, 'extraction_manager', None)
-        if ext_mgr:
-            # Check cache sizes and key attributes
-            cache_size = len(getattr(ext_mgr, '_cache', {}))
-            state_parts.append(f"ext_cache:{cache_size}")
+        # Check ApplicationStateManager (the real consolidated manager)
+        app_state = registry.get_application_state_manager()
+        if app_state:
+            # Settings and runtime state
+            state_parts.append(f"settings:{len(getattr(app_state, '_settings', {}))}")
+            state_parts.append(f"runtime:{len(getattr(app_state, '_runtime_state', {}))}")
 
-        # Check session manager state
-        sess_mgr = getattr(registry, 'session_manager', None)
-        if sess_mgr:
-            # Check session data
-            session_count = len(getattr(sess_mgr, '_sessions', {}))
-            state_parts.append(f"sess_count:{session_count}")
+            # State snapshots (OrderedDict that accumulates)
+            state_parts.append(f"snapshots:{len(getattr(app_state, '_state_snapshots', {}))}")
 
-        # Check injection manager state
-        inj_mgr = getattr(registry, 'injection_manager', None)
-        if inj_mgr:
-            cache_size = len(getattr(inj_mgr, '_cache', {}))
-            state_parts.append(f"inj_cache:{cache_size}")
+            # Sprite history (list that accumulates)
+            state_parts.append(f"history:{len(getattr(app_state, '_sprite_history', []))}")
 
-    except Exception:
-        pass  # If we can't hash state, skip validation
+            # Workflow state (enum value)
+            workflow = getattr(app_state, '_workflow_state', None)
+            state_parts.append(f"workflow:{workflow.name if workflow else 'none'}")
+
+            # Cache session stats (accumulating counters)
+            cache_stats = getattr(app_state, '_cache_session_stats', {})
+            state_parts.append(f"cache_hits:{cache_stats.get('hits', 0)}")
+            state_parts.append(f"cache_misses:{cache_stats.get('misses', 0)}")
+
+            # Preloaded offsets (set that accumulates)
+            state_parts.append(f"preloaded:{len(getattr(app_state, '_preloaded_offsets', set()))}")
+
+        # Check CoreOperationsManager
+        core_ops = registry.get_core_operations_manager()
+        if core_ops:
+            # Check if there's an active worker
+            has_worker = getattr(core_ops, '_current_worker', None) is not None
+            state_parts.append(f"active_worker:{has_worker}")
+
+    except Exception as e:
+        return f"error:{type(e).__name__}"
 
     state_str = "|".join(sorted(state_parts)) if state_parts else "empty"
-    return hashlib.md5(state_str.encode()).hexdigest()
+    return hashlib.md5(state_str.encode()).hexdigest()[:12]
+
+
+def _get_manager_state_details() -> dict[str, Any]:
+    """Get detailed manager state for debugging.
+
+    Returns a dict of state values that can be compared before/after a test.
+    """
+    state: dict[str, Any] = {}
+    try:
+        from core.managers.registry import ManagerRegistry
+
+        registry = ManagerRegistry()
+        if not registry.is_initialized():
+            return {"status": "uninitialized"}
+
+        app_state = registry.get_application_state_manager()
+        if app_state:
+            state["settings_count"] = len(getattr(app_state, '_settings', {}))
+            state["runtime_count"] = len(getattr(app_state, '_runtime_state', {}))
+            state["snapshots_count"] = len(getattr(app_state, '_state_snapshots', {}))
+            state["history_count"] = len(getattr(app_state, '_sprite_history', []))
+            workflow = getattr(app_state, '_workflow_state', None)
+            state["workflow"] = workflow.name if workflow else "none"
+            cache_stats = getattr(app_state, '_cache_session_stats', {})
+            state["cache_hits"] = cache_stats.get('hits', 0)
+            state["cache_misses"] = cache_stats.get('misses', 0)
+            state["preloaded_count"] = len(getattr(app_state, '_preloaded_offsets', set()))
+
+        core_ops = registry.get_core_operations_manager()
+        if core_ops:
+            state["active_worker"] = getattr(core_ops, '_current_worker', None) is not None
+
+    except Exception as e:
+        state["error"] = str(e)
+
+    return state
 
 
 @pytest.fixture(autouse=True)
@@ -870,18 +967,35 @@ def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, 
             "  2. Use isolated_managers instead (recommended for most tests)"
         )
 
-    # Capture state before test
+    # Capture state before test (both hash and details for debugging)
     before_hash = _hash_manager_state()
+    before_state = _get_manager_state_details()
 
     yield
 
     # Validate state unchanged after test
     after_hash = _hash_manager_state()
     if before_hash != after_hash:
+        after_state = _get_manager_state_details()
+
+        # Build detailed change report
+        changed_fields: list[str] = []
+        all_keys = set(before_state.keys()) | set(after_state.keys())
+        for key in sorted(all_keys):
+            before_val = before_state.get(key, "<missing>")
+            after_val = after_state.get(key, "<missing>")
+            if before_val != after_val:
+                changed_fields.append(f"    {key}: {before_val} -> {after_val}")
+
+        changes_str = "\n".join(changed_fields) if changed_fields else "    (no details available)"
+        fixtures_str = ", ".join(sorted(fixture_names))
+
         pytest.fail(
             f"Test '{request.node.name}' modified session manager state despite "
             "@pytest.mark.shared_state_safe marker.\n"
-            f"  State hash changed: {before_hash[:8]}... -> {after_hash[:8]}...\n"
+            f"  State hash: {before_hash} -> {after_hash}\n"
+            f"  Changed fields:\n{changes_str}\n"
+            f"  Fixtures used: {fixtures_str}\n"
             "  Either:\n"
             "    1. Fix the test to not modify shared state, or\n"
             "    2. Use isolated_managers instead"

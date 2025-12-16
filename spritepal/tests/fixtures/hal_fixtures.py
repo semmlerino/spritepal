@@ -90,11 +90,14 @@ def _find_real_hal_binaries() -> tuple[str, str] | None:
 @pytest.fixture(autouse=True)
 def reset_hal_singletons(request: FixtureRequest) -> Generator[None, None, None]:
     """
-    Reset HAL singletons after EVERY test (autouse).
+    Reset HAL singletons after tests that USE HAL (autouse, opt-in by fixture usage).
 
     This prevents HAL state (statistics, mock configuration, failure modes)
-    from leaking between tests. Previously this was opt-in; now it runs
-    automatically to catch HAL state pollution.
+    from leaking between tests. Only runs for tests that actually use HAL fixtures
+    to avoid unnecessary overhead for non-HAL tests (~1000 tests don't need this).
+
+    HAL fixtures that trigger this: hal_pool, hal_compressor, mock_hal
+    HAL marker that triggers this: @pytest.mark.real_hal
 
     Opt-out markers:
         @pytest.mark.skip_hal_reset - Skip for tests that manage HAL lifecycle manually
@@ -107,7 +110,18 @@ def reset_hal_singletons(request: FixtureRequest) -> Generator[None, None, None]
         yield
         return
 
-    # Let the test run
+    # Only run for tests that use HAL fixtures or have real_hal marker
+    hal_fixtures = {'hal_pool', 'hal_compressor', 'mock_hal'}
+    fixture_names = set(getattr(request, 'fixturenames', []))
+    uses_hal = bool(hal_fixtures & fixture_names)
+    has_hal_marker = 'real_hal' in markers
+
+    if not (uses_hal or has_hal_marker):
+        # Non-HAL test: skip reset entirely for efficiency
+        yield
+        return
+
+    # HAL test: let it run, then reset
     yield
 
     # Reset HAL singletons using centralized helper

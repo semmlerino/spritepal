@@ -87,6 +87,7 @@ class RealComponentFactory:
         settings_dir: Path | None = None,
         *,
         fail_on_leaks: bool | None = None,
+        manage_registry: bool = False,
     ):
         """
         Initialize the real component factory.
@@ -99,12 +100,18 @@ class RealComponentFactory:
             fail_on_leaks: If True, raise AssertionError on resource leaks.
                           If False, emit warnings instead.
                           If None, uses FAIL_ON_LEAKS class variable (default: True).
+            manage_registry: If True, this factory takes ownership of the ManagerRegistry
+                           lifecycle and will reset it during cleanup(). Use this when
+                           the factory is used standalone without manager fixtures.
+                           Default: False (registry lifecycle owned by test fixtures).
         """
         self._data_repo = data_repository or get_test_data_repository()
         self._temp_dirs: list[Path] = []
         self._created_components: list[QObject] = []
         self._fail_on_leaks = fail_on_leaks if fail_on_leaks is not None else self.FAIL_ON_LEAKS
         self._leaked_resources: list[str] = []
+        self._manage_registry = manage_registry
+        self._initialized_registry = False  # Track if we initialized it
 
         # Set up isolated settings directory
         if settings_dir is not None:
@@ -135,6 +142,9 @@ class RealComponentFactory:
         if not registry.is_initialized():
             from core.managers import initialize_managers
             initialize_managers("TestApp", settings_path=self._settings_path)
+            # Track that we initialized it (only relevant if manage_registry=True)
+            if self._manage_registry:
+                self._initialized_registry = True
 
     def create_extraction_manager(self, with_test_data: bool = True) -> ExtractionManager:
         """
@@ -720,7 +730,28 @@ class RealComponentFactory:
 
         self._temp_dirs.clear()
 
-        # Step 7: Final leak reporting
+        # Step 7: Registry cleanup (if we own it)
+        # Only clean up the registry if:
+        # 1. manage_registry=True was passed to __init__
+        # 2. We were the ones who initialized it
+        if self._manage_registry and self._initialized_registry:
+            try:
+                from core.managers.registry import ManagerRegistry
+                registry = ManagerRegistry()
+                if registry.is_initialized():
+                    registry.cleanup_managers()
+                    # Reset the singleton for full isolation
+                    if hasattr(registry, 'reset_for_tests'):
+                        registry.reset_for_tests()
+                self._initialized_registry = False
+            except Exception as e:
+                warnings.warn(
+                    f"Failed to clean up ManagerRegistry: {e}",
+                    ResourceWarning,
+                    stacklevel=2,
+                )
+
+        # Step 8: Final leak reporting
         if self._leaked_resources:
             if self._fail_on_leaks:
                 msg = "Resource leaks detected during cleanup:\n" + "\n".join(
