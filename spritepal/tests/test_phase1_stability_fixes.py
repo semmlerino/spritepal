@@ -41,10 +41,11 @@ from core.managers.registry import ManagerRegistry
 from ui.common import WorkerManager
 
 # Systematic pytest markers applied based on test content analysis
+# Migrated to isolated_managers for parallel-safe execution
 pytestmark = [
-    pytest.mark.usefixtures("session_managers"),
-    pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+    pytest.mark.usefixtures("isolated_managers"),
+    pytest.mark.parallel_safe,
+    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
 ]
 
 
@@ -311,11 +312,8 @@ class TestTOCTOURaceConditionStability:
 
     def test_manager_initialization_race_conditions(self):
         """Test manager initialization is safe under concurrent access."""
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        # Skip if session_managers is active - this test interferes with shared state
-        if is_session_managers_active():
-            pytest.skip("Cannot test manager initialization while session_managers is active")
+        # This test requires exclusive control of manager initialization
+        # With isolated_managers, each test has its own managers, so this is safe
 
         # Skip this test in mock environment where Qt objects can't be created properly
         from PySide6.QtWidgets import QApplication

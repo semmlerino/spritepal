@@ -13,7 +13,8 @@ Benefits of real component testing vs mocking:
 - Ensures proper signal/slot connections
 - Performance and resource management validation
 
-Uses shared session_managers fixture from core_fixtures.py with shared_state_safe marker.
+Uses isolated_managers fixture from core_fixtures.py for per-test isolation.
+Migrated from session_managers to enable parallel execution.
 """
 from __future__ import annotations
 
@@ -31,12 +32,11 @@ from core.managers.injection_manager import InjectionManager
 from tests.fixtures.test_managers import create_injection_manager_fixture
 from tests.fixtures.test_worker_helper import WorkerHelper
 
-# Serial execution required: Thread safety concerns
+# Parallel-safe: Uses isolated_managers for per-test isolation
 pytestmark = [
-    pytest.mark.usefixtures("session_managers"),
-    pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
-    pytest.mark.serial,
+    pytest.mark.usefixtures("isolated_managers"),
+    pytest.mark.parallel_safe,
+    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
     pytest.mark.thread_safety,
     pytest.mark.ci_safe,
     pytest.mark.file_io,
@@ -50,7 +50,7 @@ pytestmark = [
     pytest.mark.worker_threads,
 ]
 
-# Note: Uses shared session_managers fixture - no local setup_managers needed
+# Note: Uses isolated_managers fixture for per-test isolation (parallel-safe)
 
 @pytest.fixture
 def injection_manager_real():
@@ -112,7 +112,7 @@ class TestInjectionManagerInitialization:
     2. GREEN: Implement minimal code to pass the test
     3. REFACTOR: Improve implementation while keeping tests green
 
-    Uses shared session_managers fixture via module-level pytestmark.
+    Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
     def test_manager_initialization_with_real_components_tdd(self, injection_manager_real):
@@ -180,7 +180,7 @@ class TestInjectionManagerParameterValidation:
 
     These tests replace FileValidator mocking with real file operations
     to test actual validation logic and edge cases.
-    Uses shared session_managers fixture via module-level pytestmark.
+    Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
     def test_validate_vram_injection_params_valid_real_files(self, temp_files_with_real_content):
@@ -413,7 +413,7 @@ class TestInjectionManagerParameterValidation:
 class TestInjectionManagerWorkflows:
     """Test injection workflow methods.
 
-    Uses shared session_managers fixture via module-level pytestmark.
+    Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
     def test_start_vram_injection_success(self, tmp_path):
@@ -556,7 +556,7 @@ class TestInjectionManagerWorkflows:
 class TestInjectionManagerSignalHandling:
     """Test worker signal handling.
 
-    Uses shared session_managers fixture via module-level pytestmark.
+    Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
     def test_connect_worker_signals_no_worker(self):
@@ -647,7 +647,7 @@ class TestInjectionManagerSignalHandling:
 class TestInjectionManagerVRAMSuggestion:
     """Test smart VRAM suggestion functionality.
 
-    Uses shared session_managers fixture via module-level pytestmark.
+    Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
     def test_get_smart_vram_suggestion_no_strategies_work(self, tmp_path):

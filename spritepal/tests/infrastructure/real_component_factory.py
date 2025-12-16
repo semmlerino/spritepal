@@ -114,12 +114,19 @@ class RealComponentFactory:
         self._initialized_registry = False  # Track if we initialized it
 
         # Set up isolated settings directory
+        # Priority: explicit arg > SPRITEPAL_SETTINGS_DIR env var > tempfile
         if settings_dir is not None:
             self._settings_dir = settings_dir
         else:
-            # Create temp settings dir for isolation
-            self._settings_dir = Path(tempfile.mkdtemp(prefix="spritepal_settings_"))
-            self._temp_dirs.append(self._settings_dir)
+            env_settings = os.environ.get("SPRITEPAL_SETTINGS_DIR")
+            if env_settings:
+                # Under xdist, use a unique subdir per factory instance
+                self._settings_dir = Path(env_settings) / f"factory_{id(self)}"
+                self._settings_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                # Create temp settings dir for isolation
+                self._settings_dir = Path(tempfile.mkdtemp(prefix="spritepal_settings_"))
+                self._temp_dirs.append(self._settings_dir)
 
         self._settings_path = self._settings_dir / ".testapp_settings.json"
 
@@ -202,9 +209,15 @@ class RealComponentFactory:
         Returns:
             Real SessionManager instance
         """
-        # Use temp directory for test sessions
-        temp_dir = Path(tempfile.mkdtemp(prefix="spritepal_test_session_"))
-        self._temp_dirs.append(temp_dir)
+        # Use worker-specific session dir if under xdist, else temp directory
+        env_settings = os.environ.get("SPRITEPAL_SETTINGS_DIR")
+        if env_settings:
+            # Under xdist, use a unique subdir per factory instance
+            temp_dir = Path(env_settings) / f"session_{id(self)}"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            temp_dir = Path(tempfile.mkdtemp(prefix="spritepal_test_session_"))
+            self._temp_dirs.append(temp_dir)
 
         manager = SessionManager(app_name)
         self._created_components.append(manager)
@@ -420,8 +433,15 @@ class RealComponentFactory:
             Real ROMCache instance
         """
         if cache_dir is None:
-            cache_dir = Path(tempfile.mkdtemp(prefix="spritepal_cache_"))
-            self._temp_dirs.append(cache_dir)
+            # Priority: SPRITEPAL_CACHE_DIR env var > tempfile
+            env_cache = os.environ.get("SPRITEPAL_CACHE_DIR")
+            if env_cache:
+                # Under xdist, use a unique subdir per factory instance
+                cache_dir = Path(env_cache) / f"cache_{id(self)}"
+                cache_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                cache_dir = Path(tempfile.mkdtemp(prefix="spritepal_cache_"))
+                self._temp_dirs.append(cache_dir)
 
         # Create mock settings manager that returns appropriate values
         from unittest.mock import MagicMock

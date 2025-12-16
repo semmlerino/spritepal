@@ -227,12 +227,21 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
             pass
     """
     # Lazy import manager functions
+    import os
+
     from PySide6.QtWidgets import QApplication
 
     from core.managers import cleanup_managers, initialize_managers
 
     # Create session-specific settings directory for isolation
-    settings_dir = tmp_path_factory.mktemp("session_settings")
+    # Priority: SPRITEPAL_SETTINGS_DIR env var (xdist) > tmp_path_factory
+    env_settings = os.environ.get("SPRITEPAL_SETTINGS_DIR")
+    if env_settings:
+        # Under xdist, use worker-specific session settings
+        settings_dir = Path(env_settings) / "session_settings"
+        settings_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        settings_dir = tmp_path_factory.mktemp("session_settings")
     settings_path = settings_dir / ".test_settings.json"
 
     # Store in session state container

@@ -7,11 +7,11 @@ This module provides worker-level isolation for parallel testing:
 - Hooks for proper worker initialization and cleanup
 
 Usage:
-    # Run only parallel_safe tests in parallel
-    QT_QPA_PLATFORM=offscreen pytest -m parallel_safe -n auto
-
-    # Run all tests, but only parallel_safe ones distributed
+    # Run only parallel_safe tests in parallel (all others serialize)
     QT_QPA_PLATFORM=offscreen pytest -n auto
+
+    # Explicitly run just parallel_safe tests
+    QT_QPA_PLATFORM=offscreen pytest -m parallel_safe -n auto
 
 Architecture:
     - With pytest-xdist, each worker is a separate Python process
@@ -19,9 +19,12 @@ Architecture:
     - Module-level singletons are naturally isolated (separate process memory)
     - Filesystem resources need explicit isolation via tmp_path/worker_temp_root
 
-Conservative Approach:
-    Only tests marked @pytest.mark.parallel_safe are distributed across workers.
-    All other tests run on the controller or a single worker for safety.
+SERIAL BY DEFAULT Policy:
+    Tests are serialized by default. Only tests explicitly marked
+    @pytest.mark.parallel_safe are distributed across workers.
+    This prevents unmarked tests from racing on hidden globals.
+
+    See pytest_collection_modifyitems in conftest.py for the enforcement logic.
 """
 
 from __future__ import annotations

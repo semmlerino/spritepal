@@ -286,15 +286,20 @@ def pytest_addoption(parser: Any) -> None:
 
 
 def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
-    """Validate marker usage and auto-group tests for xdist during collection.
+    """Validate marker usage and enforce serial-by-default xdist policy.
 
     This hook performs two functions:
     1. Validates that skip_thread_cleanup markers have a reason argument
-    2. Auto-groups non-parallel_safe tests to a single 'serial' worker under xdist
+    2. Enforces SERIAL BY DEFAULT xdist policy - only @pytest.mark.parallel_safe
+       tests can distribute across workers
 
-    The xdist auto-grouping ensures that:
+    The xdist policy ensures that:
     - Tests marked @pytest.mark.parallel_safe run on any worker (true parallelism)
-    - All other tests get grouped to a single 'serial' worker to prevent interference
+    - ALL OTHER tests get grouped to a single 'serial' worker (safe default)
+
+    This conservative approach prevents unmarked tests from racing on hidden
+    globals. Tests must explicitly opt-in to parallel execution by being
+    marked parallel_safe.
 
     Args:
         config: pytest config object (required by hook signature)
@@ -329,36 +334,21 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     if not worker_count or worker_count == "0":
         return
 
-    # Auto-group tests that NEED serial execution
-    # INVERTED DEFAULT: Tests run parallel by default, only serialize when needed
+    # SERIAL BY DEFAULT: Only tests explicitly marked parallel_safe can distribute
+    # This prevents unmarked tests from racing on hidden globals
     serial_group = pytest.mark.xdist_group("serial")
-
-    # Fixtures that indicate shared mutable state requiring serialization
-    shared_fixtures = {"session_managers", "class_managers", "managers", "rom_cache"}
 
     for item in items:
         # Skip tests already marked with xdist_group
         if item.get_closest_marker("xdist_group"):
             continue
 
-        # Tests with explicit serial marker get grouped
-        if item.get_closest_marker("serial"):
-            item.add_marker(serial_group)
-            continue
+        # Tests explicitly marked parallel_safe can distribute to any worker
+        if item.get_closest_marker("parallel_safe"):
+            continue  # No serial marker = can run in parallel
 
-        # Tests with parallel_unsafe marker get grouped to serial
-        # This allows tests using wrapper fixtures around shared state to be marked
-        if item.get_closest_marker("parallel_unsafe"):
-            item.add_marker(serial_group)
-            continue
-
-        # Tests using shared fixtures get grouped to serial
-        item_fixtures = set(getattr(item, "fixturenames", []))
-        if shared_fixtures & item_fixtures:
-            item.add_marker(serial_group)
-            continue
-
-        # All other tests can run in parallel by default (no marker added)
+        # Everything else runs serial (safe default)
+        item.add_marker(serial_group)
 
 
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
@@ -460,6 +450,77 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
             )
     except ImportError:
         pass  # ManagerRegistry not available, skip check
+
+
+# ============================================================================
+# xdist Registry Cleanliness Check
+# ============================================================================
+
+@pytest.fixture(autouse=True)
+def assert_registry_clean_under_xdist(
+    request: pytest.FixtureRequest,
+) -> Generator[None, None, None]:
+    """Ensure registry is clean before/after each test under xdist.
+
+    This fixture catches direct ManagerRegistry usage outside fixtures.
+    Only active when running under pytest-xdist (PYTEST_XDIST_WORKER set).
+
+    Tests using manager fixtures are exempt - those fixtures manage lifecycle.
+    """
+    import os
+
+    # Only active under xdist workers
+    if not os.environ.get("PYTEST_XDIST_WORKER"):
+        yield
+        return
+
+    # Skip if test uses a manager fixture (they manage lifecycle)
+    manager_fixtures = {
+        "isolated_managers",
+        "session_managers",
+        "setup_managers",
+        "manager_context",
+        "real_extraction_manager",
+        "real_session_manager",
+        "real_factory",
+        "mock_main_window",
+        "main_window",
+    }
+    fixture_names = set(getattr(request, "fixturenames", []))
+    if manager_fixtures & fixture_names:
+        yield
+        return
+
+    # Skip if test has escape hatch marker
+    if request.node.get_closest_marker("allows_registry_state"):
+        yield
+        return
+
+    try:
+        from core.managers.registry import ManagerRegistry
+
+        registry = ManagerRegistry()
+
+        # Before test: registry should be clean
+        if registry.is_initialized():
+            pytest.fail(
+                f"Registry dirty before {request.node.name} - "
+                "previous test leaked state or direct instantiation detected. "
+                "Use isolated_managers fixture or reset after test."
+            )
+
+        yield
+
+        # After test: if registry got initialized, that's a problem
+        if registry.is_initialized():
+            registry.reset_for_tests()
+            pytest.fail(
+                f"Test {request.node.name} initialized ManagerRegistry "
+                "without using a manager fixture. "
+                "Fix: Use isolated_managers fixture."
+            )
+    except ImportError:
+        yield  # ManagerRegistry not available, skip check
 
 
 # ============================================================================
@@ -661,6 +722,10 @@ def guard_qpixmap_threading(request: FixtureRequest):
     tests that import Qt late, closing the timing hole in the previous
     implementation.
 
+    Overhead: Minimal. Early-exits for non-Qt tests (no_qt marker or
+    PySide6.QtGui not imported). The marker check and sys.modules check
+    are O(1) operations.
+
     Opt-out markers:
         @pytest.mark.skip_qpixmap_guard - Skip verification
         @pytest.mark.no_qt - Skip for non-Qt tests
@@ -718,11 +783,15 @@ def skip_requires_display(request: FixtureRequest):
 def reset_class_state(
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
-    """Auto-reset state for class-scoped fixtures between tests.
+    """SAFETY NET: Auto-reset state for class-scoped fixtures between tests.
 
-    This autouse fixture ensures proper state isolation for performance-optimized
-    class-scoped fixtures. It automatically runs when any class-scoped fixture
-    is used, resetting state after each test.
+    This is a SECONDARY cleanup mechanism. Class-scoped fixtures should have
+    their own explicit finalizers via request.addfinalizer(). This autouse
+    fixture provides an additional safety net to catch missed state.
+
+    Architecture:
+    - Per-fixture finalizers (primary): Run at END of fixture scope (end of class)
+    - This fixture (safety net): Runs after EACH test to reset state between tests
 
     NOTE: This is function-scoped so it runs AFTER each test to reset
     class-scoped fixture state before the next test runs.
@@ -734,6 +803,11 @@ def reset_class_state(
 
     Reset errors fail the test by default. Use @pytest.mark.lenient_reset
     to downgrade to warnings for legacy tests during migration.
+
+    MAINTENANCE: When adding new class-scoped fixtures that hold mutable state,
+    either (preferred) add a request.addfinalizer() in the fixture definition,
+    or add the fixture name to fixtures_to_reset below. The fixtures_to_reset
+    set should match the class-scoped fixtures in tests/fixtures/core_fixtures.py.
     """
     # Run test first
     yield
