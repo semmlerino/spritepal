@@ -731,7 +731,7 @@ def real_extraction_manager(
     NOTE: This returns a REAL ExtractionManager, not a mock.
     For actual mocks, create them locally with Mock(spec=ExtractionManager).
     """
-    return isolated_managers.extraction_manager
+    return isolated_managers.get_extraction_manager()
 
 
 @pytest.fixture
@@ -756,7 +756,7 @@ def real_session_manager(
     NOTE: This returns a REAL SessionManager, not a mock.
     For actual mocks, create them locally with Mock(spec=SessionManager).
     """
-    return isolated_managers.session_manager
+    return isolated_managers.get_session_manager()
 
 
 @pytest.fixture
