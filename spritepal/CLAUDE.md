@@ -215,8 +215,8 @@ def test_extraction_logic(isolated_managers, tmp_path):
 
 **Validation:** The `check_parallel_isolation` fixture (`autouse=True`) validates at test
 execution time that `parallel_safe` tests don't use incompatible fixtures. Tests using
-`session_managers` or `class_managers` with `@pytest.mark.parallel_safe` will fail with
-an explicit error message.
+`session_managers` with `@pytest.mark.parallel_safe` will fail with an explicit error message.
+Note: `class_managers` has been removed entirely and fails immediately if used.
 
 **Common Mistakes:**
 - Using `session_managers` with `parallel_safe` - causes fixture conflicts
@@ -302,7 +302,7 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 | Fixture | Replacement | Reason |
 |---------|-------------|--------|
 | `setup_managers` | `isolated_managers` | Deprecated, use `isolated_managers` for per-test isolation |
-| `class_managers` | `isolated_managers` | Class-scoped fixtures cause state leakage between tests |
+| `class_managers` | `isolated_managers` | **REMOVED** - fails immediately with error. Use `isolated_managers` |
 
 **⚠️ Do not mix `session_managers` and `isolated_managers` in the same module.** Same-module mixing causes test failures—this is intentional. It indicates a test design problem where some tests expect clean state while others expect shared state. Keep each test module consistent: either all `isolated_managers` or all `session_managers` (with proper markers). Cross-module usage (different files using different fixtures) is handled automatically.
 

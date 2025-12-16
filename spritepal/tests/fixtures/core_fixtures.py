@@ -39,7 +39,7 @@ from contextlib import AbstractContextManager as ContextManager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -671,58 +671,29 @@ def setup_managers(request: FixtureRequest, tmp_path: Path) -> Iterator[None]:
 @pytest.fixture(scope="class")
 def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     """
-    Class-scoped managers for test classes with multiple related tests.
+    REMOVED: Use isolated_managers instead.
 
-    .. deprecated::
-        Use ``isolated_managers`` instead. This fixture will be removed in a future release.
-        Class-scoped fixtures cause state leakage between tests. ``isolated_managers``
-        provides proper per-test isolation with automatic reset via ``reset_class_state``.
+    This fixture has been removed because class-scoped fixtures prevent
+    parallel test execution. All tests using this fixture must be migrated
+    to use ``isolated_managers`` instead.
 
-    This fixture initializes managers once per test class and cleans them up
-    when the class finishes.
+    Migration guide:
+        # Before
+        def test_something(self, class_managers):
+            registry = ManagerRegistry()
+            ...
 
-    Note: State can persist between tests in the same class.
-    For full isolation, use isolated_managers instead.
+        # After
+        def test_something(self, isolated_managers):
+            registry = isolated_managers
+            ...
     """
-    warnings.warn(
-        "class_managers is deprecated. Use isolated_managers instead for per-test isolation.",
-        DeprecationWarning,
-        stacklevel=2,
+    pytest.fail(
+        "class_managers fixture has been removed. "
+        "Use isolated_managers instead for per-test isolation. "
+        "See CLAUDE.md 'Test Fixture Selection Guide' for details."
     )
-    from PySide6.QtWidgets import QApplication
-
-    from core.managers import cleanup_managers, initialize_managers
-    from core.managers.registry import ManagerRegistry
-
-    registry = ManagerRegistry()
-    was_already_initialized = registry.is_initialized()
-
-    # If session_managers is active, don't initialize or cleanup - let session own lifecycle
-    if was_already_initialized and is_session_managers_active():
-        yield
-        return
-
-    # Create class-specific settings directory for isolation
-    settings_dir = tmp_path_factory.mktemp("class_settings")
-    settings_path = settings_dir / ".test_settings.json"
-
-    # Ensure Qt app exists
-    app = QApplication.instance()
-    if app is None and not IS_HEADLESS:
-        app = QApplication([])
-
-    if not was_already_initialized:
-        initialize_managers("TestApp_Class", settings_path=settings_path)
-
-    yield
-
-    # Only cleanup if WE initialized AND session_managers is NOT active
-    if not was_already_initialized and not is_session_managers_active():
-        cleanup_managers()
-
-    # Process events to ensure cleanup completes
-    if app and not IS_HEADLESS:
-        app.processEvents()
+    yield  # Never reached, but keeps type checker happy
 
 
 # ============================================================================
@@ -748,31 +719,19 @@ def real_factory(
         factory.cleanup()
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture
 def real_extraction_manager(
-    request: FixtureRequest,
-) -> Generator[ExtractionManager, None, None]:
-    """Class-scoped real extraction manager with proper cleanup.
+    isolated_managers: ManagerRegistry,
+) -> ExtractionManager:
+    """Function-scoped real extraction manager with automatic cleanup.
 
-    Used 51 times across tests. Class scope reduces instantiations
-    from 51 to ~12 (77% reduction).
+    Depends on isolated_managers to ensure proper per-test isolation.
+    The isolated_managers fixture handles initialization and cleanup.
 
     NOTE: This returns a REAL ExtractionManager, not a mock.
     For actual mocks, create them locally with Mock(spec=ExtractionManager).
     """
-    factory = RealComponentFactory(fail_on_leaks=_should_fail_on_leaks(request.config))
-    manager = factory.create_extraction_manager()
-
-    def reset_state():
-        if hasattr(manager, 'reset_state'):
-            with contextlib.suppress(Exception):
-                manager.reset_state()
-
-    request.addfinalizer(reset_state)
-
-    yield manager
-    if hasattr(factory, 'cleanup'):
-        factory.cleanup()
+    return isolated_managers.extraction_manager
 
 
 @pytest.fixture
@@ -785,65 +744,38 @@ def real_injection_manager(real_factory: RealComponentFactory) -> InjectionManag
     return real_factory.create_injection_manager()
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture
 def real_session_manager(
-    request: FixtureRequest,
-) -> Generator[SessionManager, None, None]:
-    """Class-scoped real session manager with proper cleanup.
+    isolated_managers: ManagerRegistry,
+) -> SessionManager:
+    """Function-scoped real session manager with automatic cleanup.
 
-    Used 26 times across tests. Class scope reduces instantiations
-    from 26 to ~8 (69% reduction).
+    Depends on isolated_managers to ensure proper per-test isolation.
+    The isolated_managers fixture handles initialization and cleanup.
 
     NOTE: This returns a REAL SessionManager, not a mock.
     For actual mocks, create them locally with Mock(spec=SessionManager).
     """
-    factory = RealComponentFactory(fail_on_leaks=_should_fail_on_leaks(request.config))
-    manager = factory.create_session_manager()
-
-    def reset_state():
-        if hasattr(manager, 'reset_state'):
-            with contextlib.suppress(Exception):
-                manager.reset_state()
-
-    request.addfinalizer(reset_state)
-
-    yield manager
-    if hasattr(factory, 'cleanup'):
-        factory.cleanup()
+    return isolated_managers.session_manager
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture
 def rom_cache(
     request: FixtureRequest,
-) -> Generator[ROMCache, None, None]:
-    """Class-scoped ROM cache fixture with proper cleanup.
+    tmp_path: Path,
+) -> ROMCache:
+    """Function-scoped ROM cache fixture with automatic cleanup.
 
-    Used 48 times across tests. Class scope reduces instantiations
-    from 48 to ~10 (79% reduction).
+    Uses tmp_path for worker-isolated cache directories (parallel-safe).
+    The cache is automatically cleaned up when the test finishes.
 
     Provides a real ROM cache with common caching functionality.
-    Reset between tests via clear_cache() in reset_class_state fixture.
     """
     factory = RealComponentFactory(fail_on_leaks=_should_fail_on_leaks(request.config))
-    cache = factory.create_rom_cache()
-
-    def reset_cache():
-        # Try multiple reset methods - different caches may use different APIs
-        if hasattr(cache, 'clear'):
-            with contextlib.suppress(Exception):
-                cache.clear()
-        elif hasattr(cache, 'clear_cache'):
-            with contextlib.suppress(Exception):
-                cache.clear_cache()
-        elif hasattr(cache, 'reset'):
-            with contextlib.suppress(Exception):
-                cache.reset()
-
-    request.addfinalizer(reset_cache)
-
-    yield cache
-    if hasattr(factory, 'cleanup'):
-        factory.cleanup()
+    cache_dir = tmp_path / "rom_cache"
+    cache_dir.mkdir(exist_ok=True)
+    cache = factory.create_rom_cache(cache_dir=cache_dir)
+    return cache
 
 
 @pytest.fixture
@@ -860,18 +792,15 @@ def mock_rom_cache(rom_cache: ROMCache) -> ROMCache:
 # Mock Fixtures
 # ============================================================================
 
-@pytest.fixture(scope="class")
+@pytest.fixture
 def mock_settings_manager(
-    request: FixtureRequest,
-    tmp_path_factory: TempPathFactory,
+    tmp_path: Path,
 ) -> Mock:
-    """Class-scoped mock settings manager for performance optimization.
+    """Function-scoped mock settings manager for test isolation.
 
-    Used 44 times across tests. Class scope reduces instantiations
-    from 44 to ~10 (77% reduction).
+    Uses tmp_path for worker-isolated temp directories (parallel-safe).
 
     Provides a mock settings manager with common configuration methods.
-    Uses tmp_path_factory for worker-isolated temp directories under xdist.
     """
     manager = Mock()
 
@@ -882,8 +811,8 @@ def mock_settings_manager(
     manager.load_settings = Mock()
     manager.reset_to_defaults = Mock()
 
-    # Use tmp_path_factory for worker-isolated temp directory (xdist-safe)
-    temp_output = str(tmp_path_factory.mktemp("mock_settings") / "test_output")
+    # Use tmp_path for worker-isolated temp directory (xdist-safe)
+    temp_output = str(tmp_path / "test_output")
 
     # Add common settings with default values
     manager.get_setting.side_effect = lambda key, default=None: {
@@ -892,12 +821,6 @@ def mock_settings_manager(
         'create_metadata': True,
         'auto_save': False,
     }.get(key, default)
-
-    def reset_mock_state():
-        with contextlib.suppress(Exception):
-            manager.reset_mock(return_value=True, side_effect=True)
-
-    request.addfinalizer(reset_mock_state)
 
     return manager
 
@@ -931,11 +854,11 @@ except ImportError:
     ExtractionController = None  # type: ignore[misc, assignment]
 
 
-@pytest.fixture(scope="class")
-def mock_controller(fast_mock_main_window: MockMainWindowProtocol) -> Mock:
-    """Class-scoped MOCK controller for fast unit tests.
+@pytest.fixture
+def mock_controller() -> Mock:
+    """Function-scoped MOCK controller for fast unit tests.
 
-    Uses fast_mock_main_window (MagicMock signals) for speed.
+    Creates a fresh mock controller with mock manager dependencies.
     For tests needing real signal behavior, use the real main_window
     fixture and create a real controller locally.
 
@@ -945,9 +868,23 @@ def mock_controller(fast_mock_main_window: MockMainWindowProtocol) -> Mock:
         # Return mock if controller class unavailable
         return Mock()
 
+    # Create a mock main window inline (no class-scoped dependency)
+    mock_main_window = Mock()
+    mock_main_window.extract_requested = MagicMock()
+    mock_main_window.open_in_editor_requested = MagicMock()
+    mock_main_window.arrange_rows_requested = MagicMock()
+    mock_main_window.arrange_grid_requested = MagicMock()
+    mock_main_window.inject_requested = MagicMock()
+    mock_main_window.extraction_completed = MagicMock()
+    mock_main_window.extraction_error_occurred = MagicMock()
+    mock_main_window.extraction_panel = Mock()
+    mock_main_window.rom_extraction_panel = Mock()
+    mock_main_window.output_settings_manager = Mock()
+    mock_main_window.toolbar_manager = Mock()
+
     # Create a mock controller to avoid manager initialization issues
     mock_ctrl = Mock(spec=ExtractionController if ExtractionController else None)
-    mock_ctrl.main_window = fast_mock_main_window
+    mock_ctrl.main_window = mock_main_window
     mock_ctrl.session_manager = Mock()
     mock_ctrl.extraction_manager = Mock()
     mock_ctrl.injection_manager = Mock()

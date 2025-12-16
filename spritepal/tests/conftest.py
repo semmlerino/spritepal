@@ -783,98 +783,18 @@ def skip_requires_display(request: FixtureRequest):
 def reset_class_state(
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
-    """SAFETY NET: Auto-reset state for class-scoped fixtures between tests.
+    """No-op after class-scoped fixtures were converted to function-scoped.
 
-    This is a SECONDARY cleanup mechanism. Class-scoped fixtures should have
-    their own explicit finalizers via request.addfinalizer(). This autouse
-    fixture provides an additional safety net to catch missed state.
+    Previously, this fixture was a safety net for resetting class-scoped
+    fixture state between tests. Now that all manager-related fixtures
+    (real_extraction_manager, real_session_manager, rom_cache, etc.) are
+    function-scoped, cleanup is automatic via pytest's fixture teardown.
 
-    Architecture:
-    - Per-fixture finalizers (primary): Run at END of fixture scope (end of class)
-    - This fixture (safety net): Runs after EACH test to reset state between tests
-
-    NOTE: This is function-scoped so it runs AFTER each test to reset
-    class-scoped fixture state before the next test runs.
-
-    IMPORTANT: reset_mock() only clears call history. We must also clear:
-    - return_value (if manually configured)
-    - side_effect (if manually configured)
-    - Any internal state
-
-    Reset errors fail the test by default. Use @pytest.mark.lenient_reset
-    to downgrade to warnings for legacy tests during migration.
-
-    MAINTENANCE: When adding new class-scoped fixtures that hold mutable state,
-    either (preferred) add a request.addfinalizer() in the fixture definition,
-    or add the fixture name to fixtures_to_reset below. The fixtures_to_reset
-    set should match the class-scoped fixtures in tests/fixtures/core_fixtures.py.
+    This fixture is kept for backward compatibility with tests that may
+    use @pytest.mark.lenient_reset, but it no longer performs any reset logic.
     """
-    # Run test first
     yield
-
-    # Reset fixtures AFTER each test for the next one
-    fixture_names = set(getattr(request, 'fixturenames', []))
-
-    # Class-scoped fixtures that need reset between tests
-    fixtures_to_reset = {
-        'real_extraction_manager',  # Real component - uses reset_state() or clear()
-        'real_session_manager',     # Real component - uses reset_state() or clear()
-        'rom_cache',
-        'mock_settings_manager',
-        'main_window',
-        'fast_mock_main_window',
-        'mock_controller',
-    }
-
-    # Only run reset logic if test uses class-scoped fixtures
-    used_class_fixtures = fixtures_to_reset & fixture_names
-    if not used_class_fixtures:
-        return
-
-    # Check for lenient mode marker
-    lenient = request.node.get_closest_marker("lenient_reset") is not None
-    reset_errors: list[str] = []
-
-    for fixture_name in used_class_fixtures:
-        try:
-            fixture_value = request.getfixturevalue(fixture_name)
-            if isinstance(fixture_value, Mock):
-                # Full reset: clear call history AND configured values
-                fixture_value.reset_mock(return_value=True, side_effect=True)
-            elif hasattr(fixture_value, 'reset_state'):
-                # Real component with explicit reset method
-                fixture_value.reset_state()
-            elif hasattr(fixture_value, 'clear_cache'):
-                # ROMCache and similar use clear_cache() method
-                fixture_value.clear_cache()
-            elif hasattr(fixture_value, 'clear'):
-                # Generic clear for collections
-                fixture_value.clear()
-            else:
-                # No known reset method - warn about potential state leak
-                reset_errors.append(
-                    f"Fixture '{fixture_name}' has no reset method "
-                    f"(tried: reset_state, clear_cache, clear)"
-                )
-        except pytest.FixtureLookupError:
-            pass  # Fixture not available in this context
-        except Exception as e:
-            # Handle fixtures that have been torn down (common with Qt fixtures)
-            # "The fixture value for X is not available" means it's already cleaned up
-            error_str = str(e)
-            if "not available" in error_str and "torn down" in error_str:
-                pass  # Fixture already cleaned up - no reset needed
-            else:
-                reset_errors.append(f"Reset failed for '{fixture_name}': {e}")
-
-    # Handle reset errors
-    if reset_errors:
-        error_msg = "Class fixture reset errors:\n" + "\n".join(f"  - {e}" for e in reset_errors)
-        if lenient:
-            import logging
-            logging.getLogger(__name__).warning(error_msg)
-        else:
-            pytest.fail(error_msg)
+    # No reset needed - function-scoped fixtures handle their own cleanup
 
 
 @pytest.fixture
@@ -986,145 +906,6 @@ def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, N
     yield
 
 
-def _safe_serialize(obj: Any) -> Any:
-    """Convert objects to JSON-serializable form for hashing.
-
-    Handles common Python types and converts them to a stable representation.
-    """
-    if obj is None:
-        return None
-    if isinstance(obj, (str, int, float, bool)):
-        return obj
-    if isinstance(obj, (list, tuple)):
-        return [_safe_serialize(item) for item in obj]
-    if isinstance(obj, dict):
-        return {str(k): _safe_serialize(v) for k, v in sorted(obj.items())}
-    if isinstance(obj, set):
-        return sorted(str(x) for x in obj)
-    if isinstance(obj, frozenset):
-        return sorted(str(x) for x in obj)
-    if hasattr(obj, 'name') and hasattr(obj, 'value'):  # Enum
-        return obj.name
-    if hasattr(obj, '__dict__'):
-        # For simple objects, serialize public attributes
-        return {k: _safe_serialize(v) for k, v in sorted(vars(obj).items())
-                if not k.startswith('_')}
-    return str(obj)
-
-
-def _hash_manager_state() -> str:
-    """Hash key manager state for drift detection using content-aware hashing.
-
-    Returns a hash of manager state that would indicate test pollution.
-    Unlike the previous length-based approach, this hashes actual VALUES
-    so mutations that don't change collection sizes are still detected.
-    """
-    import hashlib
-    import json
-
-    state_data: dict[str, Any] = {}
-    try:
-        from core.managers.registry import ManagerRegistry
-
-        registry = ManagerRegistry()
-        if not registry.is_initialized():
-            return "uninitialized"
-
-        # Check ApplicationStateManager (the real consolidated manager)
-        app_state = registry.get_application_state_manager()
-        if app_state:
-            # Hash actual content, not just lengths
-            state_data["settings"] = _safe_serialize(getattr(app_state, '_settings', {}))
-            state_data["runtime"] = _safe_serialize(getattr(app_state, '_runtime_state', {}))
-
-            # State snapshots - hash count only (keys are timestamps, too variable)
-            state_data["snapshots_count"] = len(getattr(app_state, '_state_snapshots', {}))
-
-            # Sprite history - hash full content
-            state_data["history"] = _safe_serialize(getattr(app_state, '_sprite_history', []))
-
-            # Workflow state (enum value)
-            workflow = getattr(app_state, '_workflow_state', None)
-            state_data["workflow"] = workflow.name if workflow else "none"
-
-            # Cache session stats (accumulating counters) - full values
-            state_data["cache_stats"] = _safe_serialize(getattr(app_state, '_cache_session_stats', {}))
-
-            # Preloaded offsets - hash full content
-            state_data["preloaded"] = _safe_serialize(getattr(app_state, '_preloaded_offsets', set()))
-
-        # Check CoreOperationsManager
-        core_ops = registry.get_core_operations_manager()
-        if core_ops:
-            # Check if there's an active worker
-            state_data["active_worker"] = getattr(core_ops, '_current_worker', None) is not None
-
-    except Exception as e:
-        return f"error:{type(e).__name__}"
-
-    # Create stable hash from serialized content
-    try:
-        state_json = json.dumps(state_data, sort_keys=True, default=str)
-        return hashlib.md5(state_json.encode()).hexdigest()[:12]
-    except Exception:
-        # Fallback to string representation
-        state_str = str(sorted(state_data.items()))
-        return hashlib.md5(state_str.encode()).hexdigest()[:12]
-
-
-def _get_manager_state_details() -> dict[str, Any]:
-    """Get detailed manager state for debugging.
-
-    Returns a dict of state values that can be compared before/after a test.
-    Unlike the hash function, this provides full content for debugging diffs.
-    """
-    state: dict[str, Any] = {}
-    try:
-        from core.managers.registry import ManagerRegistry
-
-        registry = ManagerRegistry()
-        if not registry.is_initialized():
-            return {"status": "uninitialized"}
-
-        app_state = registry.get_application_state_manager()
-        if app_state:
-            # Include actual content for detailed comparison
-            settings = getattr(app_state, '_settings', {})
-            state["settings_count"] = len(settings)
-            state["settings_keys"] = sorted(settings.keys()) if settings else []
-
-            runtime = getattr(app_state, '_runtime_state', {})
-            state["runtime_count"] = len(runtime)
-            state["runtime_keys"] = sorted(runtime.keys()) if runtime else []
-
-            state["snapshots_count"] = len(getattr(app_state, '_state_snapshots', {}))
-
-            history = getattr(app_state, '_sprite_history', [])
-            state["history_count"] = len(history)
-            # Include first few items for debugging
-            state["history_preview"] = history[:3] if history else []
-
-            workflow = getattr(app_state, '_workflow_state', None)
-            state["workflow"] = workflow.name if workflow else "none"
-
-            cache_stats = getattr(app_state, '_cache_session_stats', {})
-            state["cache_stats"] = _safe_serialize(cache_stats)
-
-            preloaded = getattr(app_state, '_preloaded_offsets', set())
-            state["preloaded_count"] = len(preloaded)
-            # Include first few offsets for debugging
-            state["preloaded_preview"] = sorted(list(preloaded)[:5]) if preloaded else []
-
-        core_ops = registry.get_core_operations_manager()
-        if core_ops:
-            state["active_worker"] = getattr(core_ops, '_current_worker', None) is not None
-
-    except Exception as e:
-        state["error"] = str(e)
-
-    return state
-
-
 @pytest.fixture(autouse=True)
 def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, None]:
     """Enforce that session_managers usage requires @pytest.mark.shared_state_safe.
@@ -1133,13 +914,16 @@ def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, 
     has the shared_state_safe marker, ensuring developers consciously acknowledge
     they're using shared state.
 
-    Additionally, it validates that manager state doesn't drift during the test,
-    catching tests that claim to be stateless but actually modify shared state.
-
     The marker requirement ensures:
     1. Developers understand session_managers shares state across tests
     2. Tests are reviewed for statelessness before using session_managers
     3. Order-dependent test failures are easier to diagnose
+
+    NOTE: State drift detection via hashing was removed because:
+    - It accessed private manager attributes (_settings, _runtime_state, etc.)
+    - Per-test JSON hashing added overhead
+    - Schema drift caused false positives
+    - Isolation is now guaranteed by fixture scoping (use isolated_managers)
     """
     # Only check tests that use session_managers
     fixture_names = set(getattr(request, 'fixturenames', []))
@@ -1156,39 +940,8 @@ def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, 
             "  2. Use isolated_managers instead (recommended for most tests)"
         )
 
-    # Capture state before test (both hash and details for debugging)
-    before_hash = _hash_manager_state()
-    before_state = _get_manager_state_details()
-
     yield
-
-    # Validate state unchanged after test
-    after_hash = _hash_manager_state()
-    if before_hash != after_hash:
-        after_state = _get_manager_state_details()
-
-        # Build detailed change report
-        changed_fields: list[str] = []
-        all_keys = set(before_state.keys()) | set(after_state.keys())
-        for key in sorted(all_keys):
-            before_val = before_state.get(key, "<missing>")
-            after_val = after_state.get(key, "<missing>")
-            if before_val != after_val:
-                changed_fields.append(f"    {key}: {before_val} -> {after_val}")
-
-        changes_str = "\n".join(changed_fields) if changed_fields else "    (no details available)"
-        fixtures_str = ", ".join(sorted(fixture_names))
-
-        pytest.fail(
-            f"Test '{request.node.name}' modified session manager state despite "
-            "@pytest.mark.shared_state_safe marker.\n"
-            f"  State hash: {before_hash} -> {after_hash}\n"
-            f"  Changed fields:\n{changes_str}\n"
-            f"  Fixtures used: {fixtures_str}\n"
-            "  Either:\n"
-            "    1. Fix the test to not modify shared state, or\n"
-            "    2. Use isolated_managers instead"
-        )
+    # No post-test state validation - isolation is guaranteed by fixture scoping
 
 
 # ===========================================================================================

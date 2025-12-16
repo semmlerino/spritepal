@@ -174,9 +174,9 @@ def qt_app() -> Any:
         )
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture
 def fast_mock_main_window() -> MockMainWindowProtocol:
-    """Class-scoped MOCK main window for fast unit tests.
+    """Function-scoped MOCK main window for fast unit tests.
 
     WARNING: Signals are MagicMock objects, NOT real Qt signals.
     - DO NOT use qtbot.waitSignal() with these signals - it will timeout
@@ -218,7 +218,7 @@ def fast_mock_main_window() -> MockMainWindowProtocol:
     window._output_path = ""
     window._extracted_files = []
 
-    return window  # pyright: ignore[reportReturnType]  # Mock conforms to protocol at runtime
+    return window  # pyright: ignore[reportReturnType]  # Mock conforms to protocol at runtime  # pyright: ignore[reportReturnType]  # Mock conforms to protocol at runtime
 
 
 @pytest.fixture(scope="function")

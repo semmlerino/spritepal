@@ -279,40 +279,43 @@ pytest -m "benchmark or performance"
 
 ### Manager Fixtures
 
-The test suite provides several manager fixtures with different scopes and isolation levels.
-**Use shared fixtures instead of defining local `setup_managers` fixtures in test files.**
+The test suite provides several manager fixtures with different isolation levels.
+**Use `isolated_managers` as the default choice.** Only use `session_managers` for proven-safe read-only tests.
 
 | Fixture | Scope | Isolation | Use When |
 |---------|-------|-----------|----------|
-| `session_managers` | Session | None (state persists) | Fast tests, shared state OK |
-| `class_managers` | Class | Per-class | Tests in same class share state |
-| `isolated_managers` | Function | Full (per-test) | Tests that modify manager state |
-| `fast_managers` | Function* | None (session-backed) | Alias for session_managers |
-| `setup_managers` | Function | Full (per-test) | Per-test isolation needed |
+| `isolated_managers` | Function | Full (per-test) | **Default choice** - any test that needs managers |
+| `session_managers` | Session | None (state persists) | Read-only tests + `@pytest.mark.shared_state_safe` |
 | `reset_manager_state` | Function | Caches only | Clean counters, keep managers |
+
+**Deprecated fixtures (do not use in new code):**
+
+| Fixture | Status | Replacement |
+|---------|--------|-------------|
+| `class_managers` | **Removed** - fails immediately | Use `isolated_managers` |
+| `setup_managers` | Deprecated | Use `isolated_managers` |
+| `fast_managers` | Deprecated | Use `session_managers` + marker |
 
 **Examples:**
 ```python
-# Class-scoped managers (recommended for test classes)
-@pytest.mark.usefixtures("class_managers")
-class TestMyComponent:
-    def test_one(self):
-        # Managers initialized once for class
-        pass
-
-    def test_two(self):
-        # Same manager state as test_one
-        pass
-
-# Session-scoped for fast tests
-def test_fast_operation(session_managers):
-    # Uses shared session managers
-    pass
-
-# Full isolation when needed
+# Default: Full isolation for each test (recommended)
 def test_modifies_state(isolated_managers):
     # Fresh managers, won't affect other tests
+    manager = isolated_managers.extraction_manager
+    ...
+
+# Session-scoped ONLY with marker (enforced)
+@pytest.mark.shared_state_safe
+def test_read_only_operation(session_managers):
+    # Uses shared session managers - must be proven stateless
     pass
+
+# For parallel execution, combine with parallel_safe
+@pytest.mark.parallel_safe
+def test_isolated_extraction(isolated_managers, tmp_path):
+    # Safe for pytest-xdist
+    output_file = tmp_path / "output.png"
+    ...
 ```
 
 ### Real Component Fixtures
@@ -322,10 +325,13 @@ Prefer real components over mocks. Mock only at true system boundaries.
 | Fixture | Scope | Returns |
 |---------|-------|---------|
 | `real_factory` | Function | RealComponentFactory instance |
-| `real_extraction_manager` | Class | Real ExtractionManager |
+| `real_extraction_manager` | Function | Real ExtractionManager (from `isolated_managers`) |
 | `real_injection_manager` | Function | Real InjectionManager |
-| `real_session_manager` | Class | Real SessionManager |
-| `rom_cache` | Class | Real ROMCache |
+| `real_session_manager` | Function | Real SessionManager (from `isolated_managers`) |
+| `rom_cache` | Function | Real ROMCache (isolated via `tmp_path`) |
+
+**Note:** All real component fixtures are function-scoped for full test isolation.
+This enables parallel execution with `@pytest.mark.parallel_safe`.
 
 ### HAL Fixtures
 
@@ -336,17 +342,43 @@ Prefer real components over mocks. Mock only at true system boundaries.
 
 ### Fixture-Marker Compatibility
 
-| Fixture | Compatible Markers | Incompatible Markers |
-|---------|-------------------|----------------------|
-| `session_managers` | `parallel_safe` | `isolated_managers` |
-| `class_managers` | `serial` | `parallel_safe` (class state) |
-| `isolated_managers` | `serial` | `parallel_safe` |
-| `hal_pool` | Any | `real_hal` (uses real HAL) |
-| `qtbot` | `gui`, `qt_real` | `no_qt` |
+| Fixture | Compatible Markers | Notes |
+|---------|-------------------|-------|
+| `isolated_managers` | `parallel_safe`, `serial` | **Default choice** - works with all markers |
+| `session_managers` | `shared_state_safe` (required) | Cannot combine with `parallel_safe` |
+| `hal_pool` | Any | Use `real_hal` marker for real HAL |
+| `qtbot` | `gui`, `qt_real` | Cannot combine with `no_qt` |
 
-### Migrating from Local Fixtures
+**Important:** Tests marked `@pytest.mark.parallel_safe` **must** use `isolated_managers` (not `session_managers`).
+The `check_parallel_isolation` fixture enforces this at runtime.
 
-If your test file has a local `setup_managers` fixture like this:
+### Migrating to Parallel-Safe Tests
+
+To enable parallel execution with pytest-xdist, tests must meet these criteria:
+
+1. Use `isolated_managers` fixture (NOT `session_managers`)
+2. Use `tmp_path` for all file operations (NOT hardcoded paths)
+3. Do not modify module-level globals
+4. Do not depend on test execution order
+
+**Migration example:**
+
+```python
+# BEFORE: Not parallel-safe
+class TestExtraction:
+    def test_extract(self, session_managers):
+        output = "/tmp/test_output.png"  # Hardcoded path - race condition!
+        ...
+
+# AFTER: Parallel-safe
+@pytest.mark.parallel_safe
+class TestExtraction:
+    def test_extract(self, isolated_managers, tmp_path):
+        output = tmp_path / "test_output.png"  # Isolated path
+        ...
+```
+
+**Migrating from local fixtures:**
 
 ```python
 # OLD - Don't do this
@@ -355,18 +387,10 @@ def setup_managers():
     initialize_managers("TestApp")
     yield
     cleanup_managers()
-```
 
-Replace with shared fixtures:
-
-```python
-# NEW - For test classes
-@pytest.mark.usefixtures("class_managers")
-class TestMyComponent:
-    ...
-
-# NEW - For standalone tests
-def test_something(session_managers):  # Or isolated_managers if needed
+# NEW - Use shared fixture
+def test_something(isolated_managers):
+    manager = isolated_managers.extraction_manager
     ...
 ```
 
