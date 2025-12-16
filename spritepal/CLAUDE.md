@@ -255,6 +255,26 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 ### Test Fixture Selection Guide
 
+**Quick Decision Flowchart:**
+```
+┌─ Writing a NEW test? ─────────────────────────────────────────────────┐
+│                                                                        │
+│  Q1: Does the test modify manager state (caches, counters, config)?   │
+│      YES → Use `isolated_managers` (DEFAULT)                          │
+│      NO  → Continue to Q2                                             │
+│                                                                        │
+│  Q2: Is the test a read-only operation verified stateless?            │
+│      YES → Use `session_managers` + `@pytest.mark.shared_state_safe`  │
+│      NO  → Use `isolated_managers` (DEFAULT)                          │
+│                                                                        │
+│  Q3: Need parallel execution with pytest-xdist?                       │
+│      YES → Use `isolated_managers` + `tmp_path` + `@pytest.mark.parallel_safe` │
+│      NO  → Default choice still applies                               │
+│                                                                        │
+│  When in doubt: Use `isolated_managers` — it's slower but always safe │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
 | Need | Use | NOT |
 |------|-----|-----|
 | **Default for all tests** | `isolated_managers` | `session_managers` |
@@ -309,6 +329,15 @@ HAL (compression/decompression) is **mock-by-default** because:
 | `@pytest.mark.shared_state_safe` | **Enforced** when using `session_managers` - test fails without it |
 | `@pytest.mark.no_manager_setup` | Skip setup_managers fixture |
 | `@pytest.mark.real_hal` | Use real HAL implementation |
+| `@pytest.mark.skip_thread_cleanup(reason='...')` | Skip thread leak detection (**reason required!**) |
+| `@pytest.mark.no_qt` | Skip all Qt-related fixtures (implies skip_thread_cleanup) |
+
+**Important:** `skip_thread_cleanup` **requires** a `reason` argument explaining why thread cleanup is skipped. Tests without a reason will fail with `pytest.UsageError`. Example:
+```python
+@pytest.mark.skip_thread_cleanup(reason='Uses session_managers which owns threads')
+def test_with_owned_threads():
+    ...
+```
 
 **Common Mistakes to Avoid:**
 - `QPixmap` in worker threads causes fatal crashes - use `ThreadSafeTestImage`

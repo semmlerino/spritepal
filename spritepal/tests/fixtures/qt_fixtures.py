@@ -69,22 +69,26 @@ def _get_session_thread_identities() -> dict[int, str]:
     return _SESSION_THREAD_IDENTITIES.copy()
 
 
-# Global timeout configuration - increased for CI/headless environments
-# Use PYTEST_TIMEOUT_MULTIPLIER environment variable to scale all timeouts (e.g., 2.0 for slow CI)
-def _get_timeout_multiplier() -> float:
-    """Get timeout multiplier from environment variable."""
-    try:
-        return float(os.environ.get("PYTEST_TIMEOUT_MULTIPLIER", "1.0"))
-    except ValueError:
-        return 1.0
+# Import consolidated timeout functions from timeouts.py (single source of truth)
+# See tests/fixtures/timeouts.py for base values and PYTEST_TIMEOUT_MULTIPLIER scaling
+from tests.fixtures.timeouts import (
+    LONG,
+    get_timeout_multiplier,
+    signal_timeout as _signal_timeout_func,
+    ui_timeout as _ui_timeout_func,
+    worker_timeout as _worker_timeout_func,
+)
 
-
-_timeout_multiplier = _get_timeout_multiplier()
+# Legacy constants for backward compatibility - delegate to timeouts.py
+# NOTE: Prefer using the functions from timeouts.py directly in new code
+_timeout_multiplier = get_timeout_multiplier()
 _is_ci_or_headless = bool(os.environ.get("CI") or IS_HEADLESS)
 
-DEFAULT_SIGNAL_TIMEOUT = int((10000 if _is_ci_or_headless else 5000) * _timeout_multiplier)
-DEFAULT_WAIT_TIMEOUT = int((5000 if _is_ci_or_headless else 2000) * _timeout_multiplier)
-DEFAULT_WORKER_TIMEOUT = int((15000 if _is_ci_or_headless else 7500) * _timeout_multiplier)
+# Apply CI/headless scaling on top of the standard timeouts
+_ci_multiplier = LONG if _is_ci_or_headless else 1.0
+DEFAULT_SIGNAL_TIMEOUT = _signal_timeout_func(_ci_multiplier)
+DEFAULT_WAIT_TIMEOUT = _ui_timeout_func(_ci_multiplier)
+DEFAULT_WORKER_TIMEOUT = _worker_timeout_func(_ci_multiplier)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -101,7 +105,8 @@ def capture_thread_baseline() -> Iterator[None]:
 
 
 # NOTE: qt_environment_setup was removed - it did nothing.
-# Qt environment variables (QT_QPA_PLATFORM=offscreen) are set in pyproject.toml.
+# Qt environment variables (QT_QPA_PLATFORM=offscreen) are set at the TOP of conftest.py
+# (before any Qt imports) to ensure reliable headless operation.
 # Tests that need real Qt must be marked @pytest.mark.gui.
 
 
@@ -112,7 +117,7 @@ def ensure_headless_qt() -> Any:
     Can be called both as a regular function (from helper classes) and
     at module import time.
 
-    Note: QT_QPA_PLATFORM=offscreen should already be set via pyproject.toml,
+    Note: QT_QPA_PLATFORM=offscreen should already be set via conftest.py,
     but this function ensures it's set for safety and creates a QApplication
     if one doesn't exist.
 
@@ -458,30 +463,58 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 
 
 # =============================================================================
-# Timeout Fixtures
+# Timeout Fixtures (Legacy - prefer functions from tests.fixtures.timeouts)
 # =============================================================================
+# NOTE: These fixture-based timeouts exist for backward compatibility.
+# For NEW code, prefer importing functions directly from tests.fixtures.timeouts:
+#
+#     from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout
+#     qtbot.waitSignal(worker.finished, timeout=worker_timeout())
+#
+# The function-based approach is documented in CLAUDE.md and provides better
+# composability with multipliers (SHORT, MEDIUM, LONG).
 
 @pytest.fixture
 def signal_timeout() -> int:
-    """Provide configurable timeout for Qt signal waiting."""
+    """Provide configurable timeout for Qt signal waiting.
+
+    .. note::
+        Prefer using ``from tests.fixtures.timeouts import signal_timeout``
+        in new code for better composability with multipliers.
+    """
     return DEFAULT_SIGNAL_TIMEOUT
 
 
 @pytest.fixture
 def wait_timeout() -> int:
-    """Provide configurable timeout for general Qt operations."""
+    """Provide configurable timeout for general Qt operations.
+
+    .. note::
+        Prefer using ``from tests.fixtures.timeouts import ui_timeout``
+        in new code for better composability with multipliers.
+    """
     return DEFAULT_WAIT_TIMEOUT
 
 
 @pytest.fixture
 def worker_timeout() -> int:
-    """Provide configurable timeout for worker thread operations."""
+    """Provide configurable timeout for worker thread operations.
+
+    .. note::
+        Prefer using ``from tests.fixtures.timeouts import worker_timeout``
+        in new code for better composability with multipliers.
+    """
     return DEFAULT_WORKER_TIMEOUT
 
 
 @pytest.fixture
 def timeout_config() -> dict[str, int]:
-    """Provide complete timeout configuration for complex tests."""
+    """Provide complete timeout configuration for complex tests.
+
+    .. note::
+        Prefer using functions from ``tests.fixtures.timeouts`` directly
+        in new code for better composability.
+    """
     return {
         'signal': DEFAULT_SIGNAL_TIMEOUT,
         'wait': DEFAULT_WAIT_TIMEOUT,

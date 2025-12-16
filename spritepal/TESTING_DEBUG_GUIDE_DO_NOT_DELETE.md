@@ -6,10 +6,16 @@
 
 ### 1. pytest-pystack - Automatic Stack Trace Capture
 
-**Installation:**
+**Installation (manual - not in default dev dependencies):**
 ```bash
+# pytest-pystack is NOT included in pyproject.toml dev dependencies
+# Install manually when needed for debugging hanging tests:
+uv pip install pytest-pystack
+# Or with pip:
 pip install pytest-pystack
 ```
+
+> **Note:** This is an optional debugging tool, not required for normal test execution.
 
 **Usage for Hanging Test Detection:**
 ```bash
