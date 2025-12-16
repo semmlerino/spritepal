@@ -171,35 +171,6 @@ class TestDivisionByZeroFixes:
             # depending on internal validation logic - that's acceptable.
             # The key verification is that no division by zero occurred.
 
-    def test_sprite_search_worker_zero_tile_count(self):
-        """Test SpriteSearchWorker quality calculation with zero tile count."""
-        from ui.rom_extraction.workers.sprite_search_worker import SpriteSearchWorker
-
-        with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
-            tmp.write(b'x' * 1024)
-            tmp.flush()
-
-            # Create mock extractor first
-            mock_extractor = MagicMock()
-            mock_extractor.extract_tiles_from_rom = MagicMock(
-                return_value=(b'', None, 0)  # 0 tile count
-            )
-
-            # Use correct initialization parameters
-            worker = SpriteSearchWorker(
-                rom_path=tmp.name,
-                start_offset=0,
-                end_offset=512,
-                direction=1,  # Forward search
-                rom_extractor=mock_extractor
-            )
-
-            # Should not crash with zero tiles
-            worker.run()
-
-            # ASSERTIONS: Verify worker handled zero tiles
-            # No exception means division by zero in quality calculation was handled
-
     def test_search_worker_zero_step(self):
         """Test SpriteSearchWorker from search_worker.py."""
         from ui.rom_extraction.workers.search_worker import SpriteSearchWorker

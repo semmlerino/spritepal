@@ -35,8 +35,6 @@ from .composed_dialog import ComposedDialog
 
 logger = get_logger(__name__)
 
-class InitializationOrderError(Exception):
-    """Raised when initialization order requirements are violated."""
 
 class DialogBaseMigrationAdapter(ComposedDialog):
     """

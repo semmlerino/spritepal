@@ -17,6 +17,7 @@ from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoad
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from core.managers import ExtractionManager
     from core.rom_extractor import ROMExtractor
 
 logger = get_logger(__name__)
@@ -113,11 +114,23 @@ class ROMWorkerOrchestrator(QObject):
 
     # ========== Sprite Location Loading ==========
 
-    def load_sprite_locations(self, rom_path: str, extractor: ROMExtractor) -> None:
-        """Load known sprite locations from ROM asynchronously."""
+    def load_sprite_locations(
+        self, rom_path: str, extraction_manager: ExtractionManager
+    ) -> None:
+        """Load known sprite locations from ROM asynchronously.
+
+        Args:
+            rom_path: Path to the ROM file
+            extraction_manager: ExtractionManager for loading sprite locations
+        """
         self._cleanup_info_worker()
 
-        self._info_worker = ROMInfoLoaderWorker(rom_path, extractor)
+        self._info_worker = ROMInfoLoaderWorker(
+            rom_path,
+            extraction_manager=extraction_manager,
+            load_header=False,
+            load_sprite_locations=True,
+        )
         self._info_thread = QThread()
         self._info_worker.moveToThread(self._info_thread)
 

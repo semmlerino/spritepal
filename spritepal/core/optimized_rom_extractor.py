@@ -367,11 +367,6 @@ class OptimizedROMExtractor(ROMExtractor):
 
         logger.info("Cleared all extractor caches")
 
-    def __del__(self):
-        """Clean up resources on deletion."""
-        with suppress(Exception):
-            self.clear_caches()
-            self._rom_readers.clear()
 
 def benchmark_extraction(rom_path: str, offsets: list[int]) -> dict[str, Any]:
     """

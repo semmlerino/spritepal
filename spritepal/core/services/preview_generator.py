@@ -669,16 +669,7 @@ class PreviewGenerator(QObject):
     def __del__(self) -> None:
         """Ensure cleanup on deletion."""
         with suppress(Exception):
-            self._cleanup_on_delete()
-
-    def _cleanup_on_delete(self) -> None:
-        """Inner cleanup function for __del__."""
-        if hasattr(self, "_debounce_timer") and self._debounce_timer is not None:
-            with suppress(RuntimeError, AttributeError):
-                self._debounce_timer.stop()
-
-        if hasattr(self, "_pending_request"):
-            self._pending_request = None
+            self.cleanup()
 
 
 class _PreviewGeneratorSingleton:

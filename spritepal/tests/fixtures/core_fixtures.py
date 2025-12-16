@@ -465,7 +465,7 @@ def detect_session_manager_cleanup(request: FixtureRequest) -> Generator[None, N
 
 
 @pytest.fixture
-def managers(session_managers: None) -> "ManagerRegistry":
+def managers(session_managers: None) -> ManagerRegistry:
     """
     Convenience fixture that provides access to the ManagerRegistry.
 
@@ -575,7 +575,6 @@ def setup_managers(request: FixtureRequest, tmp_path: Path) -> Iterator[None]:
     yields without initializing (session_managers owns the registry).
     It only cleans up if it was the one that initialized.
     """
-    import warnings
     warnings.warn(
         "setup_managers is deprecated. Use isolated_managers instead for per-test isolation.",
         DeprecationWarning,
@@ -649,7 +648,6 @@ def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     Note: State can persist between tests in the same class.
     For full isolation, use isolated_managers instead.
     """
-    import warnings
     warnings.warn(
         "class_managers is deprecated. Use isolated_managers instead for per-test isolation.",
         DeprecationWarning,

@@ -56,7 +56,7 @@ def _is_headless_environment() -> bool:
     # Try to actually initialize Qt - this is the authoritative check
     try:
         from PySide6.QtWidgets import QApplication
-        app = QApplication.instance() or QApplication([])
+        QApplication.instance() or QApplication([])
         # In offscreen mode, primaryScreen() may return None but Qt still works
         # So we only return True (headless) if Qt import/init itself fails
         return False

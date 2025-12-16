@@ -123,6 +123,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
     def teardown_method(self):
         """Clean up after each test."""
         from PySide6.QtWidgets import QApplication
+
         from ui.common import WorkerManager
 
         if self.window:
@@ -135,6 +136,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             # Wait for workers to stop using condition-based polling
             # (more efficient than fixed sleep loop - exits early when workers done)
             import time
+
             from tests.fixtures.timeouts import cleanup_timeout
 
             timeout_ms = cleanup_timeout()

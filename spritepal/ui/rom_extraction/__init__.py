@@ -11,7 +11,7 @@ from ui.rom_extraction.scan_controller import ScanController
 from ui.rom_extraction.worker_orchestrator import ROMWorkerOrchestrator
 
 __all__ = [
+    "OffsetDialogManager",
     "ROMWorkerOrchestrator",
     "ScanController",
-    "OffsetDialogManager",
 ]

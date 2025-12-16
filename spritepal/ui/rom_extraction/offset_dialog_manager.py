@@ -7,7 +7,7 @@ providing a clean interface for opening, closing, and tracking the dialog state.
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import QObject, Signal
 
@@ -15,9 +15,10 @@ from core.thread_safe_singleton import QtThreadSafeSingleton
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from PySide6.QtWidgets import QWidget
+
     from core.protocols.manager_protocols import ExtractionManagerProtocol
     from core.rom_extractor import ROMExtractor
-    from PySide6.QtWidgets import QWidget
     from ui.dialogs import UnifiedManualOffsetDialog
 
 logger = get_logger(__name__)
@@ -38,6 +39,7 @@ class _ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDia
     _lock = threading.Lock()
 
     @classmethod
+    @override
     def _create_instance(
         cls,
         manager: OffsetDialogManager | None = None,
@@ -81,6 +83,7 @@ class _ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDia
             logger.debug("Manual offset dialog destroyed")
 
     @classmethod
+    @override
     def reset(cls) -> None:
         """Reset the singleton state."""
         with cls._lock:

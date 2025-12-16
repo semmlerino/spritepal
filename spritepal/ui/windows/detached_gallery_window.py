@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 from ui.common import WorkerManager
+
 # Dialog imports moved to lazy imports in methods that use them (see _set_rom_file, _perform_extraction)
 from ui.rom_extraction.workers import SpriteScanWorker
 from ui.styles.theme import COLORS

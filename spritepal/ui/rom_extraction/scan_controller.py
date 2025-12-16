@@ -7,8 +7,7 @@ scan dialog creation, and result formatting.
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
@@ -93,10 +92,14 @@ class ScanController(QObject):
         self._scan_params = scan_params or {}
 
         try:
-            cached = self._cache.get_partial_scan_results(rom_path, scan_params)
+            # Protocol expects dict[str, int] for scan_params
+            cache_params = cast(dict[str, int], scan_params) if scan_params else {}
+            cached = self._cache.get_partial_scan_results(rom_path, cache_params)
             if cached:
                 self.cache_status_changed.emit("Cache hit", "cache-hit")
-                return True, cached
+                # Extract the sprites list from the cached result dict
+                sprites = cached.get("found_sprites", [])
+                return True, sprites
             self.cache_status_changed.emit("No cache", "cache-miss")
             return False, []
         except Exception as e:
@@ -109,6 +112,8 @@ class ScanController(QObject):
         rom_path: str,
         sprites: list[dict[str, Any]],
         scan_params: dict[str, Any] | None = None,
+        current_offset: int = 0,
+        completed: bool = True,
     ) -> bool:
         """
         Save scan results to cache.
@@ -117,6 +122,8 @@ class ScanController(QObject):
             rom_path: Path to the ROM file
             sprites: List of found sprite dictionaries
             scan_params: Parameters used for the scan
+            current_offset: Current scan offset position
+            completed: Whether the scan is complete
 
         Returns:
             True if save succeeded
@@ -126,10 +133,14 @@ class ScanController(QObject):
             return False
 
         try:
+            # Protocol expects dict[str, int] for scan_params
+            cache_params = cast(dict[str, int], scan_params) if scan_params else {}
             self._cache.save_partial_scan_results(
                 rom_path,
-                scan_params or {},
+                cache_params,
                 sprites,
+                current_offset,
+                completed,
             )
             self.cache_status_changed.emit("Results cached", "cache-saved")
             logger.info(f"Saved {len(sprites)} sprites to cache")

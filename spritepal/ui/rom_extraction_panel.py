@@ -14,7 +14,7 @@ from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
@@ -40,14 +40,15 @@ from core.managers.application_state_manager import ExtractionState
 
 # Import extracted components
 from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
-# Dialog imports moved to lazy imports in methods that use them (see _on_partial_scan_detected, _open_manual_offset_dialog, _find_sprites, _check_scan_cache)
-from ui.rom_extraction.workers import SpriteScanWorker
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
     ModeSelectorWidget,
     ROMFileWidget,
     SpriteSelectorWidget,
 )
+
+# Dialog imports moved to lazy imports in methods that use them (see _on_partial_scan_detected, _open_manual_offset_dialog, _find_sprites, _check_scan_cache)
+from ui.rom_extraction.workers import SpriteScanWorker
 from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
 from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
@@ -894,9 +895,9 @@ class ROMExtractionPanel(QWidget):
         Returns:
             True to use cache, False to start fresh, None if cancelled
         """
-        from ui.dialogs import ResumeScanDialog  # Lazy import to avoid cross-UI coupling
         from core.di_container import inject  # Delayed import
         from core.protocols.manager_protocols import ROMCacheProtocol
+        from ui.dialogs import ResumeScanDialog  # Lazy import to avoid cross-UI coupling
         rom_cache = inject(ROMCacheProtocol)
 
         # Define scan parameters (must match SpriteScanWorker)
@@ -1286,18 +1287,3 @@ class ROMExtractionPanel(QWidget):
         # Call parent implementation
         if a0 is not None:
             super().closeEvent(a0)
-
-    def __del__(self):
-        """Destructor - no-op to avoid crashes during garbage collection.
-
-        Workers registered with WorkerManager are cleaned up via:
-        1. closeEvent() when panel is closed normally
-        2. WorkerManager.cleanup_all() during test teardown
-        3. Process exit
-
-        Calling _cleanup_workers() here causes crashes because:
-        - During GC, Qt objects may already have deleted C++ backing
-        - WorkerManager.cleanup_all() may have already processed our workers
-        - Calling isRunning() on a deleted worker segfaults
-        """
-        pass

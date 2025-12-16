@@ -27,14 +27,7 @@ import os
 import time
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-import sys
-
-if sys.version_info >= (3, 12):
-    from typing import override
-else:
-    from typing_extensions import override
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import QObject, QThread, Signal
 

@@ -263,6 +263,7 @@ class TestManagedWorker:
         finished_spy = QSignalSpy(worker.operation_finished)
 
         from PySide6.QtWidgets import QApplication
+
         from tests.fixtures.timeouts import worker_timeout
 
         # Run the worker
@@ -294,6 +295,7 @@ class TestManagedWorker:
         qtbot.addWidget(worker)
 
         from PySide6.QtWidgets import QApplication
+
         from tests.fixtures.timeouts import worker_timeout
 
         error_spy = QSignalSpy(worker.error)
@@ -330,6 +332,7 @@ class TestManagedWorker:
         qtbot.addWidget(worker)
 
         from PySide6.QtWidgets import QApplication
+
         from tests.fixtures.timeouts import worker_timeout
 
         # Cancel before starting
@@ -366,6 +369,7 @@ class TestManagedWorker:
                 raise RuntimeError("Cleanup test")
 
         from PySide6.QtWidgets import QApplication
+
         from tests.fixtures.timeouts import worker_timeout
 
         manager = Mock(spec=BaseManager)
