@@ -17,6 +17,7 @@ from utils.exceptions import (
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
+    pytest.mark.parallel_safe,
     pytest.mark.headless,
     pytest.mark.no_qt,
     pytest.mark.rom_data,

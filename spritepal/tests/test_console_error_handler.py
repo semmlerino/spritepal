@@ -3,12 +3,6 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [
-    pytest.mark.ci_safe,
-    pytest.mark.dialog,
-    pytest.mark.headless,
-    pytest.mark.unit,
-]
 """
 Test suite for ConsoleErrorHandler implementation.
 
@@ -23,7 +17,12 @@ from unittest.mock import patch
 from core.console_error_handler import ConsoleErrorHandler
 
 # Mark as no_manager_setup - pure unit tests for console error handling
-pytestmark = [pytest.mark.no_manager_setup, pytest.mark.unit]
+pytestmark = [
+    pytest.mark.parallel_safe,
+    pytest.mark.no_manager_setup,
+    pytest.mark.unit,
+    pytest.mark.headless,
+]
 
 class TestConsoleErrorHandler(unittest.TestCase):
     """Test the ConsoleErrorHandler implementation"""

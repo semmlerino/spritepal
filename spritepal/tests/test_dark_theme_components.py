@@ -11,6 +11,7 @@ import re
 import pytest
 
 pytestmark = [
+    pytest.mark.parallel_safe,
     pytest.mark.skip_thread_cleanup(reason="UI tests may involve managers that spawn threads"),
     pytest.mark.allows_registry_state,  # Theme tests don't use managers but tolerate state
 ]
