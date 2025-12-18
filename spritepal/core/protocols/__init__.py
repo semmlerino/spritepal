@@ -11,23 +11,25 @@ from .dialog_protocols import (
     DialogFactoryProtocol,
     InjectionDialogProtocol,
 )
-from .error_handler_protocol import ErrorHandlerProtocol
 from .manager_protocols import (
+    ApplicationStateManagerProtocol,
+    ConfigurationServiceProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
-    MainWindowProtocol,
-    SessionManagerProtocol,
+    ROMCacheProtocol,
+    ROMExtractorProtocol,
+    SettingsManagerProtocol,
 )
-from .worker_protocol import WorkerManagerProtocol
 
 __all__ = [
+    "ApplicationStateManagerProtocol",
     "ArrangementDialogProtocol",
+    "ConfigurationServiceProtocol",
     "DialogFactoryProtocol",
-    "ErrorHandlerProtocol",
     "ExtractionManagerProtocol",
     "InjectionDialogProtocol",
     "InjectionManagerProtocol",
-    "MainWindowProtocol",
-    "SessionManagerProtocol",
-    "WorkerManagerProtocol",
+    "ROMCacheProtocol",
+    "ROMExtractorProtocol",
+    "SettingsManagerProtocol",
 ]

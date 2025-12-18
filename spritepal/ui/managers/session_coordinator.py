@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject
 
-# SessionManager accessed via DI: inject(SessionManagerProtocol)
+# SessionManager accessed via DI: inject(ApplicationStateManagerProtocol)
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import (
-        SessionManagerProtocol,
+        ApplicationStateManagerProtocol,
         SettingsManagerProtocol,
     )
     from ui.extraction_panel import ExtractionPanel
@@ -28,7 +28,7 @@ class SessionCoordinator(QObject):
         extraction_panel: ExtractionPanel,
         output_settings_manager: OutputSettingsManager,
         settings_manager: SettingsManagerProtocol,
-        session_manager: SessionManagerProtocol,
+        session_manager: ApplicationStateManagerProtocol,
     ) -> None:
         """Initialize session coordinator
 
@@ -37,7 +37,7 @@ class SessionCoordinator(QObject):
             extraction_panel: Extraction panel for file path save/restore
             output_settings_manager: Output settings for save/restore
             settings_manager: Injected SettingsManagerProtocol instance
-            session_manager: Injected SessionManagerProtocol instance
+            session_manager: Injected ApplicationStateManagerProtocol instance
         """
         super().__init__()
 

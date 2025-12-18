@@ -20,8 +20,8 @@ from core.managers import (
     validate_manager_dependencies,
 )
 from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
     ROMCacheProtocol,
-    SessionManagerProtocol,
     SettingsManagerProtocol,
 )
 from ui.main_window import MainWindow
@@ -76,7 +76,7 @@ class SpritePalApp(QApplication):
         self.main_window = MainWindow(
             settings_manager=inject(SettingsManagerProtocol),
             rom_cache=inject(ROMCacheProtocol),
-            session_manager=inject(SessionManagerProtocol),
+            session_manager=inject(ApplicationStateManagerProtocol),
         )
 
     def _apply_dark_theme(self):

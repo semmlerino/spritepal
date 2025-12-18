@@ -58,8 +58,8 @@ pytestmark = [
 # Import real UI components (not mocks!)
 from core.di_container import inject
 from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
     ROMCacheProtocol,
-    SessionManagerProtocol,
     SettingsManagerProtocol,
 )
 from ui.main_window import MainWindow
@@ -70,7 +70,7 @@ def _create_main_window():
     return MainWindow(
         settings_manager=inject(SettingsManagerProtocol),
         rom_cache=inject(ROMCacheProtocol),
-        session_manager=inject(SessionManagerProtocol),
+        session_manager=inject(ApplicationStateManagerProtocol),
     )
 
 

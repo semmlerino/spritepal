@@ -6,12 +6,12 @@ adapters. The recommended way to access managers is via dependency injection::
 
     from core.di_container import inject
     from core.protocols.manager_protocols import (
-        SessionManagerProtocol,
+        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
     )
 
-    session_mgr = inject(SessionManagerProtocol)
+    state_mgr = inject(ApplicationStateManagerProtocol)
     extraction_mgr = inject(ExtractionManagerProtocol)
     injection_mgr = inject(InjectionManagerProtocol)
 

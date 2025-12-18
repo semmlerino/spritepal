@@ -212,17 +212,17 @@ def configure_container(
         # Create default ConfigurationService
         register_singleton(ConfigurationServiceProtocol, ConfigurationService())
 
-    # NOTE: Manager protocols (SessionManagerProtocol, ExtractionManagerProtocol, etc.)
+    # NOTE: Manager protocols (ApplicationStateManagerProtocol, ExtractionManagerProtocol, etc.)
     # are registered by register_managers() AFTER managers are created.
     # This avoids circular dependency between DI container and ManagerRegistry.
 
-    # Register SettingsManager (depends on SessionManagerProtocol, so use factory)
+    # Register SettingsManager (depends on ApplicationStateManagerProtocol, so use factory)
     register_factory(
         SettingsManagerProtocol,
         lambda: SettingsManager(
             app_name="SpritePal",
             session_manager=inject(
-                __import__('core.protocols.manager_protocols', fromlist=['SessionManagerProtocol']).SessionManagerProtocol
+                __import__('core.protocols.manager_protocols', fromlist=['ApplicationStateManagerProtocol']).ApplicationStateManagerProtocol
             )
         )
     )
@@ -245,25 +245,6 @@ def configure_container(
     register_factory(
         ROMExtractorProtocol,
         lambda: ROMExtractor(rom_cache=inject(ROMCacheProtocol))
-    )
-
-    # Import and register ROMService and VRAMService
-    from core.protocols.manager_protocols import (
-        ROMServiceProtocol,
-        VRAMServiceProtocol,
-    )
-    from core.services import ROMService, VRAMService
-
-    # Register ROMService (creates its own ROMExtractor if needed)
-    register_factory(
-        ROMServiceProtocol,
-        lambda: ROMService()
-    )
-
-    # Register VRAMService
-    register_factory(
-        VRAMServiceProtocol,
-        lambda: VRAMService()
     )
 
     # NOTE: UI factory registrations (ManualOffsetDialogFactoryProtocol, DialogFactoryProtocol)

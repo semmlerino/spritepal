@@ -17,9 +17,9 @@ from core.controller import ExtractionController
 from core.di_container import inject
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
-    SessionManagerProtocol,
     SettingsManagerProtocol,
 )
 from tests.fixtures.test_main_window_helper_simple import MainWindowHelperSimple
@@ -97,7 +97,7 @@ class TestInjectionManagerRealConversion:
             window_helper = MainWindowHelperSimple()
             # Get managers from DI container
             extraction_mgr = inject(ExtractionManagerProtocol)
-            session_mgr = inject(SessionManagerProtocol)
+            session_mgr = inject(ApplicationStateManagerProtocol)
             injection_mgr = inject(InjectionManagerProtocol)
             settings_mgr = inject(SettingsManagerProtocol)
             dialog_factory = Mock(spec=DialogFactoryProtocol)
@@ -168,7 +168,7 @@ class TestInjectionManagerRealConversion:
         window_helper = MainWindowHelperSimple()
         # Get managers from DI container
         extraction_mgr = inject(ExtractionManagerProtocol)
-        session_mgr = inject(SessionManagerProtocol)
+        session_mgr = inject(ApplicationStateManagerProtocol)
         injection_mgr = inject(InjectionManagerProtocol)
         settings_mgr = inject(SettingsManagerProtocol)
         dialog_factory = Mock(spec=DialogFactoryProtocol)

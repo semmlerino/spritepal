@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any, TypedDict
 if TYPE_CHECKING:
     from core.controller import ExtractionController
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ROMCacheProtocol,
-        SessionManagerProtocol,
         SettingsManagerProtocol,
     )
 
@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# Session manager accessed via DI: inject(SessionManagerProtocol)
+# Session manager accessed via DI: inject(ApplicationStateManagerProtocol)
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
 from ui.common.spacing_constants import (
     SPACING_COMPACT_SMALL,
@@ -95,7 +95,7 @@ class MainWindow(QMainWindow):
         self,
         settings_manager: SettingsManagerProtocol,
         rom_cache: ROMCacheProtocol,
-        session_manager: SessionManagerProtocol,
+        session_manager: ApplicationStateManagerProtocol,
     ) -> None:
         super().__init__()
         # Declare instance variables with type hints
@@ -827,16 +827,15 @@ class MainWindow(QMainWindow):
             from core.di_container import inject
             from core.protocols.dialog_protocols import DialogFactoryProtocol
             from core.protocols.manager_protocols import (
+                ApplicationStateManagerProtocol,
                 ExtractionManagerProtocol,
                 InjectionManagerProtocol,
-                SessionManagerProtocol,
             )
 
-            # MainWindow implements MainWindowProtocol interface
             self._controller = ExtractionController(
-                self,  # type: ignore[arg-type]  # MainWindow implements protocol
+                self,
                 extraction_manager=inject(ExtractionManagerProtocol),
-                session_manager=inject(SessionManagerProtocol),
+                session_manager=inject(ApplicationStateManagerProtocol),
                 injection_manager=inject(InjectionManagerProtocol),
                 settings_manager=self.settings_manager,
                 dialog_factory=inject(DialogFactoryProtocol),

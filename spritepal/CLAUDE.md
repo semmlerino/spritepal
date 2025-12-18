@@ -423,7 +423,7 @@ SpritePal uses a **consolidated manager architecture** with inheritance-based ad
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │            DI Container (inject() via protocols)            │
-│  - inject(SessionManagerProtocol)    → SessionAdapter       │
+│  - inject(ApplicationStateManagerProtocol) → ApplicationStateManager │
 │  - inject(ExtractionManagerProtocol) → ExtractionAdapter    │
 │  - inject(InjectionManagerProtocol)  → InjectionAdapter     │
 └───────────────────────────┬─────────────────────────────────┘
@@ -436,50 +436,50 @@ SpritePal uses a **consolidated manager architecture** with inheritance-based ad
 │ (session, state, │ │ (extraction,    │ │ (performance)   │
 │  settings, hist) │ │  injection,     │ │                 │
 │                  │ │  palette)       │ │                 │
-└────────┬─────────┘ └────────┬────────┘ └─────────────────┘
-         │                    │
-         │ provides           │ provides
-         ▼                    ▼
-┌──────────────────┐ ┌──────────────────────────────────────┐
-│  SessionAdapter  │ │ ExtractionAdapter │ InjectionAdapter │
-│ (extends         │ │ (extends          │ (extends         │
-│  SessionManager) │ │  ExtractionMgr)   │  InjectionMgr)   │
-└────────┬─────────┘ └────────┬─────────┴──────┬───────────┘
-         │                    │                │
-    inherits from        inherits from    inherits from
-         ▼                    ▼                ▼
-┌──────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│ SessionManager   │ │ExtractionManager│ │InjectionManager │
-│ (DEPRECATED      │ │ (DEPRECATED     │ │ (DEPRECATED     │
-│  base class)     │ │  base class)    │ │  base class)    │
-└──────────────────┘ └─────────────────┘ └─────────────────┘
+└──────────────────┘ └────────┬────────┘ └─────────────────┘
+                              │
+                              │ provides
+                              ▼
+                    ┌──────────────────────────────────────┐
+                    │ ExtractionAdapter │ InjectionAdapter │
+                    │ (extends          │ (extends         │
+                    │  ExtractionMgr)   │  InjectionMgr)   │
+                    └────────┬─────────┴──────┬───────────┘
+                             │                │
+                        inherits from    inherits from
+                             ▼                ▼
+                    ┌─────────────────┐ ┌─────────────────┐
+                    │ExtractionManager│ │InjectionManager │
+                    │ (DEPRECATED     │ │ (DEPRECATED     │
+                    │  base class)    │ │  base class)    │
+                    └─────────────────┘ └─────────────────┘
 ```
 
 **Key Points:**
 - **Always use DI**: `inject(XxxManagerProtocol)` - never instantiate managers directly
 - **Consolidated managers** hold all business logic (ApplicationStateManager, CoreOperationsManager)
-- **Adapters** (SessionAdapter, ExtractionAdapter, InjectionAdapter) inherit from legacy base classes
+- **Adapters** (ExtractionAdapter, InjectionAdapter) inherit from legacy base classes
   for interface compatibility but delegate all work to consolidated managers
-- **Legacy managers** (SessionManager, ExtractionManager, InjectionManager) exist only as base classes
+- **Legacy managers** (ExtractionManager, InjectionManager) exist only as base classes
   for adapters - direct instantiation is deprecated and emits a warning
 
 **Example Usage (Production Code):**
 ```python
 from core.di_container import inject
 from core.protocols.manager_protocols import (
-    SessionManagerProtocol,
+    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
 )
 
-# Correct: Use DI to get adapter instances
-session_mgr = inject(SessionManagerProtocol)
+# Correct: Use DI to get instances
+state_mgr = inject(ApplicationStateManagerProtocol)
 extraction_mgr = inject(ExtractionManagerProtocol)
 injection_mgr = inject(InjectionManagerProtocol)
 
 # DEPRECATED: Direct instantiation emits DeprecationWarning
-# from core.managers import SessionManager
-# session_mgr = SessionManager()  # Don't do this!
+# from core.managers import ExtractionManager
+# extraction_mgr = ExtractionManager()  # Don't do this!
 ```
 
 **In Tests:** Use fixtures, not `inject()` directly:

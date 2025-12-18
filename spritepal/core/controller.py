@@ -19,10 +19,9 @@ if TYPE_CHECKING:
         InjectionDialogProtocol,
     )
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
-        MainWindowProtocol,
-        SessionManagerProtocol,
         SettingsManagerProtocol,
     )
 
@@ -31,7 +30,6 @@ from core.managers import (
     ExtractionManager,
     InjectionManager,
 )
-from core.protocols.error_handler_protocol import ErrorHandlerProtocol
 from core.services.image_utils import pil_to_qpixmap
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
@@ -68,8 +66,6 @@ class ROMExtractionParams(TypedDict):
 
 logger = get_logger(__name__)
 
-# ErrorHandlerProtocol moved to core/protocols/error_handler_protocol.py
-# ConsoleErrorHandler implements this protocol for console/file logging.
 
 class ExtractionController(QObject):
     """Controller for the extraction workflow.
@@ -107,15 +103,15 @@ class ExtractionController(QObject):
 
     def __init__(
         self,
-        main_window: MainWindowProtocol,
+        main_window: Any,  # MainWindow - no protocol defined
         extraction_manager: ExtractionManagerProtocol,
-        session_manager: SessionManagerProtocol,
+        session_manager: ApplicationStateManagerProtocol,
         injection_manager: InjectionManagerProtocol,
         settings_manager: SettingsManagerProtocol,
         dialog_factory: DialogFactoryProtocol,
     ) -> None:
         super().__init__()
-        self.main_window: MainWindowProtocol = main_window
+        self.main_window: Any = main_window  # MainWindow - no protocol defined
         self.extraction_manager = extraction_manager
         self.session_manager = session_manager
         self.injection_manager = injection_manager
@@ -131,7 +127,7 @@ class ExtractionController(QObject):
 
         # Initialize error handler - always use console error handler for core layer
         # This removes the UI dependency while still properly logging errors
-        self.error_handler: ErrorHandlerProtocol = ConsoleErrorHandler()
+        self.error_handler = ConsoleErrorHandler()
 
         # Connect UI signals
         _ = self.main_window.extract_requested.connect(self.start_extraction)

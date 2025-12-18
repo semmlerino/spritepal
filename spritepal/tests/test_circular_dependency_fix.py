@@ -9,8 +9,8 @@ from PySide6.QtWidgets import QApplication
 from core.controller import ExtractionController
 from core.di_container import inject
 from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
     ROMCacheProtocol,
-    SessionManagerProtocol,
     SettingsManagerProtocol,
 )
 from ui.main_window import MainWindow
@@ -36,7 +36,7 @@ class TestCircularDependencyFix:
         return {
             "settings_manager": inject(SettingsManagerProtocol),
             "rom_cache": inject(ROMCacheProtocol),
-            "session_manager": inject(SessionManagerProtocol),
+            "session_manager": inject(ApplicationStateManagerProtocol),
         }
 
     def test_main_window_creates_without_controller(self, qtbot, app, main_window_deps):

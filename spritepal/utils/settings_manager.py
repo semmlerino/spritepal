@@ -11,19 +11,19 @@ from utils.constants import (
 )
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import SessionManagerProtocol
+    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
 
 class SettingsManager:
     """Manages application settings and session persistence"""
 
-    def __init__(self, app_name: str = "SpritePal", session_manager: SessionManagerProtocol | None = None) -> None:
+    def __init__(self, app_name: str = "SpritePal", session_manager: ApplicationStateManagerProtocol | None = None) -> None:
         self.app_name: str = app_name
         if session_manager is None:
             # Fallback to DI container
             from core.di_container import inject
-            from core.protocols.manager_protocols import SessionManagerProtocol
-            self._session_manager = inject(SessionManagerProtocol)
+            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+            self._session_manager = inject(ApplicationStateManagerProtocol)
         else:
             self._session_manager = session_manager
         # Initialize default settings if not present

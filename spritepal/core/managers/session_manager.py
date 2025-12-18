@@ -8,9 +8,9 @@ for the SessionAdapter in the consolidated manager architecture.
     Direct instantiation of SessionManager is deprecated. Use dependency injection::
 
         from core.di_container import inject
-        from core.protocols.manager_protocols import SessionManagerProtocol
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
-        session_mgr = inject(SessionManagerProtocol)
+        state_mgr = inject(ApplicationStateManagerProtocol)
 
     This class exists primarily as a base class for SessionAdapter, which
     provides backward compatibility while delegating to ApplicationStateManager.
@@ -44,8 +44,8 @@ class SessionManager(BaseManager):
         Do not instantiate directly. Use dependency injection instead::
 
             from core.di_container import inject
-            from core.protocols.manager_protocols import SessionManagerProtocol
-            session_mgr = inject(SessionManagerProtocol)
+            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+            state_mgr = inject(ApplicationStateManagerProtocol)
 
         This class serves as a base class for SessionAdapter, which inherits
         from it for interface compatibility while delegating to
@@ -67,14 +67,14 @@ class SessionManager(BaseManager):
             settings_path: Optional custom path for settings file (for testing)
 
         .. deprecated::
-            Direct instantiation is deprecated. Use ``inject(SessionManagerProtocol)``
-            to get the managed SessionAdapter instance instead.
+            Direct instantiation is deprecated. Use ``inject(ApplicationStateManagerProtocol)``
+            to get the managed ApplicationStateManager instance instead.
         """
         # Emit deprecation warning only for direct instantiation (not adapter subclasses)
         if type(self).__name__ == "SessionManager":
             warnings.warn(
                 "Direct SessionManager instantiation is deprecated. "
-                "Use inject(SessionManagerProtocol) from core.di_container instead.",
+                "Use inject(ApplicationStateManagerProtocol) from core.di_container instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )

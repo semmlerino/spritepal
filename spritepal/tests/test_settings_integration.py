@@ -24,9 +24,9 @@ from core.controller import ExtractionController
 from core.di_container import inject
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
-    SessionManagerProtocol,
     SettingsManagerProtocol,
 )
 from utils.settings_manager import SettingsManager
@@ -120,7 +120,7 @@ class TestSettingsIntegration:
         ExtractionController(
             main_window=mock_main_window,
             extraction_manager=inject(ExtractionManagerProtocol),
-            session_manager=inject(SessionManagerProtocol),
+            session_manager=inject(ApplicationStateManagerProtocol),
             injection_manager=inject(InjectionManagerProtocol),
             settings_manager=settings,
             dialog_factory=inject(DialogFactoryProtocol),

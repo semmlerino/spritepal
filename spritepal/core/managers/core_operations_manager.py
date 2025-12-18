@@ -246,8 +246,8 @@ class CoreOperationsManager(BaseManager):
     def _get_session_manager(self) -> SessionManager:
         """Get session manager via dependency injection container."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import SessionManagerProtocol
-        return inject(SessionManagerProtocol)  # type: ignore[return-value]
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value]
 
     def _raise_extraction_failed(self, message: str) -> None:
         """Helper method to raise ExtractionError (for TRY301 compliance)."""

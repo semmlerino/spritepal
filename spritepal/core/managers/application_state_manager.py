@@ -20,9 +20,8 @@ from typing import Any, ClassVar, TypeVar, override
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
 
-from utils.state_manager import StateEntry, StateSnapshot
-
 from utils.file_validator import atomic_write
+from utils.state_manager import StateEntry, StateSnapshot
 
 from .base_manager import BaseManager
 from .exceptions import SessionError, ValidationError

@@ -38,8 +38,8 @@ from PySide6.QtWidgets import (
 # Import SpritePal components
 from core.di_container import inject
 from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
     ROMCacheProtocol,
-    SessionManagerProtocol,
     SettingsManagerProtocol,
 )
 from launch_spritepal import SpritePalApp
@@ -53,7 +53,7 @@ def _create_main_window():
     return MainWindow(
         settings_manager=inject(SettingsManagerProtocol),
         rom_cache=inject(ROMCacheProtocol),
-        session_manager=inject(SessionManagerProtocol),
+        session_manager=inject(ApplicationStateManagerProtocol),
     )
 
 pytestmark = [
@@ -623,10 +623,10 @@ def mock_manager_dependencies() -> Generator[None, None, None]:
     """Context manager to mock common manager dependencies."""
     from core.di_container import get_container, register_singleton
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
-        SessionManagerProtocol,
         SettingsManagerProtocol,
     )
 
@@ -645,7 +645,7 @@ def mock_manager_dependencies() -> Generator[None, None, None]:
     register_singleton(SettingsManagerProtocol, mock_settings)
     register_singleton(ROMCacheProtocol, mock_rom_cache)
     register_singleton(ROMExtractorProtocol, mock_rom_extractor)
-    register_singleton(SessionManagerProtocol, mock_session)
+    register_singleton(ApplicationStateManagerProtocol, mock_session)
 
     try:
         # DI container is already configured with mocks above
@@ -658,7 +658,7 @@ def mock_manager_dependencies() -> Generator[None, None, None]:
         container.unregister(SettingsManagerProtocol)
         container.unregister(ROMCacheProtocol)
         container.unregister(ROMExtractorProtocol)
-        container.unregister(SessionManagerProtocol)
+        container.unregister(ApplicationStateManagerProtocol)
 
 def create_test_spritepal_app() -> SpritePalApp:
     """Create a test SpritePalApp instance with minimal setup."""

@@ -12,9 +12,9 @@ import pytest
 from core.di_container import inject
 from core.managers.exceptions import ValidationError
 from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
-    SessionManagerProtocol,
 )
 
 
@@ -30,7 +30,7 @@ def get_injection_manager():
 
 def get_session_manager():
     """Get session manager via DI."""
-    return inject(SessionManagerProtocol)
+    return inject(ApplicationStateManagerProtocol)
 
 
 from tests.fixtures.test_managers import (

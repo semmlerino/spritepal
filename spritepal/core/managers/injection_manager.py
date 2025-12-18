@@ -137,8 +137,8 @@ class InjectionManager(BaseManager):
     def _get_session_manager(self) -> SessionManager:
         """Get session manager via dependency injection container"""
         from core.di_container import inject
-        from core.protocols.manager_protocols import SessionManagerProtocol
-        return inject(SessionManagerProtocol)  # type: ignore[return-value]  # Protocol returns concrete class
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value]  # Protocol returns concrete class
 
     def start_injection(self, params: dict[str, Any]) -> bool:
         """

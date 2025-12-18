@@ -241,16 +241,14 @@ class ManagerRegistry:
                 self._managers["session"] = state_manager
                 self._logger.debug("ApplicationStateManager created successfully")
 
-                # Register SessionManager immediately - other managers depend on it via DI
-                # (e.g., ROMCache → SettingsManager → SessionManager)
+                # Register ApplicationStateManagerProtocol immediately - other managers depend on it via DI
+                # (e.g., ROMCache → SettingsManager → ApplicationStateManager)
                 from core.di_container import register_singleton
                 from core.protocols.manager_protocols import (
                     ApplicationStateManagerProtocol,
-                    SessionManagerProtocol,
                 )
                 register_singleton(ApplicationStateManagerProtocol, state_manager)
-                register_singleton(SessionManagerProtocol, self._managers["session"])
-                self._logger.debug("Session protocols registered for downstream dependencies")
+                self._logger.debug("ApplicationStateManagerProtocol registered for downstream dependencies")
 
                 # CoreOperationsManager handles extraction and injection operations
                 self._logger.debug("Creating CoreOperationsManager...")
@@ -335,7 +333,7 @@ class ManagerRegistry:
         Get the session manager instance.
 
         .. deprecated::
-            Use ``inject(SessionManagerProtocol)`` from ``core.di_container`` instead.
+            Use ``inject(ApplicationStateManagerProtocol)`` from ``core.di_container`` instead.
 
         Returns:
             SessionManager instance
@@ -345,14 +343,14 @@ class ManagerRegistry:
         """
         warnings.warn(
             "ManagerRegistry.get_session_manager() is deprecated. "
-            "Use inject(SessionManagerProtocol) from core.di_container instead.",
+            "Use inject(ApplicationStateManagerProtocol) from core.di_container instead.",
             DeprecationWarning,
             stacklevel=2
         )
         from core.di_container import inject
-        from core.protocols.manager_protocols import SessionManagerProtocol
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
         try:
-            return inject(SessionManagerProtocol)  # type: ignore[return-value]
+            return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value]
         except ValueError as e:
             raise ManagerError("SessionManager not initialized. Call initialize_managers() first.") from e
 

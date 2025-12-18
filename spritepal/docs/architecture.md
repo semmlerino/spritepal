@@ -370,10 +370,10 @@ ManagerRegistry.initialize_managers()
 1. configure_container()           → Registers services (ConfigurationService,
    │                                  SettingsManager, ROMCache, etc.)
    ↓
-2. Create ApplicationStateManager  → Registers SessionManagerProtocol,
-   │                                  ApplicationStateManagerProtocol
+2. Create ApplicationStateManager  → Registers ApplicationStateManagerProtocol
+   │
    ↓
-3. Create CoreOperationsManager    → Can now use inject(SessionManagerProtocol)
+3. Create CoreOperationsManager    → Can now use inject(ApplicationStateManagerProtocol)
    │                                  via ROMCache → SettingsManager chain
    ↓
 4. register_managers()             → Registers ExtractionManagerProtocol,
@@ -387,8 +387,8 @@ DIContainer returns the registered implementation
 ```
 
 **Why this order matters:** CoreOperationsManager creates ROMExtractor, which needs
-ROMCache, which needs SettingsManager, which needs SessionManager. If SessionManager
-isn't registered before CoreOperationsManager is created, the DI chain fails.
+ROMCache, which needs SettingsManager, which needs ApplicationStateManager. If
+ApplicationStateManager isn't registered before CoreOperationsManager is created, the DI chain fails.
 
 ### Quick Reference
 
@@ -406,15 +406,13 @@ All protocols are defined in `core/protocols/manager_protocols.py`:
 
 | Protocol | Purpose |
 |----------|---------|
-| `SessionManagerProtocol` | Session state, settings |
+| `ApplicationStateManagerProtocol` | Consolidated session, state, settings |
 | `ExtractionManagerProtocol` | Sprite extraction |
 | `InjectionManagerProtocol` | Sprite injection |
-| `ConfigurationServiceProtocol` | App configuration |
 | `SettingsManagerProtocol` | Persistent settings |
+| `ConfigurationServiceProtocol` | App configuration |
 | `ROMCacheProtocol` | ROM file caching |
 | `ROMExtractorProtocol` | Low-level ROM extraction |
-| `ROMServiceProtocol` | ROM file operations |
-| `VRAMServiceProtocol` | VRAM operations |
 
 ### What NOT to Do
 
@@ -450,9 +448,9 @@ consolidation of managers into fewer, more cohesive classes.
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │            DI Container (inject() via protocols)            │
+│  inject(ApplicationStateManagerProtocol) → ApplicationStateManager │
 │  inject(ExtractionManagerProtocol) → ExtractionAdapter      │
 │  inject(InjectionManagerProtocol)  → InjectionAdapter       │
-│  inject(SessionManagerProtocol)    → SessionAdapter         │
 └───────────────────────────┬─────────────────────────────────┘
                             │
                             ▼
@@ -465,7 +463,7 @@ consolidation of managers into fewer, more cohesive classes.
 │                                                              │
 │  ApplicationStateManager:                                    │
 │    - Owns session, settings, state, history                  │
-│    - SessionAdapter delegates here                           │
+│    - Direct access via inject(ApplicationStateManagerProtocol) │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -477,8 +475,8 @@ consolidation of managers into fewer, more cohesive classes.
 2. **Signals forward, don't duplicate**: Adapters forward signals from
    consolidated managers. They don't emit their own copies of signals.
 
-3. **Deprecated base classes**: `ExtractionManager`, `InjectionManager`,
-   `SessionManager` exist only as base classes for adapters. Do not instantiate
+3. **Deprecated base classes**: `ExtractionManager`, `InjectionManager`
+   exist only as base classes for adapters. Do not instantiate
    them directly—use `inject()` with the protocol instead.
 
 ### Example: ExtractionAdapter

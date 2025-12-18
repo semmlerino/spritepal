@@ -16,10 +16,10 @@ import pytest
 from core.di_container import get_container, inject
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
     ROMCacheProtocol,
-    SessionManagerProtocol,
     SettingsManagerProtocol,
 )
 
@@ -54,8 +54,8 @@ class TestProtocolInjection:
         assert hasattr(settings, "set")
 
     def test_inject_session_manager_protocol(self, isolated_managers):
-        """Test SessionManagerProtocol injection."""
-        session = inject(SessionManagerProtocol)
+        """Test ApplicationStateManagerProtocol injection (for session)."""
+        session = inject(ApplicationStateManagerProtocol)
         assert session is not None
         # SessionAdapter provides get_session_data
         assert hasattr(session, "get_session_data")
@@ -89,7 +89,7 @@ class TestPureDIComponentInitialization:
 
         # Get all dependencies via DI
         extraction_mgr = inject(ExtractionManagerProtocol)
-        session_mgr = inject(SessionManagerProtocol)
+        session_mgr = inject(ApplicationStateManagerProtocol)
         injection_mgr = inject(InjectionManagerProtocol)
         settings_mgr = inject(SettingsManagerProtocol)
 
@@ -135,7 +135,7 @@ class TestPureDIComponentInitialization:
 
         settings_mgr = inject(SettingsManagerProtocol)
         rom_cache = inject(ROMCacheProtocol)
-        session_mgr = inject(SessionManagerProtocol)
+        session_mgr = inject(ApplicationStateManagerProtocol)
 
         # Create window with explicit deps
         window = MainWindow(
