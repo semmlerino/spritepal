@@ -20,7 +20,6 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
-from core.rom_extractor import ROMExtractor
 from core.services import ROMService, VRAMService
 from utils.constants import (
     SETTINGS_KEY_FAST_COMPRESSION,
@@ -40,6 +39,8 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMExtractorProtocol
+
     from .session_manager import SessionManager
 
 
@@ -98,7 +99,7 @@ class CoreOperationsManager(BaseManager):
         """Initialize the core operations manager."""
         # Initialize components
         self._sprite_extractor: SpriteExtractor | None = None
-        self._rom_extractor: ROMExtractor | None = None
+        self._rom_extractor: ROMExtractorProtocol | None = None
         self._palette_manager: PaletteManager | None = None
         self._current_worker: QThread | None = None
 
@@ -233,7 +234,7 @@ class CoreOperationsManager(BaseManager):
             raise ExtractionError("Sprite extractor not initialized")
         return self._sprite_extractor
 
-    def _ensure_rom_extractor(self) -> ROMExtractor:
+    def _ensure_rom_extractor(self) -> ROMExtractorProtocol:
         """Ensure ROM extractor is initialized."""
         if self._rom_extractor is None:
             raise ExtractionError("ROM extractor not initialized")
@@ -509,7 +510,7 @@ class CoreOperationsManager(BaseManager):
                 self._handle_operation_error(e, "preview_generation", ExtractionError, "generating preview")
             raise
 
-    def get_rom_extractor(self) -> ROMExtractor:
+    def get_rom_extractor(self) -> ROMExtractorProtocol:
         """Get the ROM extractor instance for advanced operations."""
         if self._rom_service is None:
             raise ExtractionError("ROMService not initialized")

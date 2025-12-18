@@ -36,7 +36,10 @@ class TestCallbackSignalBehavior:
         from tests.infrastructure.mock_dialogs_base import CallbackSignal
 
         received = []
-        callback = lambda x: received.append(x)
+
+        def callback(x):
+            received.append(x)
+
         signal = CallbackSignal([])
 
         signal.connect(callback)
@@ -128,7 +131,7 @@ class TestMockDialogBaseBehavior:
 
     def test_signal_properties_return_callback_signals(self):
         """Signal properties (accepted, rejected, finished) return CallbackSignal instances."""
-        from tests.infrastructure.mock_dialogs_base import MockDialogBase, CallbackSignal
+        from tests.infrastructure.mock_dialogs_base import CallbackSignal, MockDialogBase
 
         dialog = MockDialogBase()
 

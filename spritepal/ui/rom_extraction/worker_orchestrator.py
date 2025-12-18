@@ -17,7 +17,7 @@ from ui.workers.sprite_scan_worker import SpriteScanWorker
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.rom_extractor import ROMExtractor
+    from core.protocols.manager_protocols import ROMExtractorProtocol
 
 logger = get_logger(__name__)
 
@@ -78,7 +78,7 @@ class ROMWorkerOrchestrator(QObject):
 
     # ========== Header Loading ==========
 
-    def load_header(self, rom_path: str, extractor: ROMExtractor) -> None:
+    def load_header(self, rom_path: str, extractor: ROMExtractorProtocol) -> None:
         """Load ROM header information asynchronously."""
         self._cleanup_header_worker()
 
@@ -114,7 +114,7 @@ class ROMWorkerOrchestrator(QObject):
     # ========== Sprite Location Loading ==========
 
     def load_sprite_locations(
-        self, rom_path: str, extraction_manager: ROMExtractor
+        self, rom_path: str, extraction_manager: ROMExtractorProtocol
     ) -> None:
         """Load known sprite locations from ROM asynchronously.
 

@@ -27,9 +27,9 @@ if TYPE_CHECKING:
 
 from core.console_error_handler import ConsoleErrorHandler
 from core.managers import ExtractionManager
-from core.types import ROMExtractionParams, VRAMExtractionParams
 from core.services.image_utils import pil_to_qpixmap
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
+from core.types import ROMExtractionParams, VRAMExtractionParams
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 from utils.constants import (
     DEFAULT_TILES_PER_ROW,

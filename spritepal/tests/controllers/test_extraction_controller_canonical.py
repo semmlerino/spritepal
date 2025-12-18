@@ -31,8 +31,8 @@ from core.managers.extraction_manager import ExtractionManager
 from core.managers.injection_manager import InjectionManager
 from core.managers.session_manager import SessionManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.workers import VRAMExtractionWorker
 from core.services.settings_manager import SettingsManager
+from core.workers import VRAMExtractionWorker
 
 # Unified pytest markers for this consolidated module
 pytestmark = [

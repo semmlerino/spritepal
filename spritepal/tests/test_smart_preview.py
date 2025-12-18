@@ -30,8 +30,8 @@ except ImportError:
     Signal = Mock
     QT_AVAILABLE = False
 
-from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from core.services.rom_cache import ROMCache
+from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 
 
 class TestSmartPreviewROMCacheTier:

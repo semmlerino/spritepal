@@ -286,6 +286,22 @@ class ROMExtractorProtocol(Protocol):
 
     rom_injector: Any  # ROMInjector instance for compression/decompression operations
 
+    def extract_sprite_data(
+        self, rom_path: str, sprite_offset: int, sprite_config: dict[str, Any] | None = None
+    ) -> bytes:
+        """Extract raw sprite data from ROM at specified offset."""
+        ...
+
+    def extract_sprite_from_rom(
+        self, rom_path: str, sprite_offset: int, output_base: str, sprite_name: str = ""
+    ) -> tuple[str, dict[str, str | int | bool]]:
+        """Extract sprite from ROM at specified offset."""
+        ...
+
+    def get_known_sprite_locations(self, rom_path: str) -> dict[str, Any]:
+        """Get known sprite locations for the given ROM."""
+        ...
+
 
 class ROMCacheProtocol(Protocol):
     """Protocol for the ROM cache."""

@@ -118,12 +118,9 @@ def test_singleton_behavior():
     """Test the singleton cache instance"""
     print("\n=== Testing Singleton Behavior ===")
 
-    # Reset singleton
-    utils.rom_cache._rom_cache_instance = None
-
-    # Get instances
-    cache1 = get_rom_cache()
-    cache2 = get_rom_cache()
+    # Create instances (ROMCache is not a singleton - each instance is independent)
+    cache1 = ROMCache()
+    cache2 = ROMCache()
 
     if cache1 is cache2:
         print("✓ Singleton returns same instance")

@@ -12,10 +12,11 @@ from typing import Any
 from PIL import Image
 
 from core.region_analyzer import EmptyRegionConfig, EmptyRegionDetector
-from core.rom_extractor import ROMExtractor
 from core.sprite_visual_validator import SpriteVisualValidator
+from core.tile_renderer import TileRenderer
 from utils.constants import (
     BYTES_PER_TILE,
+    DEFAULT_TILES_PER_ROW,
     ROM_SCAN_STEP_DEFAULT,
     ROM_SCAN_STEP_QUICK,
     ROM_SPRITE_AREA_1_END,
@@ -62,9 +63,10 @@ class SpriteFinder:
     def __init__(self, output_dir: str = "sprite_candidates", region_config: EmptyRegionConfig | None = None) -> None:
         from core.di_container import inject
         from core.protocols.manager_protocols import ROMExtractorProtocol
-        
+
         self.extractor = inject(ROMExtractorProtocol)
         self.validator = SpriteVisualValidator()
+        self.tile_renderer = TileRenderer()
         self.output_dir = output_dir
         self.region_detector = EmptyRegionDetector(region_config)
 
@@ -243,9 +245,22 @@ class SpriteFinder:
         return candidates
 
     def _convert_to_png(self, tile_data: bytes, output_path: str) -> None:
-        """Convert raw tile data to PNG image"""
-        # Use the extractor's conversion method
-        self.extractor._convert_4bpp_to_png(tile_data, output_path)
+        """Convert raw tile data to PNG image using TileRenderer."""
+        # Calculate dimensions
+        num_tiles = len(tile_data) // BYTES_PER_TILE
+        if num_tiles == 0:
+            return
+
+        width_tiles = DEFAULT_TILES_PER_ROW
+        height_tiles = (num_tiles + width_tiles - 1) // width_tiles
+
+        # Render using TileRenderer (palette_index=None for grayscale)
+        image = self.tile_renderer.render_tiles(
+            tile_data, width_tiles, height_tiles, palette_index=None
+        )
+        if image is not None:
+            # Convert to grayscale and save
+            image.convert("L").save(output_path, "PNG")
 
     def _save_results_summary(self, rom_path: str, candidates: list[SpriteCandidate]) -> None:
         """Save a summary of found sprites"""

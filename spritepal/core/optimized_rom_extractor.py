@@ -547,10 +547,13 @@ def benchmark_extraction(rom_path: str, offsets: list[int]) -> dict[str, Any]:
     Returns:
         Performance comparison metrics
     """
+    from core.di_container import inject
+    from core.protocols.manager_protocols import ROMExtractorProtocol
+
     results = {}
 
-    # Test original extractor
-    original = ROMExtractor()
+    # Test original extractor (via DI to get rom_cache dependency)
+    original = inject(ROMExtractorProtocol)
     start = time.perf_counter()
 
     for offset in offsets:

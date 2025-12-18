@@ -480,7 +480,7 @@ class WorkerManager:
         # This helps catch workers started directly with .start() bypassing WorkerManager
         try:
             import threading
-            from PySide6.QtCore import QThread
+
             active_threads = threading.enumerate()
             unknown_workers = []
             for t in active_threads:

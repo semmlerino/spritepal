@@ -22,14 +22,16 @@ See Also:
 """
 from __future__ import annotations
 
-from typing import Any, override
+from typing import TYPE_CHECKING, Any, override
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMExtractorProtocol
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
-from core.rom_extractor import ROMExtractor
 from core.services.rom_service import ROMService
 from core.services.vram_service import VRAMService
 from utils.file_validator import FileValidator
@@ -85,7 +87,7 @@ class ExtractionManager(BaseManager):
 
         # Declare instance variables with type hints
         self._sprite_extractor: SpriteExtractor | None = None
-        self._rom_extractor: ROMExtractor | None = None
+        self._rom_extractor: ROMExtractorProtocol | None = None
         self._palette_manager: PaletteManager | None = None
 
         # Services for delegation
@@ -198,7 +200,7 @@ class ExtractionManager(BaseManager):
             raise ExtractionError("ExtractionManager not properly initialized - sprite extractor is None")
         return self._sprite_extractor
 
-    def _ensure_rom_extractor(self) -> ROMExtractor:
+    def _ensure_rom_extractor(self) -> ROMExtractorProtocol:
         """Ensure ROM extractor is initialized and return it."""
         if self._rom_extractor is None:
             raise ExtractionError("ExtractionManager not properly initialized - ROM extractor is None")
@@ -467,14 +469,14 @@ class ExtractionManager(BaseManager):
                 self._handle_operation_error(e, "preview_generation", ExtractionError, "generating preview")
             raise
 
-    def get_rom_extractor(self) -> ROMExtractor:
+    def get_rom_extractor(self) -> ROMExtractorProtocol:
         """
         Get the ROM extractor instance for advanced operations.
 
         Delegates to ROMService.
 
         Returns:
-            ROMExtractor instance
+            ROMExtractorProtocol instance
 
         Note:
             This method provides access to the underlying ROM extractor

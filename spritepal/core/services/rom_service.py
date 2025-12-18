@@ -23,10 +23,10 @@ from PySide6.QtCore import QObject, Signal
 
 if TYPE_CHECKING:
     from core.palette_manager import PaletteManager
+    from core.protocols.manager_protocols import ROMExtractorProtocol
 
 from core.exceptions import ExtractionError, ValidationError
 from core.palette_manager import PaletteManager
-from core.rom_extractor import ROMExtractor
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_PREVIEW_HEIGHT,
@@ -66,9 +66,13 @@ class ROMService(QObject):
     cache_saved = Signal(str, int)  # Cache type, number of items saved
     error_occurred = Signal(str)  # Error message
 
+    # Instance attributes (set in __init__, never None after initialization)
+    _rom_extractor: ROMExtractorProtocol
+    _palette_manager: PaletteManager
+
     def __init__(
         self,
-        rom_extractor: ROMExtractor | None = None,
+        rom_extractor: ROMExtractorProtocol | None = None,
         palette_manager: PaletteManager | None = None,
         parent: QObject | None = None,
     ) -> None:
@@ -98,12 +102,12 @@ class ROMService(QObject):
         """
         pass
 
-    def get_rom_extractor(self) -> ROMExtractor:
+    def get_rom_extractor(self) -> ROMExtractorProtocol:
         """
         Get the ROM extractor instance for advanced operations.
 
         Returns:
-            ROMExtractor instance
+            ROMExtractorProtocol instance
 
         Note:
             This method provides access to the underlying ROM extractor
@@ -111,6 +115,7 @@ class ROMService(QObject):
             Consider using the service methods when possible.
         """
         # Always valid since __init__ guarantees _rom_extractor is set
+        assert self._rom_extractor is not None
         return self._rom_extractor
 
     def extract_from_rom(

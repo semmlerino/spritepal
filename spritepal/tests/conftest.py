@@ -349,7 +349,7 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
         """Check a file for bare factory calls. Cached for efficiency."""
         try:
             path = Path(file_path)
-            if not path.exists() or not path.suffix == '.py':
+            if not path.exists() or path.suffix != '.py':
                 return []
             content = path.read_text()
             matches = []

@@ -48,8 +48,8 @@ if TYPE_CHECKING:
     from core.managers.injection_manager import InjectionManager
     from core.managers.registry import ManagerRegistry
     from core.managers.session_manager import SessionManager
-    from tests.infrastructure.test_protocols import MockMainWindowProtocol
     from core.services.rom_cache import ROMCache
+    from tests.infrastructure.test_protocols import MockMainWindowProtocol
 
 # Runtime imports for inject() - needed to avoid deprecated ManagerRegistry methods
 from core.di_container import inject

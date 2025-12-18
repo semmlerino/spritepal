@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from PySide6.QtGui import QPixmap
 
     from core.managers.extraction_manager import ExtractionManager
-    from core.rom_extractor import ROMExtractor
+    from core.protocols.manager_protocols import ROMExtractorProtocol
 
 from core.services.image_utils import pil_to_qpixmap
 from utils.logging_config import get_logger
@@ -297,7 +297,7 @@ class PreviewGenerator(QObject):
 
         # Manager references (weak to avoid circular refs)
         self._extraction_manager_ref: weakref.ref[ExtractionManager] | None = None
-        self._rom_extractor_ref: weakref.ref[ROMExtractor] | None = None
+        self._rom_extractor_ref: weakref.ref[ROMExtractorProtocol] | None = None
 
         self._setup_debounce_timer()
 
@@ -314,7 +314,7 @@ class PreviewGenerator(QObject):
 
     def set_managers(self,
                     extraction_manager: ExtractionManager | None = None,
-                    rom_extractor: ROMExtractor | None = None) -> None:
+                    rom_extractor: ROMExtractorProtocol | None = None) -> None:
         """Set manager references for preview generation.
 
         Args:

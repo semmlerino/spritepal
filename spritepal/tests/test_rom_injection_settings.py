@@ -22,6 +22,7 @@ warnings.filterwarnings(
 )
 
 from core.managers import InjectionManager
+from core.services.settings_manager import SettingsManager
 from ui.injection_dialog import InjectionDialog
 from utils.constants import (
     # Systematic pytest markers applied based on test content analysis
@@ -32,7 +33,6 @@ from utils.constants import (
     SETTINGS_KEY_LAST_SPRITE_LOCATION,
     SETTINGS_NS_ROM_INJECTION,
 )
-from core.services.settings_manager import SettingsManager
 
 pytestmark = [
     pytest.mark.dialog,

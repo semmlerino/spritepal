@@ -11,9 +11,12 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, PriorityQueue
-from typing import Any, override
+from typing import TYPE_CHECKING, Any, override
 
 from PIL import Image
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMExtractorProtocol
 from PySide6.QtCore import (
     QMutex,
     QMutexLocker,
@@ -25,7 +28,6 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QImage, QPixmap
 
-from core.rom_extractor import ROMExtractor
 from core.tile_renderer import TileRenderer
 from utils.logging_config import get_logger
 
@@ -151,7 +153,7 @@ class BatchThumbnailWorker(QObject):
     def __init__(
         self,
         rom_path: str,
-        rom_extractor: ROMExtractor | None = None,
+        rom_extractor: ROMExtractorProtocol | None = None,
         parent: QObject | None = None
     ):
         """
@@ -165,7 +167,11 @@ class BatchThumbnailWorker(QObject):
         super().__init__(parent)
 
         self.rom_path = rom_path
-        self.rom_extractor = rom_extractor or ROMExtractor()
+        if rom_extractor is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMExtractorProtocol
+            rom_extractor = inject(ROMExtractorProtocol)
+        self.rom_extractor = rom_extractor
         self.tile_renderer = TileRenderer()
 
         # Thread control
@@ -847,7 +853,7 @@ class ThumbnailWorkerController(QObject):
         self._thread: QThread | None = None
         self._cleanup_called = False
 
-    def start_worker(self, rom_path: str, rom_extractor: ROMExtractor | None = None) -> None:
+    def start_worker(self, rom_path: str, rom_extractor: ROMExtractorProtocol | None = None) -> None:
         """Start worker with proper thread management."""
         if self._thread and self._thread.isRunning():
             logger.warning("Worker already running, stopping first")

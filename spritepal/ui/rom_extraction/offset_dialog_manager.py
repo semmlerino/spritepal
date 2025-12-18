@@ -17,8 +17,7 @@ from utils.logging_config import get_logger
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
-    from core.protocols.manager_protocols import ExtractionManagerProtocol
-    from core.rom_extractor import ROMExtractor
+    from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
     from ui.dialogs import UnifiedManualOffsetDialog
 
 logger = get_logger(__name__)
@@ -144,14 +143,14 @@ class OffsetDialogManager(QObject):
         self._parent_widget = parent_widget
         self._signals_connected = False
         self._rom_path: str | None = None
-        self._extractor: ROMExtractor | None = None
+        self._extractor: ROMExtractorProtocol | None = None
 
         logger.debug("OffsetDialogManager initialized")
 
     def open_dialog(
         self,
         rom_path: str,
-        extractor: ROMExtractor,
+        extractor: ROMExtractorProtocol,
         rom_size: int,
         extraction_manager: ExtractionManagerProtocol,
         initial_offset: int | None = None,
