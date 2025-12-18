@@ -7,14 +7,7 @@ to the ExtractionManager while providing consistent threading interfaces.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict, cast
-
-try:
-    from typing import NotRequired
-except ImportError:
-    from typing import NotRequired
-
-from typing import override
+from typing import TYPE_CHECKING, cast, override
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
@@ -23,6 +16,7 @@ if TYPE_CHECKING:
     from core.managers.factory import ManagerFactory
 
 from core.managers.extraction_manager import ExtractionManager
+from core.types import ROMExtractionParams, VRAMExtractionParams
 from utils.logging_config import get_logger
 
 from .base import handle_worker_errors
@@ -34,25 +28,6 @@ from .specialized import (
 
 logger = get_logger(__name__)
 
-# Type definitions for extraction parameters
-class VRAMExtractionParams(TypedDict):
-    """Type definition for VRAM extraction parameters"""
-    vram_path: str
-    output_base: str
-    create_grayscale: bool
-    create_metadata: bool
-    grayscale_mode: bool
-    cgram_path: NotRequired[str | None]
-    oam_path: NotRequired[str | None]
-    vram_offset: NotRequired[int | None]
-
-class ROMExtractionParams(TypedDict):
-    """Type definition for ROM extraction parameters"""
-    rom_path: str
-    sprite_offset: int
-    output_base: str
-    sprite_name: str
-    cgram_path: NotRequired[str | None]
 
 class VRAMExtractionWorker(ExtractionWorkerBase):
     """

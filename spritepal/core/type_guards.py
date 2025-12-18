@@ -11,19 +11,11 @@ from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from typing import TypedDict
 
-    # from core.protocols.manager_protocols import ExtractionParams  # TODO: Define this protocol
     from PySide6.QtCore import QObject
 
     from core.managers.base_manager import BaseManager
-
-    # Temporary stub until ExtractionParams is properly defined
-    class ExtractionParams(TypedDict):
-        rom_path: str
-        offset: int
-        output_base: str
-        sprite_name: str
+    from core.types import ROMExtractionParams
 
 # Type variable for manager type guards
 T = TypeVar('T', bound='BaseManager')
@@ -97,9 +89,9 @@ def is_qobject_with_parent(obj: object) -> TypeGuard[QObject]:
     except ImportError:
         return False
 
-def is_complete_extraction_params(params: dict[str, Any]) -> TypeGuard[ExtractionParams]:
+def is_complete_extraction_params(params: dict[str, Any]) -> TypeGuard[ROMExtractionParams]:
     """
-    Type guard to check if a dict contains complete extraction parameters.
+    Type guard to check if a dict contains complete ROM extraction parameters.
 
     Args:
         params: Dictionary to check
@@ -107,11 +99,11 @@ def is_complete_extraction_params(params: dict[str, Any]) -> TypeGuard[Extractio
     Returns:
         True if params contains all required extraction parameters
     """
-    required_keys = {'rom_path', 'offset', 'output_base', 'sprite_name'}
+    required_keys = {'rom_path', 'sprite_offset', 'output_base', 'sprite_name'}
     return (
         all(key in params for key in required_keys)
         and is_valid_rom_path(params.get('rom_path'))
-        and is_valid_offset(params.get('offset'))
+        and is_valid_offset(params.get('sprite_offset'))
         and isinstance(params.get('output_base'), str)
         and isinstance(params.get('sprite_name'), str)
     )

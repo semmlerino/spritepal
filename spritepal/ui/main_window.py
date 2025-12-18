@@ -5,7 +5,7 @@ Main window for SpritePal application
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from core.controller import ExtractionController
@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 
 # Session manager accessed via DI: inject(ApplicationStateManagerProtocol)
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
+from core.types import VRAMExtractionParams
 from ui.common.spacing_constants import (
     SPACING_COMPACT_SMALL,
     SPACING_SMALL,
@@ -66,16 +67,6 @@ MIN_PANEL_WIDTH = 380  # Slightly smaller minimum
 LAYOUT_MARGINS = SPACING_SMALL  # 8px - standard margins
 LAYOUT_SPACING = SPACING_COMPACT_SMALL  # 6px - compact spacing
 
-class ExtractionParams(TypedDict):
-    """Type definition for extraction parameters"""
-    vram_path: str
-    cgram_path: str
-    oam_path: str
-    vram_offset: int
-    output_base: str
-    create_grayscale: bool
-    create_metadata: bool
-    grayscale_mode: bool
 
 class MainWindow(QMainWindow):
     """Main application window for SpritePal"""
@@ -664,7 +655,7 @@ class MainWindow(QMainWindow):
         # Update cache status indicator
         self.status_bar_manager.update_cache_status()
 
-    def get_extraction_params(self) -> ExtractionParams:
+    def get_extraction_params(self) -> VRAMExtractionParams:
         """Get extraction parameters from UI"""
         return {
             "vram_path": self.extraction_panel.get_vram_path(),

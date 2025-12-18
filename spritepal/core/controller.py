@@ -7,7 +7,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 from core.console_error_handler import ConsoleErrorHandler
 from core.managers import ExtractionManager
+from core.types import ROMExtractionParams, VRAMExtractionParams
 from core.services.image_utils import pil_to_qpixmap
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
@@ -39,27 +40,6 @@ from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
 
 # from utils.settings_manager import get_settings_manager # Removed due to DI
-
-
-# Type definitions
-class ExtractionParams(TypedDict):
-    """Type definition for extraction parameters"""
-    vram_path: str
-    cgram_path: str
-    oam_path: str
-    vram_offset: int
-    output_base: str
-    create_grayscale: bool
-    create_metadata: bool
-    grayscale_mode: bool
-
-class ROMExtractionParams(TypedDict):
-    """Type definition for ROM extraction parameters"""
-    rom_path: str
-    sprite_offset: int
-    sprite_name: str
-    output_base: str
-    cgram_path: NotRequired[str | None]
 
 logger = get_logger(__name__)
 
@@ -215,9 +195,6 @@ class ExtractionController(QObject):
                 logger.warning(f"OAM file warning: {warning}")
 
         # Create and start worker thread
-        # Import VRAMExtractionParams from the worker module
-        from core.workers.extraction import VRAMExtractionParams
-
         # Convert validated params dict to VRAMExtractionParams TypedDict
         extraction_params: VRAMExtractionParams = {
             "vram_path": params["vram_path"],

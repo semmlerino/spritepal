@@ -11,7 +11,7 @@ Moved from utils/type_aliases.py to fix layer boundary violations
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, TypeAlias
+from typing import Any, NotRequired, TypeAlias, TypedDict
 
 from PIL import Image
 from PySide6.QtGui import QPixmap
@@ -56,6 +56,31 @@ DialogResult: TypeAlias = bool
 FilePath: TypeAlias = str
 OutputPath: TypeAlias = str
 CachePath: TypeAlias = str
+
+
+# Extraction parameter TypedDicts (centralized to prevent drift)
+class VRAMExtractionParams(TypedDict):
+    """Parameters for VRAM-based sprite extraction."""
+
+    vram_path: str
+    output_base: str
+    create_grayscale: bool
+    create_metadata: bool
+    grayscale_mode: bool
+    cgram_path: NotRequired[str | None]
+    oam_path: NotRequired[str | None]
+    vram_offset: NotRequired[int | None]
+
+
+class ROMExtractionParams(TypedDict):
+    """Parameters for ROM-based sprite extraction."""
+
+    rom_path: str
+    sprite_offset: int
+    sprite_name: str
+    output_base: str
+    cgram_path: NotRequired[str | None]
+
 
 # Configuration and settings types
 ConfigDict: TypeAlias = dict[str, Any]
@@ -112,6 +137,7 @@ __all__ = [
     "ProgressCallback",
     "RGBColor",
     "ROMData",
+    "ROMExtractionParams",
     "RegionMap",
     "SearchResults",
     "SettingsValue",
@@ -125,6 +151,7 @@ __all__ = [
     "TileData",
     "TileMatrix",
     "ValidationResult",
+    "VRAMExtractionParams",
     "WidgetParent",
     "WorkerCallback",
 ]
