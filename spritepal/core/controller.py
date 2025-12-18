@@ -26,10 +26,7 @@ if TYPE_CHECKING:
     )
 
 from core.console_error_handler import ConsoleErrorHandler
-from core.managers import (
-    ExtractionManager,
-    InjectionManager,
-)
+from core.managers import ExtractionManager
 from core.services.image_utils import pil_to_qpixmap
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
@@ -139,18 +136,16 @@ class ExtractionController(QObject):
             self.update_preview_with_offset
         )
 
-        # Connect injection manager signals (cast to concrete type for signal access)
-        injection_mgr = cast(InjectionManager, self.injection_manager)
-        _ = injection_mgr.injection_progress.connect(self._on_injection_progress)
-        _ = injection_mgr.injection_finished.connect(self._on_injection_finished)
-        _ = injection_mgr.cache_saved.connect(self._on_cache_saved)
+        # Connect injection manager signals
+        _ = self.injection_manager.injection_progress.connect(self._on_injection_progress)
+        _ = self.injection_manager.injection_finished.connect(self._on_injection_finished)
+        _ = self.injection_manager.cache_saved.connect(self._on_cache_saved)
 
-        # Connect extraction manager cache signals (cast to concrete type for signal access)
-        extraction_mgr = cast(ExtractionManager, self.extraction_manager)
-        _ = extraction_mgr.cache_operation_started.connect(self._on_cache_operation_started)
-        _ = extraction_mgr.cache_hit.connect(self._on_cache_hit)
-        _ = extraction_mgr.cache_miss.connect(self._on_cache_miss)
-        _ = extraction_mgr.cache_saved.connect(self._on_cache_saved)
+        # Connect extraction manager cache signals
+        _ = self.extraction_manager.cache_operation_started.connect(self._on_cache_operation_started)
+        _ = self.extraction_manager.cache_hit.connect(self._on_cache_hit)
+        _ = self.extraction_manager.cache_miss.connect(self._on_cache_miss)
+        _ = self.extraction_manager.cache_saved.connect(self._on_cache_saved)
 
         # Initialize preview generator with managers
         self.preview_generator = get_preview_generator()
@@ -441,7 +436,9 @@ class ExtractionController(QObject):
 
             # Open row arrangement dialog using factory
             # Use main_window as parent only if it's a QWidget (for test compatibility)
-            parent = self.main_window if isinstance(self.main_window, QWidget) else None
+            # Use local var to prevent isinstance() from narrowing self.main_window's type
+            _mw = self.main_window
+            parent = _mw if isinstance(_mw, QWidget) else None
             dialog = self.dialog_factory.create_row_arrangement_dialog(
                 sprite_file, tiles_per_row, parent
             )
@@ -487,7 +484,9 @@ class ExtractionController(QObject):
         tiles_per_row = self._get_tiles_per_row_from_sprite(sprite_file)
 
         # Open grid arrangement dialog using factory
-        parent = self.main_window if isinstance(self.main_window, QWidget) else None
+        # Use local var to prevent isinstance() from narrowing self.main_window's type
+        _mw = self.main_window
+        parent = _mw if isinstance(_mw, QWidget) else None
         dialog = self.dialog_factory.create_grid_arrangement_dialog(
             sprite_file, tiles_per_row, parent
         )

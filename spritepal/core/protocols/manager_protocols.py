@@ -11,6 +11,12 @@ from typing import Any, Protocol
 class ExtractionManagerProtocol(Protocol):
     """Protocol for extraction manager."""
 
+    # Signals (accessed via attributes)
+    cache_operation_started: Any  # Signal(str, str) - operation_type, description
+    cache_hit: Any  # Signal(str, float) - cache_key, time_saved
+    cache_miss: Any  # Signal(str) - cache_key
+    cache_saved: Any  # Signal(str, int) - cache_key, size_bytes
+
     def extract_from_rom(
         self,
         rom_path: str,
@@ -89,6 +95,11 @@ class ExtractionManagerProtocol(Protocol):
 
 class InjectionManagerProtocol(Protocol):
     """Protocol for injection manager."""
+
+    # Signals (accessed via attributes)
+    injection_progress: Any  # Signal(str) - progress message
+    injection_finished: Any  # Signal(bool, str) - success, message
+    cache_saved: Any  # Signal(str, int) - cache_key, size_bytes
 
     def start_injection(self, params: dict[str, Any]) -> bool:
         """
