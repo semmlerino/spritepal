@@ -30,8 +30,11 @@ class TestPNGRoundTrip:
 
     def setup_method(self):
         """Set up test fixtures"""
+        # Use DI to get ROMExtractor (session_managers fixture sets up DI)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
         self.injector = SpriteInjector()
-        self.extractor = ROMExtractor()
+        self.extractor = inject(ROMExtractorProtocol)
 
     def create_test_tile_data(self) -> bytes:
         """Create test 4bpp tile data with known pattern"""

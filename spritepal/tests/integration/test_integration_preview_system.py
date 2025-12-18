@@ -29,17 +29,19 @@ class TestSimplePreviewCoordinator:
     """Test SimplePreviewCoordinator with real ROM data and decompression."""
 
     @pytest.fixture(autouse=True)
-    def setup_di(self, tmp_path):
+    def setup_di(self, tmp_path, managers_initialized):
         """Setup and teardown DI dependencies with isolation.
 
         Uses tmp_path for cache to prevent polluting $HOME with ~/.spritepal_rom_cache.
+        Depends on managers_initialized to ensure DI container is configured.
         """
-        from core.di_container import register_singleton
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.di_container import inject, register_singleton
+        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 
         cache_dir = tmp_path / "rom_cache"
         cache_dir.mkdir(exist_ok=True)
-        register_singleton(ROMCacheProtocol, ROMCache(cache_dir=str(cache_dir)))
+        settings_manager = inject(SettingsManagerProtocol)
+        register_singleton(ROMCacheProtocol, ROMCache(settings_manager=settings_manager, cache_dir=str(cache_dir)))
 
         yield
 
@@ -360,11 +362,12 @@ class TestPreviewCaching:
     def test_preview_cache_integration(self, test_rom_with_sprites, tmp_path):
         """Test that previews can be cached and retrieved."""
         # Register dependencies
-        from core.di_container import register_singleton
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.di_container import inject, register_singleton
+        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 
         # Create cache
-        cache = ROMCache(cache_dir=str(tmp_path))
+        settings_manager = inject(SettingsManagerProtocol)
+        cache = ROMCache(settings_manager=settings_manager, cache_dir=str(tmp_path))
         register_singleton(ROMCacheProtocol, cache)
 
         rom_info = test_rom_with_sprites

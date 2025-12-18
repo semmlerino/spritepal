@@ -265,6 +265,7 @@ class TestBatchThumbnailWorkerMemoryLeaks:
         memory_monitor.assert_no_leak(max_increase_mb=20)
 
 @pytest.mark.usefixtures("qapp")  # QPixmap requires QApplication
+@pytest.mark.parallel_unsafe  # Heavy Qt operations crash in parallel
 class TestQImageQPixmapMemoryManagement:
     """Test memory management of Qt image objects."""
 

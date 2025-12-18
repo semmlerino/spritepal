@@ -80,8 +80,10 @@ class TestROMScanning:
 
     @pytest.fixture
     def rom_extractor(self):
-        """Create a ROM extractor instance"""
-        return ROMExtractor()
+        """Create a ROM extractor instance via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        return inject(ROMExtractorProtocol)
 
     @pytest.fixture
     def mock_rom_file(self, tmp_path):
@@ -288,8 +290,10 @@ class TestROMSpriteQualityAssessment:
 
     @pytest.fixture
     def rom_extractor(self):
-        """Create a ROM extractor instance"""
-        return ROMExtractor()
+        """Create a ROM extractor instance via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        return inject(ROMExtractorProtocol)
 
     def test_assess_sprite_quality_perfect_sprite(self, rom_extractor):
         """Test quality assessment for a perfect sprite"""
@@ -359,8 +363,10 @@ class TestROMExtractorAdvancedFeatures:
 
     @pytest.fixture
     def rom_extractor(self):
-        """Create a ROM extractor instance"""
-        return ROMExtractor()
+        """Create a ROM extractor instance via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        return inject(ROMExtractorProtocol)
 
     @pytest.fixture
     def temp_rom_with_header(self, tmp_path):

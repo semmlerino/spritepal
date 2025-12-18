@@ -78,8 +78,11 @@ class TestSettingsIntegration:
 
     def test_settings_persistence_across_sessions(self, temp_settings_dir, isolated_managers):
         """Test that settings persist across application restarts"""
-        # Session 1: Save settings
-        settings1 = SettingsManager("TestApp")
+        # Session 1: Save settings - need to provide session_manager via DI
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        session_mgr = inject(ApplicationStateManagerProtocol)
+        settings1 = SettingsManager("TestApp", session_manager=session_mgr)
 
         # Set various settings
         settings1.set("session", "vram_path", "/test/vram.dmp")
@@ -92,7 +95,7 @@ class TestSettingsIntegration:
         settings1.save_settings()
 
         # Session 2: Load settings in new instance
-        settings2 = SettingsManager("TestApp")
+        settings2 = SettingsManager("TestApp", session_manager=session_mgr)
 
         # Verify settings persisted
         assert settings2.get("session", "vram_path") == "/test/vram.dmp"
@@ -133,8 +136,11 @@ class TestSettingsIntegration:
 
     def test_window_geometry_persistence(self, temp_settings_dir, isolated_managers):
         """Test UI geometry settings persistence"""
-        # Create fresh settings instance to avoid conflicts
-        settings = SettingsManager("SpritePal")
+        # Create fresh settings instance with required session_manager
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        session_mgr = inject(ApplicationStateManagerProtocol)
+        settings = SettingsManager("SpritePal", session_manager=session_mgr)
 
         # Simulate saving window state
         window_state = {
@@ -152,7 +158,7 @@ class TestSettingsIntegration:
         settings.save_settings()
 
         # Load in new instance
-        new_settings = SettingsManager("SpritePal")
+        new_settings = SettingsManager("SpritePal", session_manager=session_mgr)
 
         # Verify all geometry saved
         assert new_settings.get("ui", "window_x") == 100
@@ -255,7 +261,7 @@ class TestSettingsIntegration:
         # Create a session manager with our temp settings file
         # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
         session_manager = SessionManager(settings_path=settings_file)
-        settings = SettingsManager(session_manager=session_manager)
+        settings = SettingsManager("SpritePal", session_manager=session_manager)
 
         # Verify migration worked through the public API
         assert settings.get("session", "vram_path") == "/old/path.dmp"
@@ -287,7 +293,7 @@ class TestSettingsIntegration:
         # Create a session manager with our temp settings file
         # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
         session_manager = SessionManager(settings_path=settings_file)
-        settings = SettingsManager(session_manager=session_manager)
+        settings = SettingsManager("SpritePal", session_manager=session_manager)
 
         # Should load defaults without crashing
         # Verify defaults loaded (since file was corrupted)

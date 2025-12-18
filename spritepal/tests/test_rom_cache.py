@@ -55,10 +55,10 @@ class TestROMCacheCore:
         return str(rom_file)
 
     @pytest.fixture
-    def rom_cache(self, temp_cache_dir):
+    def rom_cache(self, temp_cache_dir, mock_settings_manager):
         """Create a ROMCache instance with temp directory."""
-        # Create cache with explicit directory
-        return ROMCache(cache_dir=temp_cache_dir)
+        # Create cache with explicit directory and required settings_manager
+        return ROMCache(settings_manager=mock_settings_manager, cache_dir=temp_cache_dir)
 
     @pytest.fixture
     def mock_settings_manager(self, temp_cache_dir):
@@ -75,9 +75,9 @@ class TestROMCacheCore:
 
         return MockSettingsManager()
 
-    def test_initialization_with_custom_dir(self, temp_cache_dir) -> None:
+    def test_initialization_with_custom_dir(self, temp_cache_dir, mock_settings_manager) -> None:
         """Test cache initialization with custom directory."""
-        cache = ROMCache(cache_dir=temp_cache_dir)
+        cache = ROMCache(settings_manager=mock_settings_manager, cache_dir=temp_cache_dir)
         assert cache.cache_dir == Path(temp_cache_dir)
         assert cache.cache_enabled is True
 
@@ -645,8 +645,17 @@ class TestROMCacheCore:
             import os
             os.makedirs(str(self), exist_ok=True)
 
+        # Create a mock settings manager for this test
+        class MockSettings:
+            def get_cache_enabled(self) -> bool:
+                return True
+            def get_cache_location(self):
+                return None
+            def get_cache_expiration_days(self) -> int:
+                return 30
+
         with patch("pathlib.Path.mkdir", mock_mkdir):
-            cache = ROMCache(cache_dir="/root/no_permission")
+            cache = ROMCache(settings_manager=MockSettings(), cache_dir="/root/no_permission")
             # Should fallback to temp directory
             assert "spritepal_rom_cache" in str(cache.cache_dir)
             assert str(cache.cache_dir).startswith(tempfile.gettempdir())
@@ -756,9 +765,10 @@ class TestROMCacheIntegration:
         )
 
         # Create worker that should resume from cache
-        # Need an extractor instance
-        from core.rom_extractor import ROMExtractor
-        extractor = ROMExtractor()
+        # Get extractor instance from DI (isolated_managers fixture sets up DI)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
 
         worker = SpriteScanWorker(
             test_rom_file,
@@ -791,9 +801,21 @@ class TestROMCacheErrorHandling:
     """Test error handling in ROM cache."""
 
     @pytest.fixture
-    def rom_cache(self, tmp_path):
+    def mock_settings_manager(self, tmp_path):
+        """Create a mock settings manager for error handling tests."""
+        class MockSettingsManager:
+            def get_cache_enabled(self) -> bool:
+                return True
+            def get_cache_location(self):
+                return str(tmp_path)
+            def get_cache_expiration_days(self) -> int:
+                return 30
+        return MockSettingsManager()
+
+    @pytest.fixture
+    def rom_cache(self, tmp_path, mock_settings_manager):
         """Create a ROMCache instance."""
-        return ROMCache(cache_dir=str(tmp_path))
+        return ROMCache(settings_manager=mock_settings_manager, cache_dir=str(tmp_path))
 
     @pytest.fixture
     def test_rom_file(self, tmp_path):

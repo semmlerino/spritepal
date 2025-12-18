@@ -21,12 +21,12 @@ warnings.filterwarnings(
 from core.di_container import reset_container
 from core.managers import (
     # Serial execution required: Thread safety concerns
-    ExtractionManager,
     ManagerError,
-    SessionManager,
     cleanup_managers,
     initialize_managers,
 )
+from core.managers.application_state_manager import ApplicationStateManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.registry import ManagerRegistry
 
 
@@ -148,10 +148,13 @@ class TestManagerRegistry:
         initialize_managers()
         all_managers = registry.get_all_managers()
 
-        assert "session" in all_managers
-        assert "extraction" in all_managers
-        assert isinstance(all_managers["session"], SessionManager)
-        assert isinstance(all_managers["extraction"], ExtractionManager)
+        # Keys are now protocol names (DI container is single source of truth)
+        assert "ApplicationStateManagerProtocol" in all_managers
+        assert "ExtractionManagerProtocol" in all_managers
+        # Consolidated architecture: state returns ApplicationStateManager
+        assert isinstance(all_managers["ApplicationStateManagerProtocol"], ApplicationStateManager)
+        # Consolidated architecture: extraction returns CoreOperationsManager
+        assert isinstance(all_managers["ExtractionManagerProtocol"], CoreOperationsManager)
 
     def test_double_initialization(self):
         """Test that double initialization doesn't create new instances"""

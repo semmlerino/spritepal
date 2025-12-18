@@ -63,22 +63,19 @@ logger: logging.Logger = get_logger(__name__)
 class ROMExtractor:
     """Handles sprite extraction directly from ROM files"""
 
-    def __init__(self, rom_cache: ROMCacheProtocol | None = None) -> None:
-        """Initialize ROM extractor with required components"""
+    def __init__(self, rom_cache: ROMCacheProtocol) -> None:
+        """Initialize ROM extractor with required components.
+
+        Args:
+            rom_cache: Required ROM cache for caching scan results and sprite data.
+        """
         logger.debug("Initializing ROMExtractor")
         self.hal_compressor: HALCompressor = HALCompressor()
         self.rom_injector: ROMInjector = ROMInjector()
         self.default_palette_loader: DefaultPaletteLoader = DefaultPaletteLoader()
         self.rom_palette_extractor: ROMPaletteExtractor = ROMPaletteExtractor()
         self.sprite_config_loader: SpriteConfigLoader = SpriteConfigLoader()
-
-        # Inject rom_cache or use fallback
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self.rom_cache = inject(ROMCacheProtocol)
-        else:
-            self.rom_cache = rom_cache
+        self.rom_cache = rom_cache
         logger.info("ROMExtractor initialized with HAL compression and palette extraction support")
 
     def extract_sprite_data(

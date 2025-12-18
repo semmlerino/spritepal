@@ -30,11 +30,11 @@ class ROMCache:
     CACHE_VERSION = "1.0"
     CACHE_DIR_NAME = ".spritepal_rom_cache"
 
-    def __init__(self, settings_manager: SettingsManagerProtocol | None = None, cache_dir: str | None = None) -> None:
+    def __init__(self, settings_manager: SettingsManagerProtocol, cache_dir: str | None = None) -> None:
         """Initialize ROM cache with robust error handling.
 
         Args:
-            settings_manager: Optional injected SettingsManagerProtocol instance.
+            settings_manager: Required SettingsManagerProtocol instance for cache settings.
             cache_dir: Optional custom cache directory. If None, uses settings or default.
         """
         self._hash_cache: dict[str, str] = {}
@@ -43,27 +43,22 @@ class ROMCache:
         self.settings_manager = settings_manager
 
         # Check if caching is enabled in settings
-        if self.settings_manager:
-            self._cache_enabled = self.settings_manager.get_cache_enabled()
-            if not self._cache_enabled:
-                logger.info("ROM caching is disabled in settings")
-                self.cache_dir = self._resolve_cache_dir()  # Still set for compatibility
-                return
-        else:
-            self._cache_enabled = True  # Default to enabled if no settings
+        self._cache_enabled = self.settings_manager.get_cache_enabled()
+        if not self._cache_enabled:
+            logger.info("ROM caching is disabled in settings")
+            self.cache_dir = self._resolve_cache_dir()  # Still set for compatibility
+            return
 
         # Determine cache directory
         if cache_dir:
             self.cache_dir = Path(cache_dir)
-        elif self.settings_manager:
+        else:
             # Check for custom cache location in settings
             custom_location = self.settings_manager.get_cache_location()
             if custom_location:
                 self.cache_dir = Path(custom_location)
             else:
                 self.cache_dir = self._resolve_cache_dir()
-        else:
-            self.cache_dir = self._resolve_cache_dir()
 
         # Create cache directory if it doesn't exist, with error handling
         if self._cache_enabled:
@@ -226,10 +221,7 @@ class ROMCache:
 
         try:
             # Get expiration days from settings
-            if self.settings_manager:
-                expiration_days = self.settings_manager.get_cache_expiration_days()
-            else:
-                expiration_days = 30  # Default fallback
+            expiration_days = self.settings_manager.get_cache_expiration_days()
 
             max_age = expiration_days * 24 * 3600  # Convert days to seconds
 
@@ -1180,10 +1172,6 @@ class ROMCache:
 
     def refresh_settings(self) -> None:
         """Refresh cache settings from settings manager."""
-        if not self.settings_manager:
-            logger.warning("No settings manager available for cache refresh.")
-            return
-
         # Update cache enabled state
         old_enabled = self._cache_enabled
         self._cache_enabled = self.settings_manager.get_cache_enabled()

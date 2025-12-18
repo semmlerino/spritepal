@@ -32,7 +32,10 @@ class TestROMExtractorInit:
 
     def test_init_creates_components(self):
         """Test that initialization creates all required components"""
-        extractor = ROMExtractor()
+        # Use DI to get ROMExtractor (session_managers fixture sets up DI)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
 
         # Verify all components are created
         assert extractor.hal_compressor is not None
@@ -61,8 +64,10 @@ class TestROMExtractor4bppConversion:
 
     @pytest.fixture
     def extractor(self):
-        """Create ROM extractor for testing"""
-        return ROMExtractor()
+        """Create ROM extractor for testing via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        return inject(ROMExtractorProtocol)
 
     def test_get_4bpp_pixel_basic(self, extractor):
         """Test basic 4bpp pixel extraction"""
@@ -195,8 +200,10 @@ class TestROMExtractorSpriteLocations:
 
     @pytest.fixture
     def mock_extractor(self):
-        """Create ROM extractor with mocked dependencies"""
-        extractor = ROMExtractor()
+        """Create ROM extractor with mocked dependencies via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
         extractor.rom_injector = Mock()
         return extractor
 
@@ -246,8 +253,10 @@ class TestROMExtractorMainExtraction:
 
     @pytest.fixture
     def mock_extractor(self):
-        """Create ROM extractor with mocked dependencies"""
-        extractor = ROMExtractor()
+        """Create ROM extractor with mocked dependencies via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
 
         # Mock all dependencies
         extractor.rom_injector = Mock()
@@ -468,7 +477,9 @@ class TestROMExtractorIntegration:
 
     def test_4bpp_conversion_integration(self, tmp_path):
         """Test 4bpp conversion with real data and file operations"""
-        extractor = ROMExtractor()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
 
         # Create realistic 4bpp test data (2 tiles)
         tile_data = bytearray(2 * BYTES_PER_TILE)
@@ -507,7 +518,9 @@ class TestROMExtractorIntegration:
 
     def test_error_recovery_file_cleanup(self, tmp_path):
         """Test that failed extractions don't leave partial files"""
-        extractor = ROMExtractor()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
 
         # Mock dependencies to cause error after PNG creation starts
         extractor.rom_injector = Mock()
@@ -529,7 +542,9 @@ class TestROMExtractorIntegration:
 
     def test_large_sprite_processing(self, tmp_path):
         """Test processing of large sprite data"""
-        extractor = ROMExtractor()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
 
         # Create data for 64 tiles (realistic sprite size)
         num_tiles = 64
@@ -549,7 +564,9 @@ class TestROMExtractorIntegration:
 
     def test_boundary_conditions(self, tmp_path):
         """Test boundary conditions and edge cases"""
-        extractor = ROMExtractor()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
 
         # Test with exactly 16 tiles (one full row)
         tile_data = b"\x00" * (16 * BYTES_PER_TILE)

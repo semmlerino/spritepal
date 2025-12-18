@@ -20,6 +20,7 @@ from typing import Any, override
 from PIL import Image
 
 from core.mmap_rom_reader import MemoryMappedROMReader, optimize_rom_operations
+from core.protocols.manager_protocols import ROMCacheProtocol
 from core.rom_extractor import ROMExtractor
 from core.tile_renderer import TileRenderer
 from utils.constants import (
@@ -202,15 +203,25 @@ class OptimizedROMExtractor(ROMExtractor):
     - Optimized palette loading
     """
 
-    def __init__(self, enable_parallel: bool = True, max_workers: int = 4):
+    def __init__(
+        self,
+        rom_cache: ROMCacheProtocol | None = None,
+        enable_parallel: bool = True,
+        max_workers: int = 4
+    ):
         """
         Initialize optimized ROM extractor.
 
         Args:
+            rom_cache: ROM cache for caching scan results. If None, uses DI.
             enable_parallel: Enable parallel extraction for multiple sprites
             max_workers: Maximum worker threads for parallel extraction
         """
-        super().__init__()
+        # Get rom_cache from DI if not provided
+        if rom_cache is None:
+            from core.di_container import inject
+            rom_cache = inject(ROMCacheProtocol)
+        super().__init__(rom_cache)
         self.enable_parallel = enable_parallel
         self.max_workers = max_workers
         self._rom_readers: dict[str, MemoryMappedROMReader] = {}

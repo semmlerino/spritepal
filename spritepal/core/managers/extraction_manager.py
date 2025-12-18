@@ -98,8 +98,11 @@ class ExtractionManager(BaseManager):
     def _initialize(self) -> None:
         """Initialize extraction components and services"""
         # Initialize extractors (kept for backward compatibility and direct access)
+        # ROMExtractor via DI (has required rom_cache dependency)
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
         self._sprite_extractor = SpriteExtractor()
-        self._rom_extractor = ROMExtractor()
+        self._rom_extractor = inject(ROMExtractorProtocol)
         self._palette_manager = PaletteManager()
 
         # Initialize services with shared components

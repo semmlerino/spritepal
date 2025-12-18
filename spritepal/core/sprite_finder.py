@@ -60,7 +60,10 @@ class SpriteFinder:
     """Finds actual character sprites in ROM files"""
 
     def __init__(self, output_dir: str = "sprite_candidates", region_config: EmptyRegionConfig | None = None) -> None:
-        self.extractor = ROMExtractor()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        
+        self.extractor = inject(ROMExtractorProtocol)
         self.validator = SpriteVisualValidator()
         self.output_dir = output_dir
         self.region_detector = EmptyRegionDetector(region_config)

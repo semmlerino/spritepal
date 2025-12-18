@@ -201,6 +201,7 @@ def configure_container(
     # Register ConfigurationService FIRST - it's needed by other managers
     from core.configuration_service import ConfigurationService
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ConfigurationServiceProtocol,
         SettingsManagerProtocol,
     )
@@ -221,9 +222,7 @@ def configure_container(
         SettingsManagerProtocol,
         lambda: SettingsManager(
             app_name="SpritePal",
-            session_manager=inject(
-                __import__('core.protocols.manager_protocols', fromlist=['ApplicationStateManagerProtocol']).ApplicationStateManagerProtocol
-            )
+            session_manager=inject(ApplicationStateManagerProtocol)
         )
     )
 

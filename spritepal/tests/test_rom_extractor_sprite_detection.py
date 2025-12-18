@@ -30,7 +30,10 @@ def rom_extractor(mock_hal):
     source level (core.hal_compression.HALCompressor), affecting all imports
     including both ROMExtractor and ROMInjector.
     """
-    extractor = ROMExtractor()
+    # Use DI to get ROMExtractor (session_managers fixture sets up DI)
+    from core.di_container import inject
+    from core.protocols.manager_protocols import ROMExtractorProtocol
+    extractor = inject(ROMExtractorProtocol)
     # Mock the rom_injector methods we use in tests
     extractor.rom_injector = Mock()
     return extractor

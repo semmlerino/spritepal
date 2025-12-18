@@ -34,8 +34,10 @@ class TestROMExtractorScanMethods:
 
     @pytest.fixture
     def extractor(self):
-        """Create ROM extractor with mocked dependencies"""
-        extractor = ROMExtractor()
+        """Create ROM extractor with mocked dependencies via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
         extractor.rom_injector = Mock()
         return extractor
 
@@ -171,8 +173,10 @@ class TestROMExtractorQualityAssessment:
 
     @pytest.fixture
     def extractor(self):
-        """Create ROM extractor for testing"""
-        return ROMExtractor()
+        """Create ROM extractor for testing via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        return inject(ROMExtractorProtocol)
 
     def test_assess_sprite_quality_perfect_sprite(self, extractor):
         """Test quality assessment with perfect sprite data"""
@@ -309,8 +313,10 @@ class TestROMExtractorValidationMethods:
 
     @pytest.fixture
     def extractor(self):
-        """Create ROM extractor for testing"""
-        return ROMExtractor()
+        """Create ROM extractor for testing via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        return inject(ROMExtractorProtocol)
 
     def test_has_4bpp_characteristics_valid(self, extractor):
         """Test 4bpp characteristics check with valid data"""
@@ -445,8 +451,10 @@ class TestROMExtractorFindBestOffsets:
 
     @pytest.fixture
     def extractor(self):
-        """Create ROM extractor with mocked scan method"""
-        extractor = ROMExtractor()
+        """Create ROM extractor with mocked scan method via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMExtractorProtocol
+        extractor = inject(ROMExtractorProtocol)
         extractor.scan_for_sprites = Mock()
         return extractor
 

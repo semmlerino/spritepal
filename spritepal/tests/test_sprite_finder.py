@@ -23,7 +23,8 @@ pytestmark = [
     pytest.mark.no_qt,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
-    pytest.mark.usefixtures("mock_hal"),  # HAL mocking for compression
+    pytest.mark.usefixtures("mock_hal", "session_managers"),  # HAL mocking + DI initialization
+    pytest.mark.shared_state_safe,  # Required when using session_managers
 ]
 
 @pytest.fixture
@@ -135,14 +136,15 @@ class TestSpriteFinder:
 
     def test_init(self, temp_output_dir):
         """Test sprite finder initialization"""
-        with patch("core.sprite_finder.ROMExtractor") as mock_ext_class, \
+        mock_extractor = Mock()
+        with patch("core.di_container.inject", return_value=mock_extractor) as mock_inject, \
              patch("core.sprite_finder.SpriteVisualValidator") as mock_val_class:
 
             finder = SpriteFinder(temp_output_dir)
 
             assert finder.output_dir == temp_output_dir
             assert Path(temp_output_dir).exists()
-            mock_ext_class.assert_called_once()
+            mock_inject.assert_called_once()  # DI inject called for ROMExtractor
             mock_val_class.assert_called_once()
 
 
@@ -250,8 +252,8 @@ class TestSpriteFinder:
             assert len(candidates) <= 3
 
     def test_convert_to_png(self, temp_output_dir, mock_extractor):
-        """Test PNG conversion method"""
-        with patch("core.sprite_finder.ROMExtractor", return_value=mock_extractor):
+        """Test PNG conversion method - verifies delegation to extractor"""
+        with patch("core.di_container.inject", return_value=mock_extractor):
             finder = SpriteFinder(temp_output_dir)
 
             tile_data = b"\x00" * 512

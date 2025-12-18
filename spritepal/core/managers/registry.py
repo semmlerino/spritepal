@@ -106,12 +106,15 @@ class ManagerRegistry:
         # Thread-safe initialization check to prevent race between __new__ and __init__
         with self._lock:
             # Only initialize once
-            if hasattr(self, "_initialized"):
+            if hasattr(self, "_init_done"):
                 return
 
             self._logger = get_logger("ManagerRegistry")
-            self._managers: dict[str, Any] = {}
-            self._initialized = True
+            # Track protocols in initialization order for proper cleanup sequencing
+            # DI container is the single source of truth for manager instances
+            self._lifecycle_order: list[type] = []
+            self._init_done = True
+            self._managers_initialized = False
 
             # Register cleanup with QApplication if available
             self._register_cleanup_hooks()
@@ -235,11 +238,7 @@ class ManagerRegistry:
                 # ApplicationStateManager handles session, settings, state, and history
                 self._logger.debug("Creating ApplicationStateManager...")
                 state_manager = ApplicationStateManager(app_name, settings_path, parent=qt_parent)
-                self._managers["state"] = state_manager
                 created_managers.append("state")
-
-                # ApplicationStateManager IS the session manager (consolidated)
-                self._managers["session"] = state_manager
                 self._logger.debug("ApplicationStateManager created successfully")
 
                 # Register ApplicationStateManagerProtocol immediately - other managers depend on it via DI
@@ -247,57 +246,59 @@ class ManagerRegistry:
                 from core.di_container import register_singleton
                 from core.protocols.manager_protocols import (
                     ApplicationStateManagerProtocol,
+                    ExtractionManagerProtocol,
+                    InjectionManagerProtocol,
                 )
                 register_singleton(ApplicationStateManagerProtocol, state_manager)
+                self._lifecycle_order.append(ApplicationStateManagerProtocol)
                 self._logger.debug("ApplicationStateManagerProtocol registered for downstream dependencies")
 
                 # CoreOperationsManager handles extraction and injection operations
                 self._logger.debug("Creating CoreOperationsManager...")
                 core_manager = CoreOperationsManager(parent=qt_parent)
-                self._managers["core_operations"] = core_manager
                 created_managers.append("core_operations")
-
-                # CoreOperationsManager IS both extraction and injection manager (consolidated)
-                self._managers["extraction"] = core_manager
-                self._managers["injection"] = core_manager
                 self._logger.debug("CoreOperationsManager created successfully")
 
                 # MonitoringManager for performance and health monitoring
                 self._logger.debug("Creating MonitoringManager...")
                 monitoring_manager = MonitoringManager(parent=qt_parent)
-                self._managers["monitoring"] = monitoring_manager
                 created_managers.append("monitoring")
                 self._logger.debug("MonitoringManager created successfully")
 
-                # Register existing managers for automatic monitoring
-                if "extraction" in self._managers:
-                    monitoring_manager.register_manager_monitoring(self._managers["extraction"])
-                if "injection" in self._managers:
-                    monitoring_manager.register_manager_monitoring(self._managers["injection"])
-                if "session" in self._managers:
-                    monitoring_manager.register_manager_monitoring(self._managers["session"])
+                # Register managers for automatic monitoring
+                monitoring_manager.register_manager_monitoring(core_manager)
+                monitoring_manager.register_manager_monitoring(state_manager)
 
                 # Register CoreOperationsManager with DI container
-                # (SessionManager and ApplicationStateManager already registered above)
+                # Registered under both ExtractionManagerProtocol and InjectionManagerProtocol
                 from core.di_container import register_managers
                 register_managers(core_operations_manager=core_manager)
+                self._lifecycle_order.append(ExtractionManagerProtocol)
+                self._lifecycle_order.append(InjectionManagerProtocol)
                 self._logger.debug("All manager protocols registered with DI container")
 
+                # Mark as initialized
+                self._managers_initialized = True
                 self._logger.info("All managers initialized successfully")
 
             except Exception as e:
                 self._logger.exception(f"Manager initialization failed: {e}")
 
-                # Cleanup any managers that were created before the failure
-                for manager_name in created_managers:
+                # Cleanup any protocols that were registered before the failure
+                from core.di_container import get_container
+                container = get_container()
+                for protocol in self._lifecycle_order:
                     try:
-                        if manager_name in self._managers:
-                            manager = self._managers[manager_name]
+                        manager = container.get_optional(protocol)
+                        if manager is not None:
                             manager.cleanup()
-                            del self._managers[manager_name]
-                            self._logger.debug(f"Cleaned up {manager_name} manager after initialization failure")
+                            container.unregister(protocol)
+                            self._logger.debug(f"Cleaned up {protocol.__name__} after initialization failure")
                     except Exception as cleanup_error:
-                        self._logger.exception(f"Error cleaning up {manager_name} manager: {cleanup_error}")
+                        self._logger.exception(f"Error cleaning up {protocol.__name__}: {cleanup_error}")
+
+                self._lifecycle_order.clear()
+                self._managers_initialized = False
 
                 # Re-raise as ManagerError
                 raise ManagerError(f"Failed to initialize managers: {e}") from e
@@ -308,20 +309,24 @@ class ManagerRegistry:
         with self._lock:
             safe_info(self._logger, "Cleaning up managers...")
 
-            # Cleanup in reverse order
-            for name in reversed(list(self._managers.keys())):
-                try:
-                    manager = self._managers[name]
-                    manager.cleanup()
-                    safe_debug(self._logger, f"Cleaned up {name} manager")
-                except Exception:
-                    safe_warning(self._logger, f"Error cleaning up {name} manager", exc_info=True)
+            # Cleanup in reverse order via lifecycle tracking
+            from core.di_container import get_container, reset_container
+            container = get_container()
 
-            self._managers.clear()
+            for protocol in reversed(self._lifecycle_order):
+                try:
+                    manager = container.get_optional(protocol)
+                    if manager is not None:
+                        manager.cleanup()
+                        safe_debug(self._logger, f"Cleaned up {protocol.__name__}")
+                except Exception:
+                    safe_warning(self._logger, f"Error cleaning up {protocol.__name__}", exc_info=True)
+
+            self._lifecycle_order.clear()
+            self._managers_initialized = False
 
             # Clear DI container registrations so managers can't be retrieved after cleanup
             try:
-                from core.di_container import reset_container
                 reset_container()
                 safe_debug(self._logger, "Cleared DI container registrations")
             except Exception as e:
@@ -417,7 +422,8 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
-        return self._get_manager("core_operations", CoreOperationsManager)
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
+        return self._get_manager_by_protocol(ExtractionManagerProtocol, CoreOperationsManager)
 
     def get_application_state_manager(self):
         """
@@ -429,26 +435,30 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
-        return self._get_manager("state", ApplicationStateManager)
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        return self._get_manager_by_protocol(ApplicationStateManagerProtocol, ApplicationStateManager)
 
     def get_monitoring_manager(self):
         """
-        Get the monitoring manager instance
+        Get the monitoring manager instance.
 
-        Returns:
-            MonitoringManager instance
+        Note: MonitoringManager is not registered with a protocol in DI container,
+        so this method is not supported. Use inject() for protocol-based access.
 
         Raises:
-            ManagerError: If manager not initialized
+            ManagerError: Always - MonitoringManager has no protocol registration
         """
-        return self._get_manager("monitoring", MonitoringManager)
+        raise ManagerError(
+            "MonitoringManager is not accessible via protocol. "
+            "It is only used internally for manager monitoring."
+        )
 
-    def _get_manager(self, name: str, expected_type: type) -> Any:
+    def _get_manager_by_protocol(self, protocol: type, expected_type: type) -> Any:
         """
-        Get a manager by name with type checking and dependency validation
+        Get a manager by protocol with type checking and dependency validation
 
         Args:
-            name: Manager name
+            protocol: Protocol type to retrieve from DI container
             expected_type: Expected manager type
 
         Returns:
@@ -458,13 +468,16 @@ class ManagerRegistry:
             ManagerError: If manager not found, wrong type, or not properly initialized
         """
         with self._lock:
-            if name not in self._managers:
+            from core.di_container import get_container
+            container = get_container()
+
+            manager = container.get_optional(protocol)
+            if manager is None:
                 raise ManagerError(
-                    f"{name.capitalize()} manager not initialized. "
+                    f"{protocol.__name__} not initialized. "
                     "Call initialize_managers() first."
                 )
 
-            manager = self._managers[name]
             if not isinstance(manager, expected_type):
                 raise ManagerError(
                     f"Manager type mismatch: expected {expected_type.__name__}, "
@@ -474,7 +487,7 @@ class ManagerRegistry:
             # Validate that the manager is properly initialized
             if not manager.is_initialized():
                 raise ManagerError(
-                    f"{name.capitalize()} manager found but not properly initialized. "
+                    f"{protocol.__name__} found but not properly initialized. "
                     "This may indicate a partial initialization failure."
                 )
 
@@ -482,15 +495,7 @@ class ManagerRegistry:
 
     def is_initialized(self) -> bool:
         """Check if managers are initialized"""
-        # Check that all expected managers are present AND initialized
-        # Note: NavigationManager excluded - see initialize_managers() for re-enable instructions
-        expected_managers = {"session", "extraction", "injection"}
-        if not expected_managers.issubset(self._managers.keys()):
-            return False
-        return all(
-            self._managers[name].is_initialized()
-            for name in expected_managers
-        )
+        return self._managers_initialized
 
     @classmethod
     def is_clean(cls) -> bool:
@@ -506,7 +511,14 @@ class ManagerRegistry:
 
     def get_all_managers(self) -> dict[str, Any]:
         """Get all registered managers (for testing/debugging)"""
-        return self._managers.copy()
+        from core.di_container import get_container
+        container = get_container()
+        result: dict[str, Any] = {}
+        for protocol in self._lifecycle_order:
+            manager = container.get_optional(protocol)
+            if manager is not None:
+                result[protocol.__name__] = manager
+        return result
 
     def validate_manager_dependencies(self) -> bool:
         """
@@ -525,18 +537,16 @@ class ManagerRegistry:
         self._logger.debug("Validating manager dependencies...")
 
         try:
+            from core.di_container import get_container
+            container = get_container()
+
             # Validate that all managers are individually initialized
-            for name, manager in self._managers.items():
+            for protocol in self._lifecycle_order:
+                manager = container.get_optional(protocol)
+                if manager is None:
+                    raise ManagerError(f"{protocol.__name__} not registered")
                 if not manager.is_initialized():
-                    raise ManagerError(f"{name} manager not properly initialized")
-
-            # Validate specific dependency relationships
-            # InjectionManager depends on SessionManager
-            injection_manager = self._managers.get("injection")
-            session_manager = self._managers.get("session")
-
-            if injection_manager and not session_manager:
-                raise ManagerError("InjectionManager requires SessionManager but it's not available")
+                    raise ManagerError(f"{protocol.__name__} not properly initialized")
 
             self._logger.debug("All manager dependencies validated successfully")
             return True

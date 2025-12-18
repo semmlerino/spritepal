@@ -76,13 +76,17 @@ class ROMService(QObject):
         Initialize the ROM service.
 
         Args:
-            rom_extractor: Optional ROMExtractor instance (created if not provided)
+            rom_extractor: Optional ROMExtractor instance (uses DI if not provided)
             palette_manager: Optional PaletteManager instance (created if not provided)
             parent: Qt parent object
         """
         super().__init__(parent)
         self._logger = get_logger(f"services.{self.__class__.__name__}")
-        self._rom_extractor = rom_extractor or ROMExtractor()
+        if rom_extractor is None:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMExtractorProtocol
+            rom_extractor = inject(ROMExtractorProtocol)
+        self._rom_extractor = rom_extractor
         self._palette_manager = palette_manager or PaletteManager()
         self._logger.info("ROMService initialized")
 

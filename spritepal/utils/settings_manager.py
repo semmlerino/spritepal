@@ -17,15 +17,15 @@ if TYPE_CHECKING:
 class SettingsManager:
     """Manages application settings and session persistence"""
 
-    def __init__(self, app_name: str = "SpritePal", session_manager: ApplicationStateManagerProtocol | None = None) -> None:
+    def __init__(self, app_name: str, session_manager: ApplicationStateManagerProtocol) -> None:
+        """Initialize SettingsManager with required dependencies.
+
+        Args:
+            app_name: Application name for settings identification.
+            session_manager: Required session manager for settings persistence.
+        """
         self.app_name: str = app_name
-        if session_manager is None:
-            # Fallback to DI container
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-            self._session_manager = inject(ApplicationStateManagerProtocol)
-        else:
-            self._session_manager = session_manager
+        self._session_manager = session_manager
         # Initialize default settings if not present
         self._ensure_default_settings()
 

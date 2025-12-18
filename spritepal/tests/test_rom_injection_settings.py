@@ -69,7 +69,7 @@ class TestROMInjectionSettingsPersistence:
         real_session_manager = SessionManager(settings_path=Path(temp_settings_file))
 
         # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
-        manager = SettingsManager(session_manager=real_session_manager)
+        manager = SettingsManager("SpritePal", session_manager=real_session_manager)
 
         # Add _settings property for test compatibility
         def get_settings():
