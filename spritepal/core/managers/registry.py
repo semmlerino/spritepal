@@ -116,18 +116,14 @@ class ManagerRegistry:
             self._init_done = True
             self._managers_initialized = False
 
-            # Register cleanup with QApplication if available
-            self._register_cleanup_hooks()
-
             self._logger.info("ManagerRegistry initialized")
 
-    def _register_cleanup_hooks(self) -> None:
-        """Register cleanup hooks with Qt application - delayed until Qt is available"""
-        # Don't try to register hooks immediately - wait until Qt is actually available
-        pass
-
     def _try_register_cleanup_hooks(self) -> None:
-        """Actually register cleanup hooks when Qt is available"""
+        """Register cleanup hooks with QApplication if available.
+
+        Called during initialize_managers() when a QApplication exists.
+        Falls back to atexit handler (module-level) if Qt is unavailable.
+        """
         # Thread-safe check-then-act to prevent duplicate cleanup registration
         with ManagerRegistry._lock:
             if ManagerRegistry._cleanup_registered:

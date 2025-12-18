@@ -230,3 +230,10 @@ MAX_TILE_COUNT_DEFAULT = 8192      # Default maximum tile count validation
 # These are used by core/ layer and should not depend on ui/
 SLEEP_WORKER = 0.1                 # 100ms sleep for worker threads
 SLEEP_BATCH = 0.05                 # 50ms sleep for batch processing
+
+# Preview cache configuration
+PREVIEW_CACHE_DEFAULT_MAX_ITEMS = 50          # Maximum items in preview cache
+PREVIEW_CACHE_DEFAULT_MAX_MB = 32             # Maximum cache size in MB
+PREVIEW_CACHE_MIN_MB = 8                      # Minimum cache size in MB
+PREVIEW_CACHE_MAX_MB = 256                    # Maximum cache size in MB
+PREVIEW_CACHE_STATS_LOG_INTERVAL = 60.0       # Seconds between stats logs

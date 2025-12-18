@@ -249,3 +249,82 @@ class TestManagerRegistry:
             for i, (session, extraction) in enumerate(results[1:], 1):
                 assert session is first_session, f"Result {i} session differs"
                 assert extraction is first_extraction, f"Result {i} extraction differs"
+
+    def test_qt_cleanup_registration_with_qapplication(self, qtbot):
+        """Test that cleanup hooks are registered when QApplication is available."""
+        from unittest.mock import MagicMock, patch
+
+        from PySide6.QtWidgets import QApplication
+
+        from tests.fixtures.core_fixtures import is_session_managers_active
+
+        if is_session_managers_active():
+            pytest.skip("Cannot test cleanup registration while session_managers is active")
+
+        # Ensure we have a QApplication (qtbot provides one)
+        app = QApplication.instance()
+        assert app is not None
+
+        # Reset cleanup flag to test registration
+        ManagerRegistry._cleanup_registered = False
+
+        # Initialize managers - should register with aboutToQuit
+        initialize_managers()
+
+        # Verify cleanup was registered
+        assert ManagerRegistry._cleanup_registered
+
+    def test_atexit_cleanup_fallback(self):
+        """Test that atexit cleanup works when QApplication is not available."""
+        from unittest.mock import patch
+
+        from core.managers.registry import _cleanup_global_registry
+        from tests.fixtures.core_fixtures import is_session_managers_active
+
+        if is_session_managers_active():
+            pytest.skip("Cannot test atexit fallback while session_managers is active")
+
+        # Reset state
+        ManagerRegistry._cleanup_registered = False
+
+        # Mock QApplication.instance() to return None
+        with patch("core.managers.registry.QApplication") as mock_qapp:
+            mock_qapp.instance.return_value = None
+
+            # Initialize managers without Qt
+            initialize_managers()
+
+            # Verify Qt cleanup was NOT registered (no app)
+            assert not ManagerRegistry._cleanup_registered
+
+        # Verify managers are initialized
+        assert are_managers_initialized()
+
+        # Call atexit handler directly
+        _cleanup_global_registry()
+
+        # Verify cleanup happened
+        assert not are_managers_initialized()
+
+    def test_cleanup_managers_idempotent(self):
+        """Test that calling cleanup_managers multiple times is safe."""
+        from tests.fixtures.core_fixtures import is_session_managers_active
+
+        if is_session_managers_active():
+            pytest.skip("Cannot test idempotent cleanup while session_managers is active")
+
+        # Initialize first
+        initialize_managers()
+        assert are_managers_initialized()
+
+        # First cleanup
+        cleanup_managers()
+        assert not are_managers_initialized()
+
+        # Second cleanup should not raise
+        cleanup_managers()  # Should be a no-op
+        assert not are_managers_initialized()
+
+        # Third cleanup also safe
+        cleanup_managers()
+        assert not are_managers_initialized()

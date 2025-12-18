@@ -169,6 +169,108 @@ class TestLRUCache:
         for i in range(3):
             assert cache.get(f"key_{i}") is None
 
+    def test_cache_byte_size_tracking(self):
+        """Test that cache tracks byte size correctly."""
+        cache = LRUCache(max_size=100, max_bytes=1024 * 1024)  # 1MB limit
+
+        pixmap = ThreadSafeTestImage(64, 64)  # 64*64*4 = 16KB
+        pil_image = Image.new("RGB", (64, 64))  # 64*64*3 = 12KB
+        result = PreviewResult(
+            pixmap=pixmap,
+            pil_image=pil_image,
+            tile_count=16,
+            sprite_name="test",
+            generation_time=0.1
+        )
+
+        cache.put("key1", result)
+        stats = cache.get_stats()
+
+        # Verify byte tracking
+        assert stats["current_bytes"] > 0
+        expected_size = result.byte_size()
+        assert stats["current_bytes"] == expected_size
+
+    def test_cache_byte_limit_eviction(self):
+        """Test that cache evicts when byte limit is reached."""
+        # Small byte limit to trigger eviction (~30KB limit)
+        cache = LRUCache(max_size=100, max_bytes=30 * 1024)
+
+        # Each result is ~28KB (64*64*4 + 64*64*3 + 100)
+        results = []
+        for i in range(3):
+            pixmap = ThreadSafeTestImage(64, 64)
+            pil_image = Image.new("RGB", (64, 64))
+            result = PreviewResult(
+                pixmap=pixmap,
+                pil_image=pil_image,
+                tile_count=16,
+                sprite_name=f"sprite_{i}",
+                generation_time=0.1
+            )
+            results.append(result)
+
+        # First item fits
+        cache.put("key1", results[0])
+        assert cache.get("key1") is not None
+
+        # Second item should trigger eviction of first
+        cache.put("key2", results[1])
+
+        stats = cache.get_stats()
+        # Cache should stay under byte limit
+        assert stats["current_bytes"] <= 30 * 1024
+        # First item should be evicted
+        assert stats["evictions_byte_limit"] > 0
+
+    def test_preview_result_byte_size(self):
+        """Test PreviewResult byte_size calculation."""
+        pixmap = ThreadSafeTestImage(128, 128)  # 128*128*4 = 65536 bytes
+        pil_image = Image.new("RGBA", (128, 128))  # 128*128*4 = 65536 bytes
+
+        result = PreviewResult(
+            pixmap=pixmap,
+            pil_image=pil_image,
+            tile_count=256,
+            sprite_name="test",
+            generation_time=0.1
+        )
+
+        size = result.byte_size()
+
+        # Expected: 65536 (pixmap) + 65536 (pil) + 100 (metadata) = ~131KB
+        assert size >= 130000
+        assert size <= 135000
+
+    def test_cache_stats_include_byte_info(self):
+        """Test that cache stats include byte size information."""
+        cache = LRUCache(max_size=10, max_bytes=1024 * 1024)
+
+        stats = cache.get_stats()
+
+        # New fields should be present
+        assert "current_bytes" in stats
+        assert "max_bytes" in stats
+        assert "current_mb" in stats
+        assert "max_mb" in stats
+        assert stats["current_bytes"] == 0
+        assert stats["max_bytes"] == 1024 * 1024
+
+    def test_cache_clear_resets_bytes(self):
+        """Test that clearing cache resets byte tracking."""
+        cache = LRUCache(max_size=10, max_bytes=1024 * 1024)
+
+        pixmap = ThreadSafeTestImage(64, 64)
+        pil_image = Image.new("RGB", (64, 64))
+        result = PreviewResult(pixmap, pil_image, 16, "test", 0.1)
+
+        cache.put("key1", result)
+        assert cache.get_stats()["current_bytes"] > 0
+
+        cache.clear()
+        assert cache.get_stats()["current_bytes"] == 0
+
+
 class TestPreviewRequest:
     """Test preview request functionality."""
 
@@ -432,8 +534,10 @@ class TestPreviewGenerator:
 
     def test_cleanup(self, generator):
         """Test cleanup functionality."""
-        # Add some cached items
-        generator._cache.put("test_key", Mock())
+        # Add some cached items (mock must have byte_size method for cache)
+        mock_result = Mock()
+        mock_result.byte_size.return_value = 1024
+        generator._cache.put("test_key", mock_result)
         assert len(generator._cache._cache) > 0
 
         # Set a pending request
