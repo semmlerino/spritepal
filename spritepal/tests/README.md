@@ -147,6 +147,18 @@ uv run pytest tests/ --memray
 ```
 
 ### Migration Tools
+
+**Preferred approach (ripgrep-based):**
+```bash
+# Find tests using deprecated patterns (replaces migration_helpers.py)
+rg "manager_context|real_factory" tests/
+
+# Check for anti-patterns (replaces check_test_patterns.py)
+rg "time\.sleep" tests/ --type py
+rg "QPixmap" tests/ --type py | grep -v "ThreadSafeTestImage"
+```
+
+**Legacy CLI tools** (still available but prefer ripgrep commands above):
 ```bash
 # Analyze mock usage in test files
 python -m tests.infrastructure.migration_helpers analyze tests/test_controller.py

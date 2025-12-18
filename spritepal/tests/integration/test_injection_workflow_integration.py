@@ -149,8 +149,8 @@ class TestInjectionManagerInitialization:
         """Test that InjectionManager initializes correctly."""
         assert injection_manager is not None
         assert injection_manager.is_initialized()
-        # Registry returns InjectionAdapter (extends InjectionManager)
-        assert injection_manager.get_name() == "InjectionAdapter"
+        # Registry returns CoreOperationsManager (consolidated manager)
+        assert injection_manager.get_name() == "CoreOperationsManager"
 
     def test_manager_initial_state(self, injection_manager):
         """Test initial state after initialization."""

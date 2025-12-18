@@ -82,8 +82,8 @@ def test_rom_with_sprites(tmp_path, test_rom_data, real_kirby_rom):
     Tests that require HAL decompression should check `if not rom_info['sprites']`
     and skip appropriately.
 
-    For tests that MUST have real sprites, use @pytest.mark.requires_real_rom
-    and the test_rom_with_real_sprites fixture instead.
+    For tests that MUST have real sprites, use the test_rom_with_real_sprites
+    fixture instead (it calls pytest.skip() automatically if ROM unavailable).
     """
     rom_path = tmp_path / "test_rom.sfc"
 
@@ -126,8 +126,8 @@ def test_rom_with_sprites(tmp_path, test_rom_data, real_kirby_rom):
 def real_kirby_rom():
     """Provide path to real Kirby ROM if available for integration testing.
 
-    Returns None if ROM not available. Tests using this MUST handle None case.
-    Use @pytest.mark.requires_real_rom to skip tests when ROM unavailable.
+    Returns None if ROM not available. Tests using this MUST handle None case
+    by calling pytest.skip() or using test_rom_with_real_sprites fixture.
     """
     # ROM is in parent directory (exhal-master/)
     rom_path = Path("../Kirby Super Star (USA).sfc")
@@ -138,10 +138,10 @@ def real_kirby_rom():
 
 @pytest.fixture
 def test_rom_with_real_sprites(tmp_path, real_kirby_rom):
-    """Create a test ROM using REAL Kirby ROM data (requires_real_rom marker).
+    """Create a test ROM using REAL Kirby ROM data.
 
-    Use this fixture with @pytest.mark.requires_real_rom for tests that
-    specifically need real compressed sprite data.
+    Use this fixture for tests that specifically need real compressed sprite data.
+    The fixture calls pytest.skip() automatically if the ROM is unavailable.
     """
     if real_kirby_rom is None:
         pytest.skip("Real Kirby ROM required but not available")

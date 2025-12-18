@@ -464,15 +464,11 @@ markers = [
     "shared_state_safe: Test verified safe with session_managers",
     "allows_registry_state: Allow registry state without manager fixtures",
     "skip_thread_cleanup: Skip thread cleanup (requires reason)",
-    "skip_qpixmap_guard: Skip QPixmap threading guard",
-    "skip_hal_reset: Skip HAL singleton reset",
-    "skip_session_reset: Skip session manager state reset",
     "no_hal: Skip HAL-related fixtures",
 
     # Resource markers
     "real_hal: Use real HAL components (requires exhal binary)",
     "requires_rom: Tests that require ROM file data",
-    "requires_real_rom: Tests requiring actual Kirby ROM",
     "rom_data: Tests involving ROM data processing",
     "file_io: Tests involving file I/O operations",
     "cache: Tests that interact with the cache",

@@ -97,58 +97,34 @@ class ExtractionManagerProtocol(Protocol):
 class InjectionManagerProtocol(Protocol):
     """Protocol for injection manager."""
 
-    def inject_to_rom(
-        self,
-        rom_path: Path,
-        sprites: list[Any],
-        offset: int | None = None
-    ) -> bool:
+    def start_injection(self, params: dict[str, Any]) -> bool:
         """
-        Inject sprites into ROM.
+        Start injection process with given parameters.
 
         Args:
-            rom_path: Path to ROM file
-            sprites: List of sprites to inject
-            offset: Optional target offset
+            params: Dictionary of injection parameters
 
         Returns:
-            True if successful
+            True if injection started successfully
         """
         ...
 
-    def validate_injection(
-        self,
-        rom_path: Path,
-        sprites: list[Any]
-    ) -> bool:
+    def validate_injection_params(self, params: dict[str, Any]) -> None:
         """
-        Validate if injection is feasible.
+        Validate injection parameters.
 
         Args:
-            rom_path: Path to ROM file
-            sprites: Sprites to inject
+            params: Parameters to validate
 
-        Returns:
-            True if injection is valid
-        """
-        ...
-
-    def get_free_space(self, rom_path: Path) -> list[tuple[int, int]]:
-        """
-        Find free space regions in ROM.
-
-        Args:
-            rom_path: Path to ROM file
-
-        Returns:
-            List of (offset, size) tuples for free regions
+        Raises:
+            ValidationError: If parameters are invalid
         """
         ...
 
     def get_smart_vram_suggestion(
         self,
         sprite_path: str,
-        metadata_path: str
+        metadata_path: str = ""
     ) -> str:
         """
         Get smart VRAM file suggestion for injection.
@@ -162,15 +138,36 @@ class InjectionManagerProtocol(Protocol):
         """
         ...
 
-    def start_injection(self, params: dict[str, Any]) -> bool:
+    def is_injection_active(self) -> bool:
         """
-        Start injection process with given parameters.
-
-        Args:
-            params: Dictionary of injection parameters
+        Check if injection is currently active.
 
         Returns:
-            True if injection started successfully
+            True if injection is running
+        """
+        ...
+
+    def load_metadata(self, metadata_path: str) -> dict[str, Any] | None:
+        """
+        Load and parse metadata file.
+
+        Args:
+            metadata_path: Path to metadata JSON file
+
+        Returns:
+            Parsed metadata dict or None if loading fails
+        """
+        ...
+
+    def load_rom_info(self, rom_path: str) -> dict[str, Any] | None:
+        """
+        Load ROM information and sprite locations.
+
+        Args:
+            rom_path: Path to ROM file
+
+        Returns:
+            Dict with header, sprite_locations, etc., or None on failure
         """
         ...
 

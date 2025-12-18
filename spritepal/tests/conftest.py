@@ -120,27 +120,15 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "shared_state_ok: Allow test to inherit session manager state without triggering pollution detection"
-    )
-    config.addinivalue_line(
-        "markers",
         "shared_state_safe: Mark test as verified safe for use with session_managers (required for session_managers usage)"
     )
     config.addinivalue_line(
         "markers",
-        "skip_qpixmap_guard: Skip QPixmap threading guard for tests with special QPixmap needs"
+        "no_qt: Skip all Qt-related fixtures (implies skip_thread_cleanup)"
     )
     config.addinivalue_line(
         "markers",
-        "skip_hal_reset: Skip HAL singleton reset for tests that manage HAL lifecycle manually"
-    )
-    config.addinivalue_line(
-        "markers",
-        "no_qt: Skip all Qt-related fixtures (implies skip_thread_cleanup, skip_qpixmap_guard)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "no_hal: Skip all HAL-related fixtures (implies skip_hal_reset)"
+        "no_hal: Skip all HAL-related fixtures"
     )
     config.addinivalue_line(
         "markers",
@@ -148,23 +136,7 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "requires_real_rom: Test requires real Kirby ROM file (skips if not available)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "skip_session_reset: Skip automatic session manager state reset"
-    )
-    config.addinivalue_line(
-        "markers",
-        "allows_resource_leaks: Allow test to have resource leaks without failure"
-    )
-    config.addinivalue_line(
-        "markers",
         "parallel_unsafe: Force test to run in serial mode under xdist (use when wrapper fixtures hide shared state)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "lenient_reset: Downgrade class fixture reset errors to warnings (for legacy tests during migration)"
     )
 
     # Make implicit RealComponentFactory warnings visible when we add them
@@ -659,8 +631,6 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     # Skip enforcement for tests that opt out
     if item.get_closest_marker("allows_registry_state"):
         return
-    if item.get_closest_marker("shared_state_ok"):
-        return
 
     # Only check tests that didn't use manager fixtures
     fixture_names = set(getattr(item, 'fixturenames', []))
@@ -887,48 +857,10 @@ def mock_manager_registry() -> Generator[Mock, None, None]:
 # ============================================================================
 # Qt Threading Safety Fixtures
 # ============================================================================
-
-@pytest.fixture(autouse=True)
-def guard_qpixmap_threading(request: FixtureRequest):
-    """Verify QPixmap threading guard is active (autouse).
-
-    The actual guard is installed via import hook in pytest_configure
-    (_install_qpixmap_guard_unconditional). This fixture just ensures
-    the guard remains active for Qt tests.
-
-    The import hook approach guarantees the guard is installed even for
-    tests that import Qt late, closing the timing hole in the previous
-    implementation.
-
-    Overhead: Minimal. Early-exits for non-Qt tests (no_qt marker or
-    PySide6.QtGui not imported). The marker check and sys.modules check
-    are O(1) operations.
-
-    Opt-out markers:
-        @pytest.mark.skip_qpixmap_guard - Skip verification
-        @pytest.mark.no_qt - Skip for non-Qt tests
-    """
-    markers = [m.name for m in request.node.iter_markers()]
-
-    # Opt-OUT: Skip if explicitly marked
-    if 'skip_qpixmap_guard' in markers or 'no_qt' in markers:
-        yield
-        return
-
-    # If Qt is imported, verify the guard is installed
-    # The import hook should have installed it when PySide6.QtGui was imported
-    if 'PySide6.QtGui' in sys.modules:
-        try:
-            from PySide6.QtGui import QPixmap
-
-            if not hasattr(QPixmap, '_test_guard_installed'):
-                # Guard not installed - try to install it now
-                # (shouldn't happen with import hook, but provides fallback)
-                _patch_qpixmap_init()
-        except ImportError:
-            pass  # Qt not available
-
-    yield
+# NOTE: QPixmap threading guard is installed via import hook in pytest_configure
+# (_install_qpixmap_guard_unconditional). The import hook guarantees the guard
+# is installed when PySide6.QtGui is imported, removing the need for a separate
+# autouse fixture to verify/fallback.
 
 
 @pytest.fixture(autouse=True)

@@ -274,11 +274,15 @@ def configure_container(
 
 
 def register_managers(
-    extraction_adapter: Any,
-    injection_adapter: Any,
+    core_operations_manager: Any,
 ) -> None:
     """
-    Register extraction and injection manager instances with the DI container.
+    Register CoreOperationsManager with the DI container.
+
+    CoreOperationsManager is the consolidated manager that handles both
+    extraction and injection operations. It is registered under both
+    ExtractionManagerProtocol and InjectionManagerProtocol for backward
+    compatibility with code that injects these protocols.
 
     NOTE: SessionManagerProtocol and ApplicationStateManagerProtocol are registered
     earlier in initialize_managers() because other services depend on them during
@@ -288,19 +292,19 @@ def register_managers(
     1. configure_container() - registers services and factories
     2. ApplicationStateManager created, SessionManagerProtocol registered
     3. CoreOperationsManager created (depends on SessionManager via DI chain)
-    4. register_managers() - registers ExtractionManager, InjectionManager (THIS FUNCTION)
+    4. register_managers() - registers CoreOperationsManager (THIS FUNCTION)
 
     Args:
-        extraction_adapter: ExtractionAdapter instance from CoreOperationsManager
-        injection_adapter: InjectionAdapter instance from CoreOperationsManager
+        core_operations_manager: CoreOperationsManager instance that handles
+            both extraction and injection operations
     """
     from core.protocols.manager_protocols import (
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
     )
 
-    # Register as singletons - these are the actual instances, not factories
-    register_singleton(ExtractionManagerProtocol, extraction_adapter)
-    register_singleton(InjectionManagerProtocol, injection_adapter)
+    # Register same instance under both protocols for backward compatibility
+    register_singleton(ExtractionManagerProtocol, core_operations_manager)
+    register_singleton(InjectionManagerProtocol, core_operations_manager)
 
-    logger.info("Extraction and injection protocols registered with DI container")
+    logger.info("CoreOperationsManager registered with DI container (extraction + injection)")

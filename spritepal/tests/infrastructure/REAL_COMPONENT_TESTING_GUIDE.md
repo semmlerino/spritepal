@@ -190,12 +190,10 @@ def test_full_workflow():
 
 ### Parallel Testing
 
-```python
-with ParallelManagerContext(num_contexts=4) as parallel:
-    with parallel.get_context() as ctx:
-        # Isolated context for parallel test
-        manager = ctx.get_extraction_manager()
-        worker = ctx.create_worker("extraction")
+Parallel testing is handled automatically by pytest-xdist. Use `isolated_managers` fixture for proper isolation:
+
+```bash
+pytest tests/ -n auto  # Uses all available cores
 ```
 
 ## Pytest Fixtures

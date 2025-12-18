@@ -570,15 +570,11 @@ widget.signal.emit.assert_called_once()  # Fails if called multiple times
 - **Strategy**: Use fixtures to reuse components across related tests
 
 #### Parallel Execution
-```python
+```bash
 # Enable parallel test execution
 pytest tests/ -n auto  # Uses all available cores
 
-# Real components support parallelization with proper isolation
-with ParallelManagerContext(num_contexts=4) as parallel:
-    with parallel.get_context() as ctx:
-        # Each parallel test gets isolated context
-        manager = ctx.get_extraction_manager()
+# Real components support parallelization with proper isolation via isolated_managers fixture
 ```
 
 ---

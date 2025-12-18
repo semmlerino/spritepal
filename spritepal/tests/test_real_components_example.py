@@ -12,8 +12,7 @@ from pathlib import Path
 import pytest
 
 # Import actual components for testing
-from core.managers.extraction_manager import ExtractionManager
-from core.managers.injection_manager import InjectionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.workers.specialized import ExtractionWorkerBase as ExtractionWorker
 from tests.infrastructure.manager_test_context import (
     ManagerTestContext,
@@ -54,8 +53,8 @@ class TestRealComponentFactory:
             # Create real manager - no mocking!
             manager = factory.create_extraction_manager(with_test_data=True)
 
-            # Verify it's a real ExtractionManager
-            assert isinstance(manager, ExtractionManager)
+            # Verify it's a real CoreOperationsManager (consolidated manager)
+            assert isinstance(manager, CoreOperationsManager)
             assert manager.is_initialized()
 
             # Test data is automatically injected
@@ -70,16 +69,16 @@ class TestRealComponentFactory:
         # Create manager with compile-time type safety
         manager = extraction_factory.create_with_test_data("medium")
 
-        # manager is typed as ExtractionManager, no cast needed
-        assert isinstance(manager, ExtractionManager)
+        # manager is typed as CoreOperationsManager, no cast needed
+        assert isinstance(manager, CoreOperationsManager)
 
-        # Can access ExtractionManager-specific methods safely
+        # Can access CoreOperationsManager-specific methods safely
         params = {
             "vram_path": "/test/vram.dmp",
             "cgram_path": "/test/cgram.dmp",
             "output_base": "/test/output",
         }
-        # This would fail type checking if manager wasn't ExtractionManager
+        # This would fail type checking if manager wasn't CoreOperationsManager
         is_valid = manager.validate_extraction_params(params)
         assert isinstance(is_valid, bool)
 
@@ -108,9 +107,9 @@ class TestManagerTestContext:
             extraction_mgr = ctx.get_extraction_manager()
             injection_mgr = ctx.get_injection_manager()
 
-            # These are real, initialized managers
-            assert isinstance(extraction_mgr, ExtractionManager)
-            assert isinstance(injection_mgr, InjectionManager)
+            # These are real, initialized managers (both CoreOperationsManager now)
+            assert isinstance(extraction_mgr, CoreOperationsManager)
+            assert isinstance(injection_mgr, CoreOperationsManager)
 
             # They're properly initialized with test data
             assert extraction_mgr.is_initialized()
@@ -162,7 +161,7 @@ class TestTypedWorkerBase:
 
             # Validate manager type - returns typed manager
             validated_manager = validator.validate_manager_type(
-                worker, ExtractionManager
+                worker, CoreOperationsManager
             )
             assert validated_manager is manager
 
@@ -220,7 +219,7 @@ class TestMigrationFromMockFactory:
         # mock_manager = factory.create_extraction_manager()
         #
         # # Unsafe cast required!
-        # manager = cast(ExtractionManager, mock_manager)
+        # manager = cast(CoreOperationsManager, mock_manager)
         #
         # # Mock doesn't behave like real manager
         # assert manager.extract_sprites.called  # Mock attribute
@@ -232,15 +231,15 @@ class TestMigrationFromMockFactory:
             # Create real manager - no mocking, no casting!
             manager = factory.create_extraction_manager()
 
-            # It's a real ExtractionManager
-            assert isinstance(manager, ExtractionManager)
+            # It's a real CoreOperationsManager
+            assert isinstance(manager, CoreOperationsManager)
 
             # Real methods work as expected
             params = factory._data_repo.get_vram_extraction_data("small")
             is_valid = manager.validate_extraction_params(params)
             assert isinstance(is_valid, bool)
 
-    # test_typed_factory_pattern removed - ExtractionManager doesn't have create_worker method
+    # test_typed_factory_pattern removed - CoreOperationsManager doesn't have create_worker method
 
     def test_integration_with_context(self):
         """NEW WAY: Integration testing with real components."""
@@ -275,7 +274,7 @@ def test_context():
 
 @pytest.fixture
 def extraction_manager_real(isolated_managers):
-    """Fixture providing real ExtractionManager."""
+    """Fixture providing real CoreOperationsManager for extraction."""
     factory = create_extraction_manager_factory(manager_registry=isolated_managers)
     manager = factory.create_with_test_data("medium")
     yield manager
@@ -283,8 +282,8 @@ def extraction_manager_real(isolated_managers):
 
 @pytest.fixture
 def injection_manager_real(isolated_managers):
-    """Fixture providing real InjectionManager."""
-    factory = TypedManagerFactory(InjectionManager, manager_registry=isolated_managers)
+    """Fixture providing real CoreOperationsManager for injection."""
+    factory = TypedManagerFactory(CoreOperationsManager, manager_registry=isolated_managers)
     manager = factory.create_with_test_data("medium")
     yield manager
     manager.cleanup()

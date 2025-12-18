@@ -234,8 +234,8 @@ class TestInjectionManagerEdgeCases:
         manager = real_factory.create_injection_manager()
         assert manager is not None
         assert manager.is_initialized()
-        # Registry returns InjectionAdapter (extends InjectionManager)
-        assert manager.get_name() == "InjectionAdapter"
+        # Registry returns CoreOperationsManager (consolidated manager)
+        assert manager.get_name() == "CoreOperationsManager"
 
     def test_load_metadata_nonexistent_file(self, real_factory, tmp_path):
         """Test loading metadata from nonexistent file."""

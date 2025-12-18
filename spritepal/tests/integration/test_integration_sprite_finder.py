@@ -212,6 +212,8 @@ class TestHALCompression:
 
 
 @pytest.mark.integration
+@pytest.mark.usefixtures("session_managers")
+@pytest.mark.shared_state_safe
 class TestROMExtractor:
     """Test ROM extractor with real data."""
 

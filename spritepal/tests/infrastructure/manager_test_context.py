@@ -19,11 +19,10 @@ from typing import Any, TypeVar, cast
 from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QApplication
 
+from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.base_manager import BaseManager
-from core.managers.extraction_manager import ExtractionManager
-from core.managers.injection_manager import InjectionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.registry import ManagerRegistry
-from core.managers.session_manager import SessionManager
 
 from .qt_application_factory import ApplicationFactory
 from .real_component_factory import RealComponentFactory
@@ -158,17 +157,17 @@ class ManagerTestContext:
             )
         return manager
 
-    def get_extraction_manager(self) -> ExtractionManager:
-        """Get the extraction manager with proper typing."""
-        return self.get_typed_manager("extraction", ExtractionManager)
+    def get_extraction_manager(self) -> CoreOperationsManager:
+        """Get the extraction manager (CoreOperationsManager) with proper typing."""
+        return self.get_typed_manager("extraction", CoreOperationsManager)
 
-    def get_injection_manager(self) -> InjectionManager:
-        """Get the injection manager with proper typing."""
-        return self.get_typed_manager("injection", InjectionManager)
+    def get_injection_manager(self) -> CoreOperationsManager:
+        """Get the injection manager (CoreOperationsManager) with proper typing."""
+        return self.get_typed_manager("injection", CoreOperationsManager)
 
-    def get_session_manager(self) -> SessionManager:
-        """Get the session manager with proper typing."""
-        return self.get_typed_manager("session", SessionManager)
+    def get_session_manager(self) -> ApplicationStateManager:
+        """Get the session manager (ApplicationStateManager) with proper typing."""
+        return self.get_typed_manager("session", ApplicationStateManager)
 
     def create_worker(self, manager_type: str, params: dict[str, Any] | None = None) -> QThread:
         """
@@ -335,68 +334,6 @@ def isolated_manager_test() -> Iterator[ManagerTestContext]:
     finally:
         context.cleanup()
 
-class ParallelManagerContext:
-    """
-    Context for running manager tests in parallel.
-
-    Ensures thread safety and isolation between parallel tests.
-    """
-
-    def __init__(self, num_contexts: int = 4):
-        """
-        Initialize parallel manager context.
-
-        Args:
-            num_contexts: Number of parallel contexts to create
-        """
-        self._contexts: list[ManagerTestContext] = []
-        self._num_contexts = num_contexts
-        self._lock = threading.RLock()
-        self._available_contexts: list[ManagerTestContext] = []
-
-    def __enter__(self) -> ParallelManagerContext:
-        """Set up parallel contexts."""
-        for _ in range(self._num_contexts):
-            context = ManagerTestContext(ensure_qt_app=False)
-            self._contexts.append(context)
-            self._available_contexts.append(context)
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Clean up all parallel contexts."""
-        for context in self._contexts:
-            context.cleanup()
-        self._contexts.clear()
-        self._available_contexts.clear()
-
-    @contextlib.contextmanager
-    def get_context(self) -> Iterator[ManagerTestContext]:
-        """
-        Get an available context for parallel testing.
-
-        Yields:
-            Available ManagerTestContext
-        """
-        context = None
-        with self._lock:
-            if self._available_contexts:
-                context = self._available_contexts.pop()
-
-        if context is None:
-            # All contexts in use, create a temporary one
-            context = ManagerTestContext(ensure_qt_app=False)
-            temporary = True
-        else:
-            temporary = False
-
-        try:
-            yield context
-        finally:
-            if temporary:
-                context.cleanup()
-            else:
-                with self._lock:
-                    self._available_contexts.append(context)
 
 # Pytest fixtures (if pytest is available)
 try:

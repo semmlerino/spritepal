@@ -51,7 +51,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from core.managers import ExtractionError, ExtractionManager, ValidationError
+from core.managers import ExtractionError, ValidationError
+from core.managers.core_operations_manager import CoreOperationsManager
 from tests.fixtures.timeouts import signal_timeout, worker_timeout
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
@@ -135,8 +136,8 @@ class TestExtractionManager:
 
         # Verify manager is properly initialized
         assert manager.is_initialized()
-        # Registry returns ExtractionAdapter (extends ExtractionManager)
-        assert manager.get_name() == "ExtractionAdapter"
+        # Registry returns CoreOperationsManager (consolidated manager)
+        assert manager.get_name() == "CoreOperationsManager"
 
         # Verify real dependencies exist (not mocks)
         assert manager._sprite_extractor is not None
@@ -155,10 +156,10 @@ class TestExtractionManager:
             manager = ctx.get_extraction_manager()
 
             # Verify context provides real, initialized manager
-            assert isinstance(manager, ExtractionManager)
+            assert isinstance(manager, CoreOperationsManager)
             assert manager.is_initialized()
-            # Registry returns ExtractionAdapter (extends ExtractionManager)
-            assert manager.get_name() == "ExtractionAdapter"
+            # Registry returns CoreOperationsManager (consolidated manager)
+            assert manager.get_name() == "CoreOperationsManager"
 
             # Context should handle lifecycle automatically
             assert manager._sprite_extractor is not None

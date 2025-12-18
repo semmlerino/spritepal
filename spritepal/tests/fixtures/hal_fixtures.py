@@ -100,13 +100,12 @@ def reset_hal_singletons(request: FixtureRequest) -> Generator[None, None, None]
     HAL marker that triggers this: @pytest.mark.real_hal
 
     Opt-out markers:
-        @pytest.mark.skip_hal_reset - Skip for tests that manage HAL lifecycle manually
         @pytest.mark.no_hal - Skip for non-HAL tests
     """
     markers = [m.name for m in request.node.iter_markers()]
 
     # Opt-OUT: Skip if explicitly marked
-    if 'skip_hal_reset' in markers or 'no_hal' in markers:
+    if 'no_hal' in markers:
         yield
         return
 

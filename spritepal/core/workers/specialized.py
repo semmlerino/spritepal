@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 if TYPE_CHECKING:
     from PIL import Image
 
-    from core.managers import ExtractionManager, InjectionManager
+    from core.managers import ExtractionManager
     from core.managers.factory import ManagerFactory
 
 from PySide6.QtCore import QObject, Signal
@@ -145,12 +145,13 @@ class SignalConnectionHelper:
         self._connections.append(connection)
         logger.debug("Connected preview generation signals")
 
-    def connect_injection_signals(self, injection_manager: InjectionManager) -> None:
+    def connect_injection_signals(self, injection_manager: Any) -> None:
         """
         Connect injection-specific signals.
 
         Args:
-            injection_manager: The injection manager instance
+            injection_manager: The injection manager instance (typed as Any because
+                Qt signals cannot be expressed in Protocol types)
         """
         if not hasattr(self.worker, "injection_finished"):
             return
@@ -162,12 +163,13 @@ class SignalConnectionHelper:
         self._connections.extend([connection1, connection2, connection3])
         logger.debug("Connected injection-specific signals")
 
-    def connect_completion_signals(self, injection_manager: InjectionManager) -> None:
+    def connect_completion_signals(self, injection_manager: Any) -> None:
         """
         Connect injection completion signals to worker operation completion.
 
         Args:
-            injection_manager: The injection manager instance
+            injection_manager: The injection manager instance (typed as Any because
+                Qt signals cannot be expressed in Protocol types)
         """
         def on_injection_finished(success: bool, message: str) -> None:
             """Handle injection completion and emit worker completion signal."""

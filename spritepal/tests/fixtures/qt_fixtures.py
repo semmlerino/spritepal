@@ -484,7 +484,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     # Report leaks
     if leaked:
         leak_mode = request.config.getoption("--leak-mode")
-        allow_leaks = leak_mode == "warn" or "allows_resource_leaks" in markers
+        allow_leaks = leak_mode == "warn"
         test_name = getattr(request.node, 'name', '<unknown>')
         message = _format_leak_message(test_name, leaked)
 

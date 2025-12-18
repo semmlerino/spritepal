@@ -72,12 +72,11 @@ class TestCoreOperationsManagerVRAMExtraction:
             output_base=output_base,
         )
 
-        # Verify result structure
-        assert isinstance(result, dict)
-        assert result.get("success") is True
-        assert "image" in result
-        assert "tile_count" in result
-        assert "output_path" in result
+        # CoreOperationsManager.extract_from_vram returns list[str] of created file paths
+        assert isinstance(result, list)
+        assert len(result) > 0
+        # At least one PNG file should be created
+        assert any(path.endswith(".png") for path in result)
 
     def test_extract_from_vram_creates_output_file(
         self,
@@ -97,10 +96,14 @@ class TestCoreOperationsManagerVRAMExtraction:
             output_base=output_base,
         )
 
-        assert result.get("success") is True
+        # Result is a list of created file paths
+        assert isinstance(result, list)
+        assert len(result) > 0
 
-        # Check output file was created
-        output_path = Path(result["output_path"])
+        # Check that at least one PNG output file was created
+        png_files = [p for p in result if p.endswith(".png")]
+        assert len(png_files) > 0
+        output_path = Path(png_files[0])
         assert output_path.exists()
         assert output_path.suffix == ".png"
 
@@ -123,17 +126,18 @@ class TestCoreOperationsManagerVRAMExtraction:
             vram_offset=0x100,  # Start 256 bytes in
         )
 
-        assert isinstance(result, dict)
-        # May fail if offset is invalid, but should not raise AttributeError
-        # The important thing is that extract_sprite method exists and is called
+        # Result is a list of created file paths
+        assert isinstance(result, list)
+        # May have fewer files if offset makes extraction partial, but should not raise AttributeError
+        # The important thing is that the method completes successfully
 
-    def test_extract_from_vram_optional_params_stored(
+    def test_extract_from_vram_with_cgram_oam(
         self,
         tmp_path: Path,
         vram_test_data: Path,
         managers_initialized,
     ) -> None:
-        """Test that optional cgram/oam paths are stored in result."""
+        """Test that extraction works with optional cgram/oam paths."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
         manager = CoreOperationsManager()
@@ -153,9 +157,10 @@ class TestCoreOperationsManagerVRAMExtraction:
             oam_path=str(oam_path),
         )
 
-        assert result.get("success") is True
-        assert result.get("cgram_path") == str(cgram_path)
-        assert result.get("oam_path") == str(oam_path)
+        # Result is a list of created file paths
+        assert isinstance(result, list)
+        # Extraction should complete successfully with the extra paths provided
+        assert len(result) > 0
 
 
 @pytest.mark.headless

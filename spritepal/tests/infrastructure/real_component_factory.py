@@ -37,11 +37,10 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QApplication, QWidget
 
+from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.base_manager import BaseManager
-from core.managers.extraction_manager import ExtractionManager
-from core.managers.injection_manager import InjectionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.registry import ManagerRegistry
-from core.managers.session_manager import SessionManager
 from ui.common import WorkerManager
 from ui.common.error_handler import ErrorHandler
 from ui.main_window import MainWindow
@@ -165,39 +164,39 @@ class RealComponentFactory:
         # manager_registry is now required - no fallback to global singleton
         # This ensures proper test isolation and prevents global state pollution
 
-    def _get_extraction_manager_from_registry(self) -> ExtractionManager | None:
-        """Get ExtractionManager from provided registry, if available."""
+    def _get_extraction_manager_from_registry(self) -> CoreOperationsManager | None:
+        """Get extraction manager (CoreOperationsManager) from provided registry, if available."""
         if self._manager_registry is not None:
             return self._manager_registry.get_extraction_manager()
         return None
 
-    def _get_injection_manager_from_registry(self) -> InjectionManager | None:
-        """Get InjectionManager from provided registry, if available."""
+    def _get_injection_manager_from_registry(self) -> CoreOperationsManager | None:
+        """Get injection manager (CoreOperationsManager) from provided registry, if available."""
         if self._manager_registry is not None:
             return self._manager_registry.get_injection_manager()
         return None
 
-    def _get_session_manager_from_registry(self) -> SessionManager | None:
-        """Get SessionManager from provided registry, if available."""
+    def _get_session_manager_from_registry(self) -> ApplicationStateManager | None:
+        """Get session manager (ApplicationStateManager) from provided registry, if available."""
         if self._manager_registry is not None:
             return self._manager_registry.get_session_manager()
         return None
 
-    def create_extraction_manager(self, with_test_data: bool = True) -> ExtractionManager:
+    def create_extraction_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """
-        Create a real ExtractionManager for testing.
+        Create a real extraction manager (CoreOperationsManager) for testing.
 
         Args:
             with_test_data: Whether to inject test data paths
 
         Returns:
-            Real ExtractionManager instance (from registry if provided, new otherwise)
+            Real CoreOperationsManager instance (from registry if provided, new otherwise)
         """
         # Prefer manager from provided registry for proper isolation
         manager = self._get_extraction_manager_from_registry()
         if manager is None:
             # Fallback: create new instance (deprecated path)
-            manager = ExtractionManager()
+            manager = CoreOperationsManager()
             self._created_components.append(manager)
 
         if with_test_data:
@@ -211,21 +210,21 @@ class RealComponentFactory:
 
         return manager
 
-    def create_injection_manager(self, with_test_data: bool = True) -> InjectionManager:
+    def create_injection_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """
-        Create a real InjectionManager for testing.
+        Create a real injection manager (CoreOperationsManager) for testing.
 
         Args:
             with_test_data: Whether to inject test data paths
 
         Returns:
-            Real InjectionManager instance (from registry if provided, new otherwise)
+            Real CoreOperationsManager instance (from registry if provided, new otherwise)
         """
         # Prefer manager from provided registry for proper isolation
         manager = self._get_injection_manager_from_registry()
         if manager is None:
             # Fallback: create new instance (deprecated path)
-            manager = InjectionManager()
+            manager = CoreOperationsManager()
             self._created_components.append(manager)
 
         if with_test_data:
@@ -238,15 +237,15 @@ class RealComponentFactory:
 
         return manager
 
-    def create_session_manager(self, app_name: str = "TestApp") -> SessionManager:
+    def create_session_manager(self, app_name: str = "TestApp") -> ApplicationStateManager:
         """
-        Create a real SessionManager for testing.
+        Create a real session manager (ApplicationStateManager) for testing.
 
         Args:
             app_name: Application name for session management
 
         Returns:
-            Real SessionManager instance (from registry if provided, new otherwise)
+            Real ApplicationStateManager instance (from registry if provided, new otherwise)
         """
         # Prefer manager from provided registry for proper isolation
         manager = self._get_session_manager_from_registry()
@@ -264,7 +263,7 @@ class RealComponentFactory:
             temp_dir = Path(tempfile.mkdtemp(prefix="spritepal_test_session_"))
             self._temp_dirs.append(temp_dir)
 
-        manager = SessionManager(app_name)
+        manager = ApplicationStateManager(app_name, settings_path=temp_dir)
         self._created_components.append(manager)
 
         # Override session directory to temp location
@@ -961,8 +960,8 @@ class TypedWorkerFactory(Generic[W]):
 # Convenience functions for common manager types
 def create_extraction_manager_factory(
     manager_registry: ManagerRegistry | None = None,
-) -> TypedManagerFactory[ExtractionManager]:
-    """Create a typed factory for ExtractionManager.
+) -> TypedManagerFactory[CoreOperationsManager]:
+    """Create a typed factory for extraction manager (CoreOperationsManager).
 
     Args:
         manager_registry: Required ManagerRegistry for proper test isolation
@@ -975,12 +974,12 @@ def create_extraction_manager_factory(
             "create_extraction_manager_factory() requires manager_registry parameter. "
             "Use: create_extraction_manager_factory(manager_registry=isolated_managers)"
         )
-    return TypedManagerFactory(ExtractionManager, manager_registry=manager_registry)
+    return TypedManagerFactory(CoreOperationsManager, manager_registry=manager_registry)
 
 def create_injection_manager_factory(
     manager_registry: ManagerRegistry | None = None,
-) -> TypedManagerFactory[InjectionManager]:
-    """Create a typed factory for InjectionManager.
+) -> TypedManagerFactory[CoreOperationsManager]:
+    """Create a typed factory for injection manager (CoreOperationsManager).
 
     Args:
         manager_registry: Required ManagerRegistry for proper test isolation
@@ -993,12 +992,12 @@ def create_injection_manager_factory(
             "create_injection_manager_factory() requires manager_registry parameter. "
             "Use: create_injection_manager_factory(manager_registry=isolated_managers)"
         )
-    return TypedManagerFactory(InjectionManager, manager_registry=manager_registry)
+    return TypedManagerFactory(CoreOperationsManager, manager_registry=manager_registry)
 
 def create_session_manager_factory(
     manager_registry: ManagerRegistry | None = None,
-) -> TypedManagerFactory[SessionManager]:
-    """Create a typed factory for SessionManager.
+) -> TypedManagerFactory[ApplicationStateManager]:
+    """Create a typed factory for session manager (ApplicationStateManager).
 
     Args:
         manager_registry: Required ManagerRegistry for proper test isolation
@@ -1011,4 +1010,4 @@ def create_session_manager_factory(
             "create_session_manager_factory() requires manager_registry parameter. "
             "Use: create_session_manager_factory(manager_registry=isolated_managers)"
         )
-    return TypedManagerFactory(SessionManager, manager_registry=manager_registry)
+    return TypedManagerFactory(ApplicationStateManager, manager_registry=manager_registry)

@@ -482,15 +482,8 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
 
     This ensures each test starts with clean caches (extraction counts,
     cached data, etc.) without full re-initialization overhead.
-
-    Opt-out: @pytest.mark.skip_session_reset
     """
     from core.managers.registry import ManagerRegistry
-
-    markers = [m.name for m in request.node.iter_markers()]
-    if 'skip_session_reset' in markers:
-        yield
-        return
 
     fixture_names = getattr(request, 'fixturenames', [])
     uses_session = 'session_managers' in fixture_names or 'managers' in fixture_names

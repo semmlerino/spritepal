@@ -237,8 +237,8 @@ class ManagerRegistry:
                 self._managers["state"] = state_manager
                 created_managers.append("state")
 
-                # Register adapters for backward compatibility
-                self._managers["session"] = state_manager.get_session_adapter()
+                # ApplicationStateManager IS the session manager (consolidated)
+                self._managers["session"] = state_manager
                 self._logger.debug("ApplicationStateManager created successfully")
 
                 # Register SessionManager immediately - other managers depend on it via DI
@@ -258,9 +258,9 @@ class ManagerRegistry:
                 self._managers["core_operations"] = core_manager
                 created_managers.append("core_operations")
 
-                # Register adapters for backward compatibility
-                self._managers["extraction"] = core_manager.get_extraction_adapter()
-                self._managers["injection"] = core_manager.get_injection_adapter()
+                # CoreOperationsManager IS both extraction and injection manager (consolidated)
+                self._managers["extraction"] = core_manager
+                self._managers["injection"] = core_manager
                 self._logger.debug("CoreOperationsManager created successfully")
 
                 # MonitoringManager for performance and health monitoring
@@ -278,13 +278,10 @@ class ManagerRegistry:
                 if "session" in self._managers:
                     monitoring_manager.register_manager_monitoring(self._managers["session"])
 
-                # Register remaining manager protocols with DI container
+                # Register CoreOperationsManager with DI container
                 # (SessionManager and ApplicationStateManager already registered above)
                 from core.di_container import register_managers
-                register_managers(
-                    extraction_adapter=self._managers["extraction"],
-                    injection_adapter=self._managers["injection"],
-                )
+                register_managers(core_operations_manager=core_manager)
                 self._logger.debug("All manager protocols registered with DI container")
 
                 self._logger.info("All managers initialized successfully")
