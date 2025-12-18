@@ -45,6 +45,19 @@ For most tests, use `isolated_managers` for complete isolation between tests.
 
 from __future__ import annotations
 
+# CRITICAL: Verify PySide6 is available BEFORE any Qt configuration
+# Tests should FAIL LOUDLY if Qt is unavailable, not silently pass via stubs
+import sys
+
+try:
+    import PySide6  # noqa: F401
+except ImportError as e:
+    sys.exit(
+        "FATAL: PySide6 is required for tests but not installed.\n"
+        "Run: uv sync --extra dev\n"
+        f"Import error: {e}"
+    )
+
 # CRITICAL: Set offscreen mode BEFORE any Qt imports to prevent dialogs
 import os
 
@@ -137,6 +150,10 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "parallel_unsafe: Force test to run in serial mode under xdist (use when wrapper fixtures hide shared state)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "legacy_mocking: Test uses legacy mock patterns awaiting migration to real components"
     )
 
     # Make implicit RealComponentFactory warnings visible when we add them
@@ -403,6 +420,10 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     config._real_hal_test_count = len(real_hal_tests)
     config._real_hal_test_nodeids = [item.nodeid for item in real_hal_tests]
 
+    # === Track legacy_mocking tests for migration visibility ===
+    legacy_mocking_tests = [item for item in items if item.get_closest_marker('legacy_mocking')]
+    config._legacy_mocking_test_count = len(legacy_mocking_tests)
+
     # === Validate skip_thread_cleanup markers ===
     for item in items:
         marker = item.get_closest_marker("skip_thread_cleanup")
@@ -549,6 +570,15 @@ def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: Any)
         )
         terminalreporter.write_line(
             "  Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH, or use --require-real-hal to fail instead",
+            yellow=True,
+        )
+
+    # === Report legacy_mocking tests for migration tracking ===
+    legacy_count = getattr(config, '_legacy_mocking_test_count', 0)
+    if legacy_count > 0:
+        terminalreporter.write_line("")
+        terminalreporter.write_line(
+            f"NOTE: {legacy_count} tests marked @legacy_mocking await migration to real components",
             yellow=True,
         )
 

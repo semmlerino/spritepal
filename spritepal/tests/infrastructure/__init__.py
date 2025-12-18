@@ -104,3 +104,14 @@ if not is_pyside6_available():
         "qt_worker_test",
         "validate_qt_object_lifecycle",
     ])
+
+    # Emit warning that headless stubs are active
+    # This helps catch environments where tests might silently skip Qt components
+    import warnings
+    warnings.warn(
+        "Headless stubs are active - PySide6 is not available. "
+        "Any test using Qt components will fail at runtime with HeadlessModeError. "
+        "Install PySide6 for proper test execution: uv sync --extra dev",
+        RuntimeWarning,
+        stacklevel=2,
+    )

@@ -476,6 +476,27 @@ class WorkerManager:
         except Exception as e:
             logger.debug(f"cleanup_all: Could not sleep: {e}")
 
+        # Defensive check: Warn if there are QThreads running that weren't registered
+        # This helps catch workers started directly with .start() bypassing WorkerManager
+        try:
+            import threading
+            from PySide6.QtCore import QThread
+            active_threads = threading.enumerate()
+            unknown_workers = []
+            for t in active_threads:
+                # Check if this is a QThread-backed thread
+                if 'QThread' in t.name or 'Dummy-' in t.name:
+                    # Don't warn about the main thread or known helper threads
+                    if t.name not in ('MainThread', 'QThread'):
+                        unknown_workers.append(t.name)
+            if unknown_workers:
+                logger.warning(
+                    f"Found {len(unknown_workers)} potential unregistered QThread(s) after cleanup: "
+                    f"{unknown_workers[:5]}. Use WorkerManager.start_worker() for proper lifecycle tracking."
+                )
+        except Exception as e:
+            logger.debug(f"cleanup_all: Could not check for unregistered workers: {e}")
+
         if cleanup_count > 0:
             logger.info(f"cleanup_all: Cleaned up {cleanup_count} worker(s)")
         else:

@@ -167,6 +167,15 @@ def reset_all_singletons() -> None:
         from core.services.worker_lifecycle import WorkerManager
         WorkerManager._worker_registry.clear()
 
+    # Reset MonitoringManager (has daemon health timer that needs explicit cleanup)
+    with contextlib.suppress(Exception):
+        from core.managers.monitoring_manager import MonitoringManager
+        if hasattr(MonitoringManager, '_instance') and MonitoringManager._instance:
+            # Shutdown the health timer if it exists
+            if hasattr(MonitoringManager._instance, 'shutdown'):
+                MonitoringManager._instance.shutdown()
+            MonitoringManager._instance = None
+
 
 def reset_hal_singletons_only() -> None:
     """Reset only HAL-related singletons.

@@ -1,6 +1,22 @@
 # Test Infrastructure Headless Compatibility
 
-The test infrastructure has been made Qt-optional to support headless testing environments without PySide6.
+> **IMPORTANT: PySide6 is Required for Running Tests**
+>
+> The headless fallbacks provide **import-time compatibility only**. They allow
+> code to import without errors, but:
+>
+> - All Qt-dependent operations raise `HeadlessModeError` at runtime
+> - Tests that create real Qt components WILL fail without PySide6
+> - This is **intentional** - tests should fail loudly, not silently pass
+>
+> For running tests, PySide6 **is required**. The stubs exist only for:
+> - Static analysis tools (basedpyright, ruff)
+> - Module loading in CI environments before test collection
+> - Documentation generation
+>
+> If you see `HeadlessModeError`, install PySide6: `uv sync --extra dev`
+
+The test infrastructure has conditional imports to support headless static analysis environments.
 
 ## Implementation
 
@@ -12,12 +28,12 @@ The test infrastructure has been made Qt-optional to support headless testing en
 ### Conditional Imports
 - `__init__.py`: Uses conditional imports based on Qt availability
 - Qt-dependent modules only imported when PySide6 is available
-- Graceful fallback to headless implementations when Qt is not available
+- Fallback stubs allow imports to succeed (for static analysis) but fail at runtime
 
 ### Fallback Implementations
 - `headless_fallbacks.py`: Provides stub implementations for Qt features
-- Raises `HeadlessModeError` with helpful messages when Qt features are accessed
-- Maintains the same public API for backward compatibility
+- **All stubs raise `HeadlessModeError` at runtime** - they do NOT silently pass
+- Maintains the same public API for import compatibility only
 
 ## Features
 

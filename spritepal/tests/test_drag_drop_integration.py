@@ -1,575 +1,441 @@
 """
-Integration tests for drag & drop functionality - Priority 1 test implementation.
-Tests file drag & drop handling across UI components.
+Integration tests for drag & drop functionality using real Qt components.
+
+Tests file drop handling across UI components with real DropZone widgets.
+Uses programmatic file setting (set_file()) and verifies signal emissions.
 """
 from __future__ import annotations
 
-import os
-import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
+from PySide6.QtTest import QSignalSpy
 
-# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-
-# Systematic pytest markers applied based on test content analysis
-pytestmark = [
-    pytest.mark.file_io,
-    pytest.mark.headless,
-    pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
-    pytest.mark.signals_slots,
-    pytest.mark.slow,
-    pytest.mark.allows_registry_state,
-]
-
-# We'll test the core drag-drop logic without Qt dependencies
+from ui.extraction_panel import DropZone
 from utils.constants import VRAM_SPRITE_OFFSET
 
+# Real Qt widget tests - require gui environment
+pytestmark = [
+    pytest.mark.file_io,
+    pytest.mark.gui,
+    pytest.mark.integration,
+    pytest.mark.ci_safe,
+]
 
-class TestDragDropIntegration:
-    """Test drag & drop functionality integration"""
 
-    @pytest.fixture
-    def sample_files(self):
-        """Create sample files for drag & drop testing"""
-        temp_dir = tempfile.mkdtemp()
+# ============================================================================
+# Test Fixtures
+# ============================================================================
 
-        # Create valid dump files
-        vram_data = bytearray(0x10000)  # 64KB
-        cgram_data = bytearray(512)  # 512 bytes
-        oam_data = bytearray(544)  # 544 bytes
 
-        files = {}
-        files["vram"] = Path(temp_dir) / "test_VRAM.dmp"
-        files["cgram"] = Path(temp_dir) / "test_CGRAM.dmp"
-        files["oam"] = Path(temp_dir) / "test_OAM.dmp"
-        files["invalid"] = Path(temp_dir) / "invalid.txt"
-        files["nonexistent"] = Path(temp_dir) / "nonexistent.dmp"
+@pytest.fixture
+def sample_files(tmp_path):
+    """Create sample files for drag & drop testing.
 
-        # Write valid files
-        files["vram"].write_bytes(vram_data)
-        files["cgram"].write_bytes(cgram_data)
-        files["oam"].write_bytes(oam_data)
-        files["invalid"].write_text("invalid content")
+    Uses tmp_path fixture for parallel-safe test file creation.
+    """
+    # Create valid dump files
+    vram_data = bytearray(0x10000)  # 64KB VRAM
+    cgram_data = bytearray(512)  # 512 bytes CGRAM
+    oam_data = bytearray(544)  # 544 bytes OAM
 
-        # Create backup files for overwrite testing
-        files["vram_backup"] = Path(temp_dir) / "backup_VRAM.dmp"
-        files["vram_backup"].write_bytes(vram_data)
+    files = {}
+    files["vram"] = tmp_path / "test_VRAM.dmp"
+    files["cgram"] = tmp_path / "test_CGRAM.dmp"
+    files["oam"] = tmp_path / "test_OAM.dmp"
+    files["invalid"] = tmp_path / "invalid.txt"
 
-        yield {"temp_dir": temp_dir, "files": files}
+    # Write valid files
+    files["vram"].write_bytes(vram_data)
+    files["cgram"].write_bytes(cgram_data)
+    files["oam"].write_bytes(oam_data)
+    files["invalid"].write_text("invalid content")
 
-        # Cleanup
-        import shutil
+    # Create backup files for overwrite testing
+    files["vram_backup"] = tmp_path / "backup_VRAM.dmp"
+    files["vram_backup"].write_bytes(vram_data)
 
-        shutil.rmtree(temp_dir)
+    return files
 
-    def create_mock_drop_zone(self, file_type="VRAM"):
-        """Create a mock drop zone that simulates DropZone behavior"""
-        drop_zone = Mock()
-        drop_zone.file_type = file_type
-        drop_zone.file_path = ""
-        drop_zone.file_dropped = Mock()
-        drop_zone.file_dropped.emit = Mock()
 
-        # Mock drag-drop methods that simulate the real behavior
-        def mock_drag_enter(event):
-            if event.mimeData().hasUrls():
-                event.acceptProposedAction()
-                return True
-            return False
+@pytest.fixture
+def vram_drop_zone(qtbot, isolated_managers):
+    """Create a real DropZone widget for VRAM files."""
+    drop_zone = DropZone(file_type="VRAM")
+    qtbot.addWidget(drop_zone)
+    return drop_zone
 
-        def mock_drop_event(event):
-            files = [url.toLocalFile() for url in event.mimeData().urls()]
-            if files and os.path.exists(files[0]):
-                drop_zone.file_path = files[0]
-                drop_zone.file_dropped.emit(files[0])
-                return True
-            return False
 
-        def mock_has_file():
-            return bool(drop_zone.file_path)
+@pytest.fixture
+def cgram_drop_zone(qtbot, isolated_managers):
+    """Create a real DropZone widget for CGRAM files."""
+    drop_zone = DropZone(file_type="CGRAM")
+    qtbot.addWidget(drop_zone)
+    return drop_zone
 
-        def mock_get_file_path():
-            return drop_zone.file_path
 
-        def mock_clear():
-            drop_zone.file_path = ""
+@pytest.fixture
+def oam_drop_zone(qtbot, isolated_managers):
+    """Create a real DropZone widget for OAM files."""
+    drop_zone = DropZone(file_type="OAM")
+    qtbot.addWidget(drop_zone)
+    return drop_zone
 
-        drop_zone.dragEnterEvent = mock_drag_enter
-        drop_zone.dropEvent = mock_drop_event
-        drop_zone.has_file = mock_has_file
-        drop_zone.get_file_path = mock_get_file_path
-        drop_zone.clear = mock_clear
 
-        return drop_zone
+# ============================================================================
+# DropZone Widget Tests - Real Component Behavior
+# ============================================================================
 
-    def create_mock_drag_drop_events(self, file_paths):
-        """Create mock drag & drop events"""
-        mime_data = Mock()
-        urls = []
-        for path in file_paths:
-            url = Mock()
-            url.toLocalFile.return_value = str(path)
-            urls.append(url)
-        mime_data.urls.return_value = urls
-        mime_data.hasUrls.return_value = bool(urls)
 
-        # Create drag enter event
-        drag_enter = Mock()
-        drag_enter.mimeData.return_value = mime_data
-        drag_enter.acceptProposedAction = Mock()
+class TestDropZoneIntegration:
+    """Test DropZone widget with real Qt components."""
 
-        # Create drop event
-        drop_event = Mock()
-        drop_event.mimeData.return_value = mime_data
+    def test_drop_zone_initialization(self, qtbot, vram_drop_zone):
+        """Test DropZone initializes correctly."""
+        assert vram_drop_zone.file_type == "VRAM"
+        assert vram_drop_zone.file_path == ""
+        assert not vram_drop_zone.has_file()
+        assert vram_drop_zone.get_file_path() == ""
 
-        return drag_enter, drop_event
+    def test_set_file_emits_signal(self, qtbot, vram_drop_zone, sample_files):
+        """Test that set_file() emits file_dropped signal."""
+        # Set up signal spy
+        spy = QSignalSpy(vram_drop_zone.file_dropped)
 
-    @pytest.mark.integration
-    def test_single_file_drag_drop(self, sample_files):
-        """Test basic single file drag-drop functionality"""
-        drop_zone = self.create_mock_drop_zone("VRAM")
+        # Set file programmatically
+        vram_path = str(sample_files["vram"])
+        vram_drop_zone.set_file(vram_path)
 
-        # Create drag & drop events
-        drag_enter, drop_event = self.create_mock_drag_drop_events(
-            [sample_files["files"]["vram"]]
-        )
+        # Verify signal was emitted
+        assert spy.count() == 1
+        assert spy.at(0)[0] == vram_path
 
-        # Test drag enter
-        result = drop_zone.dragEnterEvent(drag_enter)
-        assert result is True
-        assert drag_enter.acceptProposedAction.called
+        # Verify state
+        assert vram_drop_zone.has_file()
+        assert vram_drop_zone.get_file_path() == vram_path
+        assert vram_drop_zone.file_path == vram_path
 
-        # Test drop event
-        result = drop_zone.dropEvent(drop_event)
-        assert result is True
-
-        # Verify file was set
-        assert drop_zone.file_path == str(sample_files["files"]["vram"])
-        assert drop_zone.file_dropped.emit.called
-
-        # Verify UI state
-        assert drop_zone.has_file()
-        assert drop_zone.get_file_path() == str(sample_files["files"]["vram"])
-
-    @pytest.mark.integration
-    def test_multiple_file_drag_drop(self, sample_files):
-        """Test multiple files dropped simultaneously"""
-        drop_zone = self.create_mock_drop_zone("VRAM")
-
-        # Create drag & drop events with multiple files
-        file_paths = [
-            sample_files["files"]["vram"],
-            sample_files["files"]["cgram"],
-            sample_files["files"]["oam"],
-        ]
-        drag_enter, drop_event = self.create_mock_drag_drop_events(file_paths)
-
-        # Test drag enter with multiple files
-        result = drop_zone.dragEnterEvent(drag_enter)
-        assert result is True
-        assert drag_enter.acceptProposedAction.called
-
-        # Test drop event - should use first file only
-        result = drop_zone.dropEvent(drop_event)
-        assert result is True
-
-        # Verify only first file was set
-        assert drop_zone.file_path == str(sample_files["files"]["vram"])
-        assert drop_zone.file_dropped.emit.called
-
-        # Verify call args
-        drop_zone.file_dropped.emit.assert_called_with(
-            str(sample_files["files"]["vram"])
-        )
-
-    @pytest.mark.integration
-    def test_invalid_file_drag_drop(self, sample_files):
-        """Test error handling for invalid files"""
-        drop_zone = self.create_mock_drop_zone("VRAM")
-
-        # Test 1: Drop nonexistent file
-        drag_enter, drop_event = self.create_mock_drag_drop_events(
-            [sample_files["files"]["nonexistent"]]
-        )
-        result = drop_zone.dropEvent(drop_event)
-        assert result is False
-
-        # Verify file was not set for nonexistent file
-        assert drop_zone.file_path == ""
-        assert not drop_zone.file_dropped.emit.called
-
-        # Test 2: Drop invalid file type (but it exists)
-        drag_enter, drop_event = self.create_mock_drag_drop_events(
-            [sample_files["files"]["invalid"]]
-        )
-        result = drop_zone.dropEvent(drop_event)
-        assert result is True
-
-        # Verify file was set (since we only check existence)
-        assert drop_zone.file_path == str(sample_files["files"]["invalid"])
-        assert drop_zone.file_dropped.emit.called
-
-    @pytest.mark.integration
-    def test_drag_drop_with_existing_files(self, sample_files):
-        """Test drag & drop overwrite behavior"""
-        drop_zone = self.create_mock_drop_zone("VRAM")
-
-        # First drop - original file
-        drag_enter, drop_event = self.create_mock_drag_drop_events(
-            [sample_files["files"]["vram"]]
-        )
-        result = drop_zone.dropEvent(drop_event)
-        assert result is True
-
-        # Verify first file was set
-        assert drop_zone.file_path == str(sample_files["files"]["vram"])
-        assert drop_zone.file_dropped.emit.called
-
-        # Reset mock
-        drop_zone.file_dropped.emit.reset_mock()
-
-        # Second drop - overwrite with different file
-        drag_enter, drop_event = self.create_mock_drag_drop_events(
-            [sample_files["files"]["vram_backup"]]
-        )
-        result = drop_zone.dropEvent(drop_event)
-        assert result is True
-
-        # Verify file was overwritten
-        assert drop_zone.file_path == str(sample_files["files"]["vram_backup"])
-        assert drop_zone.file_dropped.emit.called
-
-        # Verify signal was emitted again
-        drop_zone.file_dropped.emit.assert_called_with(
-            str(sample_files["files"]["vram_backup"])
-        )
-
-    @pytest.mark.integration
-    def test_drag_drop_clear_functionality(self, sample_files):
-        """Test clearing drop zone functionality"""
-        drop_zone = self.create_mock_drop_zone("VRAM")
-
-        # First drop a file
-        drag_enter, drop_event = self.create_mock_drag_drop_events(
-            [sample_files["files"]["vram"]]
-        )
-        result = drop_zone.dropEvent(drop_event)
-        assert result is True
-        assert drop_zone.has_file()
+    def test_clear_drop_zone(self, qtbot, vram_drop_zone, sample_files):
+        """Test clearing a drop zone."""
+        # First set a file
+        vram_path = str(sample_files["vram"])
+        vram_drop_zone.set_file(vram_path)
+        assert vram_drop_zone.has_file()
 
         # Clear the drop zone
-        drop_zone.clear()
+        vram_drop_zone.clear()
 
-        # Verify file was cleared
-        assert drop_zone.file_path == ""
-        assert not drop_zone.has_file()
+        # Verify cleared state
+        assert not vram_drop_zone.has_file()
+        assert vram_drop_zone.get_file_path() == ""
+        assert vram_drop_zone.file_path == ""
 
-    @pytest.mark.integration
-    def test_empty_drop_event_handling(self, sample_files):
-        """Test handling of empty drop events"""
-        drop_zone = self.create_mock_drop_zone("VRAM")
+    def test_overwrite_file(self, qtbot, vram_drop_zone, sample_files):
+        """Test overwriting a file in drop zone."""
+        spy = QSignalSpy(vram_drop_zone.file_dropped)
 
-        # Create empty drop event
-        drag_enter, drop_event = self.create_mock_drag_drop_events([])
+        # Set first file
+        vram_path = str(sample_files["vram"])
+        vram_drop_zone.set_file(vram_path)
+        assert vram_drop_zone.get_file_path() == vram_path
+        assert spy.count() == 1
 
-        # Test drag enter with no files
-        result = drop_zone.dragEnterEvent(drag_enter)
-        assert result is False
+        # Set second file (overwrite)
+        backup_path = str(sample_files["vram_backup"])
+        vram_drop_zone.set_file(backup_path)
 
-        # Test drop event with no files
-        result = drop_zone.dropEvent(drop_event)
-        assert result is False
+        # Verify overwrite
+        assert vram_drop_zone.get_file_path() == backup_path
+        assert spy.count() == 2
+        assert spy.at(1)[0] == backup_path
 
-        # Verify no file was set
-        assert drop_zone.file_path == ""
-        assert not drop_zone.file_dropped.emit.called
+    def test_set_nonexistent_file(self, qtbot, vram_drop_zone, tmp_path):
+        """Test setting a non-existent file path.
 
-class TestExtractionPanelIntegration:
-    """Test ExtractionPanel drag & drop integration"""
+        Note: DropZone.set_file() only emits file_dropped if Path.exists() is True.
+        This is by design - invalid files are rejected at the widget level.
+        """
+        spy = QSignalSpy(vram_drop_zone.file_dropped)
 
-    @pytest.fixture
-    def sample_files(self):
-        """Create sample files for testing"""
-        temp_dir = tempfile.mkdtemp()
+        # Try to set non-existent file
+        nonexistent = str(tmp_path / "nonexistent.dmp")
+        vram_drop_zone.set_file(nonexistent)
 
-        # Create valid dump files
-        vram_data = bytearray(0x10000)  # 64KB
-        cgram_data = bytearray(512)  # 512 bytes
-        oam_data = bytearray(544)  # 544 bytes
+        # Widget rejects non-existent files - no signal emitted
+        assert spy.count() == 0
+        # File path should NOT be set for non-existent files
+        assert not vram_drop_zone.has_file()
 
-        files = {}
-        files["vram"] = Path(temp_dir) / "test_VRAM.dmp"
-        files["cgram"] = Path(temp_dir) / "test_CGRAM.dmp"
-        files["oam"] = Path(temp_dir) / "test_OAM.dmp"
+    def test_multiple_drop_zones_independent(
+        self, qtbot, vram_drop_zone, cgram_drop_zone, sample_files
+    ):
+        """Test that multiple drop zones are independent."""
+        vram_spy = QSignalSpy(vram_drop_zone.file_dropped)
+        cgram_spy = QSignalSpy(cgram_drop_zone.file_dropped)
 
-        # Write valid files
-        files["vram"].write_bytes(vram_data)
-        files["cgram"].write_bytes(cgram_data)
-        files["oam"].write_bytes(oam_data)
+        # Set files in each drop zone
+        vram_drop_zone.set_file(str(sample_files["vram"]))
+        cgram_drop_zone.set_file(str(sample_files["cgram"]))
 
-        yield {"temp_dir": temp_dir, "files": files}
+        # Verify each drop zone has its own file
+        assert vram_drop_zone.get_file_path() == str(sample_files["vram"])
+        assert cgram_drop_zone.get_file_path() == str(sample_files["cgram"])
 
-        # Cleanup
-        import shutil
+        # Verify signals were emitted independently
+        assert vram_spy.count() == 1
+        assert cgram_spy.count() == 1
 
-        shutil.rmtree(temp_dir)
 
-    def create_mock_extraction_panel(self):
-        """Create a mock ExtractionPanel with drag & drop functionality"""
-        panel = Mock()
+class TestDropZoneFileTypeValidation:
+    """Test DropZone with different file types."""
 
-        # Mock drop zones
-        panel.vram_drop = Mock()
-        panel.cgram_drop = Mock()
-        panel.oam_drop = Mock()
+    def test_vram_drop_zone_file_type(self, qtbot, vram_drop_zone):
+        """Test VRAM drop zone has correct file type."""
+        assert vram_drop_zone.file_type == "VRAM"
 
-        # Mock signals
-        panel.files_changed = Mock()
-        panel.files_changed.emit = Mock()
-        panel.extraction_ready = Mock()
-        panel.extraction_ready.emit = Mock()
-        panel.offset_changed = Mock()
-        panel.offset_changed.emit = Mock()
+    def test_cgram_drop_zone_file_type(self, qtbot, cgram_drop_zone):
+        """Test CGRAM drop zone has correct file type."""
+        assert cgram_drop_zone.file_type == "CGRAM"
 
-        # Mock methods
-        def mock_on_file_changed(file_path):
-            panel.files_changed.emit()
+    def test_oam_drop_zone_file_type(self, qtbot, oam_drop_zone):
+        """Test OAM drop zone has correct file type."""
+        assert oam_drop_zone.file_type == "OAM"
 
-            # Check if ready for extraction
-            vram_ready = panel.vram_drop.has_file()
-            cgram_ready = panel.cgram_drop.has_file()
-            ready = vram_ready and cgram_ready
-            panel.extraction_ready.emit(ready)
 
-            # If VRAM file, emit offset change
-            if file_path == panel.vram_drop.get_file_path():
-                panel.offset_changed.emit(VRAM_SPRITE_OFFSET)
+class TestDropZoneStateManagement:
+    """Test DropZone state management scenarios."""
 
-        def mock_has_vram():
-            return panel.vram_drop.has_file()
+    def test_sequential_set_clear_cycles(self, qtbot, vram_drop_zone, sample_files):
+        """Test multiple set/clear cycles.
 
-        def mock_get_vram_offset():
-            return VRAM_SPRITE_OFFSET
+        Note: clear() emits file_dropped with empty string if there was a previous file.
+        So each cycle generates 2 emissions: one for set_file, one for clear.
+        """
+        spy = QSignalSpy(vram_drop_zone.file_dropped)
 
-        panel._on_file_changed = mock_on_file_changed
-        panel.has_vram = mock_has_vram
-        panel.get_vram_offset = mock_get_vram_offset
-
-        return panel
-
-    @pytest.mark.integration
-    def test_extraction_panel_drag_drop_workflow(self, sample_files):
-        """Test complete drag & drop workflow in ExtractionPanel"""
-        panel = self.create_mock_extraction_panel()
-
-        # Set up drop zone mock behavior
-        panel.vram_drop.get_file_path.return_value = str(sample_files["files"]["vram"])
-        panel.cgram_drop.get_file_path.return_value = str(
-            sample_files["files"]["cgram"]
-        )
-        panel.oam_drop.get_file_path.return_value = str(sample_files["files"]["oam"])
-
-        panel.vram_drop.has_file.return_value = True
-        panel.cgram_drop.has_file.return_value = True
-        panel.oam_drop.has_file.return_value = True
-
-        # Test file drop workflow
-        panel._on_file_changed(str(sample_files["files"]["vram"]))
-
-        # Verify signals were emitted
-        assert panel.files_changed.emit.called
-        assert panel.extraction_ready.emit.called
-        assert panel.offset_changed.emit.called
-
-        # Verify extraction is ready
-        panel.extraction_ready.emit.assert_called_with(True)
-        panel.offset_changed.emit.assert_called_with(VRAM_SPRITE_OFFSET)
-
-    @pytest.mark.integration
-    def test_extraction_panel_partial_file_workflow(self, sample_files):
-        """Test workflow with only some files present"""
-        panel = self.create_mock_extraction_panel()
-
-        # Set up drop zone mock behavior - only VRAM file
-        panel.vram_drop.get_file_path.return_value = str(sample_files["files"]["vram"])
-        panel.cgram_drop.get_file_path.return_value = ""
-        panel.oam_drop.get_file_path.return_value = ""
-
-        panel.vram_drop.has_file.return_value = True
-        panel.cgram_drop.has_file.return_value = False
-        panel.oam_drop.has_file.return_value = False
-
-        # Test file drop workflow
-        panel._on_file_changed(str(sample_files["files"]["vram"]))
-
-        # Verify signals were emitted
-        assert panel.files_changed.emit.called
-        assert panel.extraction_ready.emit.called
-        assert panel.offset_changed.emit.called
-
-        # Verify extraction is NOT ready (missing CGRAM)
-        panel.extraction_ready.emit.assert_called_with(False)
-
-class TestDragDropErrorHandling:
-    """Test drag & drop error handling scenarios"""
-
-    @pytest.fixture
-    def mock_drop_zone(self):
-        """Create a mock drop zone for error testing"""
-        drop_zone = Mock()
-        drop_zone.file_type = "VRAM"
-        drop_zone.file_path = ""
-        drop_zone.file_dropped = Mock()
-        drop_zone.file_dropped.emit = Mock()
-
-        return drop_zone
-
-    @pytest.mark.integration
-    def test_file_system_error_recovery(self, mock_drop_zone, tmp_path):
-        """Test recovery from file system errors during drag & drop"""
-
-        # Mock drop event that throws file system error
-        def mock_drop_event_with_error(event):
-            files = [url.toLocalFile() for url in event.mimeData().urls()]
-            if files:
-                # Simulate file system error
-                raise OSError("File system error")
-
-        mock_drop_zone.dropEvent = mock_drop_event_with_error
-
-        # Create drop event
-        drop_event = Mock()
-        url = Mock()
-        url.toLocalFile.return_value = str(tmp_path / "test.dmp")
-        drop_event.mimeData.return_value.urls.return_value = [url]
-
-        # Test drop event with file system error
-        with pytest.raises(OSError, match="File system error"):
-            mock_drop_zone.dropEvent(drop_event)
-
-        # Verify error was handled (file not set)
-        assert mock_drop_zone.file_path == ""
-        assert not mock_drop_zone.file_dropped.emit.called
-
-    @pytest.mark.integration
-    def test_concurrent_drop_events(self, mock_drop_zone, tmp_path):
-        """Test handling of concurrent drop events"""
-
-        # Mock drop event that sets file
-        def mock_drop_event(event):
-            files = [url.toLocalFile() for url in event.mimeData().urls()]
-            if files:
-                mock_drop_zone.file_path = files[0]
-                mock_drop_zone.file_dropped.emit(files[0])
-
-        mock_drop_zone.dropEvent = mock_drop_event
-
-        # Create multiple drop events
-        drop_events = []
         for i in range(3):
-            drop_event = Mock()
-            url = Mock()
-            url.toLocalFile.return_value = str(tmp_path / f"test{i}.dmp")
-            drop_event.mimeData.return_value.urls.return_value = [url]
-            drop_events.append(drop_event)
+            # Set file - emits with file path
+            vram_drop_zone.set_file(str(sample_files["vram"]))
+            assert vram_drop_zone.has_file()
+            # Each cycle: set emits (2*i+1), clear emits (2*i+2)
+            # After set in cycle i: count = 2*i + 1
+            assert spy.count() == 2 * i + 1
 
-        # Process multiple drop events rapidly
-        for drop_event in drop_events:
-            mock_drop_zone.dropEvent(drop_event)
+            # Clear - emits with empty string
+            vram_drop_zone.clear()
+            assert not vram_drop_zone.has_file()
+            # After clear in cycle i: count = 2*i + 2
+            assert spy.count() == 2 * i + 2
 
-        # Verify final state - should have last file
-        assert mock_drop_zone.file_path == str(tmp_path / "test2.dmp")
-        assert mock_drop_zone.file_dropped.emit.call_count == 3
+    def test_clear_empty_drop_zone(self, qtbot, vram_drop_zone):
+        """Test clearing an already empty drop zone."""
+        assert not vram_drop_zone.has_file()
 
-    @pytest.mark.integration
-    def test_malformed_url_handling(self, mock_drop_zone):
-        """Test handling of malformed URLs in drop events"""
+        # Clear should be safe to call on empty drop zone
+        vram_drop_zone.clear()
 
-        # Mock drop event that handles malformed URLs
-        def mock_drop_event(event):
-            files = [url.toLocalFile() for url in event.mimeData().urls()]
-            if files and files[0]:  # Check for non-empty file path
-                mock_drop_zone.file_path = files[0]
-                mock_drop_zone.file_dropped.emit(files[0])
+        assert not vram_drop_zone.has_file()
+        assert vram_drop_zone.get_file_path() == ""
 
-        mock_drop_zone.dropEvent = mock_drop_event
 
-        # Create drop event with malformed URL
-        drop_event = Mock()
-        url = Mock()
-        url.toLocalFile.return_value = ""  # Empty file path
-        drop_event.mimeData.return_value.urls.return_value = [url]
+# ============================================================================
+# Multi-Component Integration Tests
+# ============================================================================
 
-        # Test drop event with malformed URL
-        mock_drop_zone.dropEvent(drop_event)
 
-        # Verify no file was set
-        assert mock_drop_zone.file_path == ""
-        assert not mock_drop_zone.file_dropped.emit.called
+class TestMultiDropZoneWorkflow:
+    """Test workflows involving multiple drop zones."""
 
-class TestDragDropSignalIntegration:
-    """Test drag & drop signal integration"""
+    def test_complete_file_set_workflow(
+        self,
+        qtbot,
+        vram_drop_zone,
+        cgram_drop_zone,
+        oam_drop_zone,
+        sample_files,
+    ):
+        """Test setting files in all three drop zones."""
+        # Set up spies
+        vram_spy = QSignalSpy(vram_drop_zone.file_dropped)
+        cgram_spy = QSignalSpy(cgram_drop_zone.file_dropped)
+        oam_spy = QSignalSpy(oam_drop_zone.file_dropped)
 
-    @pytest.mark.integration
-    def test_signal_flow_integration(self):
-        """Test signal flow between drag & drop components"""
-        # Create mock components
-        drop_zone = Mock()
-        extraction_panel = Mock()
-        main_window = Mock()
+        # Set files in order
+        vram_drop_zone.set_file(str(sample_files["vram"]))
+        cgram_drop_zone.set_file(str(sample_files["cgram"]))
+        oam_drop_zone.set_file(str(sample_files["oam"]))
 
-        # Mock signals
-        file_dropped_signal = Mock()
-        file_dropped_signal.emit = Mock()
-        files_changed_signal = Mock()
-        files_changed_signal.emit = Mock()
-        extraction_ready_signal = Mock()
-        extraction_ready_signal.emit = Mock()
+        # Verify all files set
+        assert vram_drop_zone.has_file()
+        assert cgram_drop_zone.has_file()
+        assert oam_drop_zone.has_file()
 
-        # Set up signal connections
-        drop_zone.file_dropped = file_dropped_signal
-        extraction_panel.files_changed = files_changed_signal
-        extraction_panel.extraction_ready = extraction_ready_signal
+        # Verify signals
+        assert vram_spy.count() == 1
+        assert cgram_spy.count() == 1
+        assert oam_spy.count() == 1
 
-        # Mock signal handlers
-        def handle_file_dropped(file_path):
-            files_changed_signal.emit()
+        # Verify paths
+        assert vram_drop_zone.get_file_path() == str(sample_files["vram"])
+        assert cgram_drop_zone.get_file_path() == str(sample_files["cgram"])
+        assert oam_drop_zone.get_file_path() == str(sample_files["oam"])
 
-        def handle_files_changed():
-            extraction_ready_signal.emit(True)
+    def test_partial_file_workflow(
+        self,
+        qtbot,
+        vram_drop_zone,
+        cgram_drop_zone,
+        oam_drop_zone,
+        sample_files,
+    ):
+        """Test workflow with only required files (VRAM + CGRAM)."""
+        # Set only required files
+        vram_drop_zone.set_file(str(sample_files["vram"]))
+        cgram_drop_zone.set_file(str(sample_files["cgram"]))
 
-        def handle_extraction_ready(ready):
-            main_window.update_ui(ready)
+        # Verify required files set
+        assert vram_drop_zone.has_file()
+        assert cgram_drop_zone.has_file()
 
-        # Connect signals
-        file_dropped_signal.connect = Mock(side_effect=lambda handler: handler)
-        files_changed_signal.connect = Mock(side_effect=lambda handler: handler)
-        extraction_ready_signal.connect = Mock(side_effect=lambda handler: handler)
+        # OAM should still be empty
+        assert not oam_drop_zone.has_file()
 
-        # Simulate connecting the signals
-        _ = file_dropped_signal.connect(handle_file_dropped)
-        _ = files_changed_signal.connect(handle_files_changed)
-        _ = extraction_ready_signal.connect(handle_extraction_ready)
+    def test_clear_all_drop_zones(
+        self,
+        qtbot,
+        vram_drop_zone,
+        cgram_drop_zone,
+        oam_drop_zone,
+        sample_files,
+    ):
+        """Test clearing all drop zones."""
+        # Set all files
+        vram_drop_zone.set_file(str(sample_files["vram"]))
+        cgram_drop_zone.set_file(str(sample_files["cgram"]))
+        oam_drop_zone.set_file(str(sample_files["oam"]))
 
-        # Test signal flow
-        file_dropped_signal.emit("/path/to/file.dmp")
-        handle_file_dropped("/path/to/file.dmp")
-        handle_files_changed()
-        handle_extraction_ready(True)
+        # Clear all
+        vram_drop_zone.clear()
+        cgram_drop_zone.clear()
+        oam_drop_zone.clear()
 
-        # Verify signals were emitted
-        assert file_dropped_signal.emit.called
-        assert files_changed_signal.emit.called
-        assert extraction_ready_signal.emit.called
+        # Verify all cleared
+        assert not vram_drop_zone.has_file()
+        assert not cgram_drop_zone.has_file()
+        assert not oam_drop_zone.has_file()
 
-        # Verify signal connections were established
-        assert file_dropped_signal.connect.called
-        assert files_changed_signal.connect.called
-        assert extraction_ready_signal.connect.called
+
+# ============================================================================
+# Edge Case Tests
+# ============================================================================
+
+
+class TestDropZoneEdgeCases:
+    """Test edge cases in drop zone behavior."""
+
+    def test_empty_path_string(self, qtbot, vram_drop_zone):
+        """Test setting empty path string."""
+        spy = QSignalSpy(vram_drop_zone.file_dropped)
+
+        # Set empty string
+        vram_drop_zone.set_file("")
+
+        # Should emit signal with empty string
+        assert spy.count() == 1
+
+    def test_path_with_spaces(self, qtbot, vram_drop_zone, tmp_path):
+        """Test file path with spaces."""
+        spy = QSignalSpy(vram_drop_zone.file_dropped)
+
+        # Create file with spaces in name
+        spaced_file = tmp_path / "file with spaces.dmp"
+        spaced_file.write_bytes(bytearray(0x10000))
+
+        # Set file
+        vram_drop_zone.set_file(str(spaced_file))
+
+        # Verify
+        assert spy.count() == 1
+        assert vram_drop_zone.get_file_path() == str(spaced_file)
+
+    def test_unicode_path(self, qtbot, vram_drop_zone, tmp_path):
+        """Test file path with unicode characters."""
+        spy = QSignalSpy(vram_drop_zone.file_dropped)
+
+        # Create file with unicode name
+        unicode_file = tmp_path / "测试文件.dmp"
+        unicode_file.write_bytes(bytearray(0x10000))
+
+        # Set file
+        vram_drop_zone.set_file(str(unicode_file))
+
+        # Verify
+        assert spy.count() == 1
+        assert vram_drop_zone.get_file_path() == str(unicode_file)
+
+    def test_very_long_path(self, qtbot, vram_drop_zone, tmp_path):
+        """Test handling of long file paths."""
+        spy = QSignalSpy(vram_drop_zone.file_dropped)
+
+        # Create nested directory structure
+        deep_path = tmp_path
+        for i in range(10):
+            deep_path = deep_path / f"nested_dir_{i}"
+        deep_path.mkdir(parents=True, exist_ok=True)
+
+        # Create file in deep path
+        deep_file = deep_path / "deep_file.dmp"
+        deep_file.write_bytes(bytearray(0x10000))
+
+        # Set file
+        vram_drop_zone.set_file(str(deep_file))
+
+        # Verify
+        assert spy.count() == 1
+        assert vram_drop_zone.get_file_path() == str(deep_file)
+
+
+# ============================================================================
+# Signal Flow Integration Tests
+# ============================================================================
+
+
+class TestDropZoneSignalFlow:
+    """Test signal flow and connections."""
+
+    def test_signal_contains_file_path(self, qtbot, vram_drop_zone, sample_files):
+        """Test that emitted signal contains correct file path."""
+        received_paths = []
+
+        def capture_path(path):
+            received_paths.append(path)
+
+        vram_drop_zone.file_dropped.connect(capture_path)
+
+        # Set file
+        vram_path = str(sample_files["vram"])
+        vram_drop_zone.set_file(vram_path)
+
+        # Verify signal payload
+        assert len(received_paths) == 1
+        assert received_paths[0] == vram_path
+
+    def test_multiple_signal_connections(self, qtbot, vram_drop_zone, sample_files):
+        """Test that multiple signal connections all receive events."""
+        received_1 = []
+        received_2 = []
+        received_3 = []
+
+        vram_drop_zone.file_dropped.connect(lambda p: received_1.append(p))
+        vram_drop_zone.file_dropped.connect(lambda p: received_2.append(p))
+        vram_drop_zone.file_dropped.connect(lambda p: received_3.append(p))
+
+        # Set file
+        vram_path = str(sample_files["vram"])
+        vram_drop_zone.set_file(vram_path)
+
+        # All connections should receive
+        assert received_1 == [vram_path]
+        assert received_2 == [vram_path]
+        assert received_3 == [vram_path]

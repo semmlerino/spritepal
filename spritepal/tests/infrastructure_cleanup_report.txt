@@ -1,9 +1,10 @@
 # SpritePal Test Infrastructure Cleanup Report
 ==================================================
+# Last verified: 2025-12-18
 
 ## Summary
 - Total test files analyzed: 123
-- Files with excessive mocking: 33
+- Files with excessive mocking: 32 (was 33 - removed deleted test_controller.py)
 - Files with outdated imports: 42
 - Conftest configuration issues: 2
 
@@ -12,8 +13,6 @@
   Patterns: decorator_patching, heavy_mocking
 - test_complete_user_workflow_integration.py: 35 mock patterns
   Patterns: signal_mocking, heavy_mocking
-- test_controller.py: 87 mock patterns
-  Patterns: decorator_patching, main_window_mocking, heavy_mocking
 - test_controller_dependency_injection.py: 18 mock patterns
   Patterns: heavy_mocking
 - test_drag_drop_integration.py: 58 mock patterns
@@ -79,7 +78,6 @@
 - test_collapsible_group_box.py:11: direct_qt_import
 - test_complete_user_workflow_integration.py:646: direct_qt_import
 - test_concurrent_operations.py:19: direct_qt_import
-- test_controller.py:440: direct_qt_import
 - test_controller_real_manager_integration.py:28: direct_qt_import
 - test_cross_dialog_integration_real.py:20: direct_qt_import
 - test_dialog_initialization.py:9: direct_qt_import
