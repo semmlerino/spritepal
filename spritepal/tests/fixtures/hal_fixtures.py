@@ -157,11 +157,15 @@ def hal_pool(request: FixtureRequest, tmp_path: Path) -> Generator[MockHALProces
         # Try to find real binaries first
         real_binaries = _find_real_hal_binaries()
         if real_binaries is None:
-            pytest.skip(
+            message = (
                 "Real HAL binaries not found. "
                 "Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH, "
                 "or install exhal/inhal to PATH."
             )
+            if request.config.getoption("--require-real-hal", default=False):
+                pytest.fail(message)
+            else:
+                pytest.skip(message)
 
         exhal_path, inhal_path = real_binaries
 
@@ -218,11 +222,15 @@ def hal_compressor(request: FixtureRequest, tmp_path: Path) -> Generator[MockHAL
         # Try to find real binaries first
         real_binaries = _find_real_hal_binaries()
         if real_binaries is None:
-            pytest.skip(
+            message = (
                 "Real HAL binaries not found. "
                 "Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH, "
                 "or install exhal/inhal to PATH."
             )
+            if request.config.getoption("--require-real-hal", default=False):
+                pytest.fail(message)
+            else:
+                pytest.skip(message)
 
         exhal_path, inhal_path = real_binaries
         compressor = HALCompressor(exhal_path, inhal_path, use_pool=True)

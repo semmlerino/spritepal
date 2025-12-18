@@ -52,6 +52,7 @@ import pytest
 from PIL import Image
 
 from core.managers import ExtractionError, ExtractionManager, ValidationError
+from tests.fixtures.timeouts import signal_timeout, worker_timeout
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
     manager_context,
@@ -235,7 +236,7 @@ class TestExtractionManager:
         with pytest.raises(ValidationError, match="offset must be >= 0"):
             extraction_manager.validate_extraction_params(invalid_params)
 
-    def test_extract_from_vram_real_workflow_tdd(self, test_data_repo, qtbot, worker_timeout):
+    def test_extract_from_vram_real_workflow_tdd(self, test_data_repo, qtbot):
         """TDD: VRAM extraction should create real image files from VRAM data.
         
         RED: Test complete VRAM extraction workflow with real files
@@ -454,7 +455,7 @@ class TestExtractionManager:
             assert not manager.is_operation_active("rom_extraction")
             assert not manager.is_operation_active("sprite_preview")
 
-    def test_signal_emissions_real_qt_signals_tdd(self, test_data_repo, qtbot, worker_timeout, signal_timeout):
+    def test_signal_emissions_real_qt_signals_tdd(self, test_data_repo, qtbot):
         """TDD: Extraction should emit real Qt signals during processing.
         
         RED: Test real signal emission during extraction workflow
@@ -483,7 +484,7 @@ class TestExtractionManager:
 
             try:
                 # Run real extraction with Qt signal monitoring
-                with qtbot.waitSignal(manager.files_created, timeout=worker_timeout):
+                with qtbot.waitSignal(manager.files_created, timeout=worker_timeout()):
                     manager.extract_from_vram(
                         vram_data["vram_path"],
                         vram_data["output_base"],
@@ -491,7 +492,7 @@ class TestExtractionManager:
                     )
 
                 # Wait for all Qt events to process
-                qtbot.waitUntil(lambda: len(progress_messages) > 0, timeout=signal_timeout)
+                qtbot.waitUntil(lambda: len(progress_messages) > 0, timeout=signal_timeout())
 
                 # Verify real signal emissions occurred
                 assert len(progress_messages) > 0, "Should emit progress signals"

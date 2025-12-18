@@ -58,7 +58,6 @@ from core.protocols.manager_protocols import (
     SessionManagerProtocol,
 )
 
-
 # Import Qt fixtures for IS_HEADLESS constant
 try:
     from tests.fixtures.qt_fixtures import IS_HEADLESS
@@ -574,9 +573,16 @@ def real_factory(
     Depends on isolated_managers to ensure registry is properly managed.
     The isolated_managers fixture handles initialization and cleanup,
     so RealComponentFactory won't need to manage the registry lifecycle.
+
+    Passes the isolated_managers registry to the factory for proper test isolation.
+    This ensures the factory uses managers from the test fixture instead of
+    accessing global singletons.
     """
     fail_on_leaks = _should_fail_on_leaks(request.config)
-    factory = RealComponentFactory(fail_on_leaks=fail_on_leaks)
+    factory = RealComponentFactory(
+        fail_on_leaks=fail_on_leaks,
+        manager_registry=isolated_managers,
+    )
     yield factory
     # Cleanup will be handled by factory's cleanup method if needed
     if hasattr(factory, 'cleanup'):

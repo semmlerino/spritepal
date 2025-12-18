@@ -97,6 +97,7 @@ class RealComponentFactory:
         *,
         fail_on_leaks: bool | None = None,
         manage_registry: bool = False,
+        manager_registry: ManagerRegistry | None = None,
     ):
         """
         Initialize the real component factory.
@@ -113,6 +114,10 @@ class RealComponentFactory:
                            lifecycle and will reset it during cleanup(). Use this when
                            the factory is used standalone without manager fixtures.
                            Default: False (registry lifecycle owned by test fixtures).
+            manager_registry: Optional pre-initialized ManagerRegistry to use for isolation.
+                            When provided, the factory uses this registry instead of the
+                            global singleton, ensuring proper test isolation.
+                            Recommended: Pass `isolated_managers` fixture from tests.
         """
         self._data_repo = data_repository or get_test_data_repository()
         self._temp_dirs: list[Path] = []
@@ -121,6 +126,7 @@ class RealComponentFactory:
         self._leaked_resources: list[str] = []
         self._manage_registry = manage_registry
         self._initialized_registry = False  # Track if we initialized it
+        self._manager_registry = manager_registry  # Store provided registry for isolation
 
         # Set up isolated settings directory
         # Priority: explicit arg > SPRITEPAL_SETTINGS_DIR env var > tempfile
@@ -153,13 +159,44 @@ class RealComponentFactory:
         # This is necessary because managers like ExtractionManager create ROMExtractor
         # which uses inject(ROMCacheProtocol) internally, and the DI factories depend
         # on consolidated managers being initialized
-        from core.managers.registry import ManagerRegistry
-        registry = ManagerRegistry()
-        if not registry.is_initialized():
-            from core.managers import initialize_managers
-            initialize_managers("TestApp", settings_path=self._settings_path)
-            # Track that we initialized it so cleanup can reset if needed
-            self._initialized_registry = True
+        if self._manager_registry is not None:
+            # Use provided registry - skip global initialization for proper isolation
+            pass  # Registry already initialized by fixture
+        else:
+            # Fallback to global singleton (deprecated path - emit warning)
+            import warnings
+            warnings.warn(
+                "RealComponentFactory created without manager_registry parameter. "
+                "This uses the global ManagerRegistry singleton and breaks test isolation. "
+                "Pass manager_registry=isolated_managers from your test fixture.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            from core.managers.registry import ManagerRegistry
+            registry = ManagerRegistry()
+            if not registry.is_initialized():
+                from core.managers import initialize_managers
+                initialize_managers("TestApp", settings_path=self._settings_path)
+                # Track that we initialized it so cleanup can reset if needed
+                self._initialized_registry = True
+
+    def _get_extraction_manager_from_registry(self) -> ExtractionManager | None:
+        """Get ExtractionManager from provided registry, if available."""
+        if self._manager_registry is not None:
+            return self._manager_registry.extraction_manager
+        return None
+
+    def _get_injection_manager_from_registry(self) -> InjectionManager | None:
+        """Get InjectionManager from provided registry, if available."""
+        if self._manager_registry is not None:
+            return self._manager_registry.injection_manager
+        return None
+
+    def _get_session_manager_from_registry(self) -> SessionManager | None:
+        """Get SessionManager from provided registry, if available."""
+        if self._manager_registry is not None:
+            return self._manager_registry.session_manager
+        return None
 
     def create_extraction_manager(self, with_test_data: bool = True) -> ExtractionManager:
         """
@@ -169,10 +206,14 @@ class RealComponentFactory:
             with_test_data: Whether to inject test data paths
 
         Returns:
-            Real ExtractionManager instance
+            Real ExtractionManager instance (from registry if provided, new otherwise)
         """
-        manager = ExtractionManager()
-        self._created_components.append(manager)
+        # Prefer manager from provided registry for proper isolation
+        manager = self._get_extraction_manager_from_registry()
+        if manager is None:
+            # Fallback: create new instance (deprecated path)
+            manager = ExtractionManager()
+            self._created_components.append(manager)
 
         if with_test_data:
             # Set up test data paths
@@ -193,10 +234,14 @@ class RealComponentFactory:
             with_test_data: Whether to inject test data paths
 
         Returns:
-            Real InjectionManager instance
+            Real InjectionManager instance (from registry if provided, new otherwise)
         """
-        manager = InjectionManager()
-        self._created_components.append(manager)
+        # Prefer manager from provided registry for proper isolation
+        manager = self._get_injection_manager_from_registry()
+        if manager is None:
+            # Fallback: create new instance (deprecated path)
+            manager = InjectionManager()
+            self._created_components.append(manager)
 
         if with_test_data:
             # Set up test data paths
@@ -216,8 +261,14 @@ class RealComponentFactory:
             app_name: Application name for session management
 
         Returns:
-            Real SessionManager instance
+            Real SessionManager instance (from registry if provided, new otherwise)
         """
+        # Prefer manager from provided registry for proper isolation
+        manager = self._get_session_manager_from_registry()
+        if manager is not None:
+            return manager
+
+        # Fallback: create new instance (deprecated path)
         # Use worker-specific session dir if under xdist, else temp directory
         env_settings = os.environ.get("SPRITEPAL_SETTINGS_DIR")
         if env_settings:

@@ -227,7 +227,7 @@ class _QPixmapGuardImportFinder:
 
     _installed: bool = False
 
-    def find_module(self, fullname: str, path: Any = None) -> "_QPixmapGuardImportFinder | None":
+    def find_module(self, fullname: str, path: Any = None) -> _QPixmapGuardImportFinder | None:
         """Return self if this is PySide6.QtGui, else None."""
         if fullname == 'PySide6.QtGui' and not self._installed:
             return self
@@ -290,6 +290,12 @@ def pytest_addoption(parser: Any) -> None:
         help="Use real HAL process pool instead of mocks (slower)"
     )
     parser.addoption(
+        "--require-real-hal",
+        action="store_true",
+        default=False,
+        help="Fail (don't skip) if real HAL binaries not found for @real_hal tests"
+    )
+    parser.addoption(
         "--leak-mode",
         action="store",
         choices=["fail", "warn"],
@@ -329,9 +335,10 @@ def _uses_session_fixtures(item: Any) -> bool:
 def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     """Validate marker usage and enforce PARALLEL BY DEFAULT xdist policy.
 
-    This hook performs two functions:
-    1. Validates that skip_thread_cleanup markers have a reason argument
-    2. Enforces PARALLEL BY DEFAULT xdist policy - tests using session_managers
+    This hook performs three functions:
+    1. Tracks real_hal marked tests for reporting
+    2. Validates that skip_thread_cleanup markers have a reason argument
+    3. Enforces PARALLEL BY DEFAULT xdist policy - tests using session_managers
        are auto-serialized, all others run in parallel
 
     The xdist policy ensures that:
@@ -347,6 +354,11 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
         items: list of test items being collected
     """
     import warnings
+
+    # === Track real_hal tests for CI visibility ===
+    real_hal_tests = [item for item in items if item.get_closest_marker('real_hal')]
+    config._real_hal_test_count = len(real_hal_tests)
+    config._real_hal_test_nodeids = [item.nodeid for item in real_hal_tests]
 
     # === Validate skip_thread_cleanup markers ===
     for item in items:
@@ -425,6 +437,7 @@ def _validate_no_same_module_mixing(items: list[Any]) -> None:
         pytest.fail: If any module uses both fixture types
     """
     from collections import defaultdict
+
     from tests.fixtures.core_fixtures import SESSION_DEPENDENT_FIXTURES
 
     # Group fixtures by module
@@ -459,6 +472,42 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
     """
     from tests.fixtures.core_fixtures import reset_all_singletons
     reset_all_singletons()
+
+
+def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: Any) -> None:
+    """Report real_hal test execution summary for CI visibility.
+
+    Warns if real_hal tests were skipped due to missing HAL binaries,
+    making silent failures visible in CI output.
+    """
+    if not hasattr(config, '_real_hal_test_count'):
+        return
+
+    total_count = config._real_hal_test_count
+    if total_count == 0:
+        return
+
+    # Count skipped real_hal tests by checking skip reasons
+    skipped_real_hal = 0
+    skipped_stats = terminalreporter.stats.get('skipped', [])
+    real_hal_nodeids = set(getattr(config, '_real_hal_test_nodeids', []))
+
+    for report in skipped_stats:
+        # Check if this skipped test is a real_hal test
+        if report.nodeid in real_hal_nodeids:
+            skipped_real_hal += 1
+
+    if skipped_real_hal > 0:
+        terminalreporter.write_line("")
+        terminalreporter.write_line(
+            f"WARNING: {skipped_real_hal}/{total_count} @real_hal tests were SKIPPED "
+            "(HAL binaries not found)",
+            yellow=True,
+        )
+        terminalreporter.write_line(
+            "  Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH, or use --require-real-hal to fail instead",
+            yellow=True,
+        )
 
 
 def pytest_runtest_setup(item: Any) -> None:

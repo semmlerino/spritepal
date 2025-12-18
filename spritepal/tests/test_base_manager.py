@@ -7,6 +7,7 @@ import pytest
 from PySide6.QtCore import QTimer
 
 from core.managers import BaseManager, ValidationError
+from tests.fixtures.timeouts import signal_timeout
 
 # Test characteristics: Real GUI components requiring display, Timer usage
 pytestmark = [
@@ -138,23 +139,23 @@ class TestBaseManager:
             manager._validate_range(11, "value", max_val=10)
 
     @pytest.mark.qt_no_exception_capture
-    def test_signal_emission(self, qtbot, signal_timeout):
+    def test_signal_emission(self, qtbot):
         """Test signal emission"""
         manager = ConcreteManager()
 
         # Test error signal with timeout to prevent hanging
-        with qtbot.waitSignal(manager.error_occurred, timeout=signal_timeout) as blocker:
+        with qtbot.waitSignal(manager.error_occurred, timeout=signal_timeout()) as blocker:
             # Use QTimer.singleShot to ensure signal is emitted in next event loop iteration
             QTimer.singleShot(0, lambda: manager._handle_error(Exception("Test error")))
         assert "Test error" in blocker.args[0]
 
         # Test warning signal with timeout
-        with qtbot.waitSignal(manager.warning_occurred, timeout=signal_timeout) as blocker:
+        with qtbot.waitSignal(manager.warning_occurred, timeout=signal_timeout()) as blocker:
             QTimer.singleShot(0, lambda: manager._handle_warning("Test warning"))
         assert blocker.args[0] == "Test warning"
 
         # Test progress signal with timeout
-        with qtbot.waitSignal(manager.progress_updated, timeout=signal_timeout) as blocker:
+        with qtbot.waitSignal(manager.progress_updated, timeout=signal_timeout()) as blocker:
             QTimer.singleShot(0, lambda: manager._update_progress("test_op", 50, 100))
         assert blocker.args == ["test_op", 50, 100]
 
@@ -180,7 +181,7 @@ class TestBaseManager:
         assert counter == 2
 
     @pytest.mark.qt_no_exception_capture
-    def test_error_handling_with_operation(self, qtbot, signal_timeout):
+    def test_error_handling_with_operation(self, qtbot):
         """Test error handling with active operation"""
         manager = ConcreteManager()
 
@@ -189,7 +190,7 @@ class TestBaseManager:
         assert manager.is_operation_active("test_op")
 
         # Handle error for that operation with timeout to prevent hanging
-        with qtbot.waitSignal(manager.error_occurred, timeout=signal_timeout) as blocker:
+        with qtbot.waitSignal(manager.error_occurred, timeout=signal_timeout()) as blocker:
             QTimer.singleShot(0, lambda: manager._handle_error(Exception("Operation failed"), "test_op"))
 
         # Operation should be finished
