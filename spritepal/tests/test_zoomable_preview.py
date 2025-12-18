@@ -367,10 +367,12 @@ class TestPreviewPanel:
         # Mock the focus methods
         panel.setFocus = Mock()
 
-        # Create mouse event
+        # Create mouse event (using non-deprecated constructor with globalPos)
+        local_pos = QPointF(10, 10)
         mouse_event = QMouseEvent(
             QMouseEvent.Type.MouseButtonPress,
-            QPointF(10, 10),
+            local_pos,
+            local_pos,  # globalPos - same as localPos for test purposes
             Qt.MouseButton.LeftButton,
             Qt.MouseButton.LeftButton,
             Qt.KeyboardModifier.NoModifier,

@@ -4,6 +4,7 @@ Intuitive drag-and-drop interface for arranging sprite rows
 """
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -697,42 +698,46 @@ class RowArrangementDialog(SplitterDialog):
         """Disconnect all signals to prevent memory leaks."""
         disconnect_errors = (RuntimeError, TypeError, AttributeError)
 
-        # Disconnect arrangement manager signals
-        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
-            try:
-                self.arrangement_manager.arrangement_changed.disconnect()
-            except disconnect_errors:
-                pass
+        # Suppress RuntimeWarning from PySide6 when disconnecting signals with no connections
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*disconnect.*")
 
-        # Disconnect colorizer signals
-        if hasattr(self, "colorizer"):
-            for signal_name in ("palette_mode_changed", "palette_index_changed"):
+            # Disconnect arrangement manager signals
+            if hasattr(self, "arrangement_manager") and self.arrangement_manager:
                 try:
-                    getattr(self.colorizer, signal_name).disconnect()
+                    self.arrangement_manager.arrangement_changed.disconnect()
                 except disconnect_errors:
                     pass
 
-        # Disconnect list widget signals
-        for list_name in ("available_list", "arranged_list"):
-            if hasattr(self, list_name):
-                widget = getattr(self, list_name)
-                for signal_name in ("itemDoubleClicked", "itemSelectionChanged"):
+            # Disconnect colorizer signals
+            if hasattr(self, "colorizer"):
+                for signal_name in ("palette_mode_changed", "palette_index_changed"):
                     try:
-                        getattr(widget, signal_name).disconnect()
+                        getattr(self.colorizer, signal_name).disconnect()
                     except disconnect_errors:
                         pass
-                # Disconnect custom signals on arranged_list
-                if list_name == "arranged_list":
-                    for signal_name in ("external_drop", "item_dropped"):
+
+            # Disconnect list widget signals
+            for list_name in ("available_list", "arranged_list"):
+                if hasattr(self, list_name):
+                    widget = getattr(self, list_name)
+                    for signal_name in ("itemDoubleClicked", "itemSelectionChanged"):
                         try:
                             getattr(widget, signal_name).disconnect()
                         except disconnect_errors:
                             pass
+                    # Disconnect custom signals on arranged_list
+                    if list_name == "arranged_list":
+                        for signal_name in ("external_drop", "item_dropped"):
+                            try:
+                                getattr(widget, signal_name).disconnect()
+                            except disconnect_errors:
+                                pass
 
-        # Disconnect button signals
-        for btn_name in ("add_all_btn", "add_selected_btn", "clear_btn", "remove_selected_btn"):
-            if hasattr(self, btn_name):
-                try:
-                    getattr(self, btn_name).clicked.disconnect()
-                except disconnect_errors:
-                    pass
+            # Disconnect button signals
+            for btn_name in ("add_all_btn", "add_selected_btn", "clear_btn", "remove_selected_btn"):
+                if hasattr(self, btn_name):
+                    try:
+                        getattr(self, btn_name).clicked.disconnect()
+                    except disconnect_errors:
+                        pass

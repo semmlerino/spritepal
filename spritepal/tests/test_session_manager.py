@@ -1,5 +1,9 @@
 """
 Tests for SessionManager
+
+NOTE: This file intentionally uses direct SessionManager instantiation to test
+the SessionManager class directly. The deprecation warnings are suppressed
+in pyproject.toml since we're testing the deprecated API.
 """
 from __future__ import annotations
 

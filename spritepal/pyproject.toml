@@ -31,6 +31,8 @@ dev = [
     "pytest-mock>=3.10.0",
     "pytest-timeout>=2.0.0",
     "pytest-xdist>=3.5.0",  # Parallel test execution
+    "pytest-benchmark>=4.0.0",  # Performance benchmarking
+    "memory-profiler>=0.60.0",  # Memory profiling
     "ruff>=0.1.0",
     "basedpyright>=1.8.0",
 ]
@@ -390,7 +392,9 @@ pythonpath = ["."]
 # -ra: show summary of all non-passing tests
 # --maxfail=3: stop after 3 failures (override with --maxfail=N)
 # --strict-markers: error on unknown markers
-addopts = "-v --tb=short -ra --maxfail=3 --strict-markers"
+# -n auto: parallel execution with pytest-xdist (use -n 0 for serial debugging)
+# --dist=loadscope: group tests by module/class to minimize fixture setup
+addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -n auto --dist=loadscope"
 
 # Qt-specific settings for pytest-qt
 qt_api = "pyside6"
@@ -419,11 +423,15 @@ filterwarnings = [
     "ignore:.*multi-threaded.*use of fork.*:DeprecationWarning",
     # NOTE: Mid-session cleanup warnings are NO LONGER suppressed to surface test pollution
     # Service locator deprecation warnings (B.1 - transitioning to DI)
-    "ignore:get_session_manager.*is deprecated:DeprecationWarning",
-    "ignore:get_extraction_manager.*is deprecated:DeprecationWarning",
-    "ignore:get_injection_manager.*is deprecated:DeprecationWarning",
-    "ignore:get_settings_manager.*is deprecated:DeprecationWarning",
-    "ignore:get_rom_cache.*is deprecated:DeprecationWarning",
+    "ignore:.*get_session_manager.*is deprecated:DeprecationWarning",
+    "ignore:.*get_extraction_manager.*is deprecated:DeprecationWarning",
+    "ignore:.*get_injection_manager.*is deprecated:DeprecationWarning",
+    "ignore:.*get_settings_manager.*is deprecated:DeprecationWarning",
+    "ignore:.*get_rom_cache.*is deprecated:DeprecationWarning",
+    # Direct manager instantiation deprecation (test files testing deprecated API)
+    "ignore:Direct SessionManager instantiation is deprecated:DeprecationWarning",
+    "ignore:Direct ExtractionManager instantiation is deprecated:DeprecationWarning",
+    "ignore:Direct InjectionManager instantiation is deprecated:DeprecationWarning",
     # NOTE: Worker constructor injection warnings (B.2) removed 2025-12-16
     # NOTE: ROMInjectionWorker migrated from core.workers.rom_injection_worker to core.workers.injection
     # NOTE: B.3-B.5 UI component migrations completed, all warnings removed 2025-12-16
@@ -471,7 +479,8 @@ markers = [
 
     # Execution control markers
     "serial: Tests that must run serially",
-    "parallel_safe: Tests safe for pytest-xdist parallel execution",
+    "parallel_safe: (DEPRECATED) Tests are now parallel by default - this marker is ignored",
+    "parallel_unsafe: Force test to run serially (has hidden shared state)",
     "worker_threads: Tests using worker threads",
     "thread_safety: Thread safety tests",
     "ci_safe: Tests safe for CI environments",

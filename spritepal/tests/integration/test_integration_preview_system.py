@@ -33,11 +33,6 @@ class TestSimplePreviewCoordinator:
         """Setup and teardown DI dependencies with isolation.
 
         Uses tmp_path for cache to prevent polluting $HOME with ~/.spritepal_rom_cache.
-
-        NOTE: Does NOT call reset_container() on teardown because:
-        1. session_managers may have registered dependencies we shouldn't clear
-        2. reset_container() would break subsequent tests using session fixtures
-        The session-level cleanup handles DI container reset appropriately.
         """
         from core.di_container import register_singleton
         from core.protocols.manager_protocols import ROMCacheProtocol
@@ -47,8 +42,6 @@ class TestSimplePreviewCoordinator:
         register_singleton(ROMCacheProtocol, ROMCache(cache_dir=str(cache_dir)))
 
         yield
-
-        # Don't call reset_container() - let session fixtures manage DI lifecycle
 
     def test_coordinator_initialization(self, managers_initialized):
         """Test that coordinator initializes correctly."""
@@ -107,7 +100,7 @@ class TestSimplePreviewCoordinator:
         # Cleanup
         coordinator.cleanup()
 
-    def test_preview_generation_with_real_data(self, test_rom_with_sprites, qtbot, wait_for, isolated_managers):
+    def test_preview_generation_with_real_data(self, test_rom_with_sprites, qtbot, wait_for):
         """Test that preview generates with real tile data."""
         rom_info = test_rom_with_sprites
         rom_path = str(rom_info['path'])
@@ -359,7 +352,7 @@ class TestSimplePreviewWorker:
 
 @pytest.mark.integration
 @pytest.mark.gui  # Uses Qt coordinator which can segfault in headless mode
-@pytest.mark.usefixtures("session_managers")
+@pytest.mark.usefixtures("isolated_managers")
 class TestPreviewCaching:
     """Test preview caching with ROM cache."""
 

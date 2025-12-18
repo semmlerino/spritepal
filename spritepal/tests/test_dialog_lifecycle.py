@@ -118,7 +118,7 @@ class TestDialogReopenScenarios:
     """Test various dialog reopen scenarios"""
 
     @pytest.mark.gui
-    def test_non_singleton_dialog_lifecycle(self, qtbot, isolated_managers):
+    def test_non_singleton_dialog_lifecycle(self, qtbot):
         """Test that non-singleton dialogs are properly recreated"""
         from ui.injection_dialog import InjectionDialog
 

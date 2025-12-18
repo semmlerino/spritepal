@@ -5,6 +5,7 @@ Flexible sprite arrangement supporting rows, columns, and custom tile groups
 
 from __future__ import annotations
 
+import warnings
 from enum import Enum
 from pathlib import Path
 from typing import Any, override
@@ -1361,43 +1362,47 @@ class GridArrangementDialog(SplitterDialog):
         """Disconnect all signals to prevent memory leaks."""
         disconnect_errors = (RuntimeError, TypeError, AttributeError)
 
-        # Disconnect arrangement manager signals
-        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
-            try:
-                self.arrangement_manager.arrangement_changed.disconnect()
-            except disconnect_errors:
-                pass
+        # Suppress RuntimeWarning from PySide6 when disconnecting signals with no connections
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*disconnect.*")
 
-        # Disconnect colorizer signals
-        if hasattr(self, "colorizer"):
-            try:
-                self.colorizer.palette_mode_changed.disconnect()
-            except disconnect_errors:
-                pass
-
-        # Disconnect mode button signals
-        if hasattr(self, "mode_buttons"):
-            try:
-                self.mode_buttons.buttonClicked.disconnect()
-            except disconnect_errors:
-                pass
-
-        # Disconnect grid view signals
-        if hasattr(self, "grid_view"):
-            for signal_name in ("tile_clicked", "tiles_selected", "zoom_changed"):
+            # Disconnect arrangement manager signals
+            if hasattr(self, "arrangement_manager") and self.arrangement_manager:
                 try:
-                    getattr(self.grid_view, signal_name).disconnect()
+                    self.arrangement_manager.arrangement_changed.disconnect()
                 except disconnect_errors:
                     pass
 
-        # Disconnect button signals
-        for btn_name in ("add_btn", "remove_btn", "create_group_btn", "clear_btn",
-                         "zoom_out_btn", "zoom_in_btn", "zoom_fit_btn", "zoom_reset_btn"):
-            if hasattr(self, btn_name):
+            # Disconnect colorizer signals
+            if hasattr(self, "colorizer"):
                 try:
-                    getattr(self, btn_name).clicked.disconnect()
+                    self.colorizer.palette_mode_changed.disconnect()
                 except disconnect_errors:
                     pass
+
+            # Disconnect mode button signals
+            if hasattr(self, "mode_buttons"):
+                try:
+                    self.mode_buttons.buttonClicked.disconnect()
+                except disconnect_errors:
+                    pass
+
+            # Disconnect grid view signals
+            if hasattr(self, "grid_view"):
+                for signal_name in ("tile_clicked", "tiles_selected", "zoom_changed"):
+                    try:
+                        getattr(self.grid_view, signal_name).disconnect()
+                    except disconnect_errors:
+                        pass
+
+            # Disconnect button signals
+            for btn_name in ("add_btn", "remove_btn", "create_group_btn", "clear_btn",
+                             "zoom_out_btn", "zoom_in_btn", "zoom_fit_btn", "zoom_reset_btn"):
+                if hasattr(self, btn_name):
+                    try:
+                        getattr(self, btn_name).clicked.disconnect()
+                    except disconnect_errors:
+                        pass
 
     def _cleanup_resources(self) -> None:
         """Clean up resources to prevent memory leaks"""

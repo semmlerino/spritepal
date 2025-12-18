@@ -287,10 +287,6 @@ class TestComposedDialogEssentialIntegration:
             assert cleanup_tracking['message'] is True
             assert cleanup_tracking['button'] is True
 
-    @pytest.mark.xfail(
-        reason="Test creates subclass inheriting real QDialog but patches Qt; may crash in isolation",
-        strict=False,  # Passes when QApplication exists from other tests in full suite
-    )
     def test_subclass_customization_workflow(self):
         """Test dialog subclass customization works correctly."""
 
@@ -412,13 +408,7 @@ class TestComposedDialogEssentialIntegration:
     @pytest.mark.parametrize("error_condition", [
         "missing_config",
         "invalid_dialog_context",
-        pytest.param(
-            "duplicate_component_registration",
-            marks=pytest.mark.xfail(
-                reason="Creates ComposedDialog with Qt patches; may crash in isolation",
-                strict=False,  # Passes when QApplication exists from other tests in full suite
-            )
-        ),
+        "duplicate_component_registration",
     ])
     def test_error_handling_robustness(self, error_condition):
         """Test error handling in various failure scenarios."""
