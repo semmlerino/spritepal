@@ -65,7 +65,7 @@ warnings.filterwarnings(
     category=DeprecationWarning,
 )
 
-from utils.rom_cache import ROMCache
+from core.services.rom_cache import ROMCache
 
 from .test_data_repository import DataRepository, get_test_data_repository
 

@@ -31,7 +31,7 @@ except ImportError:
     QT_AVAILABLE = False
 
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
-from utils.rom_cache import ROMCache
+from core.services.rom_cache import ROMCache
 
 
 class TestSmartPreviewROMCacheTier:

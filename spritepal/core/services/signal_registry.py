@@ -4,7 +4,7 @@ This module provides a centralized registry for tracking signal connections,
 enabling debugging of control flow and connection management.
 
 Usage:
-    from utils.signal_registry import SignalRegistry
+    from core.services.signal_registry import SignalRegistry
 
     # Register a connection with description
     registry = SignalRegistry()

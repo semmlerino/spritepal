@@ -30,7 +30,7 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from utils.rom_cache import ROMCache
+    from core.services.rom_cache import ROMCache
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 from PySide6.QtWidgets import QSlider

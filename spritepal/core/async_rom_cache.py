@@ -35,7 +35,7 @@ from PySide6.QtCore import (
 )
 
 if TYPE_CHECKING:
-    from utils.rom_cache import ROMCache
+    from core.services.rom_cache import ROMCache
 
 from core.services.worker_lifecycle import WorkerManager
 from utils.logging_config import get_logger

@@ -32,7 +32,7 @@ from utils.constants import (
     SETTINGS_KEY_LAST_SPRITE_LOCATION,
     SETTINGS_NS_ROM_INJECTION,
 )
-from utils.settings_manager import SettingsManager
+from core.services.settings_manager import SettingsManager
 
 pytestmark = [
     pytest.mark.dialog,

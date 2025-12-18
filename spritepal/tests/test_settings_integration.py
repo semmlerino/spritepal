@@ -29,7 +29,7 @@ from core.protocols.manager_protocols import (
     InjectionManagerProtocol,
     SettingsManagerProtocol,
 )
-from utils.settings_manager import SettingsManager
+from core.services.settings_manager import SettingsManager
 
 
 def get_settings_manager():
@@ -108,9 +108,9 @@ class TestSettingsIntegration:
     def test_controller_settings_integration(self, temp_settings_dir, mock_main_window, isolated_managers):
         """Test controller interaction with settings manager"""
         # Reset global instance to ensure it uses temp directory
-        import utils.settings_manager
+        import core.services.settings_manager
 
-        utils.settings_manager._settings_instance = None
+        core.services.settings_manager._settings_instance = None
 
         settings = get_settings_manager()
 

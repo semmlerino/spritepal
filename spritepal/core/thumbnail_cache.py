@@ -251,19 +251,31 @@ class ThumbnailCache:
             pixmap_size = pixmap.width() * pixmap.height() * 4
 
             # Evict oldest entries until we're under the memory limit
+            memory_evictions = 0
+            memory_bytes_evicted = 0
             while (self._memory_usage_bytes + pixmap_size > self.max_memory_cache_bytes
                    and self.memory_cache):
                 _, evicted_pixmap = self.memory_cache.popitem(last=False)
                 evicted_size = evicted_pixmap.width() * evicted_pixmap.height() * 4
                 self._memory_usage_bytes -= evicted_size
-                logger.debug(f"Evicted thumbnail from memory cache (memory pressure): {evicted_size} bytes")
+                memory_evictions += 1
+                memory_bytes_evicted += evicted_size
 
             # Also enforce count-based limit - O(1) operation with OrderedDict
+            count_evictions = 0
+            count_bytes_evicted = 0
             while len(self.memory_cache) >= self.memory_cache_limit and self.memory_cache:
                 _, evicted_pixmap = self.memory_cache.popitem(last=False)
                 evicted_size = evicted_pixmap.width() * evicted_pixmap.height() * 4
                 self._memory_usage_bytes -= evicted_size
-                logger.debug(f"Evicted thumbnail from memory cache (count limit): {evicted_size} bytes")
+                count_evictions += 1
+                count_bytes_evicted += evicted_size
+
+            # Log summary after loops (avoid per-iteration logging)
+            if memory_evictions > 0:
+                logger.debug("Evicted %d thumbnails (memory pressure): %d bytes", memory_evictions, memory_bytes_evicted)
+            if count_evictions > 0:
+                logger.debug("Evicted %d thumbnails (count limit): %d bytes", count_evictions, count_bytes_evicted)
 
             # Add new item (automatically at end of OrderedDict)
             self.memory_cache[key] = pixmap

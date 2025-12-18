@@ -388,7 +388,7 @@ class TestSignalRegistry:
 
     def test_registry_connect_and_count(self):
         """Test that SignalRegistry tracks connections."""
-        from utils.signal_registry import SignalRegistry
+        from core.services.signal_registry import SignalRegistry
 
         # Reset for clean test
         SignalRegistry.reset_instance()
@@ -415,7 +415,7 @@ class TestSignalRegistry:
 
     def test_registry_dump_connections(self):
         """Test that dump_connections produces readable output."""
-        from utils.signal_registry import SignalRegistry
+        from core.services.signal_registry import SignalRegistry
 
         SignalRegistry.reset_instance()
         registry = SignalRegistry()
@@ -445,7 +445,7 @@ class TestSignalRegistry:
 
     def test_registry_disconnect_all(self):
         """Test that disconnect_all clears all connections."""
-        from utils.signal_registry import SignalRegistry
+        from core.services.signal_registry import SignalRegistry
 
         SignalRegistry.reset_instance()
         registry = SignalRegistry()
@@ -466,7 +466,7 @@ class TestSignalRegistry:
 
     def test_registry_singleton_pattern(self):
         """Test that SignalRegistry follows singleton pattern."""
-        from utils.signal_registry import SignalRegistry
+        from core.services.signal_registry import SignalRegistry
 
         SignalRegistry.reset_instance()
 

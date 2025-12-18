@@ -9,7 +9,7 @@ import sys
 import tempfile
 import traceback
 
-import utils.rom_cache
+import core.services.rom_cache
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -17,9 +17,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Direct imports with full module resolution
 import importlib
 
-rom_cache_module = importlib.import_module("utils.rom_cache")
+rom_cache_module = importlib.import_module("core.services.rom_cache")
 ROMCache = rom_cache_module.ROMCache
-get_rom_cache = rom_cache_module.get_rom_cache
 
 # Create a simple SpritePointer class for testing
 class SpritePointer:

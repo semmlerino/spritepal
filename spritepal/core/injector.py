@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+import numpy as np
 from PIL import Image
 
 from utils.constants import (
@@ -22,38 +23,51 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-def encode_4bpp_tile(tile_pixels: list[int]) -> bytes:
+def encode_4bpp_tile(tile_pixels: list[int] | np.ndarray) -> bytes:
     """
-    Encode an 8x8 tile to SNES 4bpp format.
-    Adapted from sprite_editor/tile_utils.py
+    Encode an 8x8 tile to SNES 4bpp format using NumPy vectorization.
+
+    Args:
+        tile_pixels: 64 pixel values (either list or numpy array)
+
+    Returns:
+        32 bytes of SNES 4bpp tile data
     """
-    if len(tile_pixels) != 64:
-        logger.error(f"Invalid tile size: expected 64 pixels, got {len(tile_pixels)}")
-        raise ValueError(f"Expected 64 pixels, got {len(tile_pixels)}")
+    # Convert to numpy array if needed
+    if isinstance(tile_pixels, list):
+        pixels = np.array(tile_pixels, dtype=np.uint8)
+    else:
+        pixels = tile_pixels.astype(np.uint8)
 
-    logger.debug("Encoding 8x8 tile to 4bpp format")
+    if len(pixels) != 64:
+        logger.error(f"Invalid tile size: expected 64 pixels, got {len(pixels)}")
+        raise ValueError(f"Expected 64 pixels, got {len(pixels)}")
 
-    output = bytearray(32)
+    # Reshape to 8x8 and mask to 4-bit
+    pixels = (pixels.reshape(8, 8) & PIXEL_MASK_4BIT)
 
-    for y in range(8):
-        bp0 = 0
-        bp1 = 0
-        bp2 = 0
-        bp3 = 0
+    # Extract bitplanes (vectorized bit extraction)
+    # Each bitplane is an 8x8 array of 0s and 1s
+    bp0_bits = (pixels & 1).astype(np.uint8)
+    bp1_bits = ((pixels >> 1) & 1).astype(np.uint8)
+    bp2_bits = ((pixels >> 2) & 1).astype(np.uint8)
+    bp3_bits = ((pixels >> 3) & 1).astype(np.uint8)
 
-        # Encode each pixel in the row
-        for x in range(8):
-            pixel = tile_pixels[y * 8 + x] & PIXEL_MASK_4BIT  # Ensure 4-bit value
-            bp0 |= ((pixel & 1) >> 0) << (7 - x)
-            bp1 |= ((pixel & 2) >> 1) << (7 - x)
-            bp2 |= ((pixel & 4) >> 2) << (7 - x)
-            bp3 |= ((pixel & 8) >> 3) << (7 - x)
+    # Pack each row of 8 bits into 1 byte using np.packbits
+    # np.packbits packs bits in big-endian order (MSB first), which matches SNES format
+    bp0 = np.packbits(bp0_bits, axis=1).flatten()  # 8 bytes
+    bp1 = np.packbits(bp1_bits, axis=1).flatten()  # 8 bytes
+    bp2 = np.packbits(bp2_bits, axis=1).flatten()  # 8 bytes
+    bp3 = np.packbits(bp3_bits, axis=1).flatten()  # 8 bytes
 
-        # Store bitplanes in SNES format
-        output[y * 2] = bp0
-        output[y * 2 + 1] = bp1
-        output[16 + y * 2] = bp2
-        output[16 + y * 2 + 1] = bp3
+    # Interleave bitplanes in SNES 4bpp format:
+    # First 16 bytes: bp0[0], bp1[0], bp0[1], bp1[1], ...
+    # Next 16 bytes: bp2[0], bp3[0], bp2[1], bp3[1], ...
+    output = np.zeros(32, dtype=np.uint8)
+    output[0:16:2] = bp0  # Even indices 0,2,4,6,8,10,12,14
+    output[1:16:2] = bp1  # Odd indices 1,3,5,7,9,11,13,15
+    output[16:32:2] = bp2  # Even indices 16,18,20,22,24,26,28,30
+    output[17:32:2] = bp3  # Odd indices 17,19,21,23,25,27,29,31
 
     return bytes(output)
 
@@ -132,26 +146,25 @@ class SpriteInjector:
             return False, f"Error validating sprite: {e!s}"
 
     def convert_png_to_4bpp(self, png_path: str) -> bytes:
-        """Convert PNG to SNES 4bpp tile data"""
+        """Convert PNG to SNES 4bpp tile data using NumPy vectorization."""
         logger.info(f"Converting PNG to 4bpp: {png_path}")
 
         # Extract all needed data from image within context manager
         with Image.open(png_path) as img:
-            # Handle different image modes
+            width, height = img.size
+
+            # Handle different image modes - convert to NumPy array directly
             if img.mode == "L":
-                # Grayscale mode - likely from ROM extraction
-                # Convert grayscale values back to palette indices
-                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                pixels = list(cast(Any, img.getdata()))
-                original_max = max(pixels) if pixels else 0
-                # Divide by 17 to get original 4-bit indices (0-15)
-                pixels = [min(15, p // 17) for p in pixels]
-                logger.debug(f"Converting grayscale to palette indices: max grayscale={original_max}, max index={max(pixels) if pixels else 0}")
+                # Grayscale mode - convert to NumPy and transform to palette indices
+                pixels = np.array(img, dtype=np.uint8)
+                original_max = int(pixels.max()) if pixels.size > 0 else 0
+                # Divide by 17 to get original 4-bit indices (0-15), clamp to 15
+                pixels = np.minimum(15, pixels // 17).astype(np.uint8)
+                logger.debug(f"Converting grayscale to palette indices: max grayscale={original_max}, max index={int(pixels.max()) if pixels.size > 0 else 0}")
             elif img.mode == "P":
-                # Already indexed - use as-is
-                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                pixels = list(cast(Any, img.getdata()))
-                max_index = max(pixels) if pixels else 0
+                # Already indexed - convert directly to NumPy
+                pixels = np.array(img, dtype=np.uint8)
+                max_index = int(pixels.max()) if pixels.size > 0 else 0
                 logger.debug(f"Using indexed palette directly: max index={max_index}")
 
                 # Validate palette indices for 4-bit compatibility (Issue 7 fix)
@@ -165,41 +178,37 @@ class SpriteInjector:
                 # Convert to indexed mode
                 logger.warning(f"Converting {img.mode} to indexed mode - may lose color information")
                 converted = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=16)
-                # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                pixels = list(cast(Any, converted.getdata()))
+                pixels = np.array(converted, dtype=np.uint8)
 
-            width, height = img.size
         tiles_x = width // TILE_WIDTH
         tiles_y = height // TILE_HEIGHT
         total_tiles = tiles_x * tiles_y
         logger.debug(f"Processing {total_tiles} tiles ({tiles_x}x{tiles_y})")
 
-        # Process tiles
-        output_data = bytearray()
-        processed_tiles = 0
+        # Ensure pixels is 2D (height, width)
+        if pixels.ndim == 1:
+            pixels = pixels.reshape(height, width)
 
-        for tile_y in range(tiles_y):
-            for tile_x in range(tiles_x):
-                # Extract 8x8 tile
-                tile_pixels = []
-                for y in range(TILE_HEIGHT):
-                    for x in range(TILE_WIDTH):
-                        pixel_x = tile_x * TILE_WIDTH + x
-                        pixel_y = tile_y * TILE_HEIGHT + y
-                        pixel_index = pixel_y * width + pixel_x
+        # Mask to 4-bit values
+        pixels = pixels & PIXEL_MASK_4BIT
 
-                        if pixel_index < len(pixels):
-                            tile_pixels.append(pixels[pixel_index] & PIXEL_MASK_4BIT)
-                        else:
-                            tile_pixels.append(0)
+        # Reshape to extract tiles in one operation
+        # From (height, width) to (tiles_y, TILE_HEIGHT, tiles_x, TILE_WIDTH)
+        # Then transpose to (tiles_y, tiles_x, TILE_HEIGHT, TILE_WIDTH)
+        # This groups all pixels for each tile together
+        tiles = pixels[:tiles_y * TILE_HEIGHT, :tiles_x * TILE_WIDTH]
+        tiles = tiles.reshape(tiles_y, TILE_HEIGHT, tiles_x, TILE_WIDTH)
+        tiles = tiles.transpose(0, 2, 1, 3)  # Now shape is (tiles_y, tiles_x, 8, 8)
 
-                # Encode tile
-                tile_data = encode_4bpp_tile(tile_pixels)
-                output_data.extend(tile_data)
-                processed_tiles += 1
+        # Flatten to (total_tiles, 64) for processing
+        tiles = tiles.reshape(total_tiles, 64)
 
-                if processed_tiles % 100 == 0:
-                    logger.debug(f"Processed {processed_tiles}/{total_tiles} tiles")
+        # Process all tiles - pre-allocate output for efficiency
+        output_data = bytearray(total_tiles * 32)
+
+        for i in range(total_tiles):
+            tile_data = encode_4bpp_tile(tiles[i])
+            output_data[i * 32:(i + 1) * 32] = tile_data
 
         logger.info(f"Converted {total_tiles} tiles to {len(output_data)} bytes of 4bpp tile data")
         return bytes(output_data)

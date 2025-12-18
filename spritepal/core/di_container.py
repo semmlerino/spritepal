@@ -205,7 +205,7 @@ def configure_container(
         ConfigurationServiceProtocol,
         SettingsManagerProtocol,
     )
-    from utils.settings_manager import SettingsManager
+    from core.services.settings_manager import SettingsManager
 
     if configuration_service is not None:
         register_singleton(ConfigurationServiceProtocol, configuration_service)
@@ -228,7 +228,7 @@ def configure_container(
 
     # Import ROMCache and its Protocol
     from core.protocols.manager_protocols import ROMCacheProtocol
-    from utils.rom_cache import ROMCache
+    from core.services.rom_cache import ROMCache
 
     # Register ROMCache
     register_factory(

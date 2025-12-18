@@ -17,7 +17,7 @@ pytestmark = [
 
 from core.managers import ExtractionManager
 from ui.common.simple_preview_coordinator import SimplePreviewCoordinator, SimplePreviewWorker
-from utils.rom_cache import ROMCache
+from core.services.rom_cache import ROMCache
 
 # Note: Tests previously used skip_in_offscreen for QThread + waitSignal issues.
 # This was replaced with waitUntil pattern which is more stable in offscreen mode.

@@ -129,7 +129,7 @@ class SmartPreviewExample(QWidget):
     def _get_rom_data(self):
         """Provide ROM data for preview generation with cache support."""
         # In real implementation, return actual ROM path, extractor, and cache
-        from utils.rom_cache import get_rom_cache
+        from core.services.rom_cache import get_rom_cache
         rom_cache = get_rom_cache()
         return ("/path/to/rom.smc", None, rom_cache)  # Mock data with cache
 

@@ -13,7 +13,7 @@ import pytest
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol
 from core.rom_injector import SpritePointer
-from utils.rom_cache import ROMCache
+from core.services.rom_cache import ROMCache
 
 
 def get_rom_cache():
@@ -675,8 +675,8 @@ class TestROMCacheSingleton:
     def test_get_rom_cache_singleton(self) -> None:
         """Test that get_rom_cache returns singleton."""
         # Reset global instance
-        import utils.rom_cache
-        utils.rom_cache._rom_cache_instance = None
+        import core.services.rom_cache
+        core.services.rom_cache._rom_cache_instance = None
 
         # Get instance twice
         cache1 = get_rom_cache()
@@ -687,8 +687,8 @@ class TestROMCacheSingleton:
 
     def test_singleton_preserves_state(self, test_rom_file) -> None:
         """Test that singleton preserves state across calls."""
-        import utils.rom_cache
-        utils.rom_cache._rom_cache_instance = None
+        import core.services.rom_cache
+        core.services.rom_cache._rom_cache_instance = None
 
         cache1 = get_rom_cache()
         # Save some data

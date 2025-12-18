@@ -21,7 +21,7 @@ warnings.filterwarnings(
 
 from core.di_container import inject
 from core.protocols.manager_protocols import SettingsManagerProtocol
-from utils.settings_manager import SettingsManager
+from core.services.settings_manager import SettingsManager
 
 
 def get_settings_manager():

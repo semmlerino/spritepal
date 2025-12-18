@@ -15,7 +15,7 @@ import pytest
 from core.controller import ExtractionController
 from core.managers import ExtractionManager, InjectionManager, SessionManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from utils.settings_manager import SettingsManager
+from core.services.settings_manager import SettingsManager
 
 # Systematic pytest markers applied based on test content analysis
 # NOTE: parallel_safe removed - tests use isolated_managers fixture and mocks

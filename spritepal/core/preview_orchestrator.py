@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from PySide6.QtGui import QPixmap
 
     from core.async_rom_cache import AsyncROMCache
-    from utils.rom_cache import ROMCache
+    from core.services.rom_cache import ROMCache
 
 from utils.logging_config import get_logger
 

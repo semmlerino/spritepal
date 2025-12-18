@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from core.managers.registry import ManagerRegistry
     from core.managers.session_manager import SessionManager
     from tests.infrastructure.test_protocols import MockMainWindowProtocol
-    from utils.rom_cache import ROMCache
+    from core.services.rom_cache import ROMCache
 
 # Runtime imports for inject() - needed to avoid deprecated ManagerRegistry methods
 from core.di_container import inject
@@ -159,7 +159,7 @@ def reset_all_singletons() -> None:
 
     # Reset SignalRegistry singleton
     with contextlib.suppress(Exception):
-        from utils.signal_registry import SignalRegistry
+        from core.services.signal_registry import SignalRegistry
         SignalRegistry.reset_instance()
 
     # Clear WorkerManager thread registry

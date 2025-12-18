@@ -32,7 +32,7 @@ from core.managers.injection_manager import InjectionManager
 from core.managers.session_manager import SessionManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.workers import VRAMExtractionWorker
-from utils.settings_manager import SettingsManager
+from core.services.settings_manager import SettingsManager
 
 # Unified pytest markers for this consolidated module
 pytestmark = [
