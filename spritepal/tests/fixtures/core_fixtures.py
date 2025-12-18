@@ -270,6 +270,11 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
         app = QApplication([])
 
     initialize_managers("TestApp", settings_path=settings_path)
+
+    # Register UI factories with DI container (after managers are initialized)
+    from ui import register_ui_factories
+    register_ui_factories()
+
     yield
     cleanup_managers()
 
@@ -354,6 +359,10 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     # Initialize fresh managers for this test with isolated settings
     initialize_managers("TestApp_Isolated", settings_path=settings_path)
 
+    # Register UI factories with DI container (after managers are initialized)
+    from ui import register_ui_factories
+    register_ui_factories()
+
     # Yield the registry for convenience
     yield ManagerRegistry()  # type: ignore[misc]
 
@@ -366,6 +375,9 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     if session_active and session_settings_path:
         try:
             initialize_managers("TestApp", settings_path=session_settings_path)
+            # Re-register UI factories after restore
+            from ui import register_ui_factories
+            register_ui_factories()
         except Exception:
             pass  # Best effort restore
 

@@ -248,8 +248,9 @@ def configure_container(
     )
 
     # NOTE: UI factory registrations (ManualOffsetDialogFactoryProtocol, DialogFactoryProtocol)
-    # are handled by ui.register_ui_factories() called from ManagerRegistry.initialize_managers()
-    # This keeps UI dependencies out of core/ layer.
+    # are handled by ui.register_ui_factories() called by application entry points
+    # AFTER initialize_managers() completes. This keeps UI dependencies out of core/ layer.
+    # See: launch_spritepal.py, tests/fixtures/core_fixtures.py
 
     logger.info("DI container configured (services registered, managers pending)")
 

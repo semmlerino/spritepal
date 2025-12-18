@@ -292,6 +292,10 @@ class RealComponentFactory:
             # Initialize real managers via registry with isolated settings
             registry.initialize_managers("TestApp", settings_path=self._settings_path)
 
+            # Register UI factories with DI container (after managers are initialized)
+            from ui import register_ui_factories
+            register_ui_factories()
+
         return registry
 
     def create_main_window(self, with_managers: bool = True) -> MainWindow:
@@ -309,6 +313,10 @@ class RealComponentFactory:
             registry = ManagerRegistry()
             if not registry.is_initialized():
                 registry.initialize_managers("TestApp", settings_path=self._settings_path)
+
+                # Register UI factories with DI container (after managers are initialized)
+                from ui import register_ui_factories
+                register_ui_factories()
 
         # B.7: Create MainWindow with explicit DI dependencies (matching B.6 pattern)
         from core.di_container import inject

@@ -72,6 +72,10 @@ class ManagerTestContext:
         settings_path = self._settings_dir / ".test_settings.json"
         initialize_managers("ManagerTestContext", settings_path=settings_path)
 
+        # Register UI factories with DI container (after managers are initialized)
+        from ui import register_ui_factories
+        register_ui_factories()
+
         # Now create the factory with the initialized registry
         self._registry = ManagerRegistry()
         self._factory = RealComponentFactory(manager_registry=self._registry)

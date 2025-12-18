@@ -36,6 +36,10 @@ def managers_initialized(qt_app, request, tmp_path):
         settings_path = tmp_path / ".test_integration_settings.json"
         initialize_managers("TestApp_Integration", settings_path=settings_path)
 
+        # Register UI factories with DI container (after managers are initialized)
+        from ui import register_ui_factories
+        register_ui_factories()
+
     yield
 
     # Only cleanup if WE initialized AND session_managers is NOT active

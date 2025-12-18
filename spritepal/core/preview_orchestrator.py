@@ -28,20 +28,10 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 
 if TYPE_CHECKING:
-    from typing import Protocol
-
     from PySide6.QtGui import QPixmap
 
     from core.async_rom_cache import AsyncROMCache
     from utils.rom_cache import ROMCache
-
-    class PreviewWorkerPoolProtocol(Protocol):
-        """Protocol for preview worker pool to avoid UI layer coupling."""
-        preview_ready: Signal
-        preview_error: Signal
-
-        def generate_preview(self, request_id: str, rom_path: str, offset: int) -> None: ...
-        def cleanup(self) -> None: ...
 
 from utils.logging_config import get_logger
 
@@ -174,9 +164,12 @@ class PreviewOrchestrator(QObject):
 
         Args:
             parent: Optional Qt parent object
-            worker_pool_factory: Factory function that creates a PreviewWorkerPool instance.
-                               If not provided, will lazily import from ui.common.preview_worker_pool.
-                               Provide this to avoid layer violations or for testing.
+            worker_pool_factory: Factory function that creates a worker pool instance
+                implementing PreviewWorkerPoolProtocol. Required for preview generation.
+                The factory is called lazily on first preview request.
+
+        Raises:
+            RuntimeError: If worker_pool_factory is not provided and a preview is requested.
         """
         super().__init__(parent)
 
@@ -356,16 +349,17 @@ class PreviewOrchestrator(QObject):
             self._generate_preview(request)
 
     def _generate_preview(self, request: PreviewRequest) -> None:
-        """Generate preview using worker pool"""
+        """Generate preview using worker pool."""
         if not self._worker_pool:
             if self._worker_pool_factory:
-                # Use injected factory (preferred - avoids layer violation)
+                # Use injected factory
                 self._worker_pool = self._worker_pool_factory()
             else:
-                # Lazy import fallback - note: this is a layer violation
-                # Production code should inject worker_pool_factory in constructor
-                from ui.common.preview_worker_pool import PreviewWorkerPool
-                self._worker_pool = PreviewWorkerPool()
+                raise RuntimeError(
+                    "PreviewOrchestrator requires worker_pool_factory. "
+                    "Pass a factory function to the constructor that creates a "
+                    "worker pool implementing PreviewWorkerPoolProtocol."
+                )
             # Connect signals - worker_pool is guaranteed non-None at this point
             assert self._worker_pool is not None
             self._worker_pool.preview_ready.connect(self._on_preview_ready)

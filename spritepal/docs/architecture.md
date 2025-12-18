@@ -88,15 +88,27 @@ SpritePal uses two naming patterns for orchestration classes. Choose based on **
 2. UI coordination only? → `ui/managers/*_coordinator.py`
 3. Hybrid (UI + some logic)? → Create Manager in core, Coordinator in UI that uses it
 
-### Known Layer Boundary Limitations
+### Layer Boundary Design
 
-Some imports cross layer boundaries by necessity:
+The Core layer (`core/`) has **zero runtime imports from UI** (`ui/`). This clean separation is maintained through:
 
-1. **Dialog Factories in DI Container** (`core/di_container.py:304,321`)
-   - `ManualOffsetDialogFactory` and `ControllerDialogFactory` are imported from UI
-   - **Reason**: Factories create UI objects, so they belong in UI. DI container needs the class as a registration key.
-   - **Mitigation**: Imports are inside `configure_container()`, not at module level, reducing coupling.
-   - **Future fix**: Create protocol interfaces for factories in `core/protocols/`
+1. **Self-Registration Pattern** for UI Factories
+   - UI factories (dialogs, workers) are registered by application entry points
+   - Entry points call `register_ui_factories()` from `ui/__init__.py` AFTER `initialize_managers()`
+   - Core code accesses factories via DI protocols, never importing UI directly
+
+2. **Protocol-Based DI**
+   - Core defines protocols in `core/protocols/`
+   - UI implements these protocols
+   - DI container maps protocols to implementations at runtime
+
+**Entry Point Responsibilities:**
+```python
+# In launch_spritepal.py or test fixtures:
+initialize_managers("AppName", settings_path=...)
+from ui import register_ui_factories
+register_ui_factories()  # Must be called AFTER initialize_managers()
+```
 
 ### Common Patterns
 

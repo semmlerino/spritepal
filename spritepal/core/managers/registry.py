@@ -211,9 +211,10 @@ class ManagerRegistry:
             from core.di_container import configure_container
             configure_container(configuration_service=configuration_service)
 
-            # Register UI factories (kept in ui/ layer to avoid layer violations)
-            from ui import register_ui_factories
-            register_ui_factories()
+            # NOTE: UI factory registration (register_ui_factories) must be called
+            # by the application entry point AFTER initialize_managers() completes.
+            # This keeps the core layer free of UI dependencies.
+            # See: launch_spritepal.py, tests/fixtures/core_fixtures.py
 
             # Get Qt application instance for proper parent management
             app = QApplication.instance()
