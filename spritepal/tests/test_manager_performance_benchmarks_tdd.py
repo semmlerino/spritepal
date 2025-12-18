@@ -65,20 +65,20 @@ class TestManagerPerformanceBenchmarksTDD:
         return get_test_data_repository()
 
     @pytest.mark.benchmark
-    def test_extraction_manager_initialization_performance_tdd(self, benchmark):
+    def test_extraction_manager_initialization_performance_tdd(self, benchmark, isolated_managers):
         """TDD: Manager initialization should complete within performance budget.
-        
+
         RED: Establish initialization time requirements (< 100ms)
         GREEN: Optimize initialization to meet requirements
         REFACTOR: Maintain initialization performance while adding features
-        
+
         Performance requirements:
         - Cold initialization: < 100ms
         - Warm initialization: < 50ms
         - Memory overhead: < 10MB
         """
         def create_extraction_manager():
-            with RealComponentFactory() as factory:
+            with RealComponentFactory(manager_registry=isolated_managers) as factory:
                 manager = factory.create_extraction_manager(with_test_data=True)
 
                 # Verify manager is fully initialized
@@ -95,10 +95,10 @@ class TestManagerPerformanceBenchmarksTDD:
         assert result is not None
 
     @pytest.mark.benchmark
-    def test_injection_manager_initialization_performance_tdd(self, benchmark):
+    def test_injection_manager_initialization_performance_tdd(self, benchmark, isolated_managers):
         """TDD: Injection manager initialization performance baseline."""
         def create_injection_manager():
-            with RealComponentFactory() as factory:
+            with RealComponentFactory(manager_registry=isolated_managers) as factory:
                 manager = factory.create_injection_manager(with_test_data=True)
 
                 # Verify manager is fully initialized
@@ -354,9 +354,9 @@ class TestManagerMemoryPerformanceTDD:
     """TDD tests for manager memory usage and performance."""
 
     @pytest.mark.benchmark
-    def test_manager_memory_usage_tdd(self, benchmark):
+    def test_manager_memory_usage_tdd(self, benchmark, isolated_managers):
         """TDD: Manager memory usage should remain reasonable under load.
-        
+
         RED: Establish memory usage requirements (< 50MB per manager)
         GREEN: Optimize memory allocation and cleanup
         REFACTOR: Maintain functionality while minimizing memory footprint
@@ -366,7 +366,7 @@ class TestManagerMemoryPerformanceTDD:
 
             # Create and destroy many managers to test memory management
             for i in range(10):
-                with RealComponentFactory() as factory:
+                with RealComponentFactory(manager_registry=isolated_managers) as factory:
                     extraction_mgr = factory.create_extraction_manager()
                     injection_mgr = factory.create_injection_manager()
 

@@ -222,7 +222,7 @@ Mock where the class is imported and used, not where it's defined:
 @patch('ui.rom_extraction_panel.UnifiedManualOffsetDialog')
 
 # INCORRECT  
-@patch('ui.dialogs.manual_offset_unified_integrated.UnifiedManualOffsetDialog')
+@patch('ui.dialogs.manual_offset_dialog.UnifiedManualOffsetDialog')
 ```
 
 ### 2. QObject vs QDialog for Mocks

@@ -17,10 +17,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-if TYPE_CHECKING:
-    pass
-
-
 # Session-dependent fixtures that trigger serialization (must match core_fixtures.py)
 SESSION_DEPENDENT_FIXTURES = frozenset({
     'session_managers',
@@ -97,10 +93,10 @@ class FakeItem:
 
     def has_serial_group(self) -> bool:
         """Check if item was assigned to the serial xdist group."""
-        for marker in self._added_markers:
-            if marker.name == "xdist_group" and marker.args == ("serial",):
-                return True
-        return False
+        return any(
+            marker.name == "xdist_group" and marker.args == ("serial",)
+            for marker in self._added_markers
+        )
 
 
 class TestXdistCollectionPolicy:

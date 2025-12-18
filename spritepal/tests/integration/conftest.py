@@ -206,7 +206,8 @@ def manual_offset_dialog(qtbot, managers_initialized):
     "Internal C++ object already deleted" errors.
     """
     import shiboken6
-    from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
+
+    from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
     dialog = UnifiedManualOffsetDialog()
     # Don't use qtbot.addWidget() - we manage cleanup ourselves to avoid

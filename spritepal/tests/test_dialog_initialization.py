@@ -69,7 +69,7 @@ class TestDialogInitialization:
 
         # Save original modules before patching
         patched_modules = [
-            'ui.dialogs.manual_offset_unified_integrated',
+            'ui.dialogs.manual_offset_dialog',
             'ui.dialogs.settings_dialog',
             'ui.dialogs.grid_arrangement_dialog',
             'ui.dialogs.row_arrangement_dialog',

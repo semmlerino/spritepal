@@ -51,7 +51,7 @@ class TestControllerWithRealManagers:
         # Create real main window with real components
         # Note: fail_on_leaks=False because the test starts mock workers
         # but doesn't wait for them (it's testing controller logic, not worker lifecycle)
-        with RealComponentFactory(fail_on_leaks=False) as factory:
+        with RealComponentFactory(manager_registry=isolated_managers, fail_on_leaks=False) as factory:
             main_window = factory.create_main_window()
 
             # Get settings_manager and dialog_factory from DI container

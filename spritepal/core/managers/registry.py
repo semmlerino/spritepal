@@ -211,6 +211,10 @@ class ManagerRegistry:
             from core.di_container import configure_container
             configure_container(configuration_service=configuration_service)
 
+            # Register UI factories (kept in ui/ layer to avoid layer violations)
+            from ui import register_ui_factories
+            register_ui_factories()
+
             # Get Qt application instance for proper parent management
             app = QApplication.instance()
             if not app:

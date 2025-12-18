@@ -653,7 +653,7 @@ def patch_dialog_imports():
 
     # Create test modules for all dialog imports
     test_modules = {
-        'ui.dialogs.manual_offset_unified_integrated': MagicMock(
+        'ui.dialogs.manual_offset_dialog': MagicMock(
             UnifiedManualOffsetDialog=MockUnifiedOffsetDialog
         ),
         'ui.dialogs.settings_dialog': MagicMock(

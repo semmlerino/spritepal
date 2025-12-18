@@ -7,7 +7,13 @@ providing proper type safety without unsafe cast() operations.
 USAGE:
     from tests.infrastructure.real_component_factory import RealComponentFactory
 
-    def test_extraction(real_factory):  # Use fixture from conftest.py
+    # REQUIRED: Pass manager_registry from isolated_managers fixture
+    @pytest.fixture
+    def real_factory(isolated_managers, tmp_path):
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
+            yield factory
+
+    def test_extraction(real_factory):
         manager = real_factory.create_extraction_manager()
         result = manager.extract_sprites(params)
 
@@ -17,6 +23,7 @@ BENEFITS:
 - Type checker can verify all operations
 - Better integration testing
 - Consistent test data from DataRepository
+- Proper test isolation (no global state pollution)
 """
 
 from __future__ import annotations
@@ -92,17 +99,21 @@ class RealComponentFactory:
 
     def __init__(
         self,
+        *,
+        manager_registry: ManagerRegistry,
         data_repository: DataRepository | None = None,
         settings_dir: Path | None = None,
-        *,
         fail_on_leaks: bool | None = None,
         manage_registry: bool = False,
-        manager_registry: ManagerRegistry | None = None,
     ):
         """
         Initialize the real component factory.
 
         Args:
+            manager_registry: Pre-initialized ManagerRegistry for test isolation.
+                            REQUIRED. Pass `isolated_managers` fixture from tests.
+                            This ensures proper test isolation and prevents global
+                            state pollution.
             data_repository: Optional test data repository to use
             settings_dir: Optional directory for test settings files.
                          If not provided, a temp directory will be created
@@ -114,10 +125,6 @@ class RealComponentFactory:
                            lifecycle and will reset it during cleanup(). Use this when
                            the factory is used standalone without manager fixtures.
                            Default: False (registry lifecycle owned by test fixtures).
-            manager_registry: Optional pre-initialized ManagerRegistry to use for isolation.
-                            When provided, the factory uses this registry instead of the
-                            global singleton, ensuring proper test isolation.
-                            Recommended: Pass `isolated_managers` fixture from tests.
         """
         self._data_repo = data_repository or get_test_data_repository()
         self._temp_dirs: list[Path] = []
@@ -155,47 +162,25 @@ class RealComponentFactory:
             assert app_instance is not None, "QApplication instance should exist"
             self._app = app_instance
 
-        # Initialize managers to ensure DI container and protocols are registered
-        # This is necessary because managers like ExtractionManager create ROMExtractor
-        # which uses inject(ROMCacheProtocol) internally, and the DI factories depend
-        # on consolidated managers being initialized
-        if self._manager_registry is not None:
-            # Use provided registry - skip global initialization for proper isolation
-            pass  # Registry already initialized by fixture
-        else:
-            # Fallback to global singleton (deprecated path - emit warning)
-            import warnings
-            warnings.warn(
-                "RealComponentFactory created without manager_registry parameter. "
-                "This uses the global ManagerRegistry singleton and breaks test isolation. "
-                "Pass manager_registry=isolated_managers from your test fixture.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from core.managers.registry import ManagerRegistry
-            registry = ManagerRegistry()
-            if not registry.is_initialized():
-                from core.managers import initialize_managers
-                initialize_managers("TestApp", settings_path=self._settings_path)
-                # Track that we initialized it so cleanup can reset if needed
-                self._initialized_registry = True
+        # manager_registry is now required - no fallback to global singleton
+        # This ensures proper test isolation and prevents global state pollution
 
     def _get_extraction_manager_from_registry(self) -> ExtractionManager | None:
         """Get ExtractionManager from provided registry, if available."""
         if self._manager_registry is not None:
-            return self._manager_registry.extraction_manager
+            return self._manager_registry.get_extraction_manager()
         return None
 
     def _get_injection_manager_from_registry(self) -> InjectionManager | None:
         """Get InjectionManager from provided registry, if available."""
         if self._manager_registry is not None:
-            return self._manager_registry.injection_manager
+            return self._manager_registry.get_injection_manager()
         return None
 
     def _get_session_manager_from_registry(self) -> SessionManager | None:
         """Get SessionManager from provided registry, if available."""
         if self._manager_registry is not None:
-            return self._manager_registry.session_manager
+            return self._manager_registry.get_session_manager()
         return None
 
     def create_extraction_manager(self, with_test_data: bool = True) -> ExtractionManager:
@@ -864,16 +849,28 @@ class TypedManagerFactory(Generic[M]):
     This eliminates the need for unsafe cast() operations in tests.
     """
 
-    def __init__(self, manager_class: type[M], factory: RealComponentFactory | None = None):
+    def __init__(
+        self,
+        manager_class: type[M],
+        *,
+        factory: RealComponentFactory | None = None,
+        manager_registry: ManagerRegistry | None = None,
+    ):
         """
         Initialize typed manager factory.
 
         Args:
             manager_class: The manager class to create instances of
-            factory: Optional RealComponentFactory to use
+            factory: Optional RealComponentFactory to use (takes precedence over manager_registry)
+            manager_registry: ManagerRegistry to use if factory not provided
         """
+        if factory is None and manager_registry is None:
+            raise TypeError(
+                "TypedManagerFactory requires either factory or manager_registry parameter. "
+                "Use: TypedManagerFactory(ExtractionManager, manager_registry=isolated_managers)"
+            )
         self._manager_class = manager_class
-        self._factory = factory or RealComponentFactory()
+        self._factory = factory or RealComponentFactory(manager_registry=manager_registry)  # type: ignore[arg-type]
 
     def create(self, **kwargs: Any) -> M:
         """
@@ -906,16 +903,28 @@ class TypedWorkerFactory(Generic[W]):
     Generic factory for creating typed workers with compile-time type safety.
     """
 
-    def __init__(self, worker_class: type[W], factory: RealComponentFactory | None = None):
+    def __init__(
+        self,
+        worker_class: type[W],
+        *,
+        factory: RealComponentFactory | None = None,
+        manager_registry: ManagerRegistry | None = None,
+    ):
         """
         Initialize typed worker factory.
 
         Args:
             worker_class: The worker class to create instances of
-            factory: Optional RealComponentFactory to use
+            factory: Optional RealComponentFactory to use (takes precedence over manager_registry)
+            manager_registry: ManagerRegistry to use if factory not provided
         """
+        if factory is None and manager_registry is None:
+            raise TypeError(
+                "TypedWorkerFactory requires either factory or manager_registry parameter. "
+                "Use: TypedWorkerFactory(ExtractionWorker, manager_registry=isolated_managers)"
+            )
         self._worker_class = worker_class
-        self._factory = factory or RealComponentFactory()
+        self._factory = factory or RealComponentFactory(manager_registry=manager_registry)  # type: ignore[arg-type]
 
     def create(self, params: dict[str, Any] | None = None) -> W:
         """
@@ -950,14 +959,56 @@ class TypedWorkerFactory(Generic[W]):
         return self.create(params)
 
 # Convenience functions for common manager types
-def create_extraction_manager_factory() -> TypedManagerFactory[ExtractionManager]:
-    """Create a typed factory for ExtractionManager."""
-    return TypedManagerFactory(ExtractionManager)
+def create_extraction_manager_factory(
+    manager_registry: ManagerRegistry | None = None,
+) -> TypedManagerFactory[ExtractionManager]:
+    """Create a typed factory for ExtractionManager.
 
-def create_injection_manager_factory() -> TypedManagerFactory[InjectionManager]:
-    """Create a typed factory for InjectionManager."""
-    return TypedManagerFactory(InjectionManager)
+    Args:
+        manager_registry: Required ManagerRegistry for proper test isolation
 
-def create_session_manager_factory() -> TypedManagerFactory[SessionManager]:
-    """Create a typed factory for SessionManager."""
-    return TypedManagerFactory(SessionManager)
+    Raises:
+        TypeError: If manager_registry not provided
+    """
+    if manager_registry is None:
+        raise TypeError(
+            "create_extraction_manager_factory() requires manager_registry parameter. "
+            "Use: create_extraction_manager_factory(manager_registry=isolated_managers)"
+        )
+    return TypedManagerFactory(ExtractionManager, manager_registry=manager_registry)
+
+def create_injection_manager_factory(
+    manager_registry: ManagerRegistry | None = None,
+) -> TypedManagerFactory[InjectionManager]:
+    """Create a typed factory for InjectionManager.
+
+    Args:
+        manager_registry: Required ManagerRegistry for proper test isolation
+
+    Raises:
+        TypeError: If manager_registry not provided
+    """
+    if manager_registry is None:
+        raise TypeError(
+            "create_injection_manager_factory() requires manager_registry parameter. "
+            "Use: create_injection_manager_factory(manager_registry=isolated_managers)"
+        )
+    return TypedManagerFactory(InjectionManager, manager_registry=manager_registry)
+
+def create_session_manager_factory(
+    manager_registry: ManagerRegistry | None = None,
+) -> TypedManagerFactory[SessionManager]:
+    """Create a typed factory for SessionManager.
+
+    Args:
+        manager_registry: Required ManagerRegistry for proper test isolation
+
+    Raises:
+        TypeError: If manager_registry not provided
+    """
+    if manager_registry is None:
+        raise TypeError(
+            "create_session_manager_factory() requires manager_registry parameter. "
+            "Use: create_session_manager_factory(manager_registry=isolated_managers)"
+        )
+    return TypedManagerFactory(SessionManager, manager_registry=manager_registry)

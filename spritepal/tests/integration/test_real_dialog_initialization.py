@@ -113,7 +113,7 @@ class TestRealDialogInitialization:
 
         This dialog requires managers to be initialized.
         """
-        from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
+        from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
         dialog = UnifiedManualOffsetDialog()
         qtbot.addWidget(dialog)

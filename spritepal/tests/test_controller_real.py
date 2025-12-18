@@ -173,10 +173,9 @@ class TestExtractionControllerReal:
     def real_managers(self, isolated_managers):
         """Create real managers for the session.
 
-        Depends on isolated_managers to ensure global manager registry is initialized,
-        since ROMExtractionWorker uses get_extraction_manager() from the registry.
+        Uses isolated_managers for proper test isolation.
         """
-        with RealComponentFactory() as factory:
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
             # Create real managers
             extraction_manager = factory.create_extraction_manager()
             injection_manager = factory.create_injection_manager()

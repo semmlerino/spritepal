@@ -42,26 +42,20 @@ from .specialized import (
 )
 
 __all__ = [
-    # Base classes
     "BaseWorker",
-    # Specialized base classes
     "ExtractionWorkerBase",
     "InjectionWorkerBase",
     "ManagedWorker",
     "PreviewWorkerBase",
-    # DI-based workers (new architecture)
     "ROMExtractionWorker",
-    "ROMInjectionWorker",
-    "VRAMInjectionWorker",
-    # Parameter types
     "ROMInjectionParams",
-    "VRAMInjectionParams",
+    "ROMInjectionWorker",
     "ScanWorkerBase",
-    # Legacy implementations (singleton managers)
     "VRAMExtractionWorker",
+    "VRAMInjectionParams",
+    "VRAMInjectionWorker",
     "WorkerOwnedROMExtractionWorker",
     "WorkerOwnedROMInjectionWorker",
-    # Modern implementations (worker-owned managers)
     "WorkerOwnedVRAMExtractionWorker",
     "WorkerOwnedVRAMInjectionWorker",
 ]

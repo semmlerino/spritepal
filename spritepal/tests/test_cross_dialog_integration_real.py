@@ -65,13 +65,13 @@ class TestRealCrossDialogIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
 
-        # Initialize real manager factory (no qt_parent - uses QApplication.instance())
-        self.manager_factory = RealComponentFactory()
+        # Initialize real manager factory with proper test isolation
+        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
 
         # Initialize test data repository
         self.test_data = DataRepository()
@@ -281,7 +281,7 @@ class TestRealCrossDialogIntegration:
 class TestRealTestingInfrastructureValidation:
     """Validate that the real testing infrastructure works correctly."""
 
-    def test_real_infrastructure_components(self):
+    def test_real_infrastructure_components(self, isolated_managers):
         """Test that all real testing infrastructure components work."""
         # Test Qt application factory
         app = ApplicationFactory.get_application()
@@ -289,7 +289,7 @@ class TestRealTestingInfrastructureValidation:
         assert app.applicationName() == "SpritePal-Test"
 
         # Test real manager factory
-        factory = RealComponentFactory()
+        factory = RealComponentFactory(manager_registry=isolated_managers)
         extraction_manager = factory.create_extraction_manager()
         assert extraction_manager is not None
         # Manager is a QObject without a default parent
@@ -309,14 +309,14 @@ class TestRealTestingInfrastructureValidation:
         assert qt_framework is not None
         qt_framework.cleanup()
 
-    def test_real_vs_mock_comparison(self):
+    def test_real_vs_mock_comparison(self, isolated_managers):
         """
         Demonstrate specific cases where real tests catch bugs mocks miss.
 
         This serves as documentation of why we moved away from mocking.
         """
         # Example 1: Qt parent/child lifecycle
-        factory = RealComponentFactory()
+        factory = RealComponentFactory(manager_registry=isolated_managers)
         manager = factory.create_extraction_manager()
         app = ApplicationFactory.get_application()
 
@@ -347,10 +347,16 @@ if __name__ == "__main__":
     # Run a quick validation that the real integration tests work
     import sys
 
+    from core.managers import initialize_managers
+    from core.managers.registry import ManagerRegistry
+
     try:
         # Test infrastructure setup
         app = ApplicationFactory.get_application()
-        factory = RealComponentFactory()
+        # Initialize managers for standalone script execution
+        initialize_managers("TestApp")
+        registry = ManagerRegistry()
+        factory = RealComponentFactory(manager_registry=registry)
         test_data = DataRepository()
 
         print("✅ Real testing infrastructure initialized successfully")

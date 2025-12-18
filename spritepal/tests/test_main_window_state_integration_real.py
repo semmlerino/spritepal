@@ -76,16 +76,14 @@ class TestRealMainWindowStateIntegration:
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
 
-        # Initialize real manager factory
-        self.manager_factory = RealComponentFactory()
+        # Initialize real manager factory with proper test isolation
+        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
 
         # Initialize test data repository
         self.test_data = DataRepository()
 
         # Initialize Qt testing framework
         self.qt_framework = QtTestingFramework()
-
-        # Managers already initialized by isolated_managers fixture
 
         yield
 
@@ -391,9 +389,8 @@ class TestRealMainWindowWorkflowIntegration:
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealComponentFactory()
+        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
         self.test_data = DataRepository()
-        # Managers already initialized by isolated_managers fixture
 
         yield
 
@@ -509,9 +506,8 @@ class TestBugDiscoveryRealVsMocked:
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealComponentFactory()
+        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
         self.test_data = DataRepository()
-        # Managers already initialized by isolated_managers fixture
 
         yield
 

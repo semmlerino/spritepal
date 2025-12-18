@@ -6,29 +6,34 @@ This directory contains the pytest test suite for SpritePal, featuring **Real Co
 
 ### For New Tests (Recommended)
 ```python
+import pytest
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
-def test_extraction_workflow():
+@pytest.fixture
+def real_factory(isolated_managers):
+    """Create RealComponentFactory with proper test isolation."""
+    with RealComponentFactory(manager_registry=isolated_managers) as factory:
+        yield factory
+
+def test_extraction_workflow(real_factory):
     """Test using real components - no mocks needed!"""
-    with RealComponentFactory() as factory:
-        # Real manager, no casting required
-        manager = factory.create_extraction_manager(with_test_data=True)
-        
-        # Real validation logic
-        params = factory._data_repo.get_vram_extraction_data("small")
-        is_valid = manager.validate_extraction_params(params)
-        assert isinstance(is_valid, bool)  # Real behavior
+    # Real manager, no casting required
+    manager = real_factory.create_extraction_manager(with_test_data=True)
+
+    # Real validation logic
+    params = real_factory._data_repo.get_vram_extraction_data("small")
+    is_valid = manager.validate_extraction_params(params)
+    assert isinstance(is_valid, bool)  # Real behavior
 ```
 
 ### For Qt Widget Tests
 ```python
-def test_real_widget(qtbot):
+def test_real_widget(qtbot, real_factory):
     """Test real Qt widgets with proper lifecycle."""
-    with RealComponentFactory() as factory:
-        widget = factory.create_test_widget(qtbot)
-        widget.show()
-        qtbot.waitExposed(widget)
-        # Test real widget behavior
+    widget = real_factory.create_test_widget(qtbot)
+    widget.show()
+    qtbot.waitExposed(widget)
+    # Test real widget behavior
 ```
 
 ### For Integration Tests
@@ -176,10 +181,11 @@ python -m tests.infrastructure.migration_helpers generate tests/test_controller.
    # OLD (unsafe)
    mock_manager = MockFactory.create_extraction_manager()
    manager = cast(ExtractionManager, mock_manager)  # TYPE VIOLATION!
-   
-   # NEW (type-safe)
-   with RealComponentFactory() as factory:
-       manager = factory.create_extraction_manager()  # Properly typed
+
+   # NEW (type-safe) - use isolated_managers fixture
+   def test_extraction(isolated_managers):
+       with RealComponentFactory(manager_registry=isolated_managers) as factory:
+           manager = factory.create_extraction_manager()  # Properly typed
    ```
 
 4. **Update Test Logic**:

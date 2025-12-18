@@ -30,7 +30,7 @@ from PySide6.QtWidgets import QApplication, QDialog
 # Dialog registry - maps dialog names to import info
 DIALOG_REGISTRY = {
     "ManualOffsetDialog": {
-        "module": "ui.dialogs.manual_offset_unified_integrated",
+        "module": "ui.dialogs.manual_offset_dialog",
         "class": "ManualOffsetDialog",
         "description": "Manual ROM offset browsing and preview dialog"
     },

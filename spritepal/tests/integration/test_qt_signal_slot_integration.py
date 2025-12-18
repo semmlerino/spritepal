@@ -20,7 +20,7 @@ import pytest
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 
 from tests.infrastructure.qt_testing_framework import QtTestingFramework
-from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
+from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 from ui.rom_extraction_panel import ROMExtractionPanel
 from utils.logging_config import get_logger
 

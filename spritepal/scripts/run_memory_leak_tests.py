@@ -77,7 +77,7 @@ def run_dialog_leak_tests(profiler: MemoryLeakProfiler, cycles: int, output_dir:
     print(f"Running dialog leak tests ({cycles} cycles each)...")
 
     dialog_tests = [
-        ("ManualOffsetDialog", "ui.dialogs.manual_offset_unified_integrated", "ManualOffsetDialog"),
+        ("ManualOffsetDialog", "ui.dialogs.manual_offset_dialog", "ManualOffsetDialog"),
         ("AdvancedSearchDialog", "ui.dialogs.advanced_search_dialog", "AdvancedSearchDialog"),
         ("SettingsDialog", "ui.dialogs.settings_dialog", "SettingsDialog"),
         ("GridArrangementDialog", "ui.grid_arrangement_dialog", "GridArrangementDialog"),

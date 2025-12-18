@@ -36,9 +36,9 @@ pytestmark = [
 def real_factory(tmp_path, isolated_managers):
     """Create RealComponentFactory for integration tests.
 
-    Depends on isolated_managers to ensure global manager registry is initialized.
+    Uses isolated_managers for proper test isolation.
     """
-    with RealComponentFactory() as factory:
+    with RealComponentFactory(manager_registry=isolated_managers) as factory:
         yield factory
 
 
@@ -149,7 +149,8 @@ class TestInjectionManagerInitialization:
         """Test that InjectionManager initializes correctly."""
         assert injection_manager is not None
         assert injection_manager.is_initialized()
-        assert injection_manager.get_name() == "InjectionManager"
+        # Registry returns InjectionAdapter (extends InjectionManager)
+        assert injection_manager.get_name() == "InjectionAdapter"
 
     def test_manager_initial_state(self, injection_manager):
         """Test initial state after initialization."""

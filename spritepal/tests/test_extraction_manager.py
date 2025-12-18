@@ -77,9 +77,9 @@ class TestExtractionManager:
     """
 
     @pytest.fixture
-    def real_factory(self) -> Generator[RealComponentFactory, None, None]:
+    def real_factory(self, isolated_managers) -> Generator[RealComponentFactory, None, None]:
         """Provide real component factory for creating actual managers."""
-        with RealComponentFactory() as factory:
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
             yield factory
 
     @pytest.fixture
@@ -135,7 +135,8 @@ class TestExtractionManager:
 
         # Verify manager is properly initialized
         assert manager.is_initialized()
-        assert manager.get_name() == "ExtractionManager"
+        # Registry returns ExtractionAdapter (extends ExtractionManager)
+        assert manager.get_name() == "ExtractionAdapter"
 
         # Verify real dependencies exist (not mocks)
         assert manager._sprite_extractor is not None
@@ -156,7 +157,8 @@ class TestExtractionManager:
             # Verify context provides real, initialized manager
             assert isinstance(manager, ExtractionManager)
             assert manager.is_initialized()
-            assert manager.get_name() == "ExtractionManager"
+            # Registry returns ExtractionAdapter (extends ExtractionManager)
+            assert manager.get_name() == "ExtractionAdapter"
 
             # Context should handle lifecycle automatically
             assert manager._sprite_extractor is not None

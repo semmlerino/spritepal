@@ -42,9 +42,9 @@ class TestInjectionManagerReal:
         return InjectionManager()
 
     @pytest.fixture
-    def real_factory(self) -> Generator[RealComponentFactory, None, None]:
+    def real_factory(self, isolated_managers) -> Generator[RealComponentFactory, None, None]:
         """Provide real component factory."""
-        with RealComponentFactory() as factory:
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
             yield factory
 
     @pytest.fixture

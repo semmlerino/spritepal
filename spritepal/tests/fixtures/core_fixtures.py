@@ -510,34 +510,6 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
         _reset_manager_caches(registry)
 
 
-@pytest.fixture(scope="class")
-def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
-    """
-    REMOVED: Use isolated_managers instead.
-
-    This fixture has been removed because class-scoped fixtures prevent
-    parallel test execution. All tests using this fixture must be migrated
-    to use ``isolated_managers`` instead.
-
-    Migration guide:
-        # Before
-        def test_something(self, class_managers):
-            registry = ManagerRegistry()
-            ...
-
-        # After
-        def test_something(self, isolated_managers):
-            registry = isolated_managers
-            ...
-    """
-    pytest.fail(
-        "class_managers fixture has been removed. "
-        "Use isolated_managers instead for per-test isolation. "
-        "See CLAUDE.md 'Test Fixture Selection Guide' for details."
-    )
-    yield  # Never reached, but keeps type checker happy
-
-
 # ============================================================================
 # Real Component Fixtures
 # ============================================================================

@@ -418,7 +418,7 @@ class TestManualOffsetDialogSingletonIntegration:
         ManualOffsetDialogSingleton.reset()
 
         # Create first dialog instance manually (bypassing get_dialog to test directly)
-        from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
+        from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
         dialog1 = UnifiedManualOffsetDialog(None)
         # Don't use qtbot.addWidget for dialog1 since we'll be deleting it manually

@@ -37,9 +37,7 @@ from tests.infrastructure.typed_worker_base import (
 )
 
 pytestmark = [
-    pytest.mark.usefixtures("session_managers"),
-    pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
     pytest.mark.serial,
     pytest.mark.ci_safe,
     pytest.mark.headless,
@@ -50,9 +48,9 @@ pytestmark = [
 class TestRealComponentFactory:
     """Tests demonstrating RealComponentFactory usage."""
 
-    def test_create_real_extraction_manager(self):
+    def test_create_real_extraction_manager(self, isolated_managers):
         """Test creating a real extraction manager with test data."""
-        with RealComponentFactory() as factory:
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
             # Create real manager - no mocking!
             manager = factory.create_extraction_manager(with_test_data=True)
 
@@ -64,10 +62,10 @@ class TestRealComponentFactory:
             assert hasattr(manager, "_last_vram_path")
             assert manager._last_vram_path is not None
 
-    def test_typed_manager_factory(self):
+    def test_typed_manager_factory(self, isolated_managers):
         """Test type-safe manager creation."""
         # Create typed factory - no cast() needed!
-        extraction_factory = create_extraction_manager_factory()
+        extraction_factory = create_extraction_manager_factory(manager_registry=isolated_managers)
 
         # Create manager with compile-time type safety
         manager = extraction_factory.create_with_test_data("medium")
@@ -85,9 +83,9 @@ class TestRealComponentFactory:
         is_valid = manager.validate_extraction_params(params)
         assert isinstance(is_valid, bool)
 
-    def test_real_worker_creation(self):
+    def test_real_worker_creation(self, isolated_managers):
         """Test creating real workers with type safety."""
-        with RealComponentFactory() as factory:
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
             # Get test data from repository
             data_repo = get_test_data_repository()
             params = data_repo.get_vram_extraction_data("small")
@@ -149,9 +147,9 @@ class TestManagerTestContext:
 class TestTypedWorkerBase:
     """Tests demonstrating typed worker patterns."""
 
-    def test_typed_worker_with_validator(self):
+    def test_typed_worker_with_validator(self, isolated_managers):
         """Test worker type validation."""
-        with RealComponentFactory() as factory:
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
             # Create real manager and worker
             manager = factory.create_extraction_manager()
             params = get_test_data_repository().get_vram_extraction_data("small")
@@ -228,9 +226,9 @@ class TestMigrationFromMockFactory:
         # assert manager.extract_sprites.called  # Mock attribute
         pass
 
-    def test_after_real_component_factory(self):
+    def test_after_real_component_factory(self, isolated_managers):
         """NEW WAY: Using RealComponentFactory with type safety."""
-        with RealComponentFactory() as factory:
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
             # Create real manager - no mocking, no casting!
             manager = factory.create_extraction_manager()
 
@@ -264,9 +262,9 @@ class TestMigrationFromMockFactory:
 # Pytest fixtures demonstrating the new infrastructure
 
 @pytest.fixture
-def real_factory():
+def real_factory(isolated_managers):
     """Fixture providing RealComponentFactory."""
-    with RealComponentFactory() as factory:
+    with RealComponentFactory(manager_registry=isolated_managers) as factory:
         yield factory
 
 @pytest.fixture
@@ -276,17 +274,17 @@ def test_context():
         yield ctx
 
 @pytest.fixture
-def extraction_manager_real():
+def extraction_manager_real(isolated_managers):
     """Fixture providing real ExtractionManager."""
-    factory = create_extraction_manager_factory()
+    factory = create_extraction_manager_factory(manager_registry=isolated_managers)
     manager = factory.create_with_test_data("medium")
     yield manager
     manager.cleanup()
 
 @pytest.fixture
-def injection_manager_real():
+def injection_manager_real(isolated_managers):
     """Fixture providing real InjectionManager."""
-    factory = TypedManagerFactory(InjectionManager)
+    factory = TypedManagerFactory(InjectionManager, manager_registry=isolated_managers)
     manager = factory.create_with_test_data("medium")
     yield manager
     manager.cleanup()

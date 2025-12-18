@@ -64,7 +64,7 @@ pytestmark = [
 
 # Import manual offset dialog
 try:
-    from ui.dialogs.manual_offset_unified_integrated import UnifiedManualOffsetDialog
+    from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
     MANUAL_OFFSET_AVAILABLE = True
 except ImportError:
     MANUAL_OFFSET_AVAILABLE = False

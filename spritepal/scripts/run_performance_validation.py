@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
 
-from ui.dialogs.manual_offset_unified_integrated import (
+from ui.dialogs.manual_offset_dialog import (
     UnifiedManualOffsetDialog,
 )
 

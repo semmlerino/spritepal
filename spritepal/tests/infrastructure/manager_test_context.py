@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import tempfile
 import threading
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any, TypeVar, cast
 
 from PySide6.QtCore import QThread
@@ -20,6 +22,7 @@ from PySide6.QtWidgets import QApplication
 from core.managers.base_manager import BaseManager
 from core.managers.extraction_manager import ExtractionManager
 from core.managers.injection_manager import InjectionManager
+from core.managers.registry import ManagerRegistry
 from core.managers.session_manager import SessionManager
 
 from .qt_application_factory import ApplicationFactory
@@ -48,7 +51,6 @@ class ManagerTestContext:
         """
         self._managers: dict[str, BaseManager] = {}
         self._workers: list[QThread] = []
-        self._factory = RealComponentFactory()
         self._data_repo = get_test_data_repository()
         self._lock = threading.RLock()
 
@@ -63,6 +65,17 @@ class ManagerTestContext:
 
         # Store original registry state for restoration
         self._original_registry_state: dict[str, Any] = {}
+
+        # Initialize the global ManagerRegistry singleton
+        # This ensures managers are available when RealComponentFactory accesses them
+        from core.managers import initialize_managers
+        self._settings_dir = Path(tempfile.mkdtemp(prefix="manager_test_context_"))
+        settings_path = self._settings_dir / ".test_settings.json"
+        initialize_managers("ManagerTestContext", settings_path=settings_path)
+
+        # Now create the factory with the initialized registry
+        self._registry = ManagerRegistry()
+        self._factory = RealComponentFactory(manager_registry=self._registry)
 
     def initialize_managers(self, *manager_types: str) -> None:
         """
@@ -263,6 +276,14 @@ class ManagerTestContext:
         # Clean up QApplication if we created it
         if self._created_app and self._app:
             self._app.quit()
+
+        # Clean up temp settings directory
+        if hasattr(self, '_settings_dir') and self._settings_dir.exists():
+            import shutil
+            try:
+                shutil.rmtree(self._settings_dir)
+            except Exception:
+                pass  # Best-effort cleanup
 
     def __enter__(self) -> ManagerTestContext:
         """Context manager entry."""

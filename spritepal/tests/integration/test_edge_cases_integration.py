@@ -49,9 +49,9 @@ pytestmark = [
 
 
 @pytest.fixture
-def real_factory(tmp_path):
+def real_factory(tmp_path, isolated_managers):
     """Create RealComponentFactory for integration tests."""
-    with RealComponentFactory() as factory:
+    with RealComponentFactory(manager_registry=isolated_managers) as factory:
         yield factory
 
 
@@ -234,7 +234,8 @@ class TestInjectionManagerEdgeCases:
         manager = real_factory.create_injection_manager()
         assert manager is not None
         assert manager.is_initialized()
-        assert manager.get_name() == "InjectionManager"
+        # Registry returns InjectionAdapter (extends InjectionManager)
+        assert manager.get_name() == "InjectionAdapter"
 
     def test_load_metadata_nonexistent_file(self, real_factory, tmp_path):
         """Test loading metadata from nonexistent file."""
@@ -419,9 +420,9 @@ class TestWorkflowEdgeCases:
         with pytest.raises((ValidationError, TypeError)):
             manager.validate_extraction_params(params)
 
-    def test_factory_cleanup_on_exit(self, tmp_path):
+    def test_factory_cleanup_on_exit(self, tmp_path, isolated_managers):
         """Test that factory properly cleans up resources."""
-        with RealComponentFactory() as factory:
+        with RealComponentFactory(manager_registry=isolated_managers) as factory:
             cache = factory.create_rom_cache()
             manager = factory.create_extraction_manager()
             assert cache is not None

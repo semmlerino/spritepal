@@ -22,9 +22,10 @@ from PySide6.QtGui import QImage
 
 from utils.state_manager import StateEntry, StateSnapshot
 
+from utils.file_validator import atomic_write
+
 from .base_manager import BaseManager
-from .exceptions import SessionError
-from .session_manager import SessionManager
+from .exceptions import SessionError, ValidationError
 
 T = TypeVar("T")
 
@@ -189,9 +190,6 @@ class ApplicationStateManager(BaseManager):
         self._workflow_lock = threading.RLock()  # Separate lock for workflow transitions
         self._cache_stats_lock = threading.RLock()  # Lock for cache stats
 
-        # Create backward compatibility adapter for session
-        self._session_adapter: SessionAdapter | None = None
-
         super().__init__("ApplicationStateManager", parent)
 
     @override
@@ -208,9 +206,6 @@ class ApplicationStateManager(BaseManager):
                 "widget": {},
                 "temp": {}
             }
-
-            # Create session adapter for backward compatibility
-            self._session_adapter = SessionAdapter(self)
 
             self._is_initialized = True
             self._logger.info("ApplicationStateManager initialized successfully")
@@ -356,16 +351,28 @@ class ApplicationStateManager(BaseManager):
         """Get default settings structure."""
         return {
             "session": {
+                "vram_path": "",
+                "cgram_path": "",
+                "oam_path": "",
+                "output_name": "",
+                "create_grayscale": True,
+                "create_metadata": True,
                 "last_rom_path": "",
                 "last_vram_path": "",
                 "last_output_dir": "",
-                "recent_files": []
+            },
+            "rom_injection": {
+                "last_input_rom": "",
+                "last_output_rom": "",
+                "last_sprite_location": "",
+                "last_custom_offset": "",
+                "fast_compression": False,
             },
             "ui": {
-                "window_width": 1200,
-                "window_height": 800,
-                "window_x": None,
-                "window_y": None,
+                "window_width": 900,
+                "window_height": 600,
+                "window_x": -1,
+                "window_y": -1,
                 "restore_position": True,
                 "theme": "default"
             },
@@ -378,8 +385,16 @@ class ApplicationStateManager(BaseManager):
             },
             "paths": {
                 "default_dumps_dir": str(Path.home() / "Documents" / "Mesen2" / "Debugger"),
+                "last_used_dir": "",
                 "last_export_dir": "",
                 "last_import_dir": ""
+            },
+            "recent_files": {
+                "vram": [],
+                "cgram": [],
+                "oam": [],
+                "rom": [],
+                "max_recent": 10,
             }
         }
 
@@ -396,6 +411,355 @@ class ApplicationStateManager(BaseManager):
                         data[category][key] = default_value
 
         return data
+
+    def _migrate_old_settings(self, old_data: dict[str, Any]) -> dict[str, Any]:
+        """Migrate old flat settings format to new categorized format."""
+        # Start with defaults
+        new_settings = self._get_default_settings()
+
+        # Map old keys to new structure
+        if "vram_path" in old_data:
+            new_settings["session"]["vram_path"] = old_data["vram_path"]
+        if "cgram_path" in old_data:
+            new_settings["session"]["cgram_path"] = old_data["cgram_path"]
+        if "oam_path" in old_data:
+            new_settings["session"]["oam_path"] = old_data["oam_path"]
+        if "output_name" in old_data:
+            new_settings["session"]["output_name"] = old_data["output_name"]
+
+        if "window_width" in old_data:
+            new_settings["ui"]["window_width"] = old_data["window_width"]
+        if "window_height" in old_data:
+            new_settings["ui"]["window_height"] = old_data["window_height"]
+        if "window_x" in old_data:
+            new_settings["ui"]["window_x"] = old_data["window_x"]
+        if "window_y" in old_data:
+            new_settings["ui"]["window_y"] = old_data["window_y"]
+        if "theme" in old_data:
+            new_settings["ui"]["theme"] = old_data["theme"]
+
+        if "last_export_dir" in old_data:
+            new_settings["paths"]["last_used_dir"] = old_data["last_export_dir"]
+
+        self._logger.info("Settings migration completed")
+        return new_settings
+
+    # ========== SessionManagerProtocol Methods ==========
+
+    def get(self, category: str, key: str, default: Any = None) -> Any:
+        """
+        Get a setting value (alias for get_setting for SessionManagerProtocol).
+
+        Args:
+            category: Setting category
+            key: Setting key
+            default: Default value if not found
+
+        Returns:
+            Setting value or default
+        """
+        return self.get_setting(category, key, default)
+
+    def set(self, category: str, key: str, value: Any) -> None:
+        """
+        Set a setting value (alias for set_setting for SessionManagerProtocol).
+
+        Args:
+            category: Setting category
+            key: Setting key
+            value: Value to set
+        """
+        self.set_setting(category, key, value)
+
+        # Emit specific signals for file updates
+        if category == "session" and key in ["vram_path", "cgram_path", "oam_path"]:
+            self.files_updated.emit({key: value})
+
+    def save_session(self) -> bool:
+        """
+        Save current session to file (alias for save_settings).
+
+        Returns:
+            True if saved successfully
+        """
+        operation = "save_session"
+        if not self._start_operation(operation):
+            return False
+
+        try:
+            # Use atomic write to prevent corruption on crash/power loss
+            with self._lock:
+                data = json.dumps(self._settings, indent=2).encode("utf-8")
+                atomic_write(self._settings_file, data)
+                self._session_dirty = False
+
+            self.settings_saved.emit()
+            self._logger.info("Session saved successfully")
+            return True
+
+        except OSError as e:
+            error = SessionError(f"Could not save settings: {e}")
+            self._handle_error(error, operation)
+            return False
+        finally:
+            self._finish_operation(operation)
+
+    def load_session(self, path: str | None = None) -> bool:
+        """
+        Load session from file.
+
+        Args:
+            path: Optional custom path to load from (defaults to settings file)
+
+        Returns:
+            True if loaded successfully
+        """
+        load_path = Path(path) if path else self._settings_file
+
+        if not load_path.exists():
+            return False
+
+        try:
+            with load_path.open() as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    self._settings = self._merge_with_defaults(data)
+                    self._session_dirty = False
+                    self.session_changed.emit()
+                    self._logger.info(f"Session loaded from {load_path}")
+                    return True
+            return False
+        except (OSError, json.JSONDecodeError) as e:
+            self._logger.warning(f"Could not load session: {e}")
+            return False
+
+    def restore_session(self) -> dict[str, Any]:
+        """
+        Restore session from file.
+
+        Returns:
+            Session data dictionary
+        """
+        operation = "restore_session"
+
+        if not self._start_operation(operation):
+            return {}
+
+        try:
+            # Reload settings from file
+            self._settings = self._load_settings()
+            session_data = self.get_session_data()
+
+            self.session_restored.emit(session_data)
+            self._logger.info("Session restored successfully")
+            return session_data
+
+        except Exception as e:
+            error = SessionError(f"Could not restore session: {e}")
+            self._handle_error(error, operation)
+            return {}
+        finally:
+            self._finish_operation(operation)
+
+    def get_session_data(self) -> dict[str, Any]:
+        """Get all session data."""
+        with self._lock:
+            session = self._settings.get("session", {})
+            return session if isinstance(session, dict) else {}
+
+    def update_session_data(self, data: dict[str, Any]) -> None:
+        """
+        Update multiple session values at once.
+
+        Args:
+            data: Dictionary of session data to update
+        """
+        with self._lock:
+            if "session" not in self._settings:
+                self._settings["session"] = {}
+
+            changed = False
+            for key, value in data.items():
+                if self._settings["session"].get(key) != value:
+                    self._settings["session"][key] = value
+                    changed = True
+
+            if changed:
+                self._session_dirty = True
+                self.session_changed.emit()
+
+                # Check for file updates
+                file_keys = {"vram_path", "cgram_path", "oam_path"}
+                file_updates = {k: v for k, v in data.items() if k in file_keys}
+                if file_updates:
+                    self.files_updated.emit(file_updates)
+
+    def update_file_paths(self, vram: str | None = None,
+                         cgram: str | None = None,
+                         oam: str | None = None) -> None:
+        """
+        Update file paths in session.
+
+        Args:
+            vram: VRAM file path
+            cgram: CGRAM file path
+            oam: OAM file path
+        """
+        updates: dict[str, str] = {}
+        if vram is not None:
+            updates["vram_path"] = vram
+            self._add_recent_file("vram", vram)
+        if cgram is not None:
+            updates["cgram_path"] = cgram
+            self._add_recent_file("cgram", cgram)
+        if oam is not None:
+            updates["oam_path"] = oam
+            self._add_recent_file("oam", oam)
+
+        if updates:
+            self.update_session_data(updates)
+
+    def update_window_state(self, geometry: dict[str, int | float]) -> None:
+        """
+        Update window geometry in settings.
+
+        Args:
+            geometry: Dictionary with width, height, x, y
+        """
+        with self._lock:
+            if "ui" not in self._settings:
+                self._settings["ui"] = {}
+
+            changed = False
+            for key in ["width", "height", "x", "y"]:
+                if key in geometry:
+                    setting_key = f"window_{key}"
+                    if self._settings["ui"].get(setting_key) != geometry[key]:
+                        self._settings["ui"][setting_key] = geometry[key]
+                        changed = True
+
+            if changed:
+                self._session_dirty = True
+
+    def get_window_geometry(self) -> dict[str, int]:
+        """Get saved window geometry."""
+        with self._lock:
+            ui_settings = self._settings.get("ui", {})
+            # Use 'or' to handle both missing keys and None values
+            return {
+                "width": ui_settings.get("window_width") or 900,
+                "height": ui_settings.get("window_height") or 600,
+                "x": ui_settings.get("window_x") if ui_settings.get("window_x") is not None else -1,
+                "y": ui_settings.get("window_y") if ui_settings.get("window_y") is not None else -1,
+            }
+
+    def clear_session(self) -> None:
+        """Clear current session data."""
+        with self._lock:
+            if "session" in self._settings:
+                self._settings["session"] = self._get_default_settings()["session"]
+                self._session_dirty = True
+                self.session_changed.emit()
+                self._logger.info("Session cleared")
+
+    def clear_recent_files(self, file_type: str | None = None) -> None:
+        """
+        Clear recent files.
+
+        Args:
+            file_type: Specific type to clear, or None for all
+        """
+        with self._lock:
+            if "recent_files" not in self._settings:
+                return
+
+            if file_type:
+                if file_type in self._settings["recent_files"]:
+                    self._settings["recent_files"][file_type] = []
+                    self._session_dirty = True
+            else:
+                # Clear all except max_recent setting
+                max_recent = self._settings["recent_files"].get("max_recent", 10)
+                self._settings["recent_files"] = {"max_recent": max_recent}
+                self._session_dirty = True
+
+    def export_settings(self, file_path: str) -> None:
+        """
+        Export settings to a file.
+
+        Args:
+            file_path: Path to export to
+
+        Raises:
+            SessionError: If export fails
+        """
+        try:
+            with Path(file_path).open("w") as f:
+                json.dump(self._settings, f, indent=2)
+            self._logger.info(f"Settings exported to {file_path}")
+        except OSError as e:
+            raise SessionError(f"Could not export settings: {e}") from e
+
+    def import_settings(self, file_path: str) -> None:
+        """
+        Import settings from a file.
+
+        Args:
+            file_path: Path to import from
+
+        Raises:
+            SessionError: If import fails
+            ValidationError: If settings are invalid
+        """
+        try:
+            path = Path(file_path)
+            if not path.exists():
+                raise ValidationError(f"Settings file not found: {file_path}")
+
+            with path.open() as f:
+                data = json.load(f)
+
+            if not isinstance(data, dict):
+                raise ValidationError("Invalid settings file format")
+
+            # Validate basic structure
+            if "session" not in data and "ui" not in data and "paths" not in data:
+                raise ValidationError("Settings file missing required sections")
+
+            # Merge with defaults to ensure all keys exist
+            self._settings = self._merge_with_defaults(data)
+            self._session_dirty = True
+            self.session_changed.emit()
+            self._logger.info(f"Settings imported from {file_path}")
+
+        except (OSError, json.JSONDecodeError) as e:
+            raise SessionError(f"Could not import settings: {e}") from e
+
+    def _add_recent_file(self, file_type: str, file_path: str) -> None:
+        """Add a file to recent files list."""
+        if not file_path or not Path(file_path).exists():
+            return
+
+        with self._lock:
+            if "recent_files" not in self._settings:
+                self._settings["recent_files"] = {}
+
+            recent = self._settings["recent_files"]
+            if file_type not in recent:
+                recent[file_type] = []
+
+            # Remove if already in list
+            if file_path in recent[file_type]:
+                recent[file_type].remove(file_path)
+
+            # Add to front
+            recent[file_type].insert(0, file_path)
+
+            # Limit size
+            max_recent = recent.get("max_recent", 10)
+            recent[file_type] = recent[file_type][:max_recent]
+
+            self._session_dirty = True
 
     # ========== State Management (Runtime/Temporary) ==========
 
@@ -820,14 +1184,6 @@ class ApplicationStateManager(BaseManager):
         with self._cache_stats_lock:
             self._preloaded_offsets.clear()
 
-    # ========== Backward Compatibility Adapters ==========
-
-    def get_session_adapter(self) -> SessionManager:
-        """Get session manager adapter for backward compatibility."""
-        if not self._session_adapter:
-            raise SessionError("Session adapter not initialized")
-        return self._session_adapter
-
     # ========== Unified State Snapshot ==========
 
     def get_full_state_snapshot(self) -> dict[str, Any]:
@@ -913,63 +1269,3 @@ class ApplicationStateManager(BaseManager):
             image: The QImage preview to display
         """
         self.preview_ready.emit(offset, image)
-
-
-class SessionAdapter(SessionManager):
-    """Adapter providing SessionManager interface."""
-
-    def __init__(self, state_manager: ApplicationStateManager):
-        """Initialize adapter."""
-        self._state_mgr = state_manager
-        QObject.__init__(self, state_manager)
-        self._is_initialized = True
-        self._name = "SessionAdapter"
-        self._logger = state_manager._logger
-
-        # Set up required attributes that parent methods expect
-        self._settings = state_manager._settings
-
-        # Forward signals
-        state_manager.session_changed.connect(self.session_changed.emit)
-        state_manager.files_updated.connect(self.files_updated.emit)
-        state_manager.settings_saved.connect(self.settings_saved.emit)
-        state_manager.session_restored.connect(self.session_restored.emit)
-
-    @override
-    def _initialize(self) -> None:
-        pass
-
-    @override
-    def cleanup(self) -> None:
-        pass
-
-    @override
-    def get(self, category: str, key: str, default: Any = None) -> Any:
-        return self._state_mgr.get_setting(category, key, default)
-
-    @override
-    def set(self, category: str, key: str, value: Any) -> None:
-        self._state_mgr.set_setting(category, key, value)
-
-    def save_session(self) -> bool:  # type: ignore[override]  # Base returns None, override returns bool for success
-        return self._state_mgr.save_settings()
-
-    @override
-    def get_session_data(self) -> dict[str, Any]:
-        """Get all session data (entire session dict, not just the 'data' key)"""
-        return self._state_mgr._settings.get("session", {})
-
-    @override
-    def update_session_data(self, data: dict[str, Any]) -> None:
-        """Update session data (merge into entire session dict, not just 'data' key)"""
-        # Get current session
-        current_session = self._state_mgr._settings.get("session", {})
-        # Merge new data into current session
-        current_session.update(data)
-        # Save updated session (update in place since we got a reference to the dict)
-        self._state_mgr._settings["session"] = current_session
-        # Mark settings as dirty so they get saved
-        self._state_mgr._session_dirty = True
-
-    def update_file_path(self, file_type: str, path: str) -> None:
-        self._state_mgr.update_session_file(file_type, path)

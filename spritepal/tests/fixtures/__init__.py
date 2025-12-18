@@ -64,11 +64,16 @@ def _is_headless_environment() -> bool:
         # Qt genuinely unavailable - use mock fallback
         return True
 
-def _get_real_factory():
-    """Lazy import and return RealComponentFactory for Qt-enabled environments."""
+def _get_real_factory(manager_registry):
+    """Lazy import and return RealComponentFactory for Qt-enabled environments.
+
+    Args:
+        manager_registry: ManagerRegistry instance from isolated_managers fixture.
+                         Required for proper test isolation.
+    """
     try:
         from tests.infrastructure.real_component_factory import RealComponentFactory
-        return RealComponentFactory()
+        return RealComponentFactory(manager_registry=manager_registry)
     except ImportError as e:
         raise RuntimeError(f"Cannot import RealComponentFactory in headless environment: {e}") from e
 

@@ -267,7 +267,7 @@ class TestCompleteUIWorkflowsIntegration:
         # Step 2: Mock the manual offset dialog to avoid complex dependencies
         mock_dialog = None
 
-        with patch('ui.dialogs.manual_offset_unified_integrated.UnifiedManualOffsetDialog') as MockDialog:
+        with patch('ui.dialogs.manual_offset_dialog.UnifiedManualOffsetDialog') as MockDialog:
             # Create a real QDialog for testing (not just a Mock)
             class TestManualOffsetDialog(QDialog):
                 # Real Qt signals (QSignalSpy requires real signals, not Mocks)

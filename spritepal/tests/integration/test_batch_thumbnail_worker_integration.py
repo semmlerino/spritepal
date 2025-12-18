@@ -145,9 +145,9 @@ def test_rom_file(tmp_path) -> str:
     return str(rom_path)
 
 @pytest.fixture
-def real_component_factory(tmp_path):
+def real_component_factory(tmp_path, isolated_managers):
     """Create RealComponentFactory for integration tests."""
-    with RealComponentFactory() as factory:
+    with RealComponentFactory(manager_registry=isolated_managers) as factory:
         yield factory
 
 

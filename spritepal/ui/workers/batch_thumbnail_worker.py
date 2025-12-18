@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from queue import PriorityQueue
+from queue import Empty, PriorityQueue
 from typing import Any, override
 
 from PIL import Image
@@ -238,8 +238,8 @@ class BatchThumbnailWorker(QObject):
             while not self._request_queue.empty():
                 try:
                     self._request_queue.get_nowait()
-                except Exception:
-                    # Queue is empty or other queue operation error
+                except Empty:
+                    # Queue is empty
                     break
             self._pending_count = 0
 

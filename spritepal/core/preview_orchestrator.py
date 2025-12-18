@@ -28,11 +28,20 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 
 if TYPE_CHECKING:
+    from typing import Protocol
+
     from PySide6.QtGui import QPixmap
 
     from core.async_rom_cache import AsyncROMCache
-    from ui.common.preview_worker_pool import PreviewWorkerPool
     from utils.rom_cache import ROMCache
+
+    class PreviewWorkerPoolProtocol(Protocol):
+        """Protocol for preview worker pool to avoid UI layer coupling."""
+        preview_ready: Signal
+        preview_error: Signal
+
+        def generate_preview(self, request_id: str, rom_path: str, offset: int) -> None: ...
+        def cleanup(self) -> None: ...
 
 from utils.logging_config import get_logger
 
@@ -155,8 +164,20 @@ class PreviewOrchestrator(QObject):
     preview_error = Signal(str, object)  # request_id, PreviewError
     metrics_updated = Signal(object)     # PreviewMetrics
 
-    def __init__(self, parent: QObject | None = None):
-        """Initialize the preview orchestrator"""
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        worker_pool_factory: Callable[[], Any] | None = None,
+    ):
+        """
+        Initialize the preview orchestrator.
+
+        Args:
+            parent: Optional Qt parent object
+            worker_pool_factory: Factory function that creates a PreviewWorkerPool instance.
+                               If not provided, will lazily import from ui.common.preview_worker_pool.
+                               Provide this to avoid layer violations or for testing.
+        """
         super().__init__(parent)
 
         # Request management
@@ -169,8 +190,9 @@ class PreviewOrchestrator(QObject):
         self._async_cache: AsyncROMCache | None = None
         self._last_preview: PreviewData | None = None
 
-        # Worker management (initialized lazily)
-        self._worker_pool: PreviewWorkerPool | None = None
+        # Worker management (initialized lazily via factory)
+        self._worker_pool: Any | None = None
+        self._worker_pool_factory = worker_pool_factory
 
         # Performance tracking
         self._metrics = PreviewMetrics()
@@ -336,14 +358,22 @@ class PreviewOrchestrator(QObject):
     def _generate_preview(self, request: PreviewRequest) -> None:
         """Generate preview using worker pool"""
         if not self._worker_pool:
-            from ui.common.preview_worker_pool import PreviewWorkerPool
-            self._worker_pool = PreviewWorkerPool()
+            if self._worker_pool_factory:
+                # Use injected factory (preferred - avoids layer violation)
+                self._worker_pool = self._worker_pool_factory()
+            else:
+                # Lazy import fallback - note: this is a layer violation
+                # Production code should inject worker_pool_factory in constructor
+                from ui.common.preview_worker_pool import PreviewWorkerPool
+                self._worker_pool = PreviewWorkerPool()
+            # Connect signals - worker_pool is guaranteed non-None at this point
+            assert self._worker_pool is not None
             self._worker_pool.preview_ready.connect(self._on_preview_ready)
             self._worker_pool.preview_error.connect(self._on_preview_error)
 
         # Check if generate_preview method exists
         if hasattr(self._worker_pool, 'generate_preview'):
-            self._worker_pool.generate_preview(  # type: ignore[attr-defined]
+            self._worker_pool.generate_preview(
                 request.request_id,
                 request.rom_path,
                 request.offset

@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from threading import RLock
-from typing import Any, Protocol, TypeVar
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -266,30 +266,9 @@ def configure_container(
         lambda: VRAMService()
     )
 
-    # Register ManualOffsetDialogFactory via protocol to avoid layer violation
-    # The factory creates UI objects so it lives in ui/, but we register by protocol
-    from core.protocols.dialog_protocols import ManualOffsetDialogFactoryProtocol
-    from core.protocols.manager_protocols import ExtractionManagerProtocol
-
-    def _create_manual_offset_dialog_factory():
-        from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
-        return ManualOffsetDialogFactory(
-            rom_cache=inject(ROMCacheProtocol),
-            settings_manager=inject(SettingsManagerProtocol),
-            extraction_manager=inject(ExtractionManagerProtocol),
-            rom_extractor=inject(ROMExtractorProtocol)
-        )
-
-    register_factory(ManualOffsetDialogFactoryProtocol, _create_manual_offset_dialog_factory)
-
-    # Register DialogFactory for controller dialog creation with lazy import
-    from core.protocols.dialog_protocols import DialogFactoryProtocol
-
-    def _create_controller_dialog_factory():
-        from ui.dialogs.controller_dialog_factory import ControllerDialogFactory
-        return ControllerDialogFactory()
-
-    register_factory(DialogFactoryProtocol, _create_controller_dialog_factory)
+    # NOTE: UI factory registrations (ManualOffsetDialogFactoryProtocol, DialogFactoryProtocol)
+    # are handled by ui.register_ui_factories() called from ManagerRegistry.initialize_managers()
+    # This keeps UI dependencies out of core/ layer.
 
     logger.info("DI container configured (services registered, managers pending)")
 
@@ -325,23 +304,3 @@ def register_managers(
     register_singleton(InjectionManagerProtocol, injection_adapter)
 
     logger.info("Extraction and injection protocols registered with DI container")
-
-
-# Example usage with protocols
-if __name__ == "__main__":
-    # Example protocol
-    class DatabaseProtocol(Protocol):
-        def query(self, sql: str) -> list[str]: ...
-
-    # Example implementation
-    class SQLiteDatabase:
-        def query(self, sql: str) -> list[str]:
-            return ["result1", "result2"]
-
-    # Register
-    register_singleton(DatabaseProtocol, SQLiteDatabase())
-
-    # Use
-    db = inject(DatabaseProtocol)
-    results = db.query("SELECT * FROM users")
-    print(f"Query results: {results}")

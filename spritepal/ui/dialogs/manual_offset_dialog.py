@@ -195,29 +195,41 @@ class UnifiedManualOffsetDialog(DialogBase):
         self._debug_id = f"dialog_{int(time.time()*1000)}"
         logger.debug(f"Dialog debug ID: {self._debug_id}")
 
-        # TEMPORARILY DISABLE LayoutManagerComponent to isolate the issue
-
-        # Create minimal fallback object to prevent attribute errors
-        class MinimalLayoutManager:
+        # Inline layout manager - provides basic layout configuration
+        class DialogLayoutManager:
+            """Simple layout manager for dialog panels."""
             MAX_MINI_MAP_HEIGHT = 60
             MIN_MINI_MAP_HEIGHT = 40
-            def configure_splitter(self, *args: Any) -> None: pass
-            def fix_empty_space_issue(self) -> None: pass
+
+            def configure_splitter(self, *args: Any) -> None:
+                pass
+
+            def fix_empty_space_issue(self) -> None:
+                pass
+
             def apply_standard_layout(self, layout: Any, spacing_type: str = 'normal') -> None:
                 layout.setSpacing(8)
                 layout.setContentsMargins(8, 8, 8, 8)
-            def remove_all_stretches(self, layout: Any) -> None: pass
+
+            def remove_all_stretches(self, layout: Any) -> None:
+                pass
+
             def create_section_title(self, title: str, subtitle: str = "") -> Any:
                 from PySide6.QtWidgets import QLabel
                 label = QLabel(title)
                 label.setStyleSheet(f"font-weight: bold; font-size: 12px; color: {COLORS['text_primary']};")
                 return label
-            def on_dialog_show(self) -> None: pass
-            def update_for_tab(self, index: int, width: int) -> None: pass
-            def handle_resize(self, event: Any) -> None: pass  # Add missing method
 
-        self.layout_manager = MinimalLayoutManager()
-        logger.debug("Using minimal layout manager for debugging")
+            def on_dialog_show(self) -> None:
+                pass
+
+            def update_for_tab(self, index: int, width: int) -> None:
+                pass
+
+            def handle_resize(self, event: Any) -> None:
+                pass
+
+        self.layout_manager = DialogLayoutManager()
 
         super().__init__(
             parent=parent,
@@ -738,7 +750,29 @@ class UnifiedManualOffsetDialog(DialogBase):
         """Clean up resources to prevent memory leaks."""
         logger.debug(f"Cleaning up UnifiedManualOffsetDialog {self._debug_id}")
 
-        # Disconnect signals
+        # CRITICAL: Block signals FIRST to prevent race conditions
+        # Workers may still emit signals during cleanup
+        self.blockSignals(True)
+
+        # Block signals on child widgets that might emit during cleanup
+        if self._smart_preview_coordinator is not None:
+            self._smart_preview_coordinator.blockSignals(True)
+        if self.browse_tab is not None:
+            self.browse_tab.blockSignals(True)
+        if self.smart_tab is not None:
+            self.smart_tab.blockSignals(True)
+        if self.history_tab is not None:
+            self.history_tab.blockSignals(True)
+        if self.gallery_tab is not None:
+            self.gallery_tab.blockSignals(True)
+        if self.preview_widget is not None:
+            self.preview_widget.blockSignals(True)
+
+        # Stop and clean up workers BEFORE disconnecting signals
+        # Workers are now blocked from emitting to this dialog
+        self._cleanup_workers()
+
+        # Now safe to disconnect signals (workers have stopped)
         try:
             # Disconnect tab signals
             if self.browse_tab is not None:
@@ -769,9 +803,6 @@ class UnifiedManualOffsetDialog(DialogBase):
                 self._smart_preview_coordinator.preview_error.disconnect()
         except TypeError:
             pass  # Already disconnected
-
-        # Clean up workers
-        self._cleanup_workers()
 
         # Clear references
         self.extraction_manager = None

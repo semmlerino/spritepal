@@ -332,13 +332,81 @@ def _uses_session_fixtures(item: Any) -> bool:
     return bool(fixture_names & SESSION_DEPENDENT_FIXTURES)
 
 
+def _check_bare_factory_calls(items: list[Any]) -> None:
+    """Check for RealComponentFactory() calls missing manager_registry parameter.
+
+    This lint check runs at collection time to catch test isolation violations early.
+    Tests that use RealComponentFactory without passing manager_registry will pollute
+    global state and break test isolation.
+
+    Args:
+        items: list of test items being collected
+    """
+    import re
+    from functools import lru_cache
+    from pathlib import Path
+
+    # Pattern to detect bare RealComponentFactory() without manager_registry
+    # Matches: RealComponentFactory() or RealComponentFactory(fail_on_leaks=...)
+    # Does NOT match: RealComponentFactory(manager_registry=...)
+    bare_factory_pattern = re.compile(
+        r'RealComponentFactory\s*\('  # Opening call
+        r'(?![^)]*manager_registry)'  # Negative lookahead: no manager_registry in args
+        r'[^)]*\)'  # Rest of args and closing paren
+    )
+
+    @lru_cache(maxsize=256)
+    def check_file(file_path: str) -> list[tuple[int, str]]:
+        """Check a file for bare factory calls. Cached for efficiency."""
+        try:
+            path = Path(file_path)
+            if not path.exists() or not path.suffix == '.py':
+                return []
+            content = path.read_text()
+            matches = []
+            for i, line in enumerate(content.splitlines(), 1):
+                # Skip comments and docstrings containing examples
+                stripped = line.strip()
+                if stripped.startswith('#') or stripped.startswith('"""') or stripped.startswith("'''"):
+                    continue
+                if bare_factory_pattern.search(line):
+                    matches.append((i, line.strip()))
+            return matches
+        except (OSError, UnicodeDecodeError):
+            return []
+
+    # Collect unique source files from test items
+    checked_files: set[str] = set()
+    violations: list[str] = []
+
+    for item in items:
+        fspath = str(getattr(item, 'fspath', ''))
+        if fspath and fspath not in checked_files:
+            checked_files.add(fspath)
+            matches = check_file(fspath)
+            for line_no, line_content in matches:
+                violations.append(f"  {fspath}:{line_no}: {line_content}")
+
+    if violations:
+        import warnings
+        warnings.warn(
+            f"\n[RealComponentFactory] Found {len(violations)} bare factory call(s) missing manager_registry:\n"
+            + "\n".join(violations[:10])  # Show first 10
+            + (f"\n  ... and {len(violations) - 10} more" if len(violations) > 10 else "")
+            + "\n\nFix: Use RealComponentFactory(manager_registry=isolated_managers)",
+            UserWarning,
+            stacklevel=1,
+        )
+
+
 def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     """Validate marker usage and enforce PARALLEL BY DEFAULT xdist policy.
 
-    This hook performs three functions:
-    1. Tracks real_hal marked tests for reporting
-    2. Validates that skip_thread_cleanup markers have a reason argument
-    3. Enforces PARALLEL BY DEFAULT xdist policy - tests using session_managers
+    This hook performs four functions:
+    1. Checks for bare RealComponentFactory() calls (lint check)
+    2. Tracks real_hal marked tests for reporting
+    3. Validates that skip_thread_cleanup markers have a reason argument
+    4. Enforces PARALLEL BY DEFAULT xdist policy - tests using session_managers
        are auto-serialized, all others run in parallel
 
     The xdist policy ensures that:
@@ -354,6 +422,9 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
         items: list of test items being collected
     """
     import warnings
+
+    # === Check for bare RealComponentFactory() calls ===
+    _check_bare_factory_calls(items)
 
     # === Track real_hal tests for CI visibility ===
     real_hal_tests = [item for item in items if item.get_closest_marker('real_hal')]
@@ -520,7 +591,7 @@ def pytest_runtest_setup(item: Any) -> None:
 
     # Fixtures that indicate manager involvement
     manager_related = {
-        'session_managers', 'class_managers', 'isolated_managers',
+        'session_managers', 'isolated_managers',
         'managers', 'managers_initialized',
         'real_factory', 'manager_context', 'real_extraction_manager',
         'real_injection_manager', 'real_session_manager',
@@ -599,7 +670,7 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
 
     # Performance optimization: skip import for non-manager tests
     manager_related = {
-        'session_managers', 'class_managers', 'isolated_managers',
+        'session_managers', 'isolated_managers',
         'managers', 'managers_initialized',
         'real_factory', 'manager_context', 'real_extraction_manager',
         'real_injection_manager', 'real_session_manager',
