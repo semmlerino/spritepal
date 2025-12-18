@@ -242,7 +242,7 @@ class EventLoopHelper:
             while time.monotonic() < end_time:
                 app.processEvents()
                 # Small sleep to prevent CPU spinning
-                time.sleep(0.01)  # 10ms sleep between iterations
+                time.sleep(0.01)  # sleep-ok: CPU throttling during event loop pumping
 
     @staticmethod
     @contextmanager

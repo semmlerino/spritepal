@@ -21,11 +21,11 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
     pytest.mark.signals_slots,
     pytest.mark.slow,
+    pytest.mark.allows_registry_state,
 ]
 
 # We'll test the core drag-drop logic without Qt dependencies

@@ -16,36 +16,31 @@ Fixtures are organized into modular files for maintainability:
 - `fixtures/qt_fixtures.py`: Qt application, main window, qtbot fixtures
 - `fixtures/core_fixtures.py`: Manager fixtures, DI fixtures, state management
 - `fixtures/hal_fixtures.py`: HAL compression mock/real fixtures
+- `fixtures/xdist_fixtures.py`: Parallel test execution support
 
-## Performance Optimizations
+## Parallel Execution (pytest-xdist)
 
-This conftest.py implements fixture scope optimizations that reduce fixture
-instantiations by 68.6% based on usage analysis:
+Tests run in parallel by default with `-n auto`. The policy is:
+- Tests using `session_managers` are automatically serialized (xdist_group="serial")
+- Tests marked `@pytest.mark.parallel_unsafe` or `@pytest.mark.serial` are serialized
+- All other tests run in parallel across workers
 
-- qt_app: Session scope (1,129 → 1 instance, 99.9% reduction)
-- main_window: Class scope (129 → ~30 instances, 77% reduction)
-- controller: Class scope (119 → ~30 instances, 75% reduction)
-- mock_manager_registry: Function scope (fresh per test for isolation)
-- real_extraction_manager: Class scope (51 → ~12 instances, 77% reduction)
-- rom_cache: Class scope (48 → ~10 instances, 79% reduction)
-- mock_settings_manager: Class scope (44 → ~10 instances, 77% reduction)
-- real_session_manager: Class scope (26 → ~8 instances, 69% reduction)
+For serial debugging: `pytest -n 0`
+
+## Fixture Scopes
+
+- **qt_app**: Session scope (shared QApplication across all tests)
+- **session_managers**: Session scope (shared managers, requires @shared_state_safe)
+- **isolated_managers**: Function scope (fresh managers per test, recommended default)
+- **main_window**: Function scope (real Qt signals via RealTestMainWindow)
 
 ## State Isolation
 
-Class-scoped and module-scoped fixtures include automatic state reset
-mechanisms to ensure test isolation:
+Tests using `session_managers` require `@pytest.mark.shared_state_safe` marker
+to acknowledge shared state. Mixing `session_managers` and `isolated_managers`
+in the same module is prohibited.
 
-- `reset_class_state`: Auto-resets all class-scoped fixtures (autouse, runs automatically)
-
-## Scope Selection Guidelines
-
-- **Session scope**: For expensive, stateless resources (Qt application)
-- **Module scope**: For fixtures shared across test modules with minimal state
-- **Class scope**: For fixtures shared within test classes with manageable state
-- **Function scope**: For fixtures requiring full isolation (default)
-
-All optimized fixtures maintain backward compatibility and proper cleanup.
+For most tests, use `isolated_managers` for complete isolation between tests.
 """
 
 from __future__ import annotations
@@ -116,7 +111,7 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "no_manager_setup: Skip setup_managers fixture for this test"
+        "no_manager_setup: Skip manager initialization for this test"
     )
     # New markers for autouse fixture opt-out
     config.addinivalue_line(
@@ -180,6 +175,25 @@ def pytest_configure(config):
 
     # Install QPixmap guard via import hook - guarantees guard is installed even for late Qt imports
     _install_qpixmap_guard_unconditional()
+
+
+def pytest_sessionstart(session: Any) -> None:
+    """Capture thread baseline at session start before any tests run.
+
+    This is more reliable than module import time because:
+    1. It runs after pytest infrastructure is fully initialized
+    2. It runs before any test fixtures are set up
+    3. Under xdist, each worker gets its own session start
+
+    The baseline is stored on session.config and can be accessed by fixtures
+    via request.config._thread_baseline and request.config._thread_identities.
+    """
+    import threading
+
+    session.config._thread_baseline = threading.active_count()
+    session.config._thread_identities = {
+        t.ident: t.name for t in threading.enumerate() if t.ident is not None
+    }
 
 
 def _patch_qpixmap_init() -> None:
@@ -285,26 +299,55 @@ def pytest_addoption(parser: Any) -> None:
     # NOTE: --run-segfault-tests option removed - segfault-prone tests have been deleted
 
 
+def _uses_session_fixtures(item: Any) -> bool:
+    """Check if a test item uses session-dependent fixtures.
+
+    Uses static whitelist detection for reliability under parallel collection.
+
+    IMPORTANT: Custom fixtures wrapping session_managers must either:
+    1. Be added to SESSION_DEPENDENT_FIXTURES in core_fixtures.py, or
+    2. Be marked with @pytest.mark.parallel_unsafe
+
+    The previous dynamic detection using pytest's getfixturedefs() was unreliable
+    under xdist parallel collection because:
+    - Multiple workers collect tests simultaneously
+    - Fixture manager state may be incomplete during collection
+    - Silent failures caused non-deterministic serialization
+
+    Args:
+        item: pytest test item
+
+    Returns:
+        True if the test uses session_managers or known dependent fixtures
+    """
+    from tests.fixtures.core_fixtures import SESSION_DEPENDENT_FIXTURES
+
+    fixture_names = set(getattr(item, 'fixturenames', []))
+    return bool(fixture_names & SESSION_DEPENDENT_FIXTURES)
+
+
 def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
-    """Validate marker usage and enforce serial-by-default xdist policy.
+    """Validate marker usage and enforce PARALLEL BY DEFAULT xdist policy.
 
     This hook performs two functions:
     1. Validates that skip_thread_cleanup markers have a reason argument
-    2. Enforces SERIAL BY DEFAULT xdist policy - only @pytest.mark.parallel_safe
-       tests can distribute across workers
+    2. Enforces PARALLEL BY DEFAULT xdist policy - tests using session_managers
+       are auto-serialized, all others run in parallel
 
     The xdist policy ensures that:
-    - Tests marked @pytest.mark.parallel_safe run on any worker (true parallelism)
-    - ALL OTHER tests get grouped to a single 'serial' worker (safe default)
+    - Tests using session_managers are auto-grouped to 'serial' worker
+    - Tests marked @pytest.mark.parallel_unsafe are forced to 'serial' worker
+    - ALL OTHER tests can distribute across workers (true parallelism)
 
-    This conservative approach prevents unmarked tests from racing on hidden
-    globals. Tests must explicitly opt-in to parallel execution by being
-    marked parallel_safe.
+    This is the inverse of the previous "serial by default" policy.
+    Tests no longer need @pytest.mark.parallel_safe to run in parallel.
 
     Args:
         config: pytest config object (required by hook signature)
         items: list of test items being collected
     """
+    import warnings
+
     # === Validate skip_thread_cleanup markers ===
     for item in items:
         marker = item.get_closest_marker("skip_thread_cleanup")
@@ -319,7 +362,7 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
                     "Example: @pytest.mark.skip_thread_cleanup(reason='Uses session_managers which owns threads')"
                 )
 
-    # === Auto-group non-parallel_safe tests for xdist ===
+    # === Auto-serialize session-dependent tests for xdist ===
     # Only apply when xdist plugin is active and -n option is used
     if not config.pluginmanager.has_plugin("xdist"):
         return
@@ -334,8 +377,7 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     if not worker_count or worker_count == "0":
         return
 
-    # SERIAL BY DEFAULT: Only tests explicitly marked parallel_safe can distribute
-    # This prevents unmarked tests from racing on hidden globals
+    # PARALLEL BY DEFAULT: Only tests using session_managers are serialized
     serial_group = pytest.mark.xdist_group("serial")
 
     for item in items:
@@ -343,12 +385,70 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
         if item.get_closest_marker("xdist_group"):
             continue
 
-        # Tests explicitly marked parallel_safe can distribute to any worker
-        if item.get_closest_marker("parallel_safe"):
-            continue  # No serial marker = can run in parallel
+        # Force serial if marked parallel_unsafe or serial
+        if item.get_closest_marker("parallel_unsafe") or item.get_closest_marker("serial"):
+            item.add_marker(serial_group)
+            continue
 
-        # Everything else runs serial (safe default)
-        item.add_marker(serial_group)
+        # Auto-detect session fixture usage (direct and transitive)
+        if _uses_session_fixtures(item):
+            item.add_marker(serial_group)
+            continue
+
+        # Deprecation warning for parallel_safe marker (no longer needed)
+        if item.get_closest_marker("parallel_safe"):
+            warnings.warn(
+                f"{item.nodeid}: @pytest.mark.parallel_safe is deprecated. "
+                "Tests are now parallel by default. Remove this marker.",
+                DeprecationWarning,
+                stacklevel=1
+            )
+
+        # DEFAULT: No marker = runs in parallel (the key inversion)
+
+    # Validate no module uses both session_managers and isolated_managers
+    _validate_no_same_module_mixing(items)
+
+
+def _validate_no_same_module_mixing(items: list[Any]) -> None:
+    """Fail fast if a module uses both session_managers and isolated_managers.
+
+    This validation runs at collection time (not fixture setup time) for reliability
+    under xdist parallel collection. The previous runtime detection in isolated_managers
+    caused false positives because _session_state.is_initialized persists per-worker,
+    not per-module.
+
+    Args:
+        items: list of pytest test items
+
+    Raises:
+        pytest.fail: If any module uses both fixture types
+    """
+    from collections import defaultdict
+    from tests.fixtures.core_fixtures import SESSION_DEPENDENT_FIXTURES
+
+    # Group fixtures by module
+    module_fixtures: dict[str, set[str]] = defaultdict(set)
+    for item in items:
+        module = getattr(item.module, '__name__', None) if hasattr(item, 'module') else None
+        if module:
+            fixture_names = set(getattr(item, 'fixturenames', []))
+            module_fixtures[module].update(fixture_names)
+
+    # Check for mixing
+    for module, fixtures in module_fixtures.items():
+        uses_session = bool(fixtures & SESSION_DEPENDENT_FIXTURES)
+        uses_isolated = 'isolated_managers' in fixtures
+        if uses_session and uses_isolated:
+            pytest.fail(
+                f"Module '{module}' uses both session_managers and isolated_managers. "
+                "This causes order-dependent failures under parallel execution.\n"
+                "Fix: Use ONE fixture type per module:\n"
+                "  - Use isolated_managers for tests that need clean state (default)\n"
+                "  - Use session_managers + @pytest.mark.shared_state_safe for read-only tests\n"
+                "See CLAUDE.md 'Test Fixture Selection Guide' for guidance.",
+                pytrace=False,
+            )
 
 
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
@@ -367,12 +467,25 @@ def pytest_runtest_setup(item: Any) -> None:
     Performance optimization: Only imports ManagerRegistry for tests that use
     manager-related fixtures, avoiding import overhead for pure unit tests.
     """
+    import os
+
     # Fixtures that indicate manager involvement
     manager_related = {
         'session_managers', 'class_managers', 'isolated_managers',
-        'managers', 'setup_managers', 'managers_initialized',
+        'managers', 'managers_initialized',
         'real_factory', 'manager_context', 'real_extraction_manager',
         'real_injection_manager', 'real_session_manager',
+        'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
+        'complete_test_context', 'minimal_injection_context',
+        'mock_main_window', 'main_window',
+    }
+
+    # Fixtures that manage registry lifecycle (don't fail pre-test for these)
+    # This matches the original assert_registry_clean_under_xdist exemptions
+    cleanup_fixtures = {
+        'isolated_managers', 'session_managers', 'manager_context',
+        'managers', 'managers_initialized',  # Legacy manager fixtures
+        'real_factory', 'real_extraction_manager', 'real_session_manager',
         'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
         'complete_test_context', 'minimal_injection_context',
         'mock_main_window', 'main_window',
@@ -386,7 +499,21 @@ def pytest_runtest_setup(item: Any) -> None:
     try:
         from core.managers.registry import ManagerRegistry
         # Store whether registry was clean BEFORE the test
-        item._registry_was_clean = ManagerRegistry.is_clean()
+        is_clean = ManagerRegistry.is_clean()
+        item._registry_was_clean = is_clean
+
+        # Under xdist: fail if registry is dirty BEFORE test (pollution from previous)
+        # But only for tests NOT using cleanup fixtures (those manage lifecycle themselves)
+        is_xdist = os.environ.get("PYTEST_XDIST_WORKER") is not None
+        has_escape_marker = item.get_closest_marker("allows_registry_state")
+        uses_cleanup_fixture = bool(cleanup_fixtures.intersection(fixture_names))
+
+        if is_xdist and not is_clean and not has_escape_marker and not uses_cleanup_fixture:
+            pytest.fail(
+                f"Registry dirty before {item.name} - "
+                "previous test leaked state or direct instantiation detected. "
+                "Use isolated_managers fixture or reset after test."
+            )
     except ImportError:
         item._registry_was_clean = True  # Assume clean if can't check
 
@@ -417,14 +544,14 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
 
     # Only check tests that didn't use manager fixtures
     fixture_names = set(getattr(item, 'fixturenames', []))
-    cleanup_fixtures = {'isolated_managers', 'setup_managers', 'session_managers'}
+    cleanup_fixtures = {'isolated_managers', 'session_managers'}
     if cleanup_fixtures.intersection(fixture_names):
         return  # Test uses a fixture that manages registry lifecycle
 
     # Performance optimization: skip import for non-manager tests
     manager_related = {
         'session_managers', 'class_managers', 'isolated_managers',
-        'managers', 'setup_managers', 'managers_initialized',
+        'managers', 'managers_initialized',
         'real_factory', 'manager_context', 'real_extraction_manager',
         'real_injection_manager', 'real_session_manager',
         'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
@@ -453,79 +580,10 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
 
 
 # ============================================================================
-# xdist Registry Cleanliness Check
-# ============================================================================
-
-@pytest.fixture(autouse=True)
-def assert_registry_clean_under_xdist(
-    request: pytest.FixtureRequest,
-) -> Generator[None, None, None]:
-    """Ensure registry is clean before/after each test under xdist.
-
-    This fixture catches direct ManagerRegistry usage outside fixtures.
-    Only active when running under pytest-xdist (PYTEST_XDIST_WORKER set).
-
-    Tests using manager fixtures are exempt - those fixtures manage lifecycle.
-    """
-    import os
-
-    # Only active under xdist workers
-    if not os.environ.get("PYTEST_XDIST_WORKER"):
-        yield
-        return
-
-    # Skip if test uses a manager fixture (they manage lifecycle)
-    manager_fixtures = {
-        "isolated_managers",
-        "session_managers",
-        "setup_managers",
-        "manager_context",
-        "real_extraction_manager",
-        "real_session_manager",
-        "real_factory",
-        "mock_main_window",
-        "main_window",
-    }
-    fixture_names = set(getattr(request, "fixturenames", []))
-    if manager_fixtures & fixture_names:
-        yield
-        return
-
-    # Skip if test has escape hatch marker
-    if request.node.get_closest_marker("allows_registry_state"):
-        yield
-        return
-
-    try:
-        from core.managers.registry import ManagerRegistry
-
-        registry = ManagerRegistry()
-
-        # Before test: registry should be clean
-        if registry.is_initialized():
-            pytest.fail(
-                f"Registry dirty before {request.node.name} - "
-                "previous test leaked state or direct instantiation detected. "
-                "Use isolated_managers fixture or reset after test."
-            )
-
-        yield
-
-        # After test: if registry got initialized, that's a problem
-        if registry.is_initialized():
-            registry.reset_for_tests()
-            pytest.fail(
-                f"Test {request.node.name} initialized ManagerRegistry "
-                "without using a manager fixture. "
-                "Fix: Use isolated_managers fixture."
-            )
-    except ImportError:
-        yield  # ManagerRegistry not available, skip check
-
-
-# ============================================================================
 # Test Data Factories (not in modular files - specific to test data creation)
 # ============================================================================
+# NOTE: xdist registry cleanliness check has been consolidated into
+# pytest_runtest_setup hook above for better performance (single import)
 
 @pytest.fixture
 def test_data_factory() -> Callable[..., bytearray]:
@@ -776,26 +834,8 @@ def skip_requires_display(request: FixtureRequest):
 
 
 # ============================================================================
-# Class-scoped State Reset Fixtures
+# Test Cleanup Verification
 # ============================================================================
-
-@pytest.fixture(scope="function", autouse=True)
-def reset_class_state(
-    request: pytest.FixtureRequest,
-) -> Generator[None, None, None]:
-    """No-op after class-scoped fixtures were converted to function-scoped.
-
-    Previously, this fixture was a safety net for resetting class-scoped
-    fixture state between tests. Now that all manager-related fixtures
-    (real_extraction_manager, real_session_manager, rom_cache, etc.) are
-    function-scoped, cleanup is automatic via pytest's fixture teardown.
-
-    This fixture is kept for backward compatibility with tests that may
-    use @pytest.mark.lenient_reset, but it no longer performs any reset logic.
-    """
-    yield
-    # No reset needed - function-scoped fixtures handle their own cleanup
-
 
 @pytest.fixture
 def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
@@ -848,60 +888,30 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
 
 @pytest.fixture(autouse=True)
 def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, None]:
-    """Enforce that parallel-safe tests don't use shared mutable state.
+    """Soft validation for parallel test best practices.
 
-    This fixture automatically checks that tests marked with @pytest.mark.parallel_safe
-    don't use session-scoped or class-scoped fixtures that could cause race conditions
-    when running tests in parallel with pytest-xdist.
+    NOTE: The @pytest.mark.parallel_safe marker is DEPRECATED. Tests run in
+    parallel by default. This fixture now only emits a deprecation warning
+    if the marker is present, and provides soft recommendations for best practices.
 
-    The check runs automatically for all parallel_safe tests.
+    Best practices for parallel-safe tests:
+    1. Use isolated_managers (not session_managers)
+    2. Use tmp_path for any file operations
+    3. Don't depend on test execution order
 
-    Requirements for parallel_safe tests:
-    1. Must use isolated_managers (not session_managers, class_managers, managers)
-    2. Should use tmp_path for any file operations
-    3. Must not depend on test execution order
-
-    Usage:
-        @pytest.mark.parallel_safe
-        def test_can_run_in_parallel(isolated_managers, tmp_path):
-            # This test is validated automatically
-            ...
+    To force serial execution, use @pytest.mark.parallel_unsafe instead.
     """
-    # Only validate tests marked as parallel_safe
-    if not request.node.get_closest_marker('parallel_safe'):
-        yield
-        return
+    import warnings
 
-    # Fixtures that have mutable shared state and are unsafe for parallel execution
-    # These are session-scoped or class-scoped fixtures that persist across tests
-    shared_mutable_fixtures = {
-        'session_managers',  # Session-scoped, shares state across all tests in session
-        'class_managers',    # Class-scoped, shares state within test class
-        'managers',          # Depends on session_managers
-        'rom_cache',         # Class-scoped cache that could be shared
-    }
-
-    # Check if test uses any shared mutable fixtures
-    fixture_names = set(getattr(request, 'fixturenames', []))
-    conflicting = fixture_names & shared_mutable_fixtures
-
-    if conflicting:
-        pytest.fail(
-            f"Test '{request.node.name}' is marked @pytest.mark.parallel_safe but uses "
-            f"shared mutable fixtures: {conflicting}. "
-            "Use isolated_managers and tmp_path for parallel-safe tests."
+    # Emit deprecation warning if parallel_safe marker is present
+    if request.node.get_closest_marker('parallel_safe'):
+        warnings.warn(
+            f"Test '{request.node.name}' uses deprecated @pytest.mark.parallel_safe marker. "
+            "Tests are parallel by default; this marker is ignored. "
+            "Use @pytest.mark.parallel_unsafe to force serial execution.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-
-    # Validate that isolated_managers is used (recommended for parallel tests)
-    if 'isolated_managers' not in fixture_names:
-        # Check if it might be using managers at all
-        manager_related = {'setup_managers', 'managers_initialized'}
-        if manager_related & fixture_names:
-            pytest.fail(
-                f"Test '{request.node.name}' is marked @pytest.mark.parallel_safe but uses "
-                f"manager fixtures other than isolated_managers. "
-                "Use isolated_managers for parallel-safe tests."
-            )
 
     yield
 

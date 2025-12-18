@@ -30,6 +30,7 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.ci_safe,
     pytest.mark.integration,
+    pytest.mark.allows_registry_state,
 ]
 class TestFixtureManagers:
     """Test the test fixture managers functionality"""

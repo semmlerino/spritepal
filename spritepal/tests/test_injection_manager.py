@@ -35,7 +35,6 @@ from tests.fixtures.test_worker_helper import WorkerHelper
 # Parallel-safe: Uses isolated_managers for per-test isolation
 pytestmark = [
     pytest.mark.usefixtures("isolated_managers"),
-    pytest.mark.parallel_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
     pytest.mark.thread_safety,
     pytest.mark.ci_safe,

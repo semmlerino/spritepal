@@ -6,11 +6,13 @@ This document explains the test markers used in SpritePal's test suite and when 
 
 | Need | Markers | Command |
 |------|---------|---------|
-| Fast tests | `headless`, `unit`, `no_qt` | `QT_QPA_PLATFORM=offscreen pytest -m "headless and not slow"` |
-| GUI tests | `gui`, `requires_display` | `QT_QPA_PLATFORM=offscreen pytest -m gui` |
-| CI tests | `ci_safe`, `headless` | `QT_QPA_PLATFORM=offscreen pytest -m ci_safe` |
-| Skip managers | `no_manager_setup` | `QT_QPA_PLATFORM=offscreen pytest -m no_manager_setup` |
-| Parallel safe | `parallel_safe` | `QT_QPA_PLATFORM=offscreen pytest -m parallel_safe -n auto` |
+| Fast tests | `headless`, `unit`, `no_qt` | `pytest -m "headless and not slow"` |
+| GUI tests | `gui`, `requires_display` | `pytest -m gui` |
+| CI tests | `ci_safe`, `headless` | `pytest -m ci_safe` |
+| Skip managers | `no_manager_setup` | `pytest -m no_manager_setup` |
+| Serial debug | `-n 0` | `pytest -n 0` (disables parallel, useful for debugging) |
+
+> **Note:** Tests run in parallel by default via `-n auto` in pyproject.toml. Qt offscreen mode is also configured automatically.
 
 ## Marker Categories
 
@@ -174,23 +176,24 @@ These control test execution behavior:
 
 | Marker | Usage Count | Description | Use When |
 |--------|-------------|-------------|----------|
-| `serial` | ~54 | No parallel execution | Test modifies global state |
-| `parallel_safe` | ~42 | Can run in parallel | Test is fully isolated |
+| `parallel_unsafe` | ~few | Force serial execution | Test has hidden shared state that prevents parallelism |
+| `serial` | ~54 | No parallel execution | (Alias for `parallel_unsafe`) |
 | `worker_threads` | ~20 | Uses worker threads | Test creates QThreads |
 | `thread_safety` | ~24 | Thread safety tests | Testing concurrent access |
 | `process_pool` | ~few | Uses process pools | Test creates subprocesses |
-| `segfault_prone` | ~few | May segfault | Handle carefully in CI |
+
+> **Note:** `@pytest.mark.parallel_safe` is **deprecated and ignored**. Tests run in parallel by default. Only use `@pytest.mark.parallel_unsafe` to force serial execution for tests with hidden shared state.
 
 **Examples:**
 ```python
-@pytest.mark.serial  # Run alone, not in parallel
+@pytest.mark.parallel_unsafe  # Force serial (hidden shared state)
 def test_singleton_initialization():
     # Singleton state affects other tests
     ...
 
-@pytest.mark.parallel_safe
+# No marker needed for parallel - it's the default
 def test_isolated_calculation():
-    # Pure function, no shared state
+    # Pure function, runs in parallel automatically
     ...
 ```
 
@@ -211,8 +214,8 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.ci_safe,
     pytest.mark.headless,
-    pytest.mark.parallel_safe,
 ]
+# Note: Tests run in parallel by default - no parallel_safe marker needed
 ```
 
 ### Full GUI Test
@@ -229,20 +232,23 @@ pytestmark = [
 ## Common Commands
 
 ```bash
-# Fast tests only
-QT_QPA_PLATFORM=offscreen pytest -m "headless and not slow"
+# Run all tests (parallel by default)
+pytest
 
-# GUI tests with offscreen backend
-QT_QPA_PLATFORM=offscreen pytest -m gui
+# Serial execution for debugging
+pytest -n 0
+
+# Fast tests only
+pytest -m "headless and not slow"
+
+# GUI tests
+pytest -m gui
 
 # CI pipeline
-QT_QPA_PLATFORM=offscreen pytest -m ci_safe --tb=short
-
-# Parallel execution
-QT_QPA_PLATFORM=offscreen pytest -m parallel_safe -n auto
+pytest -m ci_safe --tb=short
 
 # Skip slow tests
-QT_QPA_PLATFORM=offscreen pytest -m "not slow"
+pytest -m "not slow"
 
 # Unit tests only
 pytest -m unit
@@ -256,6 +262,8 @@ pytest -m no_manager_setup
 # Performance tests
 pytest -m "benchmark or performance"
 ```
+
+> **Note:** Qt offscreen mode (`QT_QPA_PLATFORM=offscreen`) is configured automatically in conftest.py.
 
 ## Adding New Markers
 
@@ -293,7 +301,7 @@ The test suite provides several manager fixtures with different isolation levels
 | Fixture | Status | Replacement |
 |---------|--------|-------------|
 | `class_managers` | **Removed** - fails immediately | Use `isolated_managers` |
-| `setup_managers` | Deprecated | Use `isolated_managers` |
+| `setup_managers` | **Removed** | Use `isolated_managers` |
 | `fast_managers` | Deprecated | Use `session_managers` + marker |
 
 **Examples:**
@@ -310,10 +318,9 @@ def test_read_only_operation(session_managers):
     # Uses shared session managers - must be proven stateless
     pass
 
-# For parallel execution, combine with parallel_safe
-@pytest.mark.parallel_safe
+# Tests run in parallel by default - no marker needed
 def test_isolated_extraction(isolated_managers, tmp_path):
-    # Safe for pytest-xdist
+    # Runs in parallel automatically with pytest-xdist
     output_file = tmp_path / "output.png"
     ...
 ```
@@ -331,7 +338,7 @@ Prefer real components over mocks. Mock only at true system boundaries.
 | `rom_cache` | Function | Real ROMCache (isolated via `tmp_path`) |
 
 **Note:** All real component fixtures are function-scoped for full test isolation.
-This enables parallel execution with `@pytest.mark.parallel_safe`.
+Tests run in parallel by default (no marker needed).
 
 ### HAL Fixtures
 
@@ -344,17 +351,17 @@ This enables parallel execution with `@pytest.mark.parallel_safe`.
 
 | Fixture | Compatible Markers | Notes |
 |---------|-------------------|-------|
-| `isolated_managers` | `parallel_safe`, `serial` | **Default choice** - works with all markers |
-| `session_managers` | `shared_state_safe` (required) | Cannot combine with `parallel_safe` |
+| `isolated_managers` | Any | **Default choice** - use for any test needing managers |
+| `session_managers` | `shared_state_safe` (required) | Auto-serialized (cannot run in parallel) |
 | `hal_pool` | Any | Use `real_hal` marker for real HAL |
 | `qtbot` | `gui`, `qt_real` | Cannot combine with `no_qt` |
 
-**Important:** Tests marked `@pytest.mark.parallel_safe` **must** use `isolated_managers` (not `session_managers`).
-The `check_parallel_isolation` fixture enforces this at runtime.
+**Important:** Tests using `session_managers` are automatically serialized (run in `xdist_group="serial"`).
+Use `isolated_managers` for tests that should run in parallel.
 
-### Migrating to Parallel-Safe Tests
+### Writing Parallel-Safe Tests
 
-To enable parallel execution with pytest-xdist, tests must meet these criteria:
+Tests run in parallel by default. To ensure your test works correctly in parallel:
 
 1. Use `isolated_managers` fixture (NOT `session_managers`)
 2. Use `tmp_path` for all file operations (NOT hardcoded paths)
@@ -364,14 +371,13 @@ To enable parallel execution with pytest-xdist, tests must meet these criteria:
 **Migration example:**
 
 ```python
-# BEFORE: Not parallel-safe
+# BEFORE: Not parallel-safe (uses session_managers + hardcoded path)
 class TestExtraction:
     def test_extract(self, session_managers):
         output = "/tmp/test_output.png"  # Hardcoded path - race condition!
         ...
 
-# AFTER: Parallel-safe
-@pytest.mark.parallel_safe
+# AFTER: Parallel-safe (uses isolated_managers + tmp_path)
 class TestExtraction:
     def test_extract(self, isolated_managers, tmp_path):
         output = tmp_path / "test_output.png"  # Isolated path

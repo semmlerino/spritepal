@@ -17,7 +17,6 @@ from ui.main_window import MainWindow
 
 
 @pytest.mark.gui
-@pytest.mark.parallel_safe
 @pytest.mark.skip_thread_cleanup(reason="MainWindow spawns background threads during initialization")
 class TestCircularDependencyFix:
     """Test suite for circular dependency fix."""

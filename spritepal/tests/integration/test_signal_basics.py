@@ -185,6 +185,7 @@ class TestBasicSignalSlot:
         assert received['dict'] == {'key': 'value'}
 
 @pytest.mark.headless
+@pytest.mark.allows_registry_state
 class TestDialogSignalPatterns:
     """Test signal patterns specific to dialogs."""
 
@@ -327,6 +328,7 @@ class TestDialogSignalPatterns:
         assert received == ["connected"]
 
 @pytest.mark.headless
+@pytest.mark.allows_registry_state
 class TestSignalThreadSafety:
     """Test thread safety aspects of signals."""
 
@@ -380,6 +382,7 @@ class TestSignalThreadSafety:
         assert receiver.received_values == list(range(10))
 
 @pytest.mark.headless
+@pytest.mark.allows_registry_state
 class TestSignalRegistry:
     """Test the SignalRegistry utility for debugging and connection tracking."""
 

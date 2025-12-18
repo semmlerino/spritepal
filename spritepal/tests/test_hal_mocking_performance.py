@@ -23,6 +23,7 @@ pytestmark = [
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.performance,
+    pytest.mark.allows_registry_state,
 ]
 
 class TestHALMockingPerformance:

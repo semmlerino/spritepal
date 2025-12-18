@@ -56,7 +56,6 @@ pytestmark = [
     pytest.mark.requires_display,
     pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.parallel_safe,
     pytest.mark.xfail(
         _is_offscreen,
         reason="Real dialog instantiation may fail in Qt offscreen mode",

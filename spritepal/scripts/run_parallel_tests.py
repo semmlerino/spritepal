@@ -4,18 +4,24 @@ from __future__ import annotations
 """
 Parallel test runner for SpritePal test suite.
 
-This script provides optimized test execution using a conservative opt-in approach:
-- Only tests marked @pytest.mark.parallel_safe run in parallel with pytest-xdist
-- All other tests run serially for maximum safety
+SpritePal uses PARALLEL-BY-DEFAULT test execution:
+- All tests run in parallel by default (no marker needed)
+- Tests using `session_managers` are auto-serialized
+- Tests marked @pytest.mark.parallel_unsafe are forced to serial
+
+Note: The @pytest.mark.parallel_safe marker is deprecated and ignored.
 
 Usage:
-    # Run both serial and parallel tests
+    # Run all tests with parallel execution (default via pyproject.toml)
+    uv run pytest
+
+    # This script provides additional control options:
     QT_QPA_PLATFORM=offscreen python scripts/run_parallel_tests.py
 
-    # Run only parallel-safe tests in parallel
+    # Run only parallel tests
     QT_QPA_PLATFORM=offscreen python scripts/run_parallel_tests.py --parallel-only
 
-    # Run only serial tests
+    # Run only serial tests (session_managers, parallel_unsafe)
     QT_QPA_PLATFORM=offscreen python scripts/run_parallel_tests.py --serial-only
 """
 

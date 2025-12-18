@@ -541,6 +541,32 @@ def cleanup_test_data_repository() -> None:
     """Clean up the global test data repository."""
     _DataRepositorySingleton.cleanup()
 
+
+def get_isolated_data_repository(tmp_path: Path) -> DataRepository:
+    """Get an isolated DataRepository instance backed by tmp_path.
+
+    Unlike the singleton from get_test_data_repository(), this returns a
+    fresh instance with all generated files stored in the test's tmp_path
+    directory. This provides true parallel isolation:
+    - Each test gets its own DataRepository
+    - Generated files don't conflict between tests
+    - Auto-cleaned by pytest's tmp_path fixture
+
+    Args:
+        tmp_path: pytest tmp_path fixture for this test
+
+    Returns:
+        A new DataRepository instance using tmp_path as its base directory
+
+    Example:
+        def test_extraction(tmp_path):
+            repo = get_isolated_data_repository(tmp_path)
+            data = repo.get_vram_extraction_data("small")
+            # Files are stored in tmp_path, auto-cleaned after test
+    """
+    return DataRepository(base_test_data_dir=str(tmp_path))
+
+
 # Convenience functions
 def get_vram_test_data(size: str = "medium") -> dict[str, Any]:
     """Get VRAM test data."""

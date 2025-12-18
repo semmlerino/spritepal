@@ -19,7 +19,6 @@ pytestmark = [
     pytest.mark.mock_dialogs,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
 ]

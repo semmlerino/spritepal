@@ -10,8 +10,8 @@ The marker system organizes tests into clear categories that allow for:
 - **Parallel execution control**: Safely run tests in parallel or force serial execution
 - **Development workflow enhancement**: Focus on specific test types during development
 
-> **Note**: Parallel test execution (`-n auto`) requires `pytest-xdist`, which is not installed by default.
-> To enable: `uv add pytest-xdist --dev`. Commands in this guide show serial execution by default.
+> **Note**: SpritePal uses **PARALLEL-BY-DEFAULT** test execution via pytest-xdist.
+> Tests run in parallel automatically. Use `-n 0` to force serial execution for debugging.
 
 ## Quick Usage Examples
 
@@ -24,8 +24,8 @@ pytest -m 'headless and not slow'
 # Unit tests only - fastest possible execution
 pytest -m 'unit'
 
-# Integration tests (add -n auto if pytest-xdist is installed)
-pytest -m 'integration and parallel_safe'
+# Integration tests (runs in parallel by default)
+pytest -m 'integration'
 
 # All GUI tests (requires display)
 pytest -m 'gui'
@@ -128,20 +128,28 @@ pytest -m 'signals_slots or timer'
 
 ### 5. Execution Control Markers
 
-#### Parallelization Control:
-- **`serial`**: Must run in serial (not parallel)
-- **`parallel_safe`**: Confirmed safe for parallel execution
-- **`process_pool`**: Uses process pools that need serial execution
-- **`singleton`**: Manipulates singletons that conflict in parallel
-- **`qt_application`**: Manages QApplication that conflicts in parallel
+#### Parallelization Control (PARALLEL-BY-DEFAULT):
+SpritePal uses **parallel-by-default** test execution:
+- All tests run in parallel automatically (no marker needed)
+- Tests using `session_managers` fixture are auto-serialized
+- **`parallel_unsafe`**: Forces serial execution (for hidden shared state)
+- **`serial`**: Alias for parallel_unsafe
+- **`parallel_safe`**: **DEPRECATED** - ignored, tests are parallel by default
+
+> **Note**: The `@pytest.mark.parallel_safe` marker is deprecated and ignored.
+> Tests run in parallel by default. Only mark tests `@pytest.mark.parallel_unsafe`
+> if they have hidden shared state that can't be detected automatically.
 
 #### Usage:
 ```bash
-# Tests safe for parallel execution (add -n auto if pytest-xdist is installed)
-pytest -m 'parallel_safe'
+# All tests run in parallel by default
+pytest
 
-# Force serial execution
-pytest -m 'serial'
+# Force serial execution (for debugging race conditions)
+pytest -n 0
+
+# Force specific tests to run serially
+pytest -m 'parallel_unsafe'
 
 # All tests excluding those that conflict in parallel
 pytest -m 'not (singleton or qt_application)'

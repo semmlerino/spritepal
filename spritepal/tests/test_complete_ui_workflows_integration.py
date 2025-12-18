@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (
 
 # Test markers for proper test execution
 pytestmark = [
-    pytest.mark.gui,  # Requires display/xvfb
+    pytest.mark.gui,  # Requires display (uses offscreen mode in headless)
     pytest.mark.integration,  # End-to-end testing
     pytest.mark.serial,  # No parallel execution due to Qt singleton
     pytest.mark.slow,  # UI tests take time

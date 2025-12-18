@@ -135,9 +135,11 @@ pytest.mark.qt_real      # Real Qt components
 pytest.mark.qt_mock      # Mocked Qt components
 pytest.mark.no_qt        # No Qt dependencies
 
-# Execution markers
-pytest.mark.serial       # Sequential execution required
-pytest.mark.parallel_safe # Can run in parallel
+# Execution markers (PARALLEL-BY-DEFAULT)
+pytest.mark.parallel_unsafe  # Forces serial execution (hidden shared state)
+pytest.mark.serial           # Alias for parallel_unsafe
+# Note: @pytest.mark.parallel_safe is DEPRECATED and ignored
+# All tests run in parallel by default; session_managers tests auto-serialize
 ```
 
 ### 3. Safe Logging Pattern

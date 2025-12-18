@@ -21,7 +21,6 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
     pytest.mark.usefixtures("mock_hal"),  # HAL mocking for compression

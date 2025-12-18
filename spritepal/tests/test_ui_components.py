@@ -29,7 +29,6 @@ pytestmark = [
     pytest.mark.memory,
     pytest.mark.qt_real,
     pytest.mark.requires_display,
-    pytest.mark.parallel_safe,
 ]
 
 # Note: initialize_managers and cleanup_managers are no longer needed here

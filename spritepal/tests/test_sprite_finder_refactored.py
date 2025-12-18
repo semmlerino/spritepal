@@ -22,7 +22,6 @@ pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Refactored sprite finder tests may create background threads"),
     pytest.mark.unit,
     pytest.mark.headless,
-    pytest.mark.parallel_safe,
     pytest.mark.usefixtures("mock_hal"),  # HAL mocking for compression
 ]
 

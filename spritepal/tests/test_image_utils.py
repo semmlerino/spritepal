@@ -22,7 +22,6 @@ except ImportError:
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.mock_only,
-    pytest.mark.parallel_safe,
     pytest.mark.qt_mock,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,

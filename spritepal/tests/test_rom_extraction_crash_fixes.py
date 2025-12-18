@@ -30,7 +30,6 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.qt_real,
     pytest.mark.signals_slots,
-    pytest.mark.parallel_safe,
 ]
 
 class TestSignalLoopFixes:

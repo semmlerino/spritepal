@@ -38,6 +38,7 @@ pytestmark = [
     pytest.mark.signals_slots,
     pytest.mark.slow,
     pytest.mark.worker_threads,
+    pytest.mark.allows_registry_state,
 ]
 
 class TestCacheWorker:

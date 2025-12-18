@@ -178,11 +178,14 @@ export PYTEST_VERBOSE_ENVIRONMENT=1
 pytest -m "headless" -v
 ```
 
-### For Headless with xvfb
+### For Headless Environments (Recommended)
 ```bash
-# Run GUI tests with virtual display
-export DISPLAY=:99
-xvfb-run -a pytest -m "gui or headless" --tb=short
+# Run all tests with Qt offscreen mode (canonical approach)
+# Note: QT_QPA_PLATFORM=offscreen is set automatically in conftest.py
+uv run pytest
+
+# Or explicitly set offscreen mode
+QT_QPA_PLATFORM=offscreen uv run pytest -m "gui or headless" --tb=short
 ```
 
 ### For Local Development

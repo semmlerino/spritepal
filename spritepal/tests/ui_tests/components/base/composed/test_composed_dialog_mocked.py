@@ -260,8 +260,13 @@ class TestComposedDialogMockedIntegration:
         assert button_manager == dialog.get_component("button_box")
         assert status_manager == dialog.get_component("status_bar")
 
+    @pytest.mark.requires_display
     def test_custom_dialog_subclass_setup_ui_called(self):
-        """Test that custom dialog subclass setup_ui method is called."""
+        """Test that custom dialog subclass setup_ui method is called.
+
+        Note: Requires display because the partial mocking doesn't cover all Qt imports
+        that ComposedDialog.__init__ triggers.
+        """
 
         class CustomTestDialog(ComposedDialog):
             def __init__(self, **config):
@@ -278,8 +283,13 @@ class TestComposedDialogMockedIntegration:
             dialog = CustomTestDialog()
             assert dialog.setup_ui_called is True
 
+    @pytest.mark.requires_display
     def test_dialog_without_setup_ui_method(self):
-        """Test dialog works correctly when subclass doesn't implement setup_ui."""
+        """Test dialog works correctly when subclass doesn't implement setup_ui.
+
+        Note: Requires display because the partial mocking doesn't cover all Qt imports
+        that ComposedDialog.__init__ triggers.
+        """
 
         class MinimalDialog(ComposedDialog):
             pass

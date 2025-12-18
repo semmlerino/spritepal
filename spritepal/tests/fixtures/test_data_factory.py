@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class TestDataPaths:
+class GeneratedTestPaths:
     """Paths to test data files created by TestDataFactory."""
 
     base_dir: Path
@@ -67,7 +67,7 @@ class TestDataFactory:
         create_palette_json: bool = True,
         create_metadata: bool = True,
         minimal: bool = False,
-    ) -> TestDataPaths:
+    ) -> GeneratedTestPaths:
         """
         Create all standard test data files in the given directory.
 
@@ -79,7 +79,7 @@ class TestDataFactory:
             minimal: If True, create minimal files (smaller sizes, less data)
 
         Returns:
-            TestDataPaths with paths to all created files
+            GeneratedTestPaths with paths to all created files
         """
         base_dir = Path(base_dir)
         base_dir.mkdir(parents=True, exist_ok=True)
@@ -107,7 +107,7 @@ class TestDataFactory:
         if create_metadata:
             cls.create_metadata_json(metadata_path, palette_path)
 
-        return TestDataPaths(
+        return GeneratedTestPaths(
             base_dir=base_dir,
             vram_path=vram_path,
             cgram_path=cgram_path,
@@ -319,14 +319,14 @@ class TestDataFactory:
         return path
 
     @classmethod
-    def create_injection_test_files(cls, base_dir: Path) -> TestDataPaths:
+    def create_injection_test_files(cls, base_dir: Path) -> GeneratedTestPaths:
         """
         Create test files specifically for injection testing.
 
         This creates empty/zeroed VRAM and ROM files suitable for injection targets.
 
         Returns:
-            TestDataPaths with paths to all created files
+            GeneratedTestPaths with paths to all created files
         """
         base_dir = Path(base_dir)
         base_dir.mkdir(parents=True, exist_ok=True)
@@ -352,7 +352,7 @@ class TestDataFactory:
         palette_path = base_dir / "test_sprite.pal.json"
         metadata_path = base_dir / "test_sprite.metadata.json"
 
-        return TestDataPaths(
+        return GeneratedTestPaths(
             base_dir=base_dir,
             vram_path=vram_path,
             cgram_path=cgram_path,

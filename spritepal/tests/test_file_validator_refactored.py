@@ -9,6 +9,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.rom_data,
     pytest.mark.no_manager_setup,  # Pure unit tests for file validation
+    pytest.mark.allows_registry_state,
 ]
 """
 Test suite for the refactored FileValidator with separated concerns.
@@ -33,8 +34,7 @@ from utils.file_validator import (
     FormatValidator,
 )
 
-# Mark all tests in this module to skip manager setup
-pytestmark = pytest.mark.no_manager_setup
+# NOTE: pytestmark is defined at the top of the file
 
 class TestBasicFileValidator:
     """Test cases for BasicFileValidator."""

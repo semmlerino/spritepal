@@ -3,7 +3,7 @@
 ## Quick Reference
 
 - **Qt Framework**: PySide6 (not PyQt6)
-- **Python Version**: 3.11+
+- **Python Version**: 3.12+
 - **Package Manager**: uv
 - **Config Source of Truth**: `pyproject.toml` (ruff, basedpyright, pytest)
 
@@ -55,13 +55,32 @@ uv run pytest tests/path/test_file.py::TestClass::test_name -vv --tb=long -s
 # Tests - full suite (override maxfail)
 uv run pytest --maxfail=10
 
-# Tests - parallel (marked tests only)
-uv run pytest -m parallel_safe -n auto
+# Tests - parallel (default)
+uv run pytest -n auto
 ```
 
 **Do not use `-q` when debugging failures** - it hides information you need.
 
 ## Qt Testing Best Practices
+
+### Minimal Test Template (Copy-Paste)
+
+```python
+"""Minimal template for new tests - copy and adapt."""
+from tests.fixtures.timeouts import worker_timeout
+
+def test_my_feature(isolated_managers, tmp_path):
+    """One-line description of what this tests."""
+    # Access managers from fixture (don't use inject() in tests)
+    manager = isolated_managers.extraction_manager
+
+    # Use tmp_path for any file operations (parallel-safe)
+    output_file = tmp_path / "output.bin"
+
+    # Assert behavior, not implementation
+    result = manager.some_method()
+    assert result is not None
+```
 
 ### Real Component Testing (Preferred)
 
@@ -171,10 +190,10 @@ from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout, 
 
 | Marker | Requires Display | Can Combine With | Notes |
 |--------|-----------------|------------------|-------|
-| `@pytest.mark.gui` | Yes (offscreen OK) | `parallel_safe`, `slow` | Uses real Qt widgets |
-| `@pytest.mark.headless` | No | `parallel_safe`, `slow` | No rendering needed |
+| `@pytest.mark.gui` | Yes (offscreen OK) | `slow` | Uses real Qt widgets |
+| `@pytest.mark.headless` | No | `slow` | No rendering needed |
 | `@pytest.mark.serial` | — | Any | Forces sequential execution |
-| `@pytest.mark.parallel_safe` | — | `gui`, `headless` | Safe for pytest-xdist |
+| `@pytest.mark.parallel_unsafe` | — | Any | Forces serial execution (hidden shared state) |
 
 **Mutual exclusivity:** `gui` and `headless` are mutually exclusive — a test is either one or the other.
 
@@ -182,46 +201,52 @@ from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout, 
 
 ### Parallel Test Execution (pytest-xdist)
 
-SpritePal supports parallel test execution using pytest-xdist with a conservative opt-in approach.
+SpritePal uses **parallel-by-default** test execution with pytest-xdist. Tests using
+`session_managers` (or dependent fixtures) are automatically serialized.
 
 **Running Tests:**
 ```bash
-# Serial execution (default)
-uv run pytest
+# Parallel execution (default)
+uv run pytest -n auto
 
-# Parallel execution for marked tests only
-uv run pytest -m parallel_safe -n auto
+# Serial execution (for debugging race conditions)
+uv run pytest -n 0
 
-# Run both: serial tests first, then parallel-safe tests
-uv run pytest -m "not parallel_safe" && uv run pytest -m parallel_safe -n auto
+# Force serial for specific test file
+uv run pytest tests/test_specific.py -n 0
 ```
 
-**Marking Tests as Parallel-Safe:**
+**Automatic Serialization:**
 
-Tests must meet ALL these criteria to be marked `@pytest.mark.parallel_safe`:
+Tests are automatically serialized if they:
+1. Use `session_managers` fixture (or `managers`, `reset_manager_state`)
+2. Are marked `@pytest.mark.parallel_unsafe` or `@pytest.mark.serial`
 
-1. Uses `isolated_managers` fixture (NOT `session_managers`)
-2. Uses `tmp_path` for any file operations (NOT hardcoded paths)
-3. Does not modify module-level globals
-4. Does not depend on test execution order
+All other tests run in parallel by default.
+
+**Writing Parallel-Safe Tests:**
+
+Most tests are parallel-safe by default. Just follow these patterns:
 
 ```python
-@pytest.mark.parallel_safe
 def test_extraction_logic(isolated_managers, tmp_path):
-    """This test is safe for parallel execution."""
+    """Uses isolated_managers + tmp_path = parallel safe."""
     settings_path = tmp_path / "settings.json"
     # ... test code using isolated managers ...
+
+# Only mark tests parallel_unsafe if they have hidden shared state
+@pytest.mark.parallel_unsafe
+def test_with_global_side_effect():
+    """This test modifies module-level state."""
+    ...
 ```
 
-**Validation:** The `check_parallel_isolation` fixture (`autouse=True`) validates at test
-execution time that `parallel_safe` tests don't use incompatible fixtures. Tests using
-`session_managers` with `@pytest.mark.parallel_safe` will fail with an explicit error message.
-Note: `class_managers` has been removed entirely and fails immediately if used.
+**Note:** `@pytest.mark.parallel_safe` is deprecated and ignored. Tests are parallel by default.
 
 **Common Mistakes:**
-- Using `session_managers` with `parallel_safe` - causes fixture conflicts
 - Hardcoded `/tmp/test_output` paths - use `tmp_path` fixture instead
 - Relying on singleton state from previous tests
+- Custom fixtures wrapping `session_managers` - use `@pytest.mark.parallel_unsafe` to force serialization
 
 ### Modular Fixture Architecture
 
@@ -267,9 +292,9 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 │      YES → Use `session_managers` + `@pytest.mark.shared_state_safe`  │
 │      NO  → Use `isolated_managers` (DEFAULT)                          │
 │                                                                        │
-│  Q3: Need parallel execution with pytest-xdist?                       │
-│      YES → Use `isolated_managers` + `tmp_path` + `@pytest.mark.parallel_safe` │
-│      NO  → Default choice still applies                               │
+│  Q3: Does the test have hidden shared state (module globals, etc)?    │
+│      YES → Add `@pytest.mark.parallel_unsafe` to force serial         │
+│      NO  → Test runs parallel by default (no marker needed)           │
 │                                                                        │
 │  When in doubt: Use `isolated_managers` — it's slower but always safe │
 └────────────────────────────────────────────────────────────────────────┘
@@ -278,7 +303,7 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 | Need | Use | NOT |
 |------|-----|-----|
 | **Default for all tests** | `isolated_managers` | `session_managers` |
-| Proven-safe shared state | `session_managers` + `@pytest.mark.shared_state_safe` (enforced) | bare `session_managers` (fails) |
+| Proven-safe shared state | `session_managers` + `@pytest.mark.shared_state_safe` (required) | bare `session_managers` (fails at runtime) |
 | Real component testing | `RealComponentFactory` | `Mock()` + `cast()` |
 | Qt images in worker thread | `ThreadSafeTestImage` | `QPixmap` |
 | Singleton dialog cleanup | `cleanup_singleton` fixture (auto-cleans DialogRegistry) | Own cleanup fixture |
@@ -293,7 +318,6 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 | Fixture | Scope | Reset Between Tests | Use When |
 |---------|-------|---------------------|----------|
 | `isolated_managers` | Function | YES (full cleanup) | **Default choice** - tests that need predictable state |
-| `setup_managers` | Function | YES | Alternative default with conditional setup |
 | `session_managers` | Session | NO | Only with `@pytest.mark.shared_state_safe` |
 | `reset_manager_state` | Function | YES (caches only) | Need clean counters without full isolation |
 
@@ -301,7 +325,6 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 | Fixture | Replacement | Reason |
 |---------|-------------|--------|
-| `setup_managers` | `isolated_managers` | Deprecated, use `isolated_managers` for per-test isolation |
 | `class_managers` | `isolated_managers` | **REMOVED** - fails immediately with error. Use `isolated_managers` |
 
 **⚠️ Do not mix `session_managers` and `isolated_managers` in the same module.** Same-module mixing causes test failures—this is intentional. It indicates a test design problem where some tests expect clean state while others expect shared state. Keep each test module consistent: either all `isolated_managers` or all `session_managers` (with proper markers). Cross-module usage (different files using different fixtures) is handled automatically.
@@ -312,7 +335,7 @@ HAL (compression/decompression) is **mock-by-default** because:
 - Real HAL requires the external `exhal` binary which may not be available
 - Mock HAL is ~100x faster (~1ms vs ~100ms per operation)
 - Use `@pytest.mark.real_hal` only for integration tests validating actual compression
-- Tests marked `@pytest.mark.real_hal` will **skip** if `exhal` is not in PATH
+- Tests marked `@pytest.mark.real_hal` will **skip** if binaries aren't found (searches PATH, `SPRITEPAL_EXHAL_PATH`/`SPRITEPAL_INHAL_PATH` env vars, and common project locations)
 
 | Fixture | Default Behavior | With `--use-real-hal` or `@pytest.mark.real_hal` |
 |---------|------------------|--------------------------------------------------|
@@ -326,8 +349,7 @@ HAL (compression/decompression) is **mock-by-default** because:
 | Marker | Effect |
 |--------|--------|
 | `@pytest.mark.allows_registry_state` | Skip pollution detection for this test |
-| `@pytest.mark.shared_state_safe` | **Enforced** when using `session_managers` - test fails without it |
-| `@pytest.mark.no_manager_setup` | Skip setup_managers fixture |
+| `@pytest.mark.shared_state_safe` | **Required** when using `session_managers` - enforced by `enforce_shared_state_safe` autouse fixture at runtime (not static analysis) |
 | `@pytest.mark.real_hal` | Use real HAL implementation |
 | `@pytest.mark.skip_thread_cleanup(reason='...')` | Skip thread leak detection (**reason required!**) |
 | `@pytest.mark.no_qt` | Skip all Qt-related fixtures (implies skip_thread_cleanup) |
@@ -363,7 +385,7 @@ def test_with_owned_threads():
 **Environment Variables** (optional, read by `tests/conftest.py`):
 - `PYTEST_TIMEOUT_MULTIPLIER=2.0` - Scale all timeouts (useful for slow CI)
 
-Note: `QT_QPA_PLATFORM=offscreen` is set at the **top** of conftest.py (before any Qt imports) to ensure reliable headless operation. Do not add Qt imports above line 56 in conftest.py.
+Note: `QT_QPA_PLATFORM=offscreen` is set at the **top** of conftest.py (before any Qt imports) to ensure reliable headless operation. Do not add Qt imports before the `os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')` line in conftest.py.
 
 ## Project Architecture
 
@@ -462,12 +484,16 @@ injection_mgr = inject(InjectionManagerProtocol)
 
 **In Tests:** Use fixtures, not `inject()` directly:
 ```python
-# CORRECT: Fixtures provide isolated or session-scoped managers
-def test_extraction(isolated_managers):  # or session_managers + marker
-    from core.managers.registry import ManagerRegistry
-    registry = ManagerRegistry()
-    extraction_mgr = registry.extraction_manager
+# CORRECT: isolated_managers fixture returns a ManagerRegistry directly
+def test_extraction(isolated_managers):
+    extraction_mgr = isolated_managers.extraction_manager
     # ... test code ...
+
+# CORRECT: managers fixture also returns ManagerRegistry (requires @shared_state_safe)
+@pytest.mark.shared_state_safe
+def test_extraction_readonly(managers):
+    extraction_mgr = managers.extraction_manager
+    # ... read-only test code ...
 
 # WRONG: inject() returns shared singletons, breaks test isolation
 def test_extraction_wrong():
@@ -529,4 +555,4 @@ see `DEV_NOTES.md`. This file contains only operational development guidelines.
 
 ---
 
-*Last updated: December 15, 2025*
+*Last updated: December 17, 2025*

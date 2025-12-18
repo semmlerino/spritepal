@@ -37,6 +37,7 @@ pytestmark = [
     pytest.mark.slow,
     pytest.mark.thread_safety,
     pytest.mark.worker_threads,
+    pytest.mark.allows_registry_state,
 ]
 
 

@@ -1,12 +1,24 @@
-"""Integration tests for settings persistence across components"""
+"""Integration tests for settings persistence across components
+
+NOTE: This file creates SessionManager instances directly for testing with isolated sessions.
+The deprecation warning is suppressed.
+"""
 from __future__ import annotations
 
 import json
 import tempfile
+import warnings
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+# Suppress deprecation warning for direct SessionManager instantiation
+warnings.filterwarnings(
+    "ignore",
+    message=r"Direct SessionManager instantiation is deprecated",
+    category=DeprecationWarning,
+)
 
 from core.controller import ExtractionController
 from core.di_container import inject
@@ -33,7 +45,6 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
 ]

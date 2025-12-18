@@ -59,13 +59,47 @@ _SESSION_THREAD_IDENTITIES: dict[int, str] = {
 }
 
 
-def _get_session_thread_baseline() -> int:
-    """Get the session thread baseline (captured at module import time)."""
+def _get_session_thread_baseline(request: pytest.FixtureRequest | None = None) -> int:
+    """Get the session thread baseline.
+
+    Prefers session-captured baseline from pytest_sessionstart hook (more reliable).
+    Falls back to module import time baseline for backward compatibility.
+
+    Args:
+        request: Optional pytest request fixture for accessing session config
+
+    Returns:
+        Thread count baseline for comparison
+    """
+    if request is not None:
+        try:
+            baseline = getattr(request.config, '_thread_baseline', None)
+            if baseline is not None:
+                return baseline
+        except AttributeError:
+            pass
     return _SESSION_THREAD_BASELINE
 
 
-def _get_session_thread_identities() -> dict[int, str]:
-    """Get the session thread identities (captured at module import time)."""
+def _get_session_thread_identities(request: pytest.FixtureRequest | None = None) -> dict[int, str]:
+    """Get the session thread identities.
+
+    Prefers session-captured identities from pytest_sessionstart hook (more reliable).
+    Falls back to module import time identities for backward compatibility.
+
+    Args:
+        request: Optional pytest request fixture for accessing session config
+
+    Returns:
+        Dict mapping thread ident to thread name
+    """
+    if request is not None:
+        try:
+            identities = getattr(request.config, '_thread_identities', None)
+            if identities is not None:
+                return identities.copy()
+        except AttributeError:
+            pass
     return _SESSION_THREAD_IDENTITIES.copy()
 
 

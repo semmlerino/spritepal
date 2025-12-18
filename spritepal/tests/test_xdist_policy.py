@@ -1,9 +1,11 @@
 """Regression tests for xdist collection policy.
 
-These tests verify that the serial-by-default policy is enforced correctly:
-- Unmarked tests must be grouped to the serial worker
-- Tests marked @pytest.mark.parallel_safe must NOT get serial grouping
-- Tests already marked with xdist_group should not be modified
+These tests verify that the PARALLEL BY DEFAULT policy is enforced correctly:
+- Unmarked tests run in parallel (no serial grouping)
+- Tests using session_managers (or dependent fixtures) are auto-serialized
+- Tests marked @pytest.mark.parallel_unsafe are forced to serial
+- Tests already marked with xdist_group are not modified
+- The deprecated @pytest.mark.parallel_safe marker is ignored (with warning)
 
 The actual implementation is in conftest.py::pytest_collection_modifyitems.
 These tests use a minimal reimplementation to test the logic in isolation.
@@ -12,12 +14,19 @@ These tests use a minimal reimplementation to test the logic in isolation.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock
 
 import pytest
 
 if TYPE_CHECKING:
     pass
+
+
+# Session-dependent fixtures that trigger serialization (must match core_fixtures.py)
+SESSION_DEPENDENT_FIXTURES = frozenset({
+    'session_managers',
+    'managers',
+    'reset_manager_state',
+})
 
 
 def collection_policy_logic(
@@ -30,11 +39,12 @@ def collection_policy_logic(
     This mirrors the logic in pytest_collection_modifyitems for isolated testing.
     If conftest.py changes, this should be updated to match.
 
-    The canonical logic is:
+    PARALLEL BY DEFAULT Policy:
     1. Skip if xdist not active or workers == 0
     2. Skip items with existing xdist_group
-    3. Allow parallel_safe items to distribute (no marker added)
-    4. Add serial group to everything else
+    3. Force serial for parallel_unsafe marked items
+    4. Force serial for items using session_managers (direct or transitive)
+    5. All other items run in parallel (no marker added)
     """
     if not has_xdist:
         return
@@ -49,12 +59,18 @@ def collection_policy_logic(
         if item.get_closest_marker("xdist_group"):
             continue
 
-        # Tests explicitly marked parallel_safe can distribute to any worker
-        if item.get_closest_marker("parallel_safe"):
+        # Force serial if marked parallel_unsafe
+        if item.get_closest_marker("parallel_unsafe"):
+            item.add_marker(serial_group)
             continue
 
-        # Everything else runs serial
-        item.add_marker(serial_group)
+        # Auto-detect session fixture usage
+        fixture_names = set(getattr(item, 'fixturenames', []))
+        if fixture_names & SESSION_DEPENDENT_FIXTURES:
+            item.add_marker(serial_group)
+            continue
+
+        # DEFAULT: No marker = runs in parallel (the key policy)
 
 
 class FakeItem:
@@ -87,32 +103,71 @@ class FakeItem:
         return False
 
 
-@pytest.mark.parallel_safe
 class TestXdistCollectionPolicy:
-    """Test the serial-by-default xdist collection policy.
+    """Test the PARALLEL BY DEFAULT xdist collection policy.
 
     These tests verify the POLICY, not the full hook implementation.
     The hook also validates skip_thread_cleanup which is tested separately.
     """
 
-    def test_unmarked_test_gets_serial_group(self) -> None:
-        """Unmarked tests must be grouped to serial worker."""
+    def test_unmarked_test_runs_parallel(self) -> None:
+        """Unmarked tests should run in parallel (no serial group)."""
         item = FakeItem()
 
         collection_policy_logic(has_xdist=True, workers="auto", items=[item])
 
-        assert item.has_serial_group(), (
-            "Unmarked tests must be assigned to xdist_group('serial')"
+        assert not item.has_serial_group(), (
+            "Unmarked tests should NOT get serial group (parallel by default)"
         )
 
-    def test_parallel_safe_test_not_serialized(self) -> None:
-        """Tests marked parallel_safe must NOT get serial group."""
+    def test_session_managers_test_gets_serial_group(self) -> None:
+        """Tests using session_managers must be grouped to serial worker."""
+        item = FakeItem(fixturenames=["session_managers"])
+
+        collection_policy_logic(has_xdist=True, workers="auto", items=[item])
+
+        assert item.has_serial_group(), (
+            "Tests using session_managers must be serialized"
+        )
+
+    def test_managers_fixture_gets_serial_group(self) -> None:
+        """Tests using managers fixture (depends on session_managers) must serialize."""
+        item = FakeItem(fixturenames=["managers"])
+
+        collection_policy_logic(has_xdist=True, workers="auto", items=[item])
+
+        assert item.has_serial_group(), (
+            "Tests using managers fixture must be serialized"
+        )
+
+    def test_parallel_unsafe_marker_forces_serial(self) -> None:
+        """Tests marked parallel_unsafe must be serialized."""
+        item = FakeItem(markers={"parallel_unsafe": pytest.mark.parallel_unsafe})
+
+        collection_policy_logic(has_xdist=True, workers="auto", items=[item])
+
+        assert item.has_serial_group(), (
+            "Tests marked @pytest.mark.parallel_unsafe must be serialized"
+        )
+
+    def test_isolated_managers_runs_parallel(self) -> None:
+        """Tests using isolated_managers should run parallel."""
+        item = FakeItem(fixturenames=["isolated_managers", "tmp_path"])
+
+        collection_policy_logic(has_xdist=True, workers="auto", items=[item])
+
+        assert not item.has_serial_group(), (
+            "Tests using isolated_managers should run parallel"
+        )
+
+    def test_parallel_safe_test_still_runs_parallel(self) -> None:
+        """Tests marked parallel_safe (deprecated) should still run parallel."""
         item = FakeItem(markers={"parallel_safe": pytest.mark.parallel_safe})
 
         collection_policy_logic(has_xdist=True, workers="auto", items=[item])
 
         assert not item.has_serial_group(), (
-            "Tests marked @pytest.mark.parallel_safe must NOT get serial grouping"
+            "Tests marked @pytest.mark.parallel_safe should still run parallel"
         )
 
     def test_existing_xdist_group_not_modified(self) -> None:
@@ -131,7 +186,7 @@ class TestXdistCollectionPolicy:
 
     def test_no_grouping_without_xdist_plugin(self) -> None:
         """No grouping should happen if xdist plugin is not active."""
-        item = FakeItem()
+        item = FakeItem(fixturenames=["session_managers"])
 
         collection_policy_logic(has_xdist=False, workers="auto", items=[item])
 
@@ -141,7 +196,7 @@ class TestXdistCollectionPolicy:
 
     def test_no_grouping_with_zero_workers(self) -> None:
         """No grouping should happen if -n 0 is used."""
-        item = FakeItem()
+        item = FakeItem(fixturenames=["session_managers"])
 
         collection_policy_logic(has_xdist=True, workers="0", items=[item])
 
@@ -151,7 +206,7 @@ class TestXdistCollectionPolicy:
 
     def test_no_grouping_without_n_option(self) -> None:
         """No grouping should happen if -n is not specified."""
-        item = FakeItem()
+        item = FakeItem(fixturenames=["session_managers"])
 
         collection_policy_logic(has_xdist=True, workers=None, items=[item])
 
@@ -162,34 +217,39 @@ class TestXdistCollectionPolicy:
     def test_multiple_items_processed_correctly(self) -> None:
         """Multiple items should be processed with correct policy."""
         unmarked = FakeItem(nodeid="test_a.py::test_unmarked")
-        parallel_safe = FakeItem(
-            nodeid="test_b.py::test_parallel",
-            markers={"parallel_safe": pytest.mark.parallel_safe},
+        session_test = FakeItem(
+            nodeid="test_b.py::test_session",
+            fixturenames=["session_managers"],
+        )
+        parallel_unsafe = FakeItem(
+            nodeid="test_c.py::test_unsafe",
+            markers={"parallel_unsafe": pytest.mark.parallel_unsafe},
+        )
+        isolated_test = FakeItem(
+            nodeid="test_d.py::test_isolated",
+            fixturenames=["isolated_managers", "tmp_path"],
         )
         custom_group = FakeItem(
-            nodeid="test_c.py::test_custom",
+            nodeid="test_e.py::test_custom",
             markers={"xdist_group": pytest.mark.xdist_group("my_group")},
         )
 
-        items = [unmarked, parallel_safe, custom_group]
+        items = [unmarked, session_test, parallel_unsafe, isolated_test, custom_group]
         collection_policy_logic(has_xdist=True, workers="4", items=items)
 
-        assert unmarked.has_serial_group(), "Unmarked test should be serialized"
-        assert not parallel_safe.has_serial_group(), (
-            "parallel_safe test should NOT be serialized"
-        )
-        assert not custom_group.has_serial_group(), (
-            "Test with custom xdist_group should NOT be modified"
-        )
+        assert not unmarked.has_serial_group(), "Unmarked test should run parallel"
+        assert session_test.has_serial_group(), "session_managers test should be serialized"
+        assert parallel_unsafe.has_serial_group(), "parallel_unsafe test should be serialized"
+        assert not isolated_test.has_serial_group(), "isolated_managers test should run parallel"
+        assert not custom_group.has_serial_group(), "Custom xdist_group test should NOT be modified"
 
 
-@pytest.mark.parallel_safe
-class TestSerialByDefaultPolicyDocumentation:
+class TestParallelByDefaultPolicyDocumentation:
     """Verify the policy matches documentation claims."""
 
-    def test_policy_is_conservative(self) -> None:
-        """Verify the default is safe (serial), not dangerous (parallel)."""
-        # Create many items with various characteristics
+    def test_policy_is_parallel_by_default(self) -> None:
+        """Verify the default is parallel, not serial."""
+        # Create many unmarked items
         items = [
             FakeItem(nodeid=f"test_{i}.py::test_func")
             for i in range(10)
@@ -197,29 +257,35 @@ class TestSerialByDefaultPolicyDocumentation:
 
         collection_policy_logic(has_xdist=True, workers="auto", items=items)
 
-        # ALL items should be serialized (conservative default)
+        # All unmarked tests should run parallel (no serial group)
         for item in items:
-            assert item.has_serial_group(), (
-                f"Item {item.nodeid} should be serialized by default"
+            assert not item.has_serial_group(), (
+                f"{item.nodeid}: Unmarked tests should NOT be serialized by default"
             )
 
-    def test_only_explicit_parallel_safe_runs_parallel(self) -> None:
-        """Only items with explicit parallel_safe marker should run parallel."""
-        safe_item = FakeItem(
-            nodeid="test_safe.py::test_parallel_safe",
-            markers={"parallel_safe": pytest.mark.parallel_safe},
-        )
-        unsafe_item = FakeItem(nodeid="test_unsafe.py::test_no_marker")
+    def test_only_session_dependent_tests_serialized(self) -> None:
+        """Verify only session-dependent tests are serialized."""
+        # Create items with different characteristics
+        items = []
+        for i in range(5):
+            # Even: unmarked (should be parallel)
+            # Odd: session_managers (should be serial)
+            if i % 2 == 0:
+                items.append(FakeItem(nodeid=f"test_{i}.py::test_unmarked"))
+            else:
+                items.append(FakeItem(
+                    nodeid=f"test_{i}.py::test_session",
+                    fixturenames=["session_managers"]
+                ))
 
-        collection_policy_logic(
-            has_xdist=True,
-            workers="auto",
-            items=[safe_item, unsafe_item],
-        )
+        collection_policy_logic(has_xdist=True, workers="auto", items=items)
 
-        assert not safe_item.has_serial_group(), (
-            "parallel_safe should run parallel"
-        )
-        assert unsafe_item.has_serial_group(), (
-            "Unmarked should be serialized"
-        )
+        for i, item in enumerate(items):
+            if i % 2 == 0:
+                assert not item.has_serial_group(), (
+                    f"{item.nodeid}: Unmarked test should run parallel"
+                )
+            else:
+                assert item.has_serial_group(), (
+                    f"{item.nodeid}: session_managers test should be serialized"
+                )

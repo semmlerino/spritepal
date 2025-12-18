@@ -31,12 +31,11 @@ else
 fi
 
 # Set up display for headless environments if needed
-if [ -z "$DISPLAY" ] && command -v xvfb-run &> /dev/null; then
-    echo "🖥️  No display detected, using xvfb-run..."
-    PYTHON_CMD="xvfb-run -a python3"
-else
-    PYTHON_CMD="python3"
+if [ -z "$DISPLAY" ]; then
+    echo "🖥️  No display detected, using Qt offscreen mode..."
+    export QT_QPA_PLATFORM=offscreen
 fi
+PYTHON_CMD="python3"
 
 # Check for required dependencies
 echo "🔍 Checking dependencies..."

@@ -12,7 +12,6 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.unit,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.no_manager_setup,
 ]
 

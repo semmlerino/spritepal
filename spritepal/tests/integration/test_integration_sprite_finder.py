@@ -23,6 +23,7 @@ pytestmark = [
     pytest.mark.ci_safe,
     pytest.mark.real_hal,  # These tests need real HAL tools
     pytest.mark.skip_thread_cleanup(reason="Integration tests involve HAL pool that spawns background threads"),
+    pytest.mark.allows_registry_state,  # Tests may run after tests that initialize registry
 ]
 
 

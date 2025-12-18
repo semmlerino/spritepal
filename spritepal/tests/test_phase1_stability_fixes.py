@@ -44,7 +44,6 @@ from ui.common import WorkerManager
 # Migrated to isolated_managers for parallel-safe execution
 pytestmark = [
     pytest.mark.usefixtures("isolated_managers"),
-    pytest.mark.parallel_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
 ]
 

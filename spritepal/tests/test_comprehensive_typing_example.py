@@ -28,6 +28,9 @@ if TYPE_CHECKING:
 TestDataDict: TypeAlias = dict[str, Any]
 ParameterSet: TypeAlias = tuple[Any, ...]
 
+# Module-level marker to allow registry state (these tests don't use managers)
+pytestmark = pytest.mark.allows_registry_state
+
 
 class TestComprehensiveTypingExample:
     """Demonstrate comprehensive typing patterns in test classes."""

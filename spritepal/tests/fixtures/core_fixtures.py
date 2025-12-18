@@ -8,25 +8,21 @@ and dependency injection testing.
 
 Key fixtures:
     - session_managers: Session-scoped shared managers (fastest, state persists)
-    - class_managers: Class-scoped managers (shared within test class)
     - isolated_managers: Function-scoped isolated managers (full isolation)
     - managers: Convenience fixture returning ManagerRegistry (depends on session_managers)
     - reset_manager_state: Reset caches without re-initialization
-    - detect_manager_pollution: Autouse fixture for state leak detection
-    - setup_managers: Per-test manager initialization
 
 Fixture Selection Guide:
     | Need                        | Use                | NOT              |
     |-----------------------------|--------------------| -----------------|
     | Fast tests, shared state OK | session_managers   | isolated_managers|
-    | Tests in same class share   | class_managers     | setup_managers   |
     | Full isolation between tests| isolated_managers  | session_managers |
     | Access to ManagerRegistry   | managers           | direct import    |
     | Clean caches only           | reset_manager_state| isolated_managers|
 
 Escape hatches:
     - @pytest.mark.allows_registry_state: Skip pollution detection
-    - @pytest.mark.no_manager_setup: Skip setup_managers fixture
+    - @pytest.mark.no_manager_setup: Skip manager initialization
 """
 from __future__ import annotations
 
@@ -55,6 +51,13 @@ if TYPE_CHECKING:
     from tests.infrastructure.test_protocols import MockMainWindowProtocol
     from utils.rom_cache import ROMCache
 
+# Runtime imports for inject() - needed to avoid deprecated ManagerRegistry methods
+from core.di_container import inject
+from core.protocols.manager_protocols import (
+    ExtractionManagerProtocol,
+    SessionManagerProtocol,
+)
+
 
 # Import Qt fixtures for IS_HEADLESS constant
 try:
@@ -62,6 +65,19 @@ try:
 except ImportError:
     # Fallback if qt_fixtures can't be imported
     IS_HEADLESS = not os.environ.get("DISPLAY") and os.name != "nt"
+
+
+# ============================================================================
+# Parallel Execution Constants
+# ============================================================================
+
+# Fixtures that depend on session_managers (directly or transitively).
+# Tests using these fixtures are auto-serialized under xdist.
+SESSION_DEPENDENT_FIXTURES: frozenset[str] = frozenset({
+    'session_managers',      # Direct session-scoped fixture
+    'managers',              # Convenience wrapper for session_managers
+    'reset_manager_state',   # Requires active session to reset
+})
 
 
 @dataclass
@@ -298,24 +314,14 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     session_active = _session_state.is_initialized
     session_settings_path = _session_state.settings_path
 
-    # Check if THIS test's module also uses session_managers (same-module mixing)
-    fixture_names = set(getattr(request, 'fixturenames', []))
-    same_module_mixing = session_active and 'session_managers' in fixture_names
+    # Same-module mixing detection has been moved to collection time
+    # (see _validate_no_same_module_mixing in conftest.py) for reliability under xdist.
+    # Here we only handle cross-module cleanup and pollution detection.
 
-    # Isolation guard: fail if registry already initialized (indicates pollution or mixing)
+    # Isolation guard: clean up if registry already initialized
     registry = ManagerRegistry()
     if registry.is_initialized():
-        if same_module_mixing:
-            # FAIL FAST: Same module uses both session_managers and isolated_managers
-            # This indicates a test design problem - keep modules consistent.
-            pytest.fail(
-                f"Test '{test_name}': Cannot use isolated_managers when session_managers is also "
-                "requested in the same module. This causes order-dependent failures. Either:\n"
-                "  1. Use isolated_managers for ALL tests in this module, or\n"
-                "  2. Use session_managers + @pytest.mark.shared_state_safe for ALL tests\n"
-                "See CLAUDE.md 'Test Fixture Selection Guide' for guidance."
-            )
-        elif session_active:
+        if session_active:
             # Cross-module case: session_managers is from a different module
             # Clean up session state so this test gets fresh isolated managers
             try:
@@ -355,8 +361,10 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     # Clean up managers after test
     cleanup_managers()
 
-    # Restore session managers if they were active from a different module
-    if session_active and not same_module_mixing and session_settings_path:
+    # Restore session managers if they were active (cross-module case)
+    # Note: Same-module mixing is now caught at collection time, so if we get here
+    # with session_active=True, it must be from a different module.
+    if session_active and session_settings_path:
         try:
             initialize_managers("TestApp", settings_path=session_settings_path)
         except Exception:
@@ -365,98 +373,6 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     # Process events to ensure cleanup completes
     if app and not IS_HEADLESS:
         app.processEvents()
-
-
-@pytest.fixture(autouse=True)
-def detect_manager_pollution(request: FixtureRequest) -> Generator[None, None, None]:
-    """
-    Autouse fixture to detect unexpected ManagerRegistry state MODIFICATION.
-
-    This fixture detects tests that MODIFY registry state without using fixtures:
-    1. Tests that initialize the registry without using manager fixtures (pollution)
-    2. Tests that clean up the registry without owning it (breaking session state)
-
-    Tests that simply INHERIT initialized state (from session_managers) are OK.
-    The goal is to catch accidental pollution, not punish innocent tests.
-
-    Performance optimization: Only imports ManagerRegistry for tests that use
-    manager-related fixtures, avoiding import overhead for pure unit tests.
-
-    Escape hatches:
-    - @pytest.mark.allows_registry_state: Skip this check entirely
-    """
-    # Skip check if test has escape hatch marker
-    if request.node.get_closest_marker("allows_registry_state"):
-        yield
-        return
-
-    # Get list of manager-related fixtures this test uses
-    fixture_names = set(getattr(request, 'fixturenames', []))
-
-    # Fixtures that indicate manager involvement (direct or indirect)
-    # Check fixture presence BEFORE importing ManagerRegistry to save overhead
-    manager_related_fixtures = {
-        # Direct manager fixtures
-        'session_managers', 'class_managers', 'isolated_managers',
-        'managers', 'setup_managers', 'managers_initialized',
-        # Factory fixtures that may initialize registry
-        'real_factory', 'manager_context', 'manager_context_factory',
-        'real_extraction_manager', 'real_injection_manager', 'real_session_manager',
-        # Context fixtures
-        'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
-        'complete_test_context', 'minimal_injection_context', 'isolated_test_context',
-        # UI fixtures that need managers
-        'mock_main_window', 'mock_extraction_worker', 'main_window',
-    }
-
-    # Skip import entirely for non-manager tests (performance optimization)
-    if not manager_related_fixtures.intersection(fixture_names):
-        yield
-        return
-
-    # Now safe to import - test uses manager-related fixtures
-    from core.managers.registry import ManagerRegistry
-
-    # Include ALL fixtures that manage ManagerRegistry lifecycle
-    manager_fixtures = {
-        'session_managers', 'class_managers', 'isolated_managers',
-        'managers', 'setup_managers', 'managers_initialized',
-        'real_factory', 'manager_context',  # Factory fixtures that use registry
-    }
-    uses_manager_fixture = bool(manager_fixtures & fixture_names)
-
-    # Check state before test
-    registry = ManagerRegistry()
-    initialized_before = registry.is_initialized()
-
-    # If session_managers is active, inheriting that state is expected and OK
-    session_active = _session_state.is_initialized
-
-    yield
-
-    # Check state after test
-    initialized_after = registry.is_initialized()
-
-    # Detect pollution: test MODIFIED registry state without using a fixture
-    if not uses_manager_fixture:
-        test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
-
-        # Case 1: Test initialized registry (was uninitialized, now initialized)
-        if not initialized_before and initialized_after:
-            pytest.fail(
-                f"Test '{test_name}' initialized ManagerRegistry but didn't use manager fixtures. "
-                "This pollutes subsequent tests. "
-                "Fix: Use isolated_managers fixture, or add @pytest.mark.allows_registry_state."
-            )
-
-        # Case 2: Test cleaned up registry when session_managers was active
-        # (was initialized via session, now uninitialized)
-        if initialized_before and not initialized_after and session_active:
-            pytest.fail(
-                f"Test '{test_name}' cleaned up ManagerRegistry but session_managers is active. "
-                "This breaks session fixture contract. "
-                "Fix: Use isolated_managers if you need to call cleanup_managers()."
-            )
 
 
 @pytest.fixture(autouse=True)
@@ -595,79 +511,6 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
         _reset_manager_caches(registry)
 
 
-@pytest.fixture
-def setup_managers(request: FixtureRequest, tmp_path: Path) -> Iterator[None]:
-    """
-    Setup managers for tests requiring per-test isolation.
-
-    .. deprecated::
-        Use ``isolated_managers`` instead. This fixture will be removed in a future release.
-        ``isolated_managers`` provides the same per-test isolation with cleaner semantics.
-
-    This fixture ensures proper manager initialization and cleanup
-    for every test, replacing duplicated setup across test files.
-
-    IMPORTANT: If session_managers is active in the session, this fixture
-    yields without initializing (session_managers owns the registry).
-    It only cleans up if it was the one that initialized.
-    """
-    warnings.warn(
-        "setup_managers is deprecated. Use isolated_managers instead for per-test isolation.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    # Skip manager setup if test is marked with no_manager_setup
-    if request.node.get_closest_marker("no_manager_setup"):
-        yield
-        return
-
-    # Skip if test uses session managers (directly or via managers fixture)
-    if 'session_managers' in request.fixturenames or 'managers' in request.fixturenames:
-        yield
-        return
-
-    # Skip if session_managers is already active in this session
-    # (another test established session state - we shouldn't touch it)
-    if _session_state.is_initialized:
-        yield
-        return
-
-    # Lazy import manager functions to reduce startup overhead
-    # Ensure Qt app exists before initializing managers
-    from PySide6.QtWidgets import QApplication
-
-    from core.managers import cleanup_managers, initialize_managers
-    from core.managers.registry import ManagerRegistry
-
-    app = QApplication.instance()
-    if app is None and not IS_HEADLESS:
-        app = QApplication([])
-
-    # Track if we initialize, so we only cleanup if we initialized
-    registry = ManagerRegistry()
-    was_initialized_before = registry.is_initialized()
-
-    try:
-        if not was_initialized_before:
-            # Use temp settings path for isolation to prevent polluting user config
-            settings_path = tmp_path / ".test_settings_setup.json"
-            initialize_managers("TestApp", settings_path=settings_path)
-        yield
-    finally:
-        # Only cleanup if WE initialized (not if someone else did)
-        if not was_initialized_before:
-            try:
-                cleanup_managers()
-            except (RuntimeError, AttributeError) as e:
-                # Qt objects may already be deleted, log but don't crash
-                import logging
-                logging.getLogger(__name__).debug(f"Manager cleanup warning: {e}")
-            except Exception as e:
-                # Unexpected cleanup error, log but continue
-                import logging
-                logging.getLogger(__name__).warning(f"Unexpected manager cleanup error: {e}")
-
-
 @pytest.fixture(scope="class")
 def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     """
@@ -701,6 +544,27 @@ def class_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
 # ============================================================================
 
 @pytest.fixture
+def isolated_data_repository(tmp_path: Path) -> Generator[Any, None, None]:
+    """Per-test DataRepository with tmp_path storage.
+
+    Provides a fully isolated DataRepository instance for parallel-safe tests.
+    All generated test data files are stored in tmp_path and auto-cleaned.
+
+    Use this instead of get_test_data_repository() for parallel tests.
+
+    Example:
+        def test_extraction(isolated_data_repository, tmp_path):
+            data = isolated_data_repository.get_vram_extraction_data("small")
+            # Process data...
+    """
+    from tests.infrastructure.test_data_repository import get_isolated_data_repository
+
+    repo = get_isolated_data_repository(tmp_path)
+    yield repo
+    # Cleanup handled automatically by tmp_path fixture
+
+
+@pytest.fixture
 def real_factory(
     request: pytest.FixtureRequest,
     isolated_managers: ManagerRegistry,
@@ -731,7 +595,9 @@ def real_extraction_manager(
     NOTE: This returns a REAL ExtractionManager, not a mock.
     For actual mocks, create them locally with Mock(spec=ExtractionManager).
     """
-    return isolated_managers.get_extraction_manager()
+    # Use inject() to avoid deprecated ManagerRegistry.get_extraction_manager()
+    _ = isolated_managers  # Ensures fixture runs first to initialize managers
+    return inject(ExtractionManagerProtocol)  # type: ignore[return-value]
 
 
 @pytest.fixture
@@ -756,7 +622,9 @@ def real_session_manager(
     NOTE: This returns a REAL SessionManager, not a mock.
     For actual mocks, create them locally with Mock(spec=SessionManager).
     """
-    return isolated_managers.get_session_manager()
+    # Use inject() to avoid deprecated ManagerRegistry.get_session_manager()
+    _ = isolated_managers  # Ensures fixture runs first to initialize managers
+    return inject(SessionManagerProtocol)  # type: ignore[return-value]
 
 
 @pytest.fixture

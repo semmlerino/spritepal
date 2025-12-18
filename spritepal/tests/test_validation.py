@@ -11,7 +11,6 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.unit,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.file_io,  # Involves file operations
     pytest.mark.validation,  # Validation tests
     pytest.mark.no_manager_setup,  # Pure unit tests for validation functions

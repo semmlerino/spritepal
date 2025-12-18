@@ -20,6 +20,7 @@ pytestmark = [
     pytest.mark.widget,
     pytest.mark.requires_display,
     pytest.mark.signals_slots,
+    pytest.mark.allows_registry_state,
 ]
 
 class TestErrorHandler:

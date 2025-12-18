@@ -14,9 +14,9 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.unit,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.file_io,  # Involves file operations
     pytest.mark.rom_data,  # Tests requiring ROM files or data
+    pytest.mark.allows_registry_state,
 ]
 
 from core.extractor import SpriteExtractor

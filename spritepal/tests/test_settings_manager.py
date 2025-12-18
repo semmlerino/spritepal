@@ -1,11 +1,23 @@
-"""Tests for settings manager"""
+"""Tests for settings manager
+
+NOTE: This file creates SessionManager instances directly for testing SettingsManager
+integration. The deprecation warning is suppressed since we need isolated sessions.
+"""
 from __future__ import annotations
 
 import json
 import tempfile
+import warnings
 from pathlib import Path
 
 import pytest
+
+# Suppress deprecation warning for direct SessionManager instantiation
+warnings.filterwarnings(
+    "ignore",
+    message=r"Direct SessionManager instantiation is deprecated",
+    category=DeprecationWarning,
+)
 
 from core.di_container import inject
 from core.protocols.manager_protocols import SettingsManagerProtocol

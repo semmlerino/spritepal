@@ -559,8 +559,13 @@ class TestSynchronizationPatterns:
         expected_count = num_workers * increments_per_worker
         assert counter.get_count() == expected_count
 
+    @pytest.mark.parallel_unsafe
     def test_signal_based_synchronization(self, app):
-        """Test using signals for thread synchronization"""
+        """Test using signals for thread synchronization.
+
+        Marked parallel_unsafe because Qt threading state can conflict
+        between parallel test workers sharing the same QApplication.
+        """
 
         class Coordinator(QObject):
             start_work = Signal(int)

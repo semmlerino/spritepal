@@ -38,7 +38,6 @@ from utils.settings_manager import SettingsManager
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.headless,
-    pytest.mark.parallel_safe, # Most tests are unit and don't rely on shared state
     pytest.mark.file_io,
     pytest.mark.rom_data,
     pytest.mark.signals_slots,

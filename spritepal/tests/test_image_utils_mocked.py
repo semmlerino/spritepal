@@ -17,7 +17,6 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.unit,
     pytest.mark.ci_safe,

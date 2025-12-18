@@ -1,4 +1,4 @@
-#\!/usr/bin/env python3
+#!/usr/bin/env python3
 from __future__ import annotations
 
 """
@@ -12,8 +12,8 @@ Usage:
 
 Environment Requirements:
 - pytest-qt installed
-- xvfb for headless testing (Linux)
 - PySide6 with proper Qt installation
+- Qt offscreen mode is used for headless testing (no xvfb needed)
 """
 
 import argparse
@@ -79,11 +79,9 @@ def run_tests(args):
         cmd.extend(["-k", args.test])  # Run specific test
     
     if args.headless:
-        # Use xvfb for headless testing on Linux
-        if sys.platform.startswith('linux'):
-            cmd = ["xvfb-run", "-a", "--server-args=-screen 0 1920x1200x24", *cmd]
-        else:
-            os.environ["QT_QPA_PLATFORM"] = "offscreen"
+        # Use Qt offscreen mode for headless testing (canonical approach)
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+        os.environ["QT_QUICK_BACKEND"] = "software"
     
     # Add coverage if requested
     if args.coverage:
@@ -145,7 +143,7 @@ def main():
     
     parser.add_argument(
         "--headless", action="store_true",
-        help="Run tests in headless mode (requires xvfb on Linux)"
+        help="Run tests in headless mode (uses Qt offscreen platform)"
     )
     
     parser.add_argument(

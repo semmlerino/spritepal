@@ -22,7 +22,6 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.mock_dialogs,
     pytest.mark.mock_only,
-    pytest.mark.parallel_safe,
     pytest.mark.qt_mock,
     pytest.mark.rom_data,
     pytest.mark.widget,

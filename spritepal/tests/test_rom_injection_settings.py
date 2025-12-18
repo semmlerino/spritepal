@@ -1,14 +1,25 @@
 """
 Tests for ROM injection settings persistence
+
+NOTE: This file creates SessionManager instances directly for testing with isolated sessions.
+The deprecation warning is suppressed.
 """
 from __future__ import annotations
 
 import os
 import tempfile
+import warnings
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+
+# Suppress deprecation warning for direct SessionManager instantiation
+warnings.filterwarnings(
+    "ignore",
+    message=r"Direct SessionManager instantiation is deprecated",
+    category=DeprecationWarning,
+)
 
 from core.managers import InjectionManager
 from ui.injection_dialog import InjectionDialog
@@ -31,7 +42,6 @@ pytestmark = [
     pytest.mark.mock_dialogs,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
 ]

@@ -34,6 +34,9 @@ skip_in_offscreen = pytest.mark.skipif(
     reason="Complex Qt widgets + EventLoopHelper crash in offscreen mode"
 )
 
+# Module-level marker - tests don't use managers
+pytestmark = pytest.mark.allows_registry_state
+
 
 @pytest.fixture
 def large_rom_data(tmp_path) -> str:

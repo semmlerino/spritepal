@@ -22,7 +22,7 @@
 |-----------|-----------------|
 | **Qt Binding** | PySide6 (not PyQt6) |
 | **Qt Version** | 6.x |
-| **Python** | 3.11+ |
+| **Python** | 3.12+ |
 | **Testing** | pytest, pytest-qt, pytest-mock, pytest-timeout |
 | **Package Manager** | uv |
 

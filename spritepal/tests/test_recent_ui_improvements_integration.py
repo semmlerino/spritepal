@@ -59,7 +59,6 @@ def _create_main_window():
 pytestmark = [
     pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.parallel_safe,
     pytest.mark.usefixtures("isolated_managers"),
 ]
 

@@ -26,6 +26,7 @@ pytestmark = [
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.usefixtures("mock_hal"),  # HAL mocking
+    pytest.mark.allows_registry_state,
 ]
 
 class TestHALToolDetection(unittest.TestCase):

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 pytestmark = [
     pytest.mark.golden_hal,
     pytest.mark.headless,
-    pytest.mark.parallel_safe,
+    pytest.mark.allows_registry_state,
 ]
 
 

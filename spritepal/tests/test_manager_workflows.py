@@ -9,23 +9,28 @@ from pathlib import Path
 
 import pytest
 
+from core.di_container import inject
 from core.managers.exceptions import ValidationError
-from core.managers.registry import ManagerRegistry
+from core.protocols.manager_protocols import (
+    ExtractionManagerProtocol,
+    InjectionManagerProtocol,
+    SessionManagerProtocol,
+)
 
 
 def get_extraction_manager():
-    """Get extraction manager from registry."""
-    return ManagerRegistry().get_extraction_manager()
+    """Get extraction manager via DI."""
+    return inject(ExtractionManagerProtocol)
 
 
 def get_injection_manager():
-    """Get injection manager from registry."""
-    return ManagerRegistry().get_injection_manager()
+    """Get injection manager via DI."""
+    return inject(InjectionManagerProtocol)
 
 
 def get_session_manager():
-    """Get session manager from registry."""
-    return ManagerRegistry().get_session_manager()
+    """Get session manager via DI."""
+    return inject(SessionManagerProtocol)
 
 
 from tests.fixtures.test_managers import (
@@ -40,7 +45,6 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.no_qt,
     pytest.mark.rom_data,
-    pytest.mark.parallel_safe,
     pytest.mark.usefixtures("isolated_managers"),  # Use isolated managers for test independence
 ]
 

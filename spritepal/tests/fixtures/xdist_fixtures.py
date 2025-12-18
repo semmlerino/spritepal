@@ -7,11 +7,11 @@ This module provides worker-level isolation for parallel testing:
 - Hooks for proper worker initialization and cleanup
 
 Usage:
-    # Run only parallel_safe tests in parallel (all others serialize)
+    # Run all tests in parallel (default behavior)
     QT_QPA_PLATFORM=offscreen pytest -n auto
 
-    # Explicitly run just parallel_safe tests
-    QT_QPA_PLATFORM=offscreen pytest -m parallel_safe -n auto
+    # Run serially for debugging
+    QT_QPA_PLATFORM=offscreen pytest -n 0
 
 Architecture:
     - With pytest-xdist, each worker is a separate Python process
@@ -19,11 +19,12 @@ Architecture:
     - Module-level singletons are naturally isolated (separate process memory)
     - Filesystem resources need explicit isolation via tmp_path/worker_temp_root
 
-SERIAL BY DEFAULT Policy:
-    Tests are serialized by default. Only tests explicitly marked
-    @pytest.mark.parallel_safe are distributed across workers.
-    This prevents unmarked tests from racing on hidden globals.
+PARALLEL BY DEFAULT Policy:
+    Tests run in parallel by default. Only these are serialized:
+    1. Tests using session_managers (or dependent fixtures like 'managers')
+    2. Tests marked @pytest.mark.parallel_unsafe
 
+    The @pytest.mark.parallel_safe marker is deprecated and ignored.
     See pytest_collection_modifyitems in conftest.py for the enforcement logic.
 """
 
@@ -163,53 +164,38 @@ def configure_worker_environment(worker_temp_root: Path) -> Iterator[None]:
 
 @pytest.fixture
 def require_parallel_safe(request: pytest.FixtureRequest) -> None:
-    """Fixture that validates the test is marked parallel_safe.
+    """DEPRECATED: Tests are now parallel by default.
 
-    Use this in fixtures that should only be used with parallel-safe tests.
-    Raises pytest.fail if the test lacks the @pytest.mark.parallel_safe marker.
+    This fixture previously validated the @pytest.mark.parallel_safe marker,
+    but that marker is now deprecated. Tests run in parallel by default;
+    use @pytest.mark.parallel_unsafe to force serial execution instead.
 
-    Example:
-        @pytest.fixture
-        def my_isolated_resource(require_parallel_safe):
-            # This will fail if test isn't marked parallel_safe
-            yield create_resource()
+    This fixture now does nothing but emit a deprecation warning.
     """
-    marker = request.node.get_closest_marker("parallel_safe")
-    if marker is None:
-        pytest.fail(
-            f"Test {request.node.nodeid} uses a parallel-only fixture "
-            "but is not marked @pytest.mark.parallel_safe"
-        )
+    import warnings
+
+    warnings.warn(
+        "require_parallel_safe fixture is deprecated. "
+        "Tests are parallel by default; use @pytest.mark.parallel_unsafe "
+        "to force serial execution. This fixture will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
 
 @pytest.fixture
 def validate_parallel_isolation(request: pytest.FixtureRequest) -> None:
-    """Validate that a parallel_safe test doesn't use unsafe fixtures.
+    """Validate that tests using isolated_managers follow best practices.
 
-    Checks that the test:
-    1. Does not use session_managers (should use isolated_managers)
-    2. Does not use class_managers
-    3. Uses tmp_path for any file operations
+    Note: The @pytest.mark.parallel_safe marker is deprecated. Tests run
+    in parallel by default; this fixture now validates best practices for
+    ANY test using isolated_managers (not just those with the deprecated marker).
 
-    This fixture is automatically applied to parallel_safe tests via conftest.py.
+    Checks:
+    1. Recommends tmp_path for file operations (soft warning, not failure)
     """
-    marker = request.node.get_closest_marker("parallel_safe")
-    if marker is None:
-        return  # Skip validation for non-parallel tests
-
     # Get all fixture names used by this test
     fixture_names = set(request.fixturenames)
-
-    # Check for unsafe fixtures
-    unsafe_fixtures = {"session_managers", "class_managers"}
-    used_unsafe = fixture_names & unsafe_fixtures
-
-    if used_unsafe:
-        pytest.fail(
-            f"Test {request.node.nodeid} is marked @pytest.mark.parallel_safe "
-            f"but uses unsafe fixtures: {used_unsafe}. "
-            "Use isolated_managers instead for parallel-safe tests."
-        )
 
     # Recommend tmp_path if any file operations are likely
     if "isolated_managers" in fixture_names and "tmp_path" not in fixture_names:

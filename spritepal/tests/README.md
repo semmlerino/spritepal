@@ -107,16 +107,16 @@ tests/
 ### Basic Test Execution
 ```bash
 # All tests with real components
-source venv/bin/activate && pytest tests/ -v
+uv run pytest tests/ -v
 
 # Specific test file
-pytest tests/test_extraction_manager.py -v
+uv run pytest tests/test_extraction_manager.py -v
 
 # Integration tests only
-pytest tests/ -m "integration" -v
+uv run pytest tests/ -m "integration" -v
 
 # Quick unit tests (small test data)
-pytest tests/ -m "unit" -v
+uv run pytest tests/ -m "unit" -v
 ```
 
 ### Coverage Analysis
@@ -125,16 +125,20 @@ pytest tests/ -m "unit" -v
 pytest tests/ --cov=core --cov=ui --cov-report=html
 
 # Coverage report shows real integration paths tested
-open htmlcov/index.html
+# Open htmlcov/index.html in browser:
+#   macOS:   open htmlcov/index.html
+#   Linux:   xdg-open htmlcov/index.html
+#   Windows: start htmlcov/index.html
+#   WSL:     wslview htmlcov/index.html  # or: explorer.exe $(wslpath -w htmlcov/index.html)
 ```
 
 ### Performance Testing
 ```bash
 # Benchmark real component performance
-pytest tests/ --benchmark-only
+uv run pytest tests/ --benchmark-only
 
-# Memory leak detection
-pytest tests/ --memray
+# Memory leak detection (requires: uv pip install memray)
+uv run pytest tests/ --memray
 ```
 
 ### Migration Tools
@@ -235,11 +239,9 @@ What does your test need?
 
 **Basic test with managers:**
 ```python
-from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
-
 def test_extraction_validates_params(isolated_managers):
-    manager = inject(ExtractionManagerProtocol)
+    # Access managers directly from the fixture (don't use inject() in tests)
+    manager = isolated_managers.extraction_manager
     result = manager.validate_extraction_params({"path": "/test"})
     assert isinstance(result, bool)
 ```
@@ -292,9 +294,9 @@ Always use semantic timeouts from `tests/fixtures/timeouts.py`:
 ```python
 from tests.fixtures.timeouts import signal_timeout, worker_timeout, ui_timeout
 
-timeout=signal_timeout()  # ~1000ms - fast signals
-timeout=worker_timeout()  # ~5000ms - background workers
-timeout=ui_timeout()      # ~2000ms - UI interactions
+timeout=ui_timeout()      # ~1000ms - widget visibility, layout updates
+timeout=signal_timeout()  # ~2000ms - generic signal waits, event propagation
+timeout=worker_timeout()  # ~5000ms - background workers, QThread operations
 ```
 
 All timeouts scale with `PYTEST_TIMEOUT_MULTIPLIER` environment variable.
@@ -359,12 +361,13 @@ The test suite has been significantly improved for better isolation and parallel
 - `ManagerRegistry.reset_for_tests()` now properly resets singleton state
 - Added missing singleton resets (PreviewGenerator, SignalRegistry, WorkerManager)
 - Session manager state validated before/after tests with `shared_state_safe` marker
-- Class-scoped fixtures now auto-reset between tests via `reset_class_state` (autouse)
+- All manager fixtures are function-scoped with automatic cleanup via pytest teardown
 
 **Parallelism:**
-- xdist default inverted: tests run in parallel unless using shared fixtures
-- Tests with `session_managers`, `class_managers`, or `rom_cache` auto-grouped to serial
-- Other tests can run with `-n auto` for parallel execution
+- Tests run in parallel by default with `-n auto` (configured in pyproject.toml)
+- Tests with `session_managers` are auto-grouped to serial (xdist_group="serial")
+- Tests marked `@pytest.mark.parallel_unsafe` are forced to serial
+- For serial debugging: `pytest -n 0`
 
 **Race Condition Fixes:**
 - Signal-before-waitSignal patterns fixed (use context manager form)
@@ -376,10 +379,9 @@ The test suite has been significantly improved for better isolation and parallel
 - Headless fallback fixed: offscreen Qt is NOT treated as headless
 - Real HAL binaries used when `@pytest.mark.real_hal` is set
 
-**Deprecated Fixtures:**
-- `setup_managers` → use `isolated_managers` instead
-- `class_managers` → use `isolated_managers` instead
-- Both emit DeprecationWarning when used
+**Removed Fixtures:**
+- `setup_managers` - use `isolated_managers` instead
+- `class_managers` - use `isolated_managers` instead
 
 ## Success Metrics
 

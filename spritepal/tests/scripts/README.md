@@ -253,7 +253,7 @@ tests/scripts/
 
 **"Module not found" errors**
 - Activate virtual environment: `source venv/bin/activate`
-- Install missing dependencies: `pip install pytest pytest-qt pytest-xvfb`
+- Install missing dependencies: `pip install pytest pytest-qt`
 
 **Tests hang or timeout**
 - This is expected for some GUI tests

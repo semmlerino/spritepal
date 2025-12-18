@@ -1,9 +1,22 @@
 """
 Tests for manager registry
+
+NOTE: This file intentionally uses deprecated ManagerRegistry.get_*_manager() methods
+to test that they still work correctly (raising proper errors when not initialized).
+The deprecation warnings are suppressed since we're testing the deprecated API.
 """
 from __future__ import annotations
 
+import warnings
+
 import pytest
+
+# Suppress deprecation warnings for get_*_manager methods we're intentionally testing
+warnings.filterwarnings(
+    "ignore",
+    message=r"ManagerRegistry\.get_\w+_manager\(\) is deprecated",
+    category=DeprecationWarning,
+)
 
 from core.di_container import reset_container
 from core.managers import (

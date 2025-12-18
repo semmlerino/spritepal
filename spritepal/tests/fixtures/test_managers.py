@@ -3,14 +3,25 @@ Test fixture managers for real extraction/injection logic
 
 Provides real manager instances with test data instead of mocks,
 improving test reliability and reducing mocking overhead.
+
+NOTE: This file directly instantiates managers for testing purposes.
+The deprecation warning is suppressed since these are test fixtures.
 """
 from __future__ import annotations
 
 import os
 import sys
 import tempfile
+import warnings
 
 import pytest
+
+# Suppress deprecation warning for direct manager instantiation in test fixtures
+warnings.filterwarnings(
+    "ignore",
+    message=r"Direct SessionManager instantiation is deprecated",
+    category=DeprecationWarning,
+)
 from PIL import Image
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed

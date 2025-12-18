@@ -7,6 +7,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.rom_data,
+    pytest.mark.allows_registry_state,
 ]
 """
 Integration test to verify refactored FileValidator maintains backward compatibility.
@@ -20,8 +21,7 @@ import pytest
 
 from utils.file_validator import FileValidator
 
-# Mark all tests in this module to skip manager setup
-pytestmark = pytest.mark.no_manager_setup
+# NOTE: pytestmark is defined at the top of the file
 
 def test_file_validator_backward_compatibility():
     """Test that FileValidator maintains backward compatibility with existing usage."""

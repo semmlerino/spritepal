@@ -36,7 +36,6 @@ pytestmark = [
     pytest.mark.mock_dialogs,
     pytest.mark.mock_only,
     pytest.mark.no_qt,
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.ci_safe,
     pytest.mark.no_manager_setup,  # Uses isolated_managers, skip session_managers

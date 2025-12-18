@@ -29,7 +29,6 @@ pytestmark = [
     pytest.mark.gui,  # Changed from headless - this creates real Qt widgets
     pytest.mark.mock_dialogs,
     pytest.mark.qt_real,  # Changed from no_qt - this creates real Qt widgets
-    pytest.mark.parallel_safe,
     pytest.mark.rom_data,
     pytest.mark.integration,  # Changed from unit - this is integration testing
     pytest.mark.widget,
