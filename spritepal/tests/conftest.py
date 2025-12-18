@@ -556,58 +556,21 @@ def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: Any)
 def pytest_runtest_setup(item: Any) -> None:
     """Record registry state before test runs.
 
-    Performance optimization: Only imports ManagerRegistry for tests that use
-    manager-related fixtures, avoiding import overhead for pure unit tests.
+    Always checks actual registry state to correctly attribute pollution.
+    Tests that inherit dirty state from previous tests are not blamed;
+    only tests that CHANGE state from clean to dirty are flagged in teardown.
+
+    NOTE: This hook runs BEFORE fixtures, so we cannot fail here for tests
+    using cleanup fixtures (like isolated_managers) - the fixture hasn't had
+    a chance to clean the registry yet. All enforcement happens in teardown.
     """
-    import os
-
-    # Fixtures that indicate manager involvement
-    manager_related = {
-        'session_managers', 'isolated_managers',
-        'managers', 'managers_initialized',
-        'real_factory', 'manager_context', 'real_extraction_manager',
-        'real_injection_manager', 'real_session_manager',
-        'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
-        'complete_test_context', 'minimal_injection_context',
-        'mock_main_window', 'main_window',
-    }
-
-    # Fixtures that manage registry lifecycle (don't fail pre-test for these)
-    # This matches the original assert_registry_clean_under_xdist exemptions
-    cleanup_fixtures = {
-        'isolated_managers', 'session_managers', 'manager_context',
-        'managers', 'managers_initialized',  # Legacy manager fixtures
-        'real_factory', 'real_extraction_manager', 'real_session_manager',
-        'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
-        'complete_test_context', 'minimal_injection_context',
-        'mock_main_window', 'main_window',
-    }
-
-    fixture_names = set(getattr(item, 'fixturenames', []))
-    if not manager_related.intersection(fixture_names):
-        item._registry_was_clean = True  # Assume clean for non-manager tests
-        return
-
+    # Always check actual registry state - don't assume
     try:
         from core.managers.registry import ManagerRegistry
-        # Store whether registry was clean BEFORE the test
         is_clean = ManagerRegistry.is_clean()
         item._registry_was_clean = is_clean
-
-        # Under xdist: fail if registry is dirty BEFORE test (pollution from previous)
-        # But only for tests NOT using cleanup fixtures (those manage lifecycle themselves)
-        is_xdist = os.environ.get("PYTEST_XDIST_WORKER") is not None
-        has_escape_marker = item.get_closest_marker("allows_registry_state")
-        uses_cleanup_fixture = bool(cleanup_fixtures.intersection(fixture_names))
-
-        if is_xdist and not is_clean and not has_escape_marker and not uses_cleanup_fixture:
-            pytest.fail(
-                f"Registry dirty before {item.name} - "
-                "previous test leaked state or direct instantiation detected. "
-                "Use isolated_managers fixture or reset after test."
-            )
     except ImportError:
-        item._registry_was_clean = True  # Assume clean if can't check
+        item._registry_was_clean = True  # Assume clean if can't import
 
 
 def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
@@ -617,12 +580,10 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     enforcement. Tests that DIRTY the registry (change it from clean to dirty)
     without using a manager fixture will fail.
 
-    Performance optimization: Only imports ManagerRegistry for tests that use
-    manager-related fixtures, avoiding import overhead for pure unit tests.
-
     This catches:
     - Tests that initialize managers without cleanup fixtures
     - Accidental state pollution between tests
+    - Direct manager instantiation that bypasses fixture detection
 
     This does NOT catch:
     - Tests that inherit dirty state from previous tests (use isolated_managers to fix)
@@ -632,26 +593,16 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     if item.get_closest_marker("allows_registry_state"):
         return
 
-    # Only check tests that didn't use manager fixtures
+    # Skip for tests that use manager fixtures (they manage lifecycle)
     fixture_names = set(getattr(item, 'fixturenames', []))
     cleanup_fixtures = {'isolated_managers', 'session_managers'}
     if cleanup_fixtures.intersection(fixture_names):
         return  # Test uses a fixture that manages registry lifecycle
 
-    # Performance optimization: skip import for non-manager tests
-    manager_related = {
-        'session_managers', 'isolated_managers',
-        'managers', 'managers_initialized',
-        'real_factory', 'manager_context', 'real_extraction_manager',
-        'real_injection_manager', 'real_session_manager',
-        'test_extraction_manager', 'test_injection_manager', 'test_session_manager',
-        'complete_test_context', 'minimal_injection_context',
-        'mock_main_window', 'main_window',
-    }
-    if not manager_related.intersection(fixture_names):
-        return  # Test doesn't use managers - skip check
-
-    # Check if THIS test dirtied the registry
+    # Check unconditionally: did THIS test dirty the registry?
+    # Note: Previous version had a performance optimization that skipped this check
+    # for tests without known manager-related fixtures. That created a gap where
+    # direct manager instantiation could bypass detection. Now we always check.
     try:
         from core.managers.registry import ManagerRegistry
 
@@ -889,53 +840,68 @@ def skip_requires_display(request: FixtureRequest):
 # Test Cleanup Verification
 # ============================================================================
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
-    """Verify that test cleanup actually succeeded.
+    """Verify that test cleanup actually succeeded (autouse for Qt/manager tests).
 
-    This fixture checks for lingering state after tests complete,
-    helping identify incomplete cleanup that could cause flaky tests.
+    This fixture checks for lingering manager state (active operations, open handles)
+    after tests complete. It helps identify incomplete cleanup that could cause flaky tests.
 
-    Usage:
-        @pytest.mark.usefixtures("verify_cleanup")
-        class TestWithCleanupVerification:
-            pass
-
-    Or explicitly:
-        def test_something(verify_cleanup):
-            ...
+    Activation: Runs automatically for tests using Qt or manager fixtures.
+    Behavior: Warns or fails based on --leak-mode (consistent with cleanup_workers).
     """
+    # Only run for tests that use Qt or manager fixtures
+    relevant_fixtures = {
+        'qtbot', 'qt_app', 'qapp', 'hal_pool', 'cleanup_singleton',
+        'isolated_managers', 'session_managers', 'managers',
+        'real_factory', 'real_extraction_manager', 'real_injection_manager',
+    }
+    fixture_names = set(getattr(request, 'fixturenames', []))
+
+    if not relevant_fixtures.intersection(fixture_names):
+        yield
+        return
+
     yield
 
     # Verify no lingering manager state
     from core.managers.registry import ManagerRegistry
 
     registry = ManagerRegistry()
-    if registry.is_initialized():
-        # Check for active operations that weren't cleaned up
-        for manager_name in ['extraction_manager', 'injection_manager', 'session_manager']:
-            if hasattr(registry, manager_name):
-                manager = getattr(registry, manager_name)
-                if manager and hasattr(manager, '_active_operations'):
-                    active_ops = getattr(manager, '_active_operations', [])
-                    if active_ops:
-                        warnings.warn(
-                            f"Test '{request.node.name}': Manager '{manager_name}' has "
-                            f"{len(active_ops)} active operations after cleanup",
-                            UserWarning,
-                            stacklevel=2
-                        )
+    if not registry.is_initialized():
+        return
 
-                # Check for unclosed resources
-                if manager and hasattr(manager, '_open_handles'):
-                    handles = getattr(manager, '_open_handles', [])
-                    if handles:
-                        warnings.warn(
-                            f"Test '{request.node.name}': Manager '{manager_name}' has "
-                            f"{len(handles)} open handles after cleanup",
-                            UserWarning,
-                            stacklevel=2
-                        )
+    leak_mode = request.config.getoption("--leak-mode", default="fail")
+    leaks_found: list[str] = []
+
+    # Check for active operations and open handles that weren't cleaned up
+    for manager_name in ['extraction_manager', 'injection_manager', 'session_manager']:
+        if hasattr(registry, manager_name):
+            manager = getattr(registry, manager_name)
+            if manager and hasattr(manager, '_active_operations'):
+                active_ops = getattr(manager, '_active_operations', [])
+                if active_ops:
+                    leaks_found.append(
+                        f"Manager '{manager_name}' has {len(active_ops)} active operations"
+                    )
+
+            # Check for unclosed resources
+            if manager and hasattr(manager, '_open_handles'):
+                handles = getattr(manager, '_open_handles', [])
+                if handles:
+                    leaks_found.append(
+                        f"Manager '{manager_name}' has {len(handles)} open handles"
+                    )
+
+    if leaks_found:
+        message = (
+            f"Test '{request.node.name}' left manager state leaks:\n  - "
+            + "\n  - ".join(leaks_found)
+        )
+        if leak_mode == "warn":
+            warnings.warn(message, ResourceWarning, stacklevel=2)
+        else:
+            pytest.fail(message)
 
 
 @pytest.fixture(autouse=True)
