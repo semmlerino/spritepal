@@ -18,7 +18,6 @@ from typing import Any
 from core.sprite_finder import SpriteFinder
 from utils.constants import (
     DEFAULT_SCAN_STEP,
-    MAX_SPRITE_SIZE,
     MIN_SPRITE_SIZE,
 )
 
@@ -211,11 +210,15 @@ class ParallelSpriteFinder:
         chunk: SearchChunk,
         cancellation_token: threading.Event | None = None
     ) -> list[SearchResult]:
-        """Search a single chunk for sprites."""
+        """Search a single chunk for sprites.
+
+        Delegates all validation to SpriteFinder.scan_offset() to ensure
+        consistent behavior between sequential and parallel scanning.
+        """
         results = []
 
         # Use adaptive step sizing based on chunk characteristics
-        step = self._calculate_adaptive_step(rom_data, chunk)
+        step = self._calculate_adaptive_step(finder, rom_data, chunk)
 
         # Use a while loop to ensure we check up to and including the last valid offset
         offset = chunk.start
@@ -228,30 +231,27 @@ class ParallelSpriteFinder:
             if offset + MIN_SPRITE_SIZE > len(rom_data):
                 break
 
-            # Quick validation checks
-            if not self._quick_sprite_check(rom_data, offset):
-                offset += step
-                continue
+            # Use SpriteFinder's unified scan_offset (includes quick_check)
+            scan_result = finder.scan_offset(
+                rom_data,
+                offset,
+                quick_check=True,
+                full_visual_validation=False
+            )
 
-            # Try to find sprite at this offset
-            sprite_info = finder.find_sprite_at_offset(rom_data, offset)
-
-            if sprite_info:
+            if scan_result:
                 result = SearchResult(
                     offset=offset,
-                    size=sprite_info.get("decompressed_size", 0),
-                    tile_count=sprite_info.get("tile_count", 0),
-                    compressed_size=sprite_info.get("compressed_size", 0),
-                    confidence=self._calculate_confidence(sprite_info),
-                    metadata=sprite_info
+                    size=scan_result.decompressed_size,
+                    tile_count=scan_result.tile_count,
+                    compressed_size=scan_result.compressed_size,
+                    confidence=scan_result.confidence,
+                    metadata=scan_result.to_dict()
                 )
                 results.append(result)
 
                 # Skip ahead past this sprite
-                skip_distance = max(
-                    sprite_info.get("compressed_size", self.step_size),
-                    self.step_size
-                )
+                skip_distance = max(scan_result.compressed_size, self.step_size)
                 offset += skip_distance
             else:
                 # Move to next offset
@@ -259,28 +259,9 @@ class ParallelSpriteFinder:
 
         return results
 
-    def _quick_sprite_check(self, rom_data: bytes, offset: int) -> bool:
-        """
-        Quick heuristic check to filter obvious non-sprites.
-
-        This avoids expensive decompression attempts.
-        """
-        # Check for reasonable data patterns
-        header = rom_data[offset:offset + 16]
-
-        # All zeros or all 0xFF - unlikely to be sprite
-        if all(b == 0 for b in header) or all(b == 0xFF for b in header):
-            return False
-
-        # Check for some data variation
-        unique_bytes = len(set(header))
-        if unique_bytes < 3:  # Too uniform
-            return False
-
-        return True
-
     def _calculate_adaptive_step(
         self,
+        finder: SpriteFinder,
         rom_data: bytes,
         chunk: SearchChunk
     ) -> int:
@@ -288,6 +269,7 @@ class ParallelSpriteFinder:
         Calculate adaptive step size based on chunk characteristics.
 
         Dense sprite regions get smaller steps, sparse regions larger.
+        Uses SpriteFinder._quick_sprite_check for consistency.
         """
         # Sample the chunk to estimate sprite density
         sample_size = min(0x4000, chunk.size)  # 16KB sample
@@ -298,7 +280,7 @@ class ParallelSpriteFinder:
         for i in range(0, sample_size - 16, 0x100):
             offset = sample_offset + i
             if offset + 16 < len(rom_data):
-                if self._quick_sprite_check(rom_data, offset):
+                if finder._quick_sprite_check(rom_data, offset):
                     potential_sprites += 1
 
         # Calculate density (sprites per KB)
@@ -314,38 +296,6 @@ class ParallelSpriteFinder:
         # Normal density
         return self.step_size
 
-    def _calculate_confidence(self, sprite_info: dict[str, Any]) -> float:
-        """
-        Calculate confidence score for sprite detection.
-
-        Returns:
-            Confidence score between 0.0 and 1.0
-        """
-        score = 0.0
-
-        # Factor 1: Size reasonableness (30%)
-        size = sprite_info.get("decompressed_size", 0)
-        if MIN_SPRITE_SIZE <= size <= MAX_SPRITE_SIZE:
-            score += 0.3
-
-        # Factor 2: Compression ratio (20%)
-        compressed = sprite_info.get("compressed_size", 1)
-        decompressed = sprite_info.get("decompressed_size", 1)
-        ratio = compressed / decompressed
-        if 0.1 <= ratio <= 0.7:
-            score += 0.2
-
-        # Factor 3: Tile count (20%)
-        tiles = sprite_info.get("tile_count", 0)
-        if 4 <= tiles <= 512:
-            score += 0.2
-
-        # Factor 4: Validation metrics (30%)
-        if sprite_info.get("visual_validation", {}).get("passed", False):
-            score += 0.3
-
-        return min(score, 1.0)
-
     def shutdown(self) -> None:
         """Shutdown the thread pool. Safe to call multiple times."""
         if self._shutdown:
@@ -356,46 +306,3 @@ class ParallelSpriteFinder:
             logger.info("ParallelSpriteFinder shutdown complete")
         except Exception as e:
             logger.warning(f"Error during ParallelSpriteFinder shutdown: {e}")
-
-class AdaptiveSpriteFinder(ParallelSpriteFinder):
-    """
-    Extended parallel finder with adaptive search strategies.
-
-    Includes bloom filters, pattern learning, and predictive caching.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-
-        # Pattern learning
-        self.sprite_patterns = {}  # offset -> pattern signature
-        self.common_offsets = set()  # frequently found sprite offsets
-
-        # Adaptive parameters
-        self.min_step = 0x10
-        self.max_step = 0x2000
-        self.learning_enabled = True
-
-    def learn_from_results(self, results: list[SearchResult]):
-        """Learn patterns from found sprites to improve future searches."""
-        if not self.learning_enabled:
-            return
-
-        for result in results:
-            # Remember successful offsets
-            offset_pattern = result.offset & 0xFF00  # Pattern based on alignment
-            if offset_pattern not in self.common_offsets:
-                self.common_offsets.add(offset_pattern)
-
-            # Learn sprite signatures
-            if result.confidence > 0.8:
-                self.sprite_patterns[result.offset] = {
-                    "size": result.size,
-                    "tiles": result.tile_count,
-                    "confidence": result.confidence
-                }
-
-        logger.debug(
-            f"Learned patterns from {len(results)} sprites, "
-            f"total patterns: {len(self.sprite_patterns)}"
-        )

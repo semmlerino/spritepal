@@ -17,6 +17,8 @@ from core.tile_renderer import TileRenderer
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_TILES_PER_ROW,
+    MAX_SPRITE_SIZE,
+    MIN_SPRITE_SIZE,
     ROM_SCAN_STEP_DEFAULT,
     ROM_SCAN_STEP_QUICK,
     ROM_SPRITE_AREA_1_END,
@@ -57,6 +59,49 @@ class SpriteCandidate:
             "preview_path": self.preview_path
         }
 
+
+@dataclass
+class ScanResult:
+    """Result from scanning a single offset for a sprite.
+
+    This is the unified result type used by scan_offset() to provide
+    consistent validation across sequential and parallel finders.
+    """
+    offset: int
+    compressed_size: int
+    decompressed_size: int
+    tile_count: int
+    confidence: float
+    tile_validation_score: float
+    visual_metrics: dict[str, float] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for metadata/serialization."""
+        return {
+            "offset": self.offset,
+            "offset_hex": f"0x{self.offset:X}",
+            "compressed_size": self.compressed_size,
+            "decompressed_size": self.decompressed_size,
+            "tile_count": self.tile_count,
+            "confidence": round(self.confidence, 3),
+            "tile_validation_score": round(self.tile_validation_score, 3),
+            "visual_metrics": {k: round(v, 3) for k, v in self.visual_metrics.items()}
+                             if self.visual_metrics else None
+        }
+
+    def to_sprite_candidate(self, preview_path: str | None = None) -> SpriteCandidate:
+        """Convert to SpriteCandidate for API compatibility."""
+        return SpriteCandidate(
+            offset=self.offset,
+            compressed_size=self.compressed_size,
+            decompressed_size=self.decompressed_size,
+            tile_count=self.tile_count,
+            confidence=self.confidence,
+            visual_metrics=self.visual_metrics or {},
+            preview_path=preview_path
+        )
+
+
 class SpriteFinder:
     """Finds actual character sprites in ROM files"""
 
@@ -72,6 +117,199 @@ class SpriteFinder:
 
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    def _quick_sprite_check(self, rom_data: bytes, offset: int) -> bool:
+        """
+        Quick heuristic check to filter obvious non-sprites.
+
+        This avoids expensive decompression attempts by checking the first 16 bytes
+        for patterns that are unlikely to be valid compressed sprite data.
+
+        Args:
+            rom_data: ROM data bytes
+            offset: Offset to check
+
+        Returns:
+            True if offset might contain a sprite, False if definitely not
+        """
+        # Don't check beyond available data
+        if offset + 16 > len(rom_data):
+            return False
+
+        header = rom_data[offset:offset + 16]
+
+        # All zeros or all 0xFF - unlikely to be sprite
+        if all(b == 0 for b in header) or all(b == 0xFF for b in header):
+            return False
+
+        # Check for some data variation (need at least 3 unique bytes)
+        unique_bytes = len(set(header))
+        if unique_bytes < 3:  # Too uniform
+            return False
+
+        return True
+
+    def _calculate_quick_confidence(
+        self,
+        decompressed_size: int,
+        compressed_size: int,
+        tile_count: int,
+        tile_validation_score: float
+    ) -> float:
+        """
+        Calculate confidence score without visual validation.
+
+        Uses structural factors to estimate sprite validity. This provides
+        a consistent confidence calculation for both sequential and parallel
+        finders when full visual validation is not performed.
+
+        Args:
+            decompressed_size: Size of decompressed sprite data
+            compressed_size: Size of compressed data in ROM
+            tile_count: Number of tiles in sprite
+            tile_validation_score: Score from tile data validation (0.0-1.0)
+
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        score = 0.0
+
+        # Factor 1: Size reasonableness (30%)
+        if MIN_SPRITE_SIZE <= decompressed_size <= MAX_SPRITE_SIZE:
+            score += 0.3
+
+        # Factor 2: Compression ratio (20%)
+        if compressed_size > 0:
+            ratio = compressed_size / decompressed_size
+            if 0.1 <= ratio <= 0.7:
+                score += 0.2
+
+        # Factor 3: Tile count (20%)
+        if 4 <= tile_count <= 512:
+            score += 0.2
+
+        # Factor 4: Tile validation score (30%)
+        # Scale tile_validation_score (0.0-1.0) to contribute up to 0.3
+        score += tile_validation_score * 0.3
+
+        return min(score, 1.0)
+
+    def scan_offset(
+        self,
+        rom_data: bytes,
+        offset: int,
+        quick_check: bool = True,
+        full_visual_validation: bool = False,
+        min_tile_confidence: float = 0.4
+    ) -> ScanResult | None:
+        """
+        Unified offset scanning pipeline.
+
+        This is the canonical method for checking a single offset for a sprite.
+        Both sequential scanning (find_sprites_in_rom) and parallel scanning
+        (ParallelSpriteFinder) should use this method to ensure consistent
+        validation behavior.
+
+        Args:
+            rom_data: ROM data bytes
+            offset: Offset to scan
+            quick_check: Whether to apply pre-decompression heuristics
+            full_visual_validation: Whether to generate image and run visual validation
+            min_tile_confidence: Minimum tile validation confidence to accept
+
+        Returns:
+            ScanResult if valid sprite found, None otherwise
+        """
+        # Step 1: Pre-decompression heuristic (fast filter)
+        if quick_check and not self._quick_sprite_check(rom_data, offset):
+            return None
+
+        # Step 2: Try decompression
+        try:
+            compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
+                rom_data, offset, expected_size=None
+            )
+            if len(sprite_data) == 0:
+                return None
+        except Exception:
+            return None
+
+        # Step 3: Tile count validation
+        tile_count = len(sprite_data) // BYTES_PER_TILE
+        if tile_count < 16 or tile_count > 2048:
+            return None
+
+        # Step 4: Tile data validation
+        is_valid, tile_confidence = self.validator.validate_tile_data(
+            sprite_data, tile_count
+        )
+        if not is_valid or tile_confidence < min_tile_confidence:
+            return None
+
+        # Step 5: Calculate confidence
+        if full_visual_validation:
+            # Run full visual validation (expensive)
+            visual_metrics, final_confidence = self._run_visual_validation(
+                sprite_data, tile_confidence
+            )
+        else:
+            # Calculate confidence from structural data only
+            visual_metrics = None
+            final_confidence = self._calculate_quick_confidence(
+                decompressed_size=len(sprite_data),
+                compressed_size=compressed_size,
+                tile_count=tile_count,
+                tile_validation_score=tile_confidence
+            )
+
+        return ScanResult(
+            offset=offset,
+            compressed_size=compressed_size,
+            decompressed_size=len(sprite_data),
+            tile_count=tile_count,
+            confidence=final_confidence,
+            tile_validation_score=tile_confidence,
+            visual_metrics=visual_metrics
+        )
+
+    def _run_visual_validation(
+        self,
+        sprite_data: bytes,
+        tile_confidence: float
+    ) -> tuple[dict[str, float] | None, float]:
+        """
+        Run full visual validation pipeline.
+
+        Converts sprite data to image and runs visual metrics analysis.
+
+        Args:
+            sprite_data: Decompressed sprite data
+            tile_confidence: Confidence from tile validation
+
+        Returns:
+            Tuple of (visual_metrics dict, final confidence score)
+        """
+        temp_image_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                temp_image_path = tmp.name
+
+            self._convert_to_png(sprite_data, temp_image_path)
+
+            is_valid, confidence, metrics = self.validator.validate_sprite_image(
+                temp_image_path
+            )
+
+            if is_valid:
+                return metrics, confidence
+            else:
+                return None, tile_confidence * 0.5  # Penalize failed visual validation
+
+        except Exception:
+            return None, tile_confidence
+        finally:
+            if temp_image_path and Path(temp_image_path).exists():
+                Path(temp_image_path).unlink(missing_ok=True)
 
     def find_sprites_in_rom(
         self,

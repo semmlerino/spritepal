@@ -273,19 +273,9 @@ class OptimizedROMExtractor(ROMExtractor):
                 logger.debug(f"Cache hit for sprite at 0x{sprite_offset:X}")
                 return cached
 
-        # Validate offset before decompression
-        if sprite_offset < 0:
-            raise ValueError(f"Invalid negative offset: {sprite_offset}")
-        rom_size = Path(rom_path).stat().st_size
-        if sprite_offset >= rom_size:
-            raise ValueError(f"Offset 0x{sprite_offset:X} exceeds ROM size 0x{rom_size:X}")
-
-        # Use memory-mapped reader for efficient access
-        reader = self.get_rom_reader(rom_path)
-
-        # Decompress using optimized reader
+        # Decompress sprite data (offset validation in HALCompressor.decompress_from_rom())
         try:
-            decompressed = self._decompress_with_mmap(reader, sprite_offset)
+            decompressed = self.hal_compressor.decompress_from_rom(rom_path, sprite_offset)
 
             # Cache the result (handles LRU eviction and memory limits internally)
             if use_cache:
@@ -304,26 +294,6 @@ class OptimizedROMExtractor(ROMExtractor):
         except Exception as e:
             logger.error(f"Failed to extract sprite at 0x{sprite_offset:X}: {e}")
             raise
-
-    def _decompress_with_mmap(
-        self,
-        reader: MemoryMappedROMReader,
-        offset: int
-    ) -> bytes:
-        """
-        Decompress data using memory-mapped ROM access.
-
-        Uses the parent class's decompress_from_rom with the ROM path from the reader.
-
-        Args:
-            reader: Memory-mapped ROM reader
-            offset: Offset to decompress from
-
-        Returns:
-            Decompressed data bytes
-        """
-        # Use parent class's working decompression via hal_compressor
-        return self.hal_compressor.decompress_from_rom(str(reader.rom_path), offset)
 
     def extract_multiple_sprites(
         self,

@@ -93,18 +93,13 @@ class ROMExtractor:
             Raw sprite data as bytes
 
         Raises:
+            ValueError: If offset is invalid (negative or exceeds ROM size)
             HALCompressionError: If decompression fails
         """
         logger.debug(f"Extracting sprite data from ROM: offset=0x{sprite_offset:X}")
 
-        # Validate offset before decompression
-        if sprite_offset < 0:
-            raise ValueError(f"Invalid negative offset: {sprite_offset}")
-        rom_size = Path(rom_path).stat().st_size
-        if sprite_offset >= rom_size:
-            raise ValueError(f"Offset 0x{sprite_offset:X} exceeds ROM size 0x{rom_size:X}")
-
         try:
+            # Offset validation performed by HALCompressor.decompress_from_rom()
             # Try to decompress the data at the offset
             decompressed_data = self.hal_compressor.decompress_from_rom(
                 rom_path, sprite_offset

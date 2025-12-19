@@ -16,8 +16,6 @@ from unittest.mock import Mock, patch
 import pytest
 
 from core.parallel_sprite_finder import (
-    # Serial execution required: Thread safety concerns
-    AdaptiveSpriteFinder,
     ParallelSpriteFinder,
     SearchChunk,
     SearchResult,
@@ -199,95 +197,106 @@ class TestParallelSpriteFinder:
         assert chunks[2].size == 0x5000
 
     def test_quick_sprite_check_valid_patterns(self):
-        """Test quick sprite check with valid patterns."""
-        finder = ParallelSpriteFinder()
+        """Test quick sprite check with valid patterns (now on SpriteFinder)."""
+        parallel_finder = ParallelSpriteFinder()
+        sprite_finder = parallel_finder.sprite_finders[0]
 
         # Valid pattern with variation
         valid_data = b"\x01\x02\x03\x04\x05\x06\x07\x08" + b"\x00" * 8
-        assert finder._quick_sprite_check(valid_data, 0) is True
+        assert sprite_finder._quick_sprite_check(valid_data, 0) is True
 
     def test_quick_sprite_check_invalid_patterns(self):
-        """Test quick sprite check with invalid patterns."""
-        finder = ParallelSpriteFinder()
+        """Test quick sprite check with invalid patterns (now on SpriteFinder)."""
+        parallel_finder = ParallelSpriteFinder()
+        sprite_finder = parallel_finder.sprite_finders[0]
 
         # All zeros
         invalid_data = b"\x00" * 16
-        assert finder._quick_sprite_check(invalid_data, 0) is False
+        assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
 
         # All 0xFF
         invalid_data = b"\xFF" * 16
-        assert finder._quick_sprite_check(invalid_data, 0) is False
+        assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
 
         # Too uniform (only 2 unique bytes)
         invalid_data = b"\x00\xFF" * 8
-        assert finder._quick_sprite_check(invalid_data, 0) is False
+        assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
 
     def test_calculate_confidence_high_score(self):
-        """Test confidence calculation with high-quality sprite."""
-        finder = ParallelSpriteFinder()
+        """Test confidence calculation with high-quality sprite (now on SpriteFinder)."""
+        parallel_finder = ParallelSpriteFinder()
+        sprite_finder = parallel_finder.sprite_finders[0]
 
-        sprite_info = {
-            "decompressed_size": 2048,  # Good size
-            "compressed_size": 1024,    # Good compression ratio
-            "tile_count": 32,           # Good tile count
-            "visual_validation": {"passed": True}
-        }
-
-        confidence = finder._calculate_confidence(sprite_info)
+        # Test the new _calculate_quick_confidence method
+        confidence = sprite_finder._calculate_quick_confidence(
+            decompressed_size=2048,  # Good size
+            compressed_size=1024,    # Good compression ratio (0.5)
+            tile_count=32,           # Good tile count
+            tile_validation_score=0.9  # High tile validation score
+        )
         assert confidence >= 0.8  # Should be high confidence
 
     def test_calculate_confidence_low_score(self):
-        """Test confidence calculation with low-quality sprite."""
-        finder = ParallelSpriteFinder()
+        """Test confidence calculation with low-quality sprite (now on SpriteFinder)."""
+        parallel_finder = ParallelSpriteFinder()
+        sprite_finder = parallel_finder.sprite_finders[0]
 
-        sprite_info = {
-            "decompressed_size": 50,    # Too small
-            "compressed_size": 200,     # Bad compression ratio
-            "tile_count": 1,            # Too few tiles
-            "visual_validation": {"passed": False}
-        }
-
-        confidence = finder._calculate_confidence(sprite_info)
+        # Test the new _calculate_quick_confidence method
+        confidence = sprite_finder._calculate_quick_confidence(
+            decompressed_size=50,    # Too small
+            compressed_size=200,     # Bad compression ratio (4.0)
+            tile_count=1,            # Too few tiles
+            tile_validation_score=0.1  # Low tile validation score
+        )
         assert confidence <= 0.3  # Should be low confidence
 
     def test_calculate_adaptive_step_high_density(self):
         """Test adaptive step calculation with high sprite density."""
-        finder = ParallelSpriteFinder()
+        parallel_finder = ParallelSpriteFinder()
+        sprite_finder = parallel_finder.sprite_finders[0]
 
         # Create data with many potential sprites
         dense_data = b"\x01\x02\x03\x04\x05\x06\x07\x08" * 0x1000
         chunk = SearchChunk(start=0x0, end=0x4000, chunk_id=0)
 
-        step = finder._calculate_adaptive_step(dense_data, chunk)
-        assert step < finder.step_size  # Should reduce step for dense areas
+        step = parallel_finder._calculate_adaptive_step(sprite_finder, dense_data, chunk)
+        assert step < parallel_finder.step_size  # Should reduce step for dense areas
 
     def test_calculate_adaptive_step_low_density(self):
         """Test adaptive step calculation with low sprite density."""
-        finder = ParallelSpriteFinder()
+        parallel_finder = ParallelSpriteFinder()
+        sprite_finder = parallel_finder.sprite_finders[0]
 
         # Create sparse data
         sparse_data = b"\x00" * 0x8000
         chunk = SearchChunk(start=0x0, end=0x4000, chunk_id=0)
 
-        step = finder._calculate_adaptive_step(sparse_data, chunk)
-        assert step >= finder.step_size  # Should maintain or increase step
+        step = parallel_finder._calculate_adaptive_step(sprite_finder, sparse_data, chunk)
+        assert step >= parallel_finder.step_size  # Should maintain or increase step
 
-    @patch("core.parallel_sprite_finder.SpriteFinder")
-    def test_search_chunk_with_mock(self, mock_sprite_finder_class):
+    def test_search_chunk_with_mock(self):
         """Test single chunk search with mocked SpriteFinder."""
-        # Setup mock
-        mock_finder = Mock()
-        mock_sprite_finder_class.return_value = mock_finder
+        from core.sprite_finder import ScanResult
 
-        # Mock sprite found at offset 0x1000
-        mock_finder.find_sprite_at_offset.side_effect = lambda data, offset: (
-            {
-                "decompressed_size": 1024,
-                "compressed_size": 512,
-                "tile_count": 16,
-                "visual_validation": {"passed": True}
-            } if offset == 0x1000 else None
-        )
+        # Setup mock finder
+        mock_finder = Mock()
+
+        # Mock scan_offset to return ScanResult at offset 0x1000
+        def mock_scan_offset(data, offset, quick_check=True, full_visual_validation=False):
+            if offset == 0x1000:
+                return ScanResult(
+                    offset=offset,
+                    compressed_size=512,
+                    decompressed_size=1024,
+                    tile_count=16,
+                    confidence=0.9,
+                    tile_validation_score=0.8,
+                    visual_metrics=None
+                )
+            return None
+
+        mock_finder.scan_offset = Mock(side_effect=mock_scan_offset)
+        mock_finder._quick_sprite_check = Mock(return_value=True)
 
         finder = ParallelSpriteFinder()
         rom_data = b"\x01\x02\x03\x04" * 0x1000  # 16KB of test data
@@ -310,28 +319,40 @@ class TestParallelSpriteFinder:
         cancellation_token = Mock()
         cancellation_token.is_set.return_value = True
 
-        with patch.object(finder, "_quick_sprite_check", return_value=True):
-            results = finder._search_chunk(
-                Mock(), rom_data, chunk, cancellation_token
-            )
+        # Create a mock finder that would return results if not cancelled
+        mock_finder = Mock()
+        mock_finder.scan_offset = Mock(return_value=None)
+        mock_finder._quick_sprite_check = Mock(return_value=True)
+
+        results = finder._search_chunk(
+            mock_finder, rom_data, chunk, cancellation_token
+        )
 
         # Should return empty results due to cancellation
         assert len(results) == 0
 
     def test_search_parallel_basic(self, temp_rom_file):
         """Test basic parallel search functionality."""
+        from core.sprite_finder import ScanResult
+
         finder = ParallelSpriteFinder(num_workers=2)
 
-        # Mock the sprite finders to return known results
+        # Mock the sprite finders' scan_offset to return known results
+        def mock_scan_offset(data, offset, quick_check=True, full_visual_validation=False):
+            if offset in [0x1000, 0x5000]:
+                return ScanResult(
+                    offset=offset,
+                    compressed_size=512,
+                    decompressed_size=1024,
+                    tile_count=16,
+                    confidence=0.9,
+                    tile_validation_score=0.8,
+                    visual_metrics=None
+                )
+            return None
+
         for sprite_finder in finder.sprite_finders:
-            sprite_finder.find_sprite_at_offset = Mock(side_effect=lambda data, offset: (
-                {
-                    "decompressed_size": 1024,
-                    "compressed_size": 512,
-                    "tile_count": 16,
-                    "visual_validation": {"passed": True}
-                } if offset in [0x1000, 0x5000] else None
-            ))
+            sprite_finder.scan_offset = Mock(side_effect=mock_scan_offset)
 
         results = finder.search_parallel(
             temp_rom_file,
@@ -355,9 +376,9 @@ class TestParallelSpriteFinder:
         def progress_callback(current, total):
             progress_calls.append((current, total))
 
-        # Mock sprite finders to avoid actual search
+        # Mock sprite finders to avoid actual search (scan_offset returns None)
         for sprite_finder in finder.sprite_finders:
-            sprite_finder.find_sprite_at_offset = Mock(return_value=None)
+            sprite_finder.scan_offset = Mock(return_value=None)
 
         finder.search_parallel(
             temp_rom_file,
@@ -409,67 +430,6 @@ class TestParallelSpriteFinder:
         # Executor should be shutdown
         assert finder.executor._shutdown
 
-class TestAdaptiveSpriteFinder:
-    """Test AdaptiveSpriteFinder class."""
-
-    def test_adaptive_finder_initialization(self):
-        """Test AdaptiveSpriteFinder initialization."""
-        finder = AdaptiveSpriteFinder(num_workers=2)
-
-        # Should have all ParallelSpriteFinder properties
-        assert finder.num_workers == 2
-        assert len(finder.sprite_finders) == 2
-
-        # Should have adaptive-specific properties
-        assert hasattr(finder, "sprite_patterns")
-        assert hasattr(finder, "common_offsets")
-        assert finder.learning_enabled is True
-        assert finder.min_step == 0x10
-        assert finder.max_step == 0x2000
-
-    def test_learn_from_results_disabled(self):
-        """Test learning when disabled."""
-        finder = AdaptiveSpriteFinder()
-        finder.learning_enabled = False
-
-        results = [
-            SearchResult(
-                offset=0x1000,
-                size=2048,
-                tile_count=32,
-                compressed_size=1024,
-                confidence=0.9,
-                metadata={}
-            )
-        ]
-
-        finder.learn_from_results(results)
-
-        # Should not learn anything
-        assert len(finder.sprite_patterns) == 0
-        assert len(finder.common_offsets) == 0
-
-    def test_learn_common_offset_patterns(self):
-        """Test learning of common offset patterns."""
-        finder = AdaptiveSpriteFinder()
-
-        # Create results with common alignment patterns
-        results = [
-            SearchResult(0x1000, 1024, 16, 512, 0.9, {}),  # 0x1000 pattern
-            SearchResult(0x2000, 1024, 16, 512, 0.9, {}),  # 0x2000 pattern
-            SearchResult(0x3000, 1024, 16, 512, 0.9, {}),  # 0x3000 pattern (same as 0x1000)
-        ]
-
-        finder.learn_from_results(results)
-
-        # Should identify 0x1000 pattern as common
-        expected_pattern_1000 = 0x1000 & 0xFF00  # 0x1000
-        expected_pattern_2000 = 0x2000 & 0xFF00  # 0x2000
-        expected_pattern_3000 = 0x3000 & 0xFF00  # 0x3000
-
-        assert expected_pattern_1000 in finder.common_offsets
-        assert expected_pattern_2000 in finder.common_offsets
-        assert expected_pattern_3000 in finder.common_offsets
 
 @pytest.mark.slow
 class TestParallelPerformance:
