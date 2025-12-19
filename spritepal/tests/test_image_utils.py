@@ -1,4 +1,10 @@
-"""Tests for image utility functions"""
+"""Tests for image utility functions.
+
+This file contains:
+- TestPilToQPixmap: Real Qt tests for happy paths (requires display)
+- TestPilToQPixmapMocked: Mocked Qt tests for error paths (headless)
+- TestCreateCheckerboardPattern: Pure PIL tests (headless)
+"""
 from __future__ import annotations
 
 import logging
@@ -18,15 +24,11 @@ try:
 except ImportError:
     QT_AVAILABLE = False
 
-# Systematic pytest markers applied based on test content analysis
+# Module-level markers for tests that don't specify otherwise
 pytestmark = [
-    pytest.mark.headless,
-    pytest.mark.mock_only,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
     pytest.mark.no_manager_setup,  # Pure unit tests for image utility functions
 ]
+
 
 def is_headless_environment():
     """Check if we're in a headless environment"""
@@ -40,15 +42,24 @@ def is_headless_environment():
         or (sys.platform.startswith("linux") and not os.environ.get("DISPLAY"))
     )
 
+
+# =============================================================================
+# Real Qt Tests - Happy Paths Only (require display)
+# =============================================================================
+
+
 @pytest.mark.gui
-@pytest.mark.usefixtures("session_managers")
-@pytest.mark.shared_state_safe
+@pytest.mark.allows_registry_state  # Pure unit test, Qt import triggers registry
 @pytest.mark.skipif(not QT_AVAILABLE, reason="Qt not available")
 @pytest.mark.skipif(
     is_headless_environment(), reason="GUI tests skipped in headless environment"
 )
 class TestPilToQPixmap:
-    """Test PIL to QPixmap conversion"""
+    """Test PIL to QPixmap conversion with real Qt.
+
+    These tests validate actual QPixmap behavior and require a display.
+    Error paths are tested in TestPilToQPixmapMocked below.
+    """
 
     def setup_method(self):
         """Setup Qt application for testing"""
@@ -64,10 +75,8 @@ class TestPilToQPixmap:
 
     def test_valid_image_conversion(self):
         """Test converting a valid PIL image to QPixmap"""
-        # Create a simple test image
         pil_image = Image.new("RGB", (100, 100), color="red")
 
-        # Convert to QPixmap
         pixmap = pil_to_qpixmap(pil_image)
 
         assert pixmap is not None
@@ -78,7 +87,6 @@ class TestPilToQPixmap:
 
     def test_rgba_image_conversion(self):
         """Test converting RGBA image with transparency"""
-        # Create RGBA image with transparency
         pil_image = Image.new("RGBA", (50, 50), (255, 0, 0, 128))
 
         pixmap = pil_to_qpixmap(pil_image)
@@ -98,20 +106,6 @@ class TestPilToQPixmap:
         assert pixmap.width() == 75
         assert pixmap.height() == 75
 
-    def test_none_input(self):
-        """Test handling None input"""
-        pixmap = pil_to_qpixmap(None)
-        assert pixmap is None
-
-    def test_empty_image(self):
-        """Test handling image that evaluates to False"""
-        # Create a mock that evaluates to False
-        mock_image = MagicMock()
-        mock_image.__bool__.return_value = False
-
-        pixmap = pil_to_qpixmap(mock_image)
-        assert pixmap is None
-
     def test_very_small_image(self):
         """Test converting 1x1 pixel image"""
         pil_image = Image.new("RGB", (1, 1), "blue")
@@ -124,7 +118,6 @@ class TestPilToQPixmap:
 
     def test_large_image(self):
         """Test converting large image"""
-        # Create a reasonably large image
         pil_image = Image.new("RGB", (2000, 2000), "green")
 
         pixmap = pil_to_qpixmap(pil_image)
@@ -133,54 +126,227 @@ class TestPilToQPixmap:
         assert pixmap.width() == 2000
         assert pixmap.height() == 2000
 
-    def test_save_exception_handling(self, caplog):
-        """Test handling of save exceptions"""
-        # Create image that will fail to save
-        mock_image = MagicMock(spec=Image.Image)
-        mock_image.__bool__.return_value = True
-        mock_image.save.side_effect = Exception("Save failed")
+
+# =============================================================================
+# Mocked Qt Tests - Error Paths (headless, CI-safe)
+# =============================================================================
+
+
+@pytest.mark.headless
+@pytest.mark.no_qt
+@pytest.mark.ci_safe
+class TestPilToQPixmapMocked:
+    """Test pil_to_qpixmap function with mocked Qt dependencies.
+
+    These tests run in headless environments and cover error handling paths
+    that cannot be tested with real Qt.
+    """
+
+    def test_none_input(self):
+        """Test handling of None input"""
+        result = pil_to_qpixmap(None)
+        assert result is None
+
+    def test_falsy_image_input(self):
+        """Test handling of image that evaluates to False"""
+        mock_image = MagicMock()
+        mock_image.__bool__.return_value = False
+
+        result = pil_to_qpixmap(mock_image)
+        assert result is None
+
+    @patch("core.services.image_utils.QPixmap")
+    def test_successful_conversion(self, mock_qpixmap_class):
+        """Test successful PIL to QPixmap conversion"""
+        pil_image = Image.new("RGB", (10, 10), "red")
+
+        mock_pixmap = MagicMock()
+        mock_pixmap.loadFromData.return_value = True
+        mock_pixmap.size.return_value.width.return_value = 10
+        mock_pixmap.size.return_value.height.return_value = 10
+        mock_qpixmap_class.return_value = mock_pixmap
+
+        result = pil_to_qpixmap(pil_image)
+
+        assert result == mock_pixmap
+        mock_pixmap.loadFromData.assert_called_once()
+
+        # Verify PNG data was passed
+        call_args = mock_pixmap.loadFromData.call_args[0][0]
+        assert call_args.startswith(b"\x89PNG\r\n\x1a\n")
+
+    @patch("core.services.image_utils.QPixmap")
+    def test_buffer_too_small(self, mock_qpixmap_class, caplog):
+        """Test handling when buffer is too small"""
+        pil_image = Image.new("RGB", (10, 10), "red")
+
+        original_save = pil_image.save
+
+        def mock_save(fp, format=None, **params):
+            if hasattr(fp, "write"):
+                fp.write(b"tiny")
+            else:
+                original_save(fp, format, **params)
+
+        pil_image.save = mock_save
 
         with caplog.at_level(logging.ERROR):
-            pixmap = pil_to_qpixmap(mock_image)
+            result = pil_to_qpixmap(pil_image)
 
-        assert pixmap is None
-        assert "Failed to convert PIL to QPixmap: Save failed" in caplog.text
+        assert result is None
+        assert "Buffer data too small: 4 bytes" in caplog.text
 
-    def test_loadfromdata_failure(self, caplog):
+    @patch("core.services.image_utils.QPixmap")
+    def test_invalid_png_header(self, mock_qpixmap_class, caplog):
+        """Test handling when buffer doesn't have PNG header"""
+        pil_image = Image.new("RGB", (10, 10), "blue")
+
+        def mock_save(fp, format=None, **params):
+            if hasattr(fp, "write"):
+                fp.write(b"NOT_A_PNG_HEADER_12345678")
+
+        pil_image.save = mock_save
+
+        with caplog.at_level(logging.ERROR):
+            result = pil_to_qpixmap(pil_image)
+
+        assert result is None
+        assert "Buffer data doesn't start with PNG header" in caplog.text
+
+    @patch("core.services.image_utils.QPixmap")
+    def test_qpixmap_loadfromdata_failure(self, mock_qpixmap_class, caplog):
         """Test handling when QPixmap.loadFromData fails"""
-        pil_image = Image.new("RGB", (10, 10), "white")
+        pil_image = Image.new("RGB", (10, 10), "blue")
 
-        # Mock QPixmap to fail loading
-        with patch("core.services.image_utils.QPixmap") as mock_qpixmap_class:
-            mock_pixmap = MagicMock()
-            mock_pixmap.loadFromData.return_value = False
-            mock_qpixmap_class.return_value = mock_pixmap
+        mock_pixmap = MagicMock()
+        mock_pixmap.loadFromData.return_value = False
+        mock_qpixmap_class.return_value = mock_pixmap
+
+        with caplog.at_level(logging.ERROR):
+            result = pil_to_qpixmap(pil_image)
+
+        assert result is None
+        assert "QPixmap.loadFromData() failed" in caplog.text
+
+    def test_save_exception(self, caplog):
+        """Test handling of exception during save"""
+        pil_image = Image.new("RGB", (10, 10), "green")
+
+        with patch.object(pil_image, "save", side_effect=Exception("Save failed!")):
+            with caplog.at_level(logging.ERROR):
+                result = pil_to_qpixmap(pil_image)
+
+        assert result is None
+        assert "Failed to convert PIL to QPixmap" in caplog.text
+        assert "Save failed!" in caplog.text
+
+    def test_attribute_error_handling(self, caplog):
+        """Test handling when image lacks expected attributes"""
+
+        class FakeImage:
+            def __bool__(self):
+                return True
+
+            def save(self, buffer, format):
+                raise AttributeError("'FakeImage' object has no attribute 'size'")
+
+        fake_image = FakeImage()
+
+        with caplog.at_level(logging.ERROR):
+            result = pil_to_qpixmap(fake_image)
+
+        assert result is None
+        assert "Failed to convert PIL to QPixmap" in caplog.text
+        assert "size=unknown, mode=unknown" in caplog.text
+
+    @patch("core.services.image_utils.QPixmap")
+    def test_different_image_modes(self, mock_qpixmap_class):
+        """Test conversion of various PIL image modes"""
+        mock_pixmap = MagicMock()
+        mock_pixmap.loadFromData.return_value = True
+        mock_pixmap.size.return_value.width.return_value = 5
+        mock_pixmap.size.return_value.height.return_value = 5
+        mock_qpixmap_class.return_value = mock_pixmap
+
+        modes_to_test = ["RGB", "RGBA", "L", "P", "1"]
+
+        for mode in modes_to_test:
+            if mode == "1":
+                color = 1
+            elif mode == "L":
+                color = 128
+            elif mode == "P":
+                color = 0
+            elif mode == "RGBA":
+                color = (255, 0, 0, 128)
+            else:
+                color = (255, 0, 0)
+
+            pil_image = Image.new(mode, (5, 5), color)
+            result = pil_to_qpixmap(pil_image)
+
+            assert result is not None, f"Failed for mode {mode}"
+
+    @patch("core.services.image_utils.QPixmap")
+    def test_logging_debug_messages(self, mock_qpixmap_class, caplog):
+        """Test debug logging during conversion"""
+        pil_image = Image.new("RGBA", (20, 30))
+
+        mock_pixmap = MagicMock()
+        mock_pixmap.loadFromData.return_value = True
+        mock_pixmap.size.return_value.width.return_value = 20
+        mock_pixmap.size.return_value.height.return_value = 30
+        mock_qpixmap_class.return_value = mock_pixmap
+
+        with caplog.at_level(logging.DEBUG):
+            result = pil_to_qpixmap(pil_image)
+
+        assert result is not None
+        assert "Converting PIL image: size=(20, 30), mode=RGBA" in caplog.text
+        assert "PIL image saved to buffer:" in caplog.text
+        assert "Loading" in caplog.text
+        assert "bytes into QPixmap" in caplog.text
+        assert "Successfully created QPixmap: 20x30" in caplog.text
+
+    @patch("core.services.image_utils.QPixmap")
+    def test_empty_buffer_after_save(self, mock_qpixmap_class):
+        """Test handling when save produces empty buffer"""
+        pil_image = Image.new("RGB", (10, 10), "yellow")
+
+        def mock_save(fp, format=None, **params):
+            if hasattr(fp, "write"):
+                pass  # Don't write anything
+
+        pil_image.save = mock_save
+
+        result = pil_to_qpixmap(pil_image)
+
+        assert result is None
+
+    def test_io_error_during_save(self, caplog):
+        """Test handling of IOError during save"""
+        pil_image = Image.new("RGB", (10, 10))
+
+        with patch("core.services.image_utils.io.BytesIO") as mock_bytesio:
+            mock_buffer = MagicMock()
+            mock_buffer.write.side_effect = OSError("Disk full")
+            mock_bytesio.return_value = mock_buffer
 
             with caplog.at_level(logging.ERROR):
                 result = pil_to_qpixmap(pil_image)
 
             assert result is None
-            assert "Failed to load pixmap from buffer data" in caplog.text
+            assert "Failed to convert PIL to QPixmap" in caplog.text
 
-    def test_different_image_modes(self):
-        """Test conversion of various PIL image modes"""
-        modes_to_test = [
-            ("RGB", (255, 0, 0)),
-            ("RGBA", (255, 0, 0, 255)),
-            ("L", 128),
-            ("P", 0),  # Palette mode
-        ]
 
-        for mode, color in modes_to_test:
-            pil_image = Image.new(mode, (20, 20), color)
-            pixmap = pil_to_qpixmap(pil_image)
+# =============================================================================
+# Pure PIL Tests - Checkerboard Pattern (headless)
+# =============================================================================
 
-            assert pixmap is not None, f"Failed to convert {mode} mode image"
-            assert pixmap.width() == 20
-            assert pixmap.height() == 20
 
+@pytest.mark.headless
 class TestCreateCheckerboardPattern:
-    """Test checkerboard pattern creation"""
+    """Test checkerboard pattern creation - pure PIL, no Qt dependency."""
 
     def test_default_checkerboard(self):
         """Test creating checkerboard with default parameters"""
