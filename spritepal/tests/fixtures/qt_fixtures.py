@@ -14,6 +14,7 @@ Key fixtures:
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
@@ -58,18 +59,30 @@ _SESSION_THREAD_IDENTITIES: dict[int, str] = {
     t.ident: t.name for t in threading.enumerate() if t.ident is not None
 }
 
+# Lock for singleton cleanup to prevent race conditions during parallel fixture execution
+_singleton_cleanup_lock = threading.Lock()
+
+# Module logger for fixture diagnostics
+_logger = logging.getLogger(__name__)
+
 
 def _get_session_thread_baseline(request: pytest.FixtureRequest | None = None) -> int:
     """Get the session thread baseline.
 
     Prefers session-captured baseline from pytest_sessionstart hook (more reliable).
-    Falls back to module import time baseline for backward compatibility.
+    Falls back to module import time baseline with a warning.
 
     Args:
         request: Optional pytest request fixture for accessing session config
 
     Returns:
         Thread count baseline for comparison
+
+    Note:
+        The fallback to module-load baseline can cause false positive leak detection
+        under xdist, since module import happens before pytest_sessionstart. If you
+        see this warning frequently, ensure pytest_sessionstart hook is setting
+        request.config._thread_baseline.
     """
     if request is not None:
         try:
@@ -78,6 +91,13 @@ def _get_session_thread_baseline(request: pytest.FixtureRequest | None = None) -
                 return baseline
         except AttributeError:
             pass
+    # Fallback to module-load baseline (may cause false positives under xdist)
+    _logger.warning(
+        "Thread baseline fallback to module-load time (%d threads). "
+        "Session baseline not available - this may cause false positive leak detection. "
+        "Ensure pytest_sessionstart hook is setting config._thread_baseline.",
+        _SESSION_THREAD_BASELINE
+    )
     return _SESSION_THREAD_BASELINE
 
 
@@ -85,13 +105,17 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
     """Get the session thread identities.
 
     Prefers session-captured identities from pytest_sessionstart hook (more reliable).
-    Falls back to module import time identities for backward compatibility.
+    Falls back to module import time identities with a warning.
 
     Args:
         request: Optional pytest request fixture for accessing session config
 
     Returns:
         Dict mapping thread ident to thread name
+
+    Note:
+        The fallback to module-load identities can cause false positive leak detection
+        under xdist. See _get_session_thread_baseline for details.
     """
     if request is not None:
         try:
@@ -100,6 +124,12 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
                 return identities.copy()
         except AttributeError:
             pass
+    # Fallback to module-load identities (may cause false positives under xdist)
+    _logger.warning(
+        "Thread identities fallback to module-load time (%d threads). "
+        "Session identities not available - this may cause false positive leak detection.",
+        len(_SESSION_THREAD_IDENTITIES)
+    )
     return _SESSION_THREAD_IDENTITIES.copy()
 
 
@@ -107,7 +137,6 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
 #     from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout
 # See tests/fixtures/timeouts.py for base values and PYTEST_TIMEOUT_MULTIPLIER scaling
 from tests.fixtures.timeouts import get_timeout_multiplier
-
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -143,7 +172,6 @@ def ensure_headless_qt() -> Any:
     Returns:
         QApplication instance
     """
-    import os
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
 
@@ -513,46 +541,52 @@ def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
     from ui.rom_extraction_panel import ManualOffsetDialogSingleton
 
     def _safe_cleanup_singleton():
-        """Cleanup with explicit ordering to prevent segfaults."""
-        app = QApplication.instance()
+        """Cleanup with explicit ordering to prevent segfaults.
 
-        # Step 1: Process pending events first
-        if app:
-            app.processEvents()
+        Thread-safe: Uses _singleton_cleanup_lock to prevent concurrent
+        cleanup from multiple fixtures, which could cause race conditions
+        when accessing ManualOffsetDialogSingleton._instance.
+        """
+        with _singleton_cleanup_lock:
+            app = QApplication.instance()
 
-        instance = ManualOffsetDialogSingleton._instance
-        if instance is not None:
-            try:
-                # Step 2: Request close
-                instance.close()
+            # Step 1: Process pending events first
+            if app:
+                app.processEvents()
 
-                # Step 3: Process events to complete close
-                if app:
-                    app.processEvents()
+            instance = ManualOffsetDialogSingleton._instance
+            if instance is not None:
+                try:
+                    # Step 2: Request close
+                    instance.close()
 
-                # Step 4: Check if hidden (close completed)
-                if hasattr(instance, 'isHidden') and not instance.isHidden():
-                    # Force hide if close didn't work
-                    instance.hide()
+                    # Step 3: Process events to complete close
                     if app:
                         app.processEvents()
 
-                # Step 5: Schedule deferred deletion
-                instance.deleteLater()
+                    # Step 4: Check if hidden (close completed)
+                    if hasattr(instance, 'isHidden') and not instance.isHidden():
+                        # Force hide if close didn't work
+                        instance.hide()
+                        if app:
+                            app.processEvents()
 
-                # Step 6: Process deferred deletions
-                if app:
-                    app.processEvents()
-            except (RuntimeError, AttributeError):
-                # Widget may already be deleted, ignore
-                pass
+                    # Step 5: Schedule deferred deletion
+                    instance.deleteLater()
 
-        # Step 7: Reset singleton reference
-        ManualOffsetDialogSingleton.reset()
+                    # Step 6: Process deferred deletions
+                    if app:
+                        app.processEvents()
+                except (RuntimeError, AttributeError):
+                    # Widget may already be deleted, ignore
+                    pass
 
-        # Final event processing
-        if app:
-            app.processEvents()
+            # Step 7: Reset singleton reference
+            ManualOffsetDialogSingleton.reset()
+
+            # Final event processing
+            if app:
+                app.processEvents()
 
     # Clean before test
     _safe_cleanup_singleton()

@@ -27,6 +27,7 @@ Escape hatches:
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import tempfile
 import warnings
@@ -65,6 +66,8 @@ except ImportError:
     # Fallback if qt_fixtures can't be imported
     IS_HEADLESS = not os.environ.get("DISPLAY") and os.name != "nt"
 
+# Module logger for fixture diagnostics
+_logger = logging.getLogger(__name__)
 
 # ============================================================================
 # Parallel Execution Constants
@@ -362,15 +365,22 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
             try:
                 cleanup_managers()
                 ManagerRegistry.reset_for_tests()
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning(
+                    "isolated_managers: Failed to cleanup session managers for test '%s': %s. "
+                    "Subsequent tests may have corrupted state.",
+                    test_name, e
+                )
         else:
             # Registry initialized without session - likely test pollution
             # Try to clean up
             try:
                 cleanup_managers()
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning(
+                    "isolated_managers: Failed to cleanup polluted registry for test '%s': %s",
+                    test_name, e
+                )
             # If still initialized, fail with clear message
             if registry.is_initialized():
                 pytest.fail(
@@ -409,8 +419,12 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
             # Re-register UI factories after restore
             from ui import register_ui_factories
             register_ui_factories()
-        except Exception:
-            pass  # Best effort restore
+        except Exception as e:
+            _logger.warning(
+                "isolated_managers: Failed to restore session managers after test '%s': %s. "
+                "Subsequent tests using session_managers may fail.",
+                test_name, e
+            )
 
     # Process events to ensure cleanup completes
     if app and not IS_HEADLESS:
