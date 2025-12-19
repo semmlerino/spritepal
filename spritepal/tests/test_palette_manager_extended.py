@@ -107,8 +107,8 @@ class TestPaletteManagerExtended:
 
     def test_analyze_oam_palettes_success(self, palette_manager):
         """Test successful OAM palette analysis"""
-        # Create mock OAM data
-        oam_data = bytearray(512)
+        # Create mock OAM data (544 bytes is the expected OAM size)
+        oam_data = bytearray(544)
 
         # Create some test OAM entries
         # Entry 1: Y=50, palette=0 (sprite on-screen)
@@ -197,7 +197,8 @@ class TestPaletteManagerExtended:
 
     def test_load_cgram_file_error(self, palette_manager):
         """Test loading CGRAM file with error"""
-        with pytest.raises(FileNotFoundError):
+        # FileValidator correctly rejects non-existent files
+        with pytest.raises(ValueError, match="Invalid CGRAM file"):
             palette_manager.load_cgram("/nonexistent/file.cgram")
 
     def test_bgr555_edge_cases(self, palette_manager):

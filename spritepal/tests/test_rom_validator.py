@@ -7,7 +7,7 @@ import struct
 
 import pytest
 
-from core.rom_validator import ROMValidator
+from core.rom_validator import ROMHeader, ROMValidator
 from utils.rom_exceptions import (
     # Systematic pytest markers applied based on test content analysis
     InvalidROMError,
@@ -163,14 +163,13 @@ class TestROMValidator:
         rom_data = create_test_rom(header_location=0x7FC0)
         rom_path.write_bytes(rom_data)
 
-        header_info, header_offset = ROMValidator.validate_rom_header(str(rom_path))
+        header, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
 
-        assert header_info["title"] == "TEST ROM"
+        assert header.title == "TEST ROM"
         # Checksum will be calculated, just verify it exists
-        assert "checksum" in header_info
-        assert isinstance(header_info["checksum"], int)
-        assert header_info["header_location"] == 0x7FC0
-        assert header_offset == 0
+        assert isinstance(header.checksum, int)
+        assert header.rom_type_offset == 0x7FC0
+        assert smc_offset == 0
 
     def test_validate_rom_header_hirom(self, tmp_path):
         """Test header validation for HiROM (header at 0xFFC0)"""
@@ -178,11 +177,11 @@ class TestROMValidator:
         rom_data = create_test_rom(header_location=0xFFC0)
         rom_path.write_bytes(rom_data)
 
-        header_info, header_offset = ROMValidator.validate_rom_header(str(rom_path))
+        header, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
 
-        assert header_info["title"] == "TEST ROM"
-        assert header_info["header_location"] == 0xFFC0
-        assert header_offset == 0
+        assert header.title == "TEST ROM"
+        assert header.rom_type_offset == 0xFFC0
+        assert smc_offset == 0
 
     def test_validate_rom_header_with_smc(self, tmp_path):
         """Test header validation with SMC header"""
@@ -190,10 +189,10 @@ class TestROMValidator:
         rom_data = create_test_rom(has_smc_header=True, header_location=0x7FC0)
         rom_path.write_bytes(rom_data)
 
-        header_info, header_offset = ROMValidator.validate_rom_header(str(rom_path))
+        header, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
 
-        assert header_info["title"] == "TEST ROM"
-        assert header_offset == 512  # SMC header size
+        assert header.title == "TEST ROM"
+        assert smc_offset == 512  # SMC header size
 
     def test_validate_rom_header_invalid(self, tmp_path):
         """Test header validation with invalid header"""
@@ -215,15 +214,15 @@ class TestROMValidator:
         """Test header with non-ASCII characters in title"""
         rom_path = tmp_path / "non_ascii.sfc"
         # Create header with some non-ASCII bytes
-        header = bytearray(create_valid_rom_header())
-        header[10:15] = b"\xFF\xFE\xFD\xFC\xFB"  # Non-ASCII
-        rom_data = create_test_rom(header_data=bytes(header))
+        header_data = bytearray(create_valid_rom_header())
+        header_data[10:15] = b"\xFF\xFE\xFD\xFC\xFB"  # Non-ASCII
+        rom_data = create_test_rom(header_data=bytes(header_data))
         rom_path.write_bytes(rom_data)
 
-        header_info, _ = ROMValidator.validate_rom_header(str(rom_path))
+        header, _ = ROMValidator.validate_rom_header(str(rom_path))
 
         # Should handle non-ASCII gracefully
-        assert isinstance(header_info["title"], str)
+        assert isinstance(header.title, str)
 
     def test_verify_rom_checksum_valid(self, tmp_path):
         """Test checksum verification with valid checksum"""
@@ -231,10 +230,10 @@ class TestROMValidator:
         rom_data = create_test_rom(calculate_checksum=True)
         rom_path.write_bytes(rom_data)
 
-        header_info, header_offset = ROMValidator.validate_rom_header(str(rom_path))
+        header, _ = ROMValidator.validate_rom_header(str(rom_path))
 
         # Should not raise
-        result = ROMValidator.verify_rom_checksum(str(rom_path), header_info, header_offset)
+        result = ROMValidator.verify_rom_checksum(str(rom_path), header)
         assert result is True
 
     def test_verify_rom_checksum_invalid(self, tmp_path):
@@ -244,10 +243,10 @@ class TestROMValidator:
         rom_data = create_test_rom(calculate_checksum=False)
         rom_path.write_bytes(rom_data)
 
-        header_info, header_offset = ROMValidator.validate_rom_header(str(rom_path))
+        header, _ = ROMValidator.validate_rom_header(str(rom_path))
 
         with pytest.raises(ROMChecksumError) as exc_info:
-            ROMValidator.verify_rom_checksum(str(rom_path), header_info, header_offset)
+            ROMValidator.verify_rom_checksum(str(rom_path), header)
 
         assert "ROM checksum mismatch" in str(exc_info.value)
 
@@ -258,60 +257,84 @@ class TestROMValidator:
         rom_data = create_test_rom(size=0x200001)  # One extra byte
         rom_path.write_bytes(rom_data)
 
-        header_info, header_offset = ROMValidator.validate_rom_header(str(rom_path))
+        header, _ = ROMValidator.validate_rom_header(str(rom_path))
 
         # Should handle odd length gracefully
         try:
-            ROMValidator.verify_rom_checksum(str(rom_path), header_info, header_offset)
+            ROMValidator.verify_rom_checksum(str(rom_path), header)
         except Exception:
             # If it fails, it should be with checksum error, not index error
             pass
 
     def test_identify_rom_version_known_game(self):
         """Test ROM version identification for known game"""
-        header_info = {
-            "title": "KIRBY SUPER STAR",
-            "checksum": 0x8A5C,  # USA version
-            "region": 1
-        }
+        header = ROMHeader(
+            title="KIRBY SUPER STAR",
+            rom_type=0x21,
+            rom_size=0x0C,
+            sram_size=0x00,
+            checksum=0x8A5C,  # USA version
+            checksum_complement=0x8A5C ^ 0xFFFF,
+            header_offset=0,
+            rom_type_offset=0x7FC0,
+            region=1,
+        )
 
-        version = ROMValidator.identify_rom_version(header_info)
+        version = ROMValidator.identify_rom_version(header)
 
         assert version == "USA"
 
     def test_identify_rom_version_by_region(self):
         """Test ROM version identification by region code"""
-        header_info = {
-            "title": "UNKNOWN GAME",
-            "checksum": 0x9999,
-            "region": 2  # Europe
-        }
+        header = ROMHeader(
+            title="UNKNOWN GAME",
+            rom_type=0x21,
+            rom_size=0x0C,
+            sram_size=0x00,
+            checksum=0x9999,
+            checksum_complement=0x9999 ^ 0xFFFF,
+            header_offset=0,
+            rom_type_offset=0x7FC0,
+            region=2,  # Europe
+        )
 
-        version = ROMValidator.identify_rom_version(header_info)
+        version = ROMValidator.identify_rom_version(header)
 
         assert version == "Europe"
 
     def test_identify_rom_version_unknown(self):
         """Test ROM version identification for unknown game/region"""
-        header_info = {
-            "title": "UNKNOWN GAME",
-            "checksum": 0x9999,
-            "region": 99  # Invalid region
-        }
+        header = ROMHeader(
+            title="UNKNOWN GAME",
+            rom_type=0x21,
+            rom_size=0x0C,
+            sram_size=0x00,
+            checksum=0x9999,
+            checksum_complement=0x9999 ^ 0xFFFF,
+            header_offset=0,
+            rom_type_offset=0x7FC0,
+            region=99,  # Invalid region
+        )
 
-        version = ROMValidator.identify_rom_version(header_info)
+        version = ROMValidator.identify_rom_version(header)
 
         assert version is None
 
     def test_identify_rom_version_case_insensitive(self):
         """Test ROM title matching is case insensitive"""
-        header_info = {
-            "title": "kirby super star",  # lowercase
-            "checksum": 0x8A5C,
-            "region": 1
-        }
+        header = ROMHeader(
+            title="kirby super star",  # lowercase
+            rom_type=0x21,
+            rom_size=0x0C,
+            sram_size=0x00,
+            checksum=0x8A5C,
+            checksum_complement=0x8A5C ^ 0xFFFF,
+            header_offset=0,
+            rom_type_offset=0x7FC0,
+            region=1,
+        )
 
-        version = ROMValidator.identify_rom_version(header_info)
+        version = ROMValidator.identify_rom_version(header)
 
         assert version == "USA"
 
@@ -323,12 +346,12 @@ class TestROMValidator:
 
         sprite_offset = 0x200000  # Valid offset within ROM
 
-        header_info, header_offset = ROMValidator.validate_rom_for_injection(
+        header, smc_offset = ROMValidator.validate_rom_for_injection(
             str(rom_path), sprite_offset
         )
 
-        assert header_info["title"] == "TEST ROM"
-        assert header_offset == 0
+        assert header.title == "TEST ROM"
+        assert smc_offset == 0
 
     def test_validate_rom_for_injection_invalid_file(self):
         """Test injection validation with invalid file"""
@@ -370,8 +393,8 @@ class TestROMValidator:
         sprite_offset = 0x1FFFF0
 
         # Should succeed because offset is within actual ROM data
-        header_info, header_offset = ROMValidator.validate_rom_for_injection(
+        header, smc_offset = ROMValidator.validate_rom_for_injection(
             str(rom_path), sprite_offset
         )
 
-        assert header_offset == 512  # SMC header detected
+        assert smc_offset == 512  # SMC header detected

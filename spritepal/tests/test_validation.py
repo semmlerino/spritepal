@@ -1,4 +1,4 @@
-"""Tests for validation utilities"""
+"""Tests for validation utilities (FileValidator)"""
 from __future__ import annotations
 
 import tempfile
@@ -16,15 +16,10 @@ pytestmark = [
     pytest.mark.no_manager_setup,  # Pure unit tests for validation functions
 ]
 
-from utils.validation import (
+from utils.file_validator import (
+    FileValidator,
+    FormatValidator,
     sanitize_filename,
-    validate_cgram_file,
-    validate_image_file,
-    validate_json_file,
-    validate_oam_file,
-    validate_offset,
-    validate_tile_count,
-    validate_vram_file,
 )
 
 
@@ -39,9 +34,9 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_vram_file(f.name)
-            assert is_valid is True
-            assert error_msg == ""
+            result = FileValidator.validate_vram_file(f.name)
+            assert result.is_valid is True
+            assert result.error_message is None
         finally:
             Path(f.name).unlink()
 
@@ -52,9 +47,10 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_vram_file(f.name)
-            assert is_valid is False
-            assert "Invalid file extension" in error_msg
+            result = FileValidator.validate_vram_file(f.name)
+            assert result.is_valid is False
+            assert result.error_message is not None
+            assert "Invalid file extension" in result.error_message
         finally:
             Path(f.name).unlink()
 
@@ -66,33 +62,60 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_vram_file(f.name)
-            # NOTE: Current implementation doesn't check minimum size, only maximum
-            # This might be a bug - VRAM files should be exactly 64KB
-            assert is_valid is True  # Passes with current implementation
-            assert error_msg == ""
+            result = FileValidator.validate_vram_file(f.name)
+            # FileValidator correctly rejects files that are too small
+            assert result.is_valid is False
+            assert result.error_message is not None
+            assert "too small" in result.error_message
         finally:
             Path(f.name).unlink()
 
     def test_validate_vram_file_too_large(self):
         """Test VRAM file that's too large"""
         with tempfile.NamedTemporaryFile(suffix=".dmp", delete=False) as f:
-            # Write more than 64KB
+            # Write more than 64KB (slightly over)
             f.write(b"\x00" * (65536 + 1024))
             f.flush()
 
         try:
-            is_valid, error_msg = validate_vram_file(f.name)
-            assert is_valid is False
-            assert "File too large" in error_msg
+            result = FileValidator.validate_vram_file(f.name)
+            # FileValidator allows slightly oversized VRAM files with a warning
+            # This is flexible behavior to handle edge cases
+            assert result.is_valid is True
+            assert len(result.warnings) > 0  # Should have a warning about size
+        finally:
+            Path(f.name).unlink()
+
+    def test_validate_vram_file_much_too_large(self):
+        """Test VRAM file that's much too large"""
+        with tempfile.NamedTemporaryFile(suffix=".dmp", delete=False) as f:
+            # Write way more than 64KB (2x expected size)
+            f.write(b"\x00" * (65536 * 2))
+            f.flush()
+
+        try:
+            result = FileValidator.validate_vram_file(f.name)
+            # FileValidator is permissive with oversized files - just adds warnings
+            # This allows for edge cases like extended VRAM dumps
+            assert result.is_valid is True
+            assert len(result.warnings) > 0  # Should have size warning
+            assert any("size" in w.lower() for w in result.warnings)
         finally:
             Path(f.name).unlink()
 
     def test_validate_vram_file_nonexistent(self):
-        """Test validation of non-existent file"""
-        is_valid, error_msg = validate_vram_file("/nonexistent/file.dmp")
-        assert is_valid is True  # Non-existent files are OK per implementation
-        assert error_msg == ""
+        """Test validation of non-existent file - returns False by default"""
+        result = FileValidator.validate_vram_file("/nonexistent/file.dmp")
+        assert result.is_valid is False  # Non-existent files fail by default
+        assert result.error_message is not None
+
+    def test_validate_vram_file_nonexistent_allowed(self):
+        """Test validation with allow_nonexistent=True for legacy compatibility"""
+        result = FileValidator.validate_vram_file(
+            "/nonexistent/file.dmp", allow_nonexistent=True
+        )
+        assert result.is_valid is True  # Legacy behavior: non-existent files OK
+        assert result.error_message is None
 
     def test_validate_cgram_file_valid(self):
         """Test valid CGRAM file validation"""
@@ -102,9 +125,9 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_cgram_file(f.name)
-            assert is_valid is True
-            assert error_msg == ""
+            result = FileValidator.validate_cgram_file(f.name)
+            assert result.is_valid is True
+            assert result.error_message is None
         finally:
             Path(f.name).unlink()
 
@@ -116,10 +139,11 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_cgram_file(f.name)
-            # NOTE: Current implementation doesn't check minimum size
-            assert is_valid is True  # Passes with current implementation
-            assert error_msg == ""
+            result = FileValidator.validate_cgram_file(f.name)
+            # FileValidator correctly rejects files that are too small
+            assert result.is_valid is False
+            assert result.error_message is not None
+            assert "too small" in result.error_message
         finally:
             Path(f.name).unlink()
 
@@ -131,9 +155,10 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_cgram_file(f.name)
-            assert is_valid is False
-            assert "File too large" in error_msg
+            result = FileValidator.validate_cgram_file(f.name)
+            assert result.is_valid is False
+            assert result.error_message is not None
+            assert "File too large" in result.error_message
         finally:
             Path(f.name).unlink()
 
@@ -145,9 +170,9 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_oam_file(f.name)
-            assert is_valid is True
-            assert error_msg == ""
+            result = FileValidator.validate_oam_file(f.name)
+            assert result.is_valid is True
+            assert result.error_message is None
         finally:
             Path(f.name).unlink()
 
@@ -160,9 +185,9 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_image_file(f.name)
-            assert is_valid is True
-            assert error_msg == ""
+            result = FileValidator.validate_image_file(f.name)
+            assert result.is_valid is True
+            assert result.error_message is None
         finally:
             Path(f.name).unlink()
 
@@ -173,10 +198,11 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_image_file(f.name)
-            assert is_valid is False
-            assert "Invalid file extension" in error_msg
-            assert ".jpg" in error_msg
+            result = FileValidator.validate_image_file(f.name)
+            assert result.is_valid is False
+            assert result.error_message is not None
+            assert "Invalid file extension" in result.error_message
+            assert ".jpg" in result.error_message
         finally:
             Path(f.name).unlink()
 
@@ -187,9 +213,9 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_json_file(f.name)
-            assert is_valid is True
-            assert error_msg == ""
+            result = FileValidator.validate_json_file(f.name)
+            assert result.is_valid is True
+            assert result.error_message is None
         finally:
             Path(f.name).unlink()
 
@@ -200,9 +226,10 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_json_file(f.name)
-            assert is_valid is False
-            assert "Invalid file extension" in error_msg
+            result = FileValidator.validate_json_file(f.name)
+            assert result.is_valid is False
+            assert result.error_message is not None
+            assert "Invalid file extension" in result.error_message
         finally:
             Path(f.name).unlink()
 
@@ -214,28 +241,32 @@ class TestFileValidation:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_json_file(f.name)
-            assert is_valid is False
-            assert "File too large" in error_msg
+            result = FileValidator.validate_json_file(f.name)
+            assert result.is_valid is False
+            assert result.error_message is not None
+            assert "File too large" in result.error_message
         finally:
             Path(f.name).unlink()
+
 
 class TestValidationEdgeCases:
     """Test edge cases in validation"""
 
     def test_empty_file_path(self):
         """Test validation with empty file path"""
-        is_valid, error_msg = validate_vram_file("")
-        # Empty path is treated as not a file
-        assert is_valid is False
-        assert "Path is not a file" in error_msg
+        result = FileValidator.validate_vram_file("")
+        # Empty path is rejected with specific error message
+        assert result.is_valid is False
+        assert result.error_message is not None
+        assert "empty" in result.error_message.lower()
 
     def test_directory_instead_of_file(self):
         """Test validation with directory path"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            is_valid, error_msg = validate_vram_file(tmpdir)
-            assert is_valid is False
-            assert "not a file" in error_msg
+            result = FileValidator.validate_vram_file(tmpdir)
+            assert result.is_valid is False
+            assert result.error_message is not None
+            assert "not a file" in result.error_message
 
     def test_file_with_multiple_extensions(self):
         """Test file with multiple extensions"""
@@ -244,66 +275,73 @@ class TestValidationEdgeCases:
             f.flush()
 
         try:
-            is_valid, error_msg = validate_vram_file(f.name)
-            assert is_valid is True  # Should work with .dmp extension
+            result = FileValidator.validate_vram_file(f.name)
+            assert result.is_valid is True  # Should work with .dmp extension
         finally:
             Path(f.name).unlink()
+
 
 class TestOffsetValidation:
     """Test offset validation function"""
 
     def test_validate_offset_valid(self):
         """Test valid offset"""
-        is_valid, error_msg = validate_offset(0x4000, 0x10000)
-        assert is_valid is True
-        assert error_msg == ""
+        result = FileValidator.validate_offset(0x4000, 0x10000)
+        assert result.is_valid is True
+        assert result.error_message is None
 
     def test_validate_offset_negative(self):
         """Test negative offset"""
-        is_valid, error_msg = validate_offset(-1, 0x10000)
-        assert is_valid is False
-        assert "cannot be negative" in error_msg
+        result = FileValidator.validate_offset(-1, 0x10000)
+        assert result.is_valid is False
+        assert result.error_message is not None
+        assert "cannot be negative" in result.error_message
 
     def test_validate_offset_too_large(self):
         """Test offset exceeding maximum"""
-        is_valid, error_msg = validate_offset(0x10000, 0x10000)
-        assert is_valid is False
-        assert "exceeds maximum" in error_msg
+        result = FileValidator.validate_offset(0x10000, 0x10000)
+        assert result.is_valid is False
+        assert result.error_message is not None
+        assert "exceeds maximum" in result.error_message
 
     def test_validate_offset_at_boundary(self):
         """Test offset at boundary"""
-        is_valid, error_msg = validate_offset(0xFFFF, 0x10000)
-        assert is_valid is True
-        assert error_msg == ""
+        result = FileValidator.validate_offset(0xFFFF, 0x10000)
+        assert result.is_valid is True
+        assert result.error_message is None
+
 
 class TestTileCountValidation:
     """Test tile count validation"""
 
     def test_validate_tile_count_valid(self):
         """Test valid tile count"""
-        is_valid, error_msg = validate_tile_count(100)
-        assert is_valid is True
-        assert error_msg == ""
+        result = FormatValidator.validate_tile_count(100)
+        assert result.is_valid is True
+        assert result.error_message is None
 
     def test_validate_tile_count_negative(self):
         """Test negative tile count"""
-        is_valid, error_msg = validate_tile_count(-10)
-        assert is_valid is False
-        assert "cannot be negative" in error_msg
+        result = FormatValidator.validate_tile_count(-10)
+        assert result.is_valid is False
+        assert result.error_message is not None
+        assert "cannot be negative" in result.error_message
 
     def test_validate_tile_count_too_large(self):
         """Test tile count exceeding maximum"""
-        is_valid, error_msg = validate_tile_count(10000)
-        assert is_valid is False
-        assert "exceeds maximum" in error_msg
+        result = FormatValidator.validate_tile_count(10000)
+        assert result.is_valid is False
+        assert result.error_message is not None
+        assert "exceeds maximum" in result.error_message
 
     def test_validate_tile_count_custom_max(self):
         """Test tile count with custom maximum"""
-        is_valid, error_msg = validate_tile_count(50, max_count=100)
-        assert is_valid is True
+        result = FormatValidator.validate_tile_count(50, max_count=100)
+        assert result.is_valid is True
 
-        is_valid, error_msg = validate_tile_count(150, max_count=100)
-        assert is_valid is False
+        result = FormatValidator.validate_tile_count(150, max_count=100)
+        assert result.is_valid is False
+
 
 class TestFilenameeSanitization:
     """Test filename sanitization"""

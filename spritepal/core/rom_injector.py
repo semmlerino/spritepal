@@ -13,32 +13,13 @@ from pathlib import Path
 # Only import Qt for type checking and the worker class
 from core.hal_compression import HALCompressionError, HALCompressor
 from core.injector import SpriteInjector
-from core.rom_validator import ROMValidator
+from core.rom_validator import ROMHeader, ROMValidator
 from core.sprite_config_loader import SpriteConfigLoader
-from utils.constants import (
-    ROM_CHECKSUM_COMPLEMENT_MASK,
-    ROM_HEADER_OFFSET_HIROM,
-    ROM_HEADER_OFFSET_LOROM,
-    SMC_HEADER_SIZE,
-)
 from utils.file_validator import atomic_write
 from utils.logging_config import get_logger
 from utils.rom_backup import ROMBackupManager
 
 logger = get_logger(__name__)
-
-@dataclass
-class ROMHeader:
-    """SNES ROM header information"""
-
-    title: str
-    rom_type: int
-    rom_size: int
-    sram_size: int
-    checksum: int
-    checksum_complement: int
-    header_offset: int
-    rom_type_offset: int  # 0x7FC0 for LoROM, 0xFFC0 for HiROM
 
 @dataclass
 class SpritePointer:
@@ -62,73 +43,22 @@ class ROMInjector(SpriteInjector):
         logger.debug("ROMInjector initialized with HAL compression support")
 
     def read_rom_header(self, rom_path: str) -> ROMHeader:
-        """Read and parse SNES ROM header"""
+        """Read and parse SNES ROM header (delegates to ROMValidator)."""
         logger.info(f"Reading ROM header from: {rom_path}")
-        with Path(rom_path).open("rb") as f:
-            # Try to detect header offset (SMC header is 512 bytes)
-            f.seek(0)
-            f.read(SMC_HEADER_SIZE)
-
-            # Check for SMC header
-            header_offset = 0
-            rom_size = Path(rom_path).stat().st_size
-            if rom_size % 1024 == SMC_HEADER_SIZE:
-                header_offset = SMC_HEADER_SIZE
-                logger.debug(f"SMC header detected ({SMC_HEADER_SIZE} bytes), ROM size: {rom_size} bytes")
-            else:
-                logger.debug(f"No SMC header detected, ROM size: {rom_size} bytes")
-
-            # Read header at expected location
-            # SNES header is typically at 0x7FC0 or 0xFFC0 depending on ROM type
-            for offset in [ROM_HEADER_OFFSET_LOROM, ROM_HEADER_OFFSET_HIROM]:
-                f.seek(header_offset + offset)
-                header_data = f.read(32)
-
-                # Parse header
-                title = header_data[0:21].decode("ascii", errors="ignore").strip()
-                rom_type = header_data[21]
-                rom_size = header_data[23]
-                sram_size = header_data[24]
-                checksum_complement = struct.unpack("<H", header_data[28:30])[0]
-                checksum = struct.unpack("<H", header_data[30:32])[0]
-
-                # Verify checksum to ensure valid header
-                if (checksum ^ checksum_complement) == ROM_CHECKSUM_COMPLEMENT_MASK:
-                    self.header = ROMHeader(
-                        title=title,
-                        rom_type=rom_type,
-                        rom_size=rom_size,
-                        sram_size=sram_size,
-                        checksum=checksum,
-                        checksum_complement=checksum_complement,
-                        header_offset=header_offset,
-                        rom_type_offset=offset,  # Store which offset was validated
-                    )
-                    logger.info(f"Found valid ROM header at offset 0x{header_offset + offset:X}")
-                    logger.debug(f"ROM Title: {title}")
-                    logger.debug(f"ROM Type: 0x{rom_type:02X}")
-                    logger.debug(f"Checksum: 0x{checksum:04X}, Complement: 0x{checksum_complement:04X}")
-                    return self.header
-                logger.debug(f"Invalid checksum at offset 0x{header_offset + offset:X}")
-
-        raise ValueError("Could not find valid SNES ROM header")
+        header, _ = ROMValidator.validate_rom_header(rom_path)
+        self.header = header
+        logger.debug(f"ROM Title: {header.title}")
+        logger.debug(f"ROM Type: 0x{header.rom_type:02X}")
+        logger.debug(
+            f"Checksum: 0x{header.checksum:04X}, Complement: 0x{header.checksum_complement:04X}"
+        )
+        return self.header
 
     def calculate_checksum(self, rom_data: bytes | bytearray) -> tuple[int, int]:
-        """Calculate SNES ROM checksum and complement"""
+        """Calculate SNES ROM checksum and complement (delegates to ROMValidator)."""
         logger.debug("Calculating ROM checksum")
-        # Skip SMC header if present
         offset = self.header.header_offset if self.header else 0
-        data = rom_data[offset:]
-
-        # Calculate checksum
-        checksum = 0
-        for i in range(0, len(data), 2):
-            word = data[i + 1] << 8 | data[i] if i + 1 < len(data) else data[i]
-            checksum = (checksum + word) & ROM_CHECKSUM_COMPLEMENT_MASK
-
-        # Calculate complement
-        complement = checksum ^ ROM_CHECKSUM_COMPLEMENT_MASK
-
+        checksum, complement = ROMValidator.calculate_checksum(rom_data, offset)
         logger.debug(f"Calculated checksum: 0x{checksum:04X}, complement: 0x{complement:04X}")
         return checksum, complement
 

@@ -22,8 +22,7 @@ from utils.constants import (
     SPRITE_PALETTE_END,
     SPRITE_PALETTE_START,
 )
-from utils.file_validator import atomic_write
-from utils.validation import validate_cgram_file, validate_oam_file
+from utils.file_validator import FileValidator, atomic_write
 
 
 class PaletteManager:
@@ -36,9 +35,9 @@ class PaletteManager:
     def load_cgram(self, cgram_path: str) -> None:
         """Load CGRAM dump file with validation"""
         # Validate file before loading
-        is_valid, error_msg = validate_cgram_file(cgram_path)
-        if not is_valid:
-            raise ValueError(f"Invalid CGRAM file: {error_msg}")
+        result = FileValidator.validate_cgram_file(cgram_path)
+        if not result.is_valid:
+            raise ValueError(f"Invalid CGRAM file: {result.error_message}")
 
         with Path(cgram_path).open("rb") as f:
             self.cgram_data = f.read()
@@ -213,9 +212,9 @@ class PaletteManager:
 
         try:
             # Validate file before loading
-            is_valid, error_msg = validate_oam_file(oam_path)
-            if not is_valid:
-                self._raise_invalid_oam(error_msg)
+            result = FileValidator.validate_oam_file(oam_path)
+            if not result.is_valid:
+                self._raise_invalid_oam(result.error_message or "Unknown error")
 
             with Path(oam_path).open("rb") as f:
                 oam_data = f.read()

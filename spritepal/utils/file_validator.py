@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 
 from utils.constants import (
     CGRAM_PATTERNS,
+    MAX_TILE_COUNT_DEFAULT,
     OAM_PATTERNS,
     VRAM_PATTERNS,
 )
@@ -101,7 +102,8 @@ class BasicFileValidator:
         path: str,
         allowed_extensions: set[str] | None = None,
         min_size: int | None = None,
-        max_size: int | None = None
+        max_size: int | None = None,
+        allow_nonexistent: bool = False,
     ) -> ValidationResult:
         """
         Validate basic file properties (existence, extension, size).
@@ -111,10 +113,16 @@ class BasicFileValidator:
             allowed_extensions: Set of allowed extensions (with dots)
             min_size: Minimum file size in bytes
             max_size: Maximum file size in bytes
+            allow_nonexistent: If True, non-existent files pass validation
+                (for backward compatibility with legacy validation module)
 
         Returns:
             ValidationResult with basic validation
         """
+        # Handle non-existent files early if allowed
+        if allow_nonexistent and not Path(path).exists():
+            return ValidationResult(is_valid=True)
+
         # First check existence
         existence_result = BasicFileValidator.validate_existence(path)
         if not existence_result.is_valid:
@@ -407,6 +415,32 @@ class FormatValidator:
 
         return ValidationResult(is_valid=True)
 
+    @staticmethod
+    def validate_tile_count(
+        count: int, max_count: int = MAX_TILE_COUNT_DEFAULT
+    ) -> ValidationResult:
+        """
+        Validate tile count to prevent excessive memory usage.
+
+        Args:
+            count: Number of tiles
+            max_count: Maximum allowed tiles (default: 8192)
+
+        Returns:
+            ValidationResult with tile count validation
+        """
+        if count < 0:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Tile count cannot be negative: {count}"
+            )
+        if count > max_count:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Tile count {count} exceeds maximum: {max_count}"
+            )
+        return ValidationResult(is_valid=True)
+
 class ContentValidator:
     """Handles content parsing and validation for various file types."""
 
@@ -489,12 +523,15 @@ class FileValidator:
         self.content = ContentValidator()
 
     @classmethod
-    def validate_vram_file(cls, path: str) -> ValidationResult:
+    def validate_vram_file(
+        cls, path: str, allow_nonexistent: bool = False
+    ) -> ValidationResult:
         """
         Validate VRAM dump file with comprehensive checks.
 
         Args:
             path: Path to VRAM file
+            allow_nonexistent: If True, non-existent files pass validation
 
         Returns:
             ValidationResult with detailed validation information
@@ -504,20 +541,24 @@ class FileValidator:
             path,
             cls.VRAM_EXTENSIONS,
             FormatValidator.VRAM_MIN_SIZE,
-            FormatValidator.VRAM_MAX_SIZE
+            FormatValidator.VRAM_MAX_SIZE,
+            allow_nonexistent=allow_nonexistent,
         )
 
         if not basic_result.is_valid:
             return basic_result
 
-        # Format-specific validation
-        if basic_result.file_info:
-            format_result = FormatValidator.validate_vram_format(basic_result.file_info)
-            if not format_result.is_valid:
-                return format_result
+        # If file doesn't exist and that's allowed, skip further validation
+        if not basic_result.file_info:
+            return basic_result
 
-            # Merge warnings
-            basic_result.warnings.extend(format_result.warnings)
+        # Format-specific validation
+        format_result = FormatValidator.validate_vram_format(basic_result.file_info)
+        if not format_result.is_valid:
+            return format_result
+
+        # Merge warnings
+        basic_result.warnings.extend(format_result.warnings)
 
         # Content validation - check header
         content_result = ContentValidator.validate_vram_header(path)
@@ -528,12 +569,15 @@ class FileValidator:
         return basic_result
 
     @classmethod
-    def validate_cgram_file(cls, path: str) -> ValidationResult:
+    def validate_cgram_file(
+        cls, path: str, allow_nonexistent: bool = False
+    ) -> ValidationResult:
         """
         Validate CGRAM dump file with size requirements.
 
         Args:
             path: Path to CGRAM file
+            allow_nonexistent: If True, non-existent files pass validation
 
         Returns:
             ValidationResult with detailed validation information
@@ -543,30 +587,37 @@ class FileValidator:
             path,
             cls.CGRAM_EXTENSIONS,
             FormatValidator.CGRAM_EXPECTED_SIZE,
-            FormatValidator.CGRAM_EXPECTED_SIZE
+            FormatValidator.CGRAM_EXPECTED_SIZE,
+            allow_nonexistent=allow_nonexistent,
         )
 
         if not basic_result.is_valid:
             return basic_result
 
-        # Format-specific validation
-        if basic_result.file_info:
-            format_result = FormatValidator.validate_cgram_format(basic_result.file_info)
-            if not format_result.is_valid:
-                return format_result
+        # If file doesn't exist and that's allowed, skip further validation
+        if not basic_result.file_info:
+            return basic_result
 
-            # Merge warnings
-            basic_result.warnings.extend(format_result.warnings)
+        # Format-specific validation
+        format_result = FormatValidator.validate_cgram_format(basic_result.file_info)
+        if not format_result.is_valid:
+            return format_result
+
+        # Merge warnings
+        basic_result.warnings.extend(format_result.warnings)
 
         return basic_result
 
     @classmethod
-    def validate_oam_file(cls, path: str) -> ValidationResult:
+    def validate_oam_file(
+        cls, path: str, allow_nonexistent: bool = False
+    ) -> ValidationResult:
         """
         Validate OAM dump file with size requirements.
 
         Args:
             path: Path to OAM file
+            allow_nonexistent: If True, non-existent files pass validation
 
         Returns:
             ValidationResult with detailed validation information
@@ -576,30 +627,37 @@ class FileValidator:
             path,
             cls.OAM_EXTENSIONS,
             FormatValidator.OAM_EXPECTED_SIZE,
-            FormatValidator.OAM_EXPECTED_SIZE
+            FormatValidator.OAM_EXPECTED_SIZE,
+            allow_nonexistent=allow_nonexistent,
         )
 
         if not basic_result.is_valid:
             return basic_result
 
-        # Format-specific validation
-        if basic_result.file_info:
-            format_result = FormatValidator.validate_oam_format(basic_result.file_info)
-            if not format_result.is_valid:
-                return format_result
+        # If file doesn't exist and that's allowed, skip further validation
+        if not basic_result.file_info:
+            return basic_result
 
-            # Merge warnings
-            basic_result.warnings.extend(format_result.warnings)
+        # Format-specific validation
+        format_result = FormatValidator.validate_oam_format(basic_result.file_info)
+        if not format_result.is_valid:
+            return format_result
+
+        # Merge warnings
+        basic_result.warnings.extend(format_result.warnings)
 
         return basic_result
 
     @classmethod
-    def validate_rom_file(cls, path: str) -> ValidationResult:
+    def validate_rom_file(
+        cls, path: str, allow_nonexistent: bool = False
+    ) -> ValidationResult:
         """
         Validate ROM file with comprehensive checks.
 
         Args:
             path: Path to ROM file
+            allow_nonexistent: If True, non-existent files pass validation
 
         Returns:
             ValidationResult with detailed validation information
@@ -609,55 +667,71 @@ class FileValidator:
             path,
             cls.ROM_EXTENSIONS,
             FormatValidator.ROM_MIN_SIZE,
-            FormatValidator.ROM_MAX_SIZE
+            FormatValidator.ROM_MAX_SIZE,
+            allow_nonexistent=allow_nonexistent,
         )
 
         if not basic_result.is_valid:
             return basic_result
 
-        # Format-specific validation
-        if basic_result.file_info:
-            format_result = FormatValidator.validate_rom_format(basic_result.file_info)
-            if not format_result.is_valid:
-                return format_result
+        # If file doesn't exist and that's allowed, skip further validation
+        if not basic_result.file_info:
+            return basic_result
 
-            # Merge warnings
-            basic_result.warnings.extend(format_result.warnings)
+        # Format-specific validation
+        format_result = FormatValidator.validate_rom_format(basic_result.file_info)
+        if not format_result.is_valid:
+            return format_result
+
+        # Merge warnings
+        basic_result.warnings.extend(format_result.warnings)
 
         return basic_result
 
     @classmethod
-    def validate_image_file(cls, path: str) -> ValidationResult:
+    def validate_image_file(
+        cls, path: str, allow_nonexistent: bool = False
+    ) -> ValidationResult:
         """
         Validate image file (PNG) with size limits.
 
         Args:
             path: Path to image file
+            allow_nonexistent: If True, non-existent files pass validation
 
         Returns:
             ValidationResult with detailed validation information
         """
         return BasicFileValidator.validate_properties(
-            path, cls.IMAGE_EXTENSIONS, None, cls.IMAGE_MAX_SIZE
+            path, cls.IMAGE_EXTENSIONS, None, cls.IMAGE_MAX_SIZE,
+            allow_nonexistent=allow_nonexistent,
         )
 
     @classmethod
-    def validate_json_file(cls, path: str) -> ValidationResult:
+    def validate_json_file(
+        cls, path: str, allow_nonexistent: bool = False
+    ) -> ValidationResult:
         """
         Validate JSON file with size limits and basic JSON validation.
 
         Args:
             path: Path to JSON file
+            allow_nonexistent: If True, non-existent files pass validation
 
         Returns:
             ValidationResult with detailed validation information
         """
         # Basic file validation
         basic_result = BasicFileValidator.validate_properties(
-            path, cls.JSON_EXTENSIONS, None, cls.JSON_MAX_SIZE
+            path, cls.JSON_EXTENSIONS, None, cls.JSON_MAX_SIZE,
+            allow_nonexistent=allow_nonexistent,
         )
 
         if not basic_result.is_valid:
+            return basic_result
+
+        # If file doesn't exist and that's allowed, skip further validation
+        if not basic_result.file_info:
             return basic_result
 
         # Content validation - parse JSON
@@ -770,3 +844,33 @@ def atomic_write(path: Path | str, data: bytes) -> None:
         # Clean up temp file on any failure
         temp_path.unlink(missing_ok=True)
         raise
+
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize a filename for safe file operations.
+    
+    Removes directory traversal attempts and invalid characters.
+    
+    Args:
+        filename: The filename to sanitize
+        
+    Returns:
+        A safe filename with invalid characters replaced
+    """
+    # Remove directory separators - use Path.name to get just the filename
+    filename = Path(filename).name
+
+    # Remove potentially dangerous characters
+    invalid_chars = '<>:"|?*\x00'
+    for char in invalid_chars:
+        filename = filename.replace(char, "_")
+
+    # Remove leading/trailing dots and spaces
+    filename = filename.strip(". ")
+
+    # Ensure filename is not empty
+    if not filename:
+        filename = "unnamed"
+
+    return filename

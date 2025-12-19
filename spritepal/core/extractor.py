@@ -23,7 +23,7 @@ from utils.constants import (
     VRAM_SPRITE_SIZE,
 )
 from utils.logging_config import get_logger
-from utils.validation import validate_offset, validate_vram_file
+from utils.file_validator import FileValidator
 
 logger: logging.Logger = get_logger(__name__)
 
@@ -42,10 +42,10 @@ class SpriteExtractor:
         logger.info(f"Loading VRAM file: {vram_path}")
 
         # Validate file before loading
-        is_valid, error_msg = validate_vram_file(vram_path)
-        if not is_valid:
-            logger.error(f"VRAM validation failed: {error_msg}")
-            raise ValueError(f"Invalid VRAM file: {error_msg}")
+        result = FileValidator.validate_vram_file(vram_path)
+        if not result.is_valid:
+            logger.error(f"VRAM validation failed: {result.error_message}")
+            raise ValueError(f"Invalid VRAM file: {result.error_message}")
         logger.debug("VRAM file validation passed")
 
         with Path(vram_path).open("rb") as f:
@@ -75,10 +75,10 @@ class SpriteExtractor:
         logger.info(f"Extracting tiles from offset 0x{offset:04X}, size: {size} bytes")
 
         # Validate offset
-        is_valid, error_msg = validate_offset(offset, len(self.vram_data))
-        if not is_valid:
-            logger.error(f"Invalid extraction offset: {error_msg}")
-            raise ValueError(f"Invalid offset: {error_msg}")
+        result = FileValidator.validate_offset(offset, len(self.vram_data))
+        if not result.is_valid:
+            logger.error(f"Invalid extraction offset: {result.error_message}")
+            raise ValueError(f"Invalid offset: {result.error_message}")
 
         # Read sprite data from offset
         if offset + size > len(self.vram_data):
