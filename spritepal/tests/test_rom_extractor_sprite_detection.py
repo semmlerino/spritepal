@@ -32,8 +32,13 @@ def rom_extractor(mock_hal):
     """
     # Use DI to get ROMExtractor (session_managers fixture sets up DI)
     from core.di_container import inject
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.protocols.manager_protocols import ROMExtractorProtocol, ROMCacheProtocol
     extractor = inject(ROMExtractorProtocol)
+
+    # Clear any cached scan results to ensure test isolation
+    rom_cache = inject(ROMCacheProtocol)
+    rom_cache.clear_scan_progress_cache()
+
     # Mock the rom_injector methods we use in tests
     extractor.rom_injector = Mock()
     return extractor

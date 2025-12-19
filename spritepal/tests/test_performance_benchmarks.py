@@ -42,7 +42,6 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.qt_real,
-    pytest.mark.requires_display,
     pytest.mark.rom_data,
     pytest.mark.slow,
     pytest.mark.worker_threads,

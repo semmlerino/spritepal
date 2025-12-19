@@ -49,7 +49,6 @@ pytestmark = [
     pytest.mark.dialog,
     pytest.mark.file_io,
     pytest.mark.integration,
-    pytest.mark.requires_display,
     pytest.mark.signals_slots,
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,

@@ -37,7 +37,6 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.qt_real,
-    pytest.mark.requires_display,
     pytest.mark.rom_data,
     pytest.mark.signals_slots,
     pytest.mark.slow,
@@ -633,8 +632,6 @@ class TestPreviewOrchestratorIntegration:
 
     def test_full_preview_pipeline_integration(self, qtbot):
         """Test complete preview pipeline from request to delivery"""
-        orchestrator = PreviewOrchestrator()
-
         # Mock ROM cache for realistic setup
         mock_rom_cache = MockROMCache()
 
@@ -642,19 +639,22 @@ class TestPreviewOrchestratorIntegration:
         mock_async_instance = MockAsyncROMCache()
         mock_worker_instance = MockWorkerPool()
 
+        # Create orchestrator with worker pool factory that returns our mock
+        orchestrator = PreviewOrchestrator(
+            worker_pool_factory=lambda: mock_worker_instance
+        )
+
         # Imports happen inside methods from their respective modules
-        with patch('core.async_rom_cache.AsyncROMCache') as PatchedAsyncCache, \
-             patch('ui.common.preview_worker_pool.PreviewWorkerPool') as PatchedWorkerPool:
+        with patch('core.async_rom_cache.AsyncROMCache') as PatchedAsyncCache:
 
             # Configure patches to return our test mock instances
             PatchedAsyncCache.return_value = mock_async_instance
-            PatchedWorkerPool.return_value = mock_worker_instance
 
             # Set ROM cache to trigger async cache creation (which connects signals)
             orchestrator.set_rom_cache(mock_rom_cache)
 
             # Connect worker pool signals manually - these are connected lazily in
-            # _generate_preview, but since the patch returns our mock instance,
+            # _generate_preview, but since the factory returns our mock instance,
             # we need to connect them here. Note: async cache signals are already
             # connected by set_rom_cache, so we don't reconnect those.
             mock_worker_instance.preview_ready.connect(orchestrator._on_preview_ready)

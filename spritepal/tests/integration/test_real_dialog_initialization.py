@@ -27,15 +27,17 @@ pytestmark = [
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.dialog,
-    pytest.mark.requires_display,
 ]
 
 
 class TestRealDialogInitialization:
     """Test actual Qt dialogs can be created without crashes."""
 
-    def test_settings_dialog_real(self, qtbot: MockQtBotProtocol) -> None:
-        """Test SettingsDialog can be created with real Qt widgets."""
+    def test_settings_dialog_real(self, qtbot: MockQtBotProtocol, isolated_managers) -> None:
+        """Test SettingsDialog can be created with real Qt widgets.
+
+        Requires isolated_managers because SettingsDialog uses DI.
+        """
         from ui.dialogs.settings_dialog import SettingsDialog
 
         dialog = SettingsDialog()
@@ -52,15 +54,14 @@ class TestRealDialogInitialization:
         from ui.dialogs.user_error_dialog import UserErrorDialog
 
         dialog = UserErrorDialog(
-            title="Test Error",
-            message="Test error message",
-            details="Detailed error information",
+            error_message="Test error message",
+            technical_details="Detailed error information",
         )
         qtbot.addWidget(dialog)
 
         # Verify dialog was created
         assert dialog is not None
-        assert "Test Error" in dialog.windowTitle() or dialog.windowTitle()
+        assert dialog.windowTitle()  # Has a title
 
         dialog.close()
 
@@ -69,8 +70,13 @@ class TestRealDialogInitialization:
         from ui.dialogs.resume_scan_dialog import ResumeScanDialog
 
         dialog = ResumeScanDialog(
-            last_offset=0x1000,
-            total_sprites=10,
+            scan_info={
+                "current_offset": 0x1000,
+                "total_found": 10,
+                "found_sprites": [],
+                "scan_range": {"start": 0, "end": 0x10000, "step": 0x100},
+                "completed": False,
+            }
         )
         qtbot.addWidget(dialog)
 
@@ -84,7 +90,6 @@ class TestRealDialogInitialization:
         from ui.dialogs.scan_range_dialog import ScanRangeDialog
 
         dialog = ScanRangeDialog(
-            current_offset=0x1000,
             rom_size=0x400000,
         )
         qtbot.addWidget(dialog)
@@ -94,11 +99,15 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_advanced_search_dialog_real(self, qtbot: MockQtBotProtocol) -> None:
+    def test_advanced_search_dialog_real(self, qtbot: MockQtBotProtocol, tmp_path) -> None:
         """Test AdvancedSearchDialog can be created with real Qt widgets."""
         from ui.dialogs.advanced_search_dialog import AdvancedSearchDialog
 
-        dialog = AdvancedSearchDialog()
+        # Create a dummy ROM file for the dialog
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(b"\x00" * 1024)
+
+        dialog = AdvancedSearchDialog(rom_path=str(rom_path))
         qtbot.addWidget(dialog)
 
         # Verify dialog was created
@@ -133,8 +142,8 @@ class TestRealDialogInitialization:
         """Test SimilarityResultsDialog can be created with real Qt widgets."""
         from ui.dialogs.similarity_results_dialog import SimilarityResultsDialog
 
-        # Create with empty results
-        dialog = SimilarityResultsDialog(results=[])
+        # Create with empty matches and a source offset
+        dialog = SimilarityResultsDialog(matches=[], source_offset=0x1000)
         qtbot.addWidget(dialog)
 
         # Verify dialog was created
@@ -146,11 +155,17 @@ class TestRealDialogInitialization:
 class TestRealDialogLifecycle:
     """Test dialog show/hide/close lifecycle with real widgets."""
 
-    def test_dialog_show_close_cycle(self, qtbot: MockQtBotProtocol) -> None:
-        """Test that dialogs can be shown and closed without crashes."""
+    def test_dialog_show_close_cycle(self, qtbot: MockQtBotProtocol, isolated_managers) -> None:
+        """Test that dialogs can be shown and closed without crashes.
+
+        Requires isolated_managers because SettingsDialog uses DI.
+        """
         from ui.dialogs.settings_dialog import SettingsDialog
 
         dialog = SettingsDialog()
+        # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
+        from PySide6.QtCore import Qt
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         qtbot.addWidget(dialog)
 
         # Show the dialog (non-modal for testing)
@@ -160,7 +175,7 @@ class TestRealDialogLifecycle:
         # Verify it's visible
         assert dialog.isVisible()
 
-        # Close it
+        # Close it (pytest-qt handles final cleanup)
         dialog.close()
 
         # Verify it's no longer visible
@@ -168,12 +183,14 @@ class TestRealDialogLifecycle:
 
     def test_dialog_accept_reject(self, qtbot: MockQtBotProtocol) -> None:
         """Test dialog accept/reject methods work correctly."""
+        from PySide6.QtCore import Qt
         from ui.dialogs.user_error_dialog import UserErrorDialog
 
         dialog = UserErrorDialog(
-            title="Test",
-            message="Test message",
+            error_message="Test message",
         )
+        # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         qtbot.addWidget(dialog)
 
         # Test reject (close without accepting)
@@ -192,21 +209,22 @@ class TestRealDialogWithManagers:
         self, qtbot: MockQtBotProtocol, isolated_managers
     ) -> None:
         """Test InjectionDialog can be created with real managers."""
-        # Import may fail if injection_dialog has complex dependencies
-        with contextlib.suppress(ImportError):
-            from ui.injection_dialog import InjectionDialog
+        from PySide6.QtCore import Qt
+        from ui.injection_dialog import InjectionDialog
 
-            dialog = InjectionDialog()
-            qtbot.addWidget(dialog)
+        dialog = InjectionDialog(injection_manager=isolated_managers.get_injection_manager())
+        # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        qtbot.addWidget(dialog)
 
-            # Verify dialog was created with expected widgets
-            assert dialog is not None
+        # Verify dialog was created with expected widgets
+        assert dialog is not None
 
-            # Check for key child widgets
-            if hasattr(dialog, 'sprite_file_selector'):
-                assert dialog.sprite_file_selector is not None
+        # Check for key child widgets
+        if hasattr(dialog, 'sprite_file_selector'):
+            assert dialog.sprite_file_selector is not None
 
-            dialog.close()
+        dialog.close()
 
     def test_monitoring_dashboard_real(
         self, qtbot: MockQtBotProtocol, isolated_managers

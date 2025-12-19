@@ -669,6 +669,10 @@ class SpriteGalleryTab(QWidget):
             self.detached_window.close()
             self.detached_window = None
 
+        # Clean up gallery widget (stops timers)
+        if hasattr(self, 'gallery_widget') and self.gallery_widget:
+            self.gallery_widget.cleanup()
+
         if self.thumbnail_controller:
             self.thumbnail_controller.cleanup()
             self.thumbnail_controller = None

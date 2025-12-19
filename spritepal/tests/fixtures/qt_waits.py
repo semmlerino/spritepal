@@ -173,7 +173,7 @@ def wait_for_theme_applied(qtbot: QtBot) -> Callable[..., bool]:
         try:
             qtbot.waitUntil(theme_applied, timeout=timeout)
             return True
-        except AssertionError:
+        except Exception:  # pytestqt.exceptions.TimeoutError is raised, not AssertionError
             # Theme verification can be unreliable in headless mode
             display = os.environ.get("DISPLAY", "")
             qpa_platform = os.environ.get("QT_QPA_PLATFORM", "")

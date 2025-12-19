@@ -27,7 +27,6 @@ pytestmark = [
     pytest.mark.thread_safety,
     pytest.mark.cache,
     pytest.mark.gui,
-    pytest.mark.requires_display,
     pytest.mark.signals_slots,
 ]
 

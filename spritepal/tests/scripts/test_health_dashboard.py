@@ -40,7 +40,6 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.performance,
     pytest.mark.qt_real,
-    pytest.mark.requires_display,
     pytest.mark.rom_data,
     pytest.mark.slow,
 ]

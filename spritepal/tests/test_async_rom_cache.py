@@ -33,7 +33,6 @@ pytestmark = [
     pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.requires_display,
     pytest.mark.rom_data,
     pytest.mark.signals_slots,
     pytest.mark.slow,
@@ -145,9 +144,9 @@ class TestCacheWorker:
 
         args = blocker.args
         assert args[0] == request_id
-        # Should get error about invalid cache file or JSON decode error
-        # Common JSON error keywords: "expecting", "value", "property", "delimiter", "extra", "unterminated"
-        assert any(keyword in args[1].lower() for keyword in ["expecting", "value", "property", "delimiter", "extra", "unterminated", "invalid", "json", "decode"])
+        # Should get error about corrupted cache file
+        # The signal emits "Cache corrupted" for corrupted metadata
+        assert any(keyword in args[1].lower() for keyword in ["corrupted", "invalid", "cache"])
 
     def test_expired_cache_cleanup(self, qtbot):
         """Test that expired cache files are cleaned up"""

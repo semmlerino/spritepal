@@ -15,7 +15,8 @@ pytestmark = [
     pytest.mark.shared_state_safe,
 ]
 
-from core.managers import ExtractionManager
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
 from core.services.rom_cache import ROMCache
 from ui.common.simple_preview_coordinator import SimplePreviewCoordinator, SimplePreviewWorker
 
@@ -64,7 +65,7 @@ class TestSimplePreviewCoordinator:
 
         # Create coordinator
         coordinator = SimplePreviewCoordinator()
-        extraction_manager = ExtractionManager()
+        extraction_manager = inject(ExtractionManagerProtocol)
 
         # Set ROM data
         coordinator.set_rom_data(rom_path, rom_info['path'].stat().st_size, extraction_manager.get_rom_extractor())
@@ -109,7 +110,7 @@ class TestSimplePreviewCoordinator:
 
         # Create coordinator
         coordinator = SimplePreviewCoordinator()
-        extraction_manager = ExtractionManager()
+        extraction_manager = inject(ExtractionManagerProtocol)
 
         # Set ROM data
         coordinator.set_rom_data(rom_path, rom_info['path'].stat().st_size, extraction_manager.get_rom_extractor())
@@ -152,7 +153,7 @@ class TestSimplePreviewCoordinator:
 
         # Create coordinator
         coordinator = SimplePreviewCoordinator()
-        extraction_manager = ExtractionManager()
+        extraction_manager = inject(ExtractionManagerProtocol)
 
         # Set ROM data
         coordinator.set_rom_data(rom_path, rom_info['path'].stat().st_size, extraction_manager.get_rom_extractor())
@@ -194,7 +195,7 @@ class TestSimplePreviewCoordinator:
 
         # Create coordinator
         coordinator = SimplePreviewCoordinator()
-        extraction_manager = ExtractionManager()
+        extraction_manager = inject(ExtractionManagerProtocol)
 
         # Set ROM data
         coordinator.set_rom_data(rom_path, rom_info['path'].stat().st_size, extraction_manager.get_rom_extractor())
@@ -260,7 +261,7 @@ class TestSimplePreviewWorker:
         rom_info = test_rom_with_sprites
         rom_path = str(rom_info['path'])
 
-        extraction_manager = ExtractionManager()
+        extraction_manager = inject(ExtractionManagerProtocol)
         extractor = extraction_manager.get_rom_extractor()
 
         # Create worker without container - simpler lifecycle
@@ -311,7 +312,7 @@ class TestSimplePreviewWorker:
         if not rom_info['sprites']:
             pytest.skip("No test sprites in ROM")
 
-        extraction_manager = ExtractionManager()
+        extraction_manager = inject(ExtractionManagerProtocol)
         extractor = extraction_manager.get_rom_extractor()
 
         sprite_offset = rom_info['sprites'][0]['offset']
@@ -375,7 +376,7 @@ class TestPreviewCaching:
 
         # Create coordinator with cache (using cache created above)
         coordinator = SimplePreviewCoordinator(rom_cache=cache)
-        extraction_manager = ExtractionManager()
+        extraction_manager = inject(ExtractionManagerProtocol)
 
         # Set ROM data
         coordinator.set_rom_data(rom_path, rom_info['path'].stat().st_size, extraction_manager.get_rom_extractor())

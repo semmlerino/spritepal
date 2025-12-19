@@ -286,13 +286,15 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
         """
         Check if operation was cancelled and raise if so.
 
-        Uses Qt's built-in interruption mechanism via isInterruptionRequested().
+        Uses Qt's built-in interruption mechanism via isInterruptionRequested(),
+        plus the internal _cancellation_requested flag for cases where cancel()
+        is called before the thread is started.
         Call this periodically in long-running operations.
 
         Raises:
             InterruptedError: If operation was cancelled
         """
-        if self.isInterruptionRequested():
+        if self._cancellation_requested or self.isInterruptionRequested():
             raise InterruptedError("Operation was cancelled")
 
     def wait_if_paused(self) -> None:

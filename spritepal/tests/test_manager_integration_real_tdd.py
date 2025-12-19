@@ -49,12 +49,10 @@ pytestmark = [
     pytest.mark.thread_safety,
     pytest.mark.ci_safe,
     pytest.mark.file_io,
-    # NOTE: Removed headless marker - conflicts with requires_display
     pytest.mark.integration,
     pytest.mark.memory,
     pytest.mark.performance,
     pytest.mark.qt_real,
-    pytest.mark.requires_display,
     pytest.mark.rom_data,
     pytest.mark.signals_slots,
     pytest.mark.slow,

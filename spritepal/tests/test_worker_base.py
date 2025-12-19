@@ -29,7 +29,6 @@ pytestmark = [
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.headless,
-    pytest.mark.requires_display,
     pytest.mark.signals_slots,
 ]
 

@@ -20,7 +20,6 @@ pytestmark = [
     pytest.mark.serial,
     pytest.mark.slow,
     pytest.mark.worker_threads,
-    pytest.mark.requires_display,
     pytest.mark.signals_slots,
 ]
 

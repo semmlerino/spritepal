@@ -21,7 +21,6 @@ pytestmark = [
     pytest.mark.qt_application,
     pytest.mark.ci_safe,
     pytest.mark.headless,
-    pytest.mark.requires_display,
     pytest.mark.signals_slots,
 ]
 

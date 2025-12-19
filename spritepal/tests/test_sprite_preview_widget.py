@@ -17,19 +17,14 @@ from PySide6.QtWidgets import QApplication
 
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 
-# Skip in headless environments - this tests real Qt widget functionality
+# Uses Qt offscreen mode - works without real display
 pytestmark = [
-    pytest.mark.skipif(
-        "DISPLAY" not in os.environ,
-        reason="Requires GUI environment - tests real Qt widget rendering"
-    ),
     pytest.mark.serial,
     pytest.mark.qt_application,
     pytest.mark.qt_integration,
     pytest.mark.gui,
     pytest.mark.integration,
     pytest.mark.qt_real,
-    pytest.mark.requires_display,
     pytest.mark.rom_data,
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,

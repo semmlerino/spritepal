@@ -20,7 +20,6 @@ pytestmark = [
     pytest.mark.serial,
     pytest.mark.dialog,
     pytest.mark.qt_real,
-    pytest.mark.requires_display,
 ]
 
 @pytest.mark.gui
