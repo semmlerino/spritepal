@@ -182,12 +182,41 @@ def require_qt(feature: str) -> None:
 # Test Decorators
 # =============================================================================
 
-def skip_if_wsl(func: F) -> F:
-    """Skip test if running in WSL."""
-    return pytest.mark.skipif(
-        is_wsl_environment(),
-        reason="Test skipped in WSL environment"
-    )(func)  # type: ignore[return-value]
+def skip_if_wsl(func_or_reason: F | str | None = None) -> F | Callable[[F], F]:
+    """Skip test if running in WSL.
+    
+    Can be used as:
+        @skip_if_wsl
+        def test_foo(): ...
+        
+        @skip_if_wsl("Custom reason")
+        def test_bar(): ...
+    """
+    default_reason = "Test skipped in WSL environment"
+    
+    if func_or_reason is None:
+        # Called as @skip_if_wsl()
+        def decorator(func: F) -> F:
+            return pytest.mark.skipif(
+                is_wsl_environment(),
+                reason=default_reason
+            )(func)  # type: ignore[return-value]
+        return decorator  # type: ignore[return-value]
+    elif callable(func_or_reason):
+        # Called as @skip_if_wsl (no parentheses)
+        return pytest.mark.skipif(
+            is_wsl_environment(),
+            reason=default_reason
+        )(func_or_reason)  # type: ignore[return-value]
+    else:
+        # Called as @skip_if_wsl("reason")
+        reason = func_or_reason
+        def decorator(func: F) -> F:
+            return pytest.mark.skipif(
+                is_wsl_environment(),
+                reason=reason
+            )(func)  # type: ignore[return-value]
+        return decorator  # type: ignore[return-value]
 
 
 def skip_if_no_display(func: F) -> F:
