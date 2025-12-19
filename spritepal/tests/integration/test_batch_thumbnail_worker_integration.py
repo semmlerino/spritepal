@@ -193,7 +193,6 @@ def mock_tile_renderer():
 @pytest.mark.integration
 @pytest.mark.usefixtures("isolated_managers")
 @requires_real_qt
-@skip_if_wsl("Qt threading has known issues in WSL environments")
 class TestBatchThumbnailWorkerIntegration(QtTestCase):
     """Integration tests for batch thumbnail worker."""
 
@@ -265,6 +264,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         finally:
             controller.cleanup()
 
+    @skip_if_wsl("Timing-sensitive test: expects 8-20s execution time")
     @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
     def test_idle_detection_prevents_infinite_loop(
         self,
@@ -294,6 +294,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         assert execution_time > 8.0, f"Worker stopped too quickly ({execution_time:.2f}s), idle detection may not be working"
         assert not worker.isRunning()
 
+    @skip_if_wsl("Timing-sensitive test: expects <8s execution time")
     @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
     def test_processing_with_auto_stop(
         self,
@@ -309,7 +310,9 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
 
         # Track thumbnail emissions
         thumbnails_received = []
-        worker.thumbnail_ready.connect(thumbnails_received.append)
+        worker.thumbnail_ready.connect(
+            lambda offset, pixmap: thumbnails_received.append((offset, pixmap))
+        )
 
         # Queue a few thumbnails
         offsets = [0x10000, 0x20000, 0x30000]
@@ -363,6 +366,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         leaked_objects = final_rom_data_count - initial_rom_data_count
         assert leaked_objects <= 1, f"Leaked {leaked_objects} large byte objects"
 
+    @skip_if_wsl("Timing-sensitive test: depends on 10s auto-stop")
     @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
     def test_concurrent_queue_operations(
         self,
@@ -398,6 +402,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         worker.wait(10000)
         assert not worker.isRunning()
 
+    @skip_if_wsl("Timing-sensitive test: expects <2s stop time")
     def test_stop_request_interrupts_processing(self, test_rom_file, real_rom_extractor):
         """Test that stop request properly interrupts processing with real components."""
         worker = self.create_worker(test_rom_file, real_rom_extractor)
@@ -446,6 +451,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         # Cache should not exceed limit
         assert worker.get_cache_size() <= worker._cache_size_limit
 
+    @skip_if_wsl("Timing-sensitive test: depends on worker stop timing")
     def test_cleanup_method_comprehensive(self, test_rom_file, real_rom_extractor):
         """Test comprehensive cleanup functionality with real components."""
         worker = self.create_worker(test_rom_file, real_rom_extractor)
@@ -464,6 +470,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         # Cache should be cleared
         assert worker.get_cache_size() == 0
 
+    @skip_if_wsl("Timing-sensitive test: depends on worker stop timing")
     @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
     def test_error_handling_during_processing(
         self,
