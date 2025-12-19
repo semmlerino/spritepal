@@ -37,13 +37,12 @@ from utils.constants import (
     SETTINGS_KEY_VRAM_PATH,
     SETTINGS_NS_ROM_INJECTION,
 )
-from utils.file_validator import FileValidator
-
 from .base_manager import BaseManager
 from .exceptions import ValidationError
+from .validation_mixins import InjectionValidationMixin
 
 
-class InjectionManager(BaseManager):
+class InjectionManager(InjectionValidationMixin, BaseManager):
     """
     Deprecated injection manager.
 
@@ -232,62 +231,7 @@ class InjectionManager(BaseManager):
             self._handle_error(e, operation)
             return False
 
-    def validate_injection_params(self, params: dict[str, Any]) -> None:
-        """
-        Validate injection parameters
-
-        Args:
-            params: Parameters to validate
-
-        Raises:
-            ValidationError: If parameters are invalid
-        """
-        # Check required common parameters
-        required = ["mode", "sprite_path", "offset"]
-        self._validate_required(params, required)
-
-        self._validate_type(params["mode"], "mode", str)
-        self._validate_type(params["sprite_path"], "sprite_path", str)
-        self._validate_type(params["offset"], "offset", int)
-
-        # Use FileValidator for sprite file validation
-        sprite_result = FileValidator.validate_image_file(params["sprite_path"])
-        if not sprite_result.is_valid:
-            raise ValidationError(f"Sprite file validation failed: {sprite_result.error_message}")
-
-        self._validate_range(params["offset"], "offset", min_val=0)
-
-        # Check mode-specific parameters
-        if params["mode"] == "vram":
-            vram_required = ["input_vram", "output_vram"]
-            self._validate_required(params, vram_required)
-
-            # Use FileValidator for VRAM file validation
-            vram_result = FileValidator.validate_vram_file(params["input_vram"])
-            if not vram_result.is_valid:
-                raise ValidationError(f"Input VRAM file validation failed: {vram_result.error_message}")
-
-        elif params["mode"] == "rom":
-            rom_required = ["input_rom", "output_rom"]
-            self._validate_required(params, rom_required)
-
-            # Use FileValidator for ROM file validation
-            rom_result = FileValidator.validate_rom_file(params["input_rom"])
-            if not rom_result.is_valid:
-                raise ValidationError(f"Input ROM file validation failed: {rom_result.error_message}")
-
-            # Validate optional fast_compression parameter
-            if "fast_compression" in params:
-                self._validate_type(params["fast_compression"], "fast_compression", bool)
-        else:
-            raise ValidationError(f"Invalid injection mode: {params['mode']}")
-
-        # Validate optional metadata_path
-        if params.get("metadata_path"):
-            # Use FileValidator for JSON metadata file validation
-            metadata_result = FileValidator.validate_json_file(params["metadata_path"])
-            if not metadata_result.is_valid:
-                raise ValidationError(f"Metadata file validation failed: {metadata_result.error_message}")
+    # validate_injection_params is provided by InjectionValidationMixin
 
     def get_smart_vram_suggestion(self, sprite_path: str, metadata_path: str = "") -> str:
         """

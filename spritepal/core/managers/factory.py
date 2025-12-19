@@ -3,9 +3,23 @@ Manager factory for creating manager instances with proper Qt parent management.
 
 This factory provides a clean way to create manager instances while respecting
 Qt's object lifecycle and enabling both singleton and per-worker patterns.
+
+.. deprecated::
+    The factory pattern for creating ExtractionManager and InjectionManager
+    is deprecated. Use dependency injection instead::
+
+        from core.di_container import inject
+        from core.protocols.manager_protocols import (
+            ExtractionManagerProtocol,
+            InjectionManagerProtocol,
+        )
+
+        extraction_mgr = inject(ExtractionManagerProtocol)
+        injection_mgr = inject(InjectionManagerProtocol)
 """
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Protocol
 
 from PySide6.QtCore import QObject
@@ -93,12 +107,21 @@ class StandardManagerFactory:
         """
         Create an ExtractionManager instance with proper Qt parent.
 
+        .. deprecated::
+            Use ``inject(ExtractionManagerProtocol)`` from ``core.di_container`` instead.
+
         Args:
             parent: Optional Qt parent object. If None, uses factory's default strategy.
 
         Returns:
             New ExtractionManager instance
         """
+        warnings.warn(
+            "StandardManagerFactory.create_extraction_manager() is deprecated. "
+            "Use inject(ExtractionManagerProtocol) from core.di_container instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         qt_parent = self._get_default_parent(parent)
         manager = ExtractionManager(parent=qt_parent)
 
@@ -109,12 +132,21 @@ class StandardManagerFactory:
         """
         Create an InjectionManager instance with proper Qt parent.
 
+        .. deprecated::
+            Use ``inject(InjectionManagerProtocol)`` from ``core.di_container`` instead.
+
         Args:
             parent: Optional Qt parent object. If None, uses factory's default strategy.
 
         Returns:
             New InjectionManager instance
         """
+        warnings.warn(
+            "StandardManagerFactory.create_injection_manager() is deprecated. "
+            "Use inject(InjectionManagerProtocol) from core.di_container instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         qt_parent = self._get_default_parent(parent)
         manager = InjectionManager(parent=qt_parent)
 

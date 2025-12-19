@@ -33,9 +33,10 @@ from utils.file_validator import FileValidator
 
 from .base_manager import BaseManager
 from .exceptions import ExtractionError, ValidationError
+from .validation_mixins import ExtractionValidationMixin
 
 
-class ExtractionManager(BaseManager):
+class ExtractionManager(ExtractionValidationMixin, BaseManager):
     """
     Deprecated extraction manager.
 
@@ -373,61 +374,7 @@ class ExtractionManager(BaseManager):
             if started:
                 self._finish_operation(operation)
 
-    def validate_extraction_params(self, params: dict[str, Any]) -> bool:
-        """
-        Validate extraction parameters
-
-        Args:
-            params: Parameters to validate
-
-        Returns:
-            True if validation passes
-
-        Raises:
-            ValidationError: If validation fails
-        """
-        # Determine extraction type
-        if "vram_path" in params:
-            # VRAM extraction - check for missing VRAM file specifically
-            if not params.get("vram_path"):
-                raise ValidationError("VRAM file is required for extraction")
-            self._validate_required(params, ["output_base"])
-        elif "rom_path" in params:
-            # ROM extraction
-            self._validate_required(params, ["rom_path", "offset", "output_base"])
-
-            # Use FileValidator for ROM file validation
-            self._validate_rom_file_exists(params["rom_path"])
-
-            self._validate_type(params["offset"], "offset", int)
-            self._validate_range(params["offset"], "offset", min_val=0)
-        else:
-            raise ValidationError("Must provide either vram_path or rom_path")
-
-        # Validate CGRAM requirements for VRAM extraction
-        if "vram_path" in params:
-            grayscale_mode = params.get("grayscale_mode", False)
-            cgram_path = params.get("cgram_path")
-
-            # CGRAM is required for full color mode
-            if not grayscale_mode and not cgram_path:
-                raise ValidationError(
-                    "CGRAM file is required for Full Color mode.\n"
-                    "Please provide a CGRAM file or switch to Grayscale Only mode."
-                )
-
-            # Note: File existence validation is now handled by controller
-            # to provide better fail-fast behavior and avoid blocking I/O
-
-        # Validate output_base is provided and not empty
-        output_base = params.get("output_base", "")
-        if not output_base or not output_base.strip():
-            raise ValidationError("Output name is required for extraction")
-
-        # Note: Optional file existence validation is now handled by controller
-
-        # Return True if all validation passes
-        return True
+    # validate_extraction_params is provided by ExtractionValidationMixin
 
     def generate_preview(self, vram_path: str, offset: int) -> tuple[Image.Image, int]:
         """Generate a preview image from VRAM at the specified offset.
@@ -591,8 +538,9 @@ class ExtractionManager(BaseManager):
         if not rom_result.is_valid:
             raise ValidationError(f"ROM file validation failed: {rom_result.error_message}")
 
+    @override
     def _validate_rom_file_exists(self, rom_path: str) -> None:
-        """Validate ROM file existence and raise if not found"""
+        """Validate ROM file existence and raise if not found."""
         rom_result = FileValidator.validate_file_existence(rom_path, "ROM file")
         if not rom_result.is_valid:
             raise ValidationError(f"ROM file validation failed: {rom_result.error_message}")
