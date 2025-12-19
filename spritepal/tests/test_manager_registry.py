@@ -7,6 +7,8 @@ The deprecation warnings are suppressed since we're testing the deprecated API.
 """
 from __future__ import annotations
 
+import threading
+import time
 import warnings
 
 import pytest
@@ -26,6 +28,7 @@ from core.managers import (
     initialize_managers,
 )
 from core.managers.application_state_manager import ApplicationStateManager
+from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.registry import ManagerRegistry
 
@@ -328,3 +331,210 @@ class TestManagerRegistry:
         # Third cleanup also safe
         cleanup_managers()
         assert not are_managers_initialized()
+
+
+@pytest.mark.usefixtures("isolated_managers")
+@pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads")
+@pytest.mark.allows_registry_state
+class TestTOCTOURaceConditionStability:
+    """Test fixes for Time-of-Check-Time-of-Use race conditions.
+
+    Migrated from test_phase1_stability_fixes.py - validates Phase 1 stability fixes
+    for TOCTOU race conditions in manager initialization and concurrent access.
+    """
+
+    def test_manager_registry_thread_safety(self):
+        """Test ManagerRegistry handles concurrent access safely."""
+
+        errors = []
+        registries = []
+        lock = threading.Lock()
+
+        def create_registry():
+            try:
+                registry = ManagerRegistry()
+                with lock:
+                    registries.append(registry)
+            except Exception as e:
+                with lock:
+                    errors.append(e)
+
+        # Create multiple threads trying to create registry
+        threads = []
+        for _i in range(10):
+            thread = threading.Thread(target=create_registry)
+            threads.append(thread)
+
+        # Start all threads
+        for thread in threads:
+            thread.start()
+
+        # Wait for all threads
+        for thread in threads:
+            thread.join()
+
+        # Verify no errors occurred
+        assert not errors, f"Registry creation should be thread-safe, but got errors: {errors}"
+
+        # Verify all registries are the same instance (singleton)
+        assert len(registries) == 10, "Should have 10 registry references"
+        first_registry = registries[0]
+        for registry in registries[1:]:
+            assert registry is first_registry, "All registries should be the same instance"
+
+    def test_manager_concurrent_operations(self):
+        """Test managers handle concurrent operations safely."""
+
+        class TestManager(BaseManager):
+            def __init__(self):
+                super().__init__("test_concurrent")
+                self.operation_count = 0
+                self.operation_results = []
+
+            def _initialize(self):
+                self._is_initialized = True
+
+            def cleanup(self):
+                pass
+
+            def test_operation(self, operation_id):
+                """Thread-safe operation using manager's built-in locking."""
+                def _do_operation():
+                    # Simulate work
+                    time.sleep(0.01)  # sleep-ok: race condition test
+                    self.operation_count += 1
+                    self.operation_results.append(f"operation_{operation_id}")
+                    return f"result_{operation_id}"
+
+                return self._with_operation_lock(f"test_op_{operation_id}", _do_operation)
+
+        manager = TestManager()
+        results = []
+        errors = []
+        lock = threading.Lock()
+
+        def run_operation(op_id):
+            try:
+                result = manager.test_operation(op_id)
+                with lock:
+                    results.append(result)
+            except Exception as e:
+                with lock:
+                    errors.append(e)
+
+        # Run concurrent operations
+        threads = []
+        for i in range(20):
+            thread = threading.Thread(target=run_operation, args=(i,))
+            threads.append(thread)
+
+        # Start all threads
+        for thread in threads:
+            thread.start()
+
+        # Wait for completion
+        for thread in threads:
+            thread.join()
+
+        # Verify results
+        assert not errors, f"Concurrent operations should not cause errors: {errors}"
+        assert len(results) == 20, f"Should have 20 results, got {len(results)}"
+        assert manager.operation_count == 20, f"Should have 20 operations, got {manager.operation_count}"
+
+    def test_manager_initialization_race_conditions(self):
+        """Test manager initialization is safe under concurrent access."""
+        # This test requires exclusive control of manager initialization
+        # With isolated_managers, each test has its own managers, so this is safe
+
+        # Skip this test in mock environment where Qt objects can't be created properly
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app and "Mock" in app.__class__.__name__:
+            pytest.skip("Skipping manager initialization test in mock environment")
+
+        # Get fresh registry for clean test
+        registry = ManagerRegistry()
+
+        errors = []
+        lock = threading.Lock()
+
+        def initialize_managers_thread():
+            try:
+                # This should be safe to call from multiple threads
+                registry.initialize_managers("TestApp")
+            except Exception as e:
+                with lock:
+                    errors.append(e)
+
+        # Try to initialize from multiple threads
+        threads = []
+        for _i in range(5):
+            thread = threading.Thread(target=initialize_managers_thread)
+            threads.append(thread)
+
+        # Start all threads
+        for thread in threads:
+            thread.start()
+
+        # Wait for completion
+        for thread in threads:
+            thread.join()
+
+        # Verify no errors occurred
+        assert not errors, f"Concurrent initialization should be safe: {errors}"
+
+    def test_manager_validity_during_operations(self):
+        """Test that managers remain valid during long operations."""
+
+        class TestManager(BaseManager):
+            def __init__(self):
+                super().__init__("test_validity")
+
+            def _initialize(self):
+                self._is_initialized = True
+
+            def cleanup(self):
+                pass
+
+            def long_operation(self):
+                """Simulate a long operation that checks manager validity."""
+                if not self._start_operation("long_op"):
+                    return False
+
+                try:
+                    # Simulate work while checking validity
+                    for _i in range(50):
+                        if not self.is_initialized():
+                            return False
+                        time.sleep(0.001)  # sleep-ok: race condition test
+                    return True
+                finally:
+                    self._finish_operation("long_op")
+
+        manager = TestManager()
+
+        # Start long operation in background
+        result_container = [None]
+        error_container = [None]
+
+        def run_long_operation():
+            try:
+                result_container[0] = manager.long_operation()
+            except Exception as e:
+                error_container[0] = e
+
+        thread = threading.Thread(target=run_long_operation)
+        thread.start()
+
+        # While operation is running, verify manager state
+        time.sleep(0.01)  # sleep-ok: thread interleaving
+        assert manager.has_active_operations(), "Manager should have active operations"
+        assert manager.is_operation_active("long_op"), "Specific operation should be active"
+
+        # Wait for completion
+        thread.join()
+
+        # Verify results
+        assert error_container[0] is None, f"Long operation should not error: {error_container[0]}"
+        assert result_container[0] is True, "Long operation should succeed"
+        assert not manager.has_active_operations(), "Manager should have no active operations after completion"
