@@ -1,24 +1,19 @@
 """
-ExtractionManager - Base class for ExtractionAdapter.
-
-This module provides the ExtractionManager class which serves as a base class
-for the ExtractionAdapter in the consolidated manager architecture.
+ExtractionManager - Deprecated extraction manager.
 
 .. deprecated::
-    Direct instantiation of ExtractionManager is deprecated. Use dependency injection::
+    This class is deprecated. Use dependency injection instead::
 
         from core.di_container import inject
         from core.protocols.manager_protocols import ExtractionManagerProtocol
 
         extraction_mgr = inject(ExtractionManagerProtocol)
 
-    This class exists primarily as a base class for ExtractionAdapter, which
-    provides backward compatibility while delegating to CoreOperationsManager.
-    All business logic now lives in CoreOperationsManager.
+    All business logic now lives in CoreOperationsManager. This class
+    is retained for test compatibility but should not be used in new code.
 
 See Also:
     - :class:`core.managers.core_operations_manager.CoreOperationsManager`
-    - :class:`core.managers.core_operations_manager.ExtractionAdapter`
 """
 from __future__ import annotations
 
@@ -42,7 +37,7 @@ from .exceptions import ExtractionError, ValidationError
 
 class ExtractionManager(BaseManager):
     """
-    Base class for extraction management - provides interface for ExtractionAdapter.
+    Deprecated extraction manager.
 
     .. deprecated::
         Do not instantiate directly. Use dependency injection instead::
@@ -51,9 +46,8 @@ class ExtractionManager(BaseManager):
             from core.protocols.manager_protocols import ExtractionManagerProtocol
             extraction_mgr = inject(ExtractionManagerProtocol)
 
-        This class serves as a base class for ExtractionAdapter, which inherits
-        from it for interface compatibility while delegating to
-        CoreOperationsManager for actual functionality.
+        All business logic now lives in CoreOperationsManager. This class
+        is retained for test compatibility but should not be used in new code.
     """
 
     # Additional signals specific to extraction
@@ -82,9 +76,6 @@ class ExtractionManager(BaseManager):
                 from core.protocols.manager_protocols import ExtractionManagerProtocol
                 extraction_mgr = inject(ExtractionManagerProtocol)
         """
-        # Note: deprecation warning removed - it never fired since ExtractionAdapter
-        # is the only subclass and always passes through here
-
         # Declare instance variables with type hints
         self._sprite_extractor: SpriteExtractor | None = None
         self._rom_extractor: ROMExtractorProtocol | None = None

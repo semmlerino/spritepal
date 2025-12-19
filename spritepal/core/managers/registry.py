@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import threading
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from PySide6.QtWidgets import QApplication
 
@@ -27,56 +27,8 @@ from .injection_manager import InjectionManager
 from .monitoring_manager import MonitoringManager
 from .session_manager import SessionManager
 
-if TYPE_CHECKING:
-    from .base_manager import BaseManager
-
 # NavigationManager import deferred to avoid circular imports
 
-
-def _topological_sort(
-    manager_classes: list[type[BaseManager]],
-) -> list[type[BaseManager]]:
-    """
-    Sort manager classes by their declared dependencies using Kahn's algorithm.
-
-    Each manager class should have a DEPENDS_ON class variable listing its dependencies.
-    Returns classes in initialization order (dependencies first).
-
-    Raises:
-        ManagerError: If circular dependencies are detected
-    """
-    # Build adjacency list and in-degree count
-    in_degree: dict[type, int] = dict.fromkeys(manager_classes, 0)
-    dependents: dict[type, list[type]] = {cls: [] for cls in manager_classes}
-    class_set = set(manager_classes)
-
-    for cls in manager_classes:
-        for dep in getattr(cls, "DEPENDS_ON", []):
-            if dep in class_set:
-                in_degree[cls] += 1
-                dependents[dep].append(cls)
-
-    # Start with classes that have no dependencies
-    queue = [cls for cls in manager_classes if in_degree[cls] == 0]
-    result: list[type[BaseManager]] = []
-
-    while queue:
-        # Sort for deterministic order when multiple options exist
-        queue.sort(key=lambda c: c.__name__)
-        cls = queue.pop(0)
-        result.append(cls)
-
-        for dependent in dependents[cls]:
-            in_degree[dependent] -= 1
-            if in_degree[dependent] == 0:
-                queue.append(dependent)
-
-    if len(result) != len(manager_classes):
-        # Circular dependency detected
-        remaining = [c.__name__ for c in manager_classes if c not in result]
-        raise ManagerError(f"Circular dependency detected among: {remaining}")
-
-    return result
 
 class ManagerRegistry:
     """Singleton registry for manager instances with memory leak prevention"""
@@ -85,8 +37,8 @@ class ManagerRegistry:
     _lock: threading.RLock = threading.RLock()  # RLock for reentrant locking
     _cleanup_registered: bool = False
 
-    # List of manager classes in initialization order (topological sort validates this)
-    # When no DEPENDS_ON is declared, alphabetical order by class name is used.
+    # List of manager classes in initialization order.
+    # Order: ApplicationStateManager → CoreOperationsManager → MonitoringManager
     MANAGED_CLASSES: list[type] = [
         ApplicationStateManager,
         CoreOperationsManager,
@@ -137,44 +89,10 @@ class ManagerRegistry:
             except Exception as e:
                 self._logger.debug(f"Could not register Qt cleanup: {e}")
 
-    @classmethod
-    def validate_initialization_order(cls) -> bool:
-        """
-        Validate that MANAGED_CLASSES order matches topological sort of dependencies.
-
-        Call this in tests or during development to ensure the hardcoded order
-        is consistent with declared DEPENDS_ON attributes.
-
-        Returns:
-            True if order is valid
-
-        Raises:
-            ManagerError: If order doesn't match or circular dependency detected
-        """
-        expected_order = _topological_sort(cls.MANAGED_CLASSES)
-        if expected_order != cls.MANAGED_CLASSES:
-            expected_names = [c.__name__ for c in expected_order]
-            actual_names = [c.__name__ for c in cls.MANAGED_CLASSES]
-            raise ManagerError(
-                f"MANAGED_CLASSES order doesn't match dependencies.\n"
-                f"  Expected: {expected_names}\n"
-                f"  Actual: {actual_names}"
-            )
-        return True
-
-    # Manager initialization order is determined by declared dependencies.
-    # Each manager class should have a DEPENDS_ON class variable listing its dependencies.
-    # The _topological_sort() function computes a safe initialization order.
-    #
     # To add a new manager:
-    # 1. Declare DEPENDS_ON in your manager class (list of manager types it requires)
-    # 2. Add the manager class to MANAGED_CLASSES below
-    # 3. Add initialization code in initialize_managers() following the pattern
-    #
+    # 1. Add the manager class to MANAGED_CLASSES (maintain initialization order)
+    # 2. Add initialization code in initialize_managers() following the pattern
     # Current order: ApplicationStateManager → CoreOperationsManager → MonitoringManager
-    #
-    # Use _validate_initialization_order() to verify the hardcoded order matches
-    # what topological sort would produce.
     def initialize_managers(
         self,
         app_name: str = "SpritePal",

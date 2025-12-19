@@ -825,29 +825,21 @@ class CoreOperationsManager(BaseManager):
         if hasattr(worker, "compression_info"):
             worker.compression_info.connect(self.compression_info.emit)  # type: ignore[attr-defined]
 
+    @override
     def _on_worker_progress_adapter(self, *args: object) -> None:
         """Adapter to handle different worker progress signal signatures."""
-        if len(args) == 1:
-            message = str(args[0])
-        elif len(args) >= 2:
-            message = str(args[1])
-        else:
-            message = ""
-        self._on_worker_progress(message)
+        # Use inherited implementation from BaseManager
+        super()._on_worker_progress_adapter(*args)
 
+    @override
     def _on_worker_progress(self, message: str) -> None:
-        """Handle worker progress updates."""
+        """Handle worker progress - emit injection-specific signal."""
         self.injection_progress.emit(message)
 
     def _on_worker_finished(self, success: bool, message: str) -> None:
         """Handle worker completion."""
-        self._finish_operation("injection")
+        self._handle_worker_completion("injection", success, message)
         self.injection_finished.emit(success, message)
-
-        if success:
-            self._logger.info(f"Injection completed successfully: {message}")
-        else:
-            self._logger.error(f"Injection failed: {message}")
 
     # ========== VRAM Suggestion Strategies ==========
 

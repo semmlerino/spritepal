@@ -51,65 +51,20 @@ class ExtractionManagerFixture:
     """Test fixture providing real ExtractionManager with test data"""
 
     def __init__(self, temp_dir: str | None = None):
+        from pathlib import Path
+
+        from tests.fixtures.test_data_factory import TestDataFactory
+
         self.temp_dir = temp_dir or tempfile.mkdtemp()
         self.manager = ExtractionManager()
-        self._create_test_files()
 
-    def _create_test_files(self):
-        """Create realistic test files for extraction"""
-        # Create test VRAM file with sprite-like data pattern
-        vram_data = bytearray(0x10000)  # 64KB
-        # Add some sprite-like pattern at sprite offset
-        sprite_offset = 0xC000
-        for i in range(0x1000):  # 4KB of sprite data
-            vram_data[sprite_offset + i] = (i % 256)  # Pattern data
-
-        self.vram_path = os.path.join(self.temp_dir, "test.vram")
-        with open(self.vram_path, "wb") as f:
-            f.write(vram_data)
-
-        # Create test CGRAM file with realistic palette data
-        cgram_data = bytearray(512)  # 512 bytes
-        # Add some basic palette colors (BGR555 format)
-        palette_colors = [
-            0x0000,  # Black
-            0x001F,  # Red
-            0x03E0,  # Green
-            0x7C00,  # Blue
-            0x7FFF,  # White
-        ]
-        for i, color in enumerate(palette_colors):
-            if i * 2 + 1 < len(cgram_data):
-                cgram_data[i * 2] = color & 0xFF
-                cgram_data[i * 2 + 1] = (color >> 8) & 0xFF
-
-        self.cgram_path = os.path.join(self.temp_dir, "test.cgram")
-        with open(self.cgram_path, "wb") as f:
-            f.write(cgram_data)
-
-        # Create test OAM file
-        oam_data = b"\x00" * 544  # 544 bytes of OAM data
-        self.oam_path = os.path.join(self.temp_dir, "test.oam")
-        with open(self.oam_path, "wb") as f:
-            f.write(oam_data)
-
-        # Create test ROM file with header and sprite data
-        rom_data = bytearray(0x400000)  # 4MB ROM
-        # Add ROM header pattern
-        rom_data[0x7FC0:0x7FE0] = b"TEST ROM FOR TESTING"
-        # Add some sprite data at common offsets
-        test_sprite_offsets = [0x200000, 0x300000, 0x380000]
-        for offset in test_sprite_offsets:
-            if offset + 0x800 < len(rom_data):
-                for i in range(0x800):  # 2KB of sprite data
-                    rom_data[offset + i] = ((i * 7) % 256)  # Pattern
-
-        self.rom_path = os.path.join(self.temp_dir, "test.sfc")
-        with open(self.rom_path, "wb") as f:
-            f.write(rom_data)
-
-        self.output_dir = os.path.join(self.temp_dir, "output")
-        os.makedirs(self.output_dir, exist_ok=True)
+        # Use TestDataFactory for file creation (DRY consolidation)
+        paths = TestDataFactory.create_test_files(Path(self.temp_dir))
+        self.vram_path = str(paths.vram_path)
+        self.cgram_path = str(paths.cgram_path)
+        self.oam_path = str(paths.oam_path)
+        self.rom_path = str(paths.rom_path)
+        self.output_dir = str(paths.output_dir)
 
     def get_vram_extraction_params(self):
         """Get realistic VRAM extraction parameters"""
@@ -144,40 +99,19 @@ class InjectionManagerFixture:
     """Test fixture providing real InjectionManager with test data"""
 
     def __init__(self, temp_dir: str | None = None):
+        from pathlib import Path
+
+        from tests.fixtures.test_data_factory import TestDataFactory
+
         self.temp_dir = temp_dir or tempfile.mkdtemp()
         self.manager = InjectionManager()
-        self._create_test_files()
 
-    def _create_test_files(self):
-        """Create realistic test files for injection"""
-        # Create test sprite image
-        sprite_image = Image.new("L", (64, 64), 0)  # 64x64 grayscale
-        # Add some pattern to the sprite
-        pixels = []
-        for y in range(64):
-            for x in range(64):
-                # Create a simple pattern
-                value = ((x + y) * 4) % 256
-                pixels.append(value)
-        sprite_image.putdata(pixels)
-
-        self.sprite_path = os.path.join(self.temp_dir, "test_sprite.png")
-        sprite_image.save(self.sprite_path)
-
-        # Create test VRAM file for injection target
-        vram_data = b"\x00" * 0x10000  # 64KB
-        self.vram_input_path = os.path.join(self.temp_dir, "input.vram")
-        with open(self.vram_input_path, "wb") as f:
-            f.write(vram_data)
-
+        # Use TestDataFactory for injection test files (DRY consolidation)
+        paths = TestDataFactory.create_injection_test_files(Path(self.temp_dir))
+        self.sprite_path = str(paths.sprite_path)
+        self.vram_input_path = str(paths.vram_path)
         self.vram_output_path = os.path.join(self.temp_dir, "output.vram")
-
-        # Create test ROM file for injection target
-        rom_data = b"\x00" * 0x400000  # 4MB
-        self.rom_input_path = os.path.join(self.temp_dir, "input.sfc")
-        with open(self.rom_input_path, "wb") as f:
-            f.write(rom_data)
-
+        self.rom_input_path = str(paths.rom_path)
         self.rom_output_path = os.path.join(self.temp_dir, "output.sfc")
 
     def get_vram_injection_params(self):

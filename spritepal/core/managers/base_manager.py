@@ -32,12 +32,6 @@ from .exceptions import ValidationError
 class BaseManager(QObject):
     """Abstract base class for all manager classes"""
 
-    # Dependency declaration for initialization ordering.
-    # Subclasses should override this to declare which manager types they depend on.
-    # The registry uses topological sort to determine safe initialization order.
-    # Example: DEPENDS_ON: ClassVar[list[type[BaseManager]]] = [ApplicationStateManager]
-    DEPENDS_ON: list[type[BaseManager]] = []
-
     # Common signals that all managers can emit
     error_occurred = Signal(str)
     """Emitted on error. Args: error_message."""
@@ -202,6 +196,58 @@ class BaseManager(QObject):
             total: Total progress value
         """
         self.progress_updated.emit(operation, current, total)
+
+    def _on_worker_progress_adapter(self, *args: object) -> None:
+        """Adapter to handle different worker progress signal signatures.
+
+        Different workers emit different signals:
+        - core/workers: Signal(int, str) -> (percent, message)
+        - ui/workers: Signal(str) -> (message,)
+
+        This adapter normalizes both to extract the message and calls
+        ``_on_worker_progress(message)``. Subclasses must implement
+        ``_on_worker_progress`` to handle the normalized message.
+        """
+        if len(args) == 1:
+            # Signal(str) - message only
+            message = str(args[0])
+        elif len(args) >= 2:
+            # Signal(int, str) - (percent, message)
+            message = str(args[1])
+        else:
+            message = ""
+        self._on_worker_progress(message)
+
+    def _on_worker_progress(self, message: str) -> None:
+        """Handle normalized worker progress message.
+
+        Subclasses should override to emit domain-specific signals.
+        Default implementation emits the generic ``progress_updated`` signal.
+
+        Args:
+            message: Progress message from worker
+        """
+        self.progress_updated.emit(message)
+
+    def _handle_worker_completion(
+        self, operation: str, success: bool, message: str
+    ) -> None:
+        """Handle common worker completion logic.
+
+        Finishes the operation tracking and logs the result. Subclasses should
+        call this, then emit their domain-specific completion signal.
+
+        Args:
+            operation: Operation name (e.g., "injection", "extraction")
+            success: Whether the operation succeeded
+            message: Completion message
+        """
+        self._finish_operation(operation)
+
+        if success:
+            self._logger.info(f"{operation.title()} completed successfully: {message}")
+        else:
+            self._logger.error(f"{operation.title()} failed: {message}")
 
     def _validate_required(self, params: dict[str, Any], required: list[str]) -> None:
         """

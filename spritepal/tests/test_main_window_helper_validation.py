@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.fixtures.test_main_window_helper_simple import MainWindowHelperSimple
+from tests.fixtures.main_window_helper import MainWindowHelperSimple
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [

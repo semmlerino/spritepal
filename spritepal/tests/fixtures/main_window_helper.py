@@ -79,44 +79,14 @@ class MainWindowHelperSimple(QObject):
         self.arrange_grid_requested.connect(lambda path: self.signal_emissions["arrange_grid_requested"].append(path))
         self.inject_requested.connect(lambda: self.signal_emissions["inject_requested"].append(True))
 
-        # Create test files
-        self._create_test_files()
+        # Use TestDataFactory for file creation (DRY consolidation)
+        from tests.fixtures.test_data_factory import TestDataFactory
 
-    def _create_test_files(self):
-        """Create test files for extraction parameters"""
-        # Create test VRAM file
-        self.vram_file = self.temp_path / "test_VRAM.dmp"
-        vram_data = bytearray(0x10000)  # 64KB
-        # Add some test data at sprite offset
-        for i in range(0x1000):
-            vram_data[0xC000 + i] = i % 256
-        self.vram_file.write_bytes(vram_data)
-
-        # Create test CGRAM file
-        self.cgram_file = self.temp_path / "test_CGRAM.dmp"
-        cgram_data = bytearray(512)  # 256 colors * 2 bytes
-        for i in range(256):
-            cgram_data[i * 2] = i % 32
-            cgram_data[i * 2 + 1] = (i // 32) % 32
-        self.cgram_file.write_bytes(cgram_data)
-
-        # Create test OAM file
-        self.oam_file = self.temp_path / "test_OAM.dmp"
-        oam_data = bytearray(544)  # 544 bytes
-        # Add some test sprite entries
-        oam_data[0] = 0x50  # X position
-        oam_data[1] = 0x50  # Y position
-        oam_data[2] = 0x00  # Tile number
-        oam_data[3] = 0x00  # Attributes
-        self.oam_file.write_bytes(oam_data)
-
-        # Create test ROM file
-        self.rom_file = self.temp_path / "test_ROM.sfc"
-        rom_data = bytearray(0x400000)  # 4MB
-        # Add some test data
-        for i in range(0x1000):
-            rom_data[0x8000 + i] = i % 256
-        self.rom_file.write_bytes(rom_data)
+        paths = TestDataFactory.create_test_files(self.temp_path)
+        self.vram_file = paths.vram_path
+        self.cgram_file = paths.cgram_path
+        self.oam_file = paths.oam_path
+        self.rom_file = paths.rom_path
 
     def get_extraction_params(self) -> dict[str, Any]:
         """Get extraction parameters (mimics MainWindow.get_extraction_params)"""

@@ -9,6 +9,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from core.protocols.manager_protocols import ROMExtractorProtocol
+
 import pytest
 
 from core.sprite_finder import SpriteCandidate, SpriteFinder
@@ -63,6 +65,24 @@ def mock_extractor():
     extractor._convert_4bpp_to_png = Mock()
 
     return extractor
+
+
+def _make_inject_patcher(mock_extractor: Mock) -> patch:
+    """Create a patcher for the inject function that returns the mock extractor.
+
+    This is needed because SpriteFinder uses DI (inject(ROMExtractorProtocol))
+    rather than direct import of ROMExtractor. The inject is imported locally
+    inside SpriteFinder.__init__, so we patch it at the source (core.di_container).
+    """
+    from core.di_container import inject as original_inject
+
+    def patched_inject(protocol):
+        if protocol is ROMExtractorProtocol:
+            return mock_extractor
+        # Fall back to original inject for other protocols
+        return original_inject(protocol)
+
+    return patch("core.di_container.inject", side_effect=patched_inject)
 
 @pytest.fixture
 def mock_validator():
@@ -161,7 +181,7 @@ class TestSpriteFinder:
         sprite_data = b"\x01\x02" * 256  # 512 bytes
         mock_extractor.rom_injector.find_compressed_sprite.return_value = (256, sprite_data)
 
-        with patch("core.sprite_finder.ROMExtractor", return_value=mock_extractor), \
+        with _make_inject_patcher(mock_extractor), \
              patch("core.sprite_finder.SpriteVisualValidator", return_value=mock_validator):
 
             finder = SpriteFinder(temp_output_dir)
@@ -186,7 +206,7 @@ class TestSpriteFinder:
         small_sprite = b"\x00" * 100  # Too small
         mock_extractor.rom_injector.find_compressed_sprite.return_value = (50, small_sprite)
 
-        with patch("core.sprite_finder.ROMExtractor", return_value=mock_extractor), \
+        with _make_inject_patcher(mock_extractor), \
              patch("core.sprite_finder.SpriteVisualValidator", return_value=mock_validator):
 
             finder = SpriteFinder(temp_output_dir)
@@ -204,7 +224,7 @@ class TestSpriteFinder:
         sprite_data = b"\x01" * 512
         mock_extractor.rom_injector.find_compressed_sprite.return_value = (256, sprite_data)
 
-        with patch("core.sprite_finder.ROMExtractor", return_value=mock_extractor), \
+        with _make_inject_patcher(mock_extractor), \
              patch("core.sprite_finder.SpriteVisualValidator", return_value=mock_validator), \
              patch("core.sprite_finder.Image") as mock_image:
 
@@ -235,7 +255,7 @@ class TestSpriteFinder:
         sprite_data = b"\x01" * 512
         mock_extractor.rom_injector.find_compressed_sprite.return_value = (256, sprite_data)
 
-        with patch("core.sprite_finder.ROMExtractor", return_value=mock_extractor), \
+        with _make_inject_patcher(mock_extractor), \
              patch("core.sprite_finder.SpriteVisualValidator", return_value=mock_validator), \
              patch("core.sprite_finder.Image"):
 
@@ -252,21 +272,33 @@ class TestSpriteFinder:
             assert len(candidates) <= 3
 
     def test_convert_to_png(self, temp_output_dir, mock_extractor):
-        """Test PNG conversion method - verifies delegation to extractor"""
+        """Test PNG conversion method - verifies TileRenderer is used."""
         with patch("core.di_container.inject", return_value=mock_extractor):
             finder = SpriteFinder(temp_output_dir)
 
-            tile_data = b"\x00" * 512
+            tile_data = b"\x00" * 512  # 16 tiles worth of data
             output_path = os.path.join(temp_output_dir, "test.png")
 
-            finder._convert_to_png(tile_data, output_path)
+            # Mock the tile_renderer to verify it's called
+            with patch.object(finder, 'tile_renderer') as mock_renderer:
+                mock_image = Mock()
+                mock_image.convert.return_value = Mock()
+                mock_renderer.render_tiles.return_value = mock_image
 
-            # Verify the extractor's method was called
-            mock_extractor._convert_4bpp_to_png.assert_called_once_with(tile_data, output_path)
+                finder._convert_to_png(tile_data, output_path)
 
-    def test_save_results_summary(self, temp_output_dir):
+                # Verify tile_renderer was called (not extractor._convert_4bpp_to_png)
+                mock_renderer.render_tiles.assert_called_once_with(
+                    tile_data, 16, 1, palette_index=None
+                )
+                mock_image.convert.assert_called_once_with("L")
+                mock_image.convert.return_value.save.assert_called_once_with(
+                    output_path, "PNG"
+                )
+
+    def test_save_results_summary(self, temp_output_dir, mock_extractor):
         """Test saving results summary"""
-        with patch("core.sprite_finder.ROMExtractor"), \
+        with _make_inject_patcher(mock_extractor), \
              patch("core.sprite_finder.SpriteVisualValidator"):
 
             finder = SpriteFinder(temp_output_dir)
@@ -310,13 +342,13 @@ class TestSpriteFinder:
             txt_path = os.path.join(temp_output_dir, "sprite_search_report_test.rom.txt")
             assert os.path.exists(txt_path)
 
-    def test_quick_scan_known_areas(self, temp_output_dir, mock_rom_data):
+    def test_quick_scan_known_areas(self, temp_output_dir, mock_rom_data, mock_extractor):
         """Test quick scan of known sprite areas"""
         rom_path = str(Path(temp_output_dir) / "test.rom")
         with Path(rom_path).open("wb") as f:
             f.write(mock_rom_data)
 
-        with patch("core.sprite_finder.ROMExtractor"), \
+        with _make_inject_patcher(mock_extractor), \
              patch("core.sprite_finder.SpriteVisualValidator"):
 
             finder = SpriteFinder(temp_output_dir)
@@ -346,7 +378,7 @@ class TestSpriteFinder:
         # Make decompression always fail
         mock_extractor.rom_injector.find_compressed_sprite.side_effect = Exception("Decompress error")
 
-        with patch("core.sprite_finder.ROMExtractor", return_value=mock_extractor), \
+        with _make_inject_patcher(mock_extractor), \
              patch("core.sprite_finder.SpriteVisualValidator", return_value=mock_validator):
 
             finder = SpriteFinder(temp_output_dir)

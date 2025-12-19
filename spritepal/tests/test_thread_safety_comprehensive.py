@@ -243,20 +243,21 @@ class TestBatchThumbnailWorkerThreadSafety:
 
     @pytest.fixture
     def mock_worker_dependencies(self):
-        """Mock worker dependencies."""
-        with patch('ui.workers.batch_thumbnail_worker.ROMExtractor') as mock_extractor:
-            with patch('ui.workers.batch_thumbnail_worker.TileRenderer') as mock_renderer:
-                mock_renderer_instance = Mock()
-                mock_renderer_instance.render_tiles.return_value = Mock()
-                mock_renderer.return_value = mock_renderer_instance
+        """Mock worker dependencies.
 
-                mock_extractor_instance = Mock()
-                mock_extractor.return_value = mock_extractor_instance
+        Note: BatchThumbnailWorker accepts rom_extractor as constructor arg,
+        so we just create mocks directly rather than patching imports.
+        """
+        mock_extractor = Mock()
+        mock_extractor.extract_sprite.return_value = b'\x00' * 64
 
-                yield {
-                    'extractor': mock_extractor_instance,
-                    'renderer': mock_renderer_instance
-                }
+        mock_renderer = Mock()
+        mock_renderer.render_tiles.return_value = Mock()
+
+        yield {
+            'extractor': mock_extractor,
+            'renderer': mock_renderer
+        }
 
     def test_concurrent_queue_operations(self, test_rom_data, mock_worker_dependencies):
         """Test concurrent queue operations are thread-safe."""
@@ -428,20 +429,21 @@ class TestRaceConditionPrevention:
 
     @pytest.fixture
     def mock_worker_dependencies(self):
-        """Mock worker dependencies."""
-        with patch('ui.workers.batch_thumbnail_worker.ROMExtractor') as mock_extractor:
-            with patch('ui.workers.batch_thumbnail_worker.TileRenderer') as mock_renderer:
-                mock_renderer_instance = Mock()
-                mock_renderer_instance.render_tiles.return_value = Mock()
-                mock_renderer.return_value = mock_renderer_instance
+        """Mock worker dependencies.
 
-                mock_extractor_instance = Mock()
-                mock_extractor.return_value = mock_extractor_instance
+        Note: BatchThumbnailWorker accepts rom_extractor as constructor arg,
+        so we just create mocks directly rather than patching imports.
+        """
+        mock_extractor = Mock()
+        mock_extractor.extract_sprite.return_value = b'\x00' * 64
 
-                yield {
-                    'extractor': mock_extractor_instance,
-                    'renderer': mock_renderer_instance
-                }
+        mock_renderer = Mock()
+        mock_renderer.render_tiles.return_value = Mock()
+
+        yield {
+            'extractor': mock_extractor,
+            'renderer': mock_renderer
+        }
 
     def test_cache_clear_during_access_race(self, mock_qimage):
         """Test cache.clear() during concurrent get/put doesn't crash."""
@@ -522,20 +524,21 @@ class TestDeadlockPrevention:
 
     @pytest.fixture
     def mock_worker_dependencies(self):
-        """Mock worker dependencies."""
-        with patch('ui.workers.batch_thumbnail_worker.ROMExtractor') as mock_extractor:
-            with patch('ui.workers.batch_thumbnail_worker.TileRenderer') as mock_renderer:
-                mock_renderer_instance = Mock()
-                mock_renderer_instance.render_tiles.return_value = Mock()
-                mock_renderer.return_value = mock_renderer_instance
+        """Mock worker dependencies.
 
-                mock_extractor_instance = Mock()
-                mock_extractor.return_value = mock_extractor_instance
+        Note: BatchThumbnailWorker accepts rom_extractor as constructor arg,
+        so we just create mocks directly rather than patching imports.
+        """
+        mock_extractor = Mock()
+        mock_extractor.extract_sprite.return_value = b'\x00' * 64
 
-                yield {
-                    'extractor': mock_extractor_instance,
-                    'renderer': mock_renderer_instance
-                }
+        mock_renderer = Mock()
+        mock_renderer.render_tiles.return_value = Mock()
+
+        yield {
+            'extractor': mock_extractor,
+            'renderer': mock_renderer
+        }
 
     def test_no_deadlock_in_nested_mutex_operations(self, mock_qimage):
         """Test nested mutex operations don't cause deadlock."""

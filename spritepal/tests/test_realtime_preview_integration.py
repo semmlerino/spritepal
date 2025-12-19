@@ -31,7 +31,7 @@ pytestmark = [
     pytest.mark.slow,
 ]
 
-from tests.fixtures.test_preview_helper import (
+from tests.fixtures.preview_helper import (
     ControllerHelper,
     ExtractionPanelHelper,
     PreviewPanelHelper,

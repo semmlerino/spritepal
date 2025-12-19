@@ -30,7 +30,7 @@ from core.managers.injection_manager import InjectionManager
 
 # Real Component Testing Infrastructure (using available components)
 from tests.fixtures.test_managers import create_injection_manager_fixture
-from tests.fixtures.test_worker_helper import WorkerHelper
+from tests.fixtures.worker_helper import WorkerHelper
 
 # Parallel-safe: Uses isolated_managers for per-test isolation
 pytestmark = [

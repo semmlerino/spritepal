@@ -103,26 +103,11 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
     return _SESSION_THREAD_IDENTITIES.copy()
 
 
-# Import consolidated timeout functions from timeouts.py (single source of truth)
+# For timeout functions, import directly from tests.fixtures.timeouts:
+#     from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout
 # See tests/fixtures/timeouts.py for base values and PYTEST_TIMEOUT_MULTIPLIER scaling
-from tests.fixtures.timeouts import (
-    LONG,
-    get_timeout_multiplier,
-    signal_timeout as _signal_timeout_func,
-    ui_timeout as _ui_timeout_func,
-    worker_timeout as _worker_timeout_func,
-)
+from tests.fixtures.timeouts import get_timeout_multiplier
 
-# Legacy constants for backward compatibility - delegate to timeouts.py
-# NOTE: Prefer using the functions from timeouts.py directly in new code
-_timeout_multiplier = get_timeout_multiplier()
-_is_ci_or_headless = bool(os.environ.get("CI") or IS_HEADLESS)
-
-# Apply CI/headless scaling on top of the standard timeouts
-_ci_multiplier = LONG if _is_ci_or_headless else 1.0
-DEFAULT_SIGNAL_TIMEOUT = _signal_timeout_func(_ci_multiplier)
-DEFAULT_WAIT_TIMEOUT = _ui_timeout_func(_ci_multiplier)
-DEFAULT_WORKER_TIMEOUT = _worker_timeout_func(_ci_multiplier)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -475,7 +460,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     # when workers take up to 5 seconds to clean up
     leaked = _wait_for_threads(
         before_threads,
-        max_wait_ms=int(5000 * _timeout_multiplier),
+        max_wait_ms=int(5000 * get_timeout_multiplier()),
         poll_interval_ms=20,
         filter_pytest_timeout=filter_pytest_timeout,
         qt_available=qt_available,
@@ -497,93 +482,6 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     if IS_HEADLESS:
         import gc
         gc.collect()
-
-
-# =============================================================================
-# Timeout Fixtures (Legacy - prefer functions from tests.fixtures.timeouts)
-# =============================================================================
-# NOTE: These fixture-based timeouts exist for backward compatibility.
-# For NEW code, prefer importing functions directly from tests.fixtures.timeouts:
-#
-#     from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout
-#     qtbot.waitSignal(worker.finished, timeout=worker_timeout())
-#
-# The function-based approach is documented in CLAUDE.md and provides better
-# composability with multipliers (SHORT, MEDIUM, LONG).
-
-@pytest.fixture
-def signal_timeout() -> int:
-    """Provide configurable timeout for Qt signal waiting.
-
-    .. deprecated::
-        Use ``from tests.fixtures.timeouts import signal_timeout`` instead.
-        This fixture will be removed in a future release.
-    """
-    warnings.warn(
-        "signal_timeout fixture is deprecated. Use: "
-        "from tests.fixtures.timeouts import signal_timeout",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return DEFAULT_SIGNAL_TIMEOUT
-
-
-@pytest.fixture
-def wait_timeout() -> int:
-    """Provide configurable timeout for general Qt operations.
-
-    .. deprecated::
-        Use ``from tests.fixtures.timeouts import ui_timeout`` instead.
-        This fixture will be removed in a future release.
-    """
-    warnings.warn(
-        "wait_timeout fixture is deprecated. Use: "
-        "from tests.fixtures.timeouts import ui_timeout",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return DEFAULT_WAIT_TIMEOUT
-
-
-@pytest.fixture
-def worker_timeout() -> int:
-    """Provide configurable timeout for worker thread operations.
-
-    .. deprecated::
-        Use ``from tests.fixtures.timeouts import worker_timeout`` instead.
-        This fixture will be removed in a future release.
-    """
-    warnings.warn(
-        "worker_timeout fixture is deprecated. Use: "
-        "from tests.fixtures.timeouts import worker_timeout",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return DEFAULT_WORKER_TIMEOUT
-
-
-@pytest.fixture
-def timeout_config() -> dict[str, int]:
-    """Provide complete timeout configuration for complex tests.
-
-    .. deprecated::
-        Use functions from ``tests.fixtures.timeouts`` directly instead.
-        This fixture will be removed in a future release.
-    """
-    warnings.warn(
-        "timeout_config fixture is deprecated. Use functions from "
-        "tests.fixtures.timeouts directly",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return {
-        'signal': DEFAULT_SIGNAL_TIMEOUT,
-        'wait': DEFAULT_WAIT_TIMEOUT,
-        'worker': DEFAULT_WORKER_TIMEOUT,
-        'short': 500,
-        'medium': DEFAULT_WAIT_TIMEOUT,
-        'long': DEFAULT_WORKER_TIMEOUT,
-    }
 
 
 # =============================================================================

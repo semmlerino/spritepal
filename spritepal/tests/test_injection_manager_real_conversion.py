@@ -22,7 +22,7 @@ from core.protocols.manager_protocols import (
     InjectionManagerProtocol,
     SettingsManagerProtocol,
 )
-from tests.fixtures.test_main_window_helper_simple import MainWindowHelperSimple
+from tests.fixtures.main_window_helper import MainWindowHelperSimple
 from tests.infrastructure import (
     # Systematic pytest markers applied based on test content analysis
     ApplicationFactory,

@@ -258,22 +258,27 @@ tests/
 ├── fixtures/
 │   ├── qt_fixtures.py           # Qt app, main window, qtbot, cleanup_singleton
 │   ├── qt_waits.py              # wait_for_condition, wait_for helpers
-│   ├── qt_mocks.py              # MockDialog, MockQWidget, etc.
 │   ├── timeouts.py              # Semantic timeouts (worker_timeout, signal_timeout, etc.)
 │   ├── core_fixtures.py         # Manager fixtures, DI fixtures, state management
 │   ├── hal_fixtures.py          # HAL compression mock/real fixtures
 │   ├── xdist_fixtures.py        # Parallel testing support (pytest-xdist)
-│   └── test_*_helper.py         # Component-specific test helpers
+│   ├── signal_tracking.py       # Signal tracking utilities for tests
+│   ├── dialog_helper.py         # Dialog test helpers
+│   ├── file_dialog_helper.py    # File dialog test helpers
+│   ├── main_window_helper.py    # Main window test helpers
+│   ├── preview_helper.py        # Preview test helpers
+│   └── worker_helper.py         # Worker test helpers
 └── infrastructure/
     ├── real_component_factory.py    # RealComponentFactory
-    └── thread_safe_test_image.py    # ThreadSafeTestImage for worker threads
+    ├── thread_safe_test_image.py    # ThreadSafeTestImage for worker threads
+    └── qt_mocks.py                  # MockDialog, MockQWidget, etc.
 ```
 
 **Common imports for tests:**
 ```python
 from tests.fixtures.qt_waits import wait_for_condition, wait_for
-from tests.fixtures.qt_mocks import MockDialog
 from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout
+from tests.infrastructure.qt_mocks import MockDialog
 from tests.infrastructure.real_component_factory import RealComponentFactory
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 ```
@@ -555,4 +560,4 @@ see `DEV_NOTES.md`. This file contains only operational development guidelines.
 
 ---
 
-*Last updated: December 17, 2025*
+*Last updated: December 19, 2025*

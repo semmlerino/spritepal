@@ -131,50 +131,72 @@ def reset_all_singletons() -> None:
         - PreviewGenerator (preview caching)
         - SignalRegistry (signal tracking)
         - WorkerManager (thread registry)
+
+    Note: Failures are logged but don't stop the reset process.
+    Some resets are expected to fail in certain contexts (e.g., MockHALProcessPool
+    not imported in non-mock tests).
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    def _try_reset(name: str, action: Callable[[], None]) -> None:
+        """Attempt a reset action with failure logging."""
+        try:
+            action()
+        except Exception as e:
+            logger.debug("Failed to reset %s: %s", name, e)
+
     # Reset ManagerRegistry
-    with contextlib.suppress(Exception):
+    def reset_manager_registry() -> None:
         from core.managers.registry import ManagerRegistry
         ManagerRegistry.reset_for_tests()
+    _try_reset("ManagerRegistry", reset_manager_registry)
 
     # Reset real HAL process pool
-    with contextlib.suppress(Exception):
+    def reset_hal_pool() -> None:
         from core.hal_compression import HALProcessPool
         HALProcessPool.reset_for_tests()
+    _try_reset("HALProcessPool", reset_hal_pool)
 
     # Reset mock HAL process pool
-    with contextlib.suppress(Exception):
+    def reset_mock_hal() -> None:
         from tests.infrastructure.mock_hal import MockHALProcessPool
         MockHALProcessPool.reset_singleton()
+    _try_reset("MockHALProcessPool", reset_mock_hal)
 
     # Clean up DataRepository
-    with contextlib.suppress(Exception):
+    def cleanup_data_repo() -> None:
         from tests.infrastructure.test_data_repository import cleanup_test_data_repository
         cleanup_test_data_repository()
+    _try_reset("DataRepository", cleanup_data_repo)
 
     # Reset PreviewGenerator singleton
-    with contextlib.suppress(Exception):
+    def reset_preview_gen() -> None:
         from core.services.preview_generator import cleanup_preview_generator
         cleanup_preview_generator()
+    _try_reset("PreviewGenerator", reset_preview_gen)
 
     # Reset SignalRegistry singleton
-    with contextlib.suppress(Exception):
+    def reset_signal_registry() -> None:
         from core.services.signal_registry import SignalRegistry
         SignalRegistry.reset_instance()
+    _try_reset("SignalRegistry", reset_signal_registry)
 
     # Clear WorkerManager thread registry
-    with contextlib.suppress(Exception):
+    def clear_worker_registry() -> None:
         from core.services.worker_lifecycle import WorkerManager
         WorkerManager._worker_registry.clear()
+    _try_reset("WorkerManager", clear_worker_registry)
 
     # Reset MonitoringManager (has daemon health timer that needs explicit cleanup)
-    with contextlib.suppress(Exception):
+    def reset_monitoring() -> None:
         from core.managers.monitoring_manager import MonitoringManager
         if hasattr(MonitoringManager, '_instance') and MonitoringManager._instance:
             # Shutdown the health timer if it exists
             if hasattr(MonitoringManager._instance, 'shutdown'):
                 MonitoringManager._instance.shutdown()
             MonitoringManager._instance = None
+    _try_reset("MonitoringManager", reset_monitoring)
 
 
 def reset_hal_singletons_only() -> None:

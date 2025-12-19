@@ -136,33 +136,15 @@ class WorkerHelper:
     """Helper for creating test injection workers and scenarios"""
 
     def __init__(self, temp_dir: str) -> None:
+        from tests.fixtures.test_data_factory import TestDataFactory
+
         self.temp_dir = Path(temp_dir)
-        self.sprite_file = self.temp_dir / "test_sprite.png"
-        self.vram_file = self.temp_dir / "test_VRAM.dmp"
-        self.rom_file = self.temp_dir / "test_ROM.smc"
 
-        # Create minimal test files
-        self._create_test_files()
-
-    def _create_test_files(self) -> None:
-        """Create minimal test files"""
-        # Create minimal PNG file (1x1 pixel)
-        png_data = (
-            b"\x89PNG\r\n\x1a\n"  # PNG signature
-            b"\x00\x00\x00\rIHDR"  # IHDR chunk
-            b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"  # 1x1 RGB
-            b"\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xdd\x8d\xb4\x1c"  # Minimal data
-            b"\x00\x00\x00\x00IEND\xaeB`\x82"  # IEND
-        )
-        self.sprite_file.write_bytes(png_data)
-
-        # Create minimal VRAM file (64KB)
-        vram_data = bytearray(0x10000)
-        self.vram_file.write_bytes(vram_data)
-
-        # Create minimal ROM file (32KB)
-        rom_data = bytearray(0x8000)
-        self.rom_file.write_bytes(rom_data)
+        # Use TestDataFactory for file creation (DRY consolidation)
+        paths = TestDataFactory.create_test_files(self.temp_dir, minimal=True)
+        self.sprite_file = paths.sprite_path
+        self.vram_file = paths.vram_path
+        self.rom_file = paths.rom_path
 
     def create_vram_injection_worker(self) -> Any:
         """Create VRAM injection worker"""

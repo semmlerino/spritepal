@@ -41,6 +41,30 @@ from core.services.preview_generator import (
 )
 
 
+def _make_mock_preview_result(tile_count: int, sprite_name: str) -> PreviewResult:
+    """Create a PreviewResult with properly configured mocks.
+
+    The byte_size() method accesses pixmap.isNull(), pixmap.width(), pixmap.height(),
+    pil_image.mode, pil_image.width, pil_image.height. Bare MagicMock() returns
+    MagicMock for these, which can't be compared with integers.
+    """
+    mock_pixmap = MagicMock()
+    mock_pixmap.isNull.return_value = True  # Avoid pixmap size calculation
+
+    mock_pil = MagicMock()
+    mock_pil.mode = "RGBA"
+    mock_pil.width = 8
+    mock_pil.height = 8
+
+    return PreviewResult(
+        pixmap=mock_pixmap,
+        pil_image=mock_pil,
+        tile_count=tile_count,
+        sprite_name=sprite_name,
+        generation_time=0.1,
+    )
+
+
 class TestPreviewGeneratorThreadSafety:
     """Test thread safety of PreviewGenerator singleton."""
 
@@ -112,12 +136,9 @@ class TestPreviewGeneratorThreadSafety:
             try:
                 for i in range(100):
                     key = f"thread_{thread_id}_item_{i}"
-                    result = PreviewResult(
-                        pixmap=MagicMock(),
-                        pil_image=MagicMock(),
+                    result = _make_mock_preview_result(
                         tile_count=i,
                         sprite_name=f"sprite_{thread_id}_{i}",
-                        generation_time=0.1
                     )
                     cache.put(key, result)
                     # Small delay to increase contention

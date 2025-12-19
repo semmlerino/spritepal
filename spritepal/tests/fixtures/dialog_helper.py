@@ -34,6 +34,8 @@ class DialogHelper(QObject):
 
     def __init__(self, temp_dir: str | None = None):
         """Initialize helper with temporary directory"""
+        from tests.fixtures.test_data_factory import TestDataFactory
+
         super().__init__()
         self.temp_dir = temp_dir or tempfile.mkdtemp()
         self.temp_path = Path(self.temp_dir)
@@ -41,48 +43,13 @@ class DialogHelper(QObject):
         # Track dialog instances for cleanup
         self.active_dialogs: list[Any] = []
 
-        # Create test files
-        self._create_test_files()
-
-    def _create_test_files(self):
-        """Create test files for dialog testing"""
-        # Create test sprite file
-        self.sprite_file = self.temp_path / "test_sprite.png"
-        # Create minimal PNG data
-        png_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\x08\x02\x00\x00\x00\x90\x91h6\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x00\x0eIDATx\xdab\x00\x02\x00\x00\x05\x00\x01\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82"
-        self.sprite_file.write_bytes(png_data)
-
-        # Create test palette file
-        self.palette_file = self.temp_path / "test_sprite.pal.json"
-        palette_data = {
-            "8": [[255, 0, 255], [0, 0, 0], [255, 255, 255], [128, 128, 128]],
-            "9": [[255, 255, 0], [0, 255, 0], [0, 0, 255], [255, 128, 0]],
-        }
-        import json
-        self.palette_file.write_text(json.dumps(palette_data, indent=2))
-
-        # Create test metadata file
-        self.metadata_file = self.temp_path / "test_sprite.metadata.json"
-        metadata = {
-            "palette_files": [str(self.palette_file)],
-            "active_palettes": [8, 9],
-            "default_palette": 8
-        }
-        self.metadata_file.write_text(json.dumps(metadata, indent=2))
-
-        # Create test VRAM file
-        self.vram_file = self.temp_path / "test_VRAM.dmp"
-        vram_data = bytearray(0x10000)  # 64KB
-        for i in range(0x1000):
-            vram_data[0xC000 + i] = i % 256
-        self.vram_file.write_bytes(vram_data)
-
-        # Create test ROM file
-        self.rom_file = self.temp_path / "test_ROM.sfc"
-        rom_data = bytearray(0x400000)  # 4MB
-        for i in range(0x1000):
-            rom_data[0x8000 + i] = i % 256
-        self.rom_file.write_bytes(rom_data)
+        # Use TestDataFactory for file creation (DRY consolidation)
+        paths = TestDataFactory.create_test_files(self.temp_path)
+        self.sprite_file = paths.sprite_path
+        self.palette_file = paths.palette_path
+        self.metadata_file = paths.metadata_path
+        self.vram_file = paths.vram_path
+        self.rom_file = paths.rom_path
 
     def create_injection_dialog(self, sprite_path: str | None = None,
                               metadata_path: str | None = None,

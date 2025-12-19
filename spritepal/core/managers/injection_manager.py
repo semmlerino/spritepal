@@ -1,24 +1,19 @@
 """
-InjectionManager - Base class for InjectionAdapter.
-
-This module provides the InjectionManager class which serves as a base class
-for the InjectionAdapter in the consolidated manager architecture.
+InjectionManager - Deprecated injection manager.
 
 .. deprecated::
-    Direct instantiation of InjectionManager is deprecated. Use dependency injection::
+    This class is deprecated. Use dependency injection instead::
 
         from core.di_container import inject
         from core.protocols.manager_protocols import InjectionManagerProtocol
 
         injection_mgr = inject(InjectionManagerProtocol)
 
-    This class exists primarily as a base class for InjectionAdapter, which
-    provides backward compatibility while delegating to CoreOperationsManager.
-    All business logic now lives in CoreOperationsManager.
+    All business logic now lives in CoreOperationsManager. This class
+    is retained for test compatibility but should not be used in new code.
 
 See Also:
     - :class:`core.managers.core_operations_manager.CoreOperationsManager`
-    - :class:`core.managers.core_operations_manager.InjectionAdapter`
 """
 from __future__ import annotations
 
@@ -50,7 +45,7 @@ from .exceptions import ValidationError
 
 class InjectionManager(BaseManager):
     """
-    Base class for injection management - provides interface for InjectionAdapter.
+    Deprecated injection manager.
 
     .. deprecated::
         Do not instantiate directly. Use dependency injection instead::
@@ -59,9 +54,8 @@ class InjectionManager(BaseManager):
             from core.protocols.manager_protocols import InjectionManagerProtocol
             injection_mgr = inject(InjectionManagerProtocol)
 
-        This class serves as a base class for InjectionAdapter, which inherits
-        from it for interface compatibility while delegating to
-        CoreOperationsManager for actual functionality.
+        All business logic now lives in CoreOperationsManager. This class
+        is retained for test compatibility but should not be used in new code.
     """
 
     # Additional signals specific to injection
@@ -85,9 +79,6 @@ class InjectionManager(BaseManager):
                 from core.protocols.manager_protocols import InjectionManagerProtocol
                 injection_mgr = inject(InjectionManagerProtocol)
         """
-        # Note: deprecation warning removed - it never fired since InjectionAdapter
-        # is the only subclass and always passes through here
-
         # Declare instance variables with type hints
         self._current_worker: QThread | None = None
 
@@ -362,42 +353,21 @@ class InjectionManager(BaseManager):
         if hasattr(worker, "compression_info"):
             worker.compression_info.connect(self.compression_info.emit)  # type: ignore[attr-defined]
 
+    @override
     def _on_worker_progress_adapter(self, *args: object) -> None:
-        """Adapter to handle different worker progress signal signatures.
+        """Adapter to handle different worker progress signal signatures."""
+        # Use inherited implementation from BaseManager
+        super()._on_worker_progress_adapter(*args)
 
-        Different workers emit different signals:
-        - core/workers: Signal(int, str) -> (percent, message)
-        - ui/workers: Signal(str) -> (message,)
-
-        This adapter normalizes both to extract the message.
-        """
-        if len(args) == 1:
-            # Signal(str) - message only
-            message = str(args[0])
-        elif len(args) >= 2:
-            # Signal(int, str) - (percent, message)
-            message = str(args[1])
-        else:
-            message = ""
-        self._on_worker_progress(message)
-
+    @override
     def _on_worker_progress(self, message: str) -> None:
-        """Handle worker progress updates.
-
-        Args:
-            message: Progress message to relay
-        """
+        """Handle worker progress - emit injection-specific signal."""
         self.injection_progress.emit(message)
 
     def _on_worker_finished(self, success: bool, message: str) -> None:
-        """Handle worker completion"""
-        self._finish_operation("injection")
+        """Handle worker completion."""
+        self._handle_worker_completion("injection", success, message)
         self.injection_finished.emit(success, message)
-
-        if success:
-            self._logger.info(f"Injection completed successfully: {message}")
-        else:
-            self._logger.error(f"Injection failed: {message}")
 
     def _try_extraction_panel_vram(self) -> str:
         """Try to get VRAM path from extraction panel's current session"""

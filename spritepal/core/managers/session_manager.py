@@ -1,24 +1,19 @@
 """
-SessionManager - Base class for SessionAdapter.
-
-This module provides the SessionManager class which serves as a base class
-for the SessionAdapter in the consolidated manager architecture.
+SessionManager - Deprecated session manager.
 
 .. deprecated::
-    Direct instantiation of SessionManager is deprecated. Use dependency injection::
+    This class is deprecated. Use dependency injection instead::
 
         from core.di_container import inject
         from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
         state_mgr = inject(ApplicationStateManagerProtocol)
 
-    This class exists primarily as a base class for SessionAdapter, which
-    provides backward compatibility while delegating to ApplicationStateManager.
-    All business logic now lives in ApplicationStateManager.
+    All business logic now lives in ApplicationStateManager. This class
+    is retained for test compatibility but should not be used in new code.
 
 See Also:
     - :class:`core.managers.application_state_manager.ApplicationStateManager`
-    - :class:`core.managers.application_state_manager.SessionAdapter`
 """
 from __future__ import annotations
 
@@ -38,7 +33,7 @@ T = TypeVar("T")
 
 class SessionManager(BaseManager):
     """
-    Base class for session management - provides interface for SessionAdapter.
+    Deprecated session manager.
 
     .. deprecated::
         Do not instantiate directly. Use dependency injection instead::
@@ -47,9 +42,8 @@ class SessionManager(BaseManager):
             from core.protocols.manager_protocols import ApplicationStateManagerProtocol
             state_mgr = inject(ApplicationStateManagerProtocol)
 
-        This class serves as a base class for SessionAdapter, which inherits
-        from it for interface compatibility while delegating to
-        ApplicationStateManager for actual functionality.
+        All business logic now lives in ApplicationStateManager. This class
+        is retained for test compatibility but should not be used in new code.
     """
 
     # Signals for session events
