@@ -22,13 +22,8 @@ import pytest
 # Serial execution required: Thread safety concerns
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Preview workers may not clean up within fixture timeout"),
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
     pytest.mark.headless,
-    pytest.mark.worker_threads,
-    pytest.mark.usefixtures("session_managers"),  # DI system initialization
+    pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
 ]
 

@@ -9,11 +9,7 @@ import pytest
 
 # Serial execution required: QApplication management, HAL process pool
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.process_pool,
     pytest.mark.performance,
-    pytest.mark.qt_real,
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),

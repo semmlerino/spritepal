@@ -17,10 +17,8 @@ from utils.constants import VRAM_SPRITE_OFFSET
 
 # Real Qt widget tests - require gui environment
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.ci_safe,
 ]
 
 

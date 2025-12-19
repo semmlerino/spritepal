@@ -16,15 +16,8 @@ from __future__ import annotations
 import pytest
 
 pytestmark = [
-    # NOTE: We don't use session_managers here because these tests provide mock
-    # dependencies directly, avoiding DI container issues in large test suites.
-    pytest.mark.cache,
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.memory,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
 ]
 
 import gc

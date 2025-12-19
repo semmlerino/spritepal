@@ -17,13 +17,10 @@ def are_managers_initialized() -> bool:
     return ManagerRegistry().is_initialized()
 
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.no_qt,
-    pytest.mark.no_manager_setup,  # This test manages its own manager lifecycle
-    pytest.mark.allows_registry_state,  # Intentionally modifies registry state
-    pytest.mark.rom_data,
+    pytest.mark.no_manager_setup,
+    pytest.mark.allows_registry_state,
 ]
 class TestManagerLifecycle:
     """Debug tests for manager lifecycle issues."""

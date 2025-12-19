@@ -40,12 +40,9 @@ from tests.fixtures.test_managers import (
 )
 
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.usefixtures("isolated_managers"),  # Use isolated managers for test independence
+    pytest.mark.usefixtures("isolated_managers"),
 ]
 
 

@@ -22,14 +22,7 @@ import pytest
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.dialog,
-    pytest.mark.file_io,
     pytest.mark.headless,
-    pytest.mark.mock_dialogs,
-    pytest.mark.mock_only,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
     pytest.mark.integration,
 ]
 

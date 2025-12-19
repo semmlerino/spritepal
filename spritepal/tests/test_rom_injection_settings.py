@@ -35,15 +35,8 @@ from utils.constants import (
 )
 
 pytestmark = [
-    pytest.mark.dialog,
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_dialogs,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
 ]
 class TestROMInjectionSettingsPersistence:
     """Test ROM injection settings persistence functionality"""

@@ -16,13 +16,8 @@ from PySide6.QtGui import QKeyEvent, QMouseEvent, QPixmap
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.widget,
-    pytest.mark.ci_safe,
 ]
 
 from ui.zoomable_preview import PreviewPanel, ZoomablePreviewWidget

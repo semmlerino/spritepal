@@ -439,18 +439,22 @@ qtbot.waitUntil(lambda: condition, timeout=1000)
 ```
 
 ### Testing Modal Dialogs
+
+**Important**: Mock at the specific dialog level, not the base `QDialog` class.
+Qt uses C++ bindings, so base-class monkeypatching doesn't work reliably.
+
 ```python
 def test_dialog(qtbot, monkeypatch):
-    # Mock exec() to prevent blocking
-    monkeypatch.setattr(QDialog, "exec", 
+    # Mock exec() on the SPECIFIC dialog class, not QDialog base
+    monkeypatch.setattr(MyDialog, "exec",
                        lambda self: QDialog.DialogCode.Accepted)
-    
+
     dialog = MyDialog()
     qtbot.addWidget(dialog)
-    
+
     dialog.input_field.setText("test")
     result = dialog.exec()
-    
+
     assert result == QDialog.DialogCode.Accepted
     assert dialog.get_value() == "test"
 ```

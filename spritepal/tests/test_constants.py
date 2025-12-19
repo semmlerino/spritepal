@@ -10,8 +10,6 @@ import pytest
 # Mark this entire module for fast, pure unit tests
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.unit,
-    pytest.mark.no_qt,
     pytest.mark.no_manager_setup,
 ]
 

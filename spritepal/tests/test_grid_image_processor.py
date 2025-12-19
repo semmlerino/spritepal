@@ -16,13 +16,8 @@ from ui.row_arrangement.grid_arrangement_manager import (
 from ui.row_arrangement.grid_image_processor import GridImageProcessor
 
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
     pytest.mark.slow,
     pytest.mark.allows_registry_state,
 ]

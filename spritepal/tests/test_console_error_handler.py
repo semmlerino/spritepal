@@ -19,7 +19,6 @@ from core.console_error_handler import ConsoleErrorHandler
 # Mark as no_manager_setup - pure unit tests for console error handling
 pytestmark = [
     pytest.mark.no_manager_setup,
-    pytest.mark.unit,
     pytest.mark.headless,
     pytest.mark.allows_registry_state,
 ]

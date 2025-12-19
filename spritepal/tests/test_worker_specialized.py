@@ -22,12 +22,7 @@ from core.workers.specialized import (
 # Serial execution required: QApplication management, Thread safety concerns
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Specialized worker tests create background worker threads"),
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.thread_safety,
-    pytest.mark.cache,
     pytest.mark.gui,
-    pytest.mark.signals_slots,
 ]
 
 class TestExtractionWorkerBase:

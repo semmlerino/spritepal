@@ -48,11 +48,8 @@ def get_extraction_manager():
     return ManagerRegistry().get_extraction_manager()
 
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.ci_safe,
     pytest.mark.headless,
-    pytest.mark.allows_registry_state,  # This file explicitly manages registry state
+    pytest.mark.allows_registry_state,
 ]
 class TestManagerRegistry:
     """Test ManagerRegistry functionality"""

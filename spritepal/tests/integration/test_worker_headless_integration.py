@@ -22,15 +22,9 @@ from utils.constants import (
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.ci_safe,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
-    pytest.mark.unit,
-    pytest.mark.no_manager_setup,  # Uses isolated_managers, skip session_managers
+    pytest.mark.no_manager_setup,
 ]
 
 class TestVRAMExtractionWorkerHeadless:

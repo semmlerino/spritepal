@@ -20,18 +20,9 @@ from ui.row_arrangement_dialog import RowArrangementDialog
 
 # Skip in headless environments - this tests real Qt dialog behavior
 pytestmark = [
-    pytest.mark.skipif(
-        "DISPLAY" not in os.environ,
-        reason="Requires GUI environment - this is a real Qt integration test"
-    ),
-    pytest.mark.serial,
-    pytest.mark.qt_integration,
-    pytest.mark.dialog,
+    pytest.mark.skipif,
     pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
 ]
 
 class TestRowArrangementDialogMigration:

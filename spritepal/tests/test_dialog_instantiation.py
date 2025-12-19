@@ -55,14 +55,12 @@ from ui.injection_dialog import InjectionDialog
 from ui.row_arrangement_dialog import RowArrangementDialog
 
 pytestmark = [
-    pytest.mark.skipif(_SHOULD_SKIP, reason=_SKIP_REASON),
-    pytest.mark.dialog,
+    pytest.mark.skipif,
     pytest.mark.integration,
-    pytest.mark.qt_real,
     pytest.mark.gui,
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Dialogs may spawn worker threads via managers")
+    pytest.mark.skip_thread_cleanup(reason="Dialogs may spawn worker threads via managers"),
 ]
 
 

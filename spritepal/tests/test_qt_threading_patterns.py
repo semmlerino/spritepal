@@ -36,13 +36,8 @@ pytestmark = [
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.thread_safety,
     pytest.mark.headless,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.worker_threads,
 ]
 class ThreadInfoCapture:
     """Helper to capture thread information during signal delivery"""

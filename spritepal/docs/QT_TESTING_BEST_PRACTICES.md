@@ -98,8 +98,8 @@ class MockMainWindow(QObject):
     """Real Qt object with signals, mocked behavior"""
     
     # Real Qt signals
-    extract_requested = pyqtSignal()
-    file_opened = pyqtSignal(str)
+    extract_requested = Signal()
+    file_opened = Signal(str)
     
     def __init__(self):
         super().__init__()
@@ -355,7 +355,7 @@ class Worker(QThread):
 
 # ✅ CORRECT - Emit signal to main thread
 class Worker(QThread):
-    show_message = pyqtSignal(str)
+    show_message = Signal(str)
     
     def run(self):
         self.show_message.emit("Message")  # Main thread shows dialog
@@ -589,8 +589,8 @@ self.parent().parent().method()
 
 ```python
 import pytest
-from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtTest import QSignalSpy
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtTest import QSignalSpy
 from unittest.mock import Mock
 
 class TestMyComponent:

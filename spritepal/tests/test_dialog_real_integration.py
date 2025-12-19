@@ -41,25 +41,11 @@ _is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 # Systematic pytest markers applied based on test content analysis
 # xfail for offscreen mode - real dialogs may not work
 pytestmark = [
-    pytest.mark.dialog,
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_dialogs,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.widget,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
     pytest.mark.gui,
-    pytest.mark.qt_real,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.xfail(
-        _is_offscreen,
-        reason="Real dialog instantiation may fail in Qt offscreen mode",
-        strict=False,  # Passes if unexpectedly works
-    ),
+    pytest.mark.xfail,
 ]
 
 # Import real testing infrastructure

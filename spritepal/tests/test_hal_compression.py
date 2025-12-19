@@ -41,21 +41,12 @@ from utils.constants import HAL_POOL_SHUTDOWN_TIMEOUT
 # ============================================================================
 pytestmark = [
     pytest.mark.no_manager_setup,
-    pytest.mark.serial,
-    pytest.mark.process_pool,
-    pytest.mark.singleton,
-    pytest.mark.ci_safe,
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.performance,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.thread_safety,
-    pytest.mark.worker_threads,
     pytest.mark.allows_registry_state,
     pytest.mark.benchmark,
-    pytest.mark.unit,
 ]
 
 

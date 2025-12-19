@@ -14,7 +14,7 @@ import pytest
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Manager tests may spawn worker threads")
+    pytest.mark.skip_thread_cleanup(reason="Manager tests may spawn worker threads"),
 ]
 
 

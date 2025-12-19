@@ -44,15 +44,10 @@ from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
 
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.cache,
-    pytest.mark.dialog,
-    pytest.mark.file_io,
     pytest.mark.integration,
-    pytest.mark.signals_slots,
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Dialog tests may spawn worker threads via managers")
+    pytest.mark.skip_thread_cleanup(reason="Dialog tests may spawn worker threads via managers"),
 ]
 @pytest.mark.gui
 class TestRealCrossDialogIntegration:
@@ -64,13 +59,13 @@ class TestRealCrossDialogIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, session_managers):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
 
         # Initialize real manager factory with proper test isolation
-        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
+        self.manager_factory = RealComponentFactory(manager_registry=session_managers)
 
         # Initialize test data repository
         self.test_data = DataRepository()
@@ -280,7 +275,7 @@ class TestRealCrossDialogIntegration:
 class TestRealTestingInfrastructureValidation:
     """Validate that the real testing infrastructure works correctly."""
 
-    def test_real_infrastructure_components(self, isolated_managers):
+    def test_real_infrastructure_components(self, session_managers):
         """Test that all real testing infrastructure components work."""
         # Test Qt application factory
         app = ApplicationFactory.get_application()
@@ -288,7 +283,7 @@ class TestRealTestingInfrastructureValidation:
         assert app.applicationName() == "SpritePal-Test"
 
         # Test real manager factory
-        factory = RealComponentFactory(manager_registry=isolated_managers)
+        factory = RealComponentFactory(manager_registry=session_managers)
         extraction_manager = factory.create_extraction_manager()
         assert extraction_manager is not None
         # Manager is a QObject without a default parent
@@ -308,14 +303,14 @@ class TestRealTestingInfrastructureValidation:
         assert qt_framework is not None
         qt_framework.cleanup()
 
-    def test_real_vs_mock_comparison(self, isolated_managers):
+    def test_real_vs_mock_comparison(self, session_managers):
         """
         Demonstrate specific cases where real tests catch bugs mocks miss.
 
         This serves as documentation of why we moved away from mocking.
         """
         # Example 1: Qt parent/child lifecycle
-        factory = RealComponentFactory(manager_registry=isolated_managers)
+        factory = RealComponentFactory(manager_registry=session_managers)
         manager = factory.create_extraction_manager()
         app = ApplicationFactory.get_application()
 

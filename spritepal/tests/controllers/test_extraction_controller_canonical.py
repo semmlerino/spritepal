@@ -35,13 +35,7 @@ from core.services.settings_manager import SettingsManager
 from core.workers import VRAMExtractionWorker
 
 # Unified pytest markers for this consolidated module
-pytestmark = [
-    pytest.mark.unit,
-    pytest.mark.headless,
-    pytest.mark.file_io,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
-]
+pytestmark = [pytest.mark.headless]
 
 
 # Defer MainWindow import to avoid potential initialization issues

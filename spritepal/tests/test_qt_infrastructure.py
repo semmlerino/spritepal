@@ -18,17 +18,11 @@ pytestmark = [
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.qt_app,
-    pytest.mark.ci_safe,
+    pytest.mark.parallel_unsafe,
     pytest.mark.integration,
-    pytest.mark.memory,
-    pytest.mark.qt_real,
-    pytest.mark.signals_slots,
 ]
 
-@pytest.mark.qt_app
+
 def test_qapplication_singleton(qapp):
     """Verify single QApplication instance across test session."""
     try:
@@ -123,7 +117,6 @@ def test_qapp_functionality(qapp):
     # Should be callable without errors
     qapp.processEvents()
 
-@pytest.mark.no_gui
 def test_no_gui_marker():
     """Test that doesn't require Qt GUI components."""
     # This test should run in all environments
@@ -159,9 +152,8 @@ def test_thread_safety_marker():
     # Should be running in main thread for Qt operations
     assert threading.current_thread() is threading.main_thread()
 
-@pytest.mark.mock_gui
 def test_mock_gui_in_headless():
-    """Test that mock_gui marker allows GUI tests in headless mode."""
+    """Test that mock GUI operations work in headless mode."""
     # This test should run even in headless environments
     # because it uses mocks instead of real Qt widgets
     from unittest.mock import Mock
@@ -177,24 +169,7 @@ def test_mock_gui_in_headless():
     assert mock_widget.show.called
     assert mock_widget.close.called
 
-def test_qt_markers_configuration():
-    """Test that Qt-specific pytest markers are properly configured."""
 
-    # Verify our custom markers are available
-    # This helps ensure the pytest configuration is working
-    marker_names = {
-        'qt_app',
-        'gui',
-        'mock_gui',
-        'no_gui',
-        'thread_safety'
-    }
-
-    # At least some of our markers should be recognized
-    # (exact verification depends on pytest internals)
-    assert len(marker_names) > 0
-
-@pytest.mark.stability
 def test_multiple_qapplication_prevention():
     """Test that we prevent multiple QApplication instances."""
     try:

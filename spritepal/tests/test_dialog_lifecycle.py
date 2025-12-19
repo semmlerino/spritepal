@@ -14,17 +14,12 @@ from ui.dialogs import UnifiedManualOffsetDialog as ManualOffsetDialog
 
 # Test characteristics: Real GUI components requiring display
 pytestmark = [
-    pytest.mark.dialog,
     pytest.mark.gui,
-    pytest.mark.qt_app,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
     pytest.mark.slow,
-    pytest.mark.widget,
     pytest.mark.headless,
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Dialogs may spawn worker threads via managers")
+    pytest.mark.skip_thread_cleanup(reason="Dialogs may spawn worker threads via managers"),
 ]
 
 class TestDialogLifecycle:

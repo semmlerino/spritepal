@@ -25,10 +25,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.file_io,
-    pytest.mark.rom_data,
     pytest.mark.headless,
-    pytest.mark.ci_safe,
 ]
 
 

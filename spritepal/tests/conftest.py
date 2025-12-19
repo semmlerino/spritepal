@@ -22,7 +22,7 @@ Fixtures are organized into modular files for maintainability:
 
 Tests run in parallel by default with `-n auto`. The policy is:
 - Tests using `session_managers` are automatically serialized (xdist_group="serial")
-- Tests marked `@pytest.mark.parallel_unsafe` or `@pytest.mark.serial` are serialized
+- Tests marked `@pytest.mark.parallel_unsafe` are serialized
 - All other tests run in parallel across workers
 
 For serial debugging: `pytest -n 0`
@@ -154,6 +154,15 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "legacy_mocking: Test uses legacy mock patterns awaiting migration to real components"
+    )
+    # Categorization markers (do not control skip behavior - all Qt tests run in offscreen mode)
+    config.addinivalue_line(
+        "markers",
+        "gui: Categorizes tests that render Qt widgets (runs in offscreen mode, use requires_display for true display needs)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "headless: Categorizes tests that don't need rendering (runs same as gui in offscreen mode)"
     )
 
     # Make implicit RealComponentFactory warnings visible when we add them

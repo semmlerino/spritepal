@@ -17,19 +17,10 @@ from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.usefixtures("isolated_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.usefixtures,
     pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
-    pytest.mark.dialog,
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_dialogs,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.widget,
-    pytest.mark.ci_safe,
-    pytest.mark.qt_real,
-    pytest.mark.signals_slots,
 ]
 
 class TestSignalLoopFixes:

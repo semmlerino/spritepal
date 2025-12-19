@@ -36,19 +36,12 @@ from core.protocols.manager_protocols import (
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 pytestmark = [
-    pytest.mark.usefixtures("session_managers"),  # Initialize DI container
+    pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.thread_safety,
-    pytest.mark.cache,
     pytest.mark.headless,
-    pytest.mark.memory,
     pytest.mark.performance,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.worker_threads,
 ]
 class SignalCapture(QObject):
     """Helper class to capture Qt signals for testing"""

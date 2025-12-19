@@ -36,16 +36,9 @@ from tests.fixtures.worker_helper import WorkerHelper
 pytestmark = [
     pytest.mark.usefixtures("isolated_managers"),
     pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
-    pytest.mark.thread_safety,
-    pytest.mark.ci_safe,
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.worker_threads,
 ]
 
 # Note: Uses isolated_managers fixture for per-test isolation (parallel-safe)

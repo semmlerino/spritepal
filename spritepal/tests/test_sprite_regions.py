@@ -18,10 +18,7 @@ from utils.sprite_regions import (
 pytestmark = [
     pytest.mark.benchmark,
     pytest.mark.headless,
-    pytest.mark.no_qt,
     pytest.mark.performance,
-    pytest.mark.rom_data,
-    pytest.mark.unit,
     pytest.mark.slow,
 ]
 class TestSpriteRegion:

@@ -40,16 +40,9 @@ from PySide6.QtWidgets import (
 
 # Test markers for proper test execution
 pytestmark = [
-    pytest.mark.gui,  # Uses Qt widgets (works in offscreen mode)
-    pytest.mark.integration,  # End-to-end testing
-    pytest.mark.serial,  # No parallel execution due to Qt singleton
-    pytest.mark.slow,  # UI tests take time
-    pytest.mark.dialog,
-    pytest.mark.file_io,
-    pytest.mark.mock_dialogs,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
+    pytest.mark.gui,
+    pytest.mark.integration,
+    pytest.mark.slow,
 ]
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed

@@ -26,7 +26,6 @@ from tests.infrastructure.thread_safe_test_image import ImagePool, ThreadSafeTes
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.headless,
-    pytest.mark.unit
 ]
 
 class TestThreadSafeTestImageBasic:

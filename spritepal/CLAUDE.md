@@ -15,16 +15,12 @@ spritepal/
 ├── README.md                           # Project overview
 ├── docs/
 │   ├── architecture.md                 # Layer structure and import rules
-│   ├── REAL_COMPONENT_TESTING_GUIDE.md # Real component testing patterns
+│   ├── testing_guide.md                # Detailed testing patterns reference
 │   ├── QT_TESTING_BEST_PRACTICES.md    # pytest-qt patterns
-│   ├── dialog_development_guide.md     # Dialog creation patterns
-│   └── archive/                        # Historical documentation
+│   └── dialog_development_guide.md     # Dialog creation patterns
 ├── tests/
-│   ├── README.md                       # Test suite overview
-│   └── HEADLESS_TESTING.md             # Headless/CI testing
-├── TESTING_DEBUG_GUIDE_DO_NOT_DELETE.md    # Critical debug strategies
-├── UNIFIED_TESTING_GUIDE_DO_NOT_DELETE.md  # Testing single source of truth
-└── SPRITE_LEARNINGS_DO_NOT_DELETE.md       # Sprite extraction knowledge
+│   └── README.md                       # Test suite overview
+└── SPRITE_LEARNINGS_DO_NOT_DELETE.md   # Sprite extraction knowledge
 ```
 
 ## Development Tools
@@ -188,14 +184,28 @@ from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout, 
 
 ### Test Markers
 
-| Marker | Requires Display | Can Combine With | Notes |
-|--------|-----------------|------------------|-------|
-| `@pytest.mark.gui` | Yes (offscreen OK) | `slow` | Uses real Qt widgets |
-| `@pytest.mark.headless` | No | `slow` | No rendering needed |
-| `@pytest.mark.serial` | — | Any | Forces sequential execution |
-| `@pytest.mark.parallel_unsafe` | — | Any | Forces serial execution (hidden shared state) |
+**Categorization markers** (no behavioral effect):
+| Marker | Purpose |
+|--------|---------|
+| `@pytest.mark.gui` | Tests rendering Qt widgets |
+| `@pytest.mark.headless` | Tests not needing rendering |
+| `@pytest.mark.integration` | Cross-component tests |
+| `@pytest.mark.benchmark` | Performance benchmarking |
+| `@pytest.mark.performance` | Performance/timing tests |
+| `@pytest.mark.slow` | Tests >1s execution time |
 
-**Mutual exclusivity:** `gui` and `headless` are mutually exclusive — a test is either one or the other.
+**Functional markers** (affect test behavior):
+| Marker | Effect |
+|--------|--------|
+| `@pytest.mark.requires_display` | **Skips in offscreen mode** |
+| `@pytest.mark.parallel_unsafe` | Forces sequential execution |
+| `@pytest.mark.shared_state_safe` | **Required** for `session_managers` |
+| `@pytest.mark.skip_thread_cleanup(reason='...')` | Skip thread verification |
+| `@pytest.mark.no_manager_setup` | Skip manager initialization |
+| `@pytest.mark.allows_registry_state` | Allow registry state without fixtures |
+| `@pytest.mark.real_hal` | Use real HAL (requires exhal binary) |
+| `@pytest.mark.no_hal` | Skip HAL fixtures |
+| `@pytest.mark.qt_no_exception_capture` | Disable Qt exception capture |
 
 **Note**: Qt offscreen mode is set automatically in `conftest.py`. Do NOT use pytest-xvfb - it causes hangs in WSL2 and some CI environments.
 
@@ -220,7 +230,7 @@ uv run pytest tests/test_specific.py -n 0
 
 Tests are automatically serialized if they:
 1. Use `session_managers` fixture (or `managers`, `reset_manager_state`)
-2. Are marked `@pytest.mark.parallel_unsafe` or `@pytest.mark.serial`
+2. Are marked `@pytest.mark.parallel_unsafe`
 
 All other tests run in parallel by default.
 
@@ -354,11 +364,12 @@ HAL (compression/decompression) is **mock-by-default** because:
 | Marker | Effect |
 |--------|--------|
 | `@pytest.mark.allows_registry_state` | Skip pollution detection for this test |
-| `@pytest.mark.shared_state_safe` | **Required** when using `session_managers` - enforced by `enforce_shared_state_safe` autouse fixture at runtime (not static analysis) |
+| `@pytest.mark.shared_state_safe` | **Required** when using `session_managers` - enforced at runtime |
 | `@pytest.mark.real_hal` | Use real HAL implementation |
 | `@pytest.mark.skip_thread_cleanup(reason='...')` | Skip thread leak detection (**reason required!**) |
-| `@pytest.mark.no_qt` | Skip all Qt-related fixtures (implies skip_thread_cleanup) |
-| `@pytest.mark.parallel_unsafe` | Force serial execution under xdist (for wrapper fixtures) |
+| `@pytest.mark.parallel_unsafe` | Force serial execution under xdist |
+| `@pytest.mark.no_manager_setup` | Skip manager initialization |
+| `@pytest.mark.no_hal` | Skip HAL fixtures |
 
 **Important:** `skip_thread_cleanup` **requires** a `reason` argument explaining why thread cleanup is skipped. Tests without a reason will fail with `pytest.UsageError`. Example:
 ```python

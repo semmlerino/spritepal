@@ -31,15 +31,10 @@ def get_settings_manager():
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
-    pytest.mark.shared_state_safe,  # Tests are stateless reads/writes to isolated temp dirs
+    pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
 ]
 
 class TestSettingsManager:

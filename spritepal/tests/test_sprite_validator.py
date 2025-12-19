@@ -14,12 +14,9 @@ from core.sprite_validator import SpriteValidator
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.no_manager_setup,  # Pure unit tests for sprite validation
+    pytest.mark.no_manager_setup,
 ]
 
 class TestSpriteValidator:

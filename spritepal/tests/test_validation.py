@@ -9,11 +9,7 @@ import pytest
 # Mark this entire module for fast, pure unit tests
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.unit,
-    pytest.mark.no_qt,
-    pytest.mark.file_io,  # Involves file operations
-    pytest.mark.validation,  # Validation tests
-    pytest.mark.no_manager_setup,  # Pure unit tests for validation functions
+    pytest.mark.no_manager_setup,
 ]
 
 from utils.file_validator import (

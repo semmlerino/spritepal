@@ -26,17 +26,9 @@ from core.async_rom_cache import AsyncROMCache, CacheWorker
 
 # Mark tests that create QApplication instances for serial execution
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.thread_safety,
-    pytest.mark.cache,
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.worker_threads,
     pytest.mark.allows_registry_state,
 ]
 

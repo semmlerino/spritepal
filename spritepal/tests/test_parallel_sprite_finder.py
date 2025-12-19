@@ -27,14 +27,10 @@ logger = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Parallel finder tests create thread pools that take time to clean up"),
-    pytest.mark.usefixtures("session_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.usefixtures,
     pytest.mark.shared_state_safe,
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.ci_safe,
     pytest.mark.headless,
     pytest.mark.performance,
-    pytest.mark.rom_data,
 ]
 @pytest.fixture
 def sample_rom_data():

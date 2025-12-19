@@ -25,9 +25,7 @@ except ImportError:
     QT_AVAILABLE = False
 
 # Module-level markers for tests that don't specify otherwise
-pytestmark = [
-    pytest.mark.no_manager_setup,  # Pure unit tests for image utility functions
-]
+pytestmark = [pytest.mark.no_manager_setup]
 
 
 def is_headless_environment():
@@ -133,8 +131,6 @@ class TestPilToQPixmap:
 
 
 @pytest.mark.headless
-@pytest.mark.no_qt
-@pytest.mark.ci_safe
 class TestPilToQPixmapMocked:
     """Test pil_to_qpixmap function with mocked Qt dependencies.
 

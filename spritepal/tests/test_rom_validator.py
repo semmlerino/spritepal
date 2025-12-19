@@ -17,12 +17,9 @@ from utils.rom_exceptions import (
 )
 
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.no_manager_setup,  # Pure unit tests for ROM validation
+    pytest.mark.no_manager_setup,
 ]
 def create_valid_rom_header(
     title="TEST ROM",

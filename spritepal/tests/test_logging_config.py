@@ -15,15 +15,9 @@ from utils.logging_config import get_logger, setup_logging
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.widget,
-    pytest.mark.ci_safe,
-    pytest.mark.no_manager_setup,  # Pure unit tests for logging configuration
+    pytest.mark.no_manager_setup,
 ]
 
 class TestSetupLogging:

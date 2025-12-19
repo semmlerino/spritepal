@@ -22,20 +22,12 @@ def get_rom_cache():
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-    pytest.mark.skip_thread_cleanup(reason="Cache tests use managers that may spawn async I/O threads"),
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
-    pytest.mark.file_io,
+    pytest.mark.skip_thread_cleanup,
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.performance,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.worker_threads,
-    pytest.mark.usefixtures("isolated_managers", "mock_hal"),  # DI + HAL mocking
+    pytest.mark.usefixtures("isolated_managers"),
 ]
 
 class TestROMCacheCore:

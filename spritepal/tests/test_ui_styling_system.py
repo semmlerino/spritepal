@@ -23,10 +23,6 @@ from ui.styles import (
 )
 
 pytestmark = [
-    pytest.mark.dialog,
-    pytest.mark.qt_app,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
     pytest.mark.headless,
     pytest.mark.integration,
 ]

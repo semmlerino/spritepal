@@ -16,13 +16,7 @@ from tests.fixtures.qt_fixtures import ensure_headless_qt
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 # Serial execution required: QApplication management
-pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.ci_safe,
-    pytest.mark.headless,
-    pytest.mark.signals_slots,
-]
+pytestmark = [pytest.mark.headless]
 
 class ExtractionPanelHelper(QObject):
     """Helper for real ExtractionPanel functionality without Qt widgets"""

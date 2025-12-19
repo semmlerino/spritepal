@@ -18,12 +18,9 @@ from core.sprite_finder import SpriteFinder
 # Don't use mock_hal - these tests verify real decompression behavior
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.file_io,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
-    pytest.mark.real_hal,  # These tests need real HAL tools
+    pytest.mark.real_hal,
     pytest.mark.skip_thread_cleanup(reason="Integration tests involve HAL pool that spawns background threads"),
-    pytest.mark.allows_registry_state,  # Tests may run after tests that initialize registry
+    pytest.mark.allows_registry_state,
 ]
 
 
@@ -101,7 +98,6 @@ class TestSpriteFinder:
         # We should find at least the sprites we expected
         assert len(found_sprites) >= 1, "Should find at least one sprite"
 
-    @pytest.mark.requires_rom
     def test_find_sprites_in_real_rom(self, real_kirby_rom):
         """Test finding sprites in real Kirby ROM if available."""
         if not real_kirby_rom:

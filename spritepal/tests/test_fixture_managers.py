@@ -25,10 +25,6 @@ from tests.fixtures.test_managers import (
 
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.unit,
-    pytest.mark.ci_safe,
     pytest.mark.integration,
     pytest.mark.allows_registry_state,
 ]

@@ -10,15 +10,8 @@ from PySide6.QtCore import QThread
 
 # Test characteristics: Thread safety concerns
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.serial,
-    pytest.mark.worker_threads,
-    pytest.mark.ci_safe,
-    pytest.mark.signals_slots,
 ]
 
 class TestWorkerHelperValidation:

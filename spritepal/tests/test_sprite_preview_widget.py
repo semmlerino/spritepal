@@ -19,13 +19,8 @@ from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 
 # Uses Qt offscreen mode - works without real display
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.qt_integration,
     pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),

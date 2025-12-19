@@ -22,12 +22,7 @@ from PySide6.QtWidgets import QApplication
 if TYPE_CHECKING:
     from tests.infrastructure.test_protocols import MockQtBotProtocol
 
-pytestmark = [
-    pytest.mark.gui,
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.dialog,
-]
+pytestmark = [pytest.mark.gui]
 
 
 class TestRealDialogInitialization:

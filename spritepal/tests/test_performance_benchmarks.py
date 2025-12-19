@@ -34,17 +34,9 @@ from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 
 # Serial execution required: Thread safety concerns, Real Qt components
 pytestmark = [
-
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
     pytest.mark.slow,
-    pytest.mark.worker_threads,
 ]
 
 class PerformanceTestData:

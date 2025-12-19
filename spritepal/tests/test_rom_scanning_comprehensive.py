@@ -11,12 +11,9 @@ from tests.infrastructure.test_doubles import MockHALCompressor
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
-    pytest.mark.usefixtures("isolated_managers", "mock_hal"),  # DI + HAL mocking (isolated to prevent pollution)
+    pytest.mark.usefixtures,
 ]
 
 class CustomMockHALCompressor(MockHALCompressor):

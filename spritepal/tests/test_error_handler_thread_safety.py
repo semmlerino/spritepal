@@ -15,14 +15,7 @@ from PySide6.QtWidgets import QWidget
 from ui.common import get_error_handler, reset_error_handler
 
 # Serial execution required: Thread safety concerns
-pytestmark = [
-
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.headless,
-    pytest.mark.qt_real,
-    pytest.mark.worker_threads,
-]
+pytestmark = [pytest.mark.headless]
 
 class TestErrorHandlerThreadSafety:
     """Test thread safety of error handler singleton"""

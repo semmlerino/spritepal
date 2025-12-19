@@ -41,14 +41,11 @@ mock_injection_dialog.rom_offset_input = MagicMock()
 InjectionDialog = MagicMock(return_value=mock_injection_dialog)
 
 pytestmark = [
-
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.cache,
-    pytest.mark.dialog,
+    pytest.mark.parallel_unsafe,
     pytest.mark.headless,
 ]
-@pytest.mark.mock_dialogs
+
+
 @pytest.mark.shared_state_safe
 @pytest.mark.skip_thread_cleanup(reason="Uses session_managers which spawns threads; cleanup handled by manager lifecycle")
 class TestDialogInitialization:

@@ -7,13 +7,7 @@ import time
 import pytest
 
 # Systematic pytest markers applied based on test content analysis
-pytestmark = [
-    pytest.mark.headless,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.unit,
-    pytest.mark.cache,
-]
+pytestmark = [pytest.mark.headless]
 
 
 @pytest.mark.no_manager_setup

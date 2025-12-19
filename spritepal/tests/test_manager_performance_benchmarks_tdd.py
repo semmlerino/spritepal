@@ -43,16 +43,8 @@ from tests.infrastructure.test_data_repository import (
 )
 
 pytestmark = [
-
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.ci_safe,
     pytest.mark.headless,
-    pytest.mark.memory,
     pytest.mark.performance,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
 ]
 class TestManagerPerformanceBenchmarksTDD:

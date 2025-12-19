@@ -11,17 +11,7 @@ import pytest
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 
 # Test characteristics: Thread safety concerns
-pytestmark = [
-    pytest.mark.file_io,
-    pytest.mark.headless,
-    pytest.mark.mock_only,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.serial,
-    pytest.mark.worker_threads,
-    pytest.mark.ci_safe,
-    pytest.mark.signals_slots,
-]
+pytestmark = [pytest.mark.headless]
 
 class SyncWorkerMixin:
     """Mixin for test workers that run synchronously instead of in a thread.

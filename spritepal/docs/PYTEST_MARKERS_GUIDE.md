@@ -51,17 +51,18 @@ pytest -m 'no_qt'
 ### 1. Execution Environment Markers
 
 #### Primary Environment Classification:
-- **`gui`**: Tests requiring display/X11 environment (automatically skipped in headless)
-- **`headless`**: Tests safe for CI/headless environments
+- **`gui`**: Categorizes tests rendering Qt widgets (runs in offscreen mode)
+- **`headless`**: Categorizes tests not needing rendering (runs same as gui)
+- **`requires_display`**: Tests needing real display (**actually skips in offscreen mode**)
 - **`mock_only`**: Tests using only mocked components (fastest, most reliable)
+
+> **Note:** All Qt tests run in offscreen mode (`QT_QPA_PLATFORM=offscreen`). The `gui` and `headless` markers are for categorization only — they do NOT control skip behavior. Use `@pytest.mark.requires_display` for tests that truly need a real display (e.g., pixel-level validation).
 
 #### Usage:
 ```bash
-# Safe for CI/automated environments
-pytest -m 'headless'
-
-# Only when you have a display available
-pytest -m 'gui'
+# Filter by categorization
+pytest -m 'headless'  # Tests categorized as not needing rendering
+pytest -m 'gui'       # Tests categorized as rendering widgets
 
 # Fastest possible test execution
 pytest -m 'mock_only'
@@ -74,7 +75,6 @@ pytest -m 'mock_only'
 - **`integration`**: Tests that may require files, databases, or services
 - **`benchmark`**: Performance benchmarking tests
 - **`performance`**: Performance validation tests
-- **`stress`**: Stress/load testing
 - **`slow`**: Tests taking >1 second to execute
 
 #### Usage:
@@ -113,7 +113,6 @@ pytest -m 'no_qt'
 
 #### Concurrency Classification:
 - **`thread_safety`**: Thread safety tests
-- **`timer`**: Tests involving QTimer functionality
 - **`worker_threads`**: Tests using worker threads
 - **`signals_slots`**: Qt signal/slot mechanism tests
 
@@ -243,8 +242,8 @@ pytest -m 'not slow' --tb=short
 
 #### WSL/Windows Subsystem for Linux
 ```bash
-# WSL-safe tests only
-pytest -m '(headless or mock_only) and not wsl'
+# WSL-safe tests (headless or mocked)
+pytest -m 'headless or mock_only'
 ```
 
 ## Marker Validation and Consistency
@@ -258,8 +257,8 @@ The pytest configuration includes automatic validation to prevent conflicting ma
 
 ### Automatic Marker Inference
 - Tests with `qt_real` or `rom_data` are automatically marked as `slow`
-- GUI tests in headless environments are automatically skipped
-- Real Qt components without mocking are skipped in headless environments
+- Tests marked `@pytest.mark.requires_display` are skipped in offscreen mode
+- All Qt tests run in offscreen mode (`QT_QPA_PLATFORM=offscreen`) regardless of `gui`/`headless` markers
 
 ## Custom Marker Combinations
 

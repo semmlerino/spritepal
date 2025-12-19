@@ -16,19 +16,13 @@ from core.controller import ExtractionController
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 
-# Systematic pytest markers applied based on test content analysis
+# Test categorization
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
-    pytest.mark.signals_slots,
 ]
 
-@pytest.mark.mock
+
 class TestVRAMExtractionWorkerMocked:
     """Test VRAMExtractionWorker with mocked Qt components using modern fixtures."""
 

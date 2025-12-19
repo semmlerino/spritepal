@@ -28,15 +28,7 @@ from core.workers.injection import (
     WorkerOwnedVRAMInjectionWorker,
 )
 
-pytestmark = [
-
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.headless,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
-    pytest.mark.stability,
-]
+pytestmark = [pytest.mark.headless]
 class TestWorkerOwnedInjectionPattern:
     """Test the worker-owned injection manager pattern."""
 

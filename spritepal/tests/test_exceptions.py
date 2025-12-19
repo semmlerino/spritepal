@@ -18,10 +18,7 @@ from utils.exceptions import (
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.unit,
-    pytest.mark.no_manager_setup,  # Skip heavy manager initialization for simple exception tests
+    pytest.mark.no_manager_setup,
 ]
 
 class TestExceptions:

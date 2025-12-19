@@ -119,9 +119,8 @@ class SampleDialog(ComposedDialog):
         if status_manager:
             status_manager.show_message(f"Processing... {value}%")
 
-@pytest.mark.qt_real
 @pytest.mark.integration
-@pytest.mark.mock_only  # Allow running in headless environment
+@pytest.mark.gui
 class TestComposedDialogIntegration(QtTestCase):
     """Integration tests for the ComposedDialog architecture."""
 

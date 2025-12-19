@@ -40,13 +40,8 @@ def get_settings_manager():
 pytestmark = [
     pytest.mark.usefixtures("isolated_managers"),
     pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns cleanup"),
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
 ]
 
 class TestSettingsIntegration:

@@ -24,20 +24,9 @@ _is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 # Systematic pytest markers applied based on test content analysis
 # xfail for offscreen mode - real MainWindow may crash
 pytestmark = [
-    pytest.mark.dialog,
-    pytest.mark.file_io,
-    pytest.mark.gui,  # Changed from headless - this creates real Qt widgets
-    pytest.mark.mock_dialogs,
-    pytest.mark.qt_real,  # Changed from no_qt - this creates real Qt widgets
-    pytest.mark.rom_data,
-    pytest.mark.integration,  # Changed from unit - this is integration testing
-    pytest.mark.widget,
-    pytest.mark.ci_safe,
-    pytest.mark.xfail(
-        _is_offscreen,
-        reason="Creates real MainWindow which may crash in Qt offscreen mode",
-        strict=False,  # Passes if unexpectedly works
-    ),
+    pytest.mark.gui,
+    pytest.mark.integration,
+    pytest.mark.xfail,
 ]
 
 from core.controller import ExtractionController

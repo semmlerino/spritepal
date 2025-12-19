@@ -26,7 +26,6 @@ def get_settings_manager():
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.ci_safe,
 ]
 
 

@@ -12,10 +12,6 @@ import pytest
 # Mark this entire module for core logic tests
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.unit,
-    pytest.mark.no_qt,
-    pytest.mark.file_io,  # Involves file operations
-    pytest.mark.rom_data,  # Tests requiring ROM files or data
     pytest.mark.allows_registry_state,
 ]
 

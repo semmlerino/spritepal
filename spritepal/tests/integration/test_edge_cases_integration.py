@@ -34,7 +34,6 @@ if TYPE_CHECKING:
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.headless,
-    pytest.mark.ci_safe,
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
@@ -49,9 +48,9 @@ pytestmark = [
 
 
 @pytest.fixture
-def real_factory(tmp_path, isolated_managers):
+def real_factory(tmp_path, session_managers):
     """Create RealComponentFactory for integration tests."""
-    with RealComponentFactory(manager_registry=isolated_managers) as factory:
+    with RealComponentFactory(manager_registry=session_managers) as factory:
         yield factory
 
 
@@ -420,9 +419,9 @@ class TestWorkflowEdgeCases:
         with pytest.raises((ValidationError, TypeError)):
             manager.validate_extraction_params(params)
 
-    def test_factory_cleanup_on_exit(self, tmp_path, isolated_managers):
+    def test_factory_cleanup_on_exit(self, tmp_path, session_managers):
         """Test that factory properly cleans up resources."""
-        with RealComponentFactory(manager_registry=isolated_managers) as factory:
+        with RealComponentFactory(manager_registry=session_managers) as factory:
             cache = factory.create_rom_cache()
             manager = factory.create_extraction_manager()
             assert cache is not None

@@ -17,14 +17,8 @@ import pytest
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
-    pytest.mark.cache,
     pytest.mark.headless,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.thread_safety,
-    pytest.mark.unit,
-    pytest.mark.worker_threads,
 ]
 
 import threading

@@ -35,17 +35,10 @@ from PySide6.QtWidgets import QCheckBox, QLineEdit, QPushButton
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.dialog,
-    pytest.mark.gui,  # NOTE: gui already implies display requirement
+    pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.memory,
-    pytest.mark.qt_real,
-    # NOTE: Removed requires_display - redundant with gui marker
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.no_manager_setup,  # Uses isolated_managers, skip session_managers
+    pytest.mark.no_manager_setup,
 ]
 
 # Import real testing infrastructure

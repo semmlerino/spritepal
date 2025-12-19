@@ -17,8 +17,8 @@ from ui.components.base.composed.message_dialog_manager import MessageDialogMana
 from ui.components.base.composed.status_bar_manager import StatusBarManager
 
 
-@pytest.mark.mock_only
 @pytest.mark.integration
+@pytest.mark.headless
 class TestComposedDialogMockedIntegration:
     """Mocked integration tests for the ComposedDialog architecture."""
 

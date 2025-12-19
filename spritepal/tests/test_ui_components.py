@@ -17,17 +17,7 @@ from ui.components.visualization.rom_map_widget import ROMMapWidget
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="UI tests may involve managers that spawn threads"),
-    pytest.mark.dialog,
-    pytest.mark.file_io,
     pytest.mark.headless,
-    pytest.mark.mock_dialogs,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.widget,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
-    pytest.mark.memory,
-    pytest.mark.qt_real,
 ]
 
 # Note: initialize_managers and cleanup_managers are no longer needed here

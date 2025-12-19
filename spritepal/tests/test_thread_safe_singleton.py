@@ -24,14 +24,7 @@ from core.thread_safe_singleton import (
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.thread_safety,
-    pytest.mark.ci_safe,
-    pytest.mark.dialog,
     pytest.mark.gui,
-    # NOTE: Removed requires_display - these singleton tests work fine in offscreen mode
-    pytest.mark.worker_threads,
 ]
 class MockClass:
     """Mock class for testing singleton patterns."""

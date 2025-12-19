@@ -15,13 +15,7 @@ pytestmark = [
     pytest.mark.benchmark,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
     pytest.mark.performance,
-    pytest.mark.rom_data,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
 ]
 

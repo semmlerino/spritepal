@@ -4,11 +4,8 @@ from __future__ import annotations
 import pytest
 
 pytestmark = [
-    pytest.mark.ci_safe,
-    pytest.mark.file_io,
     pytest.mark.headless,
-    pytest.mark.rom_data,
-    pytest.mark.no_manager_setup,  # Pure unit tests for file validation
+    pytest.mark.no_manager_setup,
     pytest.mark.allows_registry_state,
 ]
 """

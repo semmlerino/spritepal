@@ -20,11 +20,7 @@ from ui.row_arrangement.grid_preview_generator import GridPreviewGenerator
 from ui.row_arrangement.palette_colorizer import PaletteColorizer
 
 # Use headless markers since this is pure PIL/Python (no Qt widgets)
-pytestmark = [
-    pytest.mark.headless,
-    pytest.mark.unit,
-    pytest.mark.ci_safe,
-]
+pytestmark = [pytest.mark.headless]
 
 
 # ============================================================================

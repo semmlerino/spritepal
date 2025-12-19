@@ -12,9 +12,8 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 from ui.components.base.composed.message_dialog_manager import MessageDialogManager
 
 pytestmark = [
-    pytest.mark.dialog,
     pytest.mark.headless,
-    pytest.mark.signals_slots,
+    pytest.mark.gui,
 ]
 
 

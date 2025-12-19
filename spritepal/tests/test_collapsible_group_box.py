@@ -15,12 +15,7 @@ from ui.common.collapsible_group_box import CollapsibleGroupBox
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.widget,
-    pytest.mark.ci_safe,
     pytest.mark.integration,
-    pytest.mark.stability,
 ]
 
 class TestCollapsibleGroupBox:

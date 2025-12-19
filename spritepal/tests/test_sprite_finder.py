@@ -20,9 +20,8 @@ from tests.infrastructure.test_doubles import (
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Refactored sprite finder tests may create background threads"),
-    pytest.mark.unit,
     pytest.mark.headless,
-    pytest.mark.usefixtures("mock_hal"),  # HAL mocking for compression
+    pytest.mark.usefixtures("mock_hal"),
 ]
 
 class TestSpriteCandidate:

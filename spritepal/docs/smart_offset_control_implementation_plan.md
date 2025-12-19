@@ -361,8 +361,8 @@ class ParallelRegionDetector(SpriteRegionDetector):
 ```python
 class ManualOffsetWidget(BaseExtractionWidget):
     # New signals
-    smart_mode_changed = pyqtSignal(bool)
-    region_changed = pyqtSignal(int)  # region index
+    smart_mode_changed = Signal(bool)
+    region_changed = Signal(int)  # region index
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -446,8 +446,8 @@ class ManualOffsetWidget(BaseExtractionWidget):
     
     def _setup_keyboard_shortcuts(self):
         """Setup comprehensive keyboard shortcuts"""
-        from PyQt6.QtGui import QKeySequence
-        from PyQt6.QtWidgets import QShortcut
+        from PySide6.QtGui import QKeySequence
+        from PySide6.QtWidgets import QShortcut
         
         # Region navigation
         QShortcut(QKeySequence("Ctrl+Left"), self, self._navigate_prev_region)
@@ -618,7 +618,7 @@ def _map_offset_to_slider(self, offset: int) -> int:
 class RegionOverviewWidget(QDialog):
     """Minimap showing all regions for quick navigation"""
     
-    region_selected = pyqtSignal(int)  # Emit region index when clicked
+    region_selected = Signal(int)  # Emit region index when clicked
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -681,7 +681,7 @@ class RegionOverviewWidget(QDialog):
 class RegionMapView(QWidget):
     """Visual representation of regions as clickable blocks"""
     
-    region_clicked = pyqtSignal(int)
+    region_clicked = Signal(int)
     
     def __init__(self):
         super().__init__()
@@ -837,7 +837,7 @@ class RegionStatisticsPanel(QWidget):
 ```python
 class ScanControlsPanel(QWidget):
     # Add new signal
-    sprites_detected = pyqtSignal(list)  # List of (offset, quality) tuples
+    sprites_detected = Signal(list)  # List of (offset, quality) tuples
     
     def _on_range_scan_complete(self, success: bool):
         """Handle range scan completion"""

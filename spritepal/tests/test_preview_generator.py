@@ -31,16 +31,8 @@ pytestmark = [
     pytest.mark.benchmark,
     pytest.mark.headless,
     pytest.mark.performance,
-    pytest.mark.qt_mock,
-    pytest.mark.rom_data,
-    pytest.mark.serial,
-    pytest.mark.widget,
-    pytest.mark.worker_threads,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    pytest.mark.usefixtures("session_managers"),  # DI system initialization
+    pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
 ]
 class TestLRUCache:

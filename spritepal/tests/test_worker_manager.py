@@ -27,14 +27,8 @@ from ui.common.timing_constants import (
 
 pytestmark = [
     pytest.mark.gui,
-    pytest.mark.qt_app,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
-    pytest.mark.serial,
     pytest.mark.slow,
-    pytest.mark.worker_threads,
     pytest.mark.headless,
-    pytest.mark.signals_slots,
 ]
 class RealTestWorker(QThread):
     """Real test worker that performs actual work."""

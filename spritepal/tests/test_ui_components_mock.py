@@ -15,12 +15,7 @@ from ui.row_arrangement_dialog import RowArrangementDialog
 from ui.zoomable_preview import PreviewPanel, ZoomablePreviewWidget
 
 # Serial execution required: Real Qt components
-pytestmark = [
-    pytest.mark.skip_thread_cleanup(reason="UI tests may involve managers that spawn threads"),
-    pytest.mark.serial,
-    pytest.mark.dialog,
-    pytest.mark.qt_real,
-]
+pytestmark = [pytest.mark.skip_thread_cleanup]
 
 @pytest.mark.gui
 class TestZoomablePreviewWidget:

@@ -19,16 +19,7 @@ from core.services.settings_manager import SettingsManager
 
 # Systematic pytest markers applied based on test content analysis
 # NOTE: parallel_safe removed - tests use isolated_managers fixture and mocks
-pytestmark = [
-    pytest.mark.headless,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.unit,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
-    pytest.mark.signals_slots,
-]
+pytestmark = [pytest.mark.headless]
 
 class TestControllerDependencyInjection:
     """Test dependency injection functionality for ExtractionController."""

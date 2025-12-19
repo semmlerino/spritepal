@@ -17,13 +17,7 @@ from utils import constants
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.unit,
-    pytest.mark.widget,
-    pytest.mark.ci_safe,
-    pytest.mark.no_manager_setup,  # Pure unit tests for constants validation
+    pytest.mark.no_manager_setup,
 ]
 
 class TestConstantsValidation:

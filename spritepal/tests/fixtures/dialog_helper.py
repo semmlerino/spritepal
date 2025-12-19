@@ -20,13 +20,8 @@ from ui.row_arrangement_dialog import RowArrangementDialog
 
 # Serial execution required: QApplication management
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.qt_application,
-    pytest.mark.ci_safe,
-    pytest.mark.dialog,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.rom_data,
 ]
 
 class DialogHelper(QObject):

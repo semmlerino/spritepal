@@ -32,15 +32,9 @@ TestResult = dict[str, str | int | float | bool]
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.dialog,
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.performance,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
     pytest.mark.slow,
 ]
 FailureCategory = str

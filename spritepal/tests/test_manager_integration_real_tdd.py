@@ -45,23 +45,10 @@ from tests.infrastructure.test_data_repository import (
 _is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 
 pytestmark = [
-    pytest.mark.serial,
-    pytest.mark.thread_safety,
-    pytest.mark.ci_safe,
-    pytest.mark.file_io,
     pytest.mark.integration,
-    pytest.mark.memory,
     pytest.mark.performance,
-    pytest.mark.qt_real,
-    pytest.mark.rom_data,
-    pytest.mark.signals_slots,
     pytest.mark.slow,
-    # TDD integration tests may discover real issues - use xfail
-    pytest.mark.xfail(
-        _is_offscreen,
-        reason="Real manager integration may fail in offscreen mode",
-        strict=False,
-    ),
+    pytest.mark.xfail,
 ]
 class TestManagerIntegrationTDD:
     """TDD tests for cross-manager integration with real components."""

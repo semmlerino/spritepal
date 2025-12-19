@@ -13,13 +13,8 @@ from core.rom_palette_extractor import ROMPaletteExtractor
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.ci_safe,
 ]
 
 class TestROMPaletteExtraction:

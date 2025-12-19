@@ -17,15 +17,8 @@ from ui.row_arrangement import (
 )
 
 pytestmark = [
-    pytest.mark.file_io,
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.mock_only,
-    pytest.mark.no_qt,
-    pytest.mark.rom_data,
-    pytest.mark.cache,
-    pytest.mark.ci_safe,
-    pytest.mark.signals_slots,
 ]
 class TestRowImageProcessor:
     """Test the RowImageProcessor component"""

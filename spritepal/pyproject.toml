@@ -437,70 +437,26 @@ filterwarnings = [
     # NOTE: B.3-B.5 UI component migrations completed, all warnings removed 2025-12-16
 ]
 
-# Markers used in the test suite
+# Markers used in the test suite (consolidated from 65 to 16 based on actual usage)
 markers = [
-    # Environment markers
+    # Categorization markers
     "gui: GUI tests requiring Qt (run with QT_QPA_PLATFORM=offscreen)",
     "headless: Tests that can run without display",
-    "no_qt: Tests with no Qt dependencies",
-    "requires_display: Tests requiring real display (skipped in offscreen)",
-
-    # Test type markers
-    "unit: Unit tests (fast, isolated)",
-    "integration: Integration tests",
+    "integration: Integration tests (cross-component)",
     "benchmark: Performance benchmarking tests",
-    "performance: Performance tests",
+    "performance: Performance/timing tests",
     "slow: Slow tests (>1s execution time)",
 
-    # Qt markers
-    "qt_real: Tests using real Qt components",
-    "qt_mock: Tests using mocked Qt components",
-    "qt_app: Tests requiring QApplication instance",
-    "qt_application: Tests requiring QApplication instance",
-    "qt_no_exception_capture: Disable Qt exception capture",
-
-    # Manager/fixture control markers
-    "no_manager_setup: Skip manager initialization",
-    "shared_state_safe: Test verified safe with session_managers",
+    # Functional markers (affect test behavior)
+    "requires_display: Tests requiring real display (skipped in offscreen mode)",
+    "qt_no_exception_capture: Disable Qt exception capture for this test",
+    "no_manager_setup: Skip manager initialization for this test",
+    "shared_state_safe: REQUIRED when using session_managers fixture",
     "allows_registry_state: Allow registry state without manager fixtures",
-    "skip_thread_cleanup: Skip thread cleanup (requires reason)",
-    "no_hal: Skip HAL-related fixtures",
-
-    # Resource markers
+    "skip_thread_cleanup: Skip thread cleanup verification (requires reason argument)",
+    "no_hal: Skip HAL-related fixtures for this test",
     "real_hal: Use real HAL components (requires exhal binary)",
-    "requires_rom: Tests that require ROM file data",
-    "rom_data: Tests involving ROM data processing",
-    "file_io: Tests involving file I/O operations",
-    "cache: Tests that interact with the cache",
 
-    # Execution control markers
-    "serial: Tests that must run serially",
-    "parallel_safe: (DEPRECATED) Tests are now parallel by default - this marker is ignored",
+    # Execution control
     "parallel_unsafe: Force test to run serially (has hidden shared state)",
-    "worker_threads: Tests using worker threads",
-    "thread_safety: Thread safety tests",
-    "ci_safe: Tests safe for CI environments",
-
-    # UI markers
-    "mock_only: Tests using only mocked components",
-    "mock_gui: Tests using mocked GUI components",
-    "mock_dialogs: Tests that mock dialog exec()",
-    "no_gui: Tests that should not use GUI",
-    "dialog: Tests involving dialog components",
-    "widget: Tests involving Qt widgets",
-    "signals_slots: Tests involving Qt signals and slots",
-    "stability: Stability/regression tests",
-    "mock: Tests using mock objects",
-
-    # Migration/legacy markers
-    "di_migration: Tests for dependency injection migration",
-    "phase: Phase-specific tests",
-    "phase1_fixes: Tests related to phase 1 stability fixes",
-    "validation: Validation tests",
-
-    # Additional markers
-    "memory: Tests that check for memory leaks",
-    "singleton: Tests that test singleton patterns",
-    "process_pool: Tests using process pools",
-    "qt_integration: Qt integration tests",
 ]
