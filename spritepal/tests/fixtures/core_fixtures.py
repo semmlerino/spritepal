@@ -420,11 +420,21 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
             # Re-register UI factories after restore
             from ui import register_ui_factories
             register_ui_factories()
+            # Verify restoration succeeded
+            registry = ManagerRegistry()
+            if not registry.is_initialized():
+                pytest.fail(
+                    f"CRITICAL: Session managers restoration verification failed after '{test_name}'.\n"
+                    "Registry is not initialized after restore attempt.",
+                    pytrace=False
+                )
         except Exception as e:
-            _logger.warning(
-                "isolated_managers: Failed to restore session managers after test '%s': %s. "
-                "Subsequent tests using session_managers may fail.",
-                test_name, e
+            # Fail hard - silent restoration failures cause mysterious downstream failures
+            pytest.fail(
+                f"CRITICAL: Failed to restore session managers after test '{test_name}': {e}\n"
+                "This will cause subsequent session_managers tests to fail.\n"
+                "Fix: Mark module with @pytest.mark.parallel_unsafe or convert to session_managers.",
+                pytrace=False
             )
 
     # Process events to ensure cleanup completes
