@@ -160,10 +160,10 @@ class FileSelector(QWidget):
 
             # Save to specific settings key if provided
             if self._settings_key and self._settings_namespace:
-                settings.set_value(self._settings_namespace, self._settings_key, filename)
+                settings.set(self._settings_namespace, self._settings_key, filename)
             elif self._settings_key:
                 # Use default namespace if only key provided
-                settings.set_value("file_selector", self._settings_key, filename)
+                settings.set("file_selector", self._settings_key, filename)
 
             # Emit signal
             self.file_selected.emit(filename)

@@ -363,7 +363,7 @@ class ROMExtractionPanel(QWidget):
             from core.di_container import inject
             from core.protocols.manager_protocols import SettingsManagerProtocol
             settings = inject(SettingsManagerProtocol)
-            last_rom = settings.get_value(
+            last_rom = settings.get(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, ""
             )
 
@@ -405,7 +405,7 @@ class ROMExtractionPanel(QWidget):
             from core.di_container import inject
             from core.protocols.manager_protocols import SettingsManagerProtocol
             settings = inject(SettingsManagerProtocol)
-            settings.set_value(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
+            settings.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
             settings.set_last_used_directory(str(Path(filename).parent))
             logger.debug(f"Saved ROM to settings: {filename}")
 

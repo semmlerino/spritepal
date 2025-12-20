@@ -9,16 +9,17 @@ and dependency injection testing.
 Key fixtures:
     - session_managers: Session-scoped shared managers (fastest, state persists)
     - isolated_managers: Function-scoped isolated managers (full isolation)
-    - managers: Convenience fixture returning ManagerRegistry (depends on session_managers)
-    - reset_manager_state: Reset caches without re-initialization
+    - clean_registry_state: Ensure registry starts uninitialized (for lifecycle tests)
 
 Fixture Selection Guide:
     | Need                        | Use                | NOT              |
     |-----------------------------|--------------------| -----------------|
     | Fast tests, shared state OK | session_managers   | isolated_managers|
     | Full isolation between tests| isolated_managers  | session_managers |
-    | Access to ManagerRegistry   | managers           | direct import    |
-    | Clean caches only           | reset_manager_state| isolated_managers|
+    | Test initialization itself  | clean_registry_state| session_managers|
+
+Note: Cache reset is handled automatically by the `auto_reset_session_state`
+autouse fixture when using session_managers.
 
 Escape hatches:
     - @pytest.mark.allows_registry_state: Skip pollution detection
@@ -492,81 +493,53 @@ def detect_session_manager_cleanup(request: FixtureRequest) -> Generator[None, N
 
 
 @pytest.fixture
-def managers(session_managers: None) -> ManagerRegistry:
+def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]:
     """
-    DEPRECATED: Use session_managers directly with @pytest.mark.shared_state_safe.
-
-    This fixture is a thin wrapper around session_managers that returns the
-    ManagerRegistry instance. It will be removed in a future release.
-
-    Migration:
-        # Old pattern (deprecated)
-        def test_something(managers):
-            extraction = managers.extraction_manager
-
-        # New pattern (recommended)
-        @pytest.mark.shared_state_safe
-        def test_something(session_managers):
-            from core.managers.registry import ManagerRegistry
-            registry = ManagerRegistry()
-            extraction = registry.extraction_manager
+    Ensure ManagerRegistry starts uninitialized for a test, even if session_managers
+    is active in this worker. Restores session managers afterward if needed.
     """
+    from PySide6.QtWidgets import QApplication
 
+    from core.di_container import reset_container
+    from core.managers import cleanup_managers, initialize_managers
     from core.managers.registry import ManagerRegistry
 
-    warnings.warn(
-        "managers fixture is deprecated. Use session_managers directly "
-        "with @pytest.mark.shared_state_safe marker, or use isolated_managers "
-        "for tests that need clean state.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
+    session_active = _session_state.is_initialized
+    session_settings_path = _session_state.settings_path
 
-    # Verify session managers are properly initialized
-    registry = ManagerRegistry()
-    if not registry.is_initialized():
-        pytest.fail(
-            "managers: Session managers are not initialized. "
-            "This indicates a test pollution issue - a prior test may have "
-            "called cleanup_managers() while using session_managers. "
-            "Fix: Find the offending test and use isolated_managers instead."
-        )
-    return registry
-
-
-@pytest.fixture
-def reset_manager_state(session_managers: None) -> Iterator[None]:
-    """
-    Lightweight state reset for session managers.
-
-    This fixture uses session_managers (fast) but resets caches and counters
-    before and after the test. Use this when you need:
-    - Clean cache state without full manager re-initialization
-    - Predictable counter values (e.g., extraction counts)
-    - Isolation from prior tests without the overhead of isolated_managers
-
-    Performance: ~5ms (vs ~50ms for isolated_managers)
-
-    Usage:
-        def test_extraction_counting(reset_manager_state):
-            # Caches cleared, counters reset, but uses session managers
-            manager = ManagerRegistry().extraction_manager
-            # manager.extraction_count == 0
-    """
-    from core.managers.registry import ManagerRegistry
+    app = QApplication.instance()
 
     registry = ManagerRegistry()
-    if not registry.is_initialized():
-        yield
-        return
+    if registry.is_initialized():
+        with contextlib.suppress(Exception):
+            cleanup_managers()
+        with contextlib.suppress(Exception):
+            ManagerRegistry.reset_for_tests()
 
-    # Reset state before test
-    _reset_manager_caches(registry)
-
+    reset_container()
     yield
 
-    # Reset state after test
-    _reset_manager_caches(registry)
+    if registry.is_initialized():
+        with contextlib.suppress(Exception):
+            cleanup_managers()
+    reset_container()
+
+    if session_active and session_settings_path:
+        if app is None:
+            app = QApplication([])
+        initialize_managers("TestApp", settings_path=session_settings_path)
+        from ui import register_ui_factories
+        register_ui_factories()
+        if not ManagerRegistry().is_initialized():
+            test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
+            pytest.fail(
+                f"CRITICAL: Failed to restore session managers after test '{test_name}'.\n"
+                "Registry is not initialized after restore attempt.",
+                pytrace=False
+            )
+
+    if app and not IS_HEADLESS:
+        app.processEvents()
 
 
 @pytest.fixture(autouse=True)
@@ -579,7 +552,7 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
     from core.managers.registry import ManagerRegistry
 
     fixture_names = getattr(request, 'fixturenames', [])
-    uses_session = 'session_managers' in fixture_names or 'managers' in fixture_names
+    uses_session = 'session_managers' in fixture_names
 
     if not uses_session or not _session_state.is_initialized:
         yield

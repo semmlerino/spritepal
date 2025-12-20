@@ -547,7 +547,7 @@ class DetachedGalleryWindow(QMainWindow):
         """Load the last selected ROM if available."""
         try:
             settings = self.settings_manager
-            last_rom = settings.get_value(
+            last_rom = settings.get(
                 SETTINGS_NS_ROM_INJECTION,
                 SETTINGS_KEY_LAST_INPUT_ROM,
                 ""
@@ -572,7 +572,7 @@ class DetachedGalleryWindow(QMainWindow):
         """Save the ROM path as the last used ROM."""
         try:
             settings = self.settings_manager
-            settings.set_value(
+            settings.set(
                 SETTINGS_NS_ROM_INJECTION,
                 SETTINGS_KEY_LAST_INPUT_ROM,
                 rom_path
@@ -593,7 +593,7 @@ class DetachedGalleryWindow(QMainWindow):
             settings = self.settings_manager
 
             # Get current recent ROMs list
-            recent_roms = settings.get_value("gallery", "recent_roms", [])
+            recent_roms = settings.get("gallery", "recent_roms", [])
 
             # Remove if already exists to avoid duplicates
             if rom_path in recent_roms:
@@ -606,7 +606,7 @@ class DetachedGalleryWindow(QMainWindow):
             recent_roms = recent_roms[:10]
 
             # Save updated list
-            settings.set_value("gallery", "recent_roms", recent_roms)
+            settings.set("gallery", "recent_roms", recent_roms)
 
             # Update menu
             self._update_recent_roms_menu()
@@ -624,7 +624,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         try:
             settings = self.settings_manager
-            recent_roms = settings.get_value("gallery", "recent_roms", [])
+            recent_roms = settings.get("gallery", "recent_roms", [])
 
             # Filter out non-existent files
             valid_roms = [rom for rom in recent_roms if Path(rom).exists()]

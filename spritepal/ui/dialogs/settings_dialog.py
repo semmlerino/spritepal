@@ -361,7 +361,7 @@ class SettingsDialog(BaseDialog):
             self.settings_manager.set("cache", "show_indicators", self.show_indicators_check.isChecked())
 
         # Save to disk
-        self.settings_manager.save()
+        self.settings_manager.save_settings()
 
         # Emit signal
         self.settings_changed.emit()

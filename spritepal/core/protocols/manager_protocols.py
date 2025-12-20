@@ -188,24 +188,12 @@ class SettingsManagerProtocol(Protocol):
         """Save settings to file."""
         ...
 
-    def save(self) -> None:
-        """Save settings to file (alias for save_settings)."""
-        ...
-
     def get(self, category: str, key: str, default: Any = None) -> Any:
         """Get a setting value."""
         ...
 
-    def get_value(self, category: str, key: str, default: Any = None) -> Any:
-        """Get a setting value (alias for get method)."""
-        ...
-
     def set(self, category: str, key: str, value: Any) -> None:
         """Set a setting value."""
-        ...
-
-    def set_value(self, category: str, key: str, value: Any) -> None:
-        """Set a setting value (alias for set method)."""
         ...
 
     def get_session_data(self) -> dict[str, Any]:

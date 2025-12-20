@@ -1,6 +1,10 @@
 """
 ComposedDialog base class for composition-based dialog architecture.
 
+.. deprecated::
+    This module is deprecated. Use DialogBase from ui.components.base.dialog_base
+    instead. ComposedDialog was never adopted in production code.
+
 This module provides the ComposedDialog class that serves as a base class for dialogs
 using the composition pattern. It automatically initializes and manages dialog
 components based on configuration, providing a flexible alternative to monolithic
@@ -8,6 +12,7 @@ inheritance hierarchies.
 """
 from __future__ import annotations
 
+import warnings
 from typing import Any, override
 
 from PySide6.QtCore import QObject
@@ -23,6 +28,10 @@ from .status_bar_manager import StatusBarManager
 class ComposedDialog(QDialog):
     """
     Base class for dialogs using composition pattern.
+
+    .. deprecated::
+        Use DialogBase from ui.components.base.dialog_base instead.
+        ComposedDialog was never adopted in production code and will be removed.
 
     This class provides a dialog base that uses composition to add functionality
     instead of relying on inheritance. Components are initialized based on
@@ -50,6 +59,12 @@ class ComposedDialog(QDialog):
             parent: Parent widget for the dialog
             **config: Configuration options for component initialization
         """
+        warnings.warn(
+            "ComposedDialog is deprecated. Use DialogBase from "
+            "ui.components.base.dialog_base instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         super().__init__(parent)
 
         # Store configuration

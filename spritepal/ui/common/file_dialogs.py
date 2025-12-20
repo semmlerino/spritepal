@@ -44,7 +44,7 @@ class FileDialogHelper:
             start_dir = initial_dir
         elif settings_key:
             # Try to restore from settings
-            saved_dir = settings.get_value(settings_namespace, settings_key, "")
+            saved_dir = settings.get(settings_namespace, settings_key, "")
             start_dir = saved_dir if saved_dir and Path(saved_dir).exists() else settings.get_default_directory()
         else:
             start_dir = settings.get_default_directory()
@@ -60,7 +60,7 @@ class FileDialogHelper:
         if directory:
             # Save to settings for future use
             if settings_key:
-                settings.set_value(settings_namespace, settings_key, directory)
+                settings.set(settings_namespace, settings_key, directory)
             settings.set_last_used_directory(directory)
 
         return directory
@@ -85,7 +85,7 @@ class FileDialogHelper:
             start_path = initial_path if Path(initial_path).is_file() else initial_path
         elif settings_key:
             # Try to restore from settings
-            saved_path = settings.get_value(settings_namespace, settings_key, "")
+            saved_path = settings.get(settings_namespace, settings_key, "")
             if saved_path and Path(saved_path).exists():
                 start_path = saved_path
             else:
@@ -104,7 +104,7 @@ class FileDialogHelper:
         if filename:
             # Save to settings for future use
             if settings_key:
-                settings.set_value(settings_namespace, settings_key, filename)
+                settings.set(settings_namespace, settings_key, filename)
             settings.set_last_used_directory(str(Path(filename).parent))
 
         return filename
@@ -139,7 +139,7 @@ class FileDialogHelper:
             start_path = initial_path
         elif settings_key:
             # Try to restore from settings
-            saved_path = settings.get_value(settings_namespace, settings_key, "")
+            saved_path = settings.get(settings_namespace, settings_key, "")
             if saved_path and Path(saved_path).parent.exists():
                 start_path = saved_path
             else:
@@ -158,7 +158,7 @@ class FileDialogHelper:
         if filename:
             # Save to settings for future use
             if settings_key:
-                settings.set_value(settings_namespace, settings_key, filename)
+                settings.set(settings_namespace, settings_key, filename)
             settings.set_last_used_directory(str(Path(filename).parent))
 
         return filename
@@ -194,7 +194,7 @@ class FileDialogHelper:
 
         # Check fallback setting
         if fallback_setting:
-            saved_dir = settings.get_value(fallback_namespace, fallback_setting, "")
+            saved_dir = settings.get(fallback_namespace, fallback_setting, "")
             if saved_dir and Path(saved_dir).exists():
                 return saved_dir
 
