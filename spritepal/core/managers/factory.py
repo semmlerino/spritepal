@@ -27,8 +27,7 @@ from PySide6.QtWidgets import QApplication
 
 from utils.logging_config import get_logger
 
-from .extraction_manager import ExtractionManager
-from .injection_manager import InjectionManager
+from .core_operations_manager import CoreOperationsManager
 
 if TYPE_CHECKING:
     import logging
@@ -38,12 +37,12 @@ logger = get_logger(__name__)
 class ManagerFactory(Protocol):
     """Protocol for manager factory implementations."""
 
-    def create_extraction_manager(self, parent: QObject | None = None) -> ExtractionManager:
-        """Create an ExtractionManager instance."""
+    def create_extraction_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
+        """Create an ExtractionManager instance (returns CoreOperationsManager)."""
         ...
 
-    def create_injection_manager(self, parent: QObject | None = None) -> InjectionManager:
-        """Create an InjectionManager instance."""
+    def create_injection_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
+        """Create an InjectionManager instance (returns CoreOperationsManager)."""
         ...
 
 class StandardManagerFactory:
@@ -103,9 +102,9 @@ class StandardManagerFactory:
         self._logger.warning(f"Unknown parent strategy: {self.default_parent_strategy}")
         return None
 
-    def create_extraction_manager(self, parent: QObject | None = None) -> ExtractionManager:
+    def create_extraction_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
         """
-        Create an ExtractionManager instance with proper Qt parent.
+        Create a CoreOperationsManager instance with proper Qt parent.
 
         .. deprecated::
             Use ``inject(ExtractionManagerProtocol)`` from ``core.di_container`` instead.
@@ -114,7 +113,7 @@ class StandardManagerFactory:
             parent: Optional Qt parent object. If None, uses factory's default strategy.
 
         Returns:
-            New ExtractionManager instance
+            New CoreOperationsManager instance
         """
         warnings.warn(
             "StandardManagerFactory.create_extraction_manager() is deprecated. "
@@ -123,14 +122,14 @@ class StandardManagerFactory:
             stacklevel=2,
         )
         qt_parent = self._get_default_parent(parent)
-        manager = ExtractionManager(parent=qt_parent)
+        manager = CoreOperationsManager(parent=qt_parent)
 
-        self._logger.debug(f"Created ExtractionManager with parent: {qt_parent}")
+        self._logger.debug(f"Created CoreOperationsManager with parent: {qt_parent}")
         return manager
 
-    def create_injection_manager(self, parent: QObject | None = None) -> InjectionManager:
+    def create_injection_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
         """
-        Create an InjectionManager instance with proper Qt parent.
+        Create a CoreOperationsManager instance with proper Qt parent.
 
         .. deprecated::
             Use ``inject(InjectionManagerProtocol)`` from ``core.di_container`` instead.
@@ -139,7 +138,7 @@ class StandardManagerFactory:
             parent: Optional Qt parent object. If None, uses factory's default strategy.
 
         Returns:
-            New InjectionManager instance
+            New CoreOperationsManager instance
         """
         warnings.warn(
             "StandardManagerFactory.create_injection_manager() is deprecated. "
@@ -148,9 +147,30 @@ class StandardManagerFactory:
             stacklevel=2,
         )
         qt_parent = self._get_default_parent(parent)
-        manager = InjectionManager(parent=qt_parent)
+        manager = CoreOperationsManager(parent=qt_parent)
 
-        self._logger.debug(f"Created InjectionManager with parent: {qt_parent}")
+        self._logger.debug(f"Created CoreOperationsManager with parent: {qt_parent}")
+        return manager
+
+    def create_operations_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
+        """
+        Create a CoreOperationsManager instance for worker-owned patterns.
+
+        This method is intended for workers that need their own manager instance
+        (not the shared singleton from DI). Unlike the deprecated create_*_manager()
+        methods, this does not emit a deprecation warning since worker-owned patterns
+        are a legitimate use case.
+
+        Args:
+            parent: Optional Qt parent object. If None, uses factory's default strategy.
+
+        Returns:
+            New CoreOperationsManager instance
+        """
+        qt_parent = self._get_default_parent(parent)
+        manager = CoreOperationsManager(parent=qt_parent)
+
+        self._logger.debug(f"Created CoreOperationsManager for worker with parent: {qt_parent}")
         return manager
 
 
@@ -168,10 +188,10 @@ def create_per_worker_factory(worker: QObject) -> ManagerFactory:
 
     # Create a custom factory that uses the worker as default parent
     class WorkerOwnedFactory:
-        def create_extraction_manager(self, parent: QObject | None = None) -> ExtractionManager:
-            return factory.create_extraction_manager(parent or worker)
+        def create_extraction_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
+            return factory.create_operations_manager(parent or worker)
 
-        def create_injection_manager(self, parent: QObject | None = None) -> InjectionManager:
-            return factory.create_injection_manager(parent or worker)
+        def create_injection_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
+            return factory.create_operations_manager(parent or worker)
 
     return WorkerOwnedFactory()

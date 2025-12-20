@@ -76,7 +76,8 @@ class TestWorkerOwnedInjectionPattern:
                 "temp_dir": temp_dir,
             }
 
-    def test_worker_owns_its_injection_manager(self, qtbot, test_sprite_files, test_vram_files):
+    @pytest.mark.shared_state_safe
+    def test_worker_owns_its_injection_manager(self, qtbot, session_managers, test_sprite_files, test_vram_files):
         """Test that worker-owned injection workers have their own manager instances."""
         # Prepare parameters
         params: VRAMInjectionParams = {

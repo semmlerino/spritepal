@@ -122,12 +122,14 @@ class CoreOperationsManager(
     def _initialize(self) -> None:
         """Initialize all core operation components."""
         try:
-            # Initialize extractors - ROMExtractor via DI (has dependencies)
+            # Initialize extractors
+            self._sprite_extractor = SpriteExtractor()
+            self._palette_manager = PaletteManager()
+
+            # ROMExtractor via DI
             from core.di_container import inject
             from core.protocols.manager_protocols import ROMExtractorProtocol
-            self._sprite_extractor = SpriteExtractor()
             self._rom_extractor = inject(ROMExtractorProtocol)
-            self._palette_manager = PaletteManager()
 
             # Initialize services
             self._rom_service = ROMService(

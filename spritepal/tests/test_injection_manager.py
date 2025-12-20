@@ -25,8 +25,8 @@ from unittest.mock import Mock, patch
 import pytest
 from PIL import Image
 
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.exceptions import ValidationError
-from core.managers.injection_manager import InjectionManager
 
 # Real Component Testing Infrastructure (using available components)
 from tests.fixtures.test_managers import create_injection_manager_fixture
@@ -45,8 +45,11 @@ pytestmark = [
 
 @pytest.fixture
 def injection_manager_real():
-    """Provide real injection manager for testing."""
-    return InjectionManager()
+    """Provide real injection manager for testing.
+
+    Uses CoreOperationsManager which implements InjectionManagerProtocol.
+    """
+    return CoreOperationsManager()
 
 @pytest.fixture
 def temp_files_with_real_content(tmp_path):
@@ -118,7 +121,7 @@ class TestInjectionManagerInitialization:
         # Verify manager is properly initialized
         assert manager._is_initialized is True
         assert manager._current_worker is None
-        assert manager._name == "InjectionManager"
+        assert manager._name == "CoreOperationsManager"
 
         # Verify real dependencies are available (not mocked)
         assert hasattr(manager, 'validate_injection_params')
@@ -133,7 +136,7 @@ class TestInjectionManagerInitialization:
         manager = injection_manager_real
 
         # RED: Manager should be properly initialized
-        assert isinstance(manager, InjectionManager)
+        assert isinstance(manager, CoreOperationsManager)
         assert manager._is_initialized is True
         assert manager._current_worker is None
 
@@ -181,7 +184,7 @@ class TestInjectionManagerParameterValidation:
         GREEN: Real FileValidator should validate actual file content
         REFACTOR: No mocking - tests real validation logic
         """
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "vram",
@@ -218,7 +221,7 @@ class TestInjectionManagerParameterValidation:
         Tests real ROM file validation including header checks, size validation,
         and format verification that mocks cannot test.
         """
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "rom",
@@ -257,7 +260,7 @@ class TestInjectionManagerParameterValidation:
         
         Tests parameter structure validation independent of file operations.
         """
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "vram",
@@ -273,7 +276,7 @@ class TestInjectionManagerParameterValidation:
         
         Tests parameter validation logic independent of file operations.
         """
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "invalid_mode",
@@ -293,7 +296,7 @@ class TestInjectionManagerParameterValidation:
         
         Tests actual file existence validation without mocking filesystem operations.
         """
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "vram",
@@ -318,7 +321,7 @@ class TestInjectionManagerParameterValidation:
         GREEN: Real validation should catch this before file validation
         REFACTOR: Test parameter validation logic independent of file mocking
         """
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "vram",
@@ -343,7 +346,7 @@ class TestInjectionManagerParameterValidation:
         Tests real JSON parsing, structure validation, and content verification
         that mocks cannot provide.
         """
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "vram",
@@ -380,7 +383,7 @@ class TestInjectionManagerParameterValidation:
         
         Tests actual filesystem operations and file existence checking.
         """
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "vram",
@@ -409,7 +412,7 @@ class TestInjectionManagerWorkflows:
 
     def test_start_vram_injection_success(self, tmp_path):
         """Test starting VRAM injection parameter validation with real fixture"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Use real injection manager fixture for testing
         injection_fixture = create_injection_manager_fixture(str(tmp_path))
@@ -443,7 +446,7 @@ class TestInjectionManagerWorkflows:
 
     def test_start_rom_injection_success(self, tmp_path):
         """Test starting ROM injection parameter validation with real fixture"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Use real injection manager fixture for testing
         injection_fixture = create_injection_manager_fixture(str(tmp_path))
@@ -479,7 +482,7 @@ class TestInjectionManagerWorkflows:
 
     def test_start_injection_validation_error(self):
         """Test start injection fails on validation error"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         params = {
             "mode": "vram",
@@ -491,7 +494,7 @@ class TestInjectionManagerWorkflows:
 
     def test_start_injection_replaces_existing_worker(self, tmp_path):
         """Test injection parameter validation for worker replacement scenario"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Use real injection manager fixture for testing
         injection_fixture = create_injection_manager_fixture(str(tmp_path))
@@ -526,7 +529,7 @@ class TestInjectionManagerWorkflows:
 
     def test_is_injection_active(self, tmp_path):
         """Test injection active status checking with real worker"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
         worker_helper = WorkerHelper(str(tmp_path))
 
         try:
@@ -552,14 +555,14 @@ class TestInjectionManagerSignalHandling:
 
     def test_connect_worker_signals_no_worker(self):
         """Test signal connection when no worker exists"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Should not raise exception
         manager._connect_worker_signals()
 
     def test_connect_worker_signals_basic_worker(self, tmp_path):
         """Test signal connection for real VRAM injection worker"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
         worker_helper = WorkerHelper(str(tmp_path))
 
         try:
@@ -581,7 +584,7 @@ class TestInjectionManagerSignalHandling:
 
     def test_connect_worker_signals_rom_worker(self, tmp_path):
         """Test signal connection for real ROM injection worker"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
         worker_helper = WorkerHelper(str(tmp_path))
 
         try:
@@ -607,7 +610,7 @@ class TestInjectionManagerSignalHandling:
 
     def test_on_worker_progress(self):
         """Test worker progress signal handling"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         with patch.object(manager, "injection_progress") as mock_signal:
             manager._on_worker_progress("Test progress message")
@@ -615,7 +618,7 @@ class TestInjectionManagerSignalHandling:
 
     def test_on_worker_finished_success(self):
         """Test worker finished signal handling for success"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Mock that operation is active
         manager._active_operations = {"injection"}
@@ -626,7 +629,7 @@ class TestInjectionManagerSignalHandling:
 
     def test_on_worker_finished_failure(self):
         """Test worker finished signal handling for failure"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Mock that operation is active
         manager._active_operations = {"injection"}
@@ -643,7 +646,7 @@ class TestInjectionManagerVRAMSuggestion:
 
     def test_get_smart_vram_suggestion_no_strategies_work(self, tmp_path):
         """Test VRAM suggestion when no strategies find a file"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         sprite_file = tmp_path / "sprite.png"
         sprite_file.write_text("fake sprite data")
@@ -653,7 +656,7 @@ class TestInjectionManagerVRAMSuggestion:
 
     def test_get_smart_vram_suggestion_basename_pattern(self, tmp_path):
         """Test VRAM suggestion using basename pattern strategy"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Create sprite file and matching VRAM file
         sprite_file = tmp_path / "test_sprite.png"
@@ -666,7 +669,7 @@ class TestInjectionManagerVRAMSuggestion:
 
     def test_get_smart_vram_suggestion_vram_dmp_pattern(self, tmp_path):
         """Test VRAM suggestion using VRAM.dmp pattern"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Create sprite file and VRAM.dmp file
         sprite_file = tmp_path / "sprite.png"
@@ -677,10 +680,10 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == str(vram_file)
 
-    @patch.object(InjectionManager, "_get_session_manager")
+    @patch.object(CoreOperationsManager, "_get_session_manager")
     def test_get_smart_vram_suggestion_session_strategy(self, mock_get_session, tmp_path):
         """Test VRAM suggestion using session strategy"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Create sprite file
         sprite_file = tmp_path / "sprite.png"
@@ -700,7 +703,7 @@ class TestInjectionManagerVRAMSuggestion:
 
     def test_try_metadata_vram_valid_file(self, tmp_path):
         """Test metadata VRAM strategy with valid metadata file"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Create VRAM file
         vram_file = tmp_path / "metadata_vram.dmp"
@@ -719,7 +722,7 @@ class TestInjectionManagerVRAMSuggestion:
 
     def test_try_metadata_vram_invalid_file(self, tmp_path):
         """Test metadata VRAM strategy with invalid metadata file"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         sprite_file = tmp_path / "sprite.png"
         sprite_file.write_text("fake sprite data")
@@ -730,7 +733,7 @@ class TestInjectionManagerVRAMSuggestion:
 
     def test_try_basename_vram_patterns_multiple_patterns(self, tmp_path):
         """Test basename VRAM patterns with multiple pattern matching"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         sprite_file = tmp_path / "test_sprite.png"
         sprite_file.write_text("fake sprite data")
@@ -742,10 +745,10 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager._try_basename_vram_patterns(str(sprite_file))
         assert result == str(vram_file)
 
-    @patch.object(InjectionManager, "_get_session_manager")
+    @patch.object(CoreOperationsManager, "_get_session_manager")
     def test_try_session_vram_recent_files(self, mock_get_session, tmp_path):
         """Test session VRAM strategy with recent files"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Create VRAM file
         vram_file = tmp_path / "recent_vram.dmp"
@@ -759,10 +762,10 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager._try_session_vram()
         assert result == str(vram_file)
 
-    @patch.object(InjectionManager, "_get_session_manager")
+    @patch.object(CoreOperationsManager, "_get_session_manager")
     def test_try_last_injection_vram_settings(self, mock_get_session, tmp_path):
         """Test last injection VRAM strategy"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Create VRAM file
         vram_file = tmp_path / "last_injection_vram.dmp"
@@ -790,7 +793,7 @@ def test_complete_injection_workflow_tdd_real_components(tmp_path, qtbot):
     - Threading and worker lifecycle problems
     - Memory and resource management
     """
-    manager = InjectionManager()
+    manager = CoreOperationsManager()
 
     # Create temporary test data using fixtures
     injection_fixture = create_injection_manager_fixture(str(tmp_path))

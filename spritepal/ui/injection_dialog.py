@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 if TYPE_CHECKING:
-    from core.managers import InjectionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
 
 # InjectionManager accessed via DI: inject(InjectionManagerProtocol)
 from core.sprite_validator import SpriteValidator

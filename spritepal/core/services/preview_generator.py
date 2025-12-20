@@ -35,7 +35,7 @@ from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 if TYPE_CHECKING:
     from PySide6.QtGui import QPixmap
 
-    from core.managers.extraction_manager import ExtractionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.protocols.manager_protocols import ROMExtractorProtocol
 
 from core.services.image_utils import pil_to_qpixmap

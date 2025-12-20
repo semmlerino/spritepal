@@ -164,106 +164,65 @@ class RealComponentFactory:
         # manager_registry is now required - no fallback to global singleton
         # This ensures proper test isolation and prevents global state pollution
 
-    def _get_extraction_manager_from_registry(self) -> CoreOperationsManager | None:
-        """Get extraction manager (CoreOperationsManager) from provided registry, if available."""
-        if self._manager_registry is not None:
-            return self._manager_registry.get_extraction_manager()
-        return None
+    def _get_extraction_manager_from_registry(self) -> CoreOperationsManager:
+        """Get extraction manager (CoreOperationsManager) from registry."""
+        return self._manager_registry.get_extraction_manager()
 
-    def _get_injection_manager_from_registry(self) -> CoreOperationsManager | None:
-        """Get injection manager (CoreOperationsManager) from provided registry, if available."""
-        if self._manager_registry is not None:
-            return self._manager_registry.get_injection_manager()
-        return None
+    def _get_injection_manager_from_registry(self) -> CoreOperationsManager:
+        """Get injection manager (CoreOperationsManager) from registry."""
+        return self._manager_registry.get_injection_manager()
 
-    def _get_session_manager_from_registry(self) -> ApplicationStateManager | None:
-        """Get session manager (ApplicationStateManager) from provided registry, if available."""
-        if self._manager_registry is not None:
-            return self._manager_registry.get_session_manager()
-        return None
+    def _get_session_manager_from_registry(self) -> ApplicationStateManager:
+        """Get session manager (ApplicationStateManager) from registry."""
+        return self._manager_registry.get_session_manager()
 
     def create_extraction_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """
-        Create a real extraction manager (CoreOperationsManager) for testing.
+        Get extraction manager (CoreOperationsManager) from registry.
 
         Args:
             with_test_data: Kept for API compatibility (no-op). Tests should get
                 data from DataRepository and pass paths to manager methods directly.
 
         Returns:
-            Real CoreOperationsManager instance (from registry if provided, new otherwise)
+            Real CoreOperationsManager instance from registry
         """
-        # Prefer manager from provided registry for proper isolation
-        manager = self._get_extraction_manager_from_registry()
-        if manager is None:
-            # Fallback: create new instance (deprecated path)
-            manager = CoreOperationsManager()
-            self._created_components.append(manager)
-
         # Note: with_test_data is intentionally unused. Test data injection via
         # private fields was removed - tests should use DataRepository directly.
         _ = with_test_data
-
-        return manager
+        return self._get_extraction_manager_from_registry()
 
     def create_injection_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """
-        Create a real injection manager (CoreOperationsManager) for testing.
+        Get injection manager (CoreOperationsManager) from registry.
 
         Args:
             with_test_data: Kept for API compatibility (no-op). Tests should get
                 data from DataRepository and pass paths to manager methods directly.
 
         Returns:
-            Real CoreOperationsManager instance (from registry if provided, new otherwise)
+            Real CoreOperationsManager instance from registry
         """
-        # Prefer manager from provided registry for proper isolation
-        manager = self._get_injection_manager_from_registry()
-        if manager is None:
-            # Fallback: create new instance (deprecated path)
-            manager = CoreOperationsManager()
-            self._created_components.append(manager)
-
         # Note: with_test_data is intentionally unused. Test data injection via
         # private fields was removed - tests should use DataRepository directly.
         _ = with_test_data
-
-        return manager
+        return self._get_injection_manager_from_registry()
 
     def create_session_manager(self, app_name: str = "TestApp") -> ApplicationStateManager:
         """
-        Create a real session manager (ApplicationStateManager) for testing.
+        Get session manager (ApplicationStateManager) from registry.
 
         Args:
-            app_name: Application name for session management
+            app_name: Kept for API compatibility (no-op). Session manager is
+                pre-configured in the registry.
 
         Returns:
-            Real ApplicationStateManager instance (from registry if provided, new otherwise)
+            Real ApplicationStateManager instance from registry
         """
-        # Prefer manager from provided registry for proper isolation
-        manager = self._get_session_manager_from_registry()
-        if manager is not None:
-            return manager
-
-        # Fallback: create new instance (deprecated path)
-        # Use worker-specific session dir if under xdist, else temp directory
-        env_settings = os.environ.get("SPRITEPAL_SETTINGS_DIR")
-        if env_settings:
-            # Under xdist, use a unique subdir per factory instance
-            temp_dir = Path(env_settings) / f"session_{id(self)}"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-        else:
-            temp_dir = Path(tempfile.mkdtemp(prefix="spritepal_test_session_"))
-            self._temp_dirs.append(temp_dir)
-
-        manager = ApplicationStateManager(app_name, settings_path=temp_dir)
-        self._created_components.append(manager)
-
-        # Override session directory to temp location
-        if hasattr(manager, "_session_dir"):
-            manager._session_dir = temp_dir
-
-        return manager
+        # Note: app_name is intentionally unused. Session manager is pre-configured
+        # in the registry with proper isolation settings.
+        _ = app_name
+        return self._get_session_manager_from_registry()
 
     def create_manager_registry(self, populate: bool = True) -> ManagerRegistry:
         """

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from core.managers.extraction_manager import ExtractionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
 
 from PySide6.QtCore import QMutex, QMutexLocker, Signal

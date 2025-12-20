@@ -71,7 +71,7 @@ class TestDialogInstantiation:
     def setup_qt_app(self, qapp):
         """Ensure Qt application is available."""
 
-    def test_manual_offset_dialog_creation(self, qtbot, managers):
+    def test_manual_offset_dialog_creation(self, qtbot, session_managers):
         """Test ManualOffsetDialog can be created and used."""
         dialog = ManualOffsetDialog()
         qtbot.addWidget(dialog)
@@ -203,7 +203,7 @@ class TestDialogInstantiation:
 class TestDialogMethodCalls:
     """Test that dialog methods can be called without AttributeError."""
 
-    def test_manual_offset_dialog_methods(self, qtbot, managers):
+    def test_manual_offset_dialog_methods(self, qtbot, session_managers):
         """Test ManualOffsetDialog methods don't fail on None attributes."""
         dialog = ManualOffsetDialog()
         qtbot.addWidget(dialog)
@@ -226,7 +226,7 @@ class TestDialogMethodCalls:
 class TestInitializationOrder:
     """Specific tests for initialization order issues."""
 
-    def test_no_overwritten_widgets(self, qtbot, managers):
+    def test_no_overwritten_widgets(self, qtbot, session_managers):
         """Test that widgets created in _setup methods aren't overwritten."""
         dialog = ManualOffsetDialog()
         qtbot.addWidget(dialog)

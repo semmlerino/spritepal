@@ -98,6 +98,21 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
+def _safe_disconnect(signal) -> None:
+    """Disconnect all slots from a signal, ignoring warnings if no connections exist.
+
+    PySide6 emits RuntimeWarning when disconnect() is called on a signal
+    with no connections. This helper suppresses those warnings.
+    """
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", "Failed to disconnect", RuntimeWarning)
+        try:
+            signal.disconnect()
+        except (TypeError, RuntimeError):
+            pass  # Already disconnected or no connections
+
 # Import tab widgets from the new module
 from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmartTab
 
@@ -773,36 +788,33 @@ class UnifiedManualOffsetDialog(DialogBase):
         self._cleanup_workers()
 
         # Now safe to disconnect signals (workers have stopped)
-        try:
-            # Disconnect tab signals
-            if self.browse_tab is not None:
-                self.browse_tab.offset_changed.disconnect()
-                self.browse_tab.find_next_clicked.disconnect()
-                self.browse_tab.find_prev_clicked.disconnect()
-                self.browse_tab.find_sprites_requested.disconnect()
+        # Disconnect tab signals using safe helper to avoid RuntimeWarning
+        if self.browse_tab is not None:
+            _safe_disconnect(self.browse_tab.offset_changed)
+            _safe_disconnect(self.browse_tab.find_next_clicked)
+            _safe_disconnect(self.browse_tab.find_prev_clicked)
+            _safe_disconnect(self.browse_tab.find_sprites_requested)
 
-            if self.smart_tab is not None:
-                self.smart_tab.smart_mode_changed.disconnect()
-                self.smart_tab.region_changed.disconnect()
-                self.smart_tab.offset_requested.disconnect()
+        if self.smart_tab is not None:
+            _safe_disconnect(self.smart_tab.smart_mode_changed)
+            _safe_disconnect(self.smart_tab.region_changed)
+            _safe_disconnect(self.smart_tab.offset_requested)
 
-            if self.history_tab is not None:
-                self.history_tab.sprite_selected.disconnect()
+        if self.history_tab is not None:
+            _safe_disconnect(self.history_tab.sprite_selected)
 
-            if self.gallery_tab is not None:
-                self.gallery_tab.sprite_selected.disconnect()
+        if self.gallery_tab is not None:
+            _safe_disconnect(self.gallery_tab.sprite_selected)
 
-            # Disconnect preview widget signals
-            if self.preview_widget is not None:
-                self.preview_widget.similarity_search_requested.disconnect()
+        # Disconnect preview widget signals
+        if self.preview_widget is not None:
+            _safe_disconnect(self.preview_widget.similarity_search_requested)
 
-            # Disconnect smart preview coordinator
-            if self._smart_preview_coordinator is not None:
-                self._smart_preview_coordinator.preview_ready.disconnect()
-                self._smart_preview_coordinator.preview_cached.disconnect()
-                self._smart_preview_coordinator.preview_error.disconnect()
-        except TypeError:
-            pass  # Already disconnected
+        # Disconnect smart preview coordinator
+        if self._smart_preview_coordinator is not None:
+            _safe_disconnect(self._smart_preview_coordinator.preview_ready)
+            _safe_disconnect(self._smart_preview_coordinator.preview_cached)
+            _safe_disconnect(self._smart_preview_coordinator.preview_error)
 
         # Clear references
         self.extraction_manager = None

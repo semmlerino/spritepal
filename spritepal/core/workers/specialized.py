@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 if TYPE_CHECKING:
     from PIL import Image
 
-    from core.managers import ExtractionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.managers.factory import ManagerFactory
 
 from PySide6.QtCore import QObject, Signal

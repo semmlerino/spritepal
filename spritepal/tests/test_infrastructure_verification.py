@@ -30,12 +30,12 @@ class TestInfrastructureVerification:
         assert elapsed < 0.5, f"Test took {elapsed:.2f}s - manager initialization not skipped!"
         print(f"✓ Fast test completed in {elapsed:.3f}s")
 
-    def test_02_session_managers_reused(self, managers):
+    def test_02_session_managers_reused(self, session_managers):
         """Verify session managers are reused, not recreated"""
         start = time.time()
 
         # First access should be fast if reusing session managers
-        extraction = managers.get_extraction_manager()
+        extraction = session_managers.get_extraction_manager()
         assert extraction is not None
 
         elapsed = time.time() - start
@@ -97,7 +97,7 @@ class TestInfrastructureVerification:
         assert widget is not None
         print("✓ Qt infrastructure working")
 
-    def test_06_performance_benchmark(self, managers):
+    def test_06_performance_benchmark(self, session_managers):
         """Benchmark to ensure acceptable performance"""
         import time
 
@@ -107,7 +107,7 @@ class TestInfrastructureVerification:
         for i in range(3):
             start = time.time()
             # Access manager (should be fast with session fixture)
-            managers.get_extraction_manager()
+            session_managers.get_extraction_manager()
             elapsed = time.time() - start
             times.append(elapsed)
 

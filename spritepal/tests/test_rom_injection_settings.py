@@ -21,7 +21,7 @@ warnings.filterwarnings(
     category=DeprecationWarning,
 )
 
-from core.managers import InjectionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.services.settings_manager import SettingsManager
 from ui.injection_dialog import InjectionDialog
 from utils.constants import (
@@ -116,7 +116,8 @@ class TestROMInjectionSettingsPersistence:
 
         return dialog
 
-    def test_save_rom_injection_parameters(self, mock_dialog, settings_manager):
+    @pytest.mark.shared_state_safe
+    def test_save_rom_injection_parameters(self, mock_dialog, settings_manager, session_managers):
         """Test saving ROM injection parameters"""
         # Set up mock values
         mock_dialog.input_rom_selector.get_path.return_value = "/path/to/test.sfc"
@@ -126,8 +127,8 @@ class TestROMInjectionSettingsPersistence:
         mock_dialog.rom_offset_input.get_text.return_value = "0x123456"
         mock_dialog.fast_compression_check.isChecked.return_value = True
 
-        # Create a real injection manager that uses our test session_manager
-        injection_manager = InjectionManager()
+        # Get injection manager from DI (requires session_managers fixture)
+        injection_manager = session_managers.get_injection_manager()
         with patch.object(
             injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
         ):
@@ -162,7 +163,8 @@ class TestROMInjectionSettingsPersistence:
             is True
         )
 
-    def test_save_empty_rom_injection_parameters(self, mock_dialog, settings_manager):
+    @pytest.mark.shared_state_safe
+    def test_save_empty_rom_injection_parameters(self, mock_dialog, settings_manager, session_managers):
         """Test saving when fields are empty"""
         # Set up empty values
         mock_dialog.input_rom_selector.get_path.return_value = ""
@@ -172,8 +174,8 @@ class TestROMInjectionSettingsPersistence:
         mock_dialog.rom_offset_input.get_text.return_value = ""
         mock_dialog.fast_compression_check.isChecked.return_value = False
 
-        # Create a real injection manager that uses our test settings_manager
-        injection_manager = InjectionManager()
+        # Get injection manager from DI (requires session_managers fixture)
+        injection_manager = session_managers.get_injection_manager()
         with patch.object(
             injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
         ):
@@ -213,7 +215,8 @@ class TestROMInjectionSettingsPersistence:
             == "/path/to/input.dmp"
         )
 
-    def test_load_rom_injection_defaults(self, mock_dialog, settings_manager):
+    @pytest.mark.shared_state_safe
+    def test_load_rom_injection_defaults(self, mock_dialog, settings_manager, session_managers):
         """Test loading ROM injection defaults"""
         # Pre-populate settings
         settings_manager.set_value(
@@ -231,8 +234,8 @@ class TestROMInjectionSettingsPersistence:
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION, True
         )
 
-        # Create a real injection manager that uses our test settings_manager
-        injection_manager = InjectionManager()
+        # Get injection manager from DI (requires session_managers fixture)
+        injection_manager = session_managers.get_injection_manager()
         with (
             patch("pathlib.Path.exists", return_value=True),  # Path().exists() not os.path.exists
             patch.object(
@@ -257,7 +260,8 @@ class TestROMInjectionSettingsPersistence:
         mock_dialog.rom_offset_input.set_text.assert_called_with("0x789ABC")
         mock_dialog.fast_compression_check.setChecked.assert_called_with(True)
 
-    def test_settings_save_error_handling(self, mock_dialog, settings_manager, caplog):
+    @pytest.mark.shared_state_safe
+    def test_settings_save_error_handling(self, mock_dialog, settings_manager, session_managers, caplog):
         """Test error handling when saving settings fails"""
         import logging
 
@@ -271,8 +275,8 @@ class TestROMInjectionSettingsPersistence:
         mock_dialog.rom_offset_input.get_text.return_value = ""
         mock_dialog.fast_compression_check.isChecked.return_value = False
 
-        # Mock save to raise exception
-        injection_manager = InjectionManager()
+        # Get injection manager from DI (requires session_managers fixture)
+        injection_manager = session_managers.get_injection_manager()
         with (
             patch.object(
                 injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
@@ -291,7 +295,8 @@ class TestROMInjectionSettingsPersistence:
             assert "Failed to save ROM injection parameters" in caplog.text
             assert "Permission denied" in caplog.text
 
-    def test_sprite_location_restoration_after_rom_load(self, mock_dialog, settings_manager):
+    @pytest.mark.shared_state_safe
+    def test_sprite_location_restoration_after_rom_load(self, mock_dialog, settings_manager, session_managers):
         """Test that sprite location is restored after ROM is loaded"""
         # Setup combo box with items
         mock_dialog.sprite_location_combo.count.return_value = 4
@@ -316,7 +321,8 @@ class TestROMInjectionSettingsPersistence:
             "Helper Sprite (0x234567)"
         )
 
-        injection_manager = InjectionManager()
+        # Get injection manager from DI (requires session_managers fixture)
+        injection_manager = session_managers.get_injection_manager()
         with patch.object(
             injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
         ):

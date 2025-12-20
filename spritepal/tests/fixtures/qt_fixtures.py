@@ -2,7 +2,7 @@
 Qt fixtures for SpritePal tests.
 
 This module provides Qt-related fixtures using pytest-qt directly.
-QT_QPA_PLATFORM=offscreen is configured in pyproject.toml for headless mode.
+QT_QPA_PLATFORM=offscreen is set by conftest.py before any Qt imports.
 
 Key fixtures:
 - qt_app: Session-scoped QApplication
@@ -40,7 +40,7 @@ from tests.infrastructure.environment_detection import (
     get_environment_info,
 )
 
-# Get environment info - Qt config is handled by pyproject.toml (qt_qpa_platform = "offscreen")
+# Get environment info - Qt config is set in conftest.py (os.environ.setdefault)
 _environment_info = get_environment_info()
 IS_HEADLESS = _environment_info.is_headless
 
@@ -326,9 +326,9 @@ _KNOWN_HELPER_THREADS: frozenset[str] = frozenset({
     "_GCMonitor",
     # Qt framework internals (specific, not generic)
     "QDBusConnectionManager",
-    # concurrent.futures ThreadPoolExecutor (legitimate helper threads)
-    "ThreadPoolExecutor-",
-    "Dummy-",
+    # NOTE: ThreadPoolExecutor- and Dummy- patterns were intentionally removed
+    # to avoid masking real thread leaks. Tests with expected pool threads
+    # should use @pytest.mark.skip_thread_cleanup(reason="...").
 })
 
 
@@ -451,6 +451,12 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 
     # Skip if explicitly marked
     if any(m in markers for m in ('skip_thread_cleanup', 'no_manager_setup', 'no_qt')):
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            "Thread cleanup skipped for %s (markers: %s)",
+            request.node.nodeid,
+            [m for m in markers if m in ('skip_thread_cleanup', 'no_manager_setup', 'no_qt')]
+        )
         yield
         return
 

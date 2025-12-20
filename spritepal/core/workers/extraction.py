@@ -12,10 +12,10 @@ from typing import TYPE_CHECKING, cast, override
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
-    from core.managers import ExtractionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.managers.factory import ManagerFactory
 
-from core.managers.extraction_manager import ExtractionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.types import ROMExtractionParams, VRAMExtractionParams
 from utils.logging_config import get_logger
 
@@ -40,7 +40,7 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
     def __init__(
         self,
         params: VRAMExtractionParams,
-        extraction_manager: ExtractionManager,
+        extraction_manager: CoreOperationsManager,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(manager=extraction_manager, parent=parent)
@@ -53,15 +53,15 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_extraction_manager() -> ExtractionManager:
+        def _get_extraction_manager() -> CoreOperationsManager:
             from core.di_container import inject
             from core.protocols.manager_protocols import ExtractionManagerProtocol
-            return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+            return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))
         if not helper.validate_manager_type(_get_extraction_manager, "VRAM extraction"):
             return
 
-        # Type cast for better type checking - we know this is ExtractionManager from __init__
-        extraction_manager = cast(ExtractionManager, self.manager)
+        # Type cast for better type checking - we know this is CoreOperationsManager from __init__
+        extraction_manager = cast(CoreOperationsManager, self.manager)
 
         # Connect all standard signals using helper
         helper.connect_progress_signals("extraction_progress", 50)
@@ -75,7 +75,7 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
     def perform_operation(self) -> None:
         """Perform VRAM extraction via manager."""
         # Type cast for better type safety
-        extraction_manager = cast(ExtractionManager, self.manager)
+        extraction_manager = cast(CoreOperationsManager, self.manager)
 
         # Check for cancellation before starting
         self.check_cancellation()
@@ -115,7 +115,7 @@ class ROMExtractionWorker(ExtractionWorkerBase):
     def __init__(
         self,
         params: ROMExtractionParams,
-        extraction_manager: ExtractionManager,
+        extraction_manager: CoreOperationsManager,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(manager=extraction_manager, parent=parent)
@@ -128,10 +128,10 @@ class ROMExtractionWorker(ExtractionWorkerBase):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_extraction_manager() -> ExtractionManager:
+        def _get_extraction_manager() -> CoreOperationsManager:
             from core.di_container import inject
             from core.protocols.manager_protocols import ExtractionManagerProtocol
-            return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+            return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))
         if not helper.validate_manager_type(_get_extraction_manager, "ROM extraction"):
             return
 
@@ -145,7 +145,7 @@ class ROMExtractionWorker(ExtractionWorkerBase):
     def perform_operation(self) -> None:
         """Perform ROM extraction via manager."""
         # Type cast for better type safety
-        extraction_manager = cast(ExtractionManager, self.manager)
+        extraction_manager = cast(CoreOperationsManager, self.manager)
 
         # Check for cancellation before starting
         self.check_cancellation()
@@ -208,15 +208,15 @@ class WorkerOwnedVRAMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMi
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_extraction_manager() -> ExtractionManager:
+        def _get_extraction_manager() -> CoreOperationsManager:
             from core.di_container import inject
             from core.protocols.manager_protocols import ExtractionManagerProtocol
-            return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+            return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))
         if not helper.validate_manager_type(_get_extraction_manager, "VRAM extraction"):
             return
 
-        # Type cast for better type checking - we know this is ExtractionManager from __init__
-        extraction_manager = cast(ExtractionManager, self.manager)
+        # Type cast for better type checking - we know this is CoreOperationsManager from __init__
+        extraction_manager = cast(CoreOperationsManager, self.manager)
 
         # Connect all standard signals using helper
         helper.connect_progress_signals("extraction_progress", 50)
@@ -230,7 +230,7 @@ class WorkerOwnedVRAMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMi
     def perform_operation(self) -> None:
         """Perform VRAM extraction via worker-owned manager."""
         # Type cast for better type safety
-        extraction_manager = cast(ExtractionManager, self.manager)
+        extraction_manager = cast(CoreOperationsManager, self.manager)
 
         # Check for cancellation before starting
         self.check_cancellation()
@@ -296,10 +296,10 @@ class WorkerOwnedROMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMix
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_extraction_manager() -> ExtractionManager:
+        def _get_extraction_manager() -> CoreOperationsManager:
             from core.di_container import inject
             from core.protocols.manager_protocols import ExtractionManagerProtocol
-            return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+            return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))
         if not helper.validate_manager_type(_get_extraction_manager, "ROM extraction"):
             return
 
@@ -313,7 +313,7 @@ class WorkerOwnedROMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMix
     def perform_operation(self) -> None:
         """Perform ROM extraction via worker-owned manager."""
         # Type cast for better type safety
-        extraction_manager = cast(ExtractionManager, self.manager)
+        extraction_manager = cast(CoreOperationsManager, self.manager)
 
         # Check for cancellation before starting
         self.check_cancellation()

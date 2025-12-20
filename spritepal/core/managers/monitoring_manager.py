@@ -499,6 +499,7 @@ class MonitoringManager(BaseManager):
         self._health_monitor = HealthMonitor()
         self._health_timer = None
         self._monitored_managers = WeakSet()
+        self._shutting_down = False  # Flag to prevent timer race during cleanup
 
         # Inject settings manager or use fallback
         if settings_manager is None:
@@ -541,6 +542,9 @@ class MonitoringManager(BaseManager):
         """Set up periodic health monitoring."""
         def run_health_check():
             """Run health check and reschedule."""
+            # Check shutdown flag to avoid race with cleanup
+            if self._shutting_down:
+                return
             if self._health_timer is not None:  # Check if timer should continue
                 self._collect_health_metrics()
                 # Reschedule next check
@@ -562,15 +566,23 @@ class MonitoringManager(BaseManager):
 
     def _collect_health_metrics(self) -> None:
         """Collect system health metrics."""
-        if not self._enabled:
+        if not self._enabled or self._shutting_down:
             return
 
         try:
             health_data = self._health_monitor.get_current_health()
             if not health_data.get('healthy', False):
-                self._logger.warning(f"System health degraded: {health_data}")
+                # Wrap logging in try-except to handle closed streams during shutdown
+                try:
+                    self._logger.warning(f"System health degraded: {health_data}")
+                except ValueError:
+                    # I/O operation on closed file - logging streams closed during test teardown
+                    pass
         except Exception as e:
-            self._logger.error(f"Failed to collect health metrics: {e}")
+            try:
+                self._logger.error(f"Failed to collect health metrics: {e}")
+            except ValueError:
+                pass  # Streams closed during shutdown
 
     @contextmanager
     def monitor_operation(self, operation: str, context: dict[str, Any] | None = None):
@@ -825,6 +837,9 @@ class MonitoringManager(BaseManager):
     @override
     def cleanup(self) -> None:
         """Cleanup resources."""
+        # Set shutdown flag first to stop health check logging
+        self._shutting_down = True
+        
         if self._health_timer:
             self._health_timer.cancel()
             # Wait for timer thread to actually exit to prevent thread leak detection

@@ -19,11 +19,9 @@ from utils.safe_logging import (
 
 from .application_state_manager import ApplicationStateManager
 
-# Import new consolidated managers
+# Import consolidated managers
 from .core_operations_manager import CoreOperationsManager
 from .exceptions import ManagerError
-from .extraction_manager import ExtractionManager
-from .injection_manager import InjectionManager
 from .monitoring_manager import MonitoringManager
 from .session_manager import SessionManager
 
@@ -388,7 +386,7 @@ class ManagerRegistry:
         except ValueError as e:
             raise ManagerError("SessionManager not initialized. Call initialize_managers() first.") from e
 
-    def get_extraction_manager(self) -> ExtractionManager:
+    def get_extraction_manager(self) -> CoreOperationsManager:
         """
         Get the extraction manager instance.
 
@@ -414,7 +412,7 @@ class ManagerRegistry:
         except ValueError as e:
             raise ManagerError("ExtractionManager not initialized. Call initialize_managers() first.") from e
 
-    def get_injection_manager(self) -> InjectionManager:
+    def get_injection_manager(self) -> CoreOperationsManager:
         """
         Get the injection manager instance.
 

@@ -21,11 +21,7 @@ from PySide6.QtWidgets import QApplication
 
 from core.controller import ExtractionController
 from core.di_container import inject
-from core.managers import (
-    # Serial execution required: QApplication management, Thread safety concerns, Real Qt components
-    ExtractionManager,
-    InjectionManager,
-)
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
     ApplicationStateManagerProtocol,
@@ -107,17 +103,17 @@ class TestQtSignalArchitecture:
         return SignalCapture()
 
     @pytest.fixture
-    def mock_factory(self, managers):
+    def mock_factory(self, session_managers):
         """Get mock factory instance"""
-        return RealComponentFactory(manager_registry=managers)
+        return RealComponentFactory(manager_registry=session_managers)
 
     def test_signal_connection_with_casting(self, app, mock_factory, signal_capture):
         """Test that signal connections work correctly with protocol casting"""
         # Managers initialized by session_managers fixture
 
         # Create real managers
-        injection_mgr = InjectionManager()
-        extraction_mgr = ExtractionManager()
+        injection_mgr = CoreOperationsManager()
+        extraction_mgr = CoreOperationsManager()
 
         # Create mock main window
         main_window = mock_factory.create_main_window()
@@ -160,7 +156,7 @@ class TestQtSignalArchitecture:
         """Test that concrete managers comply with protocols via duck typing"""
         # Test InjectionManager compliance via duck typing
         # (Protocols aren't @runtime_checkable, so use hasattr checks)
-        injection_mgr = InjectionManager()
+        injection_mgr = CoreOperationsManager()
 
         # Verify InjectionManagerProtocol signals exist
         injection_signals = ['injection_progress', 'injection_finished', 'compression_info']
@@ -170,7 +166,7 @@ class TestQtSignalArchitecture:
             assert isinstance(signal, Signal), f"{signal_name} is not a Signal"
 
         # Test ExtractionManager compliance via duck typing
-        extraction_mgr = ExtractionManager()
+        extraction_mgr = CoreOperationsManager()
 
         # Verify ExtractionManagerProtocol signals exist (actual signals on the class)
         extraction_signals = ['extraction_progress', 'cache_saved', 'preview_generated']
@@ -181,7 +177,7 @@ class TestQtSignalArchitecture:
 
     def test_thread_safety_signal_emission(self, app, signal_capture):
         """Test that signals work correctly across thread boundaries"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
         manager.injection_progress.connect(signal_capture.capture)
 
         # Define worker thread function
@@ -204,7 +200,7 @@ class TestQtSignalArchitecture:
 
     def test_signal_parameter_types(self, app, signal_capture):
         """Test that signal parameters are passed correctly with proper types"""
-        manager = ExtractionManager()
+        manager = CoreOperationsManager()
 
         # Test different signal parameter types
         # Note: Qt signal/slot mechanism converts tuples to lists in dict values
@@ -228,7 +224,7 @@ class TestQtSignalArchitecture:
 
     def test_signal_cleanup_on_deletion(self, app):
         """Test that signals are properly cleaned up when objects are deleted"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Create a receiver object
         receiver = SignalCapture()
@@ -248,13 +244,13 @@ class TestQtSignalArchitecture:
     def test_casting_preserves_functionality(self, app, mock_factory):
         """Test that casting to protocol and back preserves all functionality"""
         # Create concrete manager
-        concrete_mgr = InjectionManager()
+        concrete_mgr = CoreOperationsManager()
 
         # Cast to protocol
         protocol_mgr: InjectionManagerProtocol = concrete_mgr
 
         # Cast back to concrete type (as done in controller)
-        casted_mgr = cast(InjectionManager, protocol_mgr)  # cast-ok: testing cast behavior
+        casted_mgr = cast(CoreOperationsManager, protocol_mgr)  # cast-ok: testing cast behavior
 
         # Verify all signals still work
         capture = SignalCapture()
@@ -270,7 +266,7 @@ class TestQtSignalArchitecture:
 
     def test_error_handling_with_signals(self, app, signal_capture):
         """Test signal behavior during error conditions"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
         manager.error_occurred.connect(signal_capture.capture)
 
         # Emit error signal directly (there's no _emit_error helper method)
@@ -282,7 +278,7 @@ class TestQtSignalArchitecture:
 
     def test_concurrent_signal_emissions(self, app, signal_capture):
         """Test concurrent signal emissions from multiple threads"""
-        manager = ExtractionManager()
+        manager = CoreOperationsManager()
         manager.extraction_progress.connect(signal_capture.capture)
 
         num_threads = 5
@@ -327,7 +323,7 @@ class TestQtSignalArchitecture:
 
     def test_signal_disconnection(self, app, signal_capture):
         """Test proper signal disconnection"""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Connect signal
         manager.injection_progress.connect(signal_capture.capture)
@@ -351,8 +347,8 @@ class TestQtSignalArchitecture:
     def test_controller_signal_forwarding(self, app, mock_factory, signal_capture):
         """Test that controller properly forwards signals from managers"""
         # Create managers and controller
-        injection_mgr = InjectionManager()
-        extraction_mgr = ExtractionManager()
+        injection_mgr = CoreOperationsManager()
+        extraction_mgr = CoreOperationsManager()
         main_window = mock_factory.create_main_window()
 
         controller = ExtractionController(
@@ -572,7 +568,7 @@ class TestPerformanceImpact:
         """Test signal delivery performance across threads"""
         import statistics
 
-        manager = ExtractionManager()
+        manager = CoreOperationsManager()
 
         # Measure signal delivery times
         delivery_times = []

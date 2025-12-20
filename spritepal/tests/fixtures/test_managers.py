@@ -32,7 +32,8 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
-from core.managers import ExtractionManager, InjectionManager, SessionManager
+from core.managers import SessionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from ui.row_arrangement.grid_arrangement_manager import (
     GridArrangementManager,
     TilePosition,
@@ -44,7 +45,10 @@ from ui.row_arrangement.preview_generator import PreviewGenerator
 
 
 class ExtractionManagerFixture:
-    """Test fixture providing real ExtractionManager with test data"""
+    """Test fixture providing real extraction manager with test data.
+
+    Uses CoreOperationsManager which implements ExtractionManagerProtocol.
+    """
 
     def __init__(self, temp_dir: str | None = None):
         from pathlib import Path
@@ -52,7 +56,7 @@ class ExtractionManagerFixture:
         from tests.fixtures.test_data_factory import TestDataFactory
 
         self.temp_dir = temp_dir or tempfile.mkdtemp()
-        self.manager = ExtractionManager()
+        self.manager = CoreOperationsManager()
 
         # Use TestDataFactory for file creation (DRY consolidation)
         paths = TestDataFactory.create_test_files(Path(self.temp_dir))
@@ -92,7 +96,10 @@ class ExtractionManagerFixture:
             shutil.rmtree(self.temp_dir)
 
 class InjectionManagerFixture:
-    """Test fixture providing real InjectionManager with test data"""
+    """Test fixture providing real injection manager with test data.
+
+    Uses CoreOperationsManager which implements InjectionManagerProtocol.
+    """
 
     def __init__(self, temp_dir: str | None = None):
         from pathlib import Path
@@ -100,7 +107,7 @@ class InjectionManagerFixture:
         from tests.fixtures.test_data_factory import TestDataFactory
 
         self.temp_dir = temp_dir or tempfile.mkdtemp()
-        self.manager = InjectionManager()
+        self.manager = CoreOperationsManager()
 
         # Use TestDataFactory for injection test files (DRY consolidation)
         paths = TestDataFactory.create_injection_test_files(Path(self.temp_dir))

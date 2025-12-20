@@ -5,7 +5,7 @@ Tests the VRAMExtractionWorker and ROMExtractionWorker classes with real manager
 to ensure proper integration, signal handling, and error management.
 
 This refactored version uses:
-- Real ExtractionManager instances (session-scoped for 40x speedup)
+- Real CoreOperationsManager instances (session-scoped for 40x speedup)
 - Real test files with valid data
 - Actual signal behavior testing
 - No mocking of core components
@@ -20,7 +20,7 @@ from PIL import Image
 from PySide6.QtTest import QSignalSpy
 
 from core.di_container import inject
-from core.managers.extraction_manager import ExtractionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.manager_protocols import ExtractionManagerProtocol
 from core.workers.extraction import ROMExtractionWorker, VRAMExtractionWorker
 from tests.infrastructure.real_component_factory import RealComponentFactory
@@ -43,10 +43,10 @@ class TestVRAMExtractionWorker:
             yield factory
 
     @pytest.fixture
-    def extraction_manager(self, managers) -> ExtractionManager:
+    def extraction_manager(self, session_managers) -> CoreOperationsManager:
         """Get extraction manager from session managers."""
         from typing import cast
-        return cast(ExtractionManager, inject(ExtractionManagerProtocol))  # cast-ok: getting concrete type from DI
+        return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))  # cast-ok: getting concrete type from DI
 
     @pytest.fixture
     def test_files(self, tmp_path):
@@ -276,10 +276,10 @@ class TestROMExtractionWorker:
     """Test the ROMExtractionWorker class with real components."""
 
     @pytest.fixture
-    def extraction_manager(self, managers) -> ExtractionManager:
+    def extraction_manager(self, session_managers) -> CoreOperationsManager:
         """Get extraction manager from session managers."""
         from typing import cast
-        return cast(ExtractionManager, inject(ExtractionManagerProtocol))  # cast-ok: getting concrete type from DI
+        return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))  # cast-ok: getting concrete type from DI
 
     @pytest.fixture
     def test_rom_files(self, tmp_path):

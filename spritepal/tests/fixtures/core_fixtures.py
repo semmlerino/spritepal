@@ -45,10 +45,10 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 if TYPE_CHECKING:
     from pytest import FixtureRequest, TempPathFactory
 
-    from core.managers.extraction_manager import ExtractionManager
-    from core.managers.injection_manager import InjectionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.managers.registry import ManagerRegistry
     from core.managers.session_manager import SessionManager
+    from core.protocols.manager_protocols import InjectionManagerProtocol
     from core.services.rom_cache import ROMCache
     from tests.infrastructure.test_protocols import MockMainWindowProtocol
 
@@ -257,7 +257,7 @@ def _should_fail_on_leaks(config: Any) -> bool:
 
 
 @pytest.fixture(scope="session")
-def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
+def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[ManagerRegistry]:
     """
     Session-scoped managers for performance optimization.
 
@@ -273,8 +273,9 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
 
     Usage:
         def test_something(session_managers):
+            # session_managers is the ManagerRegistry instance
             # Managers are already initialized and shared across tests
-            pass
+            factory = RealComponentFactory(manager_registry=session_managers)
     """
     # Lazy import manager functions
     import os
@@ -282,6 +283,7 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     from PySide6.QtWidgets import QApplication
 
     from core.managers import cleanup_managers, initialize_managers
+    from core.managers.registry import ManagerRegistry
 
     # Create session-specific settings directory for isolation
     # Priority: SPRITEPAL_SETTINGS_DIR env var (xdist) > tmp_path_factory
@@ -310,7 +312,11 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     from ui import register_ui_factories
     register_ui_factories()
 
-    yield
+    # Get the global registry that was just initialized
+    from core.managers.registry import _ensure_registry
+    registry = _ensure_registry()
+
+    yield registry
     cleanup_managers()
 
     # Reset session state on cleanup
@@ -642,14 +648,14 @@ def real_factory(
 @pytest.fixture
 def real_extraction_manager(
     isolated_managers: ManagerRegistry,
-) -> ExtractionManager:
+) -> CoreOperationsManager:
     """Function-scoped real extraction manager with automatic cleanup.
 
     Depends on isolated_managers to ensure proper per-test isolation.
     The isolated_managers fixture handles initialization and cleanup.
 
-    NOTE: This returns a REAL ExtractionManager, not a mock.
-    For actual mocks, create them locally with Mock(spec=ExtractionManager).
+    NOTE: This returns the CoreOperationsManager which implements
+    ExtractionManagerProtocol. For mocks, use Mock(spec=ExtractionManagerProtocol).
     """
     # Use inject() to avoid deprecated ManagerRegistry.get_extraction_manager()
     _ = isolated_managers  # Ensures fixture runs first to initialize managers
@@ -657,11 +663,11 @@ def real_extraction_manager(
 
 
 @pytest.fixture
-def real_injection_manager(real_factory: RealComponentFactory) -> InjectionManager:
+def real_injection_manager(real_factory: RealComponentFactory) -> CoreOperationsManager:
     """Provide a fully configured real injection manager.
 
-    NOTE: Returns a REAL InjectionManager, not a mock.
-    For actual mocks, create them locally with Mock(spec=InjectionManager).
+    NOTE: Returns the CoreOperationsManager which implements
+    InjectionManagerProtocol. For mocks, use Mock(spec=InjectionManagerProtocol).
     """
     return real_factory.create_injection_manager()
 

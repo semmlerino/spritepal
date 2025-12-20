@@ -40,11 +40,11 @@ from .exceptions import (
     ValidationError,
 )
 
-# DEPRECATED: Legacy manager classes below are base classes for adapters only.
-# Do not instantiate directly. Use inject(XxxManagerProtocol) instead.
-# See module docstring above for the recommended access pattern.
-from .extraction_manager import ExtractionManager
-from .injection_manager import InjectionManager
+# NOTE: ExtractionManager and InjectionManager have been removed.
+# Use CoreOperationsManager via dependency injection:
+#   from core.di_container import inject
+#   from core.protocols.manager_protocols import ExtractionManagerProtocol, InjectionManagerProtocol
+#   manager = inject(ExtractionManagerProtocol)  # Returns CoreOperationsManager
 
 # Import DI-based manager functions
 # Note: We import from registry now which supports both consolidated and original modes
@@ -66,11 +66,8 @@ __all__ = [
     "CoreOperationsManager",
     # Exceptions
     "ExtractionError",
-    # Original Managers
-    "ExtractionManager",
     "FileOperationError",
     "InjectionError",
-    "InjectionManager",
     "ManagerError",
     "NavigationError",
     "PreviewError",

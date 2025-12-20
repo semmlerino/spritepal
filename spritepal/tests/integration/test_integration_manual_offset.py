@@ -7,7 +7,7 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 
-from core.managers import ExtractionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 
 
 @pytest.mark.integration
@@ -42,7 +42,7 @@ class TestManualOffsetDialog:
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = ExtractionManager()
+        extraction_manager = CoreOperationsManager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -75,7 +75,7 @@ class TestManualOffsetDialog:
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = ExtractionManager()
+        extraction_manager = CoreOperationsManager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -103,7 +103,7 @@ class TestManualOffsetDialog:
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = ExtractionManager()
+        extraction_manager = CoreOperationsManager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -136,7 +136,7 @@ class TestManualOffsetDialog:
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = ExtractionManager()
+        extraction_manager = CoreOperationsManager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -179,7 +179,7 @@ class TestManualOffsetDialog:
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = ExtractionManager()
+        extraction_manager = CoreOperationsManager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -239,7 +239,7 @@ class TestSpriteScanDialog:
         mocker.patch.object(QMessageBox, 'critical', return_value=QMessageBox.StandardButton.Ok)
 
         # Set ROM data
-        extraction_manager = ExtractionManager()
+        extraction_manager = CoreOperationsManager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -278,7 +278,7 @@ class TestSpriteScanDialog:
             pytest.skip("No test sprites to select")
 
         # Set ROM data
-        extraction_manager = ExtractionManager()
+        extraction_manager = CoreOperationsManager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,

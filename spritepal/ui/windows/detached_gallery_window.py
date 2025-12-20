@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 if TYPE_CHECKING:
-    from core.managers import ExtractionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
 
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol

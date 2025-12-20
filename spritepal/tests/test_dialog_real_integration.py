@@ -47,11 +47,8 @@ pytestmark = [
 
 # Import real testing infrastructure
 # Import real dialogs and managers (not mocked!)
-from core.managers import (
-    ExtractionManager,
-    InjectionManager,
-    SessionManager,
-)
+from core.managers import SessionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.registry import ManagerRegistry
 from tests.infrastructure import (
     ApplicationFactory,

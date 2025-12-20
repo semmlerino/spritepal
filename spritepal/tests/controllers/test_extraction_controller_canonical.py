@@ -27,8 +27,7 @@ from PySide6.QtTest import QSignalSpy
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 import core.controller
 from core.controller import ExtractionController
-from core.managers.extraction_manager import ExtractionManager
-from core.managers.injection_manager import InjectionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.session_manager import SessionManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.services.settings_manager import SettingsManager
@@ -129,8 +128,8 @@ def standard_mock_managers() -> tuple[Mock, Mock, Mock, Mock, Mock]:
     Returns (extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory).
     This consolidates repeated manager mock creation pattern.
     """
-    extraction_manager = Mock(spec=ExtractionManager)
-    injection_manager = Mock(spec=InjectionManager)
+    extraction_manager = Mock(spec=CoreOperationsManager)
+    injection_manager = Mock(spec=CoreOperationsManager)
     session_manager = Mock(spec=SessionManager)
     settings_manager = Mock(spec=SettingsManager)
     dialog_factory = Mock(spec=DialogFactoryProtocol)

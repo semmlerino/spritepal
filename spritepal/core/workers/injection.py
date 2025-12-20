@@ -201,7 +201,7 @@ class WorkerOwnedVRAMInjectionWorker(InjectionWorkerBase, WorkerOwnedManagerMixi
         # Create manager using standardized worker-owned pattern
         manager = self.create_worker_owned_manager(
             manager_factory,
-            lambda factory, parent: factory.create_injection_manager(parent=parent),
+            lambda factory, parent: factory.create_operations_manager(parent=parent),
             parent
         )
 
@@ -279,7 +279,7 @@ class WorkerOwnedROMInjectionWorker(InjectionWorkerBase, WorkerOwnedManagerMixin
         # Create manager using standardized worker-owned pattern
         manager = self.create_worker_owned_manager(
             manager_factory,
-            lambda factory, parent: factory.create_injection_manager(parent=parent),
+            lambda factory, parent: factory.create_operations_manager(parent=parent),
             parent
         )
 

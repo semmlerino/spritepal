@@ -12,7 +12,8 @@ import pytest
 
 from core.controller import ExtractionController
 from core.di_container import inject
-from core.managers import ExtractionManager, InjectionManager, SessionManager
+from core.managers import SessionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import SettingsManagerProtocol
 from tests.infrastructure.real_component_factory import RealComponentFactory
@@ -165,7 +166,7 @@ class TestRealManagerBenefits:
 
     def test_catches_real_validation_bugs(self):
         """Real managers catch actual validation logic bugs."""
-        manager = ExtractionManager()
+        manager = CoreOperationsManager()
 
         # This tests real validation logic, not mocked behavior
         with pytest.raises(Exception):
@@ -177,7 +178,7 @@ class TestRealManagerBenefits:
 
     def test_real_business_logic_coverage(self):
         """Real managers provide actual business logic coverage."""
-        manager = InjectionManager()
+        manager = CoreOperationsManager()
 
         # Test real smart VRAM suggestion logic
         suggestion = manager.get_smart_vram_suggestion(

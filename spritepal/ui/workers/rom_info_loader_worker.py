@@ -15,7 +15,7 @@ from core.workers.base import BaseWorker, handle_worker_errors
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.managers import ExtractionManager, InjectionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.protocols.manager_protocols import ROMExtractorProtocol
 
 logger = get_logger(__name__)

@@ -28,8 +28,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 if TYPE_CHECKING:
-    from core.managers.extraction_manager import ExtractionManager
-    from core.managers.injection_manager import InjectionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
 
 pytestmark = [
     pytest.mark.integration,

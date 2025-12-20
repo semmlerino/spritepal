@@ -63,6 +63,8 @@ import os
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
+import importlib
+import importlib.abc
 import tempfile
 import warnings
 from collections.abc import Generator
@@ -153,12 +155,6 @@ def pytest_configure(config):
         "headless: Categorizes tests that don't need rendering (runs same as gui in offscreen mode)"
     )
 
-    # Make implicit RealComponentFactory warnings visible when we add them
-    config.addinivalue_line(
-        "filterwarnings",
-        "default:RealComponentFactory.*implicit init"
-    )
-
     # Install QPixmap guard via import hook - guarantees guard is installed even for late Qt imports
     _install_qpixmap_guard_unconditional()
 
@@ -208,35 +204,47 @@ def _patch_qpixmap_init() -> None:
         pass  # Qt not available, skip guard
 
 
-class _QPixmapGuardImportFinder:
-    """Import hook to install QPixmap guard when PySide6.QtGui is imported."""
+class _QPixmapGuardFinder(importlib.abc.MetaPathFinder):
+    """Import hook to install QPixmap guard when PySide6.QtGui is imported.
+
+    Uses modern find_spec protocol (PEP 451) instead of deprecated
+    find_module/load_module APIs.
+    """
 
     _installed: bool = False
 
-    def find_module(self, fullname: str, path: Any = None) -> _QPixmapGuardImportFinder | None:
-        """Return self if this is PySide6.QtGui, else None."""
-        if fullname == 'PySide6.QtGui' and not self._installed:
-            return self
-        return None
+    def find_spec(
+        self,
+        fullname: str,
+        path: Any,
+        target: Any = None,
+    ) -> None:
+        """Intercept PySide6.QtGui import and install QPixmap guard.
 
-    def load_module(self, fullname: str) -> Any:
-        """Load the real module, then install QPixmap guard."""
-        import importlib
+        Instead of returning a ModuleSpec, we:
+        1. Remove ourselves from meta_path to avoid recursion
+        2. Import the real module (which goes into sys.modules)
+        3. Patch QPixmap
+        4. Return None - the caller finds the patched module in sys.modules
+        """
+        if fullname != 'PySide6.QtGui' or self._installed:
+            return None
+
+        # Mark as installed to prevent re-triggering
+        _QPixmapGuardFinder._installed = True
 
         # Remove ourselves from meta_path to avoid recursion
         if self in sys.meta_path:
             sys.meta_path.remove(self)
 
-        # Mark as installed to prevent re-triggering
-        _QPixmapGuardImportFinder._installed = True
-
-        # Import the real module
-        module = importlib.import_module(fullname)
+        # Import the real module (now in sys.modules)
+        importlib.import_module(fullname)
 
         # Install the guard on QPixmap
         _patch_qpixmap_init()
 
-        return module
+        # Return None - caller finds patched module in sys.modules
+        return None
 
 
 def _install_qpixmap_guard_unconditional() -> None:
@@ -252,8 +260,8 @@ def _install_qpixmap_guard_unconditional() -> None:
 
     # Otherwise, install an import hook to patch when Qt is imported
     # Check if our hook is already installed
-    if not any(isinstance(finder, _QPixmapGuardImportFinder) for finder in sys.meta_path):
-        sys.meta_path.insert(0, _QPixmapGuardImportFinder())
+    if not any(isinstance(finder, _QPixmapGuardFinder) for finder in sys.meta_path):
+        sys.meta_path.insert(0, _QPixmapGuardFinder())
 
 
 def pytest_addoption(parser: Any) -> None:
@@ -339,16 +347,42 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
     from functools import lru_cache
     from pathlib import Path
 
+    class ImportAliasCollector(ast.NodeVisitor):
+        """Collect all names that could refer to RealComponentFactory."""
+
+        def __init__(self) -> None:
+            self.factory_names: set[str] = {"RealComponentFactory"}
+
+        def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+            """Track 'from x import RealComponentFactory as Alias'."""
+            for alias in node.names:
+                if alias.name == "RealComponentFactory":
+                    # Add both the original name and any alias
+                    self.factory_names.add(alias.asname or alias.name)
+            self.generic_visit(node)
+
     class FactoryCallChecker(ast.NodeVisitor):
         """AST visitor that finds RealComponentFactory calls missing manager_registry."""
 
-        def __init__(self, source_lines: list[str]) -> None:
+        def __init__(self, source_lines: list[str], factory_names: set[str]) -> None:
             self.violations: list[tuple[int, str]] = []
             self.source_lines = source_lines
+            self.factory_names = factory_names
+
+        def _is_factory_call(self, node: ast.Call) -> bool:
+            """Check if this is a call to RealComponentFactory (by any alias)."""
+            func = node.func
+            # Case 1: Direct name or alias - RealComponentFactory(), Factory()
+            if isinstance(func, ast.Name):
+                return func.id in self.factory_names
+            # Case 2: Attribute access - module.RealComponentFactory()
+            if isinstance(func, ast.Attribute):
+                return func.attr == "RealComponentFactory"
+            return False
 
         def visit_Call(self, node: ast.Call) -> None:
-            # Check if this is a call to RealComponentFactory
-            if isinstance(node.func, ast.Name) and node.func.id == "RealComponentFactory":
+            # Check if this is a call to RealComponentFactory (direct, aliased, or via attribute)
+            if self._is_factory_call(node):
                 # Check if manager_registry is in keyword arguments
                 has_registry = any(kw.arg == "manager_registry" for kw in node.keywords)
                 if not has_registry:
@@ -369,7 +403,13 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
             content = path.read_text()
             source_lines = content.splitlines()
             tree = ast.parse(content, filename=file_path)
-            checker = FactoryCallChecker(source_lines)
+
+            # First pass: collect all aliases for RealComponentFactory
+            alias_collector = ImportAliasCollector()
+            alias_collector.visit(tree)
+
+            # Second pass: check for bare factory calls using all known names
+            checker = FactoryCallChecker(source_lines, alias_collector.factory_names)
             checker.visit(tree)
             return checker.violations
         except (OSError, UnicodeDecodeError, SyntaxError):
@@ -400,15 +440,13 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
                         violations.append(f"  {fspath}:{line_no}: {line_content}")
 
     if violations:
-        import warnings
-
-        warnings.warn(
+        pytest.fail(
             f"\n[RealComponentFactory] Found {len(violations)} bare factory call(s) missing manager_registry:\n"
             + "\n".join(violations[:10])  # Show first 10
             + (f"\n  ... and {len(violations) - 10} more" if len(violations) > 10 else "")
-            + "\n\nFix: Use RealComponentFactory(manager_registry=isolated_managers)",
-            UserWarning,
-            stacklevel=1,
+            + "\n\nFix: Use RealComponentFactory(manager_registry=isolated_managers)\n"
+            + "This is a test isolation violation that would cause flaky tests.",
+            pytrace=False,
         )
 
 

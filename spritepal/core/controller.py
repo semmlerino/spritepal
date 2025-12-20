@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     )
 
 from core.console_error_handler import ConsoleErrorHandler
-from core.managers import ExtractionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.services.image_utils import pil_to_qpixmap
 from core.services.preview_generator import create_vram_preview_request, get_preview_generator
 from core.types import ROMExtractionParams, VRAMExtractionParams
@@ -130,7 +130,7 @@ class ExtractionController(QObject):
         # Initialize preview generator with managers
         self.preview_generator = get_preview_generator()
         # Cast to concrete type for preview generator compatibility
-        extraction_mgr = cast(ExtractionManager, self.extraction_manager)
+        extraction_mgr = cast(CoreOperationsManager, self.extraction_manager)
         self.preview_generator.set_managers(
             extraction_manager=extraction_mgr,
             rom_extractor=extraction_mgr.get_rom_extractor()
@@ -207,7 +207,7 @@ class ExtractionController(QObject):
             "grayscale_mode": params.get("grayscale_mode", False),
         }
         # Pass extraction manager explicitly (B.2: constructor injection)
-        extraction_mgr = cast(ExtractionManager, self.extraction_manager)
+        extraction_mgr = cast(CoreOperationsManager, self.extraction_manager)
         self.worker = VRAMExtractionWorker(extraction_params, extraction_manager=extraction_mgr)
         _ = self.worker.progress.connect(self._on_progress)
         _ = self.worker.preview_ready.connect(self._on_preview_ready)
@@ -663,7 +663,7 @@ class ExtractionController(QObject):
             "cgram_path": params.get("cgram_path"),
         }
         # Create and start ROM extraction worker (B.2: constructor injection)
-        extraction_mgr = cast(ExtractionManager, self.extraction_manager)
+        extraction_mgr = cast(CoreOperationsManager, self.extraction_manager)
         self.rom_worker = ROMExtractionWorker(rom_extraction_params, extraction_manager=extraction_mgr)
         _ = self.rom_worker.progress.connect(self._on_rom_progress)
         _ = self.rom_worker.extraction_finished.connect(self._on_rom_extraction_finished)

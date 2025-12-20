@@ -13,7 +13,8 @@ from unittest.mock import Mock
 import pytest
 
 from core.controller import ExtractionController
-from core.managers import ExtractionManager, InjectionManager, SessionManager
+from core.managers import SessionManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.services.settings_manager import SettingsManager
 
@@ -29,9 +30,9 @@ class TestControllerDependencyInjection:
         mock_main_window = Mock()
 
         # Create mock managers that satisfy the protocol
-        mock_extraction_manager = Mock(spec=ExtractionManager)
+        mock_extraction_manager = Mock(spec=CoreOperationsManager)
         mock_session_manager = Mock(spec=SessionManager)
-        mock_injection_manager = Mock(spec=InjectionManager)
+        mock_injection_manager = Mock(spec=CoreOperationsManager)
         mock_settings_manager = Mock(spec=SettingsManager)
         mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
@@ -55,8 +56,8 @@ class TestControllerDependencyInjection:
         mock_main_window = Mock()
 
         # Create mock managers with signal attributes
-        mock_extraction_manager = Mock(spec=ExtractionManager)
-        mock_injection_manager = Mock(spec=InjectionManager)
+        mock_extraction_manager = Mock(spec=CoreOperationsManager)
+        mock_injection_manager = Mock(spec=CoreOperationsManager)
         mock_session_manager = Mock(spec=SessionManager)
         mock_settings_manager = Mock(spec=SettingsManager)
         mock_dialog_factory = Mock(spec=DialogFactoryProtocol)

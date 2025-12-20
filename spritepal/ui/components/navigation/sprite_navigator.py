@@ -16,7 +16,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.managers import ExtractionManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.protocols.manager_protocols import ROMCacheProtocol
 
 from typing import override
