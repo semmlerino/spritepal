@@ -30,15 +30,15 @@ import pytest
 from PIL import Image
 
 from core.managers.exceptions import ValidationError
-from tests.infrastructure.manager_test_context import (
-    # Serial execution required: Thread safety concerns, Real Qt components
-    manager_context,
-)
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
+)
+from tests.infrastructure.manager_test_context import (
+    # Serial execution required: Thread safety concerns, Real Qt components
+    manager_context,
 )
 
 # Determine if running in offscreen mode

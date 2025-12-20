@@ -179,6 +179,7 @@ class TestRealDialogLifecycle:
     def test_dialog_accept_reject(self, qtbot: MockQtBotProtocol) -> None:
         """Test dialog accept/reject methods work correctly."""
         from PySide6.QtCore import Qt
+
         from ui.dialogs.user_error_dialog import UserErrorDialog
 
         dialog = UserErrorDialog(
@@ -205,6 +206,7 @@ class TestRealDialogWithManagers:
     ) -> None:
         """Test InjectionDialog can be created with real managers."""
         from PySide6.QtCore import Qt
+
         from ui.injection_dialog import InjectionDialog
 
         dialog = InjectionDialog(injection_manager=isolated_managers.get_injection_manager())

@@ -29,6 +29,114 @@ from .session_manager import SessionManager
 
 # NavigationManager import deferred to avoid circular imports
 
+# Import protocols for dependency declaration (deferred to avoid circular imports at module load)
+# These are used by MANAGER_DEPENDENCIES and validation functions below.
+
+
+class InitializationError(ManagerError):
+    """Raised when manager initialization order dependencies are not satisfied."""
+
+    pass
+
+
+# Explicit manager dependencies - protocols that must be registered BEFORE manager creation.
+# This documents the dependency chain and enables validation at startup.
+# Key: Manager class, Value: List of protocol types that must be registered first
+MANAGER_DEPENDENCIES: dict[type, list[type]] = {}  # Populated lazily to avoid import issues
+
+# Maps manager classes to the protocols they register (for validation)
+MANAGER_TO_PROTOCOLS: dict[type, list[type]] = {}  # Populated lazily to avoid import issues
+
+_DEPENDENCY_MAPS_INITIALIZED = False
+
+
+def _ensure_dependency_maps() -> None:
+    """Lazily initialize dependency maps to avoid circular import issues."""
+    global _DEPENDENCY_MAPS_INITIALIZED
+    if _DEPENDENCY_MAPS_INITIALIZED:
+        return
+
+    # Import protocols here to avoid circular imports at module load time
+    from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
+        ExtractionManagerProtocol,
+        InjectionManagerProtocol,
+    )
+
+    from .application_state_manager import ApplicationStateManager
+    from .core_operations_manager import CoreOperationsManager
+    from .monitoring_manager import MonitoringManager
+
+    MANAGER_DEPENDENCIES.update({
+        ApplicationStateManager: [],  # No dependencies - always first
+        CoreOperationsManager: [ApplicationStateManagerProtocol],  # Needs state manager via DI chain
+        MonitoringManager: [],  # No DI dependencies (uses direct references passed in)
+    })
+
+    MANAGER_TO_PROTOCOLS.update({
+        ApplicationStateManager: [ApplicationStateManagerProtocol],
+        CoreOperationsManager: [ExtractionManagerProtocol, InjectionManagerProtocol],
+        MonitoringManager: [],  # Not registered with a protocol
+    })
+
+    _DEPENDENCY_MAPS_INITIALIZED = True
+
+
+def _get_protocols_for_manager(manager_class: type) -> list[type]:
+    """Return protocols registered by a manager class.
+
+    Args:
+        manager_class: The manager class to look up.
+
+    Returns:
+        List of protocol types that this manager registers.
+    """
+    _ensure_dependency_maps()
+    return MANAGER_TO_PROTOCOLS.get(manager_class, [])
+
+
+def validate_manager_order(managed_classes: list[type] | None = None) -> None:
+    """Validate that manager class order satisfies declared dependencies.
+
+    Checks that for each manager in the list, all of its required dependencies
+    (protocols) would be registered by managers appearing earlier in the list.
+
+    Args:
+        managed_classes: List of manager classes to validate. If None, uses
+            ManagerRegistry.MANAGED_CLASSES.
+
+    Raises:
+        InitializationError: If a manager appears before its dependencies.
+    """
+    _ensure_dependency_maps()
+
+    if managed_classes is None:
+        managed_classes = ManagerRegistry.MANAGED_CLASSES
+
+    # Track which protocols would be registered at each point
+    registered_protocols: set[type] = set()
+
+    for manager_class in managed_classes:
+        # Check if this manager has a dependency declaration
+        if manager_class not in MANAGER_DEPENDENCIES:
+            raise InitializationError(
+                f"{manager_class.__name__} is in MANAGED_CLASSES but not in "
+                f"MANAGER_DEPENDENCIES. Add it to document its dependencies."
+            )
+
+        # Check that all dependencies are satisfied
+        deps = MANAGER_DEPENDENCIES[manager_class]
+        for dep in deps:
+            if dep not in registered_protocols:
+                raise InitializationError(
+                    f"{manager_class.__name__} requires {dep.__name__} but no earlier "
+                    f"manager in MANAGED_CLASSES registers it. "
+                    f"Reorder MANAGED_CLASSES or update MANAGER_DEPENDENCIES."
+                )
+
+        # Track which protocols this manager provides
+        registered_protocols.update(_get_protocols_for_manager(manager_class))
+
 
 class ManagerRegistry:
     """Singleton registry for manager instances with memory leak prevention"""

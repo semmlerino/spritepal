@@ -8,8 +8,6 @@ where real Qt signals aren't needed or appropriate. Use this for:
 - Tracking signal emissions without Qt dependencies
 
 For real Qt components, use actual Signal() objects with QSignalSpy instead.
-
-See UNIFIED_TESTING_GUIDE_DO_NOT_DELETE.md for usage guidance.
 """
 
 from __future__ import annotations

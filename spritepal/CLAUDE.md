@@ -2,65 +2,122 @@
 
 ## Critical Rules (Read First)
 
-These rules prevent crashes and test failures. Violating them causes hard-to-debug issues.
+These rules prevent crashes and test failures. Each has a solution.
 
-| Rule | Why |
-|------|-----|
-| **Never `QPixmap` in worker threads** | Fatal crash. Use `ThreadSafeTestImage` instead |
-| **Never inherit `QDialog` in mocks** | Metaclass conflict = fatal crash. Use `QObject` with signals |
-| **Always use `isolated_managers` fixture** | Default choice. `session_managers` causes order-dependent failures |
-| **Use `tmp_path` for file operations** | Hardcoded paths break parallel tests |
-| **Use `with qtbot.waitSignal():`** | The non-context form races with fast workers |
-| **Never `time.sleep()` in Qt tests** | Use `qtbot.wait()` or `waitSignal()` |
-| **Mock at import location** | `@patch('spritepal.ui.panel.Dialog')`, not `@patch('spritepal.ui.dialogs.Dialog')` |
+| Rule | Solution |
+|------|----------|
+| **Never `QPixmap` in worker threads** | Use `ThreadSafeTestImage` from `tests/infrastructure/` |
+| **Never inherit `QDialog` in mocks** | Use `QObject` with signals (see `tests/infrastructure/mock_dialogs.py`) |
+| **Use `isolated_managers` by default** | Only use `session_managers` with `@pytest.mark.shared_state_safe` |
+| **Use `tmp_path` for file operations** | Never hardcode paths like `/tmp/test_output` |
+| **Use `with qtbot.waitSignal():`** | Context manager catches fast signals; non-context form races |
+| **Never `time.sleep()` in Qt tests** | Use `qtbot.wait(ms)` or `qtbot.waitSignal()` |
+| **Mock at import location** | `@patch('spritepal.ui.panel.Dialog')`, not `...dialogs.Dialog` |
 
 ## Quick Reference
 
 - **Qt Framework**: PySide6 (not PyQt6)
-- **Python Version**: 3.12+
+- **Python**: 3.12+
 - **Package Manager**: uv
-- **Config Source of Truth**: `pyproject.toml` (ruff, basedpyright, pytest)
+- **Config**: `pyproject.toml` (ruff, basedpyright, pytest)
 
-## Development Commands
+## Running Tests
 
-All tools run via `uv` from the `spritepal/` directory. If `uv` is not in PATH, use `~/.local/bin/uv run ...`
+All commands run from `spritepal/` directory. Use `~/.local/bin/uv` if `uv` isn't in PATH.
+
+Parallel execution requires pytest-xdist (included in dev dependencies).
+
+### Quick Triage (Start Here)
+
+For large test suites (1900+ tests), get a fast pass/fail summary first:
 
 ```bash
-# Dependencies
-uv sync --extra dev
+# Fast summary - no tracebacks, just pass/fail counts
+uv run pytest --tb=no -q 2>&1 | tee /tmp/pytest_triage.log
+tail -30 /tmp/pytest_triage.log  # See summary
 
-# Linting
-uv run ruff check .
-uv run ruff check . --fix
+# Re-run only failures with details
+uv run pytest --lf -vv --tb=short
+```
 
-# Type checking
-uv run basedpyright core ui utils
+**Why tee to a file:** Pytest buffers output; piping directly to `head`/`tail` loses the summary. Always capture to file first for large runs.
 
-# Tests - routine (parallel by default)
-uv run pytest
+### Standard Workflow
 
-# Tests - debug a failure (serial, verbose)
+```bash
+# 1. Quick triage (see above) - identify what's failing
+uv run pytest --tb=no -q
+
+# 2. Re-run failures with details
+uv run pytest --lf -vv --tb=short
+
+# 3. Drill down on specific test (serial, verbose, full tracebacks)
 uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
-# Tests - full suite
+# 4. Full suite when stable (override default maxfail=3)
 uv run pytest --maxfail=10
 ```
 
-**Do not use `-q` when debugging failures** - it hides needed information.
+**Why these flags:**
+- `-vv` - Full test names and assertion details
+- `--tb=long` - Full tracebacks for all frames (pyproject.toml sets `--tb=short`)
+- `-s` - Show print/log output (**only use with `-n 0`**; parallel output interleaves)
+- `-n 0` - Serial execution (pyproject.toml sets `-n auto` for parallel)
 
-## Documentation Pointers
+**Never use `-q` when debugging** - it hides information you need.
 
-| File | Content |
-|------|---------|
-| `docs/architecture.md` | Layer structure and import rules |
-| `docs/testing_guide.md` | Detailed testing patterns |
-| `tests/README.md` | Test suite overview |
-| `SPRITE_LEARNINGS_DO_NOT_DELETE.md` | Sprite extraction domain knowledge |
-| `DEV_NOTES.md` | Mesen2 integration, historical context |
+### Useful Shortcuts
 
-## Qt Testing
+```bash
+# Re-run only last failures
+uv run pytest --lf -vv
 
-### Minimal Test Template
+# Stop on first failure (fast iteration)
+uv run pytest -x -vv
+
+# Filter by name pattern
+uv run pytest -k "extraction and not slow" -vv
+
+# Filter by marker
+uv run pytest -m "not real_hal" -vv
+
+# Find slow tests
+uv run pytest --durations=20
+```
+
+### Parallel Execution
+
+Tests run parallel by default (pyproject.toml sets `-n auto --dist=loadscope`).
+
+**Note:** The config uses `--dist=loadscope` (groups by module), not `--dist=loadgroup`. The conftest.py applies `xdist_group("serial")` markers to tests using `session_managers` or `@pytest.mark.parallel_unsafe`, but these only co-locate tests on one worker (not truly serial).
+
+**For truly serial execution:** Use `-n 0`.
+
+### When Tests Fail
+
+**Flaky test (passes sometimes, fails other times):**
+1. Run serial first: `uv run pytest path/to/test.py -n 0 -vv`
+2. If it passes serial, it's a race condition - check for:
+   - Non-context `waitSignal()` (signal emits before wait starts)
+   - Hardcoded timeouts (use `worker_timeout()` functions)
+   - Fixed paths or shared filenames (use `tmp_path` fixture instead)
+
+**Crash with "Fatal Python error: Aborted":**
+- Almost always `QPixmap` in a worker thread
+- Replace with `ThreadSafeTestImage` from `tests/infrastructure/`
+
+**Test hangs forever:**
+- Ctrl-C then re-run with `--full-trace` for useful stack on interrupt
+- Dialog waiting for user input - mock `exec()` on the specific dialog class
+- Infinite loop in worker - check thread cleanup in fixture teardown
+
+**Passes locally, fails in CI:**
+- Usually timeout-related - check if CI uses `PYTEST_TIMEOUT_MULTIPLIER`
+- Or display-related - ensure test doesn't require real display (offscreen mode is default)
+
+## Writing Tests
+
+### Minimal Template
 
 ```python
 from tests.fixtures.timeouts import worker_timeout
@@ -73,32 +130,57 @@ def test_my_feature(isolated_managers, tmp_path):
     assert result is not None
 ```
 
-### Signal Testing Pattern
+### Signal Testing
 
 ```python
 from tests.fixtures.timeouts import worker_timeout, LONG
 
-# CORRECT: Context manager catches fast signals
+# CORRECT: Context manager catches signals regardless of timing
 def test_async_op(qtbot, worker):
     with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
         worker.start()
 
-# For slow operations
+# For slow operations (2x default timeout)
 def test_slow_op(qtbot, worker):
     with qtbot.waitSignal(worker.finished, timeout=worker_timeout(LONG)):
         worker.start()
 ```
 
-**Anti-pattern:**
+**Anti-pattern (causes flaky tests):**
 ```python
-# WRONG: Races with fast-completing workers
 worker.start()
-qtbot.waitSignal(worker.finished, timeout=worker_timeout())  # May miss signal!
+qtbot.waitSignal(worker.finished)  # Signal may emit before wait starts!
 ```
+
+### Fixture Selection
+
+**Default: `isolated_managers`** - slower but always safe.
+
+| Need | Use |
+|------|-----|
+| Standard test | `isolated_managers` (function-scoped, clean state) |
+| Read-only, verified stateless | `session_managers` + `@pytest.mark.shared_state_safe` |
+| Clean counters only | `reset_manager_state` |
+| HAL operations | `hal_pool` (mock by default) |
+| Real HAL | `@pytest.mark.real_hal` (skips if binary unavailable) |
+
+**Do not mix `session_managers` and `isolated_managers` in the same module.**
+
+### Test Markers
+
+| Marker | Effect | Enforced |
+|--------|--------|----------|
+| `@pytest.mark.requires_display` | Skips in offscreen mode | Yes (autouse fixture) |
+| `@pytest.mark.shared_state_safe` | **Required** for `session_managers` | Yes (test fails without it) |
+| `@pytest.mark.parallel_unsafe` | Co-locates on one xdist worker | Via `xdist_group` marker |
+| `@pytest.mark.skip_thread_cleanup(reason='...')` | Skip thread check | Yes (**reason required**) |
+| `@pytest.mark.real_hal` | Use real HAL (skips if unavailable) | Yes (fixture check) |
+
+Categorization markers (`@pytest.mark.gui`, `@pytest.mark.headless`) have no behavioral effect.
 
 ### Timeout Functions
 
-Import from `tests/fixtures/timeouts.py` (these are functions, not fixtures):
+Import from `tests/fixtures/timeouts.py` (functions, not fixtures):
 
 | Function | Base (ms) | Use For |
 |----------|-----------|---------|
@@ -112,60 +194,50 @@ Multipliers: `SHORT=0.5`, `MEDIUM=1.0` (default), `LONG=2.0`
 
 Scale all with `PYTEST_TIMEOUT_MULTIPLIER` env var for slow CI.
 
-### Test Markers
-
-| Marker | Effect |
-|--------|--------|
-| `@pytest.mark.requires_display` | Skips in offscreen mode |
-| `@pytest.mark.parallel_unsafe` | Forces serial execution |
-| `@pytest.mark.shared_state_safe` | **Required** for `session_managers` |
-| `@pytest.mark.skip_thread_cleanup(reason='...')` | Skip thread verification (**reason required**) |
-| `@pytest.mark.no_manager_setup` | Skip manager initialization |
-| `@pytest.mark.no_qt` | Skip Qt-related fixtures |
-| `@pytest.mark.allows_registry_state` | Skip pollution detection |
-| `@pytest.mark.real_hal` | Use real HAL (requires exhal binary) |
-
-Categorization markers (`@pytest.mark.gui`, `@pytest.mark.headless`) have no behavioral effect.
-
-### Fixture Selection
-
-**Default:** Use `isolated_managers`. It's slower but always safe.
-
-| Fixture | Scope | Use When |
-|---------|-------|----------|
-| `isolated_managers` | Function | **Default** - tests needing predictable state |
-| `session_managers` | Session | Only with `@pytest.mark.shared_state_safe` |
-| `reset_manager_state` | Function | Need clean counters without full isolation |
-
-**Do not mix** `session_managers` and `isolated_managers` in the same module.
-
-**`class_managers` is REMOVED** - use `isolated_managers` instead.
-
-### HAL Fixtures
-
-HAL is mock-by-default (100x faster). Use `@pytest.mark.real_hal` only for integration tests.
-
-| Fixture | Behavior |
-|---------|----------|
-| `hal_pool` | MockHALProcessPool (or real with `--use-real-hal`) |
-| `hal_compressor` | MockHALCompressor (or real with `@pytest.mark.real_hal`) |
-| `mock_hal` | Always mock (patches imports) |
-
-### Key Imports for Tests
+### Key Imports
 
 ```python
 from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout, LONG
-from tests.fixtures.qt_waits import wait_for_condition, wait_for
-from tests.infrastructure.qt_mocks import MockDialog
+from tests.fixtures.qt_waits import wait_for_condition  # Function (requires qtbot arg)
+from tests.infrastructure.mock_dialogs import MockDialog
 from tests.infrastructure.real_component_factory import RealComponentFactory
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
+
+# wait_for is a fixture - use as test parameter, not import:
+# def test_foo(wait_for): wait_for(lambda: condition, timeout=1000)
 ```
 
-### Parallel Test Execution
+## Other Development Commands
 
-Tests run parallel by default (`-n auto`). Use `-n 0` for debugging.
+```bash
+# Dependencies
+uv sync --extra dev
 
-Tests are auto-serialized if they use `session_managers` or are marked `@pytest.mark.parallel_unsafe`.
+# Linting
+uv run ruff check .
+uv run ruff check . --fix
+
+# Type checking
+uv run basedpyright core ui utils
+```
+
+### Type Checking Notes
+
+The codebase passes basedpyright with zero errors. To maintain this:
+
+- Use `| None` for optional types, not `Optional`
+- Protocols live in `core/protocols/` - check there before creating new ones
+- Qt signals need type annotations: `finished = Signal(str, int)`
+- For widgets that may not exist yet: `self.widget: QWidget | None = None`
+
+## Documentation Pointers
+
+| When you need... | Read |
+|------------------|------|
+| Qt threading rules, error path testing patterns | `docs/testing_guide.md` |
+| Layer boundaries, what imports what | `docs/architecture.md` |
+| Fixture decision tree, RealComponentFactory usage | `tests/README.md` |
+| Sprite format details, ROM structure, compression | `SPRITE_LEARNINGS_DO_NOT_DELETE.md` |
 
 ## Project Architecture
 
@@ -182,9 +254,21 @@ spritepal/
 │   └── *.py               # Panel files
 ├── tests/
 │   ├── fixtures/          # Test fixtures
-│   └── infrastructure/    # RealComponentFactory, etc.
+│   └── infrastructure/    # RealComponentFactory, ThreadSafeTestImage
 └── utils/                 # Shared utilities
 ```
+
+### Key Files
+
+| Looking for... | Location |
+|----------------|----------|
+| Manager protocols | `core/protocols/manager_protocols.py` |
+| ExtractionManager, InjectionManager | `core/managers/` |
+| DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
+| DI container, `inject()` | `core/di_container.py` |
+| Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
+| MockDialog, test mocks | `tests/infrastructure/mock_dialogs.py` |
+| ThreadSafeTestImage | `tests/infrastructure/thread_safe_test_image.py` |
 
 ### Import Rules
 
@@ -208,41 +292,20 @@ def test_extraction(isolated_managers):
     extraction_mgr = isolated_managers.extraction_manager
 ```
 
-Key managers:
-- `ApplicationStateManager` - session, state, settings, history
-- `CoreOperationsManager` - extraction, injection, palette
-- `ExtractionAdapter`/`InjectionAdapter` - legacy interface wrappers
+Key managers: `ApplicationStateManager`, `CoreOperationsManager` (registered as both `ExtractionManagerProtocol` and `InjectionManagerProtocol`)
 
 ### Key Patterns
 
-**Resource management:**
-```python
-@contextmanager
-def _rom_context(self):
-    rom_file = None
-    rom_mmap = None
-    try:
-        rom_file = Path(self.rom_path).open('rb')
-        rom_mmap = mmap.mmap(rom_file.fileno(), 0, access=mmap.ACCESS_READ)
-        yield rom_mmap
-    finally:
-        with suppress(Exception):
-            if rom_mmap: rom_mmap.close()
-        with suppress(Exception):
-            if rom_file: rom_file.close()
-```
+**Resource management:** Use `@contextmanager` with try/finally for file/mmap cleanup. See `ui/workers/batch_thumbnail_worker.py:_rom_context` for the canonical pattern.
 
-**Thread safety:** Use `QMutex/QMutexLocker` for shared state, prefer signal-based waiting.
+**Thread safety:** Use `QMutex/QMutexLocker` for shared state; prefer signal-based waiting over polling.
 
-**Dialog initialization (DialogBase):**
+**Dialog initialization (DialogBase):** Declare instance variables BEFORE `super().__init__()`:
 ```python
 class MyDialog(DialogBase):
     def __init__(self, parent: QWidget | None = None):
-        self.my_widget: QWidget | None = None  # Declare BEFORE super()
+        self.my_widget: QWidget | None = None  # BEFORE super()
         super().__init__(parent)  # Calls _setup_ui()
-
-    def _setup_ui(self):
-        self.my_widget = QPushButton("Click me")
 ```
 
 **Circular imports:** Use local imports in methods when needed.

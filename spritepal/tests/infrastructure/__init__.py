@@ -21,8 +21,8 @@ HeadlessModeError with helpful messages, while Qt-independent features remain av
 """
 from __future__ import annotations
 
-from .environment_detection import get_environment_info, is_pyside6_available
 from .data_repository import DataRepository
+from .environment_detection import get_environment_info, is_pyside6_available
 from .test_signal import TestSignal, TestSignalBlocker
 
 # Always available (Qt-independent)

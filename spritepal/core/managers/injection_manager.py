@@ -37,6 +37,7 @@ from utils.constants import (
     SETTINGS_KEY_VRAM_PATH,
     SETTINGS_NS_ROM_INJECTION,
 )
+
 from .base_manager import BaseManager
 from .exceptions import ValidationError
 from .validation_mixins import InjectionValidationMixin

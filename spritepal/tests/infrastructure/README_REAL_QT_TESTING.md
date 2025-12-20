@@ -98,57 +98,28 @@ tester.connect_dialogs(dialogs[0], "signal", dialogs[1], "slot")
 assert tester.verify_communication([("signal", (data,))])
 ```
 
-### 3. Signal Testing Utilities (`signal_testing_utils.py`)
+### 3. Signal Testing with QSignalSpy
 
-**SignalSpy**: Replaces MockSignal with real signal monitoring
+Use PySide6's built-in `QSignalSpy` for signal monitoring:
+
 ```python
-# Old approach with MockSignal
-signal = MockSignal()  # Not a real Qt signal
+from PySide6.QtTest import QSignalSpy
 
-# New approach with SignalSpy
-spy = SignalSpy(widget.real_signal, "signal_name")
+# Monitor a signal
+spy = QSignalSpy(widget.real_signal)
 
 widget.do_action()
 
-spy.assert_emitted(count=1)
-spy.assert_emitted_with("expected", "args")
-emission = spy.get_emission(-1)  # Get last emission
+assert len(spy) == 1  # Signal emitted once
+assert spy[0] == ["expected", "args"]  # Check arguments
 ```
 
-**MultiSignalSpy**: Monitor multiple signals
+For async signal waiting, use pytest-qt's `qtbot.waitSignal`:
+
 ```python
-multi_spy = MultiSignalSpy()
-multi_spy.add_signal(dialog.started, "started")
-multi_spy.add_signal(dialog.progress, "progress")
-multi_spy.add_signal(dialog.finished, "finished")
-
-dialog.run_task()
-
-multi_spy.assert_sequence(["started", "progress", "finished"])
-print(multi_spy.get_timeline())  # Visual timeline
-```
-
-**AsyncSignalTester**: Async signal patterns
-```python
-# Wait for async signal
-with AsyncSignalTester.wait_for_signal(worker.finished, 5000) as result:
-    worker.start()
-assert result[0] == "success"
-
-# Emit delayed signals for testing
-AsyncSignalTester.emit_delayed(signal, 100, "data")
-```
-
-**SignalValidator**: Complex validation rules
-```python
-validator = SignalValidator()
-validator.add_rate_limit(max_rate=10.0)  # Max 10/sec
-validator.add_sequence_rule([["start", "progress", "end"]])
-
-spy = SignalSpy(widget.signal)
-# ... perform actions ...
-
-assert validator.validate(spy)
+def test_async_signal(qtbot, worker):
+    with qtbot.waitSignal(worker.finished, timeout=5000):
+        worker.start()
 ```
 
 ## Migration Guide
@@ -167,13 +138,14 @@ dialog.signal.emit(data)
 
 **After (Real Qt):**
 ```python
-from tests.infrastructure.signal_testing_utils import SignalSpy
+from PySide6.QtTest import QSignalSpy
 
 dialog = RealDialog()  # Use real dialog
-spy = SignalSpy(dialog.signal)
+spy = QSignalSpy(dialog.signal)
 
 dialog.trigger_signal()
-spy.assert_emitted_with(data)
+assert len(spy) == 1
+assert spy[0] == [data]
 ```
 
 ### Step 2: Replace Mock Dialogs

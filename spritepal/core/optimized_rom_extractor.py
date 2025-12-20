@@ -264,6 +264,13 @@ class OptimizedROMExtractor(ROMExtractor):
         Returns:
             Raw sprite data as bytes
         """
+        # Validate offset before any operations
+        if sprite_offset < 0:
+            raise ValueError(f"Invalid negative offset: {sprite_offset}")
+        rom_size = Path(rom_path).stat().st_size
+        if sprite_offset >= rom_size:
+            raise ValueError(f"Offset 0x{sprite_offset:X} exceeds ROM size 0x{rom_size:X}")
+
         start_time = time.perf_counter()
 
         # Check decompression cache (includes mtime validation)

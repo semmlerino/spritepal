@@ -23,6 +23,7 @@ pytestmark = [
     pytest.mark.skipif,
     pytest.mark.gui,
     pytest.mark.integration,
+    pytest.mark.allows_registry_state,  # Dialog initialization uses ManagerRegistry
 ]
 
 class TestRowArrangementDialogMigration:
@@ -42,7 +43,6 @@ class TestRowArrangementDialogMigration:
         yield temp_file.name
 
         # Cleanup
-        import os
         with contextlib.suppress(Exception):
             os.unlink(temp_file.name)
 

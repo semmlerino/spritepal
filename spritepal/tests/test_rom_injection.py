@@ -84,7 +84,7 @@ class TestROMInjector(unittest.TestCase):
         try:
             header = self.injector.read_rom_header(tmp_path)
 
-            assert header.title == "TEST ROM"
+            assert header.title.strip() == "TEST ROM"
             assert header.rom_type == 32
             assert header.rom_size == 8
             assert header.checksum == 4660

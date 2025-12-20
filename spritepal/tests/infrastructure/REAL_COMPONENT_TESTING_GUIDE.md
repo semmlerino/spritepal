@@ -70,19 +70,20 @@ def test_extraction_old_way():
 
 ```python
 from tests.infrastructure.real_component_factory import RealComponentFactory
-from tests.infrastructure.manager_test_context import manager_context
 
-def test_extraction_new_way():
-    with RealComponentFactory() as factory:
-        # Real manager, no casting needed!
-        manager = factory.create_extraction_manager()
-        
-        # Real methods work as expected
-        params = factory._data_repo.get_vram_extraction_data("medium")
-        is_valid = manager.validate_extraction_params(params)
-        
-        # Type-safe worker creation
-        worker = factory.create_extraction_worker(params)
+def test_extraction_new_way(isolated_managers, tmp_path):
+    # Use isolated_managers fixture for test isolation
+    factory = RealComponentFactory(manager_registry=isolated_managers)
+
+    # Real manager from the isolated registry
+    manager = isolated_managers.extraction_manager
+
+    # Real methods work as expected
+    params = factory._data_repo.get_vram_extraction_data("medium")
+    is_valid = manager.validate_extraction_params(params)
+
+    # Type-safe worker creation
+    worker = factory.create_extraction_worker(params)
 ```
 
 ## Key Components
@@ -165,10 +166,10 @@ assert Path(vram_data["vram_path"]).exists()
 ### Simple Unit Test
 
 ```python
-def test_manager_unit():
-    with RealComponentFactory() as factory:
-        manager = factory.create_extraction_manager()
-        assert manager.is_initialized()
+def test_manager_unit(isolated_managers):
+    # Access managers through the isolated registry
+    manager = isolated_managers.extraction_manager
+    assert manager.is_initialized()
 ```
 
 ### Integration Test

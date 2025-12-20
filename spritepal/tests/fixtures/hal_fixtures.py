@@ -98,16 +98,8 @@ def reset_hal_singletons(request: FixtureRequest) -> Generator[None, None, None]
 
     HAL fixtures that trigger this: hal_pool, hal_compressor, mock_hal
     HAL marker that triggers this: @pytest.mark.real_hal
-
-    Opt-out markers:
-        @pytest.mark.no_hal - Skip for non-HAL tests
     """
     markers = [m.name for m in request.node.iter_markers()]
-
-    # Opt-OUT: Skip if explicitly marked
-    if 'no_hal' in markers:
-        yield
-        return
 
     # Only run for tests that use HAL fixtures or have real_hal marker
     hal_fixtures = {'hal_pool', 'hal_compressor', 'mock_hal'}

@@ -662,19 +662,14 @@ def create_real_test_main_window(**kwargs):
     """
     return RealTestMainWindow(**kwargs)
 
-# Backward compatibility - delegates to MockFactory if available
+# Backward compatibility function
 def create_mock_main_window(**kwargs):
-    """
-    Create a mock main window for testing.
+    """Create a mock main window for testing.
 
-    This is a compatibility function.
+    Returns a pure mock that doesn't require Qt or manager infrastructure.
+    For real component testing, use RealComponentFactory with proper manager_registry.
     """
-    try:
-        from .real_component_factory import RealComponentFactory
-        factory = RealComponentFactory()
-        return factory.create_main_window(**kwargs)
-    except ImportError:
-        return PureMockMainWindow(**kwargs)
+    return PureMockMainWindow(**kwargs)
 
 # Backward compatibility aliases - point to pure Python versions by default
 TestMainWindow = PureMockMainWindow

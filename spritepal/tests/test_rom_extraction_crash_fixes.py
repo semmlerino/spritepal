@@ -17,7 +17,7 @@ from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.usefixtures,
+    pytest.mark.usefixtures("isolated_managers", "mock_hal"),
     pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
     pytest.mark.headless,
     pytest.mark.integration,

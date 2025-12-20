@@ -24,7 +24,6 @@ PARALLEL BY DEFAULT Policy:
     1. Tests using session_managers (or dependent fixtures like 'managers')
     2. Tests marked @pytest.mark.parallel_unsafe
 
-    The @pytest.mark.parallel_safe marker is deprecated and ignored.
     See pytest_collection_modifyitems in conftest.py for the enforcement logic.
 """
 
@@ -163,33 +162,11 @@ def configure_worker_environment(worker_temp_root: Path) -> Iterator[None]:
 
 
 @pytest.fixture
-def require_parallel_safe(request: pytest.FixtureRequest) -> None:
-    """DEPRECATED: Tests are now parallel by default.
-
-    This fixture previously validated the @pytest.mark.parallel_safe marker,
-    but that marker is now deprecated. Tests run in parallel by default;
-    use @pytest.mark.parallel_unsafe to force serial execution instead.
-
-    This fixture now does nothing but emit a deprecation warning.
-    """
-    import warnings
-
-    warnings.warn(
-        "require_parallel_safe fixture is deprecated. "
-        "Tests are parallel by default; use @pytest.mark.parallel_unsafe "
-        "to force serial execution. This fixture will be removed in a future release.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-
-@pytest.fixture
 def validate_parallel_isolation(request: pytest.FixtureRequest) -> None:
     """Validate that tests using isolated_managers follow best practices.
 
-    Note: The @pytest.mark.parallel_safe marker is deprecated. Tests run
-    in parallel by default; this fixture now validates best practices for
-    ANY test using isolated_managers (not just those with the deprecated marker).
+    Tests run in parallel by default; this fixture validates best practices for
+    tests using isolated_managers.
 
     Checks:
     1. Recommends tmp_path for file operations (soft warning, not failure)

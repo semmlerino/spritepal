@@ -29,6 +29,10 @@ import pytest
 pytest.importorskip("pytest_benchmark")
 
 from core.managers import ValidationError
+from tests.infrastructure.data_repository import (
+    DataRepository,
+    get_test_data_repository,
+)
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
     ManagerTestContext,
@@ -37,10 +41,6 @@ from tests.infrastructure.manager_test_context import (
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.real_component_factory import RealComponentFactory
-from tests.infrastructure.data_repository import (
-    DataRepository,
-    get_test_data_repository,
-)
 
 pytestmark = [
     pytest.mark.headless,

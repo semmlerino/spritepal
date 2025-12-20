@@ -45,6 +45,10 @@ from PIL import Image
 from core.managers import ExtractionError, ValidationError
 from core.managers.core_operations_manager import CoreOperationsManager
 from tests.fixtures.timeouts import signal_timeout, worker_timeout
+from tests.infrastructure.data_repository import (
+    DataRepository,
+    get_test_data_repository,
+)
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
     manager_context,
@@ -52,10 +56,6 @@ from tests.infrastructure.manager_test_context import (
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.real_component_factory import RealComponentFactory
-from tests.infrastructure.data_repository import (
-    DataRepository,
-    get_test_data_repository,
-)
 from utils.constants import BYTES_PER_TILE
 
 

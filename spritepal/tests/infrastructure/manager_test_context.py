@@ -24,9 +24,9 @@ from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.registry import ManagerRegistry
 
+from .data_repository import get_test_data_repository
 from .qt_application_factory import ApplicationFactory
 from .real_component_factory import RealComponentFactory
-from .data_repository import get_test_data_repository
 
 M = TypeVar("M", bound=BaseManager)
 

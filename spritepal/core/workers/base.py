@@ -304,7 +304,7 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
         Also respects cancellation - exits if cancelled during pause.
         Call this periodically in long-running operations.
         """
-        while self._is_paused and not self.isInterruptionRequested():
+        while self._is_paused and not self._cancellation_requested and not self.isInterruptionRequested():
             self.msleep(int(SLEEP_WORKER * 1000))  # Sleep 100ms
 
     @override

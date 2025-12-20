@@ -21,7 +21,7 @@ from utils.constants import BYTES_PER_TILE
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.usefixtures,
+    pytest.mark.usefixtures("isolated_managers", "mock_hal"),
 ]
 
 

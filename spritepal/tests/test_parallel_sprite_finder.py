@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Parallel finder tests create thread pools that take time to clean up"),
-    pytest.mark.usefixtures,
+    pytest.mark.usefixtures("session_managers", "mock_hal"),
     pytest.mark.shared_state_safe,
     pytest.mark.headless,
     pytest.mark.performance,

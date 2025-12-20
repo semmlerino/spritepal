@@ -22,8 +22,8 @@ from utils.constants import (
     VRAM_SPRITE_OFFSET,
     VRAM_SPRITE_SIZE,
 )
-from utils.logging_config import get_logger
 from utils.file_validator import FileValidator
+from utils.logging_config import get_logger
 
 logger: logging.Logger = get_logger(__name__)
 

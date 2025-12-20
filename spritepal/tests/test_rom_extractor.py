@@ -20,7 +20,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.slow,
-    pytest.mark.usefixtures,
+    pytest.mark.usefixtures("session_managers", "mock_hal"),
     pytest.mark.shared_state_safe,
 ]
 

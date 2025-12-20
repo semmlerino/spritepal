@@ -47,7 +47,7 @@ from ui.workers.batch_thumbnail_worker import BatchThumbnailWorker
 # Configure Qt for the detected environment to prevent crashes
 configure_qt_for_environment()
 
-pytestmark = [pytest.mark.skip_thread_cleanup]
+pytestmark = [pytest.mark.skip_thread_cleanup(reason="BatchThumbnailWorker tests create worker threads that need cleanup time")]
 
 class WorkerThreadWrapper:
     """Wrapper to make BatchThumbnailWorker behave like a QThread for tests."""

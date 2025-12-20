@@ -493,7 +493,6 @@ def managers(session_managers: None) -> ManagerRegistry:
             registry = ManagerRegistry()
             extraction = registry.extraction_manager
     """
-    import warnings
 
     from core.managers.registry import ManagerRegistry
 
@@ -678,6 +677,7 @@ def real_session_manager(
 def rom_cache(
     request: FixtureRequest,
     tmp_path: Path,
+    isolated_managers: ManagerRegistry,
 ) -> ROMCache:
     """Function-scoped ROM cache fixture with automatic cleanup.
 
@@ -686,7 +686,10 @@ def rom_cache(
 
     Provides a real ROM cache with common caching functionality.
     """
-    factory = RealComponentFactory(fail_on_leaks=_should_fail_on_leaks(request.config))
+    factory = RealComponentFactory(
+        manager_registry=isolated_managers,
+        fail_on_leaks=_should_fail_on_leaks(request.config),
+    )
     cache_dir = tmp_path / "rom_cache"
     cache_dir.mkdir(exist_ok=True)
     cache = factory.create_rom_cache(cache_dir=cache_dir)

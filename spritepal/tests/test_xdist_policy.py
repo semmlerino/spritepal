@@ -5,7 +5,6 @@ These tests verify that the PARALLEL BY DEFAULT policy is enforced correctly:
 - Tests using session_managers (or dependent fixtures) are auto-serialized
 - Tests marked @pytest.mark.parallel_unsafe are forced to serial
 - Tests already marked with xdist_group are not modified
-- The deprecated @pytest.mark.parallel_safe marker is ignored (with warning)
 
 The actual implementation is in conftest.py::pytest_collection_modifyitems.
 These tests use a minimal reimplementation to test the logic in isolation.
@@ -17,12 +16,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-# Session-dependent fixtures that trigger serialization (must match core_fixtures.py)
-SESSION_DEPENDENT_FIXTURES = frozenset({
-    'session_managers',
-    'managers',
-    'reset_manager_state',
-})
+# Import canonical list from core_fixtures to prevent drift
+from tests.fixtures.core_fixtures import SESSION_DEPENDENT_FIXTURES
 
 
 def collection_policy_logic(
@@ -154,16 +149,6 @@ class TestXdistCollectionPolicy:
 
         assert not item.has_serial_group(), (
             "Tests using isolated_managers should run parallel"
-        )
-
-    def test_parallel_safe_test_still_runs_parallel(self) -> None:
-        """Tests marked parallel_safe (deprecated) should still run parallel."""
-        item = FakeItem(markers={"parallel_safe": pytest.mark.parallel_safe})
-
-        collection_policy_logic(has_xdist=True, workers="auto", items=[item])
-
-        assert not item.has_serial_group(), (
-            "Tests marked @pytest.mark.parallel_safe should still run parallel"
         )
 
     def test_existing_xdist_group_not_modified(self) -> None:

@@ -25,11 +25,14 @@ from PySide6.QtWidgets import QApplication
 from core.async_rom_cache import AsyncROMCache, CacheWorker
 
 # Mark tests that create QApplication instances for serial execution
+# parallel_unsafe: Tests create AsyncROMCache with worker threads that use shared
+# cache directories and can conflict in parallel execution
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.slow,
     pytest.mark.allows_registry_state,
+    pytest.mark.parallel_unsafe,
 ]
 
 class TestCacheWorker:
@@ -234,12 +237,18 @@ class TestAsyncROMCache:
         assert len(self.async_cache._memory_cache) == 0
         assert len(self.async_cache._save_queue) == 0
 
-    def test_initialization_without_rom_cache(self):
+    def test_initialization_without_rom_cache(self, monkeypatch):
         """Test fallback initialization without ROM cache"""
+        # Clear the env var to test the true fallback path
+        monkeypatch.delenv("SPRITEPAL_CACHE_DIR", raising=False)
+
         cache_without_rom = AsyncROMCache(None)
-        expected_dir = Path.home() / ".spritepal_cache"
-        assert cache_without_rom.cache_dir == expected_dir
-        del cache_without_rom
+        try:
+            expected_dir = Path.home() / ".spritepal_cache"
+            assert cache_without_rom.cache_dir == expected_dir
+        finally:
+            # Must shutdown properly to avoid thread conflicts in parallel execution
+            cache_without_rom.shutdown(timeout=2000)
 
     def test_memory_cache_hit(self, qtbot):
         """Test memory cache hit provides instant response"""

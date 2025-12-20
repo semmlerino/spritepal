@@ -310,18 +310,25 @@ def safe_qapp(qt_app: Any) -> Any:
 # Worker Thread Management
 # =============================================================================
 
-# Known helper threads that are not worker leaks (common framework/tooling threads)
+# Known helper threads that are not worker leaks (specific framework/tooling threads)
 # These threads may appear transiently and should not cause leak failures
+# IMPORTANT: Keep this list TIGHT - generic patterns like "QThread" or "Thread-"
+# hide real worker leaks. Tests with expected leaks must use skip_thread_cleanup.
 _KNOWN_HELPER_THREADS: frozenset[str] = frozenset({
+    # Testing infrastructure
     "pytest-timeout",
     "pytest_timeout",
     "coverage",
+    # Development tools
+    "pydevd",
     "watchdog",
+    # Python runtime
     "_GCMonitor",
-    "pydevd",  # Python debugger
-    "QDBusConnectionManager",  # Qt D-Bus
-    "QThread",  # Generic QThread name
-    "Thread-",  # Default Python thread naming
+    # Qt framework internals (specific, not generic)
+    "QDBusConnectionManager",
+    # concurrent.futures ThreadPoolExecutor (legitimate helper threads)
+    "ThreadPoolExecutor-",
+    "Dummy-",
 })
 
 

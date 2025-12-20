@@ -65,7 +65,7 @@ Mocks are appropriate for:
 - Error condition simulation
 - Hardware dependencies
 
-See `tests/examples/example_minimal_mock_test.py` for proper mock usage patterns.
+Mock at system boundaries only (file I/O, network, subprocess).
 
 ## Test Infrastructure
 
@@ -81,13 +81,13 @@ tests/
 ├── infrastructure/          # Real component testing framework
 │   ├── real_component_factory.py    # Factory for real components
 │   ├── manager_test_context.py      # Integration test contexts
-│   ├── test_data_repository.py      # Consistent test data
-│   └── migration_helpers.py         # Mock-to-real migration tools
-├── examples/               # Example patterns and migration guides
-│   ├── example_real_component_test.py    # Ideal real component patterns
-│   ├── example_minimal_mock_test.py      # When mocks are appropriate
-│   └── example_migration.py             # Before/after migration examples
-└── test_*.py              # Test files (many using real components)
+│   ├── data_repository.py           # Consistent test data
+│   └── mock_dialogs.py              # Dialog test doubles
+├── fixtures/               # Pytest fixtures
+│   ├── core_fixtures.py    # Manager fixtures
+│   ├── qt_fixtures.py      # Qt-specific fixtures
+│   └── timeouts.py         # Semantic timeout functions
+└── test_*.py              # Test files
 ```
 
 ## Test Categories
@@ -120,8 +120,8 @@ uv run pytest tests/test_extraction_manager.py -v
 # Integration tests only
 uv run pytest tests/ -m "integration" -v
 
-# Quick unit tests (small test data)
-uv run pytest tests/ -m "unit" -v
+# Skip slow tests
+uv run pytest tests/ -m "not slow" -v
 ```
 
 ### Coverage Analysis
@@ -211,7 +211,7 @@ python -m tests.infrastructure.migration_helpers generate tests/test_controller.
    assert isinstance(result, dict)
    ```
 
-See `tests/examples/example_migration.py` for complete before/after examples.
+See existing real component tests in the test suite for migration patterns.
 
 ## Performance Benchmarks
 
@@ -363,11 +363,8 @@ All timeouts scale with `PYTEST_TIMEOUT_MULTIPLIER` environment variable.
 
 ## Documentation
 
-- **[Marker Guide](MARKER_GUIDE.md)**: Comprehensive marker reference with usage counts and examples
-- **[Real Component Testing Guide](../docs/REAL_COMPONENT_TESTING_GUIDE.md)**: Comprehensive patterns and migration guide
-- **[Headless Testing Guide](HEADLESS_TESTING.md)**: CI/CD setup, offscreen mode, and troubleshooting
-- **[Testing Examples](examples/)**: Complete code examples for all patterns
-- **[Infrastructure Guide](infrastructure/REAL_COMPONENT_TESTING_GUIDE.md)**: Technical implementation details
+- **[Real Component Testing Guide](infrastructure/REAL_COMPONENT_TESTING_GUIDE.md)**: Comprehensive patterns and migration guide
+- **[Environment Detection](infrastructure/ENVIRONMENT_DETECTION_SUMMARY.md)**: Test environment detection and skip decorators
 
 ## Recent Test Suite Improvements
 
@@ -413,7 +410,6 @@ The real component testing migration is **ongoing**:
 
 ## Getting Help
 
-- **Examples**: Check `tests/examples/` for patterns and migration examples
-- **Migration Tools**: Use `python -m tests.infrastructure.migration_helpers` for analysis
 - **Infrastructure**: See `tests/infrastructure/` for framework documentation
 - **Patterns**: Review existing real component tests for established patterns
+- **CLAUDE.md**: Project-level testing guidelines and quick reference

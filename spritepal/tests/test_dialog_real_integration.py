@@ -88,8 +88,8 @@ class TestRealDialogIntegration:
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
 
-        # Initialize real manager factory
-        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
+        # Initialize real manager factory with isolated managers for test isolation
+        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
 
         # Initialize test data repository
         self.test_data = DataRepository()
@@ -500,7 +500,7 @@ class TestRealDialogManagerIntegration:
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
         self.test_data = DataRepository()
 
         # Managers already initialized by isolated_managers fixture
@@ -584,7 +584,7 @@ class TestBugDiscoveryRealVsMockedDialogs:
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealComponentFactory(qt_parent=self.qt_app)
+        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
         self.test_data = DataRepository()
 
         # Managers already initialized by isolated_managers fixture
