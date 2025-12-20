@@ -327,6 +327,11 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
 
     Uses AST-based detection to correctly handle multiline calls.
 
+    Scans:
+        - All collected test files
+        - tests/fixtures/*.py (fixture definitions)
+        - tests/infrastructure/*.py (support modules)
+
     Args:
         items: list of test items being collected
     """
@@ -381,6 +386,18 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
             matches = check_file(fspath)
             for line_no, line_content in matches:
                 violations.append(f"  {fspath}:{line_no}: {line_content}")
+
+    # Also scan fixtures/ and infrastructure/ directories (not test items, but contain factory calls)
+    tests_dir = Path(__file__).parent
+    for scan_dir in [tests_dir / "fixtures", tests_dir / "infrastructure"]:
+        if scan_dir.is_dir():
+            for py_file in scan_dir.glob("*.py"):
+                fspath = str(py_file)
+                if fspath not in checked_files:
+                    checked_files.add(fspath)
+                    matches = check_file(fspath)
+                    for line_no, line_content in matches:
+                        violations.append(f"  {fspath}:{line_no}: {line_content}")
 
     if violations:
         import warnings
@@ -748,6 +765,7 @@ def temp_files() -> Iterator[Callable[[bytes, str], str]]:
 def standard_test_params(
     test_data_factory: Callable[..., bytearray],
     temp_files: Callable[[bytes, str], str],
+    tmp_path: Path,
 ) -> dict[str, Any]:
     """
     Create standard test parameters used across integration tests.
@@ -769,7 +787,7 @@ def standard_test_params(
         "vram_path": vram_file,
         "cgram_path": cgram_file,
         "oam_path": oam_file,
-        "output_base": "test_output",
+        "output_base": str(tmp_path / "output"),
         "create_grayscale": True,
         "create_metadata": True,
         "vram_data": vram_data,
