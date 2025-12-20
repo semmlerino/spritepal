@@ -187,7 +187,8 @@ class RealComponentFactory:
         Create a real extraction manager (CoreOperationsManager) for testing.
 
         Args:
-            with_test_data: Whether to inject test data paths
+            with_test_data: Kept for API compatibility (no-op). Tests should get
+                data from DataRepository and pass paths to manager methods directly.
 
         Returns:
             Real CoreOperationsManager instance (from registry if provided, new otherwise)
@@ -199,14 +200,9 @@ class RealComponentFactory:
             manager = CoreOperationsManager()
             self._created_components.append(manager)
 
-        if with_test_data:
-            # Set up test data paths
-            test_data = self._data_repo.get_vram_extraction_data("medium")
-
-            # Inject test paths into manager's internal state if needed
-            # The manager validates paths, so we use real test files
-            manager._last_vram_path = test_data["vram_path"]
-            manager._last_cgram_path = test_data["cgram_path"]
+        # Note: with_test_data is intentionally unused. Test data injection via
+        # private fields was removed - tests should use DataRepository directly.
+        _ = with_test_data
 
         return manager
 
@@ -215,7 +211,8 @@ class RealComponentFactory:
         Create a real injection manager (CoreOperationsManager) for testing.
 
         Args:
-            with_test_data: Whether to inject test data paths
+            with_test_data: Kept for API compatibility (no-op). Tests should get
+                data from DataRepository and pass paths to manager methods directly.
 
         Returns:
             Real CoreOperationsManager instance (from registry if provided, new otherwise)
@@ -227,13 +224,9 @@ class RealComponentFactory:
             manager = CoreOperationsManager()
             self._created_components.append(manager)
 
-        if with_test_data:
-            # Set up test data paths
-            test_data = self._data_repo.get_injection_data("medium")
-
-            # Inject test paths if manager supports it
-            if hasattr(manager, "_last_sprite_path"):
-                manager._last_sprite_path = test_data["sprite_path"]
+        # Note: with_test_data is intentionally unused. Test data injection via
+        # private fields was removed - tests should use DataRepository directly.
+        _ = with_test_data
 
         return manager
 

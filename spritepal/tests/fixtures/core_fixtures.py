@@ -299,9 +299,9 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     _session_state.settings_path = settings_path
     _session_state.is_initialized = True
 
-    # Ensure Qt app exists
+    # Ensure Qt app exists (even in headless/offscreen mode for realistic signal behavior)
     app = QApplication.instance()
-    if app is None and not IS_HEADLESS:
+    if app is None:
         app = QApplication([])
 
     initialize_managers("TestApp", settings_path=settings_path)
@@ -317,7 +317,7 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     _session_state.is_initialized = False
 
     # Process events to ensure cleanup completes
-    if app and not IS_HEADLESS:
+    if app:
         app.processEvents()
 
 
@@ -393,9 +393,9 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     # Use temp settings path for isolation
     settings_path = tmp_path / ".test_settings.json"
 
-    # Ensure Qt app exists
+    # Ensure Qt app exists (even in headless/offscreen mode for realistic signal behavior)
     app = QApplication.instance()
-    if app is None and not IS_HEADLESS:
+    if app is None:
         app = QApplication([])
 
     # Initialize fresh managers for this test with isolated settings

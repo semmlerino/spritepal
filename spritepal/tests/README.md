@@ -244,6 +244,7 @@ What does your test need?
 ├─ HAL compression/decompression
 │  └─ Default: `hal_pool` gives MockHAL (fast)
 │     └─ Need real compression? Add @pytest.mark.real_hal
+│        └─ See "Running Real HAL Tests" section below
 │
 ├─ Wait for signals
 │  └─ Use qtbot.waitSignal() with timeout functions
@@ -393,6 +394,33 @@ The test suite has been significantly improved for better isolation and parallel
 - Thread-leak checker now opt-in (only activates for Qt/worker tests)
 - Headless fallback fixed: offscreen Qt is NOT treated as headless
 - Real HAL binaries used when `@pytest.mark.real_hal` is set
+
+### Running Real HAL Tests
+
+Tests marked with `@pytest.mark.real_hal` require the `exhal` and `inhal` binaries to be available. By default, these tests gracefully skip when binaries are unavailable.
+
+**Setup:**
+1. Build the HAL tools from source (https://github.com/Asmodegun/exhal) or obtain pre-built binaries
+2. Set environment variables pointing to the binaries:
+   ```bash
+   export SPRITEPAL_EXHAL_PATH=/path/to/exhal
+   export SPRITEPAL_INHAL_PATH=/path/to/inhal
+   ```
+3. Alternatively, place binaries in your PATH or in `~/.local/bin/`
+
+**Running:**
+```bash
+# Run only real HAL tests (skips if binaries not found)
+uv run pytest -m real_hal -v
+
+# Force failure instead of skip when binaries missing
+uv run pytest -m real_hal --require-real-hal -v
+
+# Regenerate golden data checksums
+uv run pytest tests/test_hal_golden.py --regenerate-golden -v
+```
+
+**Note:** CI does not have HAL binaries installed; `@pytest.mark.real_hal` tests are skipped in CI. This is by design to keep CI simple while allowing local verification with real compression.
 
 **Removed Fixtures:**
 - `setup_managers` - use `isolated_managers` instead
