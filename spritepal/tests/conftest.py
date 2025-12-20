@@ -481,8 +481,8 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
         if item.get_closest_marker("xdist_group"):
             continue
 
-        # Force serial if marked parallel_unsafe or serial
-        if item.get_closest_marker("parallel_unsafe") or item.get_closest_marker("serial"):
+        # Force serial if marked parallel_unsafe
+        if item.get_closest_marker("parallel_unsafe"):
             item.add_marker(serial_group)
             continue
 
@@ -491,16 +491,7 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
             item.add_marker(serial_group)
             continue
 
-        # Deprecation warning for parallel_safe marker (no longer needed)
-        if item.get_closest_marker("parallel_safe"):
-            warnings.warn(
-                f"{item.nodeid}: @pytest.mark.parallel_safe is deprecated. "
-                "Tests are now parallel by default. Remove this marker.",
-                DeprecationWarning,
-                stacklevel=1
-            )
-
-        # DEFAULT: No marker = runs in parallel (the key inversion)
+        # DEFAULT: No marker = runs in parallel
 
     # Validate no module uses both session_managers and isolated_managers
     _validate_no_same_module_mixing(items)

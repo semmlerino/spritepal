@@ -355,7 +355,7 @@ class TestSimplePreviewWorker:
 
 @pytest.mark.integration
 @pytest.mark.gui  # Uses Qt coordinator which can segfault in headless mode
-@pytest.mark.usefixtures("isolated_managers")
+@pytest.mark.usefixtures("managers_initialized")
 class TestPreviewCaching:
     """Test preview caching with ROM cache."""
 
