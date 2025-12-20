@@ -33,11 +33,7 @@ def get_session_manager():
     return inject(ApplicationStateManagerProtocol)
 
 
-from tests.fixtures.test_managers import (
-    # Systematic pytest markers applied based on test content analysis
-    create_extraction_manager_fixture,
-    create_injection_manager_fixture,
-)
+from tests.fixtures.test_data_factory import TestDataFactory
 
 pytestmark = [
     pytest.mark.headless,
@@ -91,35 +87,28 @@ class TestManagerCommunication:
         """Test ROM injection workflow integration"""
         injection_manager = get_injection_manager()
 
-        # Use injection manager fixture to create real test files
-        injection_fixture = create_injection_manager_fixture(str(tmp_path))
+        # Create test files using TestDataFactory
+        paths = TestDataFactory.create_injection_test_files(tmp_path)
 
-        try:
-            # Get real ROM injection parameters from fixture
-            fixture_params = injection_fixture.get_rom_injection_params()
+        # Build ROM injection parameters
+        rom_injection_params = {
+            "mode": "rom",
+            "sprite_path": str(paths.sprite_path),
+            "input_rom": str(paths.rom_path),
+            "output_rom": str(tmp_path / "output.sfc"),
+            "offset": 0x8000,
+            "fast_compression": True,
+        }
 
-            # Convert fixture parameter names to manager expected names
-            rom_injection_params = {
-                "mode": "rom",
-                "sprite_path": fixture_params["sprite_path"],
-                "input_rom": fixture_params["input_rom_path"],
-                "output_rom": str(tmp_path / "output.sfc"),
-                "offset": 0x8000,
-                "fast_compression": True,
-            }
+        # Validate ROM injection parameters with real manager
+        injection_manager.validate_injection_params(rom_injection_params)
 
-            # Validate ROM injection parameters with real manager
-            injection_manager.validate_injection_params(rom_injection_params)
-
-            # Verify ROM injection parameters are properly structured
-            assert Path(rom_injection_params["sprite_path"]).exists()
-            assert Path(rom_injection_params["input_rom"]).exists()
-            assert rom_injection_params["offset"] == 0x8000
-            assert rom_injection_params["mode"] == "rom"
-            assert rom_injection_params["fast_compression"] is True
-
-        finally:
-            injection_fixture.cleanup()
+        # Verify ROM injection parameters are properly structured
+        assert Path(rom_injection_params["sprite_path"]).exists()
+        assert Path(rom_injection_params["input_rom"]).exists()
+        assert rom_injection_params["offset"] == 0x8000
+        assert rom_injection_params["mode"] == "rom"
+        assert rom_injection_params["fast_compression"] is True
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

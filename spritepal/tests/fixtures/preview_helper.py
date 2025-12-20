@@ -371,32 +371,21 @@ class StatusBarHelper:
         """Get current status message"""
         return self._current_message
 
+# VRAM file creation functions - use TestDataFactory instead
+# These wrappers exist for backward compatibility
 def create_sample_vram_file(temp_dir: str, filename: str = "test_VRAM.dmp") -> str:
-    """Create sample VRAM file for testing"""
-    vram_data = bytearray(0x10000)  # 64KB
-
-    # Add different patterns at different offsets for testing
-    for offset in [0x8000, 0xC000, 0xE000]:
-        for i in range(100):  # 100 tiles worth of data
-            tile_offset = offset + i * 32
-            if tile_offset + 32 <= len(vram_data):
-                for j in range(32):
-                    vram_data[tile_offset + j] = (offset // 0x1000 + i + j) % 256
+    """Create sample VRAM file for testing. Uses TestDataFactory."""
+    from tests.fixtures.test_data_factory import TestDataFactory
 
     vram_path = Path(temp_dir) / filename
-    vram_path.write_bytes(vram_data)
-
+    TestDataFactory.create_vram_file(vram_path)
     return str(vram_path)
 
-def create_large_vram_file(temp_dir: str, filename: str = "large_VRAM.dmp") -> str:
-    """Create large VRAM file for performance testing"""
-    vram_data = bytearray(0x100000)  # 1MB
 
-    # Fill with pattern data
-    for i in range(len(vram_data)):
-        vram_data[i] = i % 256
+def create_large_vram_file(temp_dir: str, filename: str = "large_VRAM.dmp") -> str:
+    """Create large VRAM file for performance testing. Uses TestDataFactory."""
+    from tests.fixtures.test_data_factory import TestDataFactory
 
     vram_path = Path(temp_dir) / filename
-    vram_path.write_bytes(vram_data)
-
+    TestDataFactory.create_vram_file(vram_path, size=0x100000)  # 1MB
     return str(vram_path)

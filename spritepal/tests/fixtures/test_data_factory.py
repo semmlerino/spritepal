@@ -36,12 +36,8 @@ class TestDataFactory:
     """
     Factory for creating standardized test data files.
 
-    Consolidates test file creation from:
-    - test_dialog_helper.py
-    - test_main_window_helper.py
-    - test_main_window_helper_simple.py
-    - test_managers.py (ExtractionManagerFixture, InjectionManagerFixture)
-    - test_worker_helper.py
+    Consolidates test file creation from various helper modules.
+    Use this as the single source for test VRAM, ROM, sprite, and palette files.
 
     Usage:
         paths = TestDataFactory.create_test_files(temp_dir)
@@ -120,24 +116,30 @@ class TestDataFactory:
         )
 
     @classmethod
-    def create_vram_file(cls, path: Path, *, minimal: bool = False) -> Path:
+    def create_vram_file(
+        cls, path: Path, *, minimal: bool = False, size: int | None = None
+    ) -> Path:
         """
         Create a test VRAM file with sprite-like data pattern.
 
         Args:
             path: Path to create the file at
             minimal: If True, create a smaller file (32KB instead of 64KB)
+            size: Override size in bytes (for performance testing with large files)
 
         Returns:
             Path to the created file
         """
-        size = 0x8000 if minimal else cls.VRAM_SIZE
-        vram_data = bytearray(size)
+        if size is not None:
+            file_size = size
+        else:
+            file_size = 0x8000 if minimal else cls.VRAM_SIZE
+        vram_data = bytearray(file_size)
 
         # Add sprite-like pattern at sprite offset
-        sprite_offset = min(cls.SPRITE_OFFSET, size - cls.SPRITE_DATA_SIZE)
+        sprite_offset = min(cls.SPRITE_OFFSET, file_size - cls.SPRITE_DATA_SIZE)
         if sprite_offset > 0:
-            for i in range(min(cls.SPRITE_DATA_SIZE, size - sprite_offset)):
+            for i in range(min(cls.SPRITE_DATA_SIZE, file_size - sprite_offset)):
                 vram_data[sprite_offset + i] = i % 256
 
         path.write_bytes(vram_data)

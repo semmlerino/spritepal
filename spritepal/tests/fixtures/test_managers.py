@@ -1,30 +1,16 @@
 """
-Test fixture managers for real extraction/injection logic
+Test fixture managers for UI row arrangement components.
 
-Provides real manager instances with test data instead of mocks,
-improving test reliability and reducing mocking overhead.
-
-NOTE: This file directly instantiates managers for testing purposes.
-The deprecation warning is suppressed since these are test fixtures.
+Provides real component instances with test data for integration testing.
+For extraction/injection test files, use TestDataFactory directly.
 """
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
-import warnings
 
 import pytest
-
-# Suppress deprecation warning for direct manager instantiation in test fixtures
-warnings.filterwarnings(
-    "ignore",
-    message=r"Direct SessionManager instantiation is deprecated",
-    category=DeprecationWarning,
-)
 from PIL import Image
-
-# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -32,8 +18,6 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
-from core.managers import SessionManager
-from core.managers.core_operations_manager import CoreOperationsManager
 from ui.row_arrangement.grid_arrangement_manager import (
     GridArrangementManager,
     TilePosition,
@@ -43,103 +27,6 @@ from ui.row_arrangement.grid_preview_generator import GridPreviewGenerator
 from ui.row_arrangement.palette_colorizer import PaletteColorizer
 from ui.row_arrangement.preview_generator import PreviewGenerator
 
-
-class ExtractionManagerFixture:
-    """Test fixture providing real extraction manager with test data.
-
-    Uses CoreOperationsManager which implements ExtractionManagerProtocol.
-    """
-
-    def __init__(self, temp_dir: str | None = None):
-        from pathlib import Path
-
-        from tests.fixtures.test_data_factory import TestDataFactory
-
-        self.temp_dir = temp_dir or tempfile.mkdtemp()
-        self.manager = CoreOperationsManager()
-
-        # Use TestDataFactory for file creation (DRY consolidation)
-        paths = TestDataFactory.create_test_files(Path(self.temp_dir))
-        self.vram_path = str(paths.vram_path)
-        self.cgram_path = str(paths.cgram_path)
-        self.oam_path = str(paths.oam_path)
-        self.rom_path = str(paths.rom_path)
-        self.output_dir = str(paths.output_dir)
-
-    def get_vram_extraction_params(self):
-        """Get realistic VRAM extraction parameters"""
-        return {
-            "vram_path": self.vram_path,
-            "cgram_path": self.cgram_path,
-            "oam_path": self.oam_path,
-            "output_base": os.path.join(self.output_dir, "sprite"),
-            "vram_offset": 0xC000,
-            "sprite_size": (8, 8),
-            "create_metadata": True,
-            "create_grayscale": True
-        }
-
-    def get_rom_extraction_params(self):
-        """Get realistic ROM extraction parameters"""
-        return {
-            "rom_path": self.rom_path,
-            "offset": 0x200000,
-            "output_base": os.path.join(self.output_dir, "rom_sprite"),
-            "sprite_size": (16, 16),
-            "create_metadata": True
-        }
-
-    def cleanup(self):
-        """Clean up test files"""
-        import shutil
-        if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
-
-class InjectionManagerFixture:
-    """Test fixture providing real injection manager with test data.
-
-    Uses CoreOperationsManager which implements InjectionManagerProtocol.
-    """
-
-    def __init__(self, temp_dir: str | None = None):
-        from pathlib import Path
-
-        from tests.fixtures.test_data_factory import TestDataFactory
-
-        self.temp_dir = temp_dir or tempfile.mkdtemp()
-        self.manager = CoreOperationsManager()
-
-        # Use TestDataFactory for injection test files (DRY consolidation)
-        paths = TestDataFactory.create_injection_test_files(Path(self.temp_dir))
-        self.sprite_path = str(paths.sprite_path)
-        self.vram_input_path = str(paths.vram_path)
-        self.vram_output_path = os.path.join(self.temp_dir, "output.vram")
-        self.rom_input_path = str(paths.rom_path)
-        self.rom_output_path = os.path.join(self.temp_dir, "output.sfc")
-
-    def get_vram_injection_params(self):
-        """Get realistic VRAM injection parameters"""
-        return {
-            "sprite_path": self.sprite_path,
-            "input_vram_path": self.vram_input_path,
-            "output_vram_path": self.vram_output_path,
-            "vram_offset": 0xC000
-        }
-
-    def get_rom_injection_params(self):
-        """Get realistic ROM injection parameters"""
-        return {
-            "sprite_path": self.sprite_path,
-            "input_rom_path": self.rom_input_path,
-            "output_rom_path": self.rom_output_path,
-            "rom_offset": 0x200000
-        }
-
-    def cleanup(self):
-        """Clean up test files"""
-        import shutil
-        if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
 
 class GridArrangementManagerFixture:
     """Test fixture providing real GridArrangementManager with test data"""
@@ -286,34 +173,7 @@ class PreviewGeneratorFixture:
         """Get the colorizer"""
         return self.colorizer
 
-class SessionManagerFixture:
-    """Test fixture providing real SessionManager for testing"""
-
-    def __init__(self, temp_dir: str | None = None):
-        self.temp_dir = temp_dir or tempfile.mkdtemp()
-        # Create session manager with test-specific settings path
-        self.settings_path = os.path.join(self.temp_dir, "test_settings.json")
-        self.manager = SessionManager(settings_path=self.settings_path)
-
-    def get_manager(self) -> SessionManager:
-        """Get the session manager"""
-        return self.manager
-
-    def cleanup(self):
-        """Clean up test files"""
-        import shutil
-        if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
-
 # Convenience functions for creating test fixtures
-def create_extraction_manager_fixture(temp_dir: str | None = None) -> ExtractionManagerFixture:
-    """Create a test extraction manager fixture"""
-    return ExtractionManagerFixture(temp_dir)
-
-def create_injection_manager_fixture(temp_dir: str | None = None) -> InjectionManagerFixture:
-    """Create a test injection manager fixture"""
-    return InjectionManagerFixture(temp_dir)
-
 def create_grid_arrangement_fixture(rows: int = 4, cols: int = 4) -> GridArrangementManagerFixture:
     """Create a test grid arrangement manager fixture"""
     return GridArrangementManagerFixture(rows, cols)
@@ -329,7 +189,3 @@ def create_colorizer_fixture() -> PaletteColorizerFixture:
 def create_preview_generator_fixture() -> PreviewGeneratorFixture:
     """Create a test preview generator fixture"""
     return PreviewGeneratorFixture()
-
-def create_session_manager_fixture(temp_dir: str | None = None) -> SessionManagerFixture:
-    """Create a test session manager fixture"""
-    return SessionManagerFixture(temp_dir)

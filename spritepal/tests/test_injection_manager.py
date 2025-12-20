@@ -29,7 +29,7 @@ from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.exceptions import ValidationError
 
 # Real Component Testing Infrastructure (using available components)
-from tests.fixtures.test_managers import create_injection_manager_fixture
+from tests.fixtures.test_data_factory import TestDataFactory
 from tests.fixtures.worker_helper import WorkerHelper
 
 # Parallel-safe: Uses isolated_managers for per-test isolation
@@ -414,71 +414,53 @@ class TestInjectionManagerWorkflows:
         """Test starting VRAM injection parameter validation with real fixture"""
         manager = CoreOperationsManager()
 
-        # Use real injection manager fixture for testing
-        injection_fixture = create_injection_manager_fixture(str(tmp_path))
+        # Create test files using TestDataFactory
+        paths = TestDataFactory.create_injection_test_files(tmp_path)
 
-        try:
-            # Get real VRAM injection parameters from fixture
-            fixture_params = injection_fixture.get_vram_injection_params()
+        # Build injection parameters
+        params = {
+            "mode": "vram",
+            "sprite_path": str(paths.sprite_path),
+            "input_vram": str(paths.vram_path),
+            "output_vram": str(tmp_path / "output.vram"),
+            "offset": 0xC000,
+        }
 
-            # Convert to manager expected format
-            params = {
-                "mode": "vram",
-                "sprite_path": fixture_params["sprite_path"],
-                "input_vram": fixture_params["input_vram_path"],
-                "output_vram": str(tmp_path / "output.vram"),
-                "offset": fixture_params["vram_offset"],
-            }
+        # Validate injection parameters with real manager
+        manager.validate_injection_params(params)
 
-            # Validate injection parameters with real manager
-            # (Testing parameter validation instead of worker creation to avoid threading)
-            manager.validate_injection_params(params)
-
-            # Verify parameters are properly structured for real workflow
-            assert params["mode"] == "vram"
-            assert params["offset"] == fixture_params["vram_offset"]
-            from pathlib import Path
-            assert Path(params["sprite_path"]).exists()
-            assert Path(params["input_vram"]).exists()
-
-        finally:
-            injection_fixture.cleanup()
+        # Verify parameters are properly structured for real workflow
+        assert params["mode"] == "vram"
+        assert params["offset"] == 0xC000
+        assert Path(params["sprite_path"]).exists()
+        assert Path(params["input_vram"]).exists()
 
     def test_start_rom_injection_success(self, tmp_path):
         """Test starting ROM injection parameter validation with real fixture"""
         manager = CoreOperationsManager()
 
-        # Use real injection manager fixture for testing
-        injection_fixture = create_injection_manager_fixture(str(tmp_path))
+        # Create test files using TestDataFactory
+        paths = TestDataFactory.create_injection_test_files(tmp_path)
 
-        try:
-            # Get real ROM injection parameters from fixture
-            fixture_params = injection_fixture.get_rom_injection_params()
+        # Build ROM injection parameters
+        params = {
+            "mode": "rom",
+            "sprite_path": str(paths.sprite_path),
+            "input_rom": str(paths.rom_path),
+            "output_rom": str(tmp_path / "output.sfc"),
+            "offset": 0x8000,
+            "fast_compression": True,
+        }
 
-            # Convert to manager expected format
-            params = {
-                "mode": "rom",
-                "sprite_path": fixture_params["sprite_path"],
-                "input_rom": fixture_params["input_rom_path"],
-                "output_rom": str(tmp_path / "output.sfc"),
-                "offset": 0x8000,
-                "fast_compression": True,
-            }
+        # Validate ROM injection parameters with real manager
+        manager.validate_injection_params(params)
 
-            # Validate ROM injection parameters with real manager
-            # (Testing parameter validation instead of worker creation to avoid threading)
-            manager.validate_injection_params(params)
-
-            # Verify parameters are properly structured for real workflow
-            assert params["mode"] == "rom"
-            assert params["offset"] == 0x8000
-            assert params["fast_compression"] is True
-            from pathlib import Path
-            assert Path(params["sprite_path"]).exists()
-            assert Path(params["input_rom"]).exists()
-
-        finally:
-            injection_fixture.cleanup()
+        # Verify parameters are properly structured for real workflow
+        assert params["mode"] == "rom"
+        assert params["offset"] == 0x8000
+        assert params["fast_compression"] is True
+        assert Path(params["sprite_path"]).exists()
+        assert Path(params["input_rom"]).exists()
 
     def test_start_injection_validation_error(self):
         """Test start injection fails on validation error"""
@@ -496,36 +478,28 @@ class TestInjectionManagerWorkflows:
         """Test injection parameter validation for worker replacement scenario"""
         manager = CoreOperationsManager()
 
-        # Use real injection manager fixture for testing
-        injection_fixture = create_injection_manager_fixture(str(tmp_path))
+        # Create test files using TestDataFactory
+        paths = TestDataFactory.create_injection_test_files(tmp_path)
 
-        try:
-            # Get real VRAM injection parameters from fixture
-            fixture_params = injection_fixture.get_vram_injection_params()
+        # Build injection parameters
+        params = {
+            "mode": "vram",
+            "sprite_path": str(paths.sprite_path),
+            "input_vram": str(paths.vram_path),
+            "output_vram": str(tmp_path / "output.vram"),
+            "offset": 0xC000,
+        }
 
-            # Convert to manager expected format
-            params = {
-                "mode": "vram",
-                "sprite_path": fixture_params["sprite_path"],
-                "input_vram": fixture_params["input_vram_path"],
-                "output_vram": str(tmp_path / "output.vram"),
-                "offset": fixture_params["vram_offset"],
-            }
+        # Test repeated parameter validation (simulating worker replacement scenario)
+        # First validation
+        manager.validate_injection_params(params)
 
-            # Test repeated parameter validation (simulating worker replacement scenario)
-            # First validation
-            manager.validate_injection_params(params)
+        # Second validation (would replace existing worker in real scenario)
+        manager.validate_injection_params(params)
 
-            # Second validation (would replace existing worker in real scenario)
-            manager.validate_injection_params(params)
-
-            # Both validations should succeed
-            from pathlib import Path
-            assert Path(params["sprite_path"]).exists()
-            assert Path(params["input_vram"]).exists()
-
-        finally:
-            injection_fixture.cleanup()
+        # Both validations should succeed
+        assert Path(params["sprite_path"]).exists()
+        assert Path(params["input_vram"]).exists()
 
     def test_is_injection_active(self, tmp_path):
         """Test injection active status checking with real worker"""
@@ -783,70 +757,61 @@ class TestInjectionManagerVRAMSuggestion:
 
 def test_complete_injection_workflow_tdd_real_components(tmp_path, qtbot):
     """Complete TDD workflow test demonstrating real component integration.
-    
+
     This test follows the complete TDD cycle:
     RED -> GREEN -> REFACTOR with real components throughout.
-    
+
     Demonstrates bugs that real testing catches vs mocks:
     - Actual file I/O errors and validation
-    - Real Qt signal/slot connection issues  
+    - Real Qt signal/slot connection issues
     - Threading and worker lifecycle problems
     - Memory and resource management
     """
     manager = CoreOperationsManager()
 
-    # Create temporary test data using fixtures
-    injection_fixture = create_injection_manager_fixture(str(tmp_path))
+    # Create test files using TestDataFactory
+    paths = TestDataFactory.create_injection_test_files(tmp_path)
 
-    try:
-        # Get real injection test data from fixture
-        fixture_params = injection_fixture.get_vram_injection_params()
+    # Build injection parameters
+    params = {
+        "mode": "vram",
+        "sprite_path": str(paths.sprite_path),
+        "input_vram": str(paths.vram_path),
+        "output_vram": str(tmp_path / "output.vram"),
+        "offset": 0xC000,
+    }
 
-        # GREEN: Validate parameters with real files
-        params = {
-            "mode": "vram",
-            "sprite_path": fixture_params["sprite_path"],
-            "input_vram": fixture_params["input_vram_path"],
-            "output_vram": str(tmp_path / "output.vram"),
-            "offset": fixture_params["vram_offset"],
-        }
+    # REFACTOR: Real validation catches actual edge cases
+    manager.validate_injection_params(params)
 
-        # REFACTOR: Real validation catches actual edge cases
-        # NOTE: If this fails, the test data fixture needs to be fixed,
-        # or there's a real validation bug to investigate. Don't skip!
-        manager.validate_injection_params(params)
+    # Real signal connection testing
+    progress_messages: list[str] = []
+    finished_results: list[tuple[bool, str]] = []
 
-        # Real signal connection testing
-        progress_messages: list[str] = []
-        finished_results: list[tuple[bool, str]] = []
+    def on_progress(msg: str) -> None:
+        progress_messages.append(msg)
 
-        def on_progress(msg: str) -> None:
-            progress_messages.append(msg)
+    def on_finished(success: bool, msg: str) -> None:
+        finished_results.append((success, msg))
 
-        def on_finished(success: bool, msg: str) -> None:
-            finished_results.append((success, msg))
+    manager.injection_progress.connect(on_progress)
+    manager.injection_finished.connect(on_finished)
 
-        manager.injection_progress.connect(on_progress)
-        manager.injection_finished.connect(on_finished)
+    # Test real signal emission
+    manager._on_worker_progress("Test progress")
+    manager._on_worker_finished(True, "Test complete")
 
-        # Test real signal emission
-        manager._on_worker_progress("Test progress")
-        manager._on_worker_finished(True, "Test complete")
+    # Wait for Qt event processing
+    qtbot.waitUntil(lambda: len(progress_messages) > 0, timeout=1000)
+    qtbot.waitUntil(lambda: len(finished_results) > 0, timeout=1000)
 
-        # Wait for Qt event processing
-        qtbot.waitUntil(lambda: len(progress_messages) > 0, timeout=1000)
-        qtbot.waitUntil(lambda: len(finished_results) > 0, timeout=1000)
+    # Verify real signal behavior
+    assert "Test progress" in progress_messages
+    assert (True, "Test complete") in finished_results
 
-        # Verify real signal behavior
-        assert "Test progress" in progress_messages
-        assert (True, "Test complete") in finished_results
-
-        # Verify files exist and are reasonable
-        assert Path(params["sprite_path"]).exists()
-        assert Path(params["input_vram"]).exists()
-
-    finally:
-        injection_fixture.cleanup()
+    # Verify files exist and are reasonable
+    assert Path(params["sprite_path"]).exists()
+    assert Path(params["input_vram"]).exists()
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

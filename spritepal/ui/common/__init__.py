@@ -15,6 +15,7 @@ from .file_dialogs import (
     browse_for_open_file,
     browse_for_save_file,
 )
+from .signal_utils import is_valid_qt, safe_disconnect
 
 # Import spacing and sizing constants explicitly
 # NOTE: Color constants moved to ui/styles/theme.py - use COLORS dict instead
@@ -138,5 +139,8 @@ __all__ = [
     "create_info_label",
     # Error handler functions
     "get_error_handler",
+    # Signal utilities
+    "is_valid_qt",
     "reset_error_handler",
+    "safe_disconnect",
 ]

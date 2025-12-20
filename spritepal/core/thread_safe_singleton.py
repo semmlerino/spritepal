@@ -30,7 +30,6 @@ logger = get_logger(__name__)
 T = TypeVar("T")
 TSingleton = TypeVar("TSingleton")
 TQt = TypeVar("TQt")
-TLazy = TypeVar("TLazy")
 TFactory = TypeVar("TFactory")
 TResult = TypeVar("TResult")  # For safe_qt_call return type
 
@@ -260,61 +259,7 @@ class QtThreadSafeSingleton(ThreadSafeSingleton[TQt]):
                 )
 
 
-class LazyThreadSafeSingleton(ThreadSafeSingleton[TLazy]):
-    """
-    Thread-safe singleton with lazy initialization support.
-
-    Provides additional functionality for singletons that need
-    deferred initialization or conditional creation.
-    """
-
-    _initialized: bool = False
-    _initialization_lock: threading.Lock = threading.Lock()
-
-    @classmethod
-    def get_if_initialized(cls) -> TLazy | None:
-        """
-        Get the singleton instance only if it's already been initialized.
-
-        Returns:
-            The singleton instance if initialized, None otherwise
-        """
-        return cls._instance if cls._initialized else None
-
-    @classmethod
-    def initialize(cls, *args: Any, **kwargs: Any) -> TLazy:
-        """
-        Explicitly initialize the singleton instance.
-
-        This allows for controlled initialization separate from first access.
-
-        Args:
-            *args: Arguments for instance creation
-            **kwargs: Keyword arguments for instance creation
-
-        Returns:
-            The initialized singleton instance
-        """
-        # Use _lock (same as get()) to prevent race between initialize() and get()
-        with cls._lock:
-            if not cls._initialized:
-                cls._instance = cls._create_instance(*args, **kwargs)
-                cls._initialized = True
-                logger.debug(f"Initialized singleton instance of {cls.__name__}")
-            return cls._instance  # type: ignore[return-value]  # Instance is guaranteed to exist after initialization
-
-    @classmethod
-    @override
-    def reset(cls) -> None:
-        """Reset both the instance and initialization state."""
-        with cls._lock:
-            if cls._instance is not None:
-                cls._cleanup_instance(cls._instance)
-            cls._instance = None
-            cls._initialized = False
-
-
-# Convenience functions for common patterns
+# Convenience function for common patterns
 
 
 def create_simple_singleton(
@@ -345,34 +290,3 @@ def create_simple_singleton(
 
     SimpleSingleton.__name__ = f"{instance_type.__name__}Singleton"
     return SimpleSingleton
-
-
-def create_qt_singleton(
-    qt_type: type[TFactory],
-) -> type[QtThreadSafeSingleton[TFactory]]:
-    """
-    Create a thread-safe Qt singleton class for a given Qt type.
-
-    Args:
-        qt_type: The Qt type to create a singleton for
-
-    Returns:
-        A Qt singleton class for the given type
-
-    Example:
-        MyDialog = SomeDialogClass
-        MyDialogSingleton = create_qt_singleton(MyDialog)
-        dialog = MyDialogSingleton.get()
-    """
-
-    class QtSingleton(QtThreadSafeSingleton[TFactory]):  # type: ignore[misc]
-        _instance: TFactory | None = None
-        _lock = threading.Lock()
-
-        @classmethod
-        def _create_instance(cls, *args, **kwargs) -> TFactory:  # type: ignore[misc]
-            cls._ensure_main_thread()
-            return qt_type(*args, **kwargs)
-
-    QtSingleton.__name__ = f"{qt_type.__name__}Singleton"
-    return QtSingleton

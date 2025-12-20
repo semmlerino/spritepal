@@ -15,10 +15,8 @@ from PySide6.QtWidgets import QApplication, QWidget
 
 from core.thread_safe_singleton import (
     # Serial execution required: QApplication management, Thread safety concerns
-    LazyThreadSafeSingleton,
     QtThreadSafeSingleton,
     ThreadSafeSingleton,
-    create_qt_singleton,
     create_simple_singleton,
 )
 
@@ -221,36 +219,6 @@ class TestQtThreadSafeSingleton:
         # Should return None from worker thread (safe failure)
         assert worker_result[0] is None
 
-class TestLazyThreadSafeSingleton:
-    """Test lazy initialization singleton functionality."""
-
-    def test_lazy_initialization(self):
-        """Test lazy initialization behavior."""
-
-        class TestLazySingleton(LazyThreadSafeSingleton[MockClass]):
-            _instance: MockClass | None = None
-            _lock = threading.Lock()
-            _initialization_lock = threading.Lock()
-            _initialized = False
-
-            @classmethod
-            def _create_instance(cls, value: str = "lazy") -> MockClass:
-                return MockClass(value)
-
-        # Should not be initialized initially
-        assert not TestLazySingleton.is_initialized()
-        assert TestLazySingleton.get_if_initialized() is None
-
-        # Initialize explicitly
-        instance = TestLazySingleton.initialize("initialized")
-        assert TestLazySingleton.is_initialized()
-        assert TestLazySingleton.get_if_initialized() is instance
-
-        # Subsequent get should return same instance
-        same_instance = TestLazySingleton.get("different")
-        assert same_instance is instance
-        assert same_instance.value == "initialized"  # Original value preserved
-
 class TestSingletonFactories:
     """Test singleton factory functions."""
 
@@ -266,19 +234,6 @@ class TestSingletonFactories:
         assert instance1.value == "factory_test"
         assert MockSingleton.__name__ == "MockClassSingleton"
 
-    def test_create_qt_singleton(self):
-        """Test Qt singleton factory."""
-        if QApplication.instance() is None:
-            QApplication([])
-
-        MockQtSingleton = create_qt_singleton(MockQtClass)
-
-        instance1 = MockQtSingleton.get()
-        instance2 = MockQtSingleton.get()
-
-        assert instance1 is instance2
-        assert isinstance(instance1, MockQtClass)
-        assert MockQtSingleton.__name__ == "MockQtClassSingleton"
 
 class TestRealWorldScenarios:
     """Test realistic usage scenarios."""

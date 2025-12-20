@@ -99,29 +99,8 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _safe_disconnect(signal: Any) -> None:
-    """Disconnect all slots from a signal, ignoring warnings if no connections exist.
-
-    PySide6 emits RuntimeWarning when disconnect() is called on a signal
-    with no connections. This helper suppresses those warnings.
-    """
-    import warnings
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", "Failed to disconnect", RuntimeWarning)
-        try:
-            signal.disconnect()
-        except (TypeError, RuntimeError):
-            pass  # Already disconnected or no connections
-
-def _is_valid_qt(obj: Any) -> bool:
-    """Check if a Qt object is still valid (not deleted on the C++ side)."""
-    if obj is None:
-        return False
-    try:
-        from shiboken6 import isValid
-        return isValid(obj)
-    except Exception:
-        return True
+# Signal utilities imported from shared module
+from ui.common.signal_utils import is_valid_qt as _is_valid_qt, safe_disconnect as _safe_disconnect
 
 # Import tab widgets from the new module
 from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmartTab
