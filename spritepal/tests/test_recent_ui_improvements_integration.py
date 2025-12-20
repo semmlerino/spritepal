@@ -30,6 +30,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import (
+    QApplication,
     QMainWindow,
     QPushButton,
     QWidget,
@@ -42,7 +43,7 @@ from core.protocols.manager_protocols import (
     ROMCacheProtocol,
     SettingsManagerProtocol,
 )
-from launch_spritepal import SpritePalApp
+from launch_spritepal import SpritePalApp, apply_dark_theme
 from ui.main_window import MainWindow
 from ui.styles.components import get_button_style, get_dark_preview_style
 from ui.styles.theme import COLORS, get_theme_style
@@ -74,15 +75,14 @@ class TestSpritePalAppDarkThemeIntegration:
     """Test SpritePalApp dark theme integration with real Qt components."""
 
     @pytest.mark.gui
-    @pytest.mark.xfail(reason="Cannot instantiate SpritePalApp when QApplication already exists", strict=False)
     def test_spritepal_app_dark_theme_applied(self, qtbot) -> None:
-        """Test that SpritePalApp applies dark theme correctly to real application."""
-        # Create SpritePalApp instance
-        app_args = ["test_spritepal"]
-        spritepal_app = SpritePalApp(app_args)
+        """Test that dark theme applies correctly to the application."""
+        app = QApplication.instance()
+        assert app is not None, "QApplication should be initialized by pytest-qt"
+        apply_dark_theme(app)
 
         # Test that dark palette is applied
-        palette = spritepal_app.palette()
+        palette = app.palette()
 
         # Check key dark theme colors
         window_color = palette.color(QPalette.ColorRole.Window)
@@ -98,14 +98,14 @@ class TestSpritePalAppDarkThemeIntegration:
         assert button_color == QColor(55, 55, 58), f"Expected dark button color, got {button_color.name()}"
 
     @pytest.mark.gui
-    @pytest.mark.xfail(reason="Cannot instantiate SpritePalApp when QApplication already exists", strict=False)
     def test_spritepal_app_comprehensive_stylesheet_applied(self, qtbot) -> None:
         """Test that comprehensive dark theme stylesheet is applied."""
-        app_args = ["test_spritepal"]
-        spritepal_app = SpritePalApp(app_args)
+        app = QApplication.instance()
+        assert app is not None, "QApplication should be initialized by pytest-qt"
+        apply_dark_theme(app)
 
         # Get application stylesheet
-        stylesheet = spritepal_app.styleSheet()
+        stylesheet = app.styleSheet()
 
         # Test key stylesheet components
         assert "QMainWindow" in stylesheet, "Stylesheet should include QMainWindow styling"
@@ -124,14 +124,10 @@ class TestSpritePalAppDarkThemeIntegration:
             assert widget in stylesheet, f"Stylesheet should include {widget} styling"
 
     @pytest.mark.gui
-    @pytest.mark.xfail(reason="Cannot instantiate SpritePalApp when QApplication already exists", strict=False)
     def test_spritepal_app_with_main_window_size(self, qtbot) -> None:
         """Test that main window has correct size (1000x650)."""
-        app_args = ["test_spritepal"]
-        spritepal_app = SpritePalApp(app_args)
-
-        # Get main window
-        main_window = spritepal_app.main_window
+        main_window = _create_main_window()
+        qtbot.addWidget(main_window)
         assert isinstance(main_window, QMainWindow), "Should have real MainWindow instance"
 
         # Test minimum size is set correctly
@@ -210,11 +206,6 @@ class TestManualOffsetDialogSignalIntegration:
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
-    @pytest.mark.xfail(
-        _is_offscreen,
-        reason="Signal emission testing requires real widget interaction which fails in offscreen mode",
-        strict=False,
-    )
     def test_manual_offset_dialog_offset_changed_signal_emission(self, qtbot) -> None:
         """Test offset_changed signal emission with real Qt signal testing."""
         with mock_manager_dependencies():
@@ -236,25 +227,20 @@ class TestManualOffsetDialogSignalIntegration:
 
                 if not is_mock:
                     # Wait for signal emission
-                    qtbot.waitUntil(lambda: len(spy) > 0, timeout=500)
+                    qtbot.waitUntil(lambda: spy.count() > 0, timeout=500)
 
                     # Test that signal was emitted
-                    assert len(spy) > 0, "offset_changed signal should have been emitted"
+                    assert spy.count() > 0, "offset_changed signal should have been emitted"
 
                     # Test signal argument
-                    if len(spy) > 0:
-                        emitted_offset = spy[-1][0]  # Get last emitted offset
+                    if spy.count() > 0:
+                        emitted_offset = spy.at(spy.count() - 1)[0]  # Get last emitted offset
                         assert emitted_offset == test_offset, f"Expected offset {test_offset}, got {emitted_offset}"
             else:
                 pytest.skip("Dialog does not have expected browse_tab structure")
 
     @pytest.mark.gui
     @pytest.mark.skipif(not MANUAL_OFFSET_AVAILABLE, reason="Manual offset dialog not available")
-    @pytest.mark.xfail(
-        _is_offscreen,
-        reason="Signal emission testing requires real widget interaction which fails in offscreen mode",
-        strict=False,
-    )
     def test_manual_offset_dialog_sprite_found_signal_emission(self, qtbot) -> None:
         """Test sprite_found signal emission with real Qt signal testing."""
         with mock_manager_dependencies():
@@ -275,14 +261,14 @@ class TestManualOffsetDialogSignalIntegration:
 
             if not is_mock:
                 # Wait for signal processing
-                qtbot.waitUntil(lambda: len(spy) > 0, timeout=500)
+                qtbot.waitUntil(lambda: spy.count() > 0, timeout=500)
 
                 # Test that signal was emitted
-                assert len(spy) > 0, "sprite_found signal should have been emitted"
+                assert spy.count() > 0, "sprite_found signal should have been emitted"
 
                 # Test signal arguments
-                if len(spy) > 0:
-                    emitted_data = spy[-1]  # Get last emission
+                if spy.count() > 0:
+                    emitted_data = spy.at(spy.count() - 1)  # Get last emission
                     assert emitted_data[0] == test_offset, f"Expected offset {test_offset}, got {emitted_data[0]}"
                     assert emitted_data[1] == test_sprite_name, f"Expected name {test_sprite_name}, got {emitted_data[1]}"
 
@@ -660,13 +646,18 @@ def mock_manager_dependencies() -> Generator[None, None, None]:
         container.unregister(ROMExtractorProtocol)
         container.unregister(ApplicationStateManagerProtocol)
 
-def create_test_spritepal_app() -> SpritePalApp:
-    """Create a test SpritePalApp instance with minimal setup."""
-    return SpritePalApp(["test_spritepal"])
+def create_test_spritepal_app() -> QApplication:
+    """Create a test application instance with minimal setup."""
+    app = QApplication.instance()
+    if app is None:
+        app = SpritePalApp(["test_spritepal"])
+    else:
+        apply_dark_theme(app)
+    return app
 
 @pytest.fixture
-def test_app(qtbot) -> Generator[SpritePalApp, None, None]:
-    """Fixture providing a test SpritePalApp instance."""
+def test_app(qtbot) -> Generator[QApplication, None, None]:
+    """Fixture providing a test application instance."""
     app = create_test_spritepal_app()
     yield app
     # Cleanup is handled by qtbot

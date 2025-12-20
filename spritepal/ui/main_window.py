@@ -213,7 +213,7 @@ class MainWindow(QMainWindow):
         extraction_manager = inject(ExtractionManagerProtocol)
         self.rom_extraction_panel = ROMExtractionPanel(
             parent=self,
-            extraction_manager=extraction_manager  # type: ignore[arg-type]
+            extraction_manager=extraction_manager
         )
         self.extraction_tabs.addTab(self.rom_extraction_panel, "ROM Extraction")
 

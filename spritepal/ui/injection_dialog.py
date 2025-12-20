@@ -8,6 +8,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import InjectionManagerProtocol
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -24,9 +27,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-if TYPE_CHECKING:
-    from core.managers.core_operations_manager import CoreOperationsManager
 
 # InjectionManager accessed via DI: inject(InjectionManagerProtocol)
 from core.sprite_validator import SpriteValidator
@@ -55,7 +55,7 @@ class InjectionDialog(TabbedDialog):
         metadata_path: str = "",
         input_vram: str = "",
         *,
-        injection_manager: InjectionManager,
+        injection_manager: InjectionManagerProtocol,
     ):
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path = sprite_path

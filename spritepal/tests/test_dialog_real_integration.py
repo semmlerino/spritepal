@@ -18,10 +18,9 @@ This replaces mock usage in dialog tests:
 - Mock Qt parent/child relationships (misses real Qt lifecycle issues)
 - Mock signal connections (can't test real cross-dialog communication)
 
-NOTE: Uses REAL dialog instantiation which may fail in Qt offscreen mode.
-The rom_map widget initialization requires a real display. Tests are marked
-xfail for offscreen mode - they will pass if unexpectedly working, fail if
-truly requiring a real display.
+NOTE: Uses REAL dialog instantiation which can be sensitive in Qt offscreen mode.
+If these tests fail in offscreen, use @pytest.mark.requires_display or adjust
+the dialog expectations to match headless behavior.
 """
 from __future__ import annotations
 
@@ -31,13 +30,9 @@ import tempfile
 import pytest
 from PySide6.QtWidgets import QApplication
 
-# Determine if running in offscreen mode
-_is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
-
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 # Systematic pytest markers applied based on test content analysis
-# xfail for offscreen mode - real dialogs may not work
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
@@ -47,9 +42,12 @@ pytestmark = [
 
 # Import real testing infrastructure
 # Import real dialogs and managers (not mocked!)
-from core.managers import SessionManager
-from core.managers.core_operations_manager import CoreOperationsManager
-from core.managers.registry import ManagerRegistry
+from core.di_container import inject
+from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
+    ExtractionManagerProtocol,
+    InjectionManagerProtocol,
+)
 from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
@@ -95,7 +93,6 @@ class TestRealDialogIntegration:
         self.test_data.cleanup()
         # Manager cleanup handled by isolated_managers fixture
 
-    @pytest.mark.xfail(reason="Real ManualOffsetDialog may fail in offscreen mode")
     def test_real_manual_offset_dialog_vs_mocked_initialization(self):
         """
         Test real ManualOffsetDialog initialization vs mocked components.
@@ -115,8 +112,14 @@ class TestRealDialogIntegration:
             # CRITICAL: Test that all widget components are properly initialized
             # This catches the common bug where widgets are None after setup methods
             widget_attrs = [
-                "rom_map", "offset_widget", "scan_controls",
-                "import_export", "status_panel", "preview_widget"
+                "mini_rom_map",
+                "status_panel",
+                "preview_widget",
+                "tab_widget",
+                "browse_tab",
+                "smart_tab",
+                "history_tab",
+                "gallery_tab",
             ]
 
             for attr in widget_attrs:
@@ -147,7 +150,6 @@ class TestRealDialogIntegration:
                 dialog.close()
                 dialog.deleteLater()
 
-    @pytest.mark.xfail(reason="Real InjectionDialog may fail in offscreen mode")
     def test_real_injection_dialog_vs_mocked_manager_integration(self):
         """
         Test real InjectionDialog with manager integration vs mocked managers.
@@ -169,10 +171,12 @@ class TestRealDialogIntegration:
 
         try:
             # Test real dialog creation with real file paths (vs mocked paths)
+            injection_manager = inject(InjectionManagerProtocol)
             dialog = InjectionDialog(
                 sprite_path=test_sprite_path,
                 metadata_path=test_metadata_path,
-                input_vram=extraction_data["vram_path"]
+                input_vram=extraction_data["vram_path"],
+                injection_manager=injection_manager,
             )
 
             # CRITICAL: Test that all UI components are properly initialized
@@ -189,8 +193,6 @@ class TestRealDialogIntegration:
                 assert widget is not None, f"REAL BUG DISCOVERED: UI component {component} is None"
 
             # Test real manager integration (vs mocked manager returns)
-            registry = ManagerRegistry()
-            injection_manager = registry.get("injection")
             assert dialog.injection_manager is injection_manager, "Dialog should use real injection manager"
 
             # Test tab switching functionality (could expose widget initialization bugs)
@@ -492,7 +494,6 @@ class TestRealDialogManagerIntegration:
         self.test_data.cleanup()
         # Manager cleanup handled by isolated_managers fixture
 
-    @pytest.mark.xfail(reason="Real dialog-manager coordination may fail in offscreen mode")
     def test_real_dialog_manager_coordination_vs_mocked_coordination(self):
         """
         Test real dialog-manager coordination vs isolated mock managers.
@@ -506,10 +507,9 @@ class TestRealDialogManagerIntegration:
         # Managers already initialized by setup_test_infrastructure fixture
 
         # Get real managers for coordination testing
-        registry = ManagerRegistry()
-        extraction_manager = registry.get("extraction")
-        injection_manager = registry.get("injection")
-        session_manager = registry.get("session")
+        extraction_manager = inject(ExtractionManagerProtocol)
+        injection_manager = inject(InjectionManagerProtocol)
+        session_manager = inject(ApplicationStateManagerProtocol)
 
         # Test multiple dialogs using same managers (could expose resource conflicts)
         manual_dialog = ManualOffsetDialog()
@@ -577,7 +577,6 @@ class TestBugDiscoveryRealVsMockedDialogs:
         self.test_data.cleanup()
         # Manager cleanup handled by isolated_managers fixture
 
-    @pytest.mark.xfail(reason="Real ManualOffsetDialog may fail in offscreen mode")
     def test_discovered_bug_dialog_widget_initialization_order(self):
         """
         Test that exposes dialog widget initialization order bugs.
@@ -593,7 +592,11 @@ class TestBugDiscoveryRealVsMockedDialogs:
             # Test the specific initialization order bug pattern
             # Widgets created in _setup_ui might be overwritten by None declarations
 
-            critical_widgets = ["rom_map", "offset_widget", "scan_controls"]
+            critical_widgets = [
+                "mini_rom_map",
+                "status_panel",
+                "preview_widget",
+            ]
 
             for widget_name in critical_widgets:
                 widget = getattr(dialog, widget_name, None)

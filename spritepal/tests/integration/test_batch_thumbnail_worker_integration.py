@@ -348,7 +348,11 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
 
         # Process thumbnails
         worker.start()
-        worker.wait(5000)
+        finished = worker.wait(5000)
+        if not finished and worker.isRunning():
+            # Ensure the worker is stopped before GC to avoid Qt finalization races.
+            worker.stop()
+            worker.wait(2000)
 
         # Worker should clean up automatically
         gc.collect()

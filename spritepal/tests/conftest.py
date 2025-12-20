@@ -122,6 +122,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "no_qt: Skip Qt app/thread cleanup for tests that do not use Qt"
+    )
+    config.addinivalue_line(
+        "markers",
         "golden_hal: Verify HAL output against recorded golden checksums (no real binary needed)"
     )
     config.addinivalue_line(
@@ -228,7 +232,7 @@ class _QPixmapGuardFinder(importlib.abc.MetaPathFinder):
         4. Return None - the caller finds the patched module in sys.modules
         """
         if fullname != 'PySide6.QtGui' or self._installed:
-            return None
+            return
 
         # Mark as installed to prevent re-triggering
         _QPixmapGuardFinder._installed = True
@@ -244,7 +248,7 @@ class _QPixmapGuardFinder(importlib.abc.MetaPathFinder):
         _patch_qpixmap_init()
 
         # Return None - caller finds patched module in sys.modules
-        return None
+        return
 
 
 def _install_qpixmap_guard_unconditional() -> None:

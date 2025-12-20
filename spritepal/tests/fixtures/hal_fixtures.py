@@ -69,6 +69,7 @@ def _find_real_hal_binaries() -> tuple[str, str] | None:
     common_locations = [
         project_root / "bin",
         project_root,
+        project_root / "spritepal" / "tools",
         Path.home() / ".local" / "bin",
     ]
 

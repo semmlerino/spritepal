@@ -468,6 +468,7 @@ class TestEventLoopManagement:
 
                 # Emit result
                 self.result_ready.emit(result)
+                QThread.currentThread().quit()
 
         # Create and setup worker
         worker = Worker()
@@ -480,10 +481,9 @@ class TestEventLoopManagement:
 
         # Run in thread
         thread.started.connect(worker.process_with_event_loop)
-        thread.started.connect(lambda: QTimer.singleShot(200, thread.quit))
 
         thread.start()
-        thread.wait(1000)
+        assert thread.wait(1000)
 
         # Verify result
         assert len(results) == 1
@@ -807,6 +807,15 @@ class TestRealWorldScenarios:
         # Create processor
         processor = DataProcessor()
 
+        class ChunkWorker(QThread):
+            def __init__(self, chunk_id: int, data: list[int]):
+                super().__init__()
+                self.chunk_id = chunk_id
+                self.data = data
+
+            def run(self):
+                processor.process_chunk(self.chunk_id, self.data)
+
         # Create multiple worker threads
         threads = []
         chunks = {
@@ -816,23 +825,14 @@ class TestRealWorldScenarios:
         }
 
         for chunk_id, data in chunks.items():
-            thread = QThread()
-            processor_copy = DataProcessor()
-            processor_copy.moveToThread(thread)
-
             # Process chunk when thread starts
-            thread.started.connect(
-                lambda cid=chunk_id, d=data: processor.process_chunk(cid, d)
-            )
-            # Fix closure bug: capture thread by value using default arg
-            thread.started.connect(lambda t=thread: QTimer.singleShot(50, t.quit))
-
-            threads.append(thread)
-            thread.start()
+            worker = ChunkWorker(chunk_id, data)
+            threads.append(worker)
+            worker.start()
 
         # Wait for all threads
         for thread in threads:
-            thread.wait(1000)
+            assert thread.wait(1000)
 
         # Process queued signals from worker threads
         QApplication.processEvents()

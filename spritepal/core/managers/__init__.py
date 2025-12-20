@@ -45,7 +45,6 @@ from .exceptions import (
 #   from core.di_container import inject
 #   from core.protocols.manager_protocols import ExtractionManagerProtocol, InjectionManagerProtocol
 #   manager = inject(ExtractionManagerProtocol)  # Returns CoreOperationsManager
-
 # Import DI-based manager functions
 # Note: We import from registry now which supports both consolidated and original modes
 # Convenience functions removed - use inject() or ManagerRegistry() directly

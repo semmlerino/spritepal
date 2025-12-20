@@ -20,7 +20,7 @@ from ui.row_arrangement_dialog import RowArrangementDialog
 
 # Skip in headless environments - this tests real Qt dialog behavior
 pytestmark = [
-    pytest.mark.skipif,
+    pytest.mark.requires_display,
     pytest.mark.gui,
     pytest.mark.integration,
     pytest.mark.allows_registry_state,  # Dialog initialization uses ManagerRegistry

@@ -27,6 +27,6 @@ __all__ = [
     "OAMError",
     "SpritePalError",
     "TileError",
-    "ValidationError",
     "VRAMError",
+    "ValidationError",
 ]

@@ -94,7 +94,7 @@ class ControllerDialogFactory:
         injection_manager = inject(InjectionManagerProtocol)
         return InjectionDialog(
             parent, sprite_path, metadata_path, input_vram,
-            injection_manager=injection_manager  # type: ignore[arg-type]
+            injection_manager=injection_manager
         )
 
 

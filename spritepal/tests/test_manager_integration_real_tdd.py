@@ -23,7 +23,6 @@ Benefits of real integration testing vs mocking:
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -40,9 +39,6 @@ from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
     manager_context,
 )
-
-# Determine if running in offscreen mode
-_is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 
 pytestmark = [
     pytest.mark.integration,
@@ -140,7 +136,6 @@ class TestManagerIntegrationTDD:
             assert not extraction_mgr.is_operation_active("vram_extraction")
             assert not injection_mgr.is_injection_active()
 
-    @pytest.mark.xfail(reason="Session manager coordination may fail in offscreen mode")
     def test_session_manager_integration_tdd(self, test_data_repo):
         """TDD: Session manager should coordinate state across extraction and injection.
 
@@ -175,7 +170,8 @@ class TestManagerIntegrationTDD:
             # Managers should still function after session clear
             test_params = {
                 "vram_path": vram_data["vram_path"],
-                "output_base": vram_data["output_base"]
+                "output_base": vram_data["output_base"],
+                "grayscale_mode": True,
             }
             extraction_mgr.validate_extraction_params(test_params)
 
@@ -218,7 +214,6 @@ class TestManagerIntegrationTDD:
             assert not extraction_mgr.is_operation_active("vram_extraction")
             assert not injection_mgr.is_injection_active()
 
-    @pytest.mark.xfail(reason="Concurrent manager operations may fail in offscreen mode")
     def test_concurrent_manager_operations_tdd(self, test_data_repo):
         """TDD: Managers should handle concurrent operations correctly.
 
@@ -238,23 +233,25 @@ class TestManagerIntegrationTDD:
             extraction_mgr._start_operation("vram_extraction")
 
             # Create temporary VRAM file for injection if needed
-            if not Path(injection_data.get("vram_path", "")).exists():
-                temp_vram = str(Path(injection_data["output_dir"]) / "temp.vram")
-                Path(temp_vram).write_bytes(b"\x00" * 0x4000)
-                injection_data["vram_path"] = temp_vram
+            vram_input = injection_data["vram_input"]
+            if not Path(vram_input).exists():
+                temp_vram = Path(vram_data["output_base"]).with_suffix(".vram")
+                temp_vram.write_bytes(b"\x00" * 0x4000)
+                vram_input = str(temp_vram)
 
             injection_params = {
                 "mode": "vram",
                 "sprite_path": injection_data["sprite_path"],
-                "input_vram": injection_data.get("vram_path", vram_data["vram_path"]),
-                "output_vram": str(Path(injection_data["output_dir"]) / "concurrent.vram"),
+                "input_vram": vram_input,
+                "output_vram": injection_data["vram_output"],
                 "offset": 0x8000
             }
 
             # Both managers should handle concurrent validation
             extraction_params = {
                 "vram_path": vram_data["vram_path"],
-                "output_base": vram_data["output_base"]
+                "output_base": vram_data["output_base"],
+                "grayscale_mode": True,
             }
 
             extraction_mgr.validate_extraction_params(extraction_params)

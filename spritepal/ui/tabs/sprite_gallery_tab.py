@@ -600,7 +600,7 @@ class SpriteGalleryTab(QWidget):
             extraction_manager = inject(ExtractionManagerProtocol)
             self.detached_window = DetachedGalleryWindow(
                 self,
-                extraction_manager=extraction_manager  # type: ignore[arg-type]
+                extraction_manager=extraction_manager
             )
 
             # Connect signals

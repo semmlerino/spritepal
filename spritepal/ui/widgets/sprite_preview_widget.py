@@ -718,29 +718,38 @@ class SpritePreviewWidget(QWidget):
     def clear(self) -> None:
         """Clear the preview and show visible placeholder"""
         logger.debug("[DEBUG] SpritePreviewWidget.clear() called")
+        def _is_valid(widget: Any) -> bool:
+            if widget is None:
+                return False
+            try:
+                from shiboken6 import isValid
+                return isValid(widget)
+            except Exception:
+                return True
+
         # Only clear if there's actually content to clear
         # This prevents unnecessary flashing during rapid updates
-        preview_pixmap = self.preview_label.pixmap() if self.preview_label else None
+        preview_pixmap = self.preview_label.pixmap() if self.preview_label is not None and _is_valid(self.preview_label) else None
         if self.sprite_pixmap is not None or preview_pixmap is not None:
-            if self.preview_label:
+            if self.preview_label is not None and _is_valid(self.preview_label):
                 self.preview_label.clear()
-            if self.preview_label:
+            if self.preview_label is not None and _is_valid(self.preview_label):
                 self.preview_label.setText("No preview available\n\nLoad a ROM and select an offset\nto view sprite data")
             # Reset to minimum size for visibility when empty
-            if self.preview_label:
+            if self.preview_label is not None and _is_valid(self.preview_label):
                 self.preview_label.setMinimumSize(100, 100)  # Space-efficient minimum
 
             # Apply visible empty state style
             self._apply_empty_state_style()
 
-            if self.palette_combo:
+            if self.palette_combo is not None and _is_valid(self.palette_combo):
                 self.palette_combo.clear()
-            if self.palette_combo:
+            if self.palette_combo is not None and _is_valid(self.palette_combo):
                 self.palette_combo.setEnabled(False)
             # Reset both info labels to cleared state
-            if self.essential_info_label:
+            if self.essential_info_label is not None and _is_valid(self.essential_info_label):
                 self.essential_info_label.setText("No sprite loaded")
-            if self.info_label:
+            if self.info_label is not None and _is_valid(self.info_label):
                 self.info_label.setText("No sprite loaded")
             self.sprite_pixmap = None
             self.sprite_data = None
@@ -749,6 +758,12 @@ class SpritePreviewWidget(QWidget):
     def _apply_empty_state_style(self) -> None:
         """Apply dark theme styling for empty state that's clearly visible"""
         if self.preview_label:
+            try:
+                from shiboken6 import isValid
+                if not isValid(self.preview_label):
+                    return
+            except Exception:
+                pass
             self.preview_label.setStyleSheet(f"""
             QLabel {{
                 border: 2px dashed {COLORS["text_muted"]};

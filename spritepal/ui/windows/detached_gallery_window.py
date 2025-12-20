@@ -8,6 +8,9 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ExtractionManagerProtocol
+
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
@@ -25,9 +28,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-if TYPE_CHECKING:
-    from core.managers.core_operations_manager import CoreOperationsManager
 
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
@@ -56,7 +56,7 @@ class DetachedGalleryWindow(QMainWindow):
         self,
         parent: QWidget | None = None,
         *,
-        extraction_manager: ExtractionManager,
+        extraction_manager: ExtractionManagerProtocol,
     ):
         """
         Initialize the detached gallery window.

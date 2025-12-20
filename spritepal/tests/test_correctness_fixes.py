@@ -59,7 +59,7 @@ class TestTempFileCleanup:
         # Create a simple 16x16 indexed PNG
         from PIL import Image
         img = Image.new("P", (16, 16))
-        img.putpalette([i for i in range(256)] * 3)
+        img.putpalette(list(range(256)) * 3)
         img.save(sprite_path)
 
         # Count temp files before
@@ -157,7 +157,7 @@ class TestROMStateConsistency:
         # Create a simple 16x16 indexed PNG
         from PIL import Image
         img = Image.new("P", (16, 16))
-        img.putpalette([i for i in range(256)] * 3)
+        img.putpalette(list(range(256)) * 3)
         img.save(sprite_path)
 
         # Mock HALCompressor to return valid compressed data
@@ -176,7 +176,7 @@ class TestROMStateConsistency:
 
                 # Load ROM first so we can check state
                 injector.rom_data = bytearray(rom_path.read_bytes())
-                original_state = bytes(injector.rom_data)
+                bytes(injector.rom_data)
 
                 # Use inject_sprite_to_rom with correct API
                 success, message = injector.inject_sprite_to_rom(
@@ -265,7 +265,7 @@ class TestOffsetParseError:
 
         manager = isolated_managers.get_extraction_manager()
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.WARNING, logger=manager._logger.name):
             result = manager.load_rom_injection_defaults(
                 str(sprite_path),
                 metadata
@@ -302,7 +302,7 @@ class TestVRAMBufferCleanup:
         # Create a simple 16x16 indexed PNG
         from PIL import Image
         img = Image.new("P", (16, 16))
-        img.putpalette([i for i in range(256)] * 3)
+        img.putpalette(list(range(256)) * 3)
         img.save(sprite_path)
 
         # Create VRAM file

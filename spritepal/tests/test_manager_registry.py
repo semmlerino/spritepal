@@ -55,30 +55,9 @@ class TestManagerRegistry:
     """Test ManagerRegistry functionality"""
 
     @pytest.fixture(autouse=True)
-    def cleanup_registry(self):
-        """Ensure clean registry state for each test.
-
-        IMPORTANT: If session_managers fixture is active, we skip cleanup
-        to avoid breaking the session fixture's DI container registrations.
-        """
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        # Skip cleanup if session_managers is active - it owns the lifecycle
-        if is_session_managers_active():
-            yield
-            return
-
-        # Clean up before test - both manager registry and DI container
-        if are_managers_initialized():
-            cleanup_managers()
-        reset_container()  # Clear DI container singletons
-
+    def cleanup_registry(self, clean_registry_state):
+        """Ensure clean registry state for each test."""
         yield
-
-        # Clean up after test
-        if are_managers_initialized():
-            cleanup_managers()
-        reset_container()  # Clear DI container singletons
 
     def test_singleton_pattern(self):
         """Test that registry is a singleton"""
@@ -96,11 +75,6 @@ class TestManagerRegistry:
         When session_managers is active, the cleanup_registry fixture skips cleanup
         to avoid breaking other tests, so this test cannot run.
         """
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test uninitialized state while session_managers is active")
-
         # The cleanup_registry fixture should have cleaned up before this test
         # Verify we're in an uninitialized state
         assert not are_managers_initialized(), (
@@ -115,11 +89,6 @@ class TestManagerRegistry:
 
     def test_cleanup_managers(self):
         """Test cleaning up managers"""
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test cleanup_managers while session_managers is active")
-
         # Initialize first
         initialize_managers()
         assert are_managers_initialized()
@@ -134,11 +103,6 @@ class TestManagerRegistry:
 
     def test_get_all_managers(self):
         """Test getting all managers"""
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test initial empty state while session_managers is active")
-
         registry = ManagerRegistry()
 
         # Initially empty
@@ -158,11 +122,6 @@ class TestManagerRegistry:
 
     def test_double_initialization(self):
         """Test that double initialization doesn't create new instances"""
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test double initialization while session_managers is active")
-
         # First initialization
         initialize_managers()
         session_mgr1 = get_session_manager()
@@ -179,11 +138,6 @@ class TestManagerRegistry:
 
     def test_manager_type_checking(self):
         """Test that registry raises appropriate error when managers not initialized"""
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test uninitialized error while session_managers is active")
-
         # Ensure clean state - managers not initialized
         if are_managers_initialized():
             cleanup_managers()
@@ -195,11 +149,6 @@ class TestManagerRegistry:
     def test_concurrent_access(self):
         """Test thread-safe access to registry"""
         import threading
-
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test concurrent initialization while session_managers is active")
 
         # Ensure clean state before test
         if are_managers_initialized():
@@ -256,11 +205,6 @@ class TestManagerRegistry:
 
         from PySide6.QtWidgets import QApplication
 
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test cleanup registration while session_managers is active")
-
         # Ensure we have a QApplication (qtbot provides one)
         app = QApplication.instance()
         assert app is not None
@@ -279,11 +223,6 @@ class TestManagerRegistry:
         from unittest.mock import patch
 
         from core.managers.registry import _cleanup_global_registry
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test atexit fallback while session_managers is active")
-
         # Reset state
         ManagerRegistry._cleanup_registered = False
 
@@ -308,11 +247,6 @@ class TestManagerRegistry:
 
     def test_cleanup_managers_idempotent(self):
         """Test that calling cleanup_managers multiple times is safe."""
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Cannot test idempotent cleanup while session_managers is active")
-
         # Initialize first
         initialize_managers()
         assert are_managers_initialized()

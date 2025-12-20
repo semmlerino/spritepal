@@ -35,8 +35,7 @@ from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 if TYPE_CHECKING:
     from PySide6.QtGui import QPixmap
 
-    from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
 
 from core.services.image_utils import pil_to_qpixmap
 from utils.logging_config import get_logger
@@ -296,7 +295,7 @@ class PreviewGenerator(QObject):
         self._generation_mutex = QMutex()
 
         # Manager references (weak to avoid circular refs)
-        self._extraction_manager_ref: weakref.ref[ExtractionManager] | None = None
+        self._extraction_manager_ref: weakref.ref[ExtractionManagerProtocol] | None = None
         self._rom_extractor_ref: weakref.ref[ROMExtractorProtocol] | None = None
 
         self._setup_debounce_timer()
@@ -313,7 +312,7 @@ class PreviewGenerator(QObject):
         self._debounce_timer.timeout.connect(self._process_pending_request)
 
     def set_managers(self,
-                    extraction_manager: ExtractionManager | None = None,
+                    extraction_manager: ExtractionManagerProtocol | None = None,
                     rom_extractor: ROMExtractorProtocol | None = None) -> None:
         """Set manager references for preview generation.
 

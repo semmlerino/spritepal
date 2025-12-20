@@ -15,8 +15,11 @@ from core.workers.base import BaseWorker, handle_worker_errors
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.protocols.manager_protocols import (
+        ExtractionManagerProtocol,
+        InjectionManagerProtocol,
+        ROMExtractorProtocol,
+    )
 
 logger = get_logger(__name__)
 
@@ -45,8 +48,8 @@ class ROMInfoLoaderWorker(BaseWorker):
     def __init__(
         self,
         rom_path: str,
-        injection_manager: InjectionManager | None = None,
-        extraction_manager: ExtractionManager | ROMExtractorProtocol | None = None,
+        injection_manager: InjectionManagerProtocol | None = None,
+        extraction_manager: ExtractionManagerProtocol | ROMExtractorProtocol | None = None,
         load_header: bool = True,
         load_sprite_locations: bool = True,
     ) -> None:

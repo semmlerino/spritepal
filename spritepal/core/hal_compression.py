@@ -38,6 +38,17 @@ except ImportError:
     QApplication = None
     QT_AVAILABLE = False
 
+
+def _is_wsl_environment() -> bool:
+    """Detect WSL to avoid unsupported multiprocessing behavior."""
+    if sys.platform != "linux":
+        return False
+    try:
+        release = os.uname().release.lower()
+        return "microsoft" in release or "wsl" in release
+    except (OSError, AttributeError):
+        return False
+
 from utils.constants import (
     DATA_SIZE,
     HAL_POOL_SIZE_DEFAULT,
@@ -988,9 +999,15 @@ class HALCompressor:
         logger.info(f"HAL compressor initialized with exhal={self.exhal_path}, inhal={self.inhal_path}")
 
         # Initialize process pool if requested
+        pool_disabled = False
+        if use_pool and _is_wsl_environment():
+            logger.warning("WSL detected; disabling HAL process pool")
+            use_pool = False
+            pool_disabled = True
+
         self._use_pool = use_pool
         self._pool = None
-        self._pool_failed = False
+        self._pool_failed = pool_disabled
 
         if use_pool:
             try:
@@ -1457,7 +1474,7 @@ class HALCompressor:
         if not self._pool:
             return {
                 "enabled": False,
-                "reason": "Pool not configured" if not self._use_pool else "Pool initialization failed"
+                "reason": "Pool initialization failed" if self._pool_failed else "Pool not configured"
             }
 
         return {

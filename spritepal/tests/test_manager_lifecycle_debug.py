@@ -26,16 +26,8 @@ class TestManagerLifecycle:
     """Debug tests for manager lifecycle issues."""
 
     @pytest.fixture(autouse=True)
-    def skip_if_session_managers_active(self):
-        """Skip tests if session_managers is active.
-
-        These tests explicitly manage manager lifecycle (cleanup_managers, initialize_managers).
-        Running them while session_managers is active would break the session fixture's state.
-        """
-        from tests.fixtures.core_fixtures import is_session_managers_active
-
-        if is_session_managers_active():
-            pytest.skip("Skipping lifecycle test: session_managers is active")
+    def ensure_clean_registry_state(self, clean_registry_state):
+        """Ensure tests run with a clean ManagerRegistry, restoring session state after."""
         yield
 
     def test_manager_direct_usage(self):

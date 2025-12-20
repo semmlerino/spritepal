@@ -54,6 +54,10 @@ def handle_exception(
     # Call the default handler to maintain normal behavior
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
+def apply_dark_theme(app: QApplication) -> None:
+    """Apply a modern dark theme to the application."""
+    SpritePalApp._apply_dark_theme(app)  # type: ignore[arg-type]
+
 class SpritePalApp(QApplication):
     """Main application class for SpritePal"""
 

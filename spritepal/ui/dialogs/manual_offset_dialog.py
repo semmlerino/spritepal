@@ -99,7 +99,7 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _safe_disconnect(signal) -> None:
+def _safe_disconnect(signal: Any) -> None:
     """Disconnect all slots from a signal, ignoring warnings if no connections exist.
 
     PySide6 emits RuntimeWarning when disconnect() is called on a signal
@@ -112,6 +112,16 @@ def _safe_disconnect(signal) -> None:
             signal.disconnect()
         except (TypeError, RuntimeError):
             pass  # Already disconnected or no connections
+
+def _is_valid_qt(obj: Any) -> bool:
+    """Check if a Qt object is still valid (not deleted on the C++ side)."""
+    if obj is None:
+        return False
+    try:
+        from shiboken6 import isValid
+        return isValid(obj)
+    except Exception:
+        return True
 
 # Import tab widgets from the new module
 from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmartTab
@@ -772,15 +782,15 @@ class UnifiedManualOffsetDialog(DialogBase):
         # Block signals on child widgets that might emit during cleanup
         if self._smart_preview_coordinator is not None:
             self._smart_preview_coordinator.blockSignals(True)
-        if self.browse_tab is not None:
+        if self.browse_tab is not None and _is_valid_qt(self.browse_tab):
             self.browse_tab.blockSignals(True)
-        if self.smart_tab is not None:
+        if self.smart_tab is not None and _is_valid_qt(self.smart_tab):
             self.smart_tab.blockSignals(True)
-        if self.history_tab is not None:
+        if self.history_tab is not None and _is_valid_qt(self.history_tab):
             self.history_tab.blockSignals(True)
-        if self.gallery_tab is not None:
+        if self.gallery_tab is not None and _is_valid_qt(self.gallery_tab):
             self.gallery_tab.blockSignals(True)
-        if self.preview_widget is not None:
+        if self.preview_widget is not None and _is_valid_qt(self.preview_widget):
             self.preview_widget.blockSignals(True)
 
         # Stop and clean up workers BEFORE disconnecting signals
@@ -789,25 +799,25 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # Now safe to disconnect signals (workers have stopped)
         # Disconnect tab signals using safe helper to avoid RuntimeWarning
-        if self.browse_tab is not None:
+        if self.browse_tab is not None and _is_valid_qt(self.browse_tab):
             _safe_disconnect(self.browse_tab.offset_changed)
             _safe_disconnect(self.browse_tab.find_next_clicked)
             _safe_disconnect(self.browse_tab.find_prev_clicked)
             _safe_disconnect(self.browse_tab.find_sprites_requested)
 
-        if self.smart_tab is not None:
+        if self.smart_tab is not None and _is_valid_qt(self.smart_tab):
             _safe_disconnect(self.smart_tab.smart_mode_changed)
             _safe_disconnect(self.smart_tab.region_changed)
             _safe_disconnect(self.smart_tab.offset_requested)
 
-        if self.history_tab is not None:
+        if self.history_tab is not None and _is_valid_qt(self.history_tab):
             _safe_disconnect(self.history_tab.sprite_selected)
 
-        if self.gallery_tab is not None:
+        if self.gallery_tab is not None and _is_valid_qt(self.gallery_tab):
             _safe_disconnect(self.gallery_tab.sprite_selected)
 
         # Disconnect preview widget signals
-        if self.preview_widget is not None:
+        if self.preview_widget is not None and _is_valid_qt(self.preview_widget):
             _safe_disconnect(self.preview_widget.similarity_search_requested)
 
         # Disconnect smart preview coordinator

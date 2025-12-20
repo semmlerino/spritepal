@@ -28,10 +28,10 @@ from core.exceptions import (
 )
 
 __all__ = [
+    "CGRAMError",
     "CacheCorruptionError",
     "CacheError",
     "CachePermissionError",
-    "CGRAMError",
     "ExtractionError",
     "FileFormatError",
     "FileOperationError",
@@ -43,6 +43,6 @@ __all__ = [
     "SessionError",
     "SpritePalError",
     "TileError",
-    "ValidationError",
     "VRAMError",
+    "ValidationError",
 ]

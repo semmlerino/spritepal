@@ -4,31 +4,34 @@ Test the defensive validation fix in controller.start_extraction().
 This validates that the fix eliminates the 2+ minute blocking behavior
 with invalid file paths, ensuring fail-fast behavior.
 
-NOTE: Creates real MainWindow which may crash in Qt offscreen mode.
-These tests use qt_widget_test(MainWindow). Marked xfail for offscreen mode.
+NOTE: Creates real MainWindow which may be sensitive in Qt offscreen mode.
+Use @pytest.mark.requires_display if these tests ever prove unstable.
 """
 from __future__ import annotations
 
-import os
 import time
 from pathlib import Path
 
 import pytest
 
-# Determine if running in offscreen mode
-_is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
-
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
 # Systematic pytest markers applied based on test content analysis
-# xfail for offscreen mode - real MainWindow may crash
 pytestmark = [
     pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.xfail,
 ]
 
 from core.controller import ExtractionController
+from core.di_container import inject
+from core.protocols.dialog_protocols import DialogFactoryProtocol
+from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
+    ExtractionManagerProtocol,
+    InjectionManagerProtocol,
+    ROMCacheProtocol,
+    SettingsManagerProtocol,
+)
 from tests.infrastructure import ApplicationFactory
 from tests.infrastructure.data_repository import get_test_data_repository
 from ui.main_window import MainWindow
@@ -37,21 +40,41 @@ from ui.main_window import MainWindow
 class TestControllerDefensiveValidationFix:
     """Test that the defensive validation fix prevents blocking behavior."""
 
+    @pytest.fixture
+    def main_window_deps(self, isolated_managers):
+        """Get MainWindow dependencies from DI container."""
+        return {
+            "settings_manager": inject(SettingsManagerProtocol),
+            "rom_cache": inject(ROMCacheProtocol),
+            "session_manager": inject(ApplicationStateManagerProtocol),
+        }
+
+    @pytest.fixture
+    def controller_deps(self, isolated_managers):
+        """Get ExtractionController dependencies from DI container."""
+        return {
+            "extraction_manager": inject(ExtractionManagerProtocol),
+            "session_manager": inject(ApplicationStateManagerProtocol),
+            "injection_manager": inject(InjectionManagerProtocol),
+            "settings_manager": inject(SettingsManagerProtocol),
+            "dialog_factory": inject(DialogFactoryProtocol),
+        }
+
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self, isolated_managers):
         """Set up testing infrastructure using isolated_managers fixture."""
         self.qt_app = ApplicationFactory.get_application()
         yield
 
-    def test_fixed_fast_failure_with_invalid_vram_path(self, qtbot):
+    def test_fixed_fast_failure_with_invalid_vram_path(self, qtbot, main_window_deps, controller_deps):
         """Test that invalid VRAM path fails fast (< 1 second) after fix."""
         print("=== TESTING FIXED FAST FAILURE WITH INVALID VRAM PATH ===")
 
         # Managers initialized by isolated_managers fixture
-        main_window = MainWindow()
+        main_window = MainWindow(**main_window_deps)
         qtbot.addWidget(main_window)
 
-        controller = ExtractionController(main_window)
+        controller = ExtractionController(main_window, **controller_deps)
 
         # Track extraction_failed calls
         extraction_failed_called = []
@@ -107,15 +130,15 @@ class TestControllerDefensiveValidationFix:
             main_window.get_extraction_params = original_get_params
             main_window.extraction_failed = original_extraction_failed
 
-    def test_fixed_fast_failure_with_invalid_cgram_path(self, qtbot, tmp_path):
+    def test_fixed_fast_failure_with_invalid_cgram_path(self, qtbot, tmp_path, main_window_deps, controller_deps):
         """Test that invalid CGRAM path fails fast in Full Color mode."""
         print("=== TESTING FIXED FAST FAILURE WITH INVALID CGRAM PATH ===")
 
         # Managers initialized by isolated_managers fixture
-        main_window = MainWindow()
+        main_window = MainWindow(**main_window_deps)
         qtbot.addWidget(main_window)
 
-        controller = ExtractionController(main_window)
+        controller = ExtractionController(main_window, **controller_deps)
 
         # Track extraction_failed calls
         extraction_failed_called = []
@@ -175,15 +198,15 @@ class TestControllerDefensiveValidationFix:
             main_window.extraction_failed = original_extraction_failed
             repo.cleanup()
 
-    def test_fixed_grayscale_mode_bypasses_cgram_validation(self, qtbot, tmp_path):
+    def test_fixed_grayscale_mode_bypasses_cgram_validation(self, qtbot, tmp_path, main_window_deps, controller_deps):
         """Test that Grayscale Only mode bypasses CGRAM validation correctly."""
         print("=== TESTING GRAYSCALE MODE CGRAM BYPASS ===")
 
         # Managers initialized by isolated_managers fixture
-        main_window = MainWindow()
+        main_window = MainWindow(**main_window_deps)
         qtbot.addWidget(main_window)
 
-        controller = ExtractionController(main_window)
+        controller = ExtractionController(main_window, **controller_deps)
 
         # Track calls
         extraction_failed_called = []

@@ -45,6 +45,10 @@ class ManagerFactory(Protocol):
         """Create an InjectionManager instance (returns CoreOperationsManager)."""
         ...
 
+    def create_operations_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
+        """Create a CoreOperationsManager instance for worker-owned patterns."""
+        ...
+
 class StandardManagerFactory:
     """
     Standard manager factory that creates new instances with proper Qt parents.
@@ -192,6 +196,9 @@ def create_per_worker_factory(worker: QObject) -> ManagerFactory:
             return factory.create_operations_manager(parent or worker)
 
         def create_injection_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
+            return factory.create_operations_manager(parent or worker)
+
+        def create_operations_manager(self, parent: QObject | None = None) -> CoreOperationsManager:
             return factory.create_operations_manager(parent or worker)
 
     return WorkerOwnedFactory()

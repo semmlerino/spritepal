@@ -16,8 +16,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMCacheProtocol
 
 from typing import override
 
@@ -182,7 +181,7 @@ class SpriteNavigator(QWidget):
         self.current_offset = 0x200000
         self.rom_path = ""
         self.rom_size = 0x400000
-        self.extraction_manager: ExtractionManager | None = None
+        self.extraction_manager: ExtractionManagerProtocol | None = None
         self.found_sprites: list[tuple[int, float]] = []
         self.sprite_regions: list[SpriteRegion] = []
         self.navigation_mode = "manual"  # "manual" or "smart"
@@ -715,7 +714,7 @@ class SpriteNavigator(QWidget):
 
     # Public API
 
-    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: ExtractionManager):
+    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: ExtractionManagerProtocol):
         """Set ROM data for navigation"""
         self.rom_path = rom_path
         self.rom_size = rom_size

@@ -5,7 +5,10 @@ These protocols define the interfaces that managers must implement.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 
 class ExtractionManagerProtocol(Protocol):
@@ -16,6 +19,9 @@ class ExtractionManagerProtocol(Protocol):
     cache_hit: Any  # Signal(str, float) - cache_key, time_saved
     cache_miss: Any  # Signal(str) - cache_key
     cache_saved: Any  # Signal(str, int) - cache_key, size_bytes
+    palettes_extracted: Any  # Signal(list) - extracted palettes
+    active_palettes_found: Any  # Signal(list) - active palettes
+    preview_generated: Any  # Signal(Image, int) - preview image, tile count
 
     def extract_from_rom(
         self,
@@ -92,6 +98,34 @@ class ExtractionManagerProtocol(Protocol):
             Consider using the manager methods when possible.
         """
         ...
+
+    def generate_preview(self, vram_path: str, offset: int) -> tuple[Image.Image, int]:
+        """Generate a preview image from VRAM at the specified offset.
+
+        Args:
+            vram_path: Path to VRAM dump file
+            offset: Offset in VRAM to start extracting from
+
+        Returns:
+            Tuple of (PIL image, tile count)
+        """
+        ...
+
+    def extract_sprite_to_png(self, rom_path: str, sprite_offset: int,
+                              output_path: str, cgram_path: str | None = None) -> bool:
+        """Extract a single sprite to PNG file.
+
+        Args:
+            rom_path: Path to ROM file
+            sprite_offset: Offset of sprite in ROM
+            output_path: Full path where PNG should be saved
+            cgram_path: Optional CGRAM file for palette data
+
+        Returns:
+            True if extraction successful, False otherwise
+        """
+        ...
+
 
 class InjectionManagerProtocol(Protocol):
     """Protocol for injection manager."""
@@ -174,6 +208,81 @@ class InjectionManagerProtocol(Protocol):
             Dict with header, sprite_locations, etc., or None on failure
         """
         ...
+
+    def find_suggested_input_vram(self, sprite_path: str, metadata: dict[str, Any] | None = None,
+                                  suggested_vram: str = "") -> str:
+        """Find the best suggestion for input VRAM path.
+
+        Args:
+            sprite_path: Path to sprite file
+            metadata: Loaded metadata dict (from load_metadata)
+            suggested_vram: Pre-suggested VRAM path
+
+        Returns:
+            Suggested VRAM path or empty string if none found
+        """
+        ...
+
+    def suggest_output_vram_path(self, input_vram_path: str) -> str:
+        """Suggest output VRAM path based on input path with smart numbering.
+
+        Args:
+            input_vram_path: Input VRAM file path
+
+        Returns:
+            Suggested output path
+        """
+        ...
+
+    def suggest_output_rom_path(self, input_rom_path: str) -> str:
+        """Suggest output ROM path based on input path with smart numbering.
+
+        Args:
+            input_rom_path: Input ROM file path
+
+        Returns:
+            Suggested output path (in same directory as input)
+        """
+        ...
+
+    def load_rom_injection_defaults(self, sprite_path: str, metadata: dict[str, Any] | None = None
+                                    ) -> dict[str, Any]:
+        """Load ROM injection defaults from metadata or saved settings.
+
+        Args:
+            sprite_path: Path to sprite file
+            metadata: Loaded metadata dict (from load_metadata)
+
+        Returns:
+            Dict containing input_rom, output_rom, rom_offset, etc.
+        """
+        ...
+
+    def restore_saved_sprite_location(self, extraction_vram_offset: str | None,
+                                      sprite_locations: dict[str, int]) -> dict[str, Any]:
+        """Restore saved sprite location selection.
+
+        Args:
+            extraction_vram_offset: VRAM offset from extraction metadata
+            sprite_locations: Dict of sprite name -> offset from loaded ROM
+
+        Returns:
+            Dict containing sprite_location_name, sprite_location_index, custom_offset
+        """
+        ...
+
+    def save_rom_injection_settings(self, input_rom: str, sprite_location_text: str,
+                                    custom_offset: str, fast_compression: bool) -> None:
+        """Save ROM injection parameters to settings for future use.
+
+        Args:
+            input_rom: Input ROM path
+            sprite_location_text: Selected sprite location text from combo box
+            custom_offset: Custom offset text if used
+            fast_compression: Fast compression checkbox state
+        """
+        ...
+
 
 # SessionManagerProtocol has been consolidated into ApplicationStateManagerProtocol.
 # Use inject(ApplicationStateManagerProtocol) for session management functionality.

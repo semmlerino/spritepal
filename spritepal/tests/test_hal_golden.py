@@ -28,6 +28,7 @@ pytestmark = [
     pytest.mark.golden_hal,
     pytest.mark.headless,
     pytest.mark.allows_registry_state,
+    pytest.mark.no_qt,
 ]
 
 

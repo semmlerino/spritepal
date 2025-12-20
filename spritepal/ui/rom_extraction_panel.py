@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.managers.core_operations_manager import CoreOperationsManager
+    from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.managers.application_state_manager import ExtractionState
@@ -112,7 +112,7 @@ class ROMExtractionPanel(QWidget):
         self,
         parent: Any | None = None,
         *,
-        extraction_manager: ExtractionManager,
+        extraction_manager: ExtractionManagerProtocol,
     ):
         super().__init__(parent)
 
