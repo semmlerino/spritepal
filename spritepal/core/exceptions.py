@@ -1,14 +1,19 @@
 """
-Custom exceptions for SpritePal core operations.
+Custom exceptions for SpritePal.
 
-This module contains all core exceptions that can be raised throughout the application.
-Exception classes were moved here from core/managers/exceptions.py to fix layer
-boundary violations (core services should not import from managers).
+This module contains all exceptions that can be raised throughout the application.
+All exception classes are defined here to maintain a single source of truth.
 """
 from __future__ import annotations
 
 
-class ManagerError(Exception):
+# Base exception for all SpritePal errors
+class SpritePalError(Exception):
+    """Base exception for all SpritePal errors."""
+
+
+# Manager-related exceptions (inherit from SpritePalError for unified hierarchy)
+class ManagerError(SpritePalError):
     """Base exception for all manager-related errors."""
 
 
@@ -54,3 +59,25 @@ class CachePermissionError(CacheError):
 
 class NavigationError(ManagerError):
     """Exception raised during navigation operations."""
+
+
+# VRAM/Memory-related exceptions
+class VRAMError(SpritePalError):
+    """Raised for VRAM-related errors."""
+
+
+class CGRAMError(SpritePalError):
+    """Raised for CGRAM/palette-related errors."""
+
+
+class OAMError(SpritePalError):
+    """Raised for OAM-related errors."""
+
+
+# File and format exceptions
+class FileFormatError(SpritePalError):
+    """Raised for unsupported or invalid file formats."""
+
+
+class TileError(SpritePalError):
+    """Raised for tile processing errors."""

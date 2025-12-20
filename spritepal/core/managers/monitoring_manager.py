@@ -572,17 +572,42 @@ class MonitoringManager(BaseManager):
         try:
             health_data = self._health_monitor.get_current_health()
             if not health_data.get('healthy', False):
-                # Wrap logging in try-except to handle closed streams during shutdown
-                try:
-                    self._logger.warning(f"System health degraded: {health_data}")
-                except ValueError:
-                    # I/O operation on closed file - logging streams closed during test teardown
-                    pass
+                # Check shutdown flag right before logging to prevent race condition
+                if not self._shutting_down:
+                    self._safe_log_warning(f"System health degraded: {health_data}")
         except Exception as e:
-            try:
-                self._logger.error(f"Failed to collect health metrics: {e}")
-            except ValueError:
-                pass  # Streams closed during shutdown
+            # Check shutdown flag before error logging
+            if not self._shutting_down:
+                self._safe_log_error(f"Failed to collect health metrics: {e}")  # Streams closed during shutdown  # Streams closed during shutdown
+
+    def _safe_log_warning(self, message: str) -> None:
+        """Log warning message safely, suppressing errors during shutdown.
+        
+        Python's logging module prints diagnostic tracebacks when emit() fails
+        (e.g., on closed streams). This method temporarily disables that behavior
+        to prevent noisy test output during teardown.
+        """
+        import logging
+        old_raise = logging.raiseExceptions
+        try:
+            logging.raiseExceptions = False
+            self._logger.warning(message)
+        except (ValueError, OSError):
+            pass  # Stream closed during shutdown
+        finally:
+            logging.raiseExceptions = old_raise
+
+    def _safe_log_error(self, message: str) -> None:
+        """Log error message safely, suppressing errors during shutdown."""
+        import logging
+        old_raise = logging.raiseExceptions
+        try:
+            logging.raiseExceptions = False
+            self._logger.error(message)
+        except (ValueError, OSError):
+            pass  # Stream closed during shutdown
+        finally:
+            logging.raiseExceptions = old_raise
 
     @contextmanager
     def monitor_operation(self, operation: str, context: dict[str, Any] | None = None):
