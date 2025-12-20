@@ -12,7 +12,6 @@ Usage:
 """
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -134,52 +133,6 @@ def wait_for_signal_processed(qtbot: QtBot) -> Callable[[], None]:
         """
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
-
-    return _wait
-
-
-@pytest.fixture
-def wait_for_theme_applied(qtbot: QtBot) -> Callable[..., bool]:
-    """
-    Helper to wait for theme changes to be applied.
-
-    Qt theme changes may take multiple event loop cycles to apply.
-
-    Example:
-        window.apply_dark_theme()
-        wait_for_theme_applied(window)
-        # Instead of: window.apply_dark_theme(); qtbot.wait(100)
-    """
-    def _wait(widget: QWidget, is_dark_theme: bool = True, timeout: int = 500) -> bool:
-        """
-        Wait for theme to be applied to widget.
-
-        Args:
-            widget: QWidget to check
-            is_dark_theme: Whether to expect dark theme (True) or light (False)
-            timeout: Maximum wait time in milliseconds
-        """
-        from PySide6.QtGui import QPalette
-
-        def theme_applied() -> bool:
-            palette = widget.palette()
-            bg_color = palette.color(QPalette.ColorRole.Window)
-
-            if is_dark_theme:
-                return bg_color.red() < 128 and bg_color.green() < 128 and bg_color.blue() < 128
-            else:
-                return bg_color.red() > 128 or bg_color.green() > 128 or bg_color.blue() > 128
-
-        try:
-            qtbot.waitUntil(theme_applied, timeout=timeout)
-            return True
-        except Exception:  # pytestqt.exceptions.TimeoutError is raised, not AssertionError
-            # Theme verification can be unreliable in headless mode
-            display = os.environ.get("DISPLAY", "")
-            qpa_platform = os.environ.get("QT_QPA_PLATFORM", "")
-            if not display or qpa_platform == "offscreen":
-                return True
-            raise
 
     return _wait
 

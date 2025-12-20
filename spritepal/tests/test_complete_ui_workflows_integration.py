@@ -154,7 +154,7 @@ class TestCompleteUIWorkflowsIntegration:
         return None
 
     @pytest.mark.gui
-    def test_app_startup_dark_theme_rom_loading_workflow(self, qtbot, wait_for_theme_applied):
+    def test_app_startup_dark_theme_rom_loading_workflow(self, qtbot):
         """
         Test Workflow 1: User opens app → dark theme visible → loads ROM → extraction panel updates
 
@@ -171,8 +171,9 @@ class TestCompleteUIWorkflowsIntegration:
 
         # Wait for window to be fully rendered
         qtbot.waitForWindowShown(main_window)
-        # Use condition-based wait for theme application (reliable, auto-completes)
-        wait_for_theme_applied(main_window, is_dark_theme=True, timeout=500)
+        # Process events to ensure theme is applied
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
 
         # Step 2: Verify dark theme is applied
         assert self._verify_dark_theme_applied(main_window), "Dark theme should be applied to main window"

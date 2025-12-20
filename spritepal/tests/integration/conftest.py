@@ -250,5 +250,5 @@ def loaded_rom_panel(rom_extraction_panel, test_rom_with_sprites, qtbot):
 # Markers are registered in pyproject.toml and main conftest.py
 
 # NOTE: Wait helpers (wait_for, wait_for_condition, wait_for_widget_ready,
-# wait_for_signal_processed, wait_for_theme_applied, wait_for_layout_update,
-# process_events) are now provided by tests.fixtures.qt_waits via pytest_plugins
+# wait_for_signal_processed, wait_for_layout_update, process_events)
+# are now provided by tests.fixtures.qt_waits via pytest_plugins

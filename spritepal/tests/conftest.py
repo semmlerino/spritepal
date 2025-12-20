@@ -137,23 +137,11 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "no_qt: Skip all Qt-related fixtures (implies skip_thread_cleanup)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "no_hal: Skip all HAL-related fixtures"
-    )
-    config.addinivalue_line(
-        "markers",
         "requires_display: Test requires a real display (skips cleanly in offscreen mode)"
     )
     config.addinivalue_line(
         "markers",
         "parallel_unsafe: Force test to run in serial mode under xdist (use when wrapper fixtures hide shared state)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "legacy_mocking: Test uses legacy mock patterns awaiting migration to real components"
     )
     # Categorization markers (do not control skip behavior - all Qt tests run in offscreen mode)
     config.addinivalue_line(
@@ -429,10 +417,6 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     config._real_hal_test_count = len(real_hal_tests)
     config._real_hal_test_nodeids = [item.nodeid for item in real_hal_tests]
 
-    # === Track legacy_mocking tests for migration visibility ===
-    legacy_mocking_tests = [item for item in items if item.get_closest_marker('legacy_mocking')]
-    config._legacy_mocking_test_count = len(legacy_mocking_tests)
-
     # === Validate skip_thread_cleanup markers ===
     for item in items:
         marker = item.get_closest_marker("skip_thread_cleanup")
@@ -579,15 +563,6 @@ def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: Any)
         )
         terminalreporter.write_line(
             "  Set SPRITEPAL_EXHAL_PATH and SPRITEPAL_INHAL_PATH, or use --require-real-hal to fail instead",
-            yellow=True,
-        )
-
-    # === Report legacy_mocking tests for migration tracking ===
-    legacy_count = getattr(config, '_legacy_mocking_test_count', 0)
-    if legacy_count > 0:
-        terminalreporter.write_line("")
-        terminalreporter.write_line(
-            f"NOTE: {legacy_count} tests marked @legacy_mocking await migration to real components",
             yellow=True,
         )
 
@@ -944,36 +919,6 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
 
 
 @pytest.fixture(autouse=True)
-def check_parallel_isolation(request: FixtureRequest) -> Generator[None, None, None]:
-    """Soft validation for parallel test best practices.
-
-    NOTE: The @pytest.mark.parallel_safe marker is DEPRECATED. Tests run in
-    parallel by default. This fixture now only emits a deprecation warning
-    if the marker is present, and provides soft recommendations for best practices.
-
-    Best practices for parallel-safe tests:
-    1. Use isolated_managers (not session_managers)
-    2. Use tmp_path for any file operations
-    3. Don't depend on test execution order
-
-    To force serial execution, use @pytest.mark.parallel_unsafe instead.
-    """
-    import warnings
-
-    # Emit deprecation warning if parallel_safe marker is present
-    if request.node.get_closest_marker('parallel_safe'):
-        warnings.warn(
-            f"Test '{request.node.name}' uses deprecated @pytest.mark.parallel_safe marker. "
-            "Tests are parallel by default; this marker is ignored. "
-            "Use @pytest.mark.parallel_unsafe to force serial execution.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    yield
-
-
-@pytest.fixture(autouse=True)
 def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, None]:
     """Enforce that session_managers usage requires @pytest.mark.shared_state_safe.
 
@@ -1030,6 +975,5 @@ from tests.fixtures.qt_waits import (
     wait_for,
     wait_for_layout_update,
     wait_for_signal_processed,
-    wait_for_theme_applied,
     wait_for_widget_ready,
 )
