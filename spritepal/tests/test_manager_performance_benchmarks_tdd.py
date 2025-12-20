@@ -37,7 +37,7 @@ from tests.infrastructure.manager_test_context import (
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.real_component_factory import RealComponentFactory
-from tests.infrastructure.test_data_repository import (
+from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
 )

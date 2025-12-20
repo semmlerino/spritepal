@@ -325,40 +325,49 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
     Tests that use RealComponentFactory without passing manager_registry will pollute
     global state and break test isolation.
 
+    Uses AST-based detection to correctly handle multiline calls.
+
     Args:
         items: list of test items being collected
     """
-    import re
+    import ast
     from functools import lru_cache
     from pathlib import Path
 
-    # Pattern to detect bare RealComponentFactory() without manager_registry
-    # Matches: RealComponentFactory() or RealComponentFactory(fail_on_leaks=...)
-    # Does NOT match: RealComponentFactory(manager_registry=...)
-    bare_factory_pattern = re.compile(
-        r'RealComponentFactory\s*\('  # Opening call
-        r'(?![^)]*manager_registry)'  # Negative lookahead: no manager_registry in args
-        r'[^)]*\)'  # Rest of args and closing paren
-    )
+    class FactoryCallChecker(ast.NodeVisitor):
+        """AST visitor that finds RealComponentFactory calls missing manager_registry."""
+
+        def __init__(self, source_lines: list[str]) -> None:
+            self.violations: list[tuple[int, str]] = []
+            self.source_lines = source_lines
+
+        def visit_Call(self, node: ast.Call) -> None:
+            # Check if this is a call to RealComponentFactory
+            if isinstance(node.func, ast.Name) and node.func.id == "RealComponentFactory":
+                # Check if manager_registry is in keyword arguments
+                has_registry = any(kw.arg == "manager_registry" for kw in node.keywords)
+                if not has_registry:
+                    # Get the source line for context
+                    line_content = ""
+                    if 0 < node.lineno <= len(self.source_lines):
+                        line_content = self.source_lines[node.lineno - 1].strip()
+                    self.violations.append((node.lineno, line_content))
+            self.generic_visit(node)
 
     @lru_cache(maxsize=256)
     def check_file(file_path: str) -> list[tuple[int, str]]:
-        """Check a file for bare factory calls. Cached for efficiency."""
+        """Check a file for bare factory calls using AST. Cached for efficiency."""
         try:
             path = Path(file_path)
-            if not path.exists() or path.suffix != '.py':
+            if not path.exists() or path.suffix != ".py":
                 return []
             content = path.read_text()
-            matches = []
-            for i, line in enumerate(content.splitlines(), 1):
-                # Skip comments and docstrings containing examples
-                stripped = line.strip()
-                if stripped.startswith('#') or stripped.startswith('"""') or stripped.startswith("'''"):
-                    continue
-                if bare_factory_pattern.search(line):
-                    matches.append((i, line.strip()))
-            return matches
-        except (OSError, UnicodeDecodeError):
+            source_lines = content.splitlines()
+            tree = ast.parse(content, filename=file_path)
+            checker = FactoryCallChecker(source_lines)
+            checker.visit(tree)
+            return checker.violations
+        except (OSError, UnicodeDecodeError, SyntaxError):
             return []
 
     # Collect unique source files from test items
@@ -366,7 +375,7 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
     violations: list[str] = []
 
     for item in items:
-        fspath = str(getattr(item, 'fspath', ''))
+        fspath = str(getattr(item, "fspath", ""))
         if fspath and fspath not in checked_files:
             checked_files.add(fspath)
             matches = check_file(fspath)
@@ -375,6 +384,7 @@ def _check_bare_factory_calls(items: list[Any]) -> None:
 
     if violations:
         import warnings
+
         warnings.warn(
             f"\n[RealComponentFactory] Found {len(violations)} bare factory call(s) missing manager_registry:\n"
             + "\n".join(violations[:10])  # Show first 10

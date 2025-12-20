@@ -14,15 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import pytest
 from PIL import Image
 
-# Systematic pytest markers applied based on test content analysis
-pytestmark = [
-    pytest.mark.headless,
-    pytest.mark.integration,
-    pytest.mark.slow,
-]
 
 @dataclass
 class DataSet:

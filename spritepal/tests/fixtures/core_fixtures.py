@@ -79,6 +79,7 @@ SESSION_DEPENDENT_FIXTURES: frozenset[str] = frozenset({
     'session_managers',      # Direct session-scoped fixture
     'managers',              # Convenience wrapper for session_managers
     'reset_manager_state',   # Requires active session to reset
+    'managers_initialized',  # Integration test fixture that modifies DI container
 })
 
 
@@ -169,7 +170,7 @@ def reset_all_singletons() -> None:
 
     # Clean up DataRepository
     def cleanup_data_repo() -> None:
-        from tests.infrastructure.test_data_repository import cleanup_test_data_repository
+        from tests.infrastructure.data_repository import cleanup_test_data_repository
         cleanup_test_data_repository()
     _try_reset("DataRepository", cleanup_data_repo)
 
@@ -475,16 +476,34 @@ def detect_session_manager_cleanup(request: FixtureRequest) -> Generator[None, N
 @pytest.fixture
 def managers(session_managers: None) -> ManagerRegistry:
     """
-    Convenience fixture that provides access to the ManagerRegistry.
+    DEPRECATED: Use session_managers directly with @pytest.mark.shared_state_safe.
 
-    This fixture depends on session_managers (shared session state) and returns
-    the ManagerRegistry instance for easy access in tests.
+    This fixture is a thin wrapper around session_managers that returns the
+    ManagerRegistry instance. It will be removed in a future release.
 
-    Usage:
+    Migration:
+        # Old pattern (deprecated)
         def test_something(managers):
-            extraction = managers.get_extraction_manager()
+            extraction = managers.extraction_manager
+
+        # New pattern (recommended)
+        @pytest.mark.shared_state_safe
+        def test_something(session_managers):
+            from core.managers.registry import ManagerRegistry
+            registry = ManagerRegistry()
+            extraction = registry.extraction_manager
     """
+    import warnings
+
     from core.managers.registry import ManagerRegistry
+
+    warnings.warn(
+        "managers fixture is deprecated. Use session_managers directly "
+        "with @pytest.mark.shared_state_safe marker, or use isolated_managers "
+        "for tests that need clean state.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     # Verify session managers are properly initialized
     registry = ManagerRegistry()
@@ -578,7 +597,7 @@ def isolated_data_repository(tmp_path: Path) -> Generator[Any, None, None]:
             data = isolated_data_repository.get_vram_extraction_data("small")
             # Process data...
     """
-    from tests.infrastructure.test_data_repository import get_isolated_data_repository
+    from tests.infrastructure.data_repository import get_isolated_data_repository
 
     repo = get_isolated_data_repository(tmp_path)
     yield repo

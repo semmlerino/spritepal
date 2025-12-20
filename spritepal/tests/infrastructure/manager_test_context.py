@@ -26,7 +26,7 @@ from core.managers.registry import ManagerRegistry
 
 from .qt_application_factory import ApplicationFactory
 from .real_component_factory import RealComponentFactory
-from .test_data_repository import get_test_data_repository
+from .data_repository import get_test_data_repository
 
 M = TypeVar("M", bound=BaseManager)
 

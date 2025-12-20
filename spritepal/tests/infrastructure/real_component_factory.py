@@ -67,7 +67,7 @@ warnings.filterwarnings(
 
 from core.services.rom_cache import ROMCache
 
-from .test_data_repository import DataRepository, get_test_data_repository
+from .data_repository import DataRepository, get_test_data_repository
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor

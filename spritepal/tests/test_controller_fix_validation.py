@@ -34,7 +34,7 @@ from tests.infrastructure import (
     ApplicationFactory,
     qt_widget_test,
 )
-from tests.infrastructure.test_data_repository import get_test_data_repository
+from tests.infrastructure.data_repository import get_test_data_repository
 from ui.main_window import MainWindow
 
 
