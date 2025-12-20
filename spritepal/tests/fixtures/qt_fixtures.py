@@ -497,11 +497,11 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
             pass
 
     # Wait for threads to finish
-    # Use 5000ms base (aligned with worker_timeout base) to avoid false leak failures
-    # when workers take up to 5 seconds to clean up
+    # Use 2000ms base for faster test execution (reduced from 5000ms)
+    # Tests with slow cleanup should use @pytest.mark.skip_thread_cleanup
     leaked = _wait_for_threads(
         before_threads,
-        max_wait_ms=int(5000 * get_timeout_multiplier()),
+        max_wait_ms=int(2000 * get_timeout_multiplier()),
         poll_interval_ms=20,
         filter_pytest_timeout=filter_pytest_timeout,
         qt_available=qt_available,

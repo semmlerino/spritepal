@@ -720,23 +720,17 @@ class RealComponentFactory:
                 stacklevel=2,
             )
 
-        # Step 4: Force garbage collection to clean up deleted workers
-        try:
-            import gc
-            gc.collect()
-            gc.collect()  # Second pass to handle circular references
-        except Exception as e:
-            warnings.warn(
-                f"Failed to force garbage collection: {e}",
-                ResourceWarning,
-                stacklevel=2,
-            )
+        # Step 4: Skip explicit gc.collect() during cleanup
+        # Reason: gc.collect() can trigger finalization of PySide6/Qt objects
+        # while background threads are still running, which causes segfaults.
+        # Qt object cleanup is handled via deleteLater() and processEvents() above.
+        # The Python GC will clean up remaining objects naturally when safe.
 
         # Step 5: Allow time for OS thread cleanup
         # Python's threading.active_count() may still see threads being destroyed
         try:
             import time
-            time.sleep(0.15)  # sleep-ok: OS thread teardown after gc.collect()
+            time.sleep(0.05)  # Brief wait for OS thread cleanup (reduced since no GC)
         except Exception as e:
             warnings.warn(
                 f"Failed to wait for thread cleanup: {e}",

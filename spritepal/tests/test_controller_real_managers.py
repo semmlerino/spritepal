@@ -12,8 +12,6 @@ import pytest
 
 from core.controller import ExtractionController
 from core.di_container import inject
-from core.managers import SessionManager
-from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import SettingsManagerProtocol
 from tests.infrastructure.real_component_factory import RealComponentFactory
@@ -156,17 +154,9 @@ class TestControllerWithRealManagers:
 class TestRealManagerBenefits:
     """Demonstrate benefits of using real managers in tests."""
 
-    @pytest.fixture(autouse=True)
-    def setup_di_container(self, isolated_managers):
-        """Ensure DI container is set up for manager creation.
-
-        Uses isolated_managers for test independence.
-        """
-        yield
-
-    def test_catches_real_validation_bugs(self):
+    def test_catches_real_validation_bugs(self, isolated_managers):
         """Real managers catch actual validation logic bugs."""
-        manager = CoreOperationsManager()
+        manager = isolated_managers.get_extraction_manager()
 
         # This tests real validation logic, not mocked behavior
         with pytest.raises(Exception):
@@ -176,9 +166,9 @@ class TestRealManagerBenefits:
                 "output_base": ""
             })
 
-    def test_real_business_logic_coverage(self):
+    def test_real_business_logic_coverage(self, isolated_managers):
         """Real managers provide actual business logic coverage."""
-        manager = CoreOperationsManager()
+        manager = isolated_managers.get_extraction_manager()
 
         # Test real smart VRAM suggestion logic
         suggestion = manager.get_smart_vram_suggestion(
@@ -189,9 +179,9 @@ class TestRealManagerBenefits:
         # Real manager returns actual suggestion logic
         assert suggestion == ""  # Real behavior, not mocked
 
-    def test_real_state_management(self):
+    def test_real_state_management(self, isolated_managers):
         """Real managers test actual state management."""
-        manager = SessionManager("TestApp")
+        manager = isolated_managers.get_session_manager()
 
         # Test real state management
         manager.set("category", "key1", "value1")

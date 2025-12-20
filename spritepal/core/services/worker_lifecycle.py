@@ -458,13 +458,12 @@ class WorkerManager:
         except Exception as e:
             logger.debug(f"cleanup_all: Could not process events: {e}")
 
-        # Force garbage collection to help clean up deleted workers
-        try:
-            import gc
-            gc.collect()
-            logger.debug("cleanup_all: Forced garbage collection")
-        except Exception as e:
-            logger.debug(f"cleanup_all: Could not force GC: {e}")
+        # Skip explicit gc.collect() during cleanup
+        # Reason: gc.collect() can trigger finalization of PySide6/Qt objects
+        # while background threads are still running, which causes segfaults.
+        # Qt object cleanup is handled via deleteLater() and processEvents() above.
+        # The Python GC will clean up remaining objects naturally when safe.
+        logger.debug("cleanup_all: Skipping explicit gc.collect() to avoid Qt finalization race")
 
         # Give the OS a moment to fully destroy threads
         # This is necessary because Python's threading.active_count() may still

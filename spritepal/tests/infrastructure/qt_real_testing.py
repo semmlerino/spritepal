@@ -106,8 +106,10 @@ class QtTestCase:
         # Process events to ensure deleteLater takes effect
         QApplication.processEvents()
 
-        # Force garbage collection
-        gc.collect()
+        # Skip explicit gc.collect() during cleanup
+        # Reason: gc.collect() can trigger finalization of PySide6/Qt objects
+        # while background threads are still running, which causes segfaults.
+        # Qt object cleanup is handled via deleteLater() and processEvents() above.
 
         # Clear references
         self.widgets.clear()

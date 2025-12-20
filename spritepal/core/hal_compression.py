@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import atexit
 import contextlib
-import gc
 import multiprocessing as mp
 import os
 import platform
@@ -930,8 +929,10 @@ class HALProcessPool:
             self._result_queue = None
             self._shutdown = False  # Allow re-initialization
 
-            # Force garbage collection to help with cleanup
-            gc.collect()
+            # Skip explicit gc.collect() during cleanup
+            # Reason: gc.collect() can trigger finalization of PySide6/Qt objects
+            # while background threads are still running, which causes segfaults.
+            # The Python GC will clean up remaining objects naturally when safe.
 
             safe_debug(logger, "HAL process pool force reset complete")
 

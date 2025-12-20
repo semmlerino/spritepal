@@ -259,8 +259,8 @@ What does your test need?
 **Basic test with managers:**
 ```python
 def test_extraction_validates_params(isolated_managers):
-    # Access managers directly from the fixture (don't use inject() in tests)
-    manager = isolated_managers.extraction_manager
+    # Access managers via getter methods (don't use inject() in tests)
+    manager = isolated_managers.get_extraction_manager()
     result = manager.validate_extraction_params({"path": "/test"})
     assert isinstance(result, bool)
 ```

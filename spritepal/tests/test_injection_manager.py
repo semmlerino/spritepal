@@ -44,12 +44,12 @@ pytestmark = [
 # Note: Uses isolated_managers fixture for per-test isolation (parallel-safe)
 
 @pytest.fixture
-def injection_manager_real():
+def injection_manager_real(isolated_managers):
     """Provide real injection manager for testing.
 
     Uses CoreOperationsManager which implements InjectionManagerProtocol.
     """
-    return CoreOperationsManager()
+    return isolated_managers.get_injection_manager()
 
 @pytest.fixture
 def temp_files_with_real_content(tmp_path):
@@ -177,14 +177,14 @@ class TestInjectionManagerParameterValidation:
     Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
-    def test_validate_vram_injection_params_valid_real_files(self, temp_files_with_real_content):
+    def test_validate_vram_injection_params_valid_real_files(self, temp_files_with_real_content, isolated_managers):
         """TDD: Validation should succeed with real valid files.
-        
+
         RED: Validation should pass for properly formatted files
         GREEN: Real FileValidator should validate actual file content
         REFACTOR: No mocking - tests real validation logic
         """
-        manager = CoreOperationsManager()
+        manager = isolated_managers.get_injection_manager()
 
         params = {
             "mode": "vram",
@@ -215,13 +215,13 @@ class TestInjectionManagerParameterValidation:
             # This is acceptable as it shows real edge cases
             pass
 
-    def test_validate_rom_injection_params_valid_real_files(self, temp_files_with_real_content):
+    def test_validate_rom_injection_params_valid_real_files(self, temp_files_with_real_content, isolated_managers):
         """TDD: ROM validation should work with real ROM file structure.
-        
+
         Tests real ROM file validation including header checks, size validation,
         and format verification that mocks cannot test.
         """
-        manager = CoreOperationsManager()
+        manager = isolated_managers.get_injection_manager()
 
         params = {
             "mode": "rom",

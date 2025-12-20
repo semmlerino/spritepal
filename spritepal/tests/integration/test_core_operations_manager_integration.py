@@ -61,9 +61,10 @@ class TestCoreOperationsManagerVRAMExtraction:
         Previously, CoreOperationsManager.extract_from_vram would raise:
             AttributeError: 'SpriteExtractor' object has no attribute 'extract_sprite'
         """
-        from core.managers.core_operations_manager import CoreOperationsManager
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
 
-        manager = CoreOperationsManager()
+        manager = inject(ExtractionManagerProtocol)
 
         output_base = str(tmp_path / "output")
 
@@ -85,9 +86,10 @@ class TestCoreOperationsManagerVRAMExtraction:
         managers_initialized,
     ) -> None:
         """Verify that extract_from_vram creates the output PNG file."""
-        from core.managers.core_operations_manager import CoreOperationsManager
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
 
-        manager = CoreOperationsManager()
+        manager = inject(ExtractionManagerProtocol)
 
         output_base = str(tmp_path / "extraction_output")
 
@@ -114,9 +116,10 @@ class TestCoreOperationsManagerVRAMExtraction:
         managers_initialized,
     ) -> None:
         """Test extraction with a custom VRAM offset."""
-        from core.managers.core_operations_manager import CoreOperationsManager
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
 
-        manager = CoreOperationsManager()
+        manager = inject(ExtractionManagerProtocol)
 
         output_base = str(tmp_path / "offset_output")
 
@@ -138,9 +141,10 @@ class TestCoreOperationsManagerVRAMExtraction:
         managers_initialized,
     ) -> None:
         """Test that extraction works with optional cgram/oam paths."""
-        from core.managers.core_operations_manager import CoreOperationsManager
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
 
-        manager = CoreOperationsManager()
+        manager = inject(ExtractionManagerProtocol)
 
         output_base = str(tmp_path / "params_output")
 

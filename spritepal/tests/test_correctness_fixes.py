@@ -208,9 +208,7 @@ class TestWorkerCleanup:
         self, isolated_managers: Any, qtbot: Any
     ) -> None:
         """_current_worker should be None after exception in start_injection."""
-        from core.managers.core_operations_manager import CoreOperationsManager
-
-        manager = CoreOperationsManager()
+        manager = isolated_managers.get_extraction_manager()
 
         # Verify initial state
         assert manager._current_worker is None
@@ -249,7 +247,6 @@ class TestOffsetParseError:
     ) -> None:
         """Parse failure should log warning and set offset_parse_error."""
         import logging
-        from core.managers.core_operations_manager import CoreOperationsManager
 
         # Create a metadata file with invalid offset
         sprite_path = tmp_path / "sprite.png"
@@ -266,7 +263,7 @@ class TestOffsetParseError:
             }
         }
 
-        manager = CoreOperationsManager()
+        manager = isolated_managers.get_extraction_manager()
 
         with caplog.at_level(logging.WARNING):
             result = manager.load_rom_injection_defaults(

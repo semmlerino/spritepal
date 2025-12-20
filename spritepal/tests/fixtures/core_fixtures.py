@@ -80,6 +80,8 @@ SESSION_DEPENDENT_FIXTURES: frozenset[str] = frozenset({
     'managers',              # Convenience wrapper for session_managers
     'reset_manager_state',   # Requires active session to reset
     'managers_initialized',  # Integration test fixture that modifies DI container
+    'extraction_manager',    # Uses session_managers for extraction operations
+    'mock_factory',          # Uses session_managers for mock factory setup
 })
 
 

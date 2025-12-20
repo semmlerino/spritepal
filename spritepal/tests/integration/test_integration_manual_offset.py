@@ -7,8 +7,6 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 
-from core.managers.core_operations_manager import CoreOperationsManager
-
 
 @pytest.mark.integration
 @pytest.mark.gui
@@ -36,13 +34,13 @@ class TestManualOffsetDialog:
         assert hasattr(dialog.browse_tab, 'next_button')
         assert hasattr(dialog.browse_tab, 'prev_button')
 
-    def test_slider_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
+    def test_slider_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot, isolated_managers):
         """Test that slider navigation updates offset correctly."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = CoreOperationsManager()
+        extraction_manager = isolated_managers.get_extraction_manager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -69,13 +67,13 @@ class TestManualOffsetDialog:
         offset_text = dialog.browse_tab.offset_label.text()
         assert f"{new_value:06X}" in offset_text or f"{new_value:X}" in offset_text
 
-    def test_manual_offset_input(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
+    def test_manual_offset_input(self, manual_offset_dialog, test_rom_with_sprites, qtbot, isolated_managers):
         """Test manual offset input via spinbox."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = CoreOperationsManager()
+        extraction_manager = isolated_managers.get_extraction_manager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -97,13 +95,13 @@ class TestManualOffsetDialog:
         assert dialog.get_current_offset() == target_offset
         assert dialog.browse_tab.position_slider.value() == target_offset
 
-    def test_find_sprites_button_click(self, manual_offset_dialog, test_rom_with_sprites, qtbot, mocker, wait_for_signal_processed):
+    def test_find_sprites_button_click(self, manual_offset_dialog, test_rom_with_sprites, qtbot, mocker, wait_for_signal_processed, isolated_managers):
         """Test that Find Sprites button triggers sprite scanning."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = CoreOperationsManager()
+        extraction_manager = isolated_managers.get_extraction_manager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -130,13 +128,13 @@ class TestManualOffsetDialog:
         # Verify scan was triggered
         assert scan_mock.called
 
-    def test_preview_generation_on_offset_change(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for):
+    def test_preview_generation_on_offset_change(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, isolated_managers):
         """Test that preview is generated when offset changes."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = CoreOperationsManager()
+        extraction_manager = isolated_managers.get_extraction_manager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -165,7 +163,7 @@ class TestManualOffsetDialog:
 
         assert preview_updated
 
-    def test_next_prev_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for_signal_processed):
+    def test_next_prev_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for_signal_processed, isolated_managers):
         """Test next/prev sprite navigation buttons.
 
         Note: Next/Prev buttons emit find_next_clicked/find_prev_clicked signals which
@@ -179,7 +177,7 @@ class TestManualOffsetDialog:
         rom_info = test_rom_with_sprites
 
         # Set ROM data
-        extraction_manager = CoreOperationsManager()
+        extraction_manager = isolated_managers.get_extraction_manager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -223,7 +221,7 @@ class TestSpriteScanDialog:
 
     @pytest.mark.slow
     @pytest.mark.timeout(120)  # This test does real ROM scanning which is slow
-    def test_sprite_scan_with_results(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, mocker, wait_for_signal_processed):
+    def test_sprite_scan_with_results(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, mocker, wait_for_signal_processed, isolated_managers):
         """Test full sprite scan workflow with results dialog."""
         from PySide6.QtWidgets import QDialog, QMessageBox
 
@@ -239,7 +237,7 @@ class TestSpriteScanDialog:
         mocker.patch.object(QMessageBox, 'critical', return_value=QMessageBox.StandardButton.Ok)
 
         # Set ROM data
-        extraction_manager = CoreOperationsManager()
+        extraction_manager = isolated_managers.get_extraction_manager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,
@@ -269,7 +267,7 @@ class TestSpriteScanDialog:
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
 
-    def test_sprite_selection_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
+    def test_sprite_selection_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot, isolated_managers):
         """Test selecting a sprite from results navigates to it."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
@@ -278,7 +276,7 @@ class TestSpriteScanDialog:
             pytest.skip("No test sprites to select")
 
         # Set ROM data
-        extraction_manager = CoreOperationsManager()
+        extraction_manager = isolated_managers.get_extraction_manager()
         dialog.set_rom_data(
             str(rom_info['path']),
             rom_info['path'].stat().st_size,

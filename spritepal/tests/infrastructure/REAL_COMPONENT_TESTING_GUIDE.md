@@ -76,7 +76,7 @@ def test_extraction_new_way(isolated_managers, tmp_path):
     factory = RealComponentFactory(manager_registry=isolated_managers)
 
     # Real manager from the isolated registry
-    manager = isolated_managers.extraction_manager
+    manager = isolated_managers.get_extraction_manager()
 
     # Real methods work as expected
     params = factory._data_repo.get_vram_extraction_data("medium")
@@ -167,8 +167,8 @@ assert Path(vram_data["vram_path"]).exists()
 
 ```python
 def test_manager_unit(isolated_managers):
-    # Access managers through the isolated registry
-    manager = isolated_managers.extraction_manager
+    # Access managers through getter methods
+    manager = isolated_managers.get_extraction_manager()
     assert manager.is_initialized()
 ```
 
