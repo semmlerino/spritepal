@@ -705,12 +705,15 @@ class CoreOperationsManager(
             return True
 
         except (OSError, PermissionError) as e:
+            self._cleanup_current_worker()  # FIX #2: Stop worker on exception
             self._handle_file_io_error(e, operation, "injection startup")
             raise
         except (ValueError, TypeError) as e:
+            self._cleanup_current_worker()  # FIX #2: Stop worker on exception
             self._handle_data_format_error(e, operation, "injection startup")
             raise
         except Exception as e:
+            self._cleanup_current_worker()  # FIX #2: Stop worker on exception
             self._handle_error(e, operation)
             return False
 
@@ -754,6 +757,25 @@ class CoreOperationsManager(
         """Handle worker completion."""
         self._handle_worker_completion("injection", success, message)
         self.injection_finished.emit(success, message)
+
+    def _cleanup_current_worker(self) -> None:
+        """
+        Stop and clear current worker on error.
+
+        FIX #2: Ensures worker is properly stopped when exception occurs
+        after worker.start() but before normal completion.
+        """
+        if self._current_worker is None:
+            return
+
+        try:
+            from core.services.worker_lifecycle import WorkerManager
+            WorkerManager.cleanup_worker(self._current_worker, timeout=1000)
+        except Exception:
+            # Best effort cleanup - don't let cleanup errors mask original error
+            pass
+        finally:
+            self._current_worker = None
 
     # ========== VRAM Suggestion Strategies ==========
 
@@ -1236,8 +1258,12 @@ class CoreOperationsManager(
                         else:
                             result["rom_offset"] = int(rom_offset_str, 16)
                         result["custom_offset"] = rom_offset_str
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as e:
+                        # FIX #3: Log parse failure and indicate error in result
+                        self._logger.warning(
+                            f"Failed to parse ROM offset '{rom_offset_str}': {e}"
+                        )
+                        result["offset_parse_error"] = str(e)
 
                     return result
 

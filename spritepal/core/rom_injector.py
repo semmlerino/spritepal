@@ -510,80 +510,91 @@ class ROMInjector(SpriteInjector):
             logger.debug(f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed")
 
             # Compress new sprite data
-            compression_start = time.time()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as tmp:
-                compressed_path = tmp.name
+            # FIX #1: Use try-finally to guarantee temp file cleanup on any error
+            compressed_path: str | None = None
+            try:
+                compression_start = time.time()
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as tmp:
+                    compressed_path = tmp.name
 
-            compressed_size = self.hal_compressor.compress_to_file(
-                tile_data, compressed_path, fast=fast_compression
-            )
-            compression_time = time.time() - compression_start
-            logger.debug(f"Compression took {compression_time:.2f} seconds")
-
-            # Calculate compression statistics
-            uncompressed_size = len(tile_data)
-            if uncompressed_size == 0:
-                Path(compressed_path).unlink(missing_ok=True)
-                return False, "Cannot compress empty sprite data"
-            compression_ratio = (
-                (uncompressed_size - compressed_size) / uncompressed_size * 100
-            )
-            space_saved = original_size - compressed_size
-            compression_mode = "fast" if fast_compression else "standard"
-
-            logger.info(f"Compression statistics ({compression_mode} mode):")
-            logger.info(f"  - Uncompressed size: {uncompressed_size} bytes")
-            logger.info(f"  - Compressed size: {compressed_size} bytes")
-            logger.info(f"  - Compression ratio: {compression_ratio:.1f}%")
-            logger.info(f"  - Space saved vs original: {space_saved} bytes")
-
-            # Check if compressed data fits
-            if compressed_size > original_size:
-                Path(compressed_path).unlink(missing_ok=True)
-                suggestion = (
-                    "standard compression"
-                    if fast_compression
-                    else "a smaller sprite or split it into parts"
+                compressed_size = self.hal_compressor.compress_to_file(
+                    tile_data, compressed_path, fast=fast_compression
                 )
-                return False, (
-                    f"Compressed sprite too large: {compressed_size} bytes "
-                    f"(original: {original_size} bytes).\n"
-                    f"Compression ratio: {compression_ratio:.1f}%\n"
-                    f"Try using {suggestion}."
+                compression_time = time.time() - compression_start
+                logger.debug(f"Compression took {compression_time:.2f} seconds")
+
+                # Calculate compression statistics
+                uncompressed_size = len(tile_data)
+                if uncompressed_size == 0:
+                    return False, "Cannot compress empty sprite data"
+                compression_ratio = (
+                    (uncompressed_size - compressed_size) / uncompressed_size * 100
                 )
+                space_saved = original_size - compressed_size
+                compression_mode = "fast" if fast_compression else "standard"
 
-            # Read compressed data
-            with Path(compressed_path).open("rb") as f:
-                compressed_data = f.read()
-            Path(compressed_path).unlink(missing_ok=True)
+                logger.info(f"Compression statistics ({compression_mode} mode):")
+                logger.info(f"  - Uncompressed size: {uncompressed_size} bytes")
+                logger.info(f"  - Compressed size: {compressed_size} bytes")
+                logger.info(f"  - Compression ratio: {compression_ratio:.1f}%")
+                logger.info(f"  - Space saved vs original: {space_saved} bytes")
 
-            # Inject compressed data into ROM
+                # Check if compressed data fits
+                if compressed_size > original_size:
+                    suggestion = (
+                        "standard compression"
+                        if fast_compression
+                        else "a smaller sprite or split it into parts"
+                    )
+                    return False, (
+                        f"Compressed sprite too large: {compressed_size} bytes "
+                        f"(original: {original_size} bytes).\n"
+                        f"Compression ratio: {compression_ratio:.1f}%\n"
+                        f"Try using {suggestion}."
+                    )
+
+                # Read compressed data
+                with Path(compressed_path).open("rb") as f:
+                    compressed_data = f.read()
+            finally:
+                # FIX #1: Always clean up temp file, even on exception or early return
+                if compressed_path is not None:
+                    Path(compressed_path).unlink(missing_ok=True)
+
+            # FIX #4: Work on a copy of ROM data to prevent state corruption on write failure
+            # Only update self.rom_data after successful write
+            modified_rom = bytearray(self.rom_data)
+
+            # Inject compressed data into ROM copy
             # Bounds validation to prevent ROM corruption
-            if sprite_offset + compressed_size > len(self.rom_data):
+            if sprite_offset + compressed_size > len(modified_rom):
                 raise ValueError(
                     f"Sprite data would overflow ROM: offset 0x{sprite_offset:X} + "
-                    f"{compressed_size} bytes exceeds ROM size {len(self.rom_data)}"
+                    f"{compressed_size} bytes exceeds ROM size {len(modified_rom)}"
                 )
             logger.info(f"Injecting {compressed_size} bytes of compressed data at offset 0x{sprite_offset:X}")
-            self.rom_data[sprite_offset : sprite_offset + compressed_size] = (
+            modified_rom[sprite_offset : sprite_offset + compressed_size] = (
                 compressed_data
             )
 
             # Pad remaining space if needed
             if compressed_size < original_size:
                 padding = b"\xff" * (original_size - compressed_size)
-                self.rom_data[
+                modified_rom[
                     sprite_offset + compressed_size : sprite_offset + original_size
                 ] = padding
                 logger.info(f"Padded {original_size - compressed_size} bytes with 0xFF")
 
-            # Update checksum
-            self.update_rom_checksum(self.rom_data)
+            # Update checksum on the copy
+            self.update_rom_checksum(modified_rom)
 
             # Write output ROM atomically (prevents corruption on crash/power loss)
             logger.info(f"Writing modified ROM to: {output_path}")
-            atomic_write(output_path, bytes(self.rom_data))
-            logger.debug(f"Successfully wrote {len(self.rom_data)} bytes to output ROM")
+            atomic_write(output_path, bytes(modified_rom))
+            logger.debug(f"Successfully wrote {len(modified_rom)} bytes to output ROM")
+
+            # FIX #4: Only commit changes after successful write
+            self.rom_data = modified_rom
 
             total_time = time.time() - start_time
             logger.info(f"ROM injection completed in {total_time:.2f} seconds")

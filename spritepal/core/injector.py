@@ -270,6 +270,8 @@ class SpriteInjector:
             )
 
         except Exception as e:
+            # FIX #5: Clear VRAM buffer on error to free memory
+            self.vram_data = bytearray()
             logger.exception("Sprite injection failed")
             return False, f"Error injecting sprite: {e!s}"
 
