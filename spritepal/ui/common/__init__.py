@@ -67,12 +67,7 @@ from .spacing_constants import (
     WIDE_WIDTH,
 )
 from .tabbed_widget_base import TabbedWidgetBase
-from .widget_factory import (
-    WidgetFactory,
-    create_browse_layout,
-    create_checkbox_with_tooltip,
-    create_info_label,
-)
+from .widget_factory import WidgetFactory
 
 __all__ = [
     # Spacing and sizing constants
@@ -133,10 +128,6 @@ __all__ = [
     "browse_for_directory",
     "browse_for_open_file",
     "browse_for_save_file",
-    # Widget factory functions
-    "create_browse_layout",
-    "create_checkbox_with_tooltip",
-    "create_info_label",
     # Error handler functions
     "get_error_handler",
     # Signal utilities

@@ -138,43 +138,33 @@ class WorkerHelper:
 
     def create_vram_injection_worker(self) -> Any:
         """Create VRAM injection worker"""
-        # Create mock worker that looks like real one
-        from unittest.mock import Mock
-
-        from PySide6.QtCore import QThread
-
-        worker = Mock(spec=QThread)
-        worker.sprite_path = str(self.sprite_file)
+        worker = self._create_base_worker()
         worker.vram_input = str(self.vram_file)
         worker.offset = 0xC000
-
-        # Add required signal attributes
-        worker.progress = Mock()
-        worker.progress_percent = Mock()
-        worker.finished = Mock()
-
-        # Add QThread methods with proper return values
-        worker.isRunning.return_value = False
-        worker.quit.return_value = None
-        worker.wait.return_value = True
-
         return worker
 
     def create_rom_injection_worker(self) -> Any:
         """Create ROM injection worker"""
         from unittest.mock import Mock
 
+        worker = self._create_base_worker()
+        worker.rom_path = str(self.rom_file)
+        worker.offset = 0x1000
+        worker.compression_info = Mock()
+        return worker
+
+    def _create_base_worker(self) -> Any:
+        """Create base mock worker with common QThread setup."""
+        from unittest.mock import Mock
+
         from PySide6.QtCore import QThread
 
         worker = Mock(spec=QThread)
         worker.sprite_path = str(self.sprite_file)
-        worker.rom_path = str(self.rom_file)
-        worker.offset = 0x1000
 
         # Add required signal attributes
         worker.progress = Mock()
         worker.progress_percent = Mock()
-        worker.compression_info = Mock()
         worker.finished = Mock()
 
         # Add QThread methods with proper return values

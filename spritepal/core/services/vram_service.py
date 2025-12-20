@@ -112,13 +112,13 @@ class VRAMService(QObject):
         if not vram_path or not output_base:
             raise ValidationError("Missing required parameters: vram_path and output_base are required")
 
-        self._validate_vram_file(vram_path)
+        FileValidator.validate_vram_file_or_raise(vram_path)
 
         if cgram_path:
-            self._validate_cgram_file(cgram_path)
+            FileValidator.validate_cgram_file_or_raise(cgram_path)
 
         if oam_path:
-            self._validate_oam_file(oam_path)
+            FileValidator.validate_oam_file_or_raise(oam_path)
 
         try:
             extracted_files = []
@@ -299,21 +299,3 @@ class VRAMService(QObject):
             self.active_palettes_found.emit(active_palettes)
 
         return created_files
-
-    def _validate_vram_file(self, vram_path: str) -> None:
-        """Validate VRAM file exists and is valid."""
-        result = FileValidator.validate_vram_file(vram_path)
-        if not result.is_valid:
-            raise ValidationError(result.error_message or f"Invalid VRAM file: {vram_path}")
-
-    def _validate_cgram_file(self, cgram_path: str) -> None:
-        """Validate CGRAM file exists and is valid."""
-        result = FileValidator.validate_cgram_file(cgram_path)
-        if not result.is_valid:
-            raise ValidationError(result.error_message or f"Invalid CGRAM file: {cgram_path}")
-
-    def _validate_oam_file(self, oam_path: str) -> None:
-        """Validate OAM file exists and is valid."""
-        result = FileValidator.validate_oam_file(oam_path)
-        if not result.is_valid:
-            raise ValidationError(result.error_message or f"Invalid OAM file: {oam_path}")

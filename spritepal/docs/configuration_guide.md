@@ -30,7 +30,6 @@ launch_spritepal.py (Application Entry)
 │ Step 1: Early Feature Flags          │  Lines 26-42
 │ ConfigurationService() created       │
 │ Reads "experimental" settings        │
-│ e.g., use_composed_dialogs flag      │
 └──────────────────────────────────────┘
          │
          ▼
@@ -149,18 +148,18 @@ Feature flags for experimental functionality are in the `experimental` namespace
 ```json
 {
   "experimental": {
-    "use_composed_dialogs": false
+    "use_feature_x": false
   }
 }
 ```
 
 **Checking feature flags**:
 ```python
-use_composed = settings_manager.get("experimental.use_composed_dialogs", False)
-if use_composed:
-    # Use new dialog implementation
+use_feature = settings_manager.get("experimental.use_feature_x", False)
+if use_feature:
+    # Use new implementation
 else:
-    # Use legacy dialog
+    # Use default implementation
 ```
 
 **Adding a new experimental feature**:
@@ -198,7 +197,6 @@ def test_something(isolated_managers):
 | `rom_injection.last_input_rom` | str | Last loaded ROM file path |
 | `vram_extraction.default_offset` | int | Default VRAM offset |
 | `ui.window_geometry` | dict | Main window position/size |
-| `experimental.use_composed_dialogs` | bool | Enable composed dialog pattern |
 
 ---
 

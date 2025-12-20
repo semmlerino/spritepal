@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
 
+# Import here to avoid circular imports - used by _or_raise methods
+from core.exceptions import ValidationError
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -793,6 +795,72 @@ class FileValidator:
     def _format_file_size(cls, size_bytes: int) -> str:
         """Backward compatibility wrapper for file size formatting."""
         return BasicFileValidator.format_file_size(size_bytes)
+
+    # --- Convenience methods that raise ValidationError on failure ---
+
+    @classmethod
+    def validate_vram_file_or_raise(cls, path: str) -> None:
+        """Validate VRAM file and raise ValidationError if invalid.
+
+        Args:
+            path: Path to VRAM file
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        result = cls.validate_vram_file(path)
+        if not result.is_valid:
+            raise ValidationError(
+                result.error_message or f"Invalid VRAM file: {path}"
+            )
+
+    @classmethod
+    def validate_cgram_file_or_raise(cls, path: str) -> None:
+        """Validate CGRAM file and raise ValidationError if invalid.
+
+        Args:
+            path: Path to CGRAM file
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        result = cls.validate_cgram_file(path)
+        if not result.is_valid:
+            raise ValidationError(
+                result.error_message or f"Invalid CGRAM file: {path}"
+            )
+
+    @classmethod
+    def validate_oam_file_or_raise(cls, path: str) -> None:
+        """Validate OAM file and raise ValidationError if invalid.
+
+        Args:
+            path: Path to OAM file
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        result = cls.validate_oam_file(path)
+        if not result.is_valid:
+            raise ValidationError(
+                result.error_message or f"Invalid OAM file: {path}"
+            )
+
+    @classmethod
+    def validate_rom_file_exists_or_raise(cls, path: str) -> None:
+        """Validate ROM file exists and raise ValidationError if not.
+
+        Args:
+            path: Path to ROM file
+
+        Raises:
+            ValidationError: If file doesn't exist or validation fails
+        """
+        result = cls.validate_file_existence(path, "ROM file")
+        if not result.is_valid:
+            raise ValidationError(
+                result.error_message or f"ROM file not found: {path}"
+            )
 
 
 def atomic_write(path: Path | str, data: bytes) -> None:

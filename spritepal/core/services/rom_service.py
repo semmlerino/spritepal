@@ -147,7 +147,7 @@ class ROMService(QObject):
         self._validate_rom_file(rom_path)
         self._validate_offset(offset)
         if cgram_path:
-            self._validate_cgram_file(cgram_path)
+            FileValidator.validate_cgram_file_or_raise(cgram_path)
 
         try:
             extracted_files = []
@@ -248,7 +248,7 @@ class ROMService(QObject):
             ExtractionError: If preview generation fails
         """
         # Validate parameters
-        self._validate_rom_file_exists(rom_path)
+        FileValidator.validate_rom_file_exists_or_raise(rom_path)
         self._validate_offset(offset)
 
         try:
@@ -359,7 +359,7 @@ class ROMService(QObject):
         """
         try:
             # Validate ROM file exists
-            self._validate_rom_file_exists(rom_path)
+            FileValidator.validate_rom_file_exists_or_raise(rom_path)
 
             # Try to load from cache first
             start_time = time.time()
@@ -428,7 +428,7 @@ class ROMService(QObject):
         """
         try:
             # Validate ROM file exists
-            self._validate_rom_file_exists(rom_path)
+            FileValidator.validate_rom_file_exists_or_raise(rom_path)
 
             header = self._rom_extractor.rom_injector.read_rom_header(rom_path)
             return asdict(header)
@@ -524,17 +524,6 @@ class ROMService(QObject):
         result = FileValidator.validate_rom_file(rom_path)
         if not result.is_valid:
             raise ValidationError(result.error_message or f"Invalid ROM file: {rom_path}")
-
-    def _validate_rom_file_exists(self, rom_path: str) -> None:
-        """Validate ROM file exists."""
-        if not Path(rom_path).exists():
-            raise ValidationError(f"ROM file does not exist: {rom_path}")
-
-    def _validate_cgram_file(self, cgram_path: str) -> None:
-        """Validate CGRAM file exists and is valid."""
-        result = FileValidator.validate_cgram_file(cgram_path)
-        if not result.is_valid:
-            raise ValidationError(result.error_message or f"Invalid CGRAM file: {cgram_path}")
 
     def _validate_offset(self, offset: int) -> None:
         """Validate offset is a non-negative integer."""

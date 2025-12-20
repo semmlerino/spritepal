@@ -232,21 +232,21 @@ class CoreOperationsManager(BaseManager):
 
     def _ensure_sprite_extractor(self) -> SpriteExtractor:
         """Ensure sprite extractor is initialized."""
-        if self._sprite_extractor is None:
-            raise ExtractionError("Sprite extractor not initialized")
-        return self._sprite_extractor
+        return self._ensure_component(
+            self._sprite_extractor, "Sprite extractor", ExtractionError
+        )
 
     def _ensure_rom_extractor(self) -> ROMExtractorProtocol:
         """Ensure ROM extractor is initialized."""
-        if self._rom_extractor is None:
-            raise ExtractionError("ROM extractor not initialized")
-        return self._rom_extractor
+        return self._ensure_component(
+            self._rom_extractor, "ROM extractor", ExtractionError
+        )
 
     def _ensure_palette_manager(self) -> PaletteManager:
         """Ensure palette manager is initialized."""
-        if self._palette_manager is None:
-            raise ExtractionError("Palette manager not initialized")
-        return self._palette_manager
+        return self._ensure_component(
+            self._palette_manager, "Palette manager", ExtractionError
+        )
 
     def _get_session_manager(self) -> SessionManager:
         """Get session manager via dependency injection container."""
@@ -459,7 +459,7 @@ class CoreOperationsManager(BaseManager):
         elif "rom_path" in params:
             # ROM extraction
             self._validate_required(params, ["rom_path", "offset", "output_base"])
-            self._validate_rom_file_exists(params["rom_path"])
+            FileValidator.validate_rom_file_exists_or_raise(params["rom_path"])
             self._validate_type(params["offset"], "offset", int)
             self._validate_range(params["offset"], "offset", min_val=0)
         else:
@@ -600,24 +600,6 @@ class CoreOperationsManager(BaseManager):
 
     # ========== Extraction Validation Helpers ==========
 
-    def _validate_vram_file(self, vram_path: str) -> None:
-        """Validate VRAM file and raise if invalid."""
-        vram_result = FileValidator.validate_vram_file(vram_path)
-        if not vram_result.is_valid:
-            raise ValidationError(f"VRAM file validation failed: {vram_result.error_message}")
-
-    def _validate_cgram_file(self, cgram_path: str) -> None:
-        """Validate CGRAM file and raise if invalid."""
-        cgram_result = FileValidator.validate_cgram_file(cgram_path)
-        if not cgram_result.is_valid:
-            raise ValidationError(f"CGRAM file validation failed: {cgram_result.error_message}")
-
-    def _validate_oam_file(self, oam_path: str) -> None:
-        """Validate OAM file and raise if invalid."""
-        oam_result = FileValidator.validate_oam_file(oam_path)
-        if not oam_result.is_valid:
-            raise ValidationError(f"OAM file validation failed: {oam_result.error_message}")
-
     def _validate_rom_file(self, rom_path: str) -> dict[str, Any] | None:
         """Validate ROM file exists, is readable, and has reasonable size.
 
@@ -640,12 +622,6 @@ class CoreOperationsManager(BaseManager):
             return {"error": f"File too large to be a valid SNES ROM: {file_size} bytes", "error_type": "ValueError"}
 
         return None
-
-    def _validate_rom_file_exists(self, rom_path: str) -> None:
-        """Validate ROM file existence and raise if not found."""
-        rom_result = FileValidator.validate_file_existence(rom_path, "ROM file")
-        if not rom_result.is_valid:
-            raise ValidationError(f"ROM file validation failed: {rom_result.error_message}")
 
     def _validate_extraction_rom_file(self, rom_path: str) -> None:
         """Validate ROM file for extraction and raise if invalid."""
@@ -1193,6 +1169,45 @@ class CoreOperationsManager(BaseManager):
 
         return ""
 
+    def _suggest_output_path(
+        self,
+        input_path: str,
+        suffix: str,
+        extension: str | None = None,
+        preserve_parent: bool = False,
+    ) -> str:
+        """
+        Generic output path suggestion with smart numbering.
+
+        Args:
+            input_path: Input file path
+            suffix: Suffix to add (e.g., "_injected", "_modified")
+            extension: Override extension (e.g., ".dmp") or None to preserve original
+            preserve_parent: Whether to keep file in same directory as input
+
+        Returns:
+            Suggested non-existent output path
+        """
+        path = Path(input_path)
+        base = path.stem.removesuffix(suffix)
+        ext = extension if extension else path.suffix
+        parent = path.parent if preserve_parent else Path(".")
+
+        # Try base name with suffix
+        suggested = parent / f"{base}{suffix}{ext}"
+        if not suggested.exists():
+            return str(suggested)
+
+        # Try numbered variations
+        for counter in range(2, 11):
+            suggested = parent / f"{base}{suffix}{counter}{ext}"
+            if not suggested.exists():
+                return str(suggested)
+
+        # Fall back to timestamp
+        timestamp = int(time.time())
+        return str(parent / f"{base}{suffix}_{timestamp}{ext}")
+
     def suggest_output_vram_path(self, input_vram_path: str) -> str:
         """
         Suggest output VRAM path based on input path with smart numbering.
@@ -1203,22 +1218,7 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested output path
         """
-        base = Path(input_vram_path).stem
-        base = base.removesuffix("_injected")
-
-        suggested_path = f"{base}_injected.dmp"
-        if not Path(suggested_path).exists():
-            return suggested_path
-
-        counter = 2
-        while counter <= 10:
-            suggested_path = f"{base}_injected{counter}.dmp"
-            if not Path(suggested_path).exists():
-                return suggested_path
-            counter += 1
-
-        timestamp = int(time.time())
-        return f"{base}_injected_{timestamp}.dmp"
+        return self._suggest_output_path(input_vram_path, "_injected", ".dmp")
 
     def suggest_output_rom_path(self, input_rom_path: str) -> str:
         """
@@ -1230,26 +1230,9 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested output path (in same directory as input)
         """
-        input_path = Path(input_rom_path)
-        parent = input_path.parent
-        base = input_path.stem
-        ext = input_path.suffix
-
-        base = base.removesuffix("_modified")
-
-        suggested_path = parent / f"{base}_modified{ext}"
-        if not suggested_path.exists():
-            return str(suggested_path)
-
-        counter = 2
-        while counter <= 10:
-            suggested_path = parent / f"{base}_modified{counter}{ext}"
-            if not suggested_path.exists():
-                return str(suggested_path)
-            counter += 1
-
-        timestamp = int(time.time())
-        return str(parent / f"{base}_modified_{timestamp}{ext}")
+        return self._suggest_output_path(
+            input_rom_path, "_modified", None, preserve_parent=True
+        )
 
     def convert_vram_to_rom_offset(self, vram_offset_str: str | int) -> int | None:
         """
