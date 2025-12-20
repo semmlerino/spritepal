@@ -198,8 +198,10 @@ class ManagerRegistry:
                 self._logger.debug(f"Could not register Qt cleanup: {e}")
 
     # To add a new manager:
-    # 1. Add the manager class to MANAGED_CLASSES (maintain initialization order)
-    # 2. Add initialization code in initialize_managers() following the pattern
+    # 1. Add the manager class to MANAGED_CLASSES (order matters - dependencies first)
+    # 2. Add entry to MANAGER_DEPENDENCIES with required protocol dependencies
+    # 3. Add entry to MANAGER_TO_PROTOCOLS with protocols this manager registers
+    # 4. Add initialization code in initialize_managers() following the pattern
     # Current order: ApplicationStateManager → CoreOperationsManager → MonitoringManager
     def initialize_managers(
         self,
@@ -230,6 +232,10 @@ class ManagerRegistry:
                 return
 
             self._logger.info("Initializing managers with consolidated architecture...")
+
+            # Validate manager initialization order before creating anything
+            # This ensures MANAGED_CLASSES order satisfies MANAGER_DEPENDENCIES
+            validate_manager_order()
 
             # Configure the DI container first to register all protocols
             # Pass configuration_service so it gets registered in the container
