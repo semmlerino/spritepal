@@ -26,12 +26,6 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Skip tests that use qtbot.wait() in offscreen mode (causes segfaults)
-_offscreen_mode = os.environ.get('QT_QPA_PLATFORM') == 'offscreen'
-skip_in_offscreen = pytest.mark.skipif(
-    _offscreen_mode,
-    reason="qtbot.wait() causes segfaults in offscreen mode"
-)
 
 @pytest.fixture
 def qt_framework():
@@ -154,7 +148,6 @@ class TestDialogSignalConnections:
         assert isinstance(blocker.args[0], int)  # offset
         assert isinstance(blocker.args[1], str)  # sprite name
 
-    @skip_in_offscreen
     def test_multiple_rapid_emissions(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test handling of multiple rapid signal emissions."""
         dialog = UnifiedManualOffsetDialog(None)
@@ -176,7 +169,6 @@ class TestDialogSignalConnections:
         received_offsets = [args[0] for args, _ in emissions]
         assert received_offsets == offsets
 
-    @skip_in_offscreen
     def test_signal_connection_types(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test different Qt connection types for cross-thread safety."""
         dialog = UnifiedManualOffsetDialog(None)
@@ -207,7 +199,6 @@ class TestDialogSignalConnections:
 @pytest.mark.gui
 @pytest.mark.usefixtures("session_managers")
 @pytest.mark.shared_state_safe
-@skip_in_offscreen
 class TestThreadSafetyAndTiming:
     """Test thread safety and timing of signal emissions."""
 
@@ -348,7 +339,6 @@ class TestThreadSafetyAndTiming:
 @pytest.mark.gui
 @pytest.mark.usefixtures("session_managers")
 @pytest.mark.shared_state_safe
-@skip_in_offscreen
 class TestSignalBlockingAndError:
     """Test signal blocking and error conditions."""
 
@@ -383,69 +373,84 @@ class TestSignalBlockingAndError:
         dialog = UnifiedManualOffsetDialog(None)
         qtbot.addWidget(dialog)
 
-        call_count = 0
+        faulty_calls: list[int] = []
+        good_calls: list[int] = []
 
         @Slot(int)
-        def faulty_slot(offset):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
+        def faulty_slot(offset: int) -> None:
+            faulty_calls.append(offset)
+            if len(faulty_calls) == 1:
                 raise ValueError("Test exception")
 
         @Slot(int)
-        def good_slot(offset):
-            nonlocal call_count
-            call_count += 10
+        def good_slot(offset: int) -> None:
+            good_calls.append(offset)
 
         # Connect both slots
         dialog.offset_changed.connect(faulty_slot)
         dialog.offset_changed.connect(good_slot)
 
-        # Emit signal
-        dialog.offset_changed.emit(0x1000)
-        wait_for_signal_processed()
+        # Emit signal - use capture_exceptions to catch the expected ValueError
+        with qtbot.capture_exceptions() as exceptions:
+            dialog.offset_changed.emit(0x1000)
+            wait_for_signal_processed()
+
+        # Verify the exception was caught
+        assert len(exceptions) == 1
+        assert isinstance(exceptions[0][1], ValueError)
 
         # Both slots should be called despite exception
-        assert call_count >= 11  # 1 from faulty, 10 from good
+        assert len(faulty_calls) == 1
+        assert len(good_calls) == 1
 
         # Emit again - faulty slot won't raise this time
         dialog.offset_changed.emit(0x2000)
         wait_for_signal_processed()
 
-        assert call_count >= 23  # 2 from faulty, 20 from good
+        assert len(faulty_calls) == 2
+        assert len(good_calls) == 2
 
     def test_deleted_receiver(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test that deleted receivers don't cause crashes."""
+        import gc
+        import weakref
+
         dialog = UnifiedManualOffsetDialog(None)
         qtbot.addWidget(dialog)
 
+        # Track receptions with a list (avoids class attribute pollution)
+        receptions: list[int] = []
+
         # Create receiver that will be deleted
         class Receiver(QObject):
-            received = False
-
             @Slot(int)
-            def receive(self, offset):
-                Receiver.received = True
+            def receive(self, offset: int) -> None:
+                receptions.append(offset)
 
         receiver = Receiver()
+        weak_receiver = weakref.ref(receiver)
         dialog.offset_changed.connect(receiver.receive)
 
         # Emit with valid receiver
         dialog.offset_changed.emit(0x1000)
-        qtbot.waitUntil(lambda: Receiver.received, timeout=500)
-        assert Receiver.received
+        qtbot.waitUntil(lambda: len(receptions) > 0, timeout=500)
+        assert receptions == [0x1000]
 
-        # Delete receiver
-        Receiver.received = False
+        # Delete receiver and wait for actual deletion
         receiver.deleteLater()
+        del receiver  # Release our reference
         wait_for_signal_processed()
+        gc.collect()  # Force garbage collection
 
-        # Emit again - should not crash
+        # Wait until the weak reference is dead
+        qtbot.waitUntil(lambda: weak_receiver() is None, timeout=1000)
+
+        # Emit again - should not crash (receiver is now deleted)
         dialog.offset_changed.emit(0x2000)
         wait_for_signal_processed()
 
-        # Should not have been received
-        assert not Receiver.received
+        # Should not have been received (receiver was deleted)
+        assert receptions == [0x1000]
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

@@ -254,7 +254,7 @@ class TestQtSignalArchitecture:
         protocol_mgr: InjectionManagerProtocol = concrete_mgr
 
         # Cast back to concrete type (as done in controller)
-        casted_mgr = cast(InjectionManager, protocol_mgr)
+        casted_mgr = cast(InjectionManager, protocol_mgr)  # cast-ok: testing cast behavior
 
         # Verify all signals still work
         capture = SignalCapture()
@@ -345,7 +345,7 @@ class TestQtSignalArchitecture:
         manager.injection_progress.emit("Disconnected")
         # Give time for potential delivery using Qt-safe wait
         from PySide6.QtTest import QTest
-        QTest.qWait(100)
+        QTest.qWait(100)  # wait-ok: verifying signal NOT delivered after disconnect
         assert len(signal_capture.captured_signals) == 0
 
     def test_controller_signal_forwarding(self, app, mock_factory, signal_capture):
@@ -385,7 +385,7 @@ class TestQtSignalArchitecture:
         # Process events to ensure signal delivery
         app.processEvents()
         from PySide6.QtTest import QTest
-        QTest.qWait(100)
+        QTest.qWait(100)  # wait-ok: ensuring queued signal delivery completes
 
         # Verify controller methods were called
         assert len(called_methods) == 3
@@ -421,11 +421,11 @@ class TestQtSignalArchitecture:
         start_time = time.time()
         while worker.isRunning() and (time.time() - start_time) * 1000 < timeout_ms:
             app.processEvents()
-            QTest.qWait(10)  # Small wait that processes events
+            QTest.qWait(10)  # wait-ok: event loop pump in polling loop
 
         # Process any remaining pending signals
         app.processEvents()
-        QTest.qWait(100)
+        QTest.qWait(100)  # wait-ok: ensuring cross-thread signal delivery
         app.processEvents()
 
         # Verify signals were received in order
@@ -532,11 +532,11 @@ class TestMemoryManagement:
         start_time = time.time()
         while worker.isRunning() and (time.time() - start_time) * 1000 < timeout_ms:
             app.processEvents()
-            QTest.qWait(10)
+            QTest.qWait(10)  # wait-ok: event loop pump in polling loop
 
         # Process any remaining signals
         app.processEvents()
-        QTest.qWait(50)
+        QTest.qWait(50)  # wait-ok: ensuring cross-thread signal delivery
         app.processEvents()
 
         # Verify signal was received before cleanup

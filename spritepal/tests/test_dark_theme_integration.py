@@ -209,7 +209,7 @@ class TestPreviewWidgetDarkTheme:
         qtbot.addWidget(preview_label)
 
         # Create mock pixmap
-        pixmap = QPixmap(64, 64)
+        pixmap = QPixmap(64, 64)  # pixmap-ok: main thread test code
         pixmap.fill(QColor(255, 0, 0))  # Red test image
 
         preview_label.setPixmap(pixmap)

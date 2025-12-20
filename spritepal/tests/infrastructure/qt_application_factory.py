@@ -127,7 +127,7 @@ class ApplicationFactory:
             cls._application_instance.processEvents()
             # Use QTest.qWait to respect the timeout while processing events
             from PySide6.QtTest import QTest
-            QTest.qWait(timeout_ms)
+            QTest.qWait(timeout_ms)  # wait-ok: explicit API for timed event processing
 
 class QtTestContext:
     """
@@ -213,7 +213,7 @@ def validate_qt_application_state() -> dict[str, Any]:
 def _test_pixmap_creation() -> dict[str, Any]:
     """Test that Qt pixmap creation works (validates rendering setup)."""
     try:
-        pixmap = QPixmap(100, 100)
+        pixmap = QPixmap(100, 100)  # pixmap-ok: validating main thread rendering
         return {
             "success": True,
             "width": pixmap.width(),

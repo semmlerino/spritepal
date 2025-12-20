@@ -42,17 +42,29 @@ class AntiPattern(NamedTuple):
 ANTI_PATTERNS: list[AntiPattern] = [
     AntiPattern(
         r'time\.sleep\([^)]+\)',
-        'Prefer qtbot.wait() in Qt tests; allowlist with "# sleep-ok: reason" if intentional',
+        'Prefer qtbot.waitUntil/waitSignal in Qt tests; allowlist with "# sleep-ok: reason" if intentional',
         'warning'
     ),
     AntiPattern(
-        r'from time import sleep',
-        'Import time module instead; bare sleep() is harder to grep for',
+        r'qtbot\.wait\s*\(',
+        'This wait pattern can segfault in offscreen mode. Use waitUntil(), '  # wait-ok: msg
+        'waitSignal(), or wait_for_condition(). Allowlist with "# wait-ok: reason"',
+        'warning'
+    ),
+    AntiPattern(
+        r'QTest\.qWait\s*\(',
+        'This wait pattern can segfault in offscreen mode. Use waitUntil(), '  # wait-ok: msg
+        'waitSignal(), or wait_for_condition(). Allowlist with "# wait-ok: reason"',
+        'warning'
+    ),
+    AntiPattern(
+        r'from time import sleep',  # sleep-ok: pattern definition
+        'Import time module instead; bare sleep is harder to grep for',
         'warning'
     ),
     AntiPattern(
         r'QThread\.sleep\(',
-        'Use QThread.currentThread().msleep() instead of QThread.sleep()',
+        'Use currentThread().msleep() instead of this sleep pattern',  # wait-ok: msg
         'warning'
     ),
     AntiPattern(
@@ -71,8 +83,8 @@ ANTI_PATTERNS: list[AntiPattern] = [
         'warning'
     ),
     AntiPattern(
-        r'QPixmap\s*\(',
-        'QPixmap in worker threads causes crashes. Use ThreadSafeTestImage or QImage instead.',
+        r'(?<![a-zA-Z])QPixmap\s*\(',
+        'QPixmap constructor in worker threads causes crashes. Use ThreadSafeTestImage or QImage instead.',
         'warning'
     ),
     AntiPattern(
@@ -143,7 +155,7 @@ def check_file(file_path: Path) -> list[tuple[int, str, str, str]]:
                 continue
 
             # Skip if explicitly allowlisted
-            if '# sleep-ok' in line:
+            if any(marker in line for marker in ['# sleep-ok', '# wait-ok', '# pixmap-ok', '# cast-ok']):
                 continue
 
             issues.append((

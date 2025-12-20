@@ -28,6 +28,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QPalette
 from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QLabel,
     QLineEdit,
@@ -236,7 +237,7 @@ class TestCompleteUIWorkflowsIntegration:
 
         # Test that UI updates don't freeze the interface
         start_time = time.time()
-        QTest.qWait(10)  # Process events
+        QApplication.processEvents()  # Process events
         end_time = time.time()
         assert end_time - start_time < 1.0, "UI should remain responsive"
 
@@ -756,7 +757,7 @@ class TestCompleteUIWorkflowsIntegration:
             start_time = time.time()
             for i in range(10):
                 status_bar.showMessage(f"Update {i}")
-                QTest.qWait(1)  # Minimal wait
+                QApplication.processEvents()  # Process message update
             end_time = time.time()
 
             update_time = end_time - start_time

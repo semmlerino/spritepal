@@ -2,7 +2,7 @@
 Consolidated wait helpers for Qt test synchronization.
 
 This module provides condition-based wait fixtures that replace timing-dependent
-qtbot.wait() calls with proper Qt event loop handling.
+fixed-duration waits with proper Qt event loop handling.
 
 Usage:
     Import via pytest_plugins in your conftest.py:
@@ -79,7 +79,7 @@ def wait_for_widget_ready(qtbot: QtBot) -> Callable[..., bool]:
     """
     Helper to wait for widget initialization.
 
-    Replaces fixed qtbot.wait() calls with condition-based waiting.
+    Replaces fixed-duration waits with condition-based waiting.
     Auto-completes when widget becomes visible and enabled.
 
     Example:

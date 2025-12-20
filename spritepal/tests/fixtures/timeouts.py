@@ -8,7 +8,7 @@ Usage:
     from tests.fixtures.timeouts import worker_timeout, ui_timeout, signal_timeout
 
     qtbot.waitSignal(worker.finished, timeout=worker_timeout())
-    qtbot.wait(ui_timeout())
+    qtbot.waitUntil(lambda: condition, timeout=ui_timeout())
     with qtbot.waitSignal(dialog.accepted, timeout=signal_timeout()):
         dialog.accept()
 
@@ -103,7 +103,7 @@ def ui_timeout(multiplier: float = MEDIUM) -> int:
         Timeout in milliseconds
 
     Example:
-        qtbot.wait(ui_timeout(SHORT))
+        qtbot.waitUntil(condition, timeout=ui_timeout(SHORT))
     """
     return _scaled_timeout(_BASE_UI_TIMEOUT, multiplier)
 

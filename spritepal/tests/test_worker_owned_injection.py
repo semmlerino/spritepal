@@ -149,7 +149,7 @@ class TestWorkerOwnedInjectionPattern:
 
             # Wait for initial processing using Qt-safe wait
             from PySide6.QtTest import QTest
-            QTest.qWait(500)
+            QTest.qWait(500)  # wait-ok: async operation has no completion signal
 
             # The main success criteria: no Qt lifecycle errors occurred
             qt_lifecycle_error = False
@@ -221,7 +221,7 @@ class TestWorkerOwnedInjectionPattern:
             worker2.perform_operation()
 
             # Wait for async processing using Qt-safe wait
-            QTest.qWait(500)
+            QTest.qWait(500)  # wait-ok: async operation has no completion signal
 
             # The core test: verify no Qt lifecycle errors occurred (architectural success)
             for error_spy, worker_name in [(error_spy1, "Worker1"), (error_spy2, "Worker2")]:
@@ -276,7 +276,7 @@ class TestWorkerOwnedInjectionPattern:
 
         # Use Qt-safe wait
         from PySide6.QtTest import QTest
-        QTest.qWait(200)
+        QTest.qWait(200)  # wait-ok: async operation has no completion signal
 
         # Verify no Qt lifecycle errors (the main architectural test)
         qt_lifecycle_error = False
@@ -343,5 +343,5 @@ class TestWorkerOwnedInjectionPattern:
                 worker.manager.cleanup()
             
             # Allow pending deletions/signals to process
-            from PySide6.QtTest import QTest
-            QTest.qWait(50)
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()

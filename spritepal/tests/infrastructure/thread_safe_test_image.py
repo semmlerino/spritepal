@@ -46,7 +46,7 @@ class ThreadSafeTestImage:
     Usage:
         # ❌ CRASHES - QPixmap in worker thread
         def worker_function():
-            pixmap = QPixmap(100, 100)  # FATAL ERROR
+            pixmap = QPixmap(100, 100)  # FATAL ERROR  # pixmap-ok: documentation example
 
         # ✅ SAFE - ThreadSafeTestImage in worker thread
         def worker_function():

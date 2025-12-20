@@ -9,6 +9,7 @@ import tempfile
 from unittest.mock import Mock, patch
 
 import pytest
+from PySide6.QtWidgets import QApplication
 
 from core.di_container import inject
 from core.protocols.manager_protocols import InjectionManagerProtocol
@@ -207,7 +208,7 @@ class TestROMLoadingSafety:
             qtbot.waitUntil(worker_done, timeout=5000)
 
             # Process events to ensure handler runs
-            qtbot.wait(100)
+            QApplication.processEvents()
 
             # Verify an error dialog was shown (critical or warning)
             assert mock_msgbox.critical.called or mock_msgbox.warning.called or \
@@ -245,7 +246,7 @@ class TestROMLoadingSafety:
                     qtbot.waitUntil(worker_done, timeout=5000)
 
                     # Process events to ensure handler runs
-                    qtbot.wait(100)
+                    QApplication.processEvents()
 
                     # Test passes if either:
                     # 1. A warning/error dialog was shown

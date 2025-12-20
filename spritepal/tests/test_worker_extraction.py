@@ -46,7 +46,7 @@ class TestVRAMExtractionWorker:
     def extraction_manager(self, managers) -> ExtractionManager:
         """Get extraction manager from session managers."""
         from typing import cast
-        return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+        return cast(ExtractionManager, inject(ExtractionManagerProtocol))  # cast-ok: getting concrete type from DI
 
     @pytest.fixture
     def test_files(self, tmp_path):
@@ -279,7 +279,7 @@ class TestROMExtractionWorker:
     def extraction_manager(self, managers) -> ExtractionManager:
         """Get extraction manager from session managers."""
         from typing import cast
-        return cast(ExtractionManager, inject(ExtractionManagerProtocol))
+        return cast(ExtractionManager, inject(ExtractionManagerProtocol))  # cast-ok: getting concrete type from DI
 
     @pytest.fixture
     def test_rom_files(self, tmp_path):

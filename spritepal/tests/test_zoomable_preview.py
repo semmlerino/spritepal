@@ -37,7 +37,7 @@ class TestZoomablePreviewWidget:
     @pytest.fixture
     def test_pixmap(self):
         """Create a test pixmap"""
-        pixmap = QPixmap(64, 64)
+        pixmap = QPixmap(64, 64)  # pixmap-ok: main thread fixture
         pixmap.fill(Qt.GlobalColor.white)
         return pixmap
 
@@ -68,7 +68,7 @@ class TestZoomablePreviewWidget:
         widget._pan_offset = QPointF(10, 20)
 
         # Create new pixmap
-        new_pixmap = QPixmap(32, 32)
+        new_pixmap = QPixmap(32, 32)  # pixmap-ok: main thread test code
         new_pixmap.fill(Qt.GlobalColor.blue)
 
         # Update pixmap

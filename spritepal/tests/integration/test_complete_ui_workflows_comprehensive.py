@@ -299,7 +299,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         # Create mock gallery for sprite pixmap retrieval
         mock_gallery = Mock()
 
-        def mock_get_sprite_pixmap(offset: int) -> QPixmap:
+        def mock_get_sprite_pixmap(offset: int) -> QPixmap:  # pixmap-ok: main thread mock
             image = ThreadSafeTestImage(128, 128)
             image.fill()
             return image.toQPixmap()

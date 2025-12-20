@@ -373,7 +373,7 @@ class WorkerTestContext:
             return finished_spy.wait(timeout_ms)
         # No completion signal, use Qt-safe wait
         from PySide6.QtTest import QTest
-        QTest.qWait(timeout_ms)
+        QTest.qWait(timeout_ms)  # wait-ok: fallback when no completion signal available
         return True
 
     def validate_worker_state(self) -> dict[str, Any]:

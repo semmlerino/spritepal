@@ -364,7 +364,7 @@ class TestPreviewWidgetDarkBackgrounds:
         qtbot.addWidget(preview_widget)
 
         # Create test pixmap with light content (should contrast well with dark bg)
-        pixmap = QPixmap(64, 64)
+        pixmap = QPixmap(64, 64)  # pixmap-ok: main thread test code
         pixmap.fill(QColor(255, 255, 255))  # White content
 
         # Apply dark background

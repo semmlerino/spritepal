@@ -90,7 +90,7 @@ class TestSimplePreviewCoordinator:
         # Wait a bit more to ensure no additional previews are generated
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
-        qtbot.wait(200)  # Wait for any pending signals
+        qtbot.wait(200)  # wait-ok: verifying debounce by proving no extra signals arrive
 
         # Should only generate one preview for the final offset (debounced)
         # If we get exactly 1, great. If we get 2, the first request snuck through

@@ -321,7 +321,8 @@ class TestWorkerManagerReal:
         worker.setPriority(QThread.Priority.HighPriority)
 
         # Verify priority is set (give Qt a moment to apply it)
-        qtbot.wait(50)
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
 
         # Note: Linux often ignores thread priority for non-root processes,
         # so we accept either HighPriority (if supported) or InheritPriority (fallback)

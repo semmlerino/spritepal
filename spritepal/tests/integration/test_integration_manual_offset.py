@@ -266,7 +266,8 @@ class TestSpriteScanDialog:
         dialog._cancel_sprite_scan()
 
         # Give the worker time to clean up
-        qtbot.wait(100)
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
 
     def test_sprite_selection_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
         """Test selecting a sprite from results navigates to it."""

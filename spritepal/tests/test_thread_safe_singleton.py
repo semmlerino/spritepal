@@ -425,7 +425,9 @@ class TestManualOffsetDialogSingletonIntegration:
         # Now simulate external destruction without going through normal cleanup
         # (This is the bug scenario - dialog destroyed but singleton state not updated)
         dialog1.deleteLater()
-        qtbot.wait(100)  # Allow Qt to process deletion
+        # Wait for Qt to process the deferred deletion
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
 
         # Create a new dialog - it should get signals connected regardless of
         # what happened to the first dialog
