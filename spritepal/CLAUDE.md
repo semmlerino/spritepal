@@ -85,6 +85,25 @@ uv run pytest -m "not real_hal" -vv
 uv run pytest --durations=20
 ```
 
+### Custom CLI Options
+
+Options defined in conftest.py:
+
+```bash
+# Use real HAL binaries instead of mocks
+uv run pytest --use-real-hal -v
+
+# Fail if real HAL binaries not found (instead of skip)
+uv run pytest --require-real-hal -v
+
+# Control leak detection behavior
+uv run pytest --leak-mode=warn  # Warn on leaks (default local)
+uv run pytest --leak-mode=fail  # Fail on leaks (default CI)
+
+# Regenerate golden data checksums
+uv run pytest tests/test_hal_golden.py --regenerate-golden -v
+```
+
 ### Parallel Execution
 
 Tests run parallel by default (pyproject.toml sets `-n auto --dist=loadscope`).
@@ -166,6 +185,20 @@ qtbot.waitSignal(worker.finished)  # Signal may emit before wait starts!
 
 **Do not mix `session_managers` and `isolated_managers` in the same module.**
 
+### Advanced Fixtures
+
+For integration tests and real component testing:
+
+| Fixture | Scope | Purpose |
+|---------|-------|---------|
+| `real_factory` | function | RealComponentFactory wrapper with cleanup |
+| `complete_test_context` | function | All managers together (injection, extraction, session) |
+| `manager_context_factory` | function | Factory for creating test contexts |
+| `test_injection_manager` | function | Context-based injection manager |
+| `test_extraction_manager` | function | Context-based extraction manager |
+| `real_extraction_manager` | function | Direct real extraction manager |
+| `real_injection_manager` | function | Direct real injection manager |
+
 ### Test Markers
 
 | Marker | Effect | Enforced |
@@ -219,6 +252,22 @@ uv run ruff check . --fix
 
 # Type checking
 uv run basedpyright core ui utils
+```
+
+### Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `PYTEST_TIMEOUT_MULTIPLIER` | Scale all timeouts for slow CI | `1.0` |
+| `SPRITEPAL_EXHAL_PATH` | Path to real exhal binary | System PATH |
+| `SPRITEPAL_INHAL_PATH` | Path to real inhal binary | System PATH |
+| `SPRITEPAL_LEAK_MODE` | Override leak detection | `fail` (CI), `warn` (local) |
+| `QT_QPA_PLATFORM` | Qt display platform | `offscreen` (set by conftest) |
+
+Example for slow CI:
+```bash
+export PYTEST_TIMEOUT_MULTIPLIER=2.0
+uv run pytest
 ```
 
 ### Type Checking Notes
@@ -312,4 +361,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: December 19, 2025*
+*Last updated: December 20, 2025*

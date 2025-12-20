@@ -28,7 +28,6 @@ pytest.importorskip("pytest_benchmark")
 
 from core.async_rom_cache import AsyncROMCache
 from core.preview_orchestrator import PreviewOrchestrator, Priority
-from tests.infrastructure.qt_testing_framework import QtTestingFramework
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 
@@ -448,7 +447,6 @@ class TestSmartPreviewCoordinatorPerformance:
 
     def setup_method(self):
         """Set up coordinator performance tests"""
-        self.qt_framework = QtTestingFramework()
         self.coordinator = SmartPreviewCoordinator()
         self.test_sprites = PerformanceTestData.generate_test_dataset(50)
 
@@ -591,7 +589,6 @@ class TestEndToEndPerformance:
 
     def setup_method(self):
         """Set up end-to-end performance tests"""
-        self.qt_framework = QtTestingFramework()
         self.test_sprites = PerformanceTestData.generate_test_dataset(30)
 
         # Create complete pipeline components

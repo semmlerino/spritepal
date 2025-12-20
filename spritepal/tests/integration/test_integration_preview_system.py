@@ -353,39 +353,6 @@ class TestSimplePreviewWorker:
             worker.wait(500)
         worker.deleteLater()
 
-@pytest.mark.integration
-@pytest.mark.gui  # Uses Qt coordinator which can segfault in headless mode
-@pytest.mark.usefixtures("managers_initialized")
-class TestPreviewCaching:
-    """Test preview caching with ROM cache."""
-
-    @pytest.mark.skip(reason="Placeholder - caching not yet implemented")
-    def test_preview_cache_integration(self, test_rom_with_sprites, tmp_path):
-        """Test that previews can be cached and retrieved."""
-        # Register dependencies
-        from core.di_container import inject, register_singleton
-        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
-
-        # Create cache
-        settings_manager = inject(SettingsManagerProtocol)
-        cache = ROMCache(settings_manager=settings_manager, cache_dir=str(tmp_path))
-        register_singleton(ROMCacheProtocol, cache)
-
-        rom_info = test_rom_with_sprites
-        rom_path = str(rom_info['path'])
-
-        # Create coordinator with cache (using cache created above)
-        coordinator = SimplePreviewCoordinator(rom_cache=cache)
-        extraction_manager = inject(ExtractionManagerProtocol)
-
-        # Set ROM data
-        coordinator.set_rom_data(rom_path, rom_info['path'].stat().st_size, extraction_manager.get_rom_extractor())
-
-        # Generate preview (would be cached if caching is implemented)
-        coordinator.request_preview(0x10000)
-
-        # Note: Actual caching implementation may vary
-        # This test structure is ready for when caching is added
-
-        # Cleanup
-        coordinator.cleanup()
+# Note: Preview caching is tested in tests/test_smart_preview.py.
+# SimplePreviewCoordinator does not use caching by design (see its implementation:
+# "Store ROM cache for compatibility (not used in simple version)").

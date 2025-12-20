@@ -55,7 +55,7 @@ from ui.injection_dialog import InjectionDialog
 from ui.row_arrangement_dialog import RowArrangementDialog
 
 pytestmark = [
-    pytest.mark.skipif,
+    pytest.mark.skipif(_SHOULD_SKIP, reason=_SKIP_REASON),
     pytest.mark.integration,
     pytest.mark.gui,
     pytest.mark.usefixtures("session_managers"),
@@ -104,24 +104,25 @@ class TestDialogInstantiation:
         assert hasattr(dialog, "dumps_dir_edit")
         assert hasattr(dialog, "cache_enabled_check")
 
-    @pytest.mark.skip(
-        reason="InjectionDialog causes segfault during signal connection in _setup_ui(). "
-        "This is a Qt testing environment issue, not a code bug. "
-        "The dialog works correctly in the actual application."
-    )
     def test_injection_dialog_creation(self, qtbot):
-        """Test InjectionDialog can be created."""
-        from unittest.mock import Mock
-        mock_injection_manager = Mock()
-        with patch.object(InjectionDialog, "_load_metadata"), \
-             patch.object(InjectionDialog, "_set_initial_paths"), \
-             patch.object(InjectionDialog, "_load_rom_info"):
-            dialog = InjectionDialog(injection_manager=mock_injection_manager)
-            qtbot.addWidget(dialog)
+        """Test InjectionDialog can be created.
 
-            # Test UI components exist
-            assert hasattr(dialog, "sprite_file_selector")
-            assert hasattr(dialog, "preview_widget")
+        Uses real InjectionManager via DI to avoid PySide6 signal connection
+        crashes that occur with Mock objects.
+        """
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
+
+        injection_manager = inject(InjectionManagerProtocol)
+        dialog = InjectionDialog(injection_manager=injection_manager)
+        qtbot.addWidget(dialog)
+
+        # Test UI components exist
+        assert hasattr(dialog, "sprite_file_selector")
+        assert hasattr(dialog, "preview_widget")
+        # Check tabs exist (VRAM + ROM)
+        assert dialog.tab_widget is not None
+        assert dialog.tab_widget.count() == 2
 
     def test_user_error_dialog_creation(self, qtbot):
         """Test UserErrorDialog can be created."""

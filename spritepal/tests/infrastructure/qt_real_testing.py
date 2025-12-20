@@ -212,7 +212,7 @@ class EventLoopHelper:
     """Helper class for managing Qt event loops in tests."""
 
     @staticmethod
-    def process_events(duration_ms: int = 0, max_iterations: int = 100):
+    def process_events(duration_ms: int = 0, max_iterations: int = 100) -> None:
         """
         Process Qt events for a specified duration.
 
@@ -220,8 +220,6 @@ class EventLoopHelper:
             duration_ms: Duration in milliseconds (0 = process pending only)
             max_iterations: Maximum iterations to prevent infinite loops
         """
-        import time
-
         app = QApplication.instance()
         if not app:
             return
@@ -233,16 +231,20 @@ class EventLoopHelper:
                     break
                 app.processEvents()
         else:
-            # Process events for specified duration using polling loop
-            # IMPORTANT: Do NOT use app.exec() here - it creates a nested event loop
-            # which conflicts with background QThreads and causes crashes.
-            start_time = time.monotonic()
-            end_time = start_time + (duration_ms / 1000.0)
+            # Process events for specified duration using Qt-safe waiting
+            # Uses processEvents with WaitForMoreEvents to wait for events without
+            # time.sleep(), which violates Qt threading rules per CLAUDE.md
+            from PySide6.QtCore import QElapsedTimer, QEventLoop
 
-            while time.monotonic() < end_time:
-                app.processEvents()
-                # Small sleep to prevent CPU spinning
-                time.sleep(0.01)  # sleep-ok: CPU throttling during event loop pumping
+            timer = QElapsedTimer()
+            timer.start()
+            while timer.elapsed() < duration_ms:
+                remaining = duration_ms - timer.elapsed()
+                if remaining <= 0:
+                    break
+                # Process events, waiting up to 10ms for new ones if none pending
+                wait_time = min(10, int(remaining))
+                app.processEvents(QEventLoop.AllEvents | QEventLoop.WaitForMoreEvents, wait_time)
 
     @staticmethod
     @contextmanager
@@ -252,6 +254,9 @@ class EventLoopHelper:
     ) -> Generator[list[Any], None, None]:
         """
         Context manager to wait for a signal to be emitted.
+
+        Handles fast signals that emit before the event loop starts by tracking
+        whether the signal was already received during the context body.
 
         Args:
             signal: Signal to wait for
@@ -267,10 +272,13 @@ class EventLoopHelper:
         """
         loop = QEventLoop()
         args: list[Any] = []
+        received = [False]  # List for closure mutation
 
-        def on_signal(*signal_args):
+        def on_signal(*signal_args: Any) -> None:
             args.extend(signal_args)
-            loop.quit()
+            received[0] = True
+            if loop.isRunning():
+                loop.quit()
 
         signal.connect(on_signal)
 
@@ -282,7 +290,9 @@ class EventLoopHelper:
 
         try:
             yield args
-            loop.exec()
+            # Only enter event loop if signal wasn't already received
+            if not received[0]:
+                loop.exec()
         finally:
             signal.disconnect(on_signal)
             timer.stop()
@@ -304,11 +314,13 @@ class EventLoopHelper:
         Returns:
             True if condition was met, False if timeout
         """
+        from PySide6.QtTest import QTest
+
         elapsed = 0
         while elapsed < timeout_ms:
             if condition():
                 return True
-            EventLoopHelper.process_events(interval_ms)
+            QTest.qWait(interval_ms)
             elapsed += interval_ms
         return False
 

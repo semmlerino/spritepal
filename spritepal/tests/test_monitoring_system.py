@@ -517,11 +517,14 @@ class TestMonitoringSettings:
         assert len(issues) > 0  # Should have validation issues
 
 
-@pytest.mark.skip(reason="GUI test requires display")
 @pytest.mark.usefixtures("isolated_managers")
 class TestMonitoringDashboard:
-    """Test the monitoring dashboard UI."""
-    
+    """Test the monitoring dashboard UI.
+
+    Previously skipped with 'GUI test requires display' but verified to work
+    with QT_QPA_PLATFORM=offscreen.
+    """
+
     def test_dashboard_initialization(self, qtbot):
         """Test dashboard initialization."""
         with patch('ui.dialogs.monitoring_dashboard.get_monitoring_manager'):

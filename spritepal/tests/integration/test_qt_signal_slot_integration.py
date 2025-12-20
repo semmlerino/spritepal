@@ -19,18 +19,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 
-from tests.infrastructure.qt_testing_framework import QtTestingFramework
 from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 from ui.rom_extraction_panel import ROMExtractionPanel
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-
-@pytest.fixture
-def qt_framework():
-    """Provide Qt testing framework."""
-    return QtTestingFramework()
 
 @pytest.fixture
 def temp_rom_file():

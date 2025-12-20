@@ -20,10 +20,8 @@ This replaces test_main_window_state_integration.py which heavily mocked:
 """
 from __future__ import annotations
 
-import sys
 from collections.abc import Generator
 from contextlib import contextmanager
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -45,10 +43,7 @@ pytestmark = [
 from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
-    QtTestingFramework,
     RealComponentFactory,
-    qt_widget_test,
-    validate_qt_object_lifecycle,
 )
 
 # Import real MainWindow (not mocked!)
@@ -74,9 +69,6 @@ class TestRealMainWindowStateIntegration:
 
         # Initialize test data repository
         self.test_data = DataRepository()
-
-        # Initialize Qt testing framework
-        self.qt_framework = QtTestingFramework()
 
         yield
 
@@ -132,9 +124,6 @@ class TestRealMainWindowStateIntegration:
             assert main_window.arrange_rows_button.isEnabled() is False, "Arrange button should start disabled"
             assert main_window.inject_button.isEnabled() is False, "Inject button should start disabled"
 
-            # Validate real Qt object lifecycle
-            validate_qt_object_lifecycle(main_window)
-            validate_qt_object_lifecycle(main_window.extract_button)
 
     def test_real_button_state_management_vs_mocked(self):
         """

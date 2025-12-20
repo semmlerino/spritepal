@@ -48,7 +48,6 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.performance,
     pytest.mark.slow,
-    pytest.mark.xfail,
 ]
 class TestManagerIntegrationTDD:
     """TDD tests for cross-manager integration with real components."""
@@ -141,9 +140,10 @@ class TestManagerIntegrationTDD:
             assert not extraction_mgr.is_operation_active("vram_extraction")
             assert not injection_mgr.is_injection_active()
 
+    @pytest.mark.xfail(reason="Session manager coordination may fail in offscreen mode")
     def test_session_manager_integration_tdd(self, test_data_repo):
         """TDD: Session manager should coordinate state across extraction and injection.
-        
+
         RED: Test session state sharing between multiple managers
         GREEN: Verify real session persistence and retrieval
         REFACTOR: Optimize session coordination without breaking isolation
@@ -218,9 +218,10 @@ class TestManagerIntegrationTDD:
             assert not extraction_mgr.is_operation_active("vram_extraction")
             assert not injection_mgr.is_injection_active()
 
+    @pytest.mark.xfail(reason="Concurrent manager operations may fail in offscreen mode")
     def test_concurrent_manager_operations_tdd(self, test_data_repo):
         """TDD: Managers should handle concurrent operations correctly.
-        
+
         RED: Test multiple managers operating simultaneously
         GREEN: Verify thread safety and resource isolation
         REFACTOR: Optimize concurrent access patterns

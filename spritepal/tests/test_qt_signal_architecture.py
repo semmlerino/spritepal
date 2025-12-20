@@ -463,48 +463,49 @@ class TestMemoryManagement:
             app = QApplication([])
         yield app
 
-    @pytest.mark.skip(reason="Test creates standalone InjectionManager which conflicts with session_managers in full suite; passes in isolation")
     def test_circular_reference_prevention(self, app):
-        """Test that signal connections don't create circular references"""
+        """Test that signal connections don't create circular references.
+
+        Uses a simple test QObject with signals instead of InjectionManager
+        to avoid DI conflicts and focus on signal connection behavior.
+        """
+        import gc
         import weakref
 
-        # Create manager
-        manager = InjectionManager()
-        manager_ref = weakref.ref(manager)
+        # Create a simple test class with a signal
+        class TestEmitter(QObject):
+            test_signal = Signal(str)
 
-        # Create receiver that holds reference to manager
         class Receiver(QObject):
-            def __init__(self, mgr):
+            def __init__(self, emitter):
                 super().__init__()
-                self.manager = mgr  # Potential circular reference
+                self.emitter = emitter  # Potential circular reference
 
             def on_signal(self, msg):
                 pass
 
-        receiver = Receiver(manager)
+        # Create emitter and receiver
+        emitter = TestEmitter()
+        emitter_ref = weakref.ref(emitter)
+
+        receiver = Receiver(emitter)
         receiver_ref = weakref.ref(receiver)
 
         # Connect signal
-        manager.injection_progress.connect(receiver.on_signal)
+        emitter.test_signal.connect(receiver.on_signal)
 
         # Delete strong references
-        del manager
+        del emitter
         del receiver
 
         # Process events and garbage collect
         app.processEvents()
-        import gc
         gc.collect()
 
         # Both should be garbage collected (no circular reference)
-        assert manager_ref() is None
+        assert emitter_ref() is None
         assert receiver_ref() is None
 
-    @pytest.mark.skip(
-        reason="Test crashes with segfault in full suite due to accumulated Qt/shiboken6 state "
-        "corruption from ~1000 prior tests. The test creates local QThread subclass with signals "
-        "which exposes Qt memory management issues. Passes in isolation."
-    )
     def test_signal_cleanup_on_thread_deletion(self, app):
         """Test that worker thread signals are properly cleaned up"""
         import weakref

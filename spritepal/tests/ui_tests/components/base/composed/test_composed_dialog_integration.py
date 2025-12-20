@@ -7,8 +7,6 @@ that the architecture provides the expected functionality.
 """
 from __future__ import annotations
 
-import os
-import sys
 from typing import Any
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -29,8 +27,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-# Import test infrastructure
-from tests.infrastructure.qt_real_testing import QtTestCase
 from ui.components.base.composed.button_box_manager import ButtonBoxManager
 from ui.components.base.composed.composed_dialog import ComposedDialog
 from ui.components.base.composed.dialog_context import DialogContext
@@ -121,22 +117,13 @@ class SampleDialog(ComposedDialog):
 
 @pytest.mark.integration
 @pytest.mark.gui
-class TestComposedDialogIntegration(QtTestCase):
+class TestComposedDialogIntegration:
     """Integration tests for the ComposedDialog architecture."""
 
-    def setup_method(self):
-        """Setup before each test."""
-        super().setup_method()
-        # Ensure we have a QApplication for Qt widgets
-        if not QApplication.instance():
-            os.environ["QT_QPA_PLATFORM"] = "offscreen"
-            self.app = QApplication(sys.argv)
-        else:
-            self.app = QApplication.instance()
-
-    def test_basic_dialog_creation_with_defaults(self) -> None:
+    def test_basic_dialog_creation_with_defaults(self, qtbot: Any) -> None:
         """Test dialog can be created with default configuration."""
-        dialog = self.create_widget(SampleDialog)
+        dialog = SampleDialog()
+        qtbot.addWidget(dialog)
 
         # Verify dialog was created successfully
         assert dialog is not None

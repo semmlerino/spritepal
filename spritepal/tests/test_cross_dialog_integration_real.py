@@ -12,7 +12,6 @@ This demonstrates the new testing architecture that:
 """
 from __future__ import annotations
 
-import contextlib
 import os
 from unittest.mock import Mock
 
@@ -31,11 +30,7 @@ from core.protocols.manager_protocols import (
 from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
-    # Serial execution required: Real Qt components
-    QtTestingFramework,
     RealComponentFactory,
-    qt_dialog_test,
-    qt_test_context,
 )
 from ui.dialogs.settings_dialog import SettingsDialog
 
@@ -59,10 +54,13 @@ class TestRealCrossDialogIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, session_managers):
+    def setup_test_infrastructure(self, session_managers, qtbot):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
+
+        # Store qtbot for test methods
+        self._qtbot = qtbot
 
         # Initialize real manager factory with proper test isolation
         self.manager_factory = RealComponentFactory(manager_registry=session_managers)
@@ -70,13 +68,9 @@ class TestRealCrossDialogIntegration:
         # Initialize test data repository
         self.test_data = DataRepository()
 
-        # Initialize Qt testing framework
-        self.qt_framework = QtTestingFramework(self.qt_app)
-
         yield
 
         # Cleanup
-        self.qt_framework.cleanup()
         self.manager_factory.cleanup()
         self.test_data.cleanup()
 
@@ -101,21 +95,23 @@ class TestRealCrossDialogIntegration:
         assert injection_manager is not None
 
         # Test injection dialog with real managers and data
-        with qt_dialog_test(InjectionDialog, sprite_path=injection_data["sprite_path"], injection_manager=injection_manager) as dialog:
-            # Validate dialog Qt parent relationship
-            assert dialog.parent() is None
+        dialog = InjectionDialog(sprite_path=injection_data["sprite_path"], injection_manager=injection_manager)
+        self._qtbot.addWidget(dialog)
 
-            # Test dialog with real injection data
-            dialog.show()
-            QApplication.processEvents()
+        # Validate dialog Qt parent relationship
+        assert dialog.parent() is None
 
-            # Test real dialog initialization with provided sprite path
-            assert dialog.sprite_path == injection_data["sprite_path"]
+        # Test dialog with real injection data
+        dialog.show()
+        QApplication.processEvents()
 
-            # Test real injection manager integration
-            params = dialog.get_parameters()
-            # Parameters might be None if dialog not accepted, which is normal
-            assert params is None or isinstance(params, dict)
+        # Test real dialog initialization with provided sprite path
+        assert dialog.sprite_path == injection_data["sprite_path"]
+
+        # Test real injection manager integration
+        params = dialog.get_parameters()
+        # Parameters might be None if dialog not accepted, which is normal
+        assert params is None or isinstance(params, dict)
 
     def test_settings_dialog_real_manager_integration(self):
         """
@@ -131,20 +127,22 @@ class TestRealCrossDialogIntegration:
         assert session_manager is not None
 
         # Test settings dialog with real session manager
-        with qt_dialog_test(SettingsDialog) as dialog:
-            # Validate dialog Qt parent relationship
-            assert dialog.parent() is None
+        dialog = SettingsDialog()
+        self._qtbot.addWidget(dialog)
 
-            # Test that settings dialog can be shown and has basic functionality
-            dialog.show()
-            QApplication.processEvents()
+        # Validate dialog Qt parent relationship
+        assert dialog.parent() is None
 
-            # Test that dialog has expected UI components
-            assert hasattr(dialog, "dumps_dir_edit")
-            assert hasattr(dialog, "cache_enabled_check")
+        # Test that settings dialog can be shown and has basic functionality
+        dialog.show()
+        QApplication.processEvents()
 
-            # Test settings dialog state validation
-            assert dialog.windowTitle() == "SpritePal Settings"
+        # Test that dialog has expected UI components
+        assert hasattr(dialog, "dumps_dir_edit")
+        assert hasattr(dialog, "cache_enabled_check")
+
+        # Test settings dialog state validation
+        assert dialog.windowTitle() == "SpritePal Settings"
 
     def test_controller_real_manager_coordination(self):
         """
@@ -180,41 +178,40 @@ class TestRealCrossDialogIntegration:
                     pass
 
         # Create real extraction controller
-        with qt_test_context():
-            # Create a mock main window for the controller
-            mock_main_window = Mock()
-            controller = ExtractionController(
-                mock_main_window,
-                extraction_manager=extraction_manager,
-                injection_manager=injection_manager,
-                session_manager=session_manager,
-                settings_manager=settings_manager,
-                dialog_factory=dialog_factory,
-            )
+        # Create a mock main window for the controller
+        mock_main_window = Mock()
+        controller = ExtractionController(
+            mock_main_window,
+            extraction_manager=extraction_manager,
+            injection_manager=injection_manager,
+            session_manager=session_manager,
+            settings_manager=settings_manager,
+            dialog_factory=dialog_factory,
+        )
 
-            # Test real manager coordination
-            test_data = self.test_data.get_vram_extraction_data("small")
+        # Test real manager coordination
+        test_data = self.test_data.get_vram_extraction_data("small")
 
-            # This tests real controller-manager interaction
-            try:
-                # Test parameter validation with real managers
-                {
-                    "vram_path": test_data["vram_path"],
-                    "cgram_path": test_data["cgram_path"],
-                    "output_base": test_data["output_base"],
-                }
+        # This tests real controller-manager interaction
+        try:
+            # Test parameter validation with real managers
+            {
+                "vram_path": test_data["vram_path"],
+                "cgram_path": test_data["cgram_path"],
+                "output_base": test_data["output_base"],
+            }
 
-                # Validate controller can be used with real managers
-                # Test that controller has the expected methods
-                assert hasattr(controller, "start_extraction")
-                assert hasattr(controller, "start_injection")
+            # Validate controller can be used with real managers
+            # Test that controller has the expected methods
+            assert hasattr(controller, "start_extraction")
+            assert hasattr(controller, "start_injection")
 
-                # Controller creation and manager coordination is the real test here
-                # Real workflow testing is covered in other test files
+            # Controller creation and manager coordination is the real test here
+            # Real workflow testing is covered in other test files
 
-            except Exception as e:
-                # If controller creation fails with real managers, that's a real bug
-                pytest.fail(f"Controller creation with real managers failed: {e}")
+        except Exception as e:
+            # If controller creation fails with real managers, that's a real bug
+            pytest.fail(f"Controller creation with real managers failed: {e}")
 
 
     def test_real_integration_catches_architectural_bugs(self):
@@ -264,7 +261,7 @@ class TestRealCrossDialogIntegration:
             manager.extraction_finished.emit([])  # Emit signal
 
             # Process Qt events to ensure signal delivery
-            self.qt_framework.process_events(100)
+            QApplication.processEvents()
 
             assert signal_connected, "Real Qt signal should trigger callback"
 
@@ -296,12 +293,6 @@ class TestRealTestingInfrastructureValidation:
         assert "vram_path" in vram_data
         assert os.path.exists(vram_data["vram_path"])
         test_data.cleanup()
-
-        # Test Qt testing framework
-        qt_framework = QtTestingFramework()
-        # Qt framework should be created successfully
-        assert qt_framework is not None
-        qt_framework.cleanup()
 
     def test_real_vs_mock_comparison(self, session_managers):
         """
