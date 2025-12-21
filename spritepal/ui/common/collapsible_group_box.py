@@ -151,8 +151,8 @@ class CollapsibleGroupBox(QFrame):
 
         main_layout.addWidget(self._content_widget)
 
-        # Set size policies
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        # Set size policies - use Minimum vertical so collapsed state doesn't expand
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self._content_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
 
     def _setup_animation(self) -> None:

@@ -6,8 +6,7 @@ from typing import Any
 from PySide6.QtWidgets import QGroupBox, QLayout, QSizePolicy, QVBoxLayout, QWidget
 
 from ui.common.collapsible_group_box import CollapsibleGroupBox
-
-from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_MEDIUM
+from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_MEDIUM
 from ui.styles.theme import COLORS
 
 
@@ -54,21 +53,24 @@ class BaseExtractionWidget(QWidget):
         group = QGroupBox(title)
         # Minimal styling - no borders to reduce visual noise
         # Only the title provides section separation
+        # Note: margin-top creates space for title when subcontrol-origin: margin
         group.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
                 color: {COLORS["text_secondary"]};
-                margin-top: {SPACING_COMPACT_SMALL}px;
-                padding-top: {SPACING_SMALL}px;
+                margin-top: 12px;
+                padding-top: 8px;
                 padding-left: 0px;
                 padding-right: 0px;
-                padding-bottom: {SPACING_COMPACT_SMALL}px;
+                padding-bottom: 4px;
                 border: none;
                 background-color: transparent;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
+                subcontrol-position: top left;
                 left: 0px;
+                top: 0px;
                 padding: 0 {SPACING_COMPACT_SMALL}px 0 0px;
             }}
         """)
