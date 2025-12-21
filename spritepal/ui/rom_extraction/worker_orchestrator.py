@@ -82,7 +82,7 @@ class ROMWorkerOrchestrator(QObject):
         """Load ROM header information asynchronously."""
         self._cleanup_header_worker()
 
-        self._header_worker = ROMHeaderLoaderWorker(rom_path, extractor)
+        self._header_worker = ROMHeaderLoaderWorker(rom_path, extractor.rom_injector)
         self._header_thread = QThread()
         self._header_worker.moveToThread(self._header_thread)
 

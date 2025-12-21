@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ExtractionManagerProtocol
+    from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QPixmap
@@ -467,7 +467,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         logger.info(f"Copied {copied_count} thumbnails to detached gallery")
 
-    def set_rom_info(self, rom_path: str, rom_extractor: Any):
+    def set_rom_info(self, rom_path: str, rom_extractor: ROMExtractorProtocol) -> None:
         """
         Set ROM information for thumbnail generation.
 

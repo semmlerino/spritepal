@@ -27,6 +27,8 @@ from utils.logging_config import get_logger
 if TYPE_CHECKING:
     from weakref import ReferenceType
 
+    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
+
 logger = get_logger(__name__)
 
 class PooledPreviewWorker(SpritePreviewWorker):
@@ -53,7 +55,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
         self._signals_connected = False
         self._being_destroyed = False  # Flag to prevent signal processing during cleanup
 
-    def setup_request(self, request: Any, extractor: Any, rom_cache: Any = None) -> None:
+    def setup_request(self, request: Any, extractor: ROMExtractorProtocol, rom_cache: ROMCacheProtocol | None = None) -> None:
         """Setup worker for new request with optional ROM cache."""
         self.rom_path = request.rom_path
         self.offset = request.offset
@@ -318,7 +320,7 @@ class PreviewWorkerPool(QObject):
 
         logger.debug(f"PreviewWorkerPool initialized with max_workers={max_workers}")
 
-    def submit_request(self, request: Any, extractor: Any, rom_cache: Any = None) -> None:
+    def submit_request(self, request: Any, extractor: ROMExtractorProtocol, rom_cache: ROMCacheProtocol | None = None) -> None:
         """
         Submit a preview request to the worker pool.
 

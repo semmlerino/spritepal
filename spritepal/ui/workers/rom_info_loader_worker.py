@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         InjectionManagerProtocol,
         ROMExtractorProtocol,
     )
+    from core.rom_injector import ROMInjector
 
 logger = get_logger(__name__)
 
@@ -132,7 +133,7 @@ class ROMHeaderLoaderWorker(BaseWorker):
     def __init__(
         self,
         rom_path: str,
-        rom_injector: Any,  # ROMInjector
+        rom_injector: ROMInjector,
         sprite_config_loader: Any | None = None,
     ) -> None:
         """
@@ -165,7 +166,7 @@ class ROMHeaderLoaderWorker(BaseWorker):
 
         # Optionally load sprite configurations
         sprite_configs = None
-        if self.sprite_config_loader is not None and header is not None:
+        if self.sprite_config_loader is not None:
             self.emit_progress(70, "Loading sprite configurations...")
             sprite_configs = self.sprite_config_loader.get_game_sprites(
                 header.title, header.checksum

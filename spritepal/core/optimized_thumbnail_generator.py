@@ -21,7 +21,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ROMExtractorProtocol
 
 # Maximum queue size to prevent memory exhaustion during rapid scrolling
 MAX_QUEUE_SIZE = 500
@@ -504,7 +507,7 @@ class OptimizedThumbnailGenerator:
             logger.warning(f"Error during thumbnail generator shutdown: {e}")
 
 def create_optimized_generator(
-    rom_extractor: Any,
+    rom_extractor: ROMExtractorProtocol,
     tile_renderer: Any,
     rom_path: str | Path,
     max_workers: int = 4
@@ -521,12 +524,13 @@ def create_optimized_generator(
         Configured thumbnail generator
     """
     generator = OptimizedThumbnailGenerator(max_workers=max_workers)
+    rom_path_str = str(rom_path)
 
     def generate_thumbnail(offset: int, size: tuple[int, int]) -> Image.Image | None:
         """Generate thumbnail from ROM sprite."""
         try:
             # Extract sprite data
-            sprite_data = rom_extractor.extract_sprite_data(rom_path, offset)
+            sprite_data = rom_extractor.extract_sprite_data(rom_path_str, offset)
 
             if not sprite_data:
                 return None

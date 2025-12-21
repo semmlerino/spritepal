@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
 
 from typing import override
 
@@ -53,7 +53,7 @@ class SpriteScanWorker(BaseWorker):
     scan_progress = Signal(int, int)
     """Alias for progress_detailed. Args: current_step, total_steps."""
 
-    def __init__(self, rom_path: str, extractor: Any = None, use_cache: bool = True,
+    def __init__(self, rom_path: str, extractor: ROMExtractorProtocol | None = None, use_cache: bool = True,
                  start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None, *,
                  rom_cache: ROMCacheProtocol,
                  parallel_finder: ParallelSpriteFinder | None = None,

@@ -28,11 +28,11 @@ BENEFITS:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 import warnings
 from pathlib import Path
-import contextlib
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from PySide6.QtCore import QObject, QThread
@@ -41,10 +41,9 @@ from PySide6.QtWidgets import QApplication, QWidget
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.registry import ManagerRegistry
+from core.services.rom_cache import ROMCache
 from ui.common import WorkerManager
 from ui.main_window import MainWindow
-
-from core.services.rom_cache import ROMCache
 
 from .data_repository import DataRepository, get_test_data_repository
 
