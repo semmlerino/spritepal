@@ -229,6 +229,9 @@ class ROMInjector(SpriteInjector):
         """
         Validate if data appears to be valid sprite data.
 
+        Samples tiles throughout the data (not just the first few) to catch
+        cases where the beginning is valid but the rest is garbage.
+
         Args:
             data: Decompressed data to validate
 
@@ -246,12 +249,26 @@ class ROMInjector(SpriteInjector):
 
         num_tiles = len(data) // bytes_per_tile
 
-        # Sample several tiles to check for sprite characteristics
-        tiles_to_check = min(10, num_tiles)
-        valid_tiles = 0
+        # Sample tiles throughout the data, not just the beginning
+        # For small sprite: check all tiles (up to 10)
+        # For large sprite: sample evenly distributed tiles
+        max_samples = 10
+        if num_tiles <= max_samples:
+            # Check all tiles for small sprites
+            tile_indices = list(range(num_tiles))
+        else:
+            # Sample evenly throughout the data
+            step = num_tiles // max_samples
+            tile_indices = [i * step for i in range(max_samples)]
+            # Always include the last tile to catch truncation issues
+            if tile_indices[-1] != num_tiles - 1:
+                tile_indices[-1] = num_tiles - 1
 
-        for i in range(tiles_to_check):
-            tile_offset = i * bytes_per_tile
+        valid_tiles = 0
+        tiles_to_check = len(tile_indices)
+
+        for tile_idx in tile_indices:
+            tile_offset = tile_idx * bytes_per_tile
             tile_data = data[tile_offset:tile_offset + bytes_per_tile]
 
             # Check for 4bpp characteristics
@@ -342,75 +359,86 @@ class ROMInjector(SpriteInjector):
         """
         Parse HAL compression stream to find actual compressed block size.
 
-        HAL compression format:
-        - Bytes 0-1: Decompressed size (little-endian, 16-bit)
-        - Byte 2+: Compressed command stream
-          - Each command byte's bits indicate literal (0) vs copy (1) for next 8 values
-          - Literals: 1 byte each
-          - Copies: 2 bytes (offset + length, length in high nibble + 3)
+        HAL compression format (verified from exhal compress.c):
+        - No header - starts directly with command bytes
+        - Command byte determines type and length:
+          - If (cmd & 0xE0) == 0xE0: Long command
+            - command = (cmd >> 2) & 0x07
+            - length = (((cmd & 0x03) << 8) | next_byte) + 1
+          - Else: Short command
+            - command = cmd >> 5
+            - length = (cmd & 0x1F) + 1
+        - Commands:
+          - 0: Raw bytes (length bytes follow in stream)
+          - 1: 8-bit RLE (1 byte follows)
+          - 2: 16-bit RLE (2 bytes follow)
+          - 3: Sequence RLE (1 byte follows)
+          - 4,7: Forward backref (2 bytes offset follow)
+          - 5: Rotated backref (2 bytes offset follow)
+          - 6: Backward backref (2 bytes offset follow)
+        - 0xFF terminates the stream
 
         Returns:
             Actual compressed block size in bytes
         """
         logger.debug(f"Parsing HAL compressed size at offset 0x{offset:X}")
 
-        if offset + 2 > len(rom_data):
-            logger.warning(f"Offset 0x{offset:X} too close to ROM end, falling back to heuristic")
-            return self._estimate_compressed_size_conservative(rom_data, offset)
-
-        # Read decompressed size from header (little-endian 16-bit)
-        decompressed_size = int.from_bytes(rom_data[offset : offset + 2], "little")
-
-        # Sanity check - unreasonable values indicate bad offset or non-HAL data
-        if decompressed_size == 0 or decompressed_size > 65536:
-            logger.warning(
-                f"Unusual decompressed size {decompressed_size} at 0x{offset:X}, "
-                "falling back to conservative scan"
-            )
-            return self._estimate_compressed_size_conservative(rom_data, offset)
-
-        # Parse compressed stream to find actual end
-        pos = offset + 2  # Start after header
-        output_size = 0
         max_pos = min(offset + 0x10000, len(rom_data))  # Cap at 64KB
+        pos = offset
 
         try:
-            while pos < max_pos and output_size < decompressed_size:
+            while pos < max_pos:
                 if pos >= len(rom_data):
                     break
 
                 cmd = rom_data[pos]
                 pos += 1
 
-                # Process 8 values per command byte
-                for bit in range(8):
-                    if output_size >= decompressed_size:
-                        break
+                # 0xFF terminates the stream
+                if cmd == 0xFF:
+                    compressed_size = pos - offset
+                    logger.debug(f"HAL parsing complete: compressed={compressed_size} bytes")
+                    return compressed_size
 
-                    if cmd & (1 << bit):  # Copy command (backreference)
-                        # Copy: 2 bytes (low byte = offset low, high byte = length<<4 | offset high)
-                        if pos + 2 > len(rom_data):
-                            logger.warning(
-                                f"Truncated copy command at 0x{pos:X}, using position as size"
-                            )
-                            return pos - offset
-                        # Length is encoded in high nibble of second byte + 3
-                        copy_len = ((rom_data[pos + 1] >> 4) & 0x0F) + 3
-                        pos += 2
-                        output_size += copy_len
-                    else:  # Literal byte
-                        if pos >= len(rom_data):
-                            logger.warning(
-                                f"Truncated literal at 0x{pos:X}, using position as size"
-                            )
-                            return pos - offset
-                        pos += 1
-                        output_size += 1
+                # Decode command and length
+                if (cmd & 0xE0) == 0xE0:
+                    # Long command
+                    if pos >= len(rom_data):
+                        logger.warning(f"Truncated long command at 0x{pos:X}")
+                        return pos - offset
+                    command = (cmd >> 2) & 0x07
+                    length = (((cmd & 0x03) << 8) | rom_data[pos]) + 1
+                    pos += 1
+                else:
+                    # Short command
+                    command = cmd >> 5
+                    length = (cmd & 0x1F) + 1
 
+                # Consume data bytes based on command type
+                if command == 0:
+                    # Raw: length bytes follow
+                    pos += length
+                elif command == 1:
+                    # 8-bit RLE: 1 byte follows
+                    pos += 1
+                elif command == 2:
+                    # 16-bit RLE: 2 bytes follow
+                    pos += 2
+                elif command == 3:
+                    # Sequence RLE: 1 byte follows
+                    pos += 1
+                elif command in (4, 5, 6, 7):
+                    # Backreferences: 2 bytes offset follow
+                    pos += 2
+                else:
+                    # Unknown command - treat as end
+                    logger.warning(f"Unknown HAL command {command} at 0x{pos:X}")
+                    break
+
+            # No terminator found within limit
             compressed_size = pos - offset
             logger.debug(
-                f"HAL parsing complete: compressed={compressed_size} bytes, "
-                f"decompressed={output_size}/{decompressed_size} bytes"
+                f"HAL parsing reached limit without terminator: size={compressed_size} bytes"
             )
             return compressed_size
 
@@ -497,6 +525,15 @@ class ROMInjector(SpriteInjector):
             with Path(rom_path).open("rb") as f:
                 self.rom_data = bytearray(f.read())
 
+            # Adjust sprite offset for SMC header (ROM offset -> file offset)
+            smc_offset = self.header.header_offset
+            file_offset = sprite_offset + smc_offset
+            if smc_offset > 0:
+                logger.info(
+                    f"Adjusting for {smc_offset}-byte SMC header: "
+                    f"ROM offset 0x{sprite_offset:X} -> file offset 0x{file_offset:X}"
+                )
+
             # Convert PNG to 4bpp
             logger.info("Converting PNG to 4bpp tile data")
             tile_data = self.convert_png_to_4bpp(sprite_path)
@@ -505,7 +542,7 @@ class ROMInjector(SpriteInjector):
             # Find and decompress original sprite for size comparison
             logger.info("Analyzing original sprite data in ROM")
             original_size, original_data = self.find_compressed_sprite(
-                self.rom_data, sprite_offset
+                self.rom_data, file_offset
             )
             logger.debug(f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed")
 
@@ -567,13 +604,13 @@ class ROMInjector(SpriteInjector):
 
             # Inject compressed data into ROM copy
             # Bounds validation to prevent ROM corruption
-            if sprite_offset + compressed_size > len(modified_rom):
+            if file_offset + compressed_size > len(modified_rom):
                 raise ValueError(
-                    f"Sprite data would overflow ROM: offset 0x{sprite_offset:X} + "
+                    f"Sprite data would overflow ROM: file offset 0x{file_offset:X} + "
                     f"{compressed_size} bytes exceeds ROM size {len(modified_rom)}"
                 )
-            logger.info(f"Injecting {compressed_size} bytes of compressed data at offset 0x{sprite_offset:X}")
-            modified_rom[sprite_offset : sprite_offset + compressed_size] = (
+            logger.info(f"Injecting {compressed_size} bytes of compressed data at ROM offset 0x{sprite_offset:X}")
+            modified_rom[file_offset : file_offset + compressed_size] = (
                 compressed_data
             )
 
@@ -581,7 +618,7 @@ class ROMInjector(SpriteInjector):
             if compressed_size < original_size:
                 padding = b"\xff" * (original_size - compressed_size)
                 modified_rom[
-                    sprite_offset + compressed_size : sprite_offset + original_size
+                    file_offset + compressed_size : file_offset + original_size
                 ] = padding
                 logger.info(f"Padded {original_size - compressed_size} bytes with 0xFF")
 

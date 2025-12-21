@@ -121,6 +121,13 @@ class SpritePreviewWorker(BaseWorker):
             except (PermissionError, OSError) as e:
                 _validate_rom_file_access(self.rom_path, e)
 
+            # Strip SMC header if present (512 bytes when file_size % 1024 == 512)
+            file_size = len(rom_data)
+            smc_offset = 512 if file_size % 1024 == 512 else 0
+            if smc_offset > 0:
+                logger.debug(f"Stripping {smc_offset}-byte SMC header from ROM data")
+                rom_data = rom_data[smc_offset:]
+
             # Validate ROM size
             rom_size = len(rom_data)
             _validate_rom_size(rom_size)

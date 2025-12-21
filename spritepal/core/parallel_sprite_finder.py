@@ -112,9 +112,16 @@ class ParallelSpriteFinder:
         Returns:
             List of found sprites sorted by offset
         """
-        # Read ROM data
+        # Read ROM data, stripping SMC header if present
         with Path(rom_path).open("rb") as f:
             rom_data = f.read()
+
+        # Detect and strip SMC header (512 bytes present when file_size % 1024 == 512)
+        file_size = len(rom_data)
+        smc_offset = 512 if file_size % 1024 == 512 else 0
+        if smc_offset > 0:
+            logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
+            rom_data = rom_data[smc_offset:]
 
         rom_size = len(rom_data)
         end_offset = rom_size if end_offset is None else min(end_offset, rom_size)

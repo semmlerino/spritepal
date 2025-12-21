@@ -31,24 +31,10 @@ from PySide6.QtGui import QImage, QPixmap
 
 from core.tile_renderer import TileRenderer
 from utils.logging_config import get_logger
+from utils.rom_utils import BytesMMAPWrapper, detect_smc_offset
 
 logger = get_logger(__name__)
 
-
-class BytesMMAPWrapper:
-    """Wrapper for bytes to provide mmap-compatible interface for fallback loading."""
-
-    def __init__(self, data: bytes):
-        self._data = data
-
-    def __getitem__(self, key: int | slice) -> bytes | int:
-        return self._data[key]
-
-    def __len__(self) -> int:
-        return len(self._data)
-
-    def close(self) -> None:
-        pass  # No-op for bytes wrapper
 
 @dataclass
 class ThumbnailRequest:
@@ -208,6 +194,7 @@ class BatchThumbnailWorker(QObject):
         # Memory-mapped ROM data
         self._rom_file = None
         self._rom_mmap = None
+        self._smc_offset = 0  # SMC header offset (0 or 512)
 
         # Multi-threading for parallel thumbnail generation
         self._use_multithreading = True
@@ -489,7 +476,12 @@ class BatchThumbnailWorker(QObject):
                 # Store handles for persistent use (cleanup via _clear_rom_data)
                 self._rom_file = rom_file
                 self._rom_mmap = rom_mmap
-                logger.info(f"ROM data mapped: {len(self._rom_mmap)} bytes")
+                # Detect SMC header (512 bytes present when file_size % 1024 == 512)
+                file_size = len(self._rom_mmap)
+                self._smc_offset = 512 if file_size % 1024 == 512 else 0
+                if self._smc_offset > 0:
+                    logger.info(f"Detected {self._smc_offset}-byte SMC header in ROM")
+                logger.info(f"ROM data mapped: {file_size} bytes (SMC offset: {self._smc_offset})")
             except Exception as mmap_error:
                 # Memory mapping failed - close file and use fallback
                 logger.warning(f"Failed to memory-map ROM, using fallback: {mmap_error}")
@@ -497,10 +489,16 @@ class BatchThumbnailWorker(QObject):
                 rom_file.close()
                 rom_file = None
 
+                # Detect SMC header (512 bytes present when file_size % 1024 == 512)
+                file_size = len(rom_data)
+                self._smc_offset = 512 if file_size % 1024 == 512 else 0
+                if self._smc_offset > 0:
+                    logger.info(f"Detected {self._smc_offset}-byte SMC header in ROM")
+
                 # Use module-level BytesMMAPWrapper for mmap-compatible interface
                 self._rom_mmap = BytesMMAPWrapper(rom_data)
                 self._rom_file = None
-                logger.info(f"ROM data loaded (fallback): {len(self._rom_mmap)} bytes")
+                logger.info(f"ROM data loaded (fallback): {file_size} bytes (SMC offset: {self._smc_offset})")
 
         except Exception as e:
             # Clean up any partially opened handles on failure
@@ -516,21 +514,28 @@ class BatchThumbnailWorker(QObject):
             self.error.emit(f"Failed to load ROM: {e}")
 
     def _read_rom_chunk(self, offset: int, size: int) -> bytes | None:
-        """Read a chunk from memory-mapped ROM."""
+        """Read a chunk from memory-mapped ROM.
+
+        The offset is treated as a ROM offset (without SMC header).
+        If the file has an SMC header, this method adjusts the offset automatically.
+        """
         if not self._rom_mmap:
             return None
 
         try:
-            # Bounds checking
-            if offset < 0 or offset >= len(self._rom_mmap):
+            # Adjust offset for SMC header (ROM offset -> file offset)
+            file_offset = offset + self._smc_offset
+
+            # Bounds checking (use adjusted file offset)
+            if file_offset < 0 or file_offset >= len(self._rom_mmap):
                 return None
 
-            end_offset = min(offset + size, len(self._rom_mmap))
-            chunk = self._rom_mmap[offset:end_offset]
+            end_offset = min(file_offset + size, len(self._rom_mmap))
+            chunk = self._rom_mmap[file_offset:end_offset]
             # Slicing always returns bytes, not int
             return chunk if isinstance(chunk, bytes) else bytes(chunk) if hasattr(chunk, '__iter__') else None
         except Exception as e:
-            logger.error(f"Failed to read ROM chunk at 0x{offset:06X}: {e}")
+            logger.error(f"Failed to read ROM chunk at ROM offset 0x{offset:06X} (file: 0x{offset + self._smc_offset:06X}): {e}")
             return None
 
     def _get_next_request(self) -> ThumbnailRequest | None:
@@ -790,6 +795,9 @@ class BatchThumbnailWorker(QObject):
                 if hasattr(self, '_rom_file') and self._rom_file:
                     self._rom_file.close()
                     self._rom_file = None
+
+                # Reset SMC offset
+                self._smc_offset = 0
 
                 if rom_size > 0:
                     logger.debug(f"Cleared ROM data: freed {rom_size} bytes")

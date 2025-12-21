@@ -99,6 +99,13 @@ class RangeScanWorker(BaseWorker):
             with Path(self.rom_path).open("rb") as f:
                 rom_data = f.read()
 
+            # Strip SMC header if present (512 bytes when file_size % 1024 == 512)
+            file_size = len(rom_data)
+            smc_offset = 512 if file_size % 1024 == 512 else 0
+            if smc_offset > 0:
+                logger.debug(f"Stripping {smc_offset}-byte SMC header from ROM data")
+                rom_data = rom_data[smc_offset:]
+
             # Check for cached partial results
             self.scan_params = {
                 "start_offset": self.start_offset,

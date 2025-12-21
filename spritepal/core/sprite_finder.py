@@ -24,16 +24,8 @@ from utils.constants import (
     MIN_SPRITE_SIZE,
     ROM_SCAN_STEP_DEFAULT,
     ROM_SCAN_STEP_QUICK,
-    ROM_SPRITE_AREA_1_END,
     ROM_SPRITE_AREA_1_START,
-    ROM_SPRITE_AREA_2_END,
-    ROM_SPRITE_AREA_2_START,
-    ROM_SPRITE_AREA_3_END,
-    ROM_SPRITE_AREA_3_START,
-    ROM_SPRITE_AREA_4_END,
-    ROM_SPRITE_AREA_4_START,
-    ROM_SPRITE_AREA_5_END,
-    ROM_SPRITE_AREA_5_START,
+    get_sprite_search_areas,
 )
 from utils.logging_config import get_logger
 
@@ -361,9 +353,16 @@ class SpriteFinder:
 
         candidates = []
 
-        # Read ROM data
+        # Read ROM data, stripping SMC header if present
         with Path(rom_path).open("rb") as f:
             rom_data = f.read()
+
+        # Detect and strip SMC header (512 bytes present when file_size % 1024 == 512)
+        file_size = len(rom_data)
+        smc_offset = 512 if file_size % 1024 == 512 else 0
+        if smc_offset > 0:
+            logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
+            rom_data = rom_data[smc_offset:]
 
         rom_size = len(rom_data)
         if end_offset is None or end_offset > rom_size:
@@ -558,14 +557,27 @@ class SpriteFinder:
     def quick_scan_known_areas(self, rom_path: str) -> list[SpriteCandidate]:
         """
         Quick scan of areas where sprites are commonly found in SNES games.
+
+        Dynamically adjusts search areas based on ROM size to find sprites
+        in larger ROMs that exceed the traditional 3MB sprite area.
         """
-        common_sprite_ranges = [
-            (ROM_SPRITE_AREA_1_START, ROM_SPRITE_AREA_1_END),   # Common sprite area 1
-            (ROM_SPRITE_AREA_2_START, ROM_SPRITE_AREA_2_END),  # Common sprite area 2
-            (ROM_SPRITE_AREA_3_START, ROM_SPRITE_AREA_3_END),  # Common sprite area 3
-            (ROM_SPRITE_AREA_4_START, ROM_SPRITE_AREA_4_END),  # Extended sprite area
-            (ROM_SPRITE_AREA_5_START, ROM_SPRITE_AREA_5_END),  # Additional sprites
-        ]
+        # Get ROM size to determine appropriate search areas
+        rom_file = Path(rom_path)
+        if not rom_file.exists():
+            logger.error(f"ROM file not found: {rom_path}")
+            return []
+
+        file_size = rom_file.stat().st_size
+        # Adjust for SMC header if present
+        rom_size = file_size - 512 if file_size % 1024 == 512 else file_size
+
+        # Get search areas appropriate for this ROM size
+        common_sprite_ranges = get_sprite_search_areas(rom_size)
+
+        logger.info(
+            f"Quick scanning {len(common_sprite_ranges)} areas for "
+            f"{rom_size / 1024 / 1024:.1f}MB ROM"
+        )
 
         all_candidates = []
 

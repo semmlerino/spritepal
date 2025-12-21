@@ -209,17 +209,24 @@ class ROMExtractor:
             rom_path: Path to ROM file
 
         Returns:
-            Tuple of (header, rom_data)
+            Tuple of (header, rom_data) where rom_data has SMC header stripped
         """
         # Read ROM header for validation
         header = self.rom_injector.read_rom_header(rom_path)
         logger.info(f"ROM identified: {header.title} (checksum: 0x{header.checksum:04X})")
 
-        # Read ROM data
+        # Read ROM data, stripping SMC header if present
         logger.info(f"Reading ROM data from: {rom_path}")
         with Path(rom_path).open("rb") as rom_file:
             rom_data = rom_file.read()
-        logger.debug(f"ROM size: {len(rom_data)} bytes")
+
+        # Strip SMC header so offsets are ROM addresses (not file offsets)
+        smc_offset = header.header_offset
+        if smc_offset > 0:
+            logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
+            rom_data = rom_data[smc_offset:]
+
+        logger.debug(f"ROM size: {len(rom_data)} bytes (after SMC strip)")
 
         return header, rom_data
 
@@ -653,17 +660,25 @@ class ROMExtractor:
         return [], start_offset
 
     def _load_rom_data(self, rom_path: str) -> bytes:
-        """Load ROM data from file.
+        """Load ROM data from file, stripping SMC header if present.
 
         Args:
             rom_path: Path to ROM file
 
         Returns:
-            ROM data as bytes
+            ROM data as bytes (with SMC header stripped so offsets are ROM addresses)
         """
         with Path(rom_path).open("rb") as rom_file:
             rom_data = rom_file.read()
-        logger.debug(f"ROM size: {len(rom_data)} bytes")
+
+        # Detect and strip SMC header (512 bytes present when file_size % 1024 == 512)
+        file_size = len(rom_data)
+        smc_offset = 512 if file_size % 1024 == 512 else 0
+        if smc_offset > 0:
+            logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
+            rom_data = rom_data[smc_offset:]
+
+        logger.debug(f"ROM size: {len(rom_data)} bytes (after SMC strip)")
         return rom_data
 
     def _validate_scan_range(self, rom_data: bytes, end_offset: int) -> int:

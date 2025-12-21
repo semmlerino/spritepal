@@ -274,6 +274,7 @@ class TestROMExtractorMainExtraction:
         mock_header = Mock()
         mock_header.title = "TEST ROM"
         mock_header.checksum = 0x1234
+        mock_header.header_offset = 0  # No SMC header
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
         # Mock compressed sprite data
@@ -319,6 +320,7 @@ class TestROMExtractorMainExtraction:
         mock_header = Mock()
         mock_header.title = "KIRBY SUPER STAR"
         mock_header.checksum = 0x5678
+        mock_header.header_offset = 0  # No SMC header
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
         # Mock sprite data
@@ -368,6 +370,7 @@ class TestROMExtractorMainExtraction:
         mock_header = Mock()
         mock_header.title = "UNKNOWN ROM"
         mock_header.checksum = 0x9999
+        mock_header.header_offset = 0  # No SMC header
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
         # Mock sprite data
@@ -408,6 +411,7 @@ class TestROMExtractorMainExtraction:
         mock_header = Mock()
         mock_header.title = "TEST ROM"
         mock_header.checksum = 0xABCD
+        mock_header.header_offset = 0  # No SMC header
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
         # Mock sprite data
@@ -438,6 +442,7 @@ class TestROMExtractorMainExtraction:
         mock_header = Mock()
         mock_header.title = "TEST ROM"
         mock_header.checksum = 0x1234
+        mock_header.header_offset = 0  # No SMC header
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
         # Mock sprite config loader to return empty dict
