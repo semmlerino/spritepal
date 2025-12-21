@@ -42,7 +42,7 @@ class TestManualOffsetDialog:
         assert hasattr(dialog.browse_tab, 'next_button')
         assert hasattr(dialog.browse_tab, 'prev_button')
 
-    def test_slider_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot, isolated_managers):
+    def test_slider_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
         """Test that slider navigation updates offset correctly."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
@@ -75,7 +75,7 @@ class TestManualOffsetDialog:
         offset_text = dialog.browse_tab.offset_label.text()
         assert f"{new_value:06X}" in offset_text or f"{new_value:X}" in offset_text
 
-    def test_manual_offset_input(self, manual_offset_dialog, test_rom_with_sprites, qtbot, isolated_managers):
+    def test_manual_offset_input(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
         """Test manual offset input via spinbox."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
@@ -103,7 +103,7 @@ class TestManualOffsetDialog:
         assert dialog.get_current_offset() == target_offset
         assert dialog.browse_tab.position_slider.value() == target_offset
 
-    def test_find_sprites_button_click(self, manual_offset_dialog, test_rom_with_sprites, qtbot, mocker, wait_for_signal_processed, isolated_managers):
+    def test_find_sprites_button_click(self, manual_offset_dialog, test_rom_with_sprites, qtbot, mocker, wait_for_signal_processed):
         """Test that Find Sprites button triggers sprite scanning."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
@@ -136,7 +136,7 @@ class TestManualOffsetDialog:
         # Verify scan was triggered
         assert scan_mock.called
 
-    def test_preview_generation_on_offset_change(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, isolated_managers):
+    def test_preview_generation_on_offset_change(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for):
         """Test that preview is generated when offset changes."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
@@ -171,7 +171,7 @@ class TestManualOffsetDialog:
 
         assert preview_updated
 
-    def test_next_prev_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for_signal_processed, isolated_managers):
+    def test_next_prev_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for_signal_processed):
         """Test next/prev sprite navigation buttons.
 
         Note: Next/Prev buttons emit find_next_clicked/find_prev_clicked signals which
@@ -229,7 +229,7 @@ class TestSpriteScanDialog:
 
     @pytest.mark.slow
     @pytest.mark.timeout(120)  # This test does real ROM scanning which is slow
-    def test_sprite_scan_with_results(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, mocker, wait_for_signal_processed, isolated_managers):
+    def test_sprite_scan_with_results(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, mocker, wait_for_signal_processed):
         """Test full sprite scan workflow with results dialog."""
         from PySide6.QtWidgets import QDialog, QMessageBox
 
@@ -275,7 +275,7 @@ class TestSpriteScanDialog:
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
 
-    def test_sprite_selection_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot, isolated_managers):
+    def test_sprite_selection_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
         """Test selecting a sprite from results navigates to it."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites

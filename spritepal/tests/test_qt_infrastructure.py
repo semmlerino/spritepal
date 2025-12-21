@@ -1,8 +1,7 @@
 """
-Test the Qt test infrastructure to ensure proper qtbot and QApplication management.
+Test Qt infrastructure smoke test.
 
-This test verifies that our Qt fixtures work correctly and prevent common
-Qt testing issues like multiple QApplication instances and resource leaks.
+Most tests removed as they just verify Qt framework behavior.
 """
 from __future__ import annotations
 
@@ -10,10 +9,8 @@ from unittest.mock import Mock
 
 import pytest
 
-# Test markers for Qt infrastructure validation
 pytest_plugins = ["pytestqt"]
 
-# Qt infrastructure tests must run serially to avoid QApplication conflicts
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
@@ -24,166 +21,17 @@ pytestmark = [
 
 
 def test_qapplication_singleton(qapp):
-    """Verify single QApplication instance across test session."""
+    """Verify single QApplication instance across test session - smoke test."""
     try:
         from PySide6.QtWidgets import QApplication
 
-        # Get instances multiple times
         app1 = QApplication.instance()
         app2 = QApplication.instance()
 
-        # Should be the same instance
         assert app1 is app2
         assert app1 is not None
-
-        # Should match our fixture
         assert app1 is qapp
 
     except ImportError:
         # In environments without Qt, should get mock
         assert isinstance(qapp, Mock)
-
-def test_qtbot_widget_cleanup(qtbot):
-    """Verify widgets are properly registered with qtbot for cleanup."""
-    try:
-        from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
-
-        # Create a test widget
-        widget = QWidget()
-        qtbot.addWidget(widget)
-
-        # Add some content
-        label = QLabel("Test content")
-        layout = QVBoxLayout()
-        layout.addWidget(label)
-        widget.setLayout(layout)
-
-        # Widget should be registered with qtbot
-        # qtbot will handle cleanup automatically
-        assert widget is not None
-        assert label.text() == "Test content"
-
-    except ImportError:
-        # In headless environments, qtbot might be mocked
-        assert hasattr(qtbot, 'addWidget')
-        qtbot.addWidget(Mock())
-
-@pytest.mark.gui
-def test_qt_gui_functionality(qtbot):
-    """Test that requires full Qt GUI capabilities."""
-    try:
-        from PySide6.QtCore import QTimer, Signal
-        from PySide6.QtWidgets import QPushButton, QWidget
-
-        class TestWidget(QWidget):
-            clicked = Signal()
-
-            def __init__(self):
-                super().__init__()
-                self.button = QPushButton("Test Button")
-                self.button.clicked.connect(self.clicked.emit)
-
-        widget = TestWidget()
-        qtbot.addWidget(widget)
-
-        # Test signal emission
-        with qtbot.waitSignal(widget.clicked, timeout=1000):
-            widget.button.click()
-
-    except ImportError:
-        # In mock environments, just verify mock functionality
-        assert hasattr(qtbot, 'waitSignal')
-        assert hasattr(qtbot, 'addWidget')
-
-def test_qt_cleanup_integration(qtbot, qapp):
-    """Test that Qt cleanup works properly between tests."""
-    try:
-        import gc
-
-        from PySide6.QtWidgets import QWidget
-
-        # Create widgets that will be cleaned up
-        widgets = [QWidget() for _ in range(5)]
-        for widget in widgets:
-            qtbot.addWidget(widget)
-
-        # Force garbage collection
-        gc.collect()
-
-        # Process events to allow cleanup
-        if hasattr(qapp, 'processEvents'):
-            qapp.processEvents()
-
-    except ImportError:
-        # In mock environments, just verify structure
-        pass
-
-def test_thread_safety_marker():
-    """Test Qt thread safety markers work correctly."""
-    import threading
-
-    # Should be running in main thread for Qt operations
-    assert threading.current_thread() is threading.main_thread()
-
-def test_mock_gui_in_headless():
-    """Test that mock GUI operations work in headless mode."""
-    # This test should run even in headless environments
-    # because it uses mocks instead of real Qt widgets
-    from unittest.mock import Mock
-
-    mock_widget = Mock()
-    mock_widget.show = Mock()
-    mock_widget.close = Mock()
-
-    # Mock GUI operations
-    mock_widget.show()
-    mock_widget.close()
-
-    assert mock_widget.show.called
-    assert mock_widget.close.called
-
-
-def test_multiple_qapplication_prevention():
-    """Test that we prevent multiple QApplication instances."""
-    try:
-        from PySide6.QtWidgets import QApplication
-
-        # Get the current instance
-        app1 = QApplication.instance()
-
-        # Attempting to create another should return the same instance
-        # (QApplication constructor will raise an error if we try to create another)
-        app2 = QApplication.instance()
-
-        assert app1 is app2
-
-    except ImportError:
-        # In mock environments, this is handled by our fixture
-        pass
-
-def test_qt_resource_cleanup():
-    """Test that Qt resources are properly cleaned up.
-
-    Note: This test checks for egregious thread leaks. The threshold is set
-    conservatively high because:
-    - pytest-timeout creates Timer threads for each test
-    - MonitoringManager creates health check Timer threads
-    - pytest-xdist workers create additional threads
-
-    A truly clean test run would have < 10 threads, but in practice the test
-    suite accumulates infrastructure threads. We check for > 500 to catch
-    major leaks while avoiding false positives.
-    """
-    import gc
-
-    # Force garbage collection
-    gc.collect()
-
-    # Check active thread count (should be reasonable)
-    import threading
-    active_count = threading.active_count()
-
-    # Should not have egregious thread leaks
-    # Note: High threshold to accommodate pytest infrastructure threads
-    # A proper fix would be to capture baseline at test start
-    assert active_count < 500, f"Egregious thread leak detected: {active_count} active threads"

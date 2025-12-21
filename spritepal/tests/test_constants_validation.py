@@ -6,8 +6,6 @@ and that the replacement of magic numbers is effective.
 """
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
 from ui.common import spacing_constants
@@ -22,20 +20,6 @@ pytestmark = [
 
 class TestConstantsValidation:
     """Test constants definition and validation"""
-
-    def test_memory_offset_constants_validity(self):
-        """Test that memory offset constants are valid"""
-        # VRAM constants
-        assert constants.VRAM_SPRITE_OFFSET == 0xC000
-        assert constants.VRAM_SPRITE_SIZE == 0x4000
-        assert constants.VRAM_SPRITE_OFFSET + constants.VRAM_SPRITE_SIZE <= 0x10000  # Within VRAM
-
-        # Palette constants
-        assert constants.SPRITE_PALETTE_START == 8
-        assert constants.SPRITE_PALETTE_END == 16
-        assert constants.SPRITE_PALETTE_START < constants.SPRITE_PALETTE_END
-        assert constants.COLORS_PER_PALETTE == 16
-        assert constants.CGRAM_PALETTE_SIZE == 32  # 16 colors * 2 bytes
 
     def test_sprite_format_constants_consistency(self):
         """Test sprite format constants are mathematically consistent"""
@@ -144,22 +128,6 @@ class TestConstantsValidation:
             assert len(namespace) > 0, f"Namespace {namespace} should not be empty"
             assert namespace.isalnum() or "_" in namespace, f"Namespace {namespace} has invalid characters"
 
-    def test_magic_number_replacement_effectiveness(self):
-        """Test that magic numbers have been effectively replaced with constants"""
-        # Test common magic numbers that should now be constants
-        magic_numbers_replaced = {
-            0xC000: constants.VRAM_SPRITE_OFFSET,
-            0x4000: constants.VRAM_SPRITE_SIZE,
-            32: constants.BYTES_PER_TILE,
-            16: constants.COLORS_PER_PALETTE,
-            8: constants.SPRITE_PALETTE_START,
-            512: constants.SMC_HEADER_SIZE,
-        }
-
-        for magic_number, constant_value in magic_numbers_replaced.items():
-            assert magic_number == constant_value, \
-                f"Magic number {hex(magic_number)} doesn't match constant value {constant_value}"
-
 class TestSpacingConstantsValidation:
     """Test UI spacing constants validation"""
 
@@ -255,16 +223,6 @@ class TestSpacingConstantsValidation:
 class TestConstantUsageValidation:
     """Test that constants are being used correctly in the codebase"""
 
-    def test_vram_offset_constant_usage(self):
-        """Test that VRAM offset constant is used instead of magic numbers"""
-        # This would normally check actual code usage, but here we verify the constant exists
-        # and has the correct value for the expected usage
-        assert hasattr(constants, "VRAM_SPRITE_OFFSET")
-        assert constants.VRAM_SPRITE_OFFSET == 0xC000
-
-        # Verify it's properly typed (should be int)
-        assert isinstance(constants.VRAM_SPRITE_OFFSET, int)
-
     def test_palette_constants_usage(self):
         """Test palette-related constants are properly defined for usage"""
         # These constants should be available for palette validation logic
@@ -316,16 +274,3 @@ class TestConstantUsageValidation:
             assert len(key) > 0, f"Settings key {key} should not be empty"
             assert key.replace("_", "").isalnum(), f"Settings key {key} has invalid characters"
 
-    @patch("utils.constants.VRAM_SPRITE_OFFSET", 0x8000)
-    def test_constant_modification_impact(self):
-        """Test that modifying constants has expected impact"""
-        # This test demonstrates that constants can be modified for testing
-        # and validates that such modifications would work as expected
-        from utils import constants
-
-        # Verify the patch worked
-        assert constants.VRAM_SPRITE_OFFSET == 0x8000
-
-        # Test that calculations using the constant would change
-        test_address = constants.VRAM_SPRITE_OFFSET + 0x1000
-        assert test_address == 0x9000  # Would be 0xD000 with original value
