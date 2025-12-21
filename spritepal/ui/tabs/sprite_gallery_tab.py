@@ -28,8 +28,8 @@ from PySide6.QtWidgets import (
 )
 
 from core.rom_extractor import ROMExtractor
-from ui.common.file_dialogs import browse_for_directory, browse_for_save_file
 from core.sprite_finder import SpriteFinder
+from ui.common.file_dialogs import browse_for_directory, browse_for_save_file
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 from utils.logging_config import get_logger

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from utils.exceptions import TileError
+from core.exceptions import TileError
 
 from .grid_arrangement_manager import TileGroup, TilePosition
 from .image_processor import RowImageProcessor

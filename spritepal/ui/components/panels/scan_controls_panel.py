@@ -49,7 +49,7 @@ class ScanControlsPanel(QWidget):
     partial_scan_detected = Signal(dict)  # cache info for resume dialog
     sprites_detected = Signal(list)  # List of (offset, quality) tuples for region detection
 
-    def __init__(self, parent: QWidget | None = None, rom_cache: ROMCacheProtocol | None = None):
+    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCacheProtocol):
         # Step 1: Declare all instance variables with type hints
         # State
         self.rom_path: str = ""
@@ -72,13 +72,8 @@ class ScanControlsPanel(QWidget):
         # Cache status UI
         self.cache_status_label: QLabel | None = None
 
-        # Inject rom_cache or use fallback
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self.rom_cache = inject(ROMCacheProtocol)
-        else:
-            self.rom_cache = rom_cache
+        # Assign rom_cache
+        self.rom_cache = rom_cache
 
         # Step 2: Initialize parent
         super().__init__(parent)
@@ -344,7 +339,8 @@ class ScanControlsPanel(QWidget):
         try:
             step_size = 0x100  # 256 byte steps for comprehensive scanning
             self.range_scan_worker = RangeScanWorker(
-                self.rom_path, start_offset, end_offset, step_size, rom_extractor
+                self.rom_path, start_offset, end_offset, step_size, rom_extractor,
+                rom_cache=self.rom_cache
             )
         except Exception as e:
             logger.exception("Failed to create range scan worker")
@@ -587,6 +583,8 @@ class ScanControlsPanel(QWidget):
 
     def _update_cache_status(self, message: str, status_type: str = "default") -> None:
         """Update the cache status label with different styling based on type"""
+        if self.cache_status_label is None:
+            return
         self.cache_status_label.setText(message)
         self.cache_status_label.setVisible(True)
 
@@ -648,6 +646,8 @@ class ScanControlsPanel(QWidget):
 
     def _clear_cache_status(self) -> None:
         """Clear the cache status label"""
+        if self.cache_status_label is None:
+            return
         self.cache_status_label.setVisible(False)
 
     def _check_scan_cache_before_start(self, start_offset: int, end_offset: int) -> bool | None:

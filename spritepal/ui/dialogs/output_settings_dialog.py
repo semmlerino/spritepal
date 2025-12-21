@@ -7,7 +7,7 @@ removing the need for a permanent output settings panel in the main window.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, override
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -76,6 +76,7 @@ class OutputSettingsDialog(BaseDialog):
             with_button_box=True,
         )
 
+    @override
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""
         layout = QVBoxLayout()

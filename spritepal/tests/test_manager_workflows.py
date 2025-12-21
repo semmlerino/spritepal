@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from core.di_container import inject
-from core.managers.exceptions import ValidationError
+from core.exceptions import ValidationError
 from core.protocols.manager_protocols import (
     ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,

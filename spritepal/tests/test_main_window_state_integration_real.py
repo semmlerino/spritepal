@@ -45,10 +45,10 @@ from tests.infrastructure import (
     DataRepository,
     RealComponentFactory,
 )
+from ui.dialogs.output_settings_dialog import OutputSettingsDialog
 
 # Import real MainWindow (not mocked!)
 from ui.main_window import MainWindow
-from ui.dialogs.output_settings_dialog import OutputSettingsDialog
 
 
 def _apply_vram_output_settings(

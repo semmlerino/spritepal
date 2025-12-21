@@ -31,7 +31,7 @@ from .base_manager import BaseManager
 from .core_operations_manager import CoreOperationsManager
 from .workflow_manager import ExtractionState, WorkflowManager
 from .history_manager import HistoryManager
-from .exceptions import (
+from core.exceptions import (
     ExtractionError,
     FileOperationError,
     InjectionError,

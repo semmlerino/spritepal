@@ -28,11 +28,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
-
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 from ui.common import WorkerManager
+from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 
 # Dialog imports moved to lazy imports in methods that use them (see _set_rom_file, _perform_extraction)
 from ui.rom_extraction.workers import SpriteScanWorker
@@ -828,7 +827,8 @@ class DetachedGalleryWindow(QMainWindow):
             use_cache=True,
             start_offset=start_offset,
             end_offset=end_offset,
-            parent=self
+            parent=self,
+            rom_cache=self.rom_cache
         )
 
         # Connect signals with proper error handling

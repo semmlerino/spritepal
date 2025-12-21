@@ -26,7 +26,7 @@ import pytest
 from PIL import Image
 
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.managers.exceptions import ValidationError
+from core.exceptions import ValidationError
 
 # Real Component Testing Infrastructure (using available components)
 from tests.fixtures.test_data_factory import TestDataFactory
@@ -49,7 +49,9 @@ def injection_manager_real(isolated_managers):
 
     Uses CoreOperationsManager which implements InjectionManagerProtocol.
     """
-    return isolated_managers.get_injection_manager()
+    from core.di_container import inject
+    from core.protocols.manager_protocols import InjectionManagerProtocol
+    return inject(InjectionManagerProtocol)
 
 @pytest.fixture
 def temp_files_with_real_content(tmp_path):
@@ -184,7 +186,9 @@ class TestInjectionManagerParameterValidation:
         GREEN: Real FileValidator should validate actual file content
         REFACTOR: No mocking - tests real validation logic
         """
-        manager = isolated_managers.get_injection_manager()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
+        manager = inject(InjectionManagerProtocol)
 
         params = {
             "mode": "vram",
@@ -221,7 +225,9 @@ class TestInjectionManagerParameterValidation:
         Tests real ROM file validation including header checks, size validation,
         and format verification that mocks cannot test.
         """
-        manager = isolated_managers.get_injection_manager()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
+        manager = inject(InjectionManagerProtocol)
 
         params = {
             "mode": "rom",

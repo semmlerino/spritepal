@@ -33,7 +33,7 @@ from utils.constants import (
 from utils.file_validator import FileValidator
 
 from .base_manager import BaseManager
-from .exceptions import (
+from core.exceptions import (
     ExtractionError,
     ValidationError,
 )

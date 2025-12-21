@@ -165,16 +165,22 @@ class RealComponentFactory:
         # This ensures proper test isolation and prevents global state pollution
 
     def _get_extraction_manager_from_registry(self) -> CoreOperationsManager:
-        """Get extraction manager (CoreOperationsManager) from registry."""
-        return self._manager_registry.get_extraction_manager()
+        """Get extraction manager (CoreOperationsManager) via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
+        return inject(ExtractionManagerProtocol)  # type: ignore[return-value]
 
     def _get_injection_manager_from_registry(self) -> CoreOperationsManager:
-        """Get injection manager (CoreOperationsManager) from registry."""
-        return self._manager_registry.get_injection_manager()
+        """Get injection manager (CoreOperationsManager) via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import InjectionManagerProtocol
+        return inject(InjectionManagerProtocol)  # type: ignore[return-value]
 
     def _get_session_manager_from_registry(self) -> ApplicationStateManager:
-        """Get session manager (ApplicationStateManager) from registry."""
-        return self._manager_registry.get_session_manager()
+        """Get session manager (ApplicationStateManager) via DI."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value]
 
     def create_extraction_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """

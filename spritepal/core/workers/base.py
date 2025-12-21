@@ -19,9 +19,6 @@ if TYPE_CHECKING:
 else:
     from PySide6.QtCore import QObject
 
-if TYPE_CHECKING:
-    from core.managers.factory import ManagerFactory
-
 from core.managers.base_manager import BaseManager
 from utils.constants import SLEEP_WORKER
 from utils.logging_config import get_logger
@@ -352,7 +349,7 @@ class ManagedWorker(BaseWorker):
     def __init__(
         self,
         manager: BaseManager | None = None,
-        manager_factory: ManagerFactory | None = None,
+        manager_factory: Any | None = None,
         parent: QObject | None = None
     ) -> None:
         super().__init__(parent)

@@ -7,7 +7,7 @@ from typing import Any
 
 from PIL import Image
 
-from utils.exceptions import FileFormatError
+from core.exceptions import FileFormatError
 
 
 class RowImageProcessor:

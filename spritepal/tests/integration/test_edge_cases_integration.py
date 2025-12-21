@@ -23,7 +23,7 @@ from unittest.mock import MagicMock
 import pytest
 from PySide6.QtCore import Qt
 
-from core.managers.exceptions import ValidationError
+from core.exceptions import ValidationError
 from tests.infrastructure.real_component_factory import RealComponentFactory
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
@@ -301,7 +301,7 @@ class TestROMDataEdgeCases:
 
     def test_extraction_manager_read_header_nonexistent_file(self, real_factory, tmp_path):
         """Test reading header from nonexistent file."""
-        from core.managers.exceptions import ExtractionError
+        from core.exceptions import ExtractionError
 
         manager = real_factory.create_extraction_manager()
         fake_path = tmp_path / "nonexistent.sfc"

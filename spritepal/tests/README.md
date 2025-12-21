@@ -38,14 +38,14 @@ def test_real_widget(qtbot, real_factory):
 
 ### For Integration Tests
 ```python
-from tests.infrastructure.manager_test_context import manager_context
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol, InjectionManagerProtocol
 
-def test_real_integration():
+def test_real_integration(isolated_managers):
     """Test real manager integration."""
-    with manager_context("extraction", "injection") as ctx:
-        extraction = ctx.get_extraction_manager()  # Real ExtractionManager
-        injection = ctx.get_injection_manager()    # Real InjectionManager
-        # Test real workflow
+    extraction = inject(ExtractionManagerProtocol)  # Real ExtractionManager
+    injection = inject(InjectionManagerProtocol)    # Real InjectionManager
+    # Test real workflow
 ```
 
 ## Testing Philosophy
@@ -258,9 +258,12 @@ What does your test need?
 
 **Basic test with managers:**
 ```python
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
+
 def test_extraction_validates_params(isolated_managers):
-    # Access managers via getter methods (don't use inject() in tests)
-    manager = isolated_managers.get_extraction_manager()
+    # Use inject() to get managers (isolated_managers sets up DI container)
+    manager = inject(ExtractionManagerProtocol)
     result = manager.validate_extraction_params({"path": "/test"})
     assert isinstance(result, bool)
 ```

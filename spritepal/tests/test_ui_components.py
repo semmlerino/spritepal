@@ -132,12 +132,14 @@ class TestScanControlsPanel:
         """Test ScanControlsPanel creation"""
         from PySide6.QtWidgets import QWidget
 
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
         from ui.components.panels.scan_controls_panel import ScanControlsPanel
 
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
-        panel = ScanControlsPanel(parent_widget)
+        panel = ScanControlsPanel(parent_widget, rom_cache=inject(ROMCacheProtocol))
         qtbot.addWidget(panel)
 
         # Verify initialization - use the actual button names from the implementation
@@ -151,12 +153,14 @@ class TestScanControlsPanel:
         """Test scan parameter validation"""
         from PySide6.QtWidgets import QWidget
 
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
         from ui.components.panels.scan_controls_panel import ScanControlsPanel
 
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
-        panel = ScanControlsPanel(parent_widget)
+        panel = ScanControlsPanel(parent_widget, rom_cache=inject(ROMCacheProtocol))
         qtbot.addWidget(panel)
 
         # Test the validation method directly with mock parameters
@@ -232,29 +236,41 @@ class TestStatusPanel:
         """Test StatusPanel creation"""
         from PySide6.QtWidgets import QWidget
 
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
         from ui.components.panels.status_panel import StatusPanel
 
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
-        panel = StatusPanel(parent_widget)
+        panel = StatusPanel(
+            parent_widget,
+            settings_manager=inject(SettingsManagerProtocol),
+            rom_cache=inject(ROMCacheProtocol)
+        )
         qtbot.addWidget(panel)
 
         # Verify initialization - use actual attribute names from implementation
         assert hasattr(panel, "detection_info")  # Status label
         assert hasattr(panel, "scan_progress")   # Progress bar
-        assert hasattr(panel, "cache_status_widget")  # Cache status
+        assert hasattr(panel, "cache_status_widget")  # Cache status  # Cache status
 
     def test_status_updates(self, qtbot):
         """Test status message updates"""
         from PySide6.QtWidgets import QWidget
 
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
         from ui.components.panels.status_panel import StatusPanel
 
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
-        panel = StatusPanel(parent_widget)
+        panel = StatusPanel(
+            parent_widget,
+            settings_manager=inject(SettingsManagerProtocol),
+            rom_cache=inject(ROMCacheProtocol)
+        )
         qtbot.addWidget(panel)
 
         # Ensure the parent widget is shown so the entire hierarchy is visible

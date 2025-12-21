@@ -92,9 +92,15 @@ class TestDialogInstantiation:
         current_offset = dialog.get_current_offset()
         assert isinstance(current_offset, int)
 
-    def test_settings_dialog_creation(self, qtbot):
+    def test_settings_dialog_creation(self, qtbot, isolated_managers):
         """Test SettingsDialog can be created."""
-        dialog = SettingsDialog()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+
+        dialog = SettingsDialog(
+            settings_manager=inject(SettingsManagerProtocol),
+            rom_cache=inject(ROMCacheProtocol)
+        )
         qtbot.addWidget(dialog)
 
         # Test loading settings doesn't fail

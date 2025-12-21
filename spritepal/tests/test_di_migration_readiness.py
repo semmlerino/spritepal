@@ -209,7 +209,7 @@ class TestNoFallbackScenario:
             container._factories.update(original_factories)
 
     def test_deprecated_functions_were_removed(self, isolated_managers):
-        """Verify deprecated convenience functions have been removed from module exports."""
+        """Verify deprecated convenience functions have been removed from module exports and registry."""
         import core.managers
 
         # These functions should no longer exist at module level
@@ -223,11 +223,15 @@ class TestNoFallbackScenario:
         assert not hasattr(core.managers, "get_navigation_manager"), \
             "get_navigation_manager should have been removed"
 
-        # These are still available on the registry instance
+        # Deprecated methods have been removed from registry as well
         from core.managers.registry import ManagerRegistry
         registry = ManagerRegistry()
-        assert hasattr(registry, "get_extraction_manager"), \
-            "Registry should still have get_extraction_manager method"
+        assert not hasattr(registry, "get_extraction_manager"), \
+            "Registry get_extraction_manager method should have been removed"
+        assert not hasattr(registry, "get_injection_manager"), \
+            "Registry get_injection_manager method should have been removed"
+        assert not hasattr(registry, "get_session_manager"), \
+            "Registry get_session_manager method should have been removed"
 
 
 class TestInjectionManagerDI:

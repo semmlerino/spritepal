@@ -39,13 +39,31 @@ def are_managers_initialized() -> bool:
 
 
 def get_session_manager():
-    """Get session manager from registry."""
-    return ManagerRegistry().get_session_manager()
+    """Get session manager via DI.
+
+    Wraps inject() to raise ManagerError for compatibility with tests
+    that expect the old API's error semantics.
+    """
+    from core.di_container import inject
+    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    try:
+        return inject(ApplicationStateManagerProtocol)
+    except ValueError as e:
+        raise ManagerError("SessionManager not initialized") from e
 
 
 def get_extraction_manager():
-    """Get extraction manager from registry."""
-    return ManagerRegistry().get_extraction_manager()
+    """Get extraction manager via DI.
+
+    Wraps inject() to raise ManagerError for compatibility with tests
+    that expect the old API's error semantics.
+    """
+    from core.di_container import inject
+    from core.protocols.manager_protocols import ExtractionManagerProtocol
+    try:
+        return inject(ExtractionManagerProtocol)
+    except ValueError as e:
+        raise ManagerError("ExtractionManager not initialized") from e
 
 pytestmark = [
     pytest.mark.headless,

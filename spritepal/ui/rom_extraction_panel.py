@@ -198,7 +198,10 @@ class ROMExtractionPanel(QWidget):
         Args:
             layout: Layout to add controls to
         """
-        self.rom_file_widget = ROMFileWidget()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+
+        self.rom_file_widget = ROMFileWidget(rom_cache=inject(ROMCacheProtocol))
         self.rom_file_widget.browse_clicked.connect(self._browse_rom)
         self.rom_file_widget.partial_scan_detected.connect(self._on_partial_scan_detected)
         layout.addWidget(self.rom_file_widget)

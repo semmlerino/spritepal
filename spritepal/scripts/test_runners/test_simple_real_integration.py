@@ -16,7 +16,7 @@ sys.path.insert(0, str(current_dir))
 
 import pytest
 
-from core.managers.exceptions import ValidationError
+from core.exceptions import ValidationError
 from tests.infrastructure import (
     DataRepository,
     RealManagerFixtureFactory,

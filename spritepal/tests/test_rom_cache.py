@@ -705,10 +705,12 @@ class TestROMCacheIntegration:
 
     def test_rom_file_widget_cache_check(self, qtbot, test_rom_file) -> None:
         """Test ROMFileWidget cache status checking."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
         from ui.rom_extraction.widgets.rom_file_widget import ROMFileWidget
 
-        # Create widget
-        widget = ROMFileWidget()
+        # Create widget with injected rom_cache
+        widget = ROMFileWidget(rom_cache=inject(ROMCacheProtocol))
         qtbot.addWidget(widget)
 
         # Set ROM path
@@ -759,7 +761,7 @@ class TestROMCacheIntegration:
         # Create worker that should resume from cache
         # Get extractor instance from DI (isolated_managers fixture sets up DI)
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMExtractorProtocol
+        from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
         extractor = inject(ROMExtractorProtocol)
 
         worker = SpriteScanWorker(
@@ -768,6 +770,7 @@ class TestROMCacheIntegration:
             scan_params["end_offset"],
             step_size=scan_params["alignment"],
             extractor=extractor,
+            rom_cache=inject(ROMCacheProtocol)
         )
 
         # Collect signals

@@ -13,8 +13,22 @@ import pytest
 from core.controller import ExtractionController
 from core.di_container import inject
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.protocols.manager_protocols import SettingsManagerProtocol
+from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
+    ExtractionManagerProtocol,
+    SettingsManagerProtocol,
+)
 from tests.infrastructure.real_component_factory import RealComponentFactory
+
+
+def get_extraction_manager():
+    """Get extraction manager via DI."""
+    return inject(ExtractionManagerProtocol)
+
+
+def get_session_manager():
+    """Get session manager via DI."""
+    return inject(ApplicationStateManagerProtocol)
 
 # Serial execution required: Real Qt components
 pytestmark = [
@@ -156,7 +170,7 @@ class TestRealManagerBenefits:
 
     def test_catches_real_validation_bugs(self, isolated_managers):
         """Real managers catch actual validation logic bugs."""
-        manager = isolated_managers.get_extraction_manager()
+        manager = get_extraction_manager()
 
         # This tests real validation logic, not mocked behavior
         with pytest.raises(Exception):
@@ -168,7 +182,7 @@ class TestRealManagerBenefits:
 
     def test_real_business_logic_coverage(self, isolated_managers):
         """Real managers provide actual business logic coverage."""
-        manager = isolated_managers.get_extraction_manager()
+        manager = get_extraction_manager()
 
         # Test real smart VRAM suggestion logic
         suggestion = manager.get_smart_vram_suggestion(
@@ -181,7 +195,7 @@ class TestRealManagerBenefits:
 
     def test_real_state_management(self, isolated_managers):
         """Real managers test actual state management."""
-        manager = isolated_managers.get_session_manager()
+        manager = get_session_manager()
 
         # Test real state management
         manager.set("category", "key1", "value1")

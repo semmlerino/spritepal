@@ -24,7 +24,7 @@ from utils.file_validator import atomic_write
 from utils.state_manager import StateEntry, StateSnapshot
 
 from .base_manager import BaseManager
-from .exceptions import SessionError, ValidationError
+from core.exceptions import SessionError, ValidationError
 
 T = TypeVar("T")
 

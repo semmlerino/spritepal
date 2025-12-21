@@ -7,7 +7,7 @@ to the InjectionManager while providing consistent threading interfaces.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 try:
     from typing import override
@@ -16,8 +16,6 @@ except ImportError:
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
-
-    from core.managers.factory import ManagerFactory
 
 from core.managers.base_manager import BaseManager
 from core.protocols.manager_protocols import InjectionManagerProtocol
@@ -195,7 +193,7 @@ class WorkerOwnedVRAMInjectionWorker(InjectionWorkerBase, WorkerOwnedManagerMixi
     def __init__(
         self,
         params: VRAMInjectionParams,
-        manager_factory: ManagerFactory | None = None,
+        manager_factory: Any | None = None,
         parent: QObject | None = None
     ) -> None:
         # Create manager using standardized worker-owned pattern
@@ -273,7 +271,7 @@ class WorkerOwnedROMInjectionWorker(InjectionWorkerBase, WorkerOwnedManagerMixin
     def __init__(
         self,
         params: ROMInjectionParams,
-        manager_factory: ManagerFactory | None = None,
+        manager_factory: Any | None = None,
         parent: QObject | None = None
     ) -> None:
         # Create manager using standardized worker-owned pattern

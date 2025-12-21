@@ -34,18 +34,13 @@ class ROMFileWidget(BaseExtractionWidget):
     cache_status_changed = Signal(dict)  # Emitted when cache status changes
     partial_scan_detected = Signal(dict)  # Emitted when partial scan cache found
 
-    def __init__(self, parent: Any | None = None, rom_cache: ROMCacheProtocol | None = None):
+    def __init__(self, parent: Any | None = None, *, rom_cache: ROMCacheProtocol):
         super().__init__(parent)
         self._rom_path = ""
         self._cache_status = {"has_cache": False, "cache_type": None}
 
-        # Inject rom_cache or use fallback
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self._rom_cache = inject(ROMCacheProtocol)
-        else:
-            self._rom_cache = rom_cache
+        # Assign rom_cache
+        self._rom_cache = rom_cache
 
         self._setup_ui()
 
@@ -105,7 +100,7 @@ class ROMFileWidget(BaseExtractionWidget):
         rom_layout.addWidget(self.loading_progress)
 
         # Use flat layout without group box for cleaner appearance
-        self._setup_widget_flat(rom_layout, with_separator=True)
+        self._setup_widget_flat(rom_layout, with_separator=False)
 
     def _set_empty_state_guidance(self) -> None:
         """Show simple guidance when no ROM is loaded, with detailed tooltip"""

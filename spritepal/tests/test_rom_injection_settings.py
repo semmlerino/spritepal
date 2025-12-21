@@ -21,9 +21,18 @@ warnings.filterwarnings(
     category=DeprecationWarning,
 )
 
+from core.di_container import inject
 from core.managers.core_operations_manager import CoreOperationsManager
+from core.protocols.manager_protocols import InjectionManagerProtocol
 from core.services.settings_manager import SettingsManager
 from ui.injection_dialog import InjectionDialog
+
+
+def get_injection_manager():
+    """Get injection manager via DI."""
+    return inject(InjectionManagerProtocol)
+
+
 from utils.constants import (
     # Systematic pytest markers applied based on test content analysis
     SETTINGS_KEY_FAST_COMPRESSION,
@@ -128,7 +137,7 @@ class TestROMInjectionSettingsPersistence:
         mock_dialog.fast_compression_check.isChecked.return_value = True
 
         # Get injection manager from DI (requires session_managers fixture)
-        injection_manager = session_managers.get_injection_manager()
+        injection_manager = get_injection_manager()
         with patch.object(
             injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
         ):
@@ -175,7 +184,7 @@ class TestROMInjectionSettingsPersistence:
         mock_dialog.fast_compression_check.isChecked.return_value = False
 
         # Get injection manager from DI (requires session_managers fixture)
-        injection_manager = session_managers.get_injection_manager()
+        injection_manager = get_injection_manager()
         with patch.object(
             injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
         ):
@@ -235,7 +244,7 @@ class TestROMInjectionSettingsPersistence:
         )
 
         # Get injection manager from DI (requires session_managers fixture)
-        injection_manager = session_managers.get_injection_manager()
+        injection_manager = get_injection_manager()
         with (
             patch("pathlib.Path.exists", return_value=True),  # Path().exists() not os.path.exists
             patch.object(
@@ -276,7 +285,7 @@ class TestROMInjectionSettingsPersistence:
         mock_dialog.fast_compression_check.isChecked.return_value = False
 
         # Get injection manager from DI (requires session_managers fixture)
-        injection_manager = session_managers.get_injection_manager()
+        injection_manager = get_injection_manager()
         with (
             patch.object(
                 injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
@@ -322,7 +331,7 @@ class TestROMInjectionSettingsPersistence:
         )
 
         # Get injection manager from DI (requires session_managers fixture)
-        injection_manager = session_managers.get_injection_manager()
+        injection_manager = get_injection_manager()
         with patch.object(
             injection_manager, "_get_session_manager", return_value=settings_manager._mock_session_manager
         ):

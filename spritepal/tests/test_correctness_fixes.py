@@ -17,6 +17,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
+
+
+def get_extraction_manager():
+    """Get extraction manager via DI."""
+    return inject(ExtractionManagerProtocol)
+
+
 # Mark all tests as headless and integration
 pytestmark = [
     pytest.mark.headless,
@@ -208,7 +217,7 @@ class TestWorkerCleanup:
         self, isolated_managers: Any, qtbot: Any
     ) -> None:
         """_current_worker should be None after exception in start_injection."""
-        manager = isolated_managers.get_extraction_manager()
+        manager = get_extraction_manager()
 
         # Verify initial state
         assert manager._current_worker is None
@@ -263,7 +272,7 @@ class TestOffsetParseError:
             }
         }
 
-        manager = isolated_managers.get_extraction_manager()
+        manager = get_extraction_manager()
 
         with caplog.at_level(logging.WARNING, logger=manager._logger.name):
             result = manager.load_rom_injection_defaults(

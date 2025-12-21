@@ -19,7 +19,6 @@ from PySide6.QtCore import QCoreApplication
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QApplication
 
-from core.managers.factory import StandardManagerFactory
 from core.workers.injection import (
     ROMInjectionParams,
     # Serial execution required: QApplication management
@@ -77,8 +76,13 @@ class TestWorkerOwnedInjectionPattern:
             }
 
     @pytest.mark.shared_state_safe
-    def test_worker_owns_its_injection_manager(self, qtbot, session_managers, test_sprite_files, test_vram_files):
-        """Test that worker-owned injection workers have their own manager instances."""
+    def test_workers_share_di_singleton_manager(self, qtbot, session_managers, test_sprite_files, test_vram_files):
+        """Test that workers share the DI singleton manager.
+
+        With the migration to DI, workers no longer own their own managers.
+        Instead, they share the singleton CoreOperationsManager from DI.
+        This test verifies the new architecture is working correctly.
+        """
         # Prepare parameters
         params: VRAMInjectionParams = {
             "mode": "vram",
@@ -92,31 +96,23 @@ class TestWorkerOwnedInjectionPattern:
         worker1 = WorkerOwnedVRAMInjectionWorker(params)
         worker2 = WorkerOwnedVRAMInjectionWorker(params)
 
-        # Verify they have different manager instances (before running)
+        # Verify both workers have managers
         assert worker1.manager is not None
         assert worker2.manager is not None
-        assert worker1.manager is not worker2.manager
-        assert id(worker1.manager) != id(worker2.manager)
 
-        # Verify managers are properly parented to their workers
-        assert worker1.manager.parent() is worker1
-        assert worker2.manager.parent() is worker2
+        # NEW: With DI architecture, workers SHARE the singleton manager
+        assert worker1.manager is worker2.manager, "Workers should share DI singleton manager"
+        assert id(worker1.manager) == id(worker2.manager), "Manager IDs should be identical"
 
-        print(f"Worker1 injection manager: {id(worker1.manager)} (parent: {worker1.manager.parent()})")
-        print(f"Worker2 injection manager: {id(worker2.manager)} (parent: {worker2.manager.parent()})")
+        print(f"Shared DI singleton manager: {id(worker1.manager)}")
+        print("✅ Workers correctly share DI singleton manager")
 
         # Removed start() calls to avoid double-threading crash architecture issue
-        # The test verifies instantiation and ownership, which is sufficient here.
-        
-        # Cleanup
-        if worker1.manager:
-            worker1.manager.cleanup()
-        if worker2.manager:
-            worker2.manager.cleanup()
+        # The test verifies DI integration, which is sufficient here.
 
-    def test_worker_owned_vram_injection_no_global_state(self, qtbot, test_sprite_files, test_vram_files):
-        """Test VRAM injection with worker-owned managers (no global registry needed)."""
-        # NOTE: This test deliberately does NOT initialize global managers to prove isolation
+    def test_worker_vram_injection_with_di(self, qtbot, isolated_managers, test_sprite_files, test_vram_files):
+        """Test VRAM injection uses DI singleton manager correctly."""
+        # With DI architecture, workers use the shared singleton manager
 
         # Prepare parameters
         params: VRAMInjectionParams = {
@@ -127,15 +123,13 @@ class TestWorkerOwnedInjectionPattern:
             "offset": 0xC000,
         }
 
-        # Create worker (will create its own manager)
+        # Create worker (uses DI singleton)
         worker = WorkerOwnedVRAMInjectionWorker(params)
-        # worker.start() - Removed to avoid double-threading crash (manager spawns its own thread)
-        # worker.wait()
 
         # Verify manager exists and is properly configured
         assert worker.manager is not None
         assert worker.manager.is_initialized()
-        assert worker.manager.parent() is worker
+        # Note: With DI singleton, manager parent is NOT the worker
 
         # The core test: verify that worker-owned managers can be created and operated
         # without Qt lifecycle errors (regardless of injection success/failure)
@@ -164,11 +158,10 @@ class TestWorkerOwnedInjectionPattern:
             # Progress signal should have been emitted (shows manager is responsive)
             assert progress_spy.count() >= 1, "No progress signals emitted - manager may not be working"
 
-            print("✅ Worker-owned injection pattern test PASSED:")
-            print(f"   - Manager created with proper Qt parent: {worker.manager.parent() is worker}")
+            print("✅ Worker DI injection pattern test PASSED:")
+            print("   - Manager obtained from DI singleton")
             print("   - No Qt lifecycle errors detected")
             print(f"   - Manager responsive (progress signals: {progress_spy.count()})")
-            print("   - Worker isolation proven (no global registry needed)")
 
         except Exception as e:
             # Check if it's a Qt lifecycle error (the critical failure we're testing for)
@@ -183,8 +176,8 @@ class TestWorkerOwnedInjectionPattern:
             if worker.manager:
                 worker.manager.cleanup()
 
-    def test_multiple_concurrent_injection_workers_isolated(self, qtbot, test_sprite_files, test_vram_files):
-        """Test that multiple worker-owned injection workers don't interfere with each other."""
+    def test_multiple_concurrent_injection_workers_with_shared_manager(self, qtbot, isolated_managers, test_sprite_files, test_vram_files):
+        """Test that multiple workers can operate concurrently with shared DI manager."""
         from PySide6.QtTest import QTest
 
         # Create parameters for two different injections
@@ -208,6 +201,9 @@ class TestWorkerOwnedInjectionPattern:
         worker1 = WorkerOwnedVRAMInjectionWorker(params1)
         worker2 = WorkerOwnedVRAMInjectionWorker(params2)
 
+        # Verify workers share the DI singleton manager
+        assert worker1.manager is worker2.manager, "Workers should share DI singleton"
+
         # Set up error spies
         error_spy1 = QSignalSpy(worker1.error)
         error_spy2 = QSignalSpy(worker2.error)
@@ -230,24 +226,17 @@ class TestWorkerOwnedInjectionPattern:
                     error_msg = error_spy.at(0)[0]
                     assert "wrapped C/C++ object" not in error_msg, f"{worker_name} Qt lifecycle error: {error_msg}"
 
-            print("✅ Concurrent injection workers test PASSED:")
-            print("   - Both workers created with isolated managers")
+            print("✅ Concurrent workers with shared DI manager test PASSED:")
+            print("   - Both workers correctly share DI singleton manager")
             print("   - No Qt lifecycle errors detected")
-            print("   - Worker isolation proven (independent operation)")
             print(f"   - Progress signals: worker1={progress_spy1.count()}, worker2={progress_spy2.count()}")
 
         finally:
-            # Cleanup to prevent "QThread Destroyed while thread is still running"
-            if worker1.manager:
-                worker1.manager.cleanup()
-            if worker2.manager:
-                worker2.manager.cleanup()
+            # No per-worker cleanup needed - shared manager is cleaned up by DI container
+            pass
 
-    def test_custom_injection_manager_factory(self, qtbot, test_sprite_files, test_vram_files):
-        """Test using a custom manager factory with worker-owned injection pattern."""
-        # Create a custom factory with specific configuration
-        factory = StandardManagerFactory(default_parent_strategy="application")
-
+    def test_di_injection_manager(self, qtbot, isolated_managers, test_sprite_files, test_vram_files):
+        """Test that worker uses DI-injected manager (factory pattern deprecated)."""
         # Prepare parameters
         params: VRAMInjectionParams = {
             "mode": "vram",
@@ -257,19 +246,14 @@ class TestWorkerOwnedInjectionPattern:
             "offset": 0xC000,
         }
 
-        # Create worker with custom factory
-        worker = WorkerOwnedVRAMInjectionWorker(params, manager_factory=factory)
-        # qtbot.addWidget(worker) - Removed as worker is QThread, not QWidget
+        # Create worker without factory (uses DI)
+        worker = WorkerOwnedVRAMInjectionWorker(params, manager_factory=None)
 
-        # Verify manager was created using the custom factory
+        # Verify manager was obtained from DI
         assert worker.manager is not None
         assert worker.manager.is_initialized()
 
-        # The factory should have set QApplication as parent, but worker constructor
-        # overrides this to use worker as parent for worker-owned pattern
-        assert worker.manager.parent() is worker
-
-        # Test injection works with custom factory
+        # Test injection works with DI manager
         QSignalSpy(worker.operation_finished)
         error_spy = QSignalSpy(worker.error)
 
@@ -294,8 +278,8 @@ class TestWorkerOwnedInjectionPattern:
         if worker.manager:
             worker.manager.cleanup()
 
-    def test_worker_owned_rom_injection(self, qtbot, test_sprite_files):
-        """Test ROM injection with worker-owned managers."""
+    def test_worker_owned_rom_injection(self, qtbot, isolated_managers, test_sprite_files):
+        """Test ROM injection with DI singleton manager."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create dummy ROM files
             input_rom = os.path.join(temp_dir, "input.sfc")

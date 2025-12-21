@@ -54,8 +54,8 @@ class SpriteScanWorker(BaseWorker):
     """Alias for progress_detailed. Args: current_step, total_steps."""
 
     def __init__(self, rom_path: str, extractor: Any = None, use_cache: bool = True,
-                 start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None,
-                 rom_cache: ROMCacheProtocol | None = None,
+                 start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None, *,
+                 rom_cache: ROMCacheProtocol,
                  parallel_finder: ParallelSpriteFinder | None = None,
                  step: int | None = None):
         super().__init__(parent)
@@ -72,13 +72,8 @@ class SpriteScanWorker(BaseWorker):
             step_size=0x100      # 256-byte alignment
         )
 
-        # Inject rom_cache or use fallback
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self.rom_cache = inject(ROMCacheProtocol)
-        else:
-            self.rom_cache = rom_cache
+        # Assign rom_cache
+        self.rom_cache = rom_cache
 
     @handle_worker_errors("sprite scanning", handle_interruption=True)
     def run(self):

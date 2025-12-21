@@ -175,7 +175,7 @@ class SpriteNavigator(QWidget):
     region_changed = Signal(int)  # Emitted when region selection changes
     navigation_mode_changed = Signal(str)  # "manual" or "smart"
 
-    def __init__(self, parent: QWidget | None = None, rom_cache: ROMCacheProtocol | None = None):
+    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCacheProtocol):
         super().__init__(parent)
 
         # State
@@ -188,12 +188,7 @@ class SpriteNavigator(QWidget):
         self.navigation_mode = "manual"  # "manual" or "smart"
 
         # Cache and performance
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self.rom_cache = inject(ROMCacheProtocol)
-        else:
-            self.rom_cache = rom_cache
+        self.rom_cache = rom_cache
         self.thumbnail_cache: dict[int, QPixmap] = {}
         self._last_thumbnail_update = 0
 

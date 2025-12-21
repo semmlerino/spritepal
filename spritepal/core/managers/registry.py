@@ -4,7 +4,6 @@ Registry for accessing manager instances
 from __future__ import annotations
 
 import threading
-import warnings
 from typing import Any
 
 from PySide6.QtWidgets import QApplication
@@ -21,9 +20,8 @@ from .application_state_manager import ApplicationStateManager
 
 # Import consolidated managers
 from .core_operations_manager import CoreOperationsManager
-from .exceptions import ManagerError
+from core.exceptions import ManagerError
 from .monitoring_manager import MonitoringManager
-from .session_manager import SessionManager
 
 # NavigationManager import deferred to avoid circular imports
 
@@ -363,84 +361,6 @@ class ManagerRegistry:
                 safe_debug(self._logger, f"Error clearing DI container: {e}")
 
             safe_info(self._logger, "All managers cleaned up")
-
-    def get_session_manager(self) -> SessionManager:
-        """
-        Get the session manager instance.
-
-        .. deprecated::
-            Use ``inject(ApplicationStateManagerProtocol)`` from ``core.di_container`` instead.
-
-        Returns:
-            SessionManager instance
-
-        Raises:
-            ManagerError: If manager not initialized
-        """
-        warnings.warn(
-            "ManagerRegistry.get_session_manager() is deprecated. "
-            "Use inject(ApplicationStateManagerProtocol) from core.di_container instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-        try:
-            return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value]
-        except ValueError as e:
-            raise ManagerError("SessionManager not initialized. Call initialize_managers() first.") from e
-
-    def get_extraction_manager(self) -> CoreOperationsManager:
-        """
-        Get the extraction manager instance.
-
-        .. deprecated::
-            Use ``inject(ExtractionManagerProtocol)`` from ``core.di_container`` instead.
-
-        Returns:
-            ExtractionManager instance
-
-        Raises:
-            ManagerError: If manager not initialized
-        """
-        warnings.warn(
-            "ManagerRegistry.get_extraction_manager() is deprecated. "
-            "Use inject(ExtractionManagerProtocol) from core.di_container instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ExtractionManagerProtocol
-        try:
-            return inject(ExtractionManagerProtocol)  # type: ignore[return-value]
-        except ValueError as e:
-            raise ManagerError("ExtractionManager not initialized. Call initialize_managers() first.") from e
-
-    def get_injection_manager(self) -> CoreOperationsManager:
-        """
-        Get the injection manager instance.
-
-        .. deprecated::
-            Use ``inject(InjectionManagerProtocol)`` from ``core.di_container`` instead.
-
-        Returns:
-            InjectionManager instance
-
-        Raises:
-            ManagerError: If manager not initialized
-        """
-        warnings.warn(
-            "ManagerRegistry.get_injection_manager() is deprecated. "
-            "Use inject(InjectionManagerProtocol) from core.di_container instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        from core.di_container import inject
-        from core.protocols.manager_protocols import InjectionManagerProtocol
-        try:
-            return inject(InjectionManagerProtocol)  # type: ignore[return-value]
-        except ValueError as e:
-            raise ManagerError("InjectionManager not initialized. Call initialize_managers() first.") from e
 
     def get_core_operations_manager(self):
         """

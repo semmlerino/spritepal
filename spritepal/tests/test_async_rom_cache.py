@@ -23,9 +23,7 @@ from PySide6.QtCore import QMutexLocker, QThread
 from PySide6.QtWidgets import QApplication
 
 from core.async_rom_cache import AsyncROMCache, CacheWorker
-from tests.fixtures.timeouts import (
-    cleanup_timeout, dialog_timeout, signal_timeout, worker_timeout, SHORT
-)
+from tests.fixtures.timeouts import SHORT, cleanup_timeout, dialog_timeout, signal_timeout, worker_timeout
 
 # Mark tests that create QApplication instances for serial execution
 # parallel_unsafe: Tests create AsyncROMCache with worker threads that use shared

@@ -7,7 +7,6 @@ from typing import TypedDict
 
 from .theme import COLORS, DIMENSIONS, FONTS, get_disabled_state_style
 
-
 # =============================================================================
 # Internal helper functions for DRY styling
 # =============================================================================
@@ -150,18 +149,18 @@ def _build_badge_style(config: BadgeStyleConfig) -> str:
         parts.append(f"    color: {config['text_color']};")
 
     # Dimensions (for fixed-size badges)
-    if config.get("min_width") is not None:
-        parts.append(f"    min-width: {config['min_width']}px;")
-    if config.get("max_width") is not None:
-        parts.append(f"    max-width: {config['max_width']}px;")
-    if config.get("min_height") is not None:
-        parts.append(f"    min-height: {config['min_height']}px;")
-    if config.get("max_height") is not None:
-        parts.append(f"    max-height: {config['max_height']}px;")
+    if (min_width := config.get("min_width")) is not None:
+        parts.append(f"    min-width: {min_width}px;")
+    if (max_width := config.get("max_width")) is not None:
+        parts.append(f"    max-width: {max_width}px;")
+    if (min_height := config.get("min_height")) is not None:
+        parts.append(f"    min-height: {min_height}px;")
+    if (max_height := config.get("max_height")) is not None:
+        parts.append(f"    max-height: {max_height}px;")
 
     # Alignment (Qt property)
-    if config.get("alignment"):
-        parts.append(f"    qproperty-alignment: {config['alignment']};")
+    if alignment := config.get("alignment"):
+        parts.append(f"    qproperty-alignment: {alignment};")
 
     parts.append("}")
     return "\n            ".join(parts)

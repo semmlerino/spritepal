@@ -20,26 +20,15 @@ if TYPE_CHECKING:
 class StatusPanel(QWidget):
     """Panel for displaying status information and progress"""
 
-    def __init__(self, parent: QWidget | None = None,
-                 settings_manager: SettingsManagerProtocol | None = None,
-                 rom_cache: ROMCacheProtocol | None = None):
+    def __init__(self, parent: QWidget | None = None, *,
+                 settings_manager: SettingsManagerProtocol,
+                 rom_cache: ROMCacheProtocol):
         super().__init__(parent)
         self.setStyleSheet(get_panel_style())
 
-        # Inject dependencies or use fallback
-        if settings_manager is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            self.settings_manager = inject(SettingsManagerProtocol)
-        else:
-            self.settings_manager = settings_manager
-
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self.rom_cache = inject(ROMCacheProtocol)
-        else:
-            self.rom_cache = rom_cache
+        # Assign dependencies
+        self.settings_manager = settings_manager
+        self.rom_cache = rom_cache
 
         self._setup_ui()
 

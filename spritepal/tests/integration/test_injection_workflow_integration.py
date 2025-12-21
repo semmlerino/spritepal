@@ -262,7 +262,7 @@ class TestInjectionParameters:
 
     def test_validate_complete_params(self, injection_manager, test_rom_file, test_vram_file, test_sprite_png):
         """Test validation of complete injection parameters for VRAM mode."""
-        from core.managers.exceptions import ValidationError
+        from core.exceptions import ValidationError
 
         params = {
             "mode": "vram",
@@ -281,7 +281,7 @@ class TestInjectionParameters:
 
     def test_validate_missing_params(self, injection_manager):
         """Test validation with missing parameters."""
-        from core.managers.exceptions import ValidationError
+        from core.exceptions import ValidationError
 
         params = {}
 
@@ -291,7 +291,7 @@ class TestInjectionParameters:
 
     def test_validate_invalid_paths(self, injection_manager, tmp_path):
         """Test validation with invalid file paths."""
-        from core.managers.exceptions import ValidationError
+        from core.exceptions import ValidationError
 
         params = {
             "mode": "vram",
@@ -421,7 +421,7 @@ class TestInjectionWorkflowEndToEnd:
         test_sprite_png
     ):
         """Test complete preparation for injection (without actual injection)."""
-        from core.managers.exceptions import ValidationError
+        from core.exceptions import ValidationError
 
         # 1. Load ROM info
         rom_info = injection_manager.load_rom_info(str(test_rom_file))

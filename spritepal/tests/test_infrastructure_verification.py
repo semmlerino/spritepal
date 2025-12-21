@@ -4,6 +4,14 @@ Run this to verify all fixes are properly applied.
 """
 import pytest
 
+from core.di_container import inject
+from core.protocols.manager_protocols import ExtractionManagerProtocol
+
+
+def get_extraction_manager():
+    """Get extraction manager via DI."""
+    return inject(ExtractionManagerProtocol)
+
 # Serial execution required: QApplication management, HAL process pool
 pytestmark = [
     pytest.mark.performance,
@@ -53,7 +61,7 @@ class TestInfrastructureVerification:
         for i in range(3):
             start = time.time()
             # Access manager (should be fast with session fixture)
-            session_managers.get_extraction_manager()
+            get_extraction_manager()
             elapsed = time.time() - start
             times.append(elapsed)
 

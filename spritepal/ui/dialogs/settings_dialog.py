@@ -41,9 +41,9 @@ class SettingsDialog(BaseDialog):
     settings_changed = Signal()
     cache_cleared = Signal()
 
-    def __init__(self, parent: Any | None = None,
-                 settings_manager: SettingsManagerProtocol | None = None,
-                 rom_cache: ROMCacheProtocol | None = None):
+    def __init__(self, parent: Any | None = None, *,
+                 settings_manager: SettingsManagerProtocol,
+                 rom_cache: ROMCacheProtocol):
         # Store original settings to detect changes
         self._original_settings: dict[str, Any] = {}
 
@@ -57,20 +57,9 @@ class SettingsDialog(BaseDialog):
             with_button_box=True,
         )
 
-        # Inject dependencies or use fallback
-        if settings_manager is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            self.settings_manager = inject(SettingsManagerProtocol)
-        else:
-            self.settings_manager = settings_manager
-
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self.rom_cache = inject(ROMCacheProtocol)
-        else:
-            self.rom_cache = rom_cache
+        # Assign dependencies
+        self.settings_manager = settings_manager
+        self.rom_cache = rom_cache
 
         self._load_original_settings()
 

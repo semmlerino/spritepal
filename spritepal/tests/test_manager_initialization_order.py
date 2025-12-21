@@ -149,7 +149,7 @@ class TestInitializationErrorException:
 
     def test_initialization_error_is_manager_error(self) -> None:
         """InitializationError inherits from ManagerError."""
-        from core.managers.exceptions import ManagerError
+        from core.exceptions import ManagerError
 
         assert issubclass(InitializationError, ManagerError)
 

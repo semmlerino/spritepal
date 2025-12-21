@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QObject, QThread, Signal
 
 from ui.common import WorkerManager
+from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
 from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoaderWorker
-from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -162,6 +162,9 @@ class ROMWorkerOrchestrator(QObject):
 
     def start_scan(self, rom_path: str, step: int = 0x1000) -> None:
         """Start sprite scanning on the ROM."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+
         if self._is_scanning:
             logger.warning("Scan already in progress")
             return
@@ -170,7 +173,7 @@ class ROMWorkerOrchestrator(QObject):
         self._found_sprites = []
         self._is_scanning = True
 
-        self._scan_worker = SpriteScanWorker(rom_path, step=step)
+        self._scan_worker = SpriteScanWorker(rom_path, step=step, rom_cache=inject(ROMCacheProtocol))
         self._scan_thread = QThread()
         self._scan_worker.moveToThread(self._scan_thread)
 

@@ -28,7 +28,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from core.managers.exceptions import ValidationError
+from core.exceptions import ValidationError
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.data_repository import (

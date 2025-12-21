@@ -7,13 +7,12 @@ to the ExtractionManager while providing consistent threading interfaces.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.managers.factory import ManagerFactory
 
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.types import ROMExtractionParams, VRAMExtractionParams
@@ -184,7 +183,7 @@ class WorkerOwnedVRAMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMi
     def __init__(
         self,
         params: VRAMExtractionParams,
-        manager_factory: ManagerFactory | None = None,
+        manager_factory: Any | None = None,
         parent: QObject | None = None
     ) -> None:
         # Create manager using standardized worker-owned pattern
@@ -271,7 +270,7 @@ class WorkerOwnedROMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMix
     def __init__(
         self,
         params: ROMExtractionParams,
-        manager_factory: ManagerFactory | None = None,
+        manager_factory: Any | None = None,
         parent: QObject | None = None
     ) -> None:
         # Create manager using standardized worker-owned pattern

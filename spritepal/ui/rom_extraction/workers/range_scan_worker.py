@@ -49,8 +49,8 @@ class RangeScanWorker(BaseWorker):
     """Emitted when cache progress is saved. Args: current_offset, sprites_found, progress_percent."""
 
     def __init__(self, rom_path: str, start_offset: int, end_offset: int,
-                 step_size: int, extractor: ROMExtractor, parent: QObject | None = None,
-                 rom_cache: ROMCacheProtocol | None = None):
+                 step_size: int, extractor: ROMExtractor, parent: QObject | None = None, *,
+                 rom_cache: ROMCacheProtocol):
         """
         Initialize range scan worker
 
@@ -79,12 +79,7 @@ class RangeScanWorker(BaseWorker):
         self._should_stop = False
 
         # Cache integration
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self.rom_cache = inject(ROMCacheProtocol)
-        else:
-            self.rom_cache = rom_cache
+        self.rom_cache = rom_cache
 
         self.found_sprites: list[dict[str, Any]] = []
         self.current_offset = start_offset

@@ -19,6 +19,15 @@ from typing import TYPE_CHECKING
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from core.di_container import inject
+from core.protocols.manager_protocols import InjectionManagerProtocol
+
+
+def get_injection_manager():
+    """Get injection manager via DI."""
+    return inject(InjectionManagerProtocol)
+
+
 if TYPE_CHECKING:
     from tests.infrastructure.test_protocols import MockQtBotProtocol
 
@@ -33,9 +42,14 @@ class TestRealDialogInitialization:
 
         Requires isolated_managers because SettingsDialog uses DI.
         """
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
         from ui.dialogs.settings_dialog import SettingsDialog
 
-        dialog = SettingsDialog()
+        dialog = SettingsDialog(
+            settings_manager=inject(SettingsManagerProtocol),
+            rom_cache=inject(ROMCacheProtocol)
+        )
         qtbot.addWidget(dialog)
 
         # Verify real Qt widgets exist
@@ -155,9 +169,14 @@ class TestRealDialogLifecycle:
 
         Requires isolated_managers because SettingsDialog uses DI.
         """
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
         from ui.dialogs.settings_dialog import SettingsDialog
 
-        dialog = SettingsDialog()
+        dialog = SettingsDialog(
+            settings_manager=inject(SettingsManagerProtocol),
+            rom_cache=inject(ROMCacheProtocol)
+        )
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
         from PySide6.QtCore import Qt
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
@@ -209,7 +228,7 @@ class TestRealDialogWithManagers:
 
         from ui.injection_dialog import InjectionDialog
 
-        dialog = InjectionDialog(injection_manager=isolated_managers.get_injection_manager())
+        dialog = InjectionDialog(injection_manager=get_injection_manager())
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         qtbot.addWidget(dialog)

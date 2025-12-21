@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 if TYPE_CHECKING:
     from PIL import Image
 
-    from core.managers.factory import ManagerFactory
     from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 from PySide6.QtCore import QObject, Signal
@@ -198,29 +197,28 @@ class WorkerOwnedManagerMixin:
 
     @staticmethod
     def create_worker_owned_manager(
-        manager_factory: ManagerFactory | None,
-        manager_creator_func: Callable[[ManagerFactory, QObject | None], BaseManager],
+        manager_factory: Any | None,
+        manager_creator_func: Callable[[Any, QObject | None], BaseManager],
         parent: QObject | None = None
     ) -> BaseManager:
         """
-        Create a manager using the worker-owned pattern.
+        Create a manager using DI injection.
+
+        Note: The factory pattern is deprecated. This now uses DI to get
+        the singleton CoreOperationsManager instance.
 
         Args:
-            manager_factory: Manager factory or None to create default
-            manager_creator_func: Function to create manager from factory (takes factory and parent)
-            parent: Initial parent (will be changed to worker later)
+            manager_factory: Deprecated, ignored if provided
+            manager_creator_func: Deprecated, ignored
+            parent: Ignored (singleton manager has its own parent)
 
         Returns:
-            Created manager instance
+            CoreOperationsManager instance from DI
         """
-        # Create manager factory if none provided
-        if manager_factory is None:
-            # Delayed import to avoid circular dependency in worker initialization
-            from core.managers.factory import StandardManagerFactory
-            manager_factory = StandardManagerFactory(default_parent_strategy="none")
-
-        # Create the manager (parent will be set after super init)
-        return manager_creator_func(manager_factory, parent)
+        # Use DI to get the singleton manager
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ExtractionManagerProtocol
+        return inject(ExtractionManagerProtocol)  # type: ignore[return-value]
 
     def setup_worker_owned_manager(self, manager: BaseManager) -> None:
         """

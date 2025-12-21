@@ -254,7 +254,6 @@ SpritePal uses multiple singleton patterns for resource management:
 | `DIContainer` | `core/di_container.py` | Protocol bindings | No | `reset_container()` |
 | `HALProcessPool` | `core/hal_compression.py` | Compression workers | Yes (Lock) | `shutdown()` |
 | `PreviewGenerator` | `core/services/preview_generator.py` | Thumbnail generation | Yes (QMutex) | `cleanup()` |
-| `ManagerFactory` | `core/managers/factory.py` | Manager creation | Yes (Lock) | N/A |
 
 ### Cleanup Order
 
@@ -432,9 +431,9 @@ All protocols are defined in `core/protocols/manager_protocols.py`:
 ### What NOT to Do
 
 ```python
-# DEPRECATED - don't use in new code
-from core.managers.registry import ManagerRegistry
-manager = ManagerRegistry().get_extraction_manager()
+# REMOVED - these methods no longer exist
+# from core.managers.registry import ManagerRegistry
+# manager = ManagerRegistry().get_extraction_manager()  # Method removed
 
 # CORRECT - use inject()
 from core.di_container import inject

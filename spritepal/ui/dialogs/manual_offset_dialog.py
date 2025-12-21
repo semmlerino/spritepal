@@ -317,7 +317,10 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # Status panel - expanded by default for better visibility
         self.status_collapsible = CollapsibleGroupBox("Status", collapsed=False)
-        self.status_panel = StatusPanel()
+        self.status_panel = StatusPanel(
+            settings_manager=self.settings_manager,
+            rom_cache=self.rom_cache
+        )
         self.status_collapsible.add_widget(self.status_panel)
 
         # Add context menu for cache management
@@ -883,7 +886,7 @@ class UnifiedManualOffsetDialog(DialogBase):
         self._scan_progress_dialog.show()
 
         # Create and start worker
-        self._sprite_scan_worker = SpriteScanWorker(self.rom_path, step=0x1000)
+        self._sprite_scan_worker = SpriteScanWorker(self.rom_path, step=0x1000, rom_cache=self.rom_cache)
         self._sprite_scan_worker.scan_progress.connect(self._on_sprite_scan_progress)
         self._sprite_scan_worker.sprites_found.connect(self._on_sprite_scan_complete)
         self._sprite_scan_worker.error.connect(self._on_sprite_scan_error)

@@ -27,7 +27,7 @@ from PySide6.QtCore import Signal
 from utils.file_validator import atomic_write
 
 from .base_manager import BaseManager
-from .exceptions import SessionError, ValidationError
+from core.exceptions import SessionError, ValidationError
 
 T = TypeVar("T")
 

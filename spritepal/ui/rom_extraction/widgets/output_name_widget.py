@@ -4,19 +4,15 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QVBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit
+
+from ui.common.spacing_constants import (
+    CONTROL_PANEL_LABEL_WIDTH,
+    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
+)
 
 from .base_widget import BaseExtractionWidget
 
-# UI Spacing Constants (matching main panel)
-SPACING_SMALL = 6
-SPACING_MEDIUM = 10
-SPACING_LARGE = 16
-SPACING_XLARGE = 20
-BUTTON_MIN_HEIGHT = 32
-COMBO_MIN_WIDTH = 200
-BUTTON_MAX_WIDTH = 150
-LABEL_MIN_WIDTH = 120
 
 class OutputNameWidget(BaseExtractionWidget):
     """Widget for managing output file naming"""
@@ -32,10 +28,10 @@ class OutputNameWidget(BaseExtractionWidget):
         """Initialize the user interface"""
         output_layout = QHBoxLayout()
         output_layout.setSpacing(SPACING_MEDIUM)
-        output_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
+        output_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
 
         name_label = QLabel("Name:")
-        name_label.setMinimumWidth(60)
+        name_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
         name_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         output_layout.addWidget(name_label)
 
