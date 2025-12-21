@@ -295,9 +295,8 @@ User modifies sprite
 ```
 
 **Key files:**
-- `core/managers/injection_manager.py` - Injection coordination
-- `ui/workers/injection_worker.py` - Background injection thread
-- `ui/workers/rom_injection_worker.py` - ROM-specific injection
+- `core/managers/core_operations_manager.py` - Injection coordination
+- `core/workers/injection.py` - Background injection workers (VRAMInjectionWorker, ROMInjectionWorker)
 
 ---
 

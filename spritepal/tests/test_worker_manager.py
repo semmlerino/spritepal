@@ -159,7 +159,7 @@ class TestWorkerManagerReal:
         qtbot.waitUntil(worker.isRunning, timeout=TEST_TIMEOUT_MEDIUM)
 
         # Cleanup with sufficient timeout should succeed
-        WorkerManager.cleanup_worker(worker, timeout=500, enable_force_cleanup=False)
+        WorkerManager.cleanup_worker(worker, timeout=500)
 
         # Worker should eventually stop
         assert not worker.isRunning()

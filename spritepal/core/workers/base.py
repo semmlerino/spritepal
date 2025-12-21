@@ -64,7 +64,7 @@ def handle_worker_errors(
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Extract self from args for proper BaseWorker access
-            self: BaseWorker = args[0]  # type: ignore[assignment]
+            self: BaseWorker = args[0]  # type: ignore[assignment] - ParamSpec args[0] is the decorated method's self
             try:
                 return func(*args, **kwargs)
 

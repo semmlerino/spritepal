@@ -253,7 +253,7 @@ class CoreOperationsManager(BaseManager):
         """Get session manager via dependency injection container."""
         from core.di_container import inject
         from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-        return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value]
+        return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value] - DI returns protocol, caller expects concrete
 
     def _raise_extraction_failed(self, message: str) -> None:
         """Helper method to raise ExtractionError (for TRY301 compliance)."""
@@ -847,18 +847,19 @@ class CoreOperationsManager(BaseManager):
             return
 
         worker = self._current_worker
+        # Signal attributes checked via hasattr but not visible to static analysis (BaseWorker defines these)
         if hasattr(worker, "progress"):
-            worker.progress.connect(self._on_worker_progress_adapter)  # type: ignore[attr-defined]
+            worker.progress.connect(self._on_worker_progress_adapter)  # type: ignore[attr-defined] - Signal from BaseWorker
         if hasattr(worker, "injection_finished"):
-            worker.injection_finished.connect(self._on_worker_finished)  # type: ignore[attr-defined]
+            worker.injection_finished.connect(self._on_worker_finished)  # type: ignore[attr-defined] - Signal from BaseWorker
         else:
             worker.finished.connect(lambda: self._on_worker_finished(True, "Completed"))
 
         # ROM-specific signals
         if hasattr(worker, "progress_percent"):
-            worker.progress_percent.connect(self.progress_percent.emit)  # type: ignore[attr-defined]
+            worker.progress_percent.connect(self.progress_percent.emit)  # type: ignore[attr-defined] - Signal from BaseWorker
         if hasattr(worker, "compression_info"):
-            worker.compression_info.connect(self.compression_info.emit)  # type: ignore[attr-defined]
+            worker.compression_info.connect(self.compression_info.emit)  # type: ignore[attr-defined] - Signal from BaseWorker
 
     @override
     def _on_worker_progress_adapter(self, *args: object) -> None:
@@ -1132,7 +1133,7 @@ class CoreOperationsManager(BaseManager):
                     for name, pointer in locations.items():
                         display_name = name.replace("_", " ").title()
                         # Pointer objects have .offset attribute (from ROM analysis)
-                        sprite_dict[display_name] = cast(object, pointer).offset  # type: ignore[attr-defined]
+                        sprite_dict[display_name] = cast(object, pointer).offset  # type: ignore[attr-defined] - SpritePointer has offset attr
                     result["sprite_locations"] = sprite_dict
 
                     self._logger.info(f"Found {len(sprite_dict)} sprite locations")

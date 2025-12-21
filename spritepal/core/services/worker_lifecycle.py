@@ -70,7 +70,6 @@ class WorkerManager:
     def cleanup_worker(
         worker: QThread | None,
         timeout: int = DEFAULT_CLEANUP_TIMEOUT,
-        enable_force_cleanup: bool = False
     ) -> None:
         """
         Safely clean up a worker thread without using dangerous terminate().
@@ -85,12 +84,6 @@ class WorkerManager:
             worker: The worker thread to clean up (can be None)
             timeout: Milliseconds to wait for graceful shutdown (default: 1000ms).
                     Use QUICK_CLEANUP_TIMEOUT (100ms) for shutdown scenarios.
-            enable_force_cleanup: DEPRECATED - kept for backwards compatibility.
-                                 This parameter is ignored as terminate() is never used.
-
-        Note:
-            The enable_force_cleanup parameter is deprecated and ignored.
-            This method will never use terminate() regardless of this setting.
         """
         if worker is None:
             return
@@ -122,7 +115,7 @@ class WorkerManager:
         if hasattr(worker, "cancel") and callable(getattr(worker, "cancel", None)):
             logger.debug(f"{worker_name}: Requesting cancellation via cancel()")
             try:
-                worker.cancel()  # type: ignore[attr-defined]
+                worker.cancel()  # type: ignore[attr-defined] - BaseWorker has cancel(), QThread doesn't
             except Exception as e:
                 logger.warning(f"{worker_name}: Error calling cancel(): {e}")
 
@@ -255,7 +248,7 @@ class WorkerManager:
         if hasattr(worker, "cancel") and callable(getattr(worker, "cancel", None)):
             logger.debug(f"{worker_name}: Calling cancel()")
             try:
-                worker.cancel()  # type: ignore[attr-defined]
+                worker.cancel()  # type: ignore[attr-defined] - BaseWorker has cancel(), QThread doesn't
             except Exception as e:
                 logger.warning(f"{worker_name}: Error during cancel(): {e}")
 

@@ -224,7 +224,7 @@ class WorkerOwnedManagerMixin:
         # Use DI to get the singleton manager
         from core.di_container import inject
         from core.protocols.manager_protocols import ExtractionManagerProtocol
-        return inject(ExtractionManagerProtocol)  # type: ignore[return-value]
+        return inject(ExtractionManagerProtocol)  # type: ignore[return-value] - DI returns protocol, caller expects concrete
 
     def setup_worker_owned_manager(self, manager: BaseManager) -> None:
         """

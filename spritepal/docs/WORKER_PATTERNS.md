@@ -231,7 +231,6 @@ The following production workers still use the deprecated `QThread` inheritance 
 
 | File | Class | Priority | Notes |
 |------|-------|----------|-------|
-| `core/workers/rom_injection_worker.py` | `ROMInjectionWorker` | Medium | Used by CoreOperationsManager |
 | `ui/rom_extraction/workers/search_worker.py` | `SpriteSearchWorker` | Low | Used by ROMExtractionPanel |
 | `ui/dialogs/advanced_search_dialog.py` | `SearchWorker` | Low | Dialog-local worker |
 | `ui/common/simple_preview_coordinator.py` | `SimplePreviewWorker` | Low | Preview generation |

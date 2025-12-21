@@ -190,7 +190,7 @@ class WorkerOwnedVRAMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMi
         # Cast factory to Any for .create_extraction_manager() access
         manager = self.create_worker_owned_manager(
             manager_factory,
-            lambda factory, parent: factory.create_extraction_manager(parent=parent),  # type: ignore[attr-defined]
+            lambda factory, parent: factory.create_extraction_manager(parent=parent),  # type: ignore[attr-defined] - Factory method accessed dynamically
             parent
         )
 
@@ -278,7 +278,7 @@ class WorkerOwnedROMExtractionWorker(ExtractionWorkerBase, WorkerOwnedManagerMix
         # Cast factory to Any for .create_extraction_manager() access
         manager = self.create_worker_owned_manager(
             manager_factory,
-            lambda factory, parent: factory.create_extraction_manager(parent=parent),  # type: ignore[attr-defined]
+            lambda factory, parent: factory.create_extraction_manager(parent=parent),  # type: ignore[attr-defined] - Factory method accessed dynamically
             parent
         )
 

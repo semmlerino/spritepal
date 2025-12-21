@@ -85,7 +85,7 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
         is_selected = index.data(SpriteGalleryModel.SelectedRole)
 
         # Calculate rectangles
-        item_rect = option.rect  # type: ignore[attr-defined]
+        item_rect = option.rect  # type: ignore[attr-defined] - PySide6 QStyleOption stubs incomplete
         thumbnail_rect = QRect(
             item_rect.x() + self._spacing,
             item_rect.y() + self._spacing,
@@ -100,7 +100,7 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
         )
 
         # Determine colors based on state
-        is_hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)  # type: ignore[attr-defined]
+        is_hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)  # type: ignore[attr-defined] - PySide6 QStyleOption stubs incomplete
 
         if is_selected:
             bg_color = self._bg_selected_color

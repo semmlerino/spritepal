@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout, QWidget
 
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
@@ -34,7 +34,7 @@ class ROMFileWidget(BaseExtractionWidget):
     cache_status_changed = Signal(dict)  # Emitted when cache status changes
     partial_scan_detected = Signal(dict)  # Emitted when partial scan cache found
 
-    def __init__(self, parent: Any | None = None, *, rom_cache: ROMCacheProtocol) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
+    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCacheProtocol) -> None:
         super().__init__(parent)
         self._rom_path = ""
         self._cache_status = {"has_cache": False, "cache_type": None}

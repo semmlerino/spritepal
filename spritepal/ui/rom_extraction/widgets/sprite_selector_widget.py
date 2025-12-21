@@ -4,7 +4,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
@@ -25,7 +25,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
     sprite_changed = Signal(int)  # Emitted when sprite selection changes
     find_sprites_clicked = Signal()  # Emitted when find sprites button clicked
 
-    def __init__(self, parent: Any | None = None):  # pyright: ignore[reportExplicitAny] - Qt parent type
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._setup_ui()
 

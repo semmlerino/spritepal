@@ -574,7 +574,7 @@ class ROMCache:
                     # This is a SpritePointer object - capture all fields
                     # Safe to access attributes after hasattr check
                     serializable_locations[name] = {
-                        "offset": cast(object, location).offset,  # type: ignore[attr-defined]
+                        "offset": cast(object, location).offset,  # type: ignore[attr-defined] - SpritePointer has offset attr
                         "bank": getattr(location, "bank", 0),
                         "address": getattr(location, "address", 0),
                         "compressed_size": getattr(location, "compressed_size", None),

@@ -1367,7 +1367,7 @@ class SpritePreviewWidget(QWidget):
             logger.debug(f"[DEBUG_SPRITE] Current thread: {QThread.currentThread()}")
             logger.debug(f"[DEBUG_SPRITE] Label thread: {self.preview_label.thread()}")
         parent = self.parent()
-        parent_visible = parent.isVisible() if parent and hasattr(parent, 'isVisible') else 'N/A'  # type: ignore[attr-defined]
+        parent_visible = parent.isVisible() if isinstance(parent, QWidget) else 'N/A'
         logger.debug(f"[SPRITE_DISPLAY] Widget hierarchy visibility: widget={self.isVisible()}, parent={parent_visible}")
 
         # Apply the standard guarantee method
@@ -1386,11 +1386,11 @@ class SpritePreviewWidget(QWidget):
         while parent:
             parent_info = {
                 'class': parent.__class__.__name__,
-                'visible': parent.isVisible() if hasattr(parent, 'isVisible') else 'N/A',  # type: ignore[attr-defined]
-                'enabled': parent.isEnabled() if hasattr(parent, 'isEnabled') else 'N/A'  # type: ignore[attr-defined]
+                'visible': parent.isVisible() if isinstance(parent, QWidget) else 'N/A',
+                'enabled': parent.isEnabled() if isinstance(parent, QWidget) else 'N/A'
             }
             parent_chain.append(parent_info)
-            if hasattr(parent, 'isVisible') and not parent.isVisible():  # type: ignore[attr-defined]
+            if isinstance(parent, QWidget) and not parent.isVisible():
                 logger.warning(f"[DEBUG_SPRITE] Parent widget not visible: {parent.__class__.__name__}")
             parent = parent.parent() if hasattr(parent, 'parent') else None
 
@@ -1475,8 +1475,8 @@ class SpritePreviewWidget(QWidget):
         level = 1
         while parent and level < 10:  # Limit depth to prevent infinite loops
             report.append(f"  {'  ' * level}Parent {level}: {parent.__class__.__name__}")
-            if hasattr(parent, 'isVisible'):
-                report.append(f"  {'  ' * level}  - visible: {parent.isVisible()}")  # type: ignore[attr-defined]
+            if isinstance(parent, QWidget):
+                report.append(f"  {'  ' * level}  - visible: {parent.isVisible()}")
             parent = parent.parent() if hasattr(parent, 'parent') else None
             level += 1
 

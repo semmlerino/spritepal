@@ -85,7 +85,7 @@ class DropZone(QWidget):
     def __init__(
         self,
         file_type: str,
-        parent: Any | None = None,  # pyright: ignore[reportExplicitAny] - Qt parent type
+        parent: QWidget | None = None,
         settings_manager: SettingsManagerProtocol | None = None,
         required: bool = True,
     ) -> None:
@@ -327,7 +327,7 @@ class ExtractionPanel(QGroupBox):
     offset_changed = Signal(int)  # Emitted when VRAM offset changes
     mode_changed = Signal(int)  # Emitted when extraction mode changes
 
-    def __init__(self, settings_manager: SettingsManagerProtocol, parent: Any | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
+    def __init__(self, settings_manager: SettingsManagerProtocol, parent: QWidget | None = None) -> None:
         super().__init__("Input Files", parent)
         # Timer for debouncing offset changes
         self._offset_timer = QTimer(self)  # Parent this timer to prevent crashes

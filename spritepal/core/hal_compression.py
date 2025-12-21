@@ -414,8 +414,8 @@ class HALProcessPool:
 
                 # Create multiprocessing manager for queues
                 self._manager = mp.Manager()
-                self._request_queue = self._manager.Queue()  # type: ignore[assignment]
-                self._result_queue = self._manager.Queue()  # type: ignore[assignment]
+                self._request_queue = self._manager.Queue()  # type: ignore[assignment] - Manager.Queue() returns untyped proxy
+                self._result_queue = self._manager.Queue()  # type: ignore[assignment] - Manager.Queue() returns untyped proxy
 
                 # Start worker processes (daemon=False to prevent zombie processes)
                 logger.info(f"Starting HAL process pool with {pool_size} workers")

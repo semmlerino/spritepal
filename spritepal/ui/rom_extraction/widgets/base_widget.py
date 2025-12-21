@@ -1,8 +1,6 @@
 """Base widget class for ROM extraction widgets"""
 from __future__ import annotations
 
-from typing import Any
-
 from PySide6.QtWidgets import QGroupBox, QLayout, QSizePolicy, QVBoxLayout, QWidget
 
 from ui.common.collapsible_group_box import CollapsibleGroupBox
@@ -23,7 +21,7 @@ class BaseExtractionWidget(QWidget):
         self._setup_widget_with_group("Group Title", inner_layout)
     """
 
-    def __init__(self, parent: Any | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
     def _setup_widget_with_group(self, title: str, inner_layout: QLayout) -> None:

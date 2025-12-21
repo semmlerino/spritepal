@@ -1544,7 +1544,7 @@ Cache Misses: {session_stats['misses']}"""
                 # Note: Qt geometry methods always return int, but this guards against test mocks
                 values = [available_x, available_y, available_width, available_height,
                           dialog_width, dialog_height]
-                if not all(isinstance(v, (int, float)) for v in values):  # type: ignore[reportUnnecessaryIsInstance]
+                if not all(isinstance(v, (int, float)) for v in values):  # pyright: ignore[reportUnnecessaryIsInstance] - guards against test mocks returning non-int
                     # Skip validation if any values are not numeric (likely mocks)
                     return
 

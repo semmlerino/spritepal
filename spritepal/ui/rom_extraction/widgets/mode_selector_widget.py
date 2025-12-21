@@ -1,9 +1,7 @@
 """Mode selector widget for ROM extraction"""
 
-from typing import Any
-
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
@@ -21,7 +19,7 @@ class ModeSelectorWidget(BaseExtractionWidget):
     # Signals
     mode_changed = Signal(int)  # Emitted when mode changes
 
-    def __init__(self, parent: Any | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._setup_ui()
 

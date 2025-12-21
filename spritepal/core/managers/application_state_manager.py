@@ -16,12 +16,15 @@ from datetime import UTC, datetime
 # Enum import no longer needed - ExtractionState imported from workflow_manager
 from pathlib import Path
 from types import MappingProxyType
-from typing import ClassVar, TypedDict, TypeVar, cast, override
+from typing import TYPE_CHECKING, ClassVar, TypedDict, TypeVar, cast, override
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
 
 from core.exceptions import SessionError, ValidationError
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ConfigurationServiceProtocol
 from utils.file_validator import atomic_write
 from utils.state_manager import StateEntry, StateSnapshot
 
@@ -148,7 +151,7 @@ class ApplicationStateManager(BaseManager):
 
     def __init__(self, app_name: str = "SpritePal", settings_path: Path | None = None,
                  parent: QObject | None = None,
-                 configuration_service: object = None) -> None:
+                 configuration_service: ConfigurationServiceProtocol | None = None) -> None:
         """
         Initialize application state manager.
 
@@ -180,7 +183,9 @@ class ApplicationStateManager(BaseManager):
                     from core.configuration_service import get_configuration_service
                     config = get_configuration_service()
 
-            self._settings_file = cast(Path, config.settings_file)  # type: ignore[reportAttributeAccessIssue]
+            # At this point config is guaranteed to be set (fallback always provides one)
+            assert config is not None, "ConfigurationService should always be available"
+            self._settings_file = config.settings_file
 
         # Persistent settings (saved to disk) - JSON-serializable values
         self._settings: dict[str, dict[str, object]] = {}
