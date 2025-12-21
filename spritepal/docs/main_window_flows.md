@@ -270,5 +270,9 @@ print(f"Extracted files: {self._extracted_files}")
 ## See Also
 
 - [architecture.md](architecture.md) - Layer structure
-- [dependency_injection_guide.md](dependency_injection_guide.md) - How managers are obtained
+- [configuration_guide.md](configuration_guide.md) - Settings and configuration
 - [dialog_development_guide.md](dialog_development_guide.md) - Dialog patterns
+
+---
+
+*Last updated: December 21, 2025*

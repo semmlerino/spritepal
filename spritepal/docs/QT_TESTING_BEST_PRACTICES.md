@@ -634,3 +634,7 @@ class TestMyComponent:
 Effective Qt testing requires understanding the framework's unique characteristics. By following these patterns and avoiding common pitfalls, you can create a robust, maintainable test suite that actually validates your application's behavior rather than just achieving coverage metrics.
 
 Remember: **Real components with mocked dependencies** provide the optimal balance between test isolation and realistic behavior validation.
+
+---
+
+*Last updated: December 21, 2025*

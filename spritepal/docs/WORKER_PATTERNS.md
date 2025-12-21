@@ -240,4 +240,4 @@ The following production workers still use the deprecated `QThread` inheritance 
 
 ---
 
-*Last updated: December 15, 2025*
+*Last updated: December 21, 2025*

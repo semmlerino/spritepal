@@ -222,3 +222,7 @@ class FixedSingleton(BaseDialog):
 ## Summary
 
 The key insight is that Qt's parent-child lifecycle is strict: when a parent dies, all children die. Singleton dialogs must be parentless to survive. Always test the full lifecycle with real Qt widgets to catch these issues early.
+
+---
+
+*Last updated: December 21, 2025*

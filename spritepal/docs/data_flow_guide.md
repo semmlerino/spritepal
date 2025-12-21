@@ -380,4 +380,4 @@ ManagerRegistry.initialize_managers()
 
 ---
 
-*Last updated: December 2024*
+*Last updated: December 21, 2025*

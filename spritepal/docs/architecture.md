@@ -41,9 +41,12 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
    - Purpose: Stateless operations, data transformations
    - Files:
      - `image_utils.py` - Image format conversions
-     - `preview_generator.py` - Thumbnail/preview generation
+     - `preview_generator.py` - Thumbnail/preview generation (singleton)
      - `rom_service.py` - ROM file operations
+     - `rom_cache.py` - ROM file caching with async support
      - `vram_service.py` - VRAM extraction operations
+     - `settings_manager.py` - Settings persistence
+     - `signal_registry.py` - Signal management for cross-component communication
      - `worker_lifecycle.py` - Background worker management
 
 4. **Core Layer (`core/`)**
@@ -519,3 +522,7 @@ The adapter pattern allows:
 - **Single source of truth**: All business logic lives in consolidated managers
 - **Gradual migration**: New code can use consolidated managers directly if needed
 - **Reduced duplication**: Services are created once, not per-adapter
+
+---
+
+*Last updated: December 21, 2025*

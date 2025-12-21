@@ -27,9 +27,9 @@ This is the central entry point for all SpritePal documentation. Start here to f
 | Document | Purpose |
 |----------|---------|
 | [tests/README.md](../tests/README.md) | Test suite overview, **fixture quick reference** |
-| [UNIFIED_TESTING_GUIDE_DO_NOT_DELETE.md](../UNIFIED_TESTING_GUIDE_DO_NOT_DELETE.md) | Comprehensive testing patterns |
-| [TESTING_DEBUG_GUIDE_DO_NOT_DELETE.md](../TESTING_DEBUG_GUIDE_DO_NOT_DELETE.md) | Debugging test failures |
+| [testing_guide.md](testing_guide.md) | Comprehensive testing patterns (Qt, threading, mocking) |
 | [QT_TESTING_BEST_PRACTICES.md](QT_TESTING_BEST_PRACTICES.md) | pytest-qt specific patterns |
+| [WORKER_PATTERNS.md](WORKER_PATTERNS.md) | Background worker patterns and lifecycle |
 
 ## Domain Knowledge
 
@@ -56,13 +56,24 @@ This is the central entry point for all SpritePal documentation. Start here to f
 
 # Lint
 uv run ruff check .
+uv run ruff check . --fix  # Auto-fix
 
 # Type check
 uv run basedpyright core ui utils
 
-# Run tests (headless)
-QT_QPA_PLATFORM=offscreen uv run pytest tests --maxfail=1 --tb=short
+# Run tests (QT_QPA_PLATFORM=offscreen is set automatically by conftest.py)
+uv run pytest
 
-# Run specific test
-QT_QPA_PLATFORM=offscreen uv run pytest tests/path/test_file.py::test_name -vv
+# Quick triage for large test suite
+uv run pytest --tb=no -q
+
+# Re-run failures with details
+uv run pytest --lf -vv --tb=short
+
+# Run specific test (serial, verbose)
+uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 ```
+
+---
+
+*Last updated: December 21, 2025*
