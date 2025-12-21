@@ -3,13 +3,13 @@ Simplified helper for testing MainWindow functionality without creating Qt widge
 """
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
 from PySide6.QtCore import QObject, Signal
+
+from tests.fixtures.helper_base import SignalTrackingMixin, TempDirectoryMixin
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -17,7 +17,7 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
-class MainWindowHelperSimple(QObject):
+class MainWindowHelperSimple(QObject, SignalTrackingMixin, TempDirectoryMixin):
     """Simplified helper for MainWindow testing without real Qt widgets"""
 
     # Define signals that MainWindow has
@@ -30,8 +30,7 @@ class MainWindowHelperSimple(QObject):
     def __init__(self, temp_dir: str | None = None):
         """Initialize helper with optional temporary directory"""
         super().__init__()
-        self.temp_dir = temp_dir or tempfile.mkdtemp()
-        self.temp_path = Path(self.temp_dir)
+        self._init_temp_dir(temp_dir)
 
         # Track state without creating Qt widgets
         self._extracted_files: list[str] = []
@@ -303,23 +302,9 @@ class MainWindowHelperSimple(QObject):
         """Simulate user requesting grid arrangement"""
         self.arrange_grid_requested.emit(sprite_path)
 
-    def clear_signal_tracking(self):
-        """Clear signal emission tracking"""
-        for key in self.signal_emissions:
-            self.signal_emissions[key].clear()
-
-    def get_signal_emissions(self) -> dict[str, list[Any]]:
-        """Get copy of signal emissions for testing"""
-        return {key: value.copy() for key, value in self.signal_emissions.items()}
-
     def cleanup(self):
         """Cleanup helper resources"""
-        # Cleanup temp files
-        import shutil
-        try:
-            shutil.rmtree(self.temp_dir)
-        except Exception:
-            pass  # Best effort cleanup
+        self.cleanup_temp_dir()
 
     # Convenience methods for common test scenarios
     def create_vram_extraction_scenario(self) -> dict[str, Any]:

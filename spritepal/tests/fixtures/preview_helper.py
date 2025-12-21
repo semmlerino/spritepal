@@ -3,7 +3,6 @@ Helper for testing real preview functionality without extensive mocking
 """
 from __future__ import annotations
 
-import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -12,13 +11,14 @@ import pytest
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
+from tests.fixtures.helper_base import SignalTrackingMixin, TempDirectoryMixin
 from tests.fixtures.qt_fixtures import ensure_headless_qt
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 # Serial execution required: QApplication management
 pytestmark = [pytest.mark.headless]
 
-class ExtractionPanelHelper(QObject):
+class ExtractionPanelHelper(QObject, SignalTrackingMixin, TempDirectoryMixin):
     """Helper for real ExtractionPanel functionality without Qt widgets"""
 
     # Define real signals
@@ -27,9 +27,7 @@ class ExtractionPanelHelper(QObject):
     def __init__(self, vram_path: str, temp_dir: str | None = None):
         super().__init__()
         ensure_headless_qt()
-
-        self.temp_dir = temp_dir or tempfile.mkdtemp()
-        self.temp_path = Path(self.temp_dir)
+        self._init_temp_dir(temp_dir)
         self.vram_path = vram_path
 
         # State tracking
@@ -69,16 +67,7 @@ class ExtractionPanelHelper(QObject):
         """Simulate offset spinbox change"""
         self.set_vram_offset(offset)
 
-    def get_signal_emissions(self) -> dict[str, list[Any]]:
-        """Get copy of signal emissions for testing"""
-        return {key: value.copy() for key, value in self.signal_emissions.items()}
-
-    def clear_signal_tracking(self):
-        """Clear signal emission tracking"""
-        for key in self.signal_emissions:
-            self.signal_emissions[key].clear()
-
-class PreviewPanelHelper(QObject):
+class PreviewPanelHelper(QObject, SignalTrackingMixin, TempDirectoryMixin):
     """Helper for real PreviewPanel functionality without Qt widgets"""
 
     # Define real signals
@@ -88,9 +77,7 @@ class PreviewPanelHelper(QObject):
     def __init__(self, temp_dir: str | None = None):
         super().__init__()
         ensure_headless_qt()
-
-        self.temp_dir = temp_dir or tempfile.mkdtemp()
-        self.temp_path = Path(self.temp_dir)
+        self._init_temp_dir(temp_dir)
 
         # State tracking
         self._current_pixmap: QPixmap | ThreadSafeTestImage | None = None
@@ -255,14 +242,6 @@ class PreviewPanelHelper(QObject):
         if self._palette_mode:
             self.apply_current_palette()
 
-    def get_signal_emissions(self) -> dict[str, list[Any]]:
-        """Get copy of signal emissions for testing"""
-        return {key: value.copy() for key, value in self.signal_emissions.items()}
-
-    def clear_signal_tracking(self):
-        """Clear signal emission tracking"""
-        for key in self.signal_emissions:
-            self.signal_emissions[key].clear()
 
 class ControllerHelper(QObject):
     """Helper for real ExtractionController functionality"""
@@ -370,22 +349,3 @@ class StatusBarHelper:
     def currentMessage(self) -> str:
         """Get current status message"""
         return self._current_message
-
-# VRAM file creation functions - use TestDataFactory instead
-# These wrappers exist for backward compatibility
-def create_sample_vram_file(temp_dir: str, filename: str = "test_VRAM.dmp") -> str:
-    """Create sample VRAM file for testing. Uses TestDataFactory."""
-    from tests.fixtures.test_data_factory import TestDataFactory
-
-    vram_path = Path(temp_dir) / filename
-    TestDataFactory.create_vram_file(vram_path)
-    return str(vram_path)
-
-
-def create_large_vram_file(temp_dir: str, filename: str = "large_VRAM.dmp") -> str:
-    """Create large VRAM file for performance testing. Uses TestDataFactory."""
-    from tests.fixtures.test_data_factory import TestDataFactory
-
-    vram_path = Path(temp_dir) / filename
-    TestDataFactory.create_vram_file(vram_path, size=0x100000)  # 1MB
-    return str(vram_path)

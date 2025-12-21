@@ -24,16 +24,19 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
+
+# Shared fixture for all test classes (DRY consolidation)
+@pytest.fixture
+def injection_dialog(qtbot, isolated_managers):
+    """Create injection dialog for testing."""
+    injection_manager = inject(InjectionManagerProtocol)
+    dialog = InjectionDialog(injection_manager=injection_manager)
+    qtbot.addWidget(dialog)
+    return dialog
+
+
 class TestSignalLoopFixes:
     """Test signal loop protection in injection dialog"""
-
-    @pytest.fixture
-    def injection_dialog(self, qtbot, isolated_managers):
-        """Create injection dialog for testing"""
-        injection_manager = inject(InjectionManagerProtocol)
-        dialog = InjectionDialog(injection_manager=injection_manager)
-        qtbot.addWidget(dialog)
-        return dialog
 
     def test_sprite_location_change_blocks_signals(self, injection_dialog):
         """Test that changing sprite location blocks signals to prevent recursion"""
@@ -97,53 +100,35 @@ class TestSignalLoopFixes:
 class TestOffsetParsingFixes:
     """Test improved offset parsing with error handling"""
 
-    @pytest.fixture
-    def injection_dialog(self, qtbot, isolated_managers):
-        """Create injection dialog for testing"""
-        injection_manager = inject(InjectionManagerProtocol)
-        dialog = InjectionDialog(injection_manager=injection_manager)
-        qtbot.addWidget(dialog)
-        return dialog
+    @pytest.mark.parametrize("input_text,expected", [
+        ("0x8000", 0x8000),
+        ("0X8000", 0x8000),
+        ("8000", 0x8000),
+        ("0xABCD", 0xABCD),
+        ("abcd", 0xABCD),
+        ("0x0", 0x0),
+        ("FFFF", 0xFFFF),
+        (" 0x8000 ", 0x8000),  # With whitespace
+    ])
+    def test_parse_hex_offset_valid(self, injection_dialog, input_text, expected):
+        """Test parsing of valid hex offset format: {input_text}"""
+        result = injection_dialog.rom_offset_input._parse_hex_offset(input_text)
+        assert result == expected
 
-    def test_parse_hex_offset_valid_formats(self, injection_dialog):
-        """Test parsing of various valid hex offset formats"""
-        dialog = injection_dialog
-
-        # Test various valid formats
-        test_cases = [
-            ("0x8000", 0x8000),
-            ("0X8000", 0x8000),
-            ("8000", 0x8000),
-            ("0xABCD", 0xABCD),
-            ("abcd", 0xABCD),
-            ("0x0", 0x0),
-            ("FFFF", 0xFFFF),
-            (" 0x8000 ", 0x8000),  # With whitespace
-        ]
-
-        for input_text, expected in test_cases:
-            result = dialog.rom_offset_input._parse_hex_offset(input_text)
-            assert result == expected, f"Failed for input: '{input_text}'"
-
-    def test_parse_hex_offset_invalid_formats(self, injection_dialog):
-        """Test parsing of invalid hex offset formats"""
-        dialog = injection_dialog
-
-        # Test various invalid formats
-        invalid_inputs = [
-            "",
-            "   ",
-            "not_hex",
-            "0xGGGG",
-            "12345G",
-            "0x",
-            "x8000",
-            None,
-        ]
-
-        for invalid_input in invalid_inputs:
-            result = dialog.rom_offset_input._parse_hex_offset(invalid_input)
-            assert result is None, f"Should have failed for input: '{invalid_input}'"
+    @pytest.mark.parametrize("invalid_input", [
+        "",
+        "   ",
+        "not_hex",
+        "0xGGGG",
+        "12345G",
+        "0x",
+        "x8000",
+        None,
+    ])
+    def test_parse_hex_offset_invalid(self, injection_dialog, invalid_input):
+        """Test parsing rejects invalid hex input"""
+        result = injection_dialog.rom_offset_input._parse_hex_offset(invalid_input)
+        assert result is None
 
     def test_offset_validation_in_get_parameters(self, injection_dialog):
         """Test that get_parameters properly validates offsets"""
@@ -173,14 +158,6 @@ class TestOffsetParsingFixes:
 
 class TestROMLoadingSafety:
     """Test safe ROM loading with error handling"""
-
-    @pytest.fixture
-    def injection_dialog(self, qtbot, isolated_managers):
-        """Create injection dialog for testing"""
-        injection_manager = inject(InjectionManagerProtocol)
-        dialog = InjectionDialog(injection_manager=injection_manager)
-        qtbot.addWidget(dialog)
-        return dialog
 
     def test_load_rom_info_file_not_found(self, injection_dialog, qtbot):
         """Test ROM loading with non-existent file - async worker pattern.
@@ -358,14 +335,6 @@ class TestPreviewWorkerSafety:
 
 class TestInputValidation:
     """Test input validation improvements"""
-
-    @pytest.fixture
-    def injection_dialog(self, qtbot, isolated_managers):
-        """Create injection dialog for testing"""
-        injection_manager = inject(InjectionManagerProtocol)
-        dialog = InjectionDialog(injection_manager=injection_manager)
-        qtbot.addWidget(dialog)
-        return dialog
 
     def test_real_time_offset_validation(self, injection_dialog):
         """Test offset input accepts various formats"""

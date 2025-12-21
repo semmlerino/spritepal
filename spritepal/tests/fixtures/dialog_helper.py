@@ -5,14 +5,12 @@ from __future__ import annotations
 
 import contextlib
 import json
-import tempfile
-from pathlib import Path
 from typing import Any
 
 import pytest
 from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QApplication
 
+from tests.fixtures.helper_base import TempDirectoryMixin
 from tests.fixtures.qt_fixtures import ensure_headless_qt
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
@@ -24,7 +22,7 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
-class DialogHelper(QObject):
+class DialogHelper(QObject, TempDirectoryMixin):
     """Helper for dialog integration testing with real dialogs"""
 
     def __init__(self, temp_dir: str | None = None):
@@ -32,8 +30,7 @@ class DialogHelper(QObject):
         from tests.fixtures.test_data_factory import TestDataFactory
 
         super().__init__()
-        self.temp_dir = temp_dir or tempfile.mkdtemp()
-        self.temp_path = Path(self.temp_dir)
+        self._init_temp_dir(temp_dir)
 
         # Track dialog instances for cleanup
         self.active_dialogs: list[Any] = []
@@ -50,12 +47,7 @@ class DialogHelper(QObject):
                               metadata_path: str | None = None,
                               input_vram: str | None = None) -> InjectionDialog:
         """Create real InjectionDialog for testing"""
-        # Ensure headless Qt environment
         ensure_headless_qt()
-
-        # Ensure QApplication exists
-        if not QApplication.instance():
-            QApplication([])
 
         dialog = InjectionDialog(
             parent=None,  # Use None instead of Mock for parent
@@ -70,12 +62,7 @@ class DialogHelper(QObject):
     def create_row_arrangement_dialog(self, sprite_path: str | None = None,
                                     tiles_per_row: int = 16) -> RowArrangementDialog:
         """Create real RowArrangementDialog for testing"""
-        # Ensure headless Qt environment
         ensure_headless_qt()
-
-        # Ensure QApplication exists
-        if not QApplication.instance():
-            QApplication([])
 
         dialog = RowArrangementDialog(
             sprite_file=sprite_path or str(self.sprite_file),
@@ -96,12 +83,7 @@ class DialogHelper(QObject):
     def create_grid_arrangement_dialog(self, sprite_path: str | None = None,
                                      tiles_per_row: int = 16) -> GridArrangementDialog:
         """Create real GridArrangementDialog for testing"""
-        # Ensure headless Qt environment
         ensure_headless_qt()
-
-        # Ensure QApplication exists
-        if not QApplication.instance():
-            QApplication([])
 
         dialog = GridArrangementDialog(
             sprite_file=sprite_path or str(self.sprite_file),
@@ -147,9 +129,5 @@ class DialogHelper(QObject):
 
         self.active_dialogs.clear()
 
-        # Cleanup temp files
-        import shutil
-        try:
-            shutil.rmtree(self.temp_dir)
-        except Exception:
-            pass  # Best effort cleanup
+        # Cleanup temp files using mixin
+        self.cleanup_temp_dir()

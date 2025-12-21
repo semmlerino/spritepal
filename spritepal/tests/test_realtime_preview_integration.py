@@ -30,10 +30,9 @@ from tests.fixtures.preview_helper import (
     ExtractionPanelHelper,
     PreviewPanelHelper,
     StatusBarHelper,
-    create_large_vram_file,
-    create_sample_vram_file,
-    ensure_headless_qt,
 )
+from tests.fixtures.qt_fixtures import ensure_headless_qt
+from tests.fixtures.test_data_factory import TestDataFactory
 
 
 # Ensure QApplication exists for all tests
@@ -58,7 +57,9 @@ class TestVRAMOffsetPreviewUpdates:
     @pytest.fixture
     def sample_vram_file(self, temp_dir):
         """Create sample VRAM file for testing"""
-        return create_sample_vram_file(temp_dir)
+        vram_path = Path(temp_dir) / "test_VRAM.dmp"
+        TestDataFactory.create_vram_file(vram_path)
+        return str(vram_path)
 
     @pytest.fixture
     def preview_components(self, sample_vram_file, temp_dir):
@@ -376,7 +377,9 @@ class TestPreviewPerformanceIntegration:
     @pytest.fixture
     def large_vram_file(self, temp_dir):
         """Create large VRAM file for performance testing"""
-        return create_large_vram_file(temp_dir)
+        vram_path = Path(temp_dir) / "large_VRAM.dmp"
+        TestDataFactory.create_vram_file(vram_path, size=0x100000)  # 1MB
+        return str(vram_path)
 
     @pytest.fixture
     def performance_components(self, large_vram_file, temp_dir):
@@ -460,7 +463,9 @@ class TestPreviewErrorHandling:
         ensure_headless_qt()
 
         # Create with valid VRAM file for error testing
-        vram_path = create_sample_vram_file(temp_dir)
+        vram_file = Path(temp_dir) / "test_VRAM.dmp"
+        TestDataFactory.create_vram_file(vram_file)
+        vram_path = str(vram_file)
         extraction_panel = ExtractionPanelHelper(vram_path, temp_dir)
         preview_panel = PreviewPanelHelper(temp_dir)
         controller = ControllerHelper(extraction_panel, preview_panel)
@@ -548,7 +553,9 @@ class TestPreviewSignalIntegration:
         """Create real components for signal testing"""
         ensure_headless_qt()
 
-        vram_path = create_sample_vram_file(temp_dir)
+        vram_file = Path(temp_dir) / "test_VRAM.dmp"
+        TestDataFactory.create_vram_file(vram_file)
+        vram_path = str(vram_file)
         extraction_panel = ExtractionPanelHelper(vram_path, temp_dir)
         preview_panel = PreviewPanelHelper(temp_dir)
         controller = ControllerHelper(extraction_panel, preview_panel)
