@@ -85,17 +85,29 @@ class SessionCoordinator(QObject):
         settings_manager = self.settings_manager
         if settings_manager.get("ui", "restore_position", False):
             window_geometry = self.session_manager.get_window_geometry()
-            # Safely get values with defaults for None values
-            width = window_geometry.get("width") or 0
-            height = window_geometry.get("height") or 0
-            x = window_geometry.get("x")
-            y = window_geometry.get("y")
+
+            # Extract scalar values with type narrowing
+            width_val = window_geometry.get("width")
+            height_val = window_geometry.get("height")
+            x_val = window_geometry.get("x")
+            y_val = window_geometry.get("y")
+
+            # Safely get values ensuring int type
+            width = width_val if isinstance(width_val, int) else 0
+            height = height_val if isinstance(height_val, int) else 0
+            x = x_val if isinstance(x_val, int) else None
+            y = y_val if isinstance(y_val, int) else None
 
             if width > 0 and height > 0:
                 self.main_window.resize(width, height)
 
             if x is not None and y is not None and x >= 0:
                 self.main_window.move(x, y)
+
+            # Restore splitter sizes if available
+            splitter_sizes = window_geometry.get("splitter_sizes", [])
+            if isinstance(splitter_sizes, list) and len(splitter_sizes) >= 2:
+                self.main_window.main_splitter.setSizes(splitter_sizes)
 
     def save_session(self) -> None:
         """Save the current session"""
@@ -112,12 +124,13 @@ class SessionCoordinator(QObject):
         # Save session data
         self.session_manager.update_session_data(session_data)
 
-        # Save UI settings
-        window_geometry: dict[str, int | float] = {
+        # Save UI settings including splitter positions
+        window_geometry: dict[str, int | float | list[int]] = {
             "width": self.main_window.width(),
             "height": self.main_window.height(),
             "x": self.main_window.x(),
             "y": self.main_window.y(),
+            "splitter_sizes": self.main_window.main_splitter.sizes(),
         }
         self.session_manager.update_window_state(window_geometry)
 

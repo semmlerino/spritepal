@@ -136,7 +136,7 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
 # For timeout functions, import directly from tests.fixtures.timeouts:
 #     from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout
 # See tests/fixtures/timeouts.py for base values and PYTEST_TIMEOUT_MULTIPLIER scaling
-from tests.fixtures.timeouts import get_timeout_multiplier
+from tests.fixtures.timeouts import cleanup_timeout, get_timeout_multiplier
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -504,11 +504,11 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
             pass
 
     # Wait for threads to finish
-    # Use 2000ms base for faster test execution (reduced from 5000ms)
+    # Uses cleanup_timeout() (2000ms base, scaled by PYTEST_TIMEOUT_MULTIPLIER)
     # Tests with slow cleanup should use @pytest.mark.skip_thread_cleanup
     leaked = _wait_for_threads(
         before_threads,
-        max_wait_ms=int(2000 * get_timeout_multiplier()),
+        max_wait_ms=cleanup_timeout(),
         poll_interval_ms=20,
         filter_pytest_timeout=filter_pytest_timeout,
         qt_available=qt_available,

@@ -47,7 +47,6 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.file_dialogs import browse_for_open_file
-
 from ui.common.spacing_constants import (
     BORDER_THICK,
     BROWSE_BUTTON_MAX_WIDTH,
@@ -398,7 +397,13 @@ class ExtractionPanel(QGroupBox):
         _ = self.offset_slider.valueChanged.connect(self._on_offset_slider_changed)
         if self.offset_slider:
             self.offset_slider.setStyleSheet(get_slider_style("extract"))
-        self.offset_slider.setToolTip("VRAM Offset: Adjust position within VRAM dump (0x0000-0x10000)")
+        self.offset_slider.setToolTip(
+            "VRAM Offset: Drag to adjust position (0x0000-0x10000)\n\n"
+            "Keyboard shortcuts (Custom Range mode):\n"
+            "  Ctrl+←/→  Step by current step size\n"
+            "  Page Up/Down  Jump by 0x1000\n"
+            "  1-9  Jump to 10%-90% of range"
+        )
         offset_layout.addWidget(self.offset_slider)
 
         # Primary offset control row (always visible)
@@ -414,7 +419,13 @@ class ExtractionPanel(QGroupBox):
         self.offset_spinbox.setPrefix("0x")
         self.offset_spinbox.setMinimumWidth(OFFSET_SPINBOX_MIN_WIDTH)
         _ = self.offset_spinbox.valueChanged.connect(self._on_offset_spinbox_changed)
-        self.offset_spinbox.setToolTip("Enter offset in hex (0x prefix) or decimal")
+        self.offset_spinbox.setToolTip(
+            "VRAM Offset (hex or decimal)\n\n"
+            "Keyboard shortcuts (Custom Range mode):\n"
+            "  Ctrl+←/→  Step by current step size\n"
+            "  Page Up/Down  Jump by 0x1000\n"
+            "  1-9  Jump to 10%-90% of range"
+        )
         offset_controls_layout.addWidget(self.offset_spinbox)
 
         offset_controls_layout.addStretch()

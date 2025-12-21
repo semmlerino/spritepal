@@ -141,12 +141,12 @@ class MainWindow(QMainWindow):
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
 
-        # Main horizontal splitter
-        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Main horizontal splitter (stored as instance for session persistence)
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS)
         main_layout.setSpacing(0)  # Splitter handles spacing
-        main_layout.addWidget(main_splitter)
+        main_layout.addWidget(self.main_splitter)
 
         # Left panel - Input and controls
         self.left_panel = self._create_left_panel()
@@ -156,7 +156,7 @@ class MainWindow(QMainWindow):
         self.palette_preview = PalettePreviewWidget()
 
         # Add panels to main splitter (right panel created by manager)
-        main_splitter.addWidget(self.left_panel)
+        self.main_splitter.addWidget(self.left_panel)
         # Right panel will be added by PreviewCoordinator
 
         # Configure main splitter with proper stretch factors
@@ -164,9 +164,9 @@ class MainWindow(QMainWindow):
         total_width = MAIN_WINDOW_MIN_SIZE[0] - (2 * LAYOUT_MARGINS)
         left_width = int(total_width * DEFAULT_SPLITTER_RATIO)
         right_width = total_width - left_width
-        main_splitter.setSizes([left_width, right_width])
-        main_splitter.setStretchFactor(0, 1)  # Left panel stretches proportionally
-        main_splitter.setStretchFactor(1, 3)  # Right panel stretches more for preview
+        self.main_splitter.setSizes([left_width, right_width])
+        self.main_splitter.setStretchFactor(0, 1)  # Left panel stretches proportionally
+        self.main_splitter.setStretchFactor(1, 3)  # Right panel stretches more for preview
 
         # Set minimum sizes for panels
         self.left_panel.setMinimumWidth(MIN_PANEL_WIDTH)
@@ -225,8 +225,8 @@ class MainWindow(QMainWindow):
         self.extraction_tabs.setToolTip("Switch tabs with Ctrl+Tab/Ctrl+Shift+Tab")
 
         content_layout.addWidget(self.extraction_tabs)
-        content_layout.addStretch()  # Push tabs to top when content is small
-        
+        content_layout.addStretch()  # Push content to top, keep compact
+
         scroll_area.setWidget(content_widget)
         main_layout.addWidget(scroll_area, stretch=1)  # Takes all available vertical space
 
@@ -252,9 +252,13 @@ class MainWindow(QMainWindow):
         self.status_bar_manager = StatusBarManager(self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         self.output_settings_manager = OutputSettingsManager(self, self)
 
-        # Connect ROM panel to shared output name (removes redundant output field from ROM panel)
-        self.rom_extraction_panel.set_output_name_provider(
-            self.output_settings_manager.get_output_name
+        # Connect ROM panel to shared output name via signals (decoupled communication)
+        self.output_settings_manager.output_name_changed.connect(
+            self.rom_extraction_panel.set_output_name
+        )
+        # Initialize with current value
+        self.rom_extraction_panel.set_output_name(
+            self.output_settings_manager.get_output_name()
         )
 
         self.toolbar_manager = ToolbarManager(self, self)
@@ -303,14 +307,12 @@ class MainWindow(QMainWindow):
             action_zone_layout.addLayout(button_layout)
 
         # Add preview panel to main splitter
-        main_splitter = self.centralWidget().findChild(QSplitter)
-        if main_splitter:
-            right_panel = self.preview_coordinator.create_preview_panel(self)
-            main_splitter.addWidget(right_panel)
-            right_panel.setMinimumWidth(MIN_PANEL_WIDTH)
-            # Ensure right panel has proper size policy
-            from PySide6.QtWidgets import QSizePolicy
-            right_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        right_panel = self.preview_coordinator.create_preview_panel(self)
+        self.main_splitter.addWidget(right_panel)
+        right_panel.setMinimumWidth(MIN_PANEL_WIDTH)
+        # Ensure right panel has proper size policy
+        from PySide6.QtWidgets import QSizePolicy
+        right_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def _update_initial_ui_state(self) -> None:
         """Update initial UI state after setup"""

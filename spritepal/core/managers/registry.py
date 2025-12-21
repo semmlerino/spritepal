@@ -263,7 +263,11 @@ class ManagerRegistry:
                 # Create consolidated managers
                 # ApplicationStateManager handles session, settings, state, and history
                 self._logger.debug("Creating ApplicationStateManager...")
-                state_manager = ApplicationStateManager(app_name, settings_path, parent=qt_parent)
+                state_manager = ApplicationStateManager(
+                    app_name, settings_path,
+                    parent=qt_parent,
+                    configuration_service=configuration_service
+                )
                 created_managers.append("state")
                 self._logger.debug("ApplicationStateManager created successfully")
 
