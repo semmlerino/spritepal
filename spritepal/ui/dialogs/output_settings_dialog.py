@@ -64,13 +64,6 @@ class OutputSettingsDialog(BaseDialog):
             is_rom_mode: If True, palette and metadata options are locked on
             default_directory: Default directory for browse dialog
         """
-        # Declare instance variables BEFORE super().__init__()
-        self.output_name_edit: QLineEdit | None = None
-        self.browse_button: QPushButton | None = None
-        self.palette_check: QCheckBox | None = None
-        self.metadata_check: QCheckBox | None = None
-        self.info_label: QLabel | None = None
-
         self._suggested_name = suggested_name
         self._is_rom_mode = is_rom_mode
         self._default_directory = default_directory
@@ -160,19 +153,16 @@ class OutputSettingsDialog(BaseDialog):
 
     def _update_info_label(self) -> None:
         """Update the label showing which files will be created."""
-        if not self.info_label:
-            return
-
-        output_name = self.output_name_edit.text() if self.output_name_edit else ""
+        output_name = self.output_name_edit.text()
         if not output_name:
             self.info_label.setText("Enter an output name to see files that will be created")
             self.info_label.setStyleSheet(f"color: {COLORS['warning']}; font-style: italic;")
             return
 
         files = [f"{output_name}.png"]
-        if self.palette_check and self.palette_check.isChecked():
+        if self.palette_check.isChecked():
             files.append(f"{output_name}.pal.json (x8)")
-        if self.metadata_check and self.metadata_check.isChecked():
+        if self.metadata_check.isChecked():
             files.append(f"{output_name}.metadata.json")
 
         self.info_label.setText(f"Files to create: {', '.join(files)}")
@@ -180,7 +170,7 @@ class OutputSettingsDialog(BaseDialog):
 
     def _browse_output(self) -> None:
         """Open file browser for output location."""
-        current_name = self.output_name_edit.text() if self.output_name_edit else ""
+        current_name = self.output_name_edit.text()
         suggested_path = str(Path(self._default_directory) / f"{current_name}.png")
 
         filename, _ = QFileDialog.getSaveFileName(
@@ -190,7 +180,7 @@ class OutputSettingsDialog(BaseDialog):
             "PNG Files (*.png)",
         )
 
-        if filename and self.output_name_edit:
+        if filename:
             # Update output name without extension
             base_name = Path(filename).stem
             self.output_name_edit.setText(base_name)
@@ -204,9 +194,9 @@ class OutputSettingsDialog(BaseDialog):
             OutputSettings namedtuple with output_name, export_palette_files, include_metadata
         """
         return OutputSettings(
-            output_name=self.output_name_edit.text() if self.output_name_edit else "",
-            export_palette_files=self.palette_check.isChecked() if self.palette_check else True,
-            include_metadata=self.metadata_check.isChecked() if self.metadata_check else True,
+            output_name=self.output_name_edit.text(),
+            export_palette_files=self.palette_check.isChecked(),
+            include_metadata=self.metadata_check.isChecked(),
         )
 
     def get_output_name(self) -> str:
@@ -215,7 +205,7 @@ class OutputSettingsDialog(BaseDialog):
         Returns:
             The output name string
         """
-        return self.output_name_edit.text() if self.output_name_edit else ""
+        return self.output_name_edit.text()
 
     @staticmethod
     def get_output_settings(

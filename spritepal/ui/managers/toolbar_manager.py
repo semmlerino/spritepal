@@ -121,31 +121,26 @@ class ToolbarManager(QObject):
         self.extract_button.setMinimumHeight(PRIMARY_BUTTON_HEIGHT)  # Taller for emphasis
         self.extract_button.setShortcut(QKeySequence("Ctrl+E"))
         self.extract_button.setToolTip("Extract sprites for editing (Ctrl+E)")
-        if self.extract_button:
-            self.extract_button.setStyleSheet(get_button_style("extract"))
+        self.extract_button.setStyleSheet(get_button_style("extract"))
         layout.addWidget(self.extract_button, 1, 0, 1, 2)  # Row 1, span both columns
 
     def _create_open_editor_button(self, layout: QGridLayout) -> None:
         """Create open editor button - secondary action with outline style"""
         self.open_editor_button = QPushButton("Open Editor")
         self.open_editor_button.setMinimumHeight(BUTTON_HEIGHT)
-        if self.open_editor_button:
-            self.open_editor_button.setEnabled(False)
+        self.open_editor_button.setEnabled(False)
         self.open_editor_button.setShortcut(QKeySequence("Ctrl+O"))
         self.open_editor_button.setToolTip("Open extracted sprites in pixel editor (Ctrl+O)")
-        if self.open_editor_button:
-            self.open_editor_button.setStyleSheet(get_button_style("secondary_outline"))
+        self.open_editor_button.setStyleSheet(get_button_style("secondary_outline"))
         layout.addWidget(self.open_editor_button, 3, 0)  # Row 3, first column
 
     def _create_arrange_button(self, layout: QGridLayout) -> None:
         """Create consolidated arrange button with dropdown menu - secondary action"""
         self.arrange_button = QPushButton("Arrange...")
         self.arrange_button.setMinimumHeight(BUTTON_HEIGHT)
-        if self.arrange_button:
-            self.arrange_button.setEnabled(False)
+        self.arrange_button.setEnabled(False)
         self.arrange_button.setToolTip("Arrange sprites (Ctrl+R for rows, Ctrl+G for grid)")
-        if self.arrange_button:
-            self.arrange_button.setStyleSheet(get_button_style("secondary_outline"))
+        self.arrange_button.setStyleSheet(get_button_style("secondary_outline"))
 
         # Create dropdown menu for arrange options
         self.arrange_menu = QMenu(self.parent_widget)
@@ -166,13 +161,11 @@ class ToolbarManager(QObject):
         self.inject_button = QPushButton("Inject")
         # Match Extract button height for visual balance
         self.inject_button.setMinimumHeight(PRIMARY_BUTTON_HEIGHT)
-        if self.inject_button:
-            self.inject_button.setEnabled(False)
+        self.inject_button.setEnabled(False)
         self.inject_button.setShortcut(QKeySequence("Ctrl+I"))
         self.inject_button.setToolTip("Inject edited sprite back into VRAM or ROM (Ctrl+I)")
-        if self.inject_button:
-            # Use gradient danger style for visual prominence
-            self.inject_button.setStyleSheet(get_danger_action_button_style())
+        # Use gradient danger style for visual prominence
+        self.inject_button.setStyleSheet(get_danger_action_button_style())
         layout.addWidget(self.inject_button, 4, 0, 1, 2)  # Row 4, span both columns
 
     def _connect_button_signals(self) -> None:
@@ -190,26 +183,22 @@ class ToolbarManager(QObject):
             enabled: Whether button should be enabled
             reason: If disabled, explanation of why (e.g., "Load a ROM file")
         """
-        if not hasattr(self, "extract_button") or not self.extract_button:
-            return
-
         self.extract_button.setEnabled(enabled)
 
         # Update inline status label visibility and text
-        if hasattr(self, "extraction_status_label") and self.extraction_status_label:
-            if enabled:
-                # Show positive ready status with green accent
-                self.extraction_status_label.setText("✓ Ready to extract")
-                self.extraction_status_label.setStyleSheet(get_ready_status_style())
-                self.extraction_status_label.show()
-            elif reason:
-                self.extraction_status_label.setText(f"⚠ {reason}")
-                self.extraction_status_label.setStyleSheet(get_extraction_checklist_style())
-                self.extraction_status_label.show()
-            else:
-                self.extraction_status_label.setText("⚠ Requirements not met")
-                self.extraction_status_label.setStyleSheet(get_extraction_checklist_style())
-                self.extraction_status_label.show()
+        if enabled:
+            # Show positive ready status with green accent
+            self.extraction_status_label.setText("✓ Ready to extract")
+            self.extraction_status_label.setStyleSheet(get_ready_status_style())
+            self.extraction_status_label.show()
+        elif reason:
+            self.extraction_status_label.setText(f"⚠ {reason}")
+            self.extraction_status_label.setStyleSheet(get_extraction_checklist_style())
+            self.extraction_status_label.show()
+        else:
+            self.extraction_status_label.setText("⚠ Requirements not met")
+            self.extraction_status_label.setStyleSheet(get_extraction_checklist_style())
+            self.extraction_status_label.show()
 
         # Also keep tooltip for accessibility
         if enabled:
@@ -221,15 +210,11 @@ class ToolbarManager(QObject):
 
     def set_post_extraction_buttons_enabled(self, enabled: bool) -> None:
         """Set post-extraction buttons enabled state"""
-        if hasattr(self, "open_editor_button") and self.open_editor_button:
-            self.open_editor_button.setEnabled(enabled)
-        if hasattr(self, "arrange_button") and self.arrange_button:
-            self.arrange_button.setEnabled(enabled)
-        if hasattr(self, "inject_button") and self.inject_button:
-            self.inject_button.setEnabled(enabled)
+        self.open_editor_button.setEnabled(enabled)
+        self.arrange_button.setEnabled(enabled)
+        self.inject_button.setEnabled(enabled)
 
     def reset_buttons(self) -> None:
         """Reset all buttons to initial state"""
-        if hasattr(self, "extract_button") and self.extract_button:
-            self.extract_button.setEnabled(False)
+        self.extract_button.setEnabled(False)
         self.set_post_extraction_buttons_enabled(False)

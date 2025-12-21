@@ -126,8 +126,7 @@ class ScanControlsPanel(QWidget):
 
         # Cache status label
         self.cache_status_label = QLabel("")
-        if self.cache_status_label:
-            self.cache_status_label.setStyleSheet(f"""
+        self.cache_status_label.setStyleSheet(f"""
             QLabel {{
                 color: {COLORS["text_muted"]};
                 font-size: 11px;
@@ -295,14 +294,11 @@ class ScanControlsPanel(QWidget):
         self.scan_status_changed.emit(f"Scanning {range_kb} KB range...")
 
         # Disable scan buttons during operation and show control buttons
-        if self.scan_range_btn:
-            self.scan_range_btn.setEnabled(False)
-        if self.scan_all_btn:
-            self.scan_all_btn.setEnabled(False)
+        self.scan_range_btn.setEnabled(False)
+        self.scan_all_btn.setEnabled(False)
         self.pause_btn.setVisible(True)
         self.stop_btn.setVisible(True)
-        if self.pause_btn:
-            self.pause_btn.setText("Pause")  # Reset pause button text
+        self.pause_btn.setText("Pause")  # Reset pause button text
 
         # Emit scan started signal
         self.scan_started.emit()
@@ -433,14 +429,12 @@ class ScanControlsPanel(QWidget):
 
     def _on_scan_paused(self):
         """Handle scan paused signal"""
-        if self.pause_btn:
-            self.pause_btn.setText("Resume")
+        self.pause_btn.setText("Resume")
         self.scan_status_changed.emit("Scan paused - click Resume to continue")
 
     def _on_scan_resumed(self):
         """Handle scan resumed signal"""
-        if self.pause_btn:
-            self.pause_btn.setText("Pause")
+        self.pause_btn.setText("Pause")
         count = len(self.found_sprites)
         self.scan_status_changed.emit(f"Scanning... Found {count} sprite{'s' if count != 1 else ''}")
 
@@ -457,10 +451,8 @@ class ScanControlsPanel(QWidget):
         self.is_scanning = False
 
         # Re-enable scan buttons and hide control buttons
-        if self.scan_range_btn:
-            self.scan_range_btn.setEnabled(True)
-        if self.scan_all_btn:
-            self.scan_all_btn.setEnabled(True)
+        self.scan_range_btn.setEnabled(True)
+        self.scan_all_btn.setEnabled(True)
         self.pause_btn.setVisible(False)
         self.stop_btn.setVisible(False)
 
@@ -595,11 +587,7 @@ class ScanControlsPanel(QWidget):
 
     def _update_cache_status(self, message: str, status_type: str = "default") -> None:
         """Update the cache status label with different styling based on type"""
-        if self.cache_status_label is None:
-            return
-
-        if self.cache_status_label:
-            self.cache_status_label.setText(message)
+        self.cache_status_label.setText(message)
         self.cache_status_label.setVisible(True)
 
         # Different styles for different cache operations (dark theme compatible)
@@ -656,13 +644,11 @@ class ScanControlsPanel(QWidget):
                 }}
             """
 
-        if self.cache_status_label:
-            self.cache_status_label.setStyleSheet(style)
+        self.cache_status_label.setStyleSheet(style)
 
     def _clear_cache_status(self) -> None:
         """Clear the cache status label"""
-        if self.cache_status_label is not None:
-            self.cache_status_label.setVisible(False)
+        self.cache_status_label.setVisible(False)
 
     def _check_scan_cache_before_start(self, start_offset: int, end_offset: int) -> bool | None:
         """

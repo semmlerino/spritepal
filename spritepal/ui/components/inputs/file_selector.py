@@ -152,8 +152,7 @@ class FileSelector(QWidget):
 
         if filename:
             # Update the path
-            if self.path_edit:
-                self.path_edit.setText(filename)
+            self.path_edit.setText(filename)
 
             # Update settings manager with last used directory
             settings.set_last_used_directory(str(Path(filename).parent))
@@ -188,13 +187,11 @@ class FileSelector(QWidget):
             # Convert any type to string
             converted_path = str(path)
 
-        if self.path_edit:
-            self.path_edit.setText(converted_path)
+        self.path_edit.setText(converted_path)
 
     def clear_path(self):
         """Clear the file path"""
-        if self.path_edit:
-            self.path_edit.clear()
+        self.path_edit.clear()
 
     def is_valid(self) -> bool:
         """Check if current path exists (for validation)"""
@@ -228,5 +225,4 @@ class FileSelector(QWidget):
 
     def set_browse_enabled(self, enabled: bool):
         """Enable/disable the browse button"""
-        if self.browse_button:
-            self.browse_button.setEnabled(enabled)
+        self.browse_button.setEnabled(enabled)

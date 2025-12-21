@@ -33,6 +33,22 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
+class BytesMMAPWrapper:
+    """Wrapper for bytes to provide mmap-compatible interface for fallback loading."""
+
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def __getitem__(self, key: int | slice) -> bytes | int:
+        return self._data[key]
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def close(self) -> None:
+        pass  # No-op for bytes wrapper
+
 @dataclass
 class ThumbnailRequest:
     """Request for thumbnail generation."""
@@ -446,17 +462,7 @@ class BatchThumbnailWorker(QObject):
                 rom_file.seek(0)
                 rom_data = rom_file.read()
 
-                # Create a mmap-compatible wrapper
-                class BytesMMAPWrapper:
-                    def __init__(self, data: bytes):
-                        self._data = data
-                    def __getitem__(self, key: int | slice) -> bytes | int:
-                        return self._data[key]
-                    def __len__(self) -> int:
-                        return len(self._data)
-                    def close(self) -> None:
-                        pass  # No-op for bytes wrapper
-
+                # Use module-level BytesMMAPWrapper for mmap-compatible interface
                 yield BytesMMAPWrapper(rom_data)
         finally:
             # Ensure proper cleanup in all cases
@@ -490,17 +496,7 @@ class BatchThumbnailWorker(QObject):
                 rom_file.close()
                 rom_file = None
 
-                # Create a mmap-compatible wrapper (no file handle needed)
-                class BytesMMAPWrapper:
-                    def __init__(self, data: bytes):
-                        self._data = data
-                    def __getitem__(self, key: int | slice) -> bytes | int:
-                        return self._data[key]
-                    def __len__(self) -> int:
-                        return len(self._data)
-                    def close(self) -> None:
-                        pass  # No-op for bytes wrapper
-
+                # Use module-level BytesMMAPWrapper for mmap-compatible interface
                 self._rom_mmap = BytesMMAPWrapper(rom_data)
                 self._rom_file = None
                 logger.info(f"ROM data loaded (fallback): {len(self._rom_mmap)} bytes")
