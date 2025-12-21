@@ -78,8 +78,6 @@ _logger = logging.getLogger(__name__)
 # Tests using these fixtures are auto-serialized under xdist.
 SESSION_DEPENDENT_FIXTURES: frozenset[str] = frozenset({
     'session_managers',      # Direct session-scoped fixture
-    'managers',              # Convenience wrapper for session_managers
-    'reset_manager_state',   # Requires active session to reset
     'managers_initialized',  # Integration test fixture that modifies DI container
     'extraction_manager',    # Uses session_managers for extraction operations
     'mock_factory',          # Uses session_managers for mock factory setup
@@ -272,7 +270,7 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[ManagerRegis
     State is stored in SessionState dataclass to avoid global mutable variables.
 
     WARNING: Manager state persists across ALL tests. Use isolated_managers
-    or reset_manager_state if you need clean state.
+    if you need clean state.
 
     Usage:
         def test_something(session_managers):
@@ -544,10 +542,11 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
 
 @pytest.fixture(autouse=True)
 def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, None]:
-    """Auto-reset session manager caches before tests using session_managers.
+    """Auto-reset session manager caches after tests using session_managers.
 
-    This ensures each test starts with clean caches (extraction counts,
-    cached data, etc.) without full re-initialization overhead.
+    Resets caches (extraction counts, cached data, etc.) after each test
+    without full re-initialization overhead. Only post-test reset is needed
+    since the previous test's cleanup already left state clean.
     """
     from core.managers.registry import ManagerRegistry
 
@@ -558,13 +557,10 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
         yield
         return
 
-    registry = ManagerRegistry()
-    if registry.is_initialized():
-        _reset_manager_caches(registry)
-
     yield
 
-    # Also reset after test to clean up any state it created
+    # Reset after test to clean up any state it created
+    registry = ManagerRegistry()
     if registry.is_initialized():
         _reset_manager_caches(registry)
 

@@ -26,6 +26,8 @@ import pytest
 # Skip entire module if pytest-benchmark is not installed
 pytest.importorskip("pytest_benchmark")
 
+from PySide6.QtCore import QMutexLocker
+
 from core.async_rom_cache import AsyncROMCache
 from core.preview_orchestrator import PreviewOrchestrator, Priority
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
@@ -115,7 +117,7 @@ class TestAsyncROMCachePerformance:
         sprite = self.test_sprites[0]
 
         cache_key = self.async_cache._generate_cache_key(rom_path, sprite["offset"])
-        with self.async_cache._request_mutex:
+        with QMutexLocker(self.async_cache._request_mutex):
             self.async_cache._memory_cache[cache_key] = (
                 sprite["data"],
                 {"width": sprite["width"], "height": sprite["height"]},
@@ -124,7 +126,7 @@ class TestAsyncROMCachePerformance:
 
         # Benchmark memory cache lookup
         def memory_lookup():
-            with self.async_cache._request_mutex:
+            with QMutexLocker(self.async_cache._request_mutex):
                 return self.async_cache._memory_cache.get(cache_key)
 
         result = benchmark(memory_lookup)
@@ -133,7 +135,9 @@ class TestAsyncROMCachePerformance:
         assert result[0] == sprite["data"]
 
         # Memory cache hits should be extremely fast (< 1ms for 60fps scrubbing)
-        assert benchmark.stats.mean < 0.001  # < 1ms average
+        if benchmark.stats is None:
+            pytest.skip("Benchmark stats unavailable under xdist; run with -n 0 for timing assertions.")
+        assert benchmark.stats.stats.mean < 0.001  # < 1ms average
 
     @pytest.mark.performance
     def test_concurrent_cache_access_performance(self, qtbot):
@@ -212,7 +216,7 @@ class TestAsyncROMCachePerformance:
 
             # Check memory cache directly for timing
             cache_key = self.async_cache._generate_cache_key(rom_path, offset)
-            with self.async_cache._request_mutex:
+            with QMutexLocker(self.async_cache._request_mutex):
                 if cache_key in self.async_cache._memory_cache:
                     cache_hits += 1
                 else:
@@ -459,8 +463,6 @@ class TestSmartPreviewCoordinatorPerformance:
     @pytest.mark.performance
     def test_high_frequency_slider_updates_performance(self):
         """Test performance during rapid slider movement (60fps simulation)"""
-        rom_path = "/test/high_frequency.sfc"
-
         # Simulate 60 FPS updates for 1 second
         num_updates = 60
         update_interval = 1.0 / 60  # 16.67ms between updates
@@ -472,7 +474,7 @@ class TestSmartPreviewCoordinatorPerformance:
             sprite = self.test_sprites[i % len(self.test_sprites)]
 
             update_start = time.perf_counter()
-            self.coordinator.request_preview(rom_path, sprite["offset"])
+            self.coordinator.request_preview(sprite["offset"])
             update_time = time.perf_counter() - update_start
 
             response_times.append(update_time)
@@ -494,8 +496,6 @@ class TestSmartPreviewCoordinatorPerformance:
     @pytest.mark.performance
     def test_debouncing_effectiveness_performance(self):
         """Test debouncing effectiveness under rapid updates"""
-        rom_path = "/test/debouncing.sfc"
-
         # Submit rapid updates that should be debounced
         num_rapid_updates = 100
         debounce_window = 0.05  # 50ms debounce window
@@ -505,7 +505,7 @@ class TestSmartPreviewCoordinatorPerformance:
 
         for i in range(num_rapid_updates):
             sprite = self.test_sprites[i % 10]  # Cycle through 10 offsets
-            request_id = self.coordinator.request_preview(rom_path, sprite["offset"])
+            request_id = self.coordinator.request_preview(sprite["offset"])
             request_ids.append(request_id)
 
             # Rapid updates (5ms apart - should trigger debouncing)
@@ -554,20 +554,18 @@ class TestSmartPreviewCoordinatorPerformance:
         for offset in browsing_pattern:
             start_time = time.perf_counter()
 
-            # Mock cache check
-            if hasattr(self.coordinator, '_memory_cache'):
-                cache_key = f"preview_{hash(rom_path)}_{offset:08x}"
-                if self.coordinator._memory_cache and hasattr(self.coordinator._memory_cache, 'get'):
-                    if self.coordinator._memory_cache.get(cache_key):
-                        cache_operations["hits"] += 1
-                    else:
-                        cache_operations["misses"] += 1
-                        # Simulate adding to cache
-                        if hasattr(self.coordinator._memory_cache, 'put'):
-                            self.coordinator._memory_cache.put(cache_key, b"mock_data")
+            # Mock cache check using current PreviewCache interface
+            if hasattr(self.coordinator, "_cache"):
+                cache_key = self.coordinator._cache.make_key(rom_path, offset)
+                if self.coordinator._cache.contains(cache_key):
+                    cache_operations["hits"] += 1
+                else:
+                    cache_operations["misses"] += 1
+                    # Simulate adding to cache
+                    self.coordinator._cache.put(cache_key, (b"mock_data", 0, 0, "mock"))
 
             # Request preview
-            self.coordinator.request_preview(rom_path, offset)
+            self.coordinator.request_preview(offset)
 
             response_time = time.perf_counter() - start_time
             response_times.append(response_time)

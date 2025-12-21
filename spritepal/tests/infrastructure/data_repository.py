@@ -262,22 +262,22 @@ class DataRepository:
         config = size_map.get(data_set.name, size_map["medium_test"])
 
         # Generate VRAM file
-        if not data_set.vram_path:
+        if not data_set.vram_path or not Path(data_set.vram_path).exists():
             data_set.vram_path = self._create_vram_file(
                 f"{data_set.name}_vram.dmp",
                 config["vram_size"]
             )
 
         # Generate CGRAM file
-        if not data_set.cgram_path:
+        if not data_set.cgram_path or not Path(data_set.cgram_path).exists():
             data_set.cgram_path = self._create_cgram_file(f"{data_set.name}_cgram.dmp")
 
         # Generate OAM file
-        if not data_set.oam_path:
+        if not data_set.oam_path or not Path(data_set.oam_path).exists():
             data_set.oam_path = self._create_oam_file(f"{data_set.name}_oam.dmp")
 
         # Generate ROM file
-        if not data_set.rom_path:
+        if not data_set.rom_path or not Path(data_set.rom_path).exists():
             data_set.rom_path = self._create_rom_file(
                 f"{data_set.name}_rom.sfc",
                 config["rom_size"]

@@ -121,16 +121,6 @@ class TestXdistCollectionPolicy:
             "Tests using session_managers must be serialized"
         )
 
-    def test_managers_fixture_gets_serial_group(self) -> None:
-        """Tests using managers fixture (depends on session_managers) must serialize."""
-        item = FakeItem(fixturenames=["managers"])
-
-        collection_policy_logic(has_xdist=True, workers="auto", items=[item])
-
-        assert item.has_serial_group(), (
-            "Tests using managers fixture must be serialized"
-        )
-
     def test_parallel_unsafe_marker_forces_serial(self) -> None:
         """Tests marked parallel_unsafe must be serialized."""
         item = FakeItem(markers={"parallel_unsafe": pytest.mark.parallel_unsafe})

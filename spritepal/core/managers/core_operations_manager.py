@@ -677,6 +677,9 @@ class CoreOperationsManager(BaseManager):
                         f"Previous worker still running after {cleanup_timeout}ms cleanup timeout. "
                         "Declining to start new injection to prevent data corruption."
                     )
+                    # FIX T1.2: Clear zombie reference even though worker is still running.
+                    # This prevents holding references to unresponsive workers.
+                    self._current_worker = None
                     self._finish_operation(operation)
                     return False
             self._current_worker = None
@@ -719,17 +722,23 @@ class CoreOperationsManager(BaseManager):
             return True
 
         except (OSError, PermissionError) as e:
-            self._cleanup_current_worker()  # FIX #2: Stop worker on exception
+            self._cleanup_current_worker()
             self._handle_file_io_error(e, operation, "injection startup")
             raise
         except (ValueError, TypeError) as e:
-            self._cleanup_current_worker()  # FIX #2: Stop worker on exception
+            self._cleanup_current_worker()
             self._handle_data_format_error(e, operation, "injection startup")
             raise
         except Exception as e:
-            self._cleanup_current_worker()  # FIX #2: Stop worker on exception
+            self._cleanup_current_worker()
             self._handle_error(e, operation)
             return False
+        finally:
+            # FIX T1.1: Always finish operation if we didn't successfully start a worker.
+            # If worker is running, it will call _finish_operation when it completes.
+            # This prevents "injection already in progress" errors after validation failures.
+            if not self._current_worker or not self._current_worker.isRunning():
+                self._finish_operation(operation)
 
     def validate_injection_params(self, params: dict[str, Any]) -> None:
         """

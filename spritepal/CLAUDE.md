@@ -179,7 +179,7 @@ qtbot.waitSignal(worker.finished)  # Signal may emit before wait starts!
 |------|-----|
 | Standard test | `isolated_managers` (function-scoped, clean state) |
 | Read-only, verified stateless | `session_managers` + `@pytest.mark.shared_state_safe` |
-| Clean counters only | `reset_manager_state` |
+| Clean counters only | `isolated_managers` |
 | HAL operations | `hal_pool` (mock by default) |
 | Real HAL | `@pytest.mark.real_hal` (skips if binary unavailable) |
 

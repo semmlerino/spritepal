@@ -28,22 +28,22 @@ def apply_global_accessibility_styles() -> None:
     # Uses dark theme compatible colors - bright borders instead of light backgrounds
     global_style = f"""
     /* ===== FOCUS INDICATORS (Dark Theme Compatible) ===== */
-    /* All focusable widgets get a clear focus outline */
+    /* All focusable widgets get a clear focus outline (3px for visibility) */
     QWidget:focus {{
-        outline: 2px solid {COLORS["border_focus"]};
+        outline: 3px solid {COLORS["border_focus"]};
         outline-offset: 1px;
     }}
 
     /* Text input fields - dark background with bright border */
     QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
-        border: 2px solid {COLORS["border_focus"]};
+        border: 3px solid {COLORS["border_focus"]};
         background-color: {COLORS["focus_background"]};
         color: {COLORS["text_primary"]};
     }}
 
     /* Buttons - dark background with bright border */
     QPushButton:focus {{
-        border: 2px solid {COLORS["border_focus"]};
+        border: 3px solid {COLORS["border_focus"]};
         padding: 3px;
         background-color: {COLORS["focus_background"]};
         color: {COLORS["text_primary"]};
@@ -56,7 +56,7 @@ def apply_global_accessibility_styles() -> None:
 
     /* Dropdowns and spinners */
     QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
-        border: 2px solid {COLORS["border_focus"]};
+        border: 3px solid {COLORS["border_focus"]};
         background-color: {COLORS["focus_background"]};
         color: {COLORS["text_primary"]};
     }}
@@ -68,19 +68,18 @@ def apply_global_accessibility_styles() -> None:
         color: {COLORS["text_primary"]};
     }}
 
-    /* Checkboxes and radio buttons */
+    /* Checkboxes and radio buttons - subtle focus indication */
     QCheckBox:focus, QRadioButton:focus {{
-        color: {COLORS["highlight"]};
-        font-weight: bold;
+        color: {COLORS["text_primary"]};
     }}
 
     QCheckBox:focus::indicator, QRadioButton:focus::indicator {{
-        border: 2px solid {COLORS["border_focus"]};
+        border: 1px solid {COLORS["border"]};
     }}
 
     /* Tab widgets */
     QTabBar::tab:focus {{
-        border: 2px solid {COLORS["border_focus"]};
+        border: 3px solid {COLORS["border_focus"]};
         background-color: {COLORS["focus_background"]};
         color: {COLORS["text_primary"]};
     }}
@@ -166,13 +165,13 @@ def apply_global_accessibility_styles() -> None:
     }}
 
     /* ===== GROUP BOXES (Dark Theme) ===== */
-    /* Make group boxes more visible */
+    /* Make group boxes more visible - tighter margins, more internal padding */
     QGroupBox {{
         font-weight: bold;
         border: 2px solid {COLORS["border"]};
         border-radius: 5px;
-        margin-top: 10px;
-        padding-top: 10px;
+        margin-top: 8px;
+        padding-top: 12px;
     }}
 
     QGroupBox::title {{

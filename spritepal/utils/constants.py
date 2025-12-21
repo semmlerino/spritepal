@@ -22,6 +22,7 @@ HAL_POOL_TIMEOUT_SECONDS = 30        # Pool process timeout in seconds
 HAL_POOL_RETRY_ATTEMPTS = 3          # Number of retry attempts for failed operations
 HAL_POOL_BATCH_SIZE_DEFAULT = 10     # Default batch size for bulk operations
 HAL_POOL_SHUTDOWN_TIMEOUT = 5        # Timeout for graceful pool shutdown
+HAL_POOL_MIN_WORKER_RATIO = 0.75     # FIX T2.4: Minimum ratio of workers that must respond
 
 # Empty Region Detection Configuration
 EMPTY_REGION_ENTROPY_THRESHOLD = 0.1  # Shannon entropy threshold (0-8 scale)

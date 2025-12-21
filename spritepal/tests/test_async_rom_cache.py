@@ -23,6 +23,9 @@ from PySide6.QtCore import QMutexLocker, QThread
 from PySide6.QtWidgets import QApplication
 
 from core.async_rom_cache import AsyncROMCache, CacheWorker
+from tests.fixtures.timeouts import (
+    cleanup_timeout, dialog_timeout, signal_timeout, worker_timeout, SHORT
+)
 
 # Mark tests that create QApplication instances for serial execution
 # parallel_unsafe: Tests create AsyncROMCache with worker threads that use shared
@@ -60,7 +63,7 @@ class TestCacheWorker:
         """Clean up test fixtures"""
         if hasattr(self, 'async_cache'):
             # Explicitly shutdown to stop the worker thread before deleting
-            self.async_cache.shutdown(timeout=2000)
+            self.async_cache.shutdown(timeout=cleanup_timeout())
         if hasattr(self, 'worker'):
             self.worker.stop()
         # Clean up temp directory
@@ -85,7 +88,7 @@ class TestCacheWorker:
         metadata = {"width": 128, "height": 128, "format": "4bpp"}
 
         # Connect signal spy
-        with qtbot.wait_signal(self.worker.save_complete, timeout=1000) as blocker:
+        with qtbot.wait_signal(self.worker.save_complete, timeout=signal_timeout(SHORT)) as blocker:
             self.worker.save_to_cache(cache_key, test_data, metadata)
 
         # Verify save completed successfully
@@ -100,7 +103,7 @@ class TestCacheWorker:
 
         # Test loading the cached data
         request_id = "load_test_123"
-        with qtbot.wait_signal(self.worker.data_loaded, timeout=1000) as blocker:
+        with qtbot.wait_signal(self.worker.data_loaded, timeout=signal_timeout(SHORT)) as blocker:
             self.worker.load_from_cache(request_id, cache_key)
 
         # Verify loaded data matches
@@ -118,7 +121,7 @@ class TestCacheWorker:
         request_id = "missing_test_456"
         cache_key = "nonexistent_key"
 
-        with qtbot.wait_signal(self.worker.load_error, timeout=1000) as blocker:
+        with qtbot.wait_signal(self.worker.load_error, timeout=signal_timeout(SHORT)) as blocker:
             self.worker.load_from_cache(request_id, cache_key)
 
         args = blocker.args
@@ -134,7 +137,7 @@ class TestCacheWorker:
         cache_file.write_bytes(b"\xFF\xFF\xFF\xFF" + b"invalid_json")
 
         request_id = "corrupt_test_789"
-        with qtbot.wait_signal(self.worker.load_error, timeout=1000) as blocker:
+        with qtbot.wait_signal(self.worker.load_error, timeout=signal_timeout(SHORT)) as blocker:
             self.worker.load_from_cache(request_id, cache_key)
 
         args = blocker.args
@@ -159,7 +162,7 @@ class TestCacheWorker:
             f.write(test_data)
 
         request_id = "expired_test_321"
-        with qtbot.wait_signal(self.worker.load_error, timeout=1000) as blocker:
+        with qtbot.wait_signal(self.worker.load_error, timeout=signal_timeout(SHORT)) as blocker:
             self.worker.load_from_cache(request_id, cache_key)
 
         # Should get cache expired error
@@ -187,7 +190,7 @@ class TestCacheWorker:
         test_data = b"atomic_data" * 1000  # Larger data to increase write time
         metadata = {"test": "atomic"}
 
-        with qtbot.wait_signal(self.worker.save_complete, timeout=2000) as blocker:
+        with qtbot.wait_signal(self.worker.save_complete, timeout=signal_timeout()) as blocker:
             self.worker.save_to_cache(cache_key, test_data, metadata)
 
         # Verify no .tmp file remains
@@ -200,7 +203,7 @@ class TestCacheWorker:
 
         # Verify file is not corrupted by attempting to load
         request_id = "atomic_load_test"
-        with qtbot.wait_signal(self.worker.data_loaded, timeout=1000) as blocker:
+        with qtbot.wait_signal(self.worker.data_loaded, timeout=signal_timeout(SHORT)) as blocker:
             self.worker.load_from_cache(request_id, cache_key)
 
         args = blocker.args
@@ -222,7 +225,7 @@ class TestAsyncROMCache:
         """Clean up test fixtures"""
         if hasattr(self, 'async_cache'):
             # Explicitly shutdown to stop the worker thread before deleting
-            self.async_cache.shutdown(timeout=2000)
+            self.async_cache.shutdown(timeout=cleanup_timeout())
             del self.async_cache
         # Clean up temp directory
         import shutil
@@ -248,7 +251,7 @@ class TestAsyncROMCache:
             assert cache_without_rom.cache_dir == expected_dir
         finally:
             # Must shutdown properly to avoid thread conflicts in parallel execution
-            cache_without_rom.shutdown(timeout=2000)
+            cache_without_rom.shutdown(timeout=cleanup_timeout())
 
     def test_memory_cache_hit(self, qtbot):
         """Test memory cache hit provides instant response"""
@@ -288,7 +291,7 @@ class TestAsyncROMCache:
             self.async_cache._memory_cache[cache_key] = (b"expired", {}, old_timestamp)
 
         # Request should not hit expired cache, should emit cache_error (miss)
-        with qtbot.wait_signal(self.async_cache.cache_error, timeout=1000):
+        with qtbot.wait_signal(self.async_cache.cache_error, timeout=signal_timeout(SHORT)):
             self.async_cache.get_cached_async(rom_path, offset, request_id)
 
         # Expired entry should be removed from memory cache
@@ -312,7 +315,7 @@ class TestAsyncROMCache:
             with QMutexLocker(self.async_cache._request_mutex):
                 return len(self.async_cache._memory_cache) > 0
 
-        qtbot.waitUntil(cache_has_entries, timeout=1000)
+        qtbot.waitUntil(cache_has_entries, timeout=signal_timeout(SHORT))
 
         # Should only have the most recent 3 entries
         with QMutexLocker(self.async_cache._request_mutex):
@@ -354,7 +357,7 @@ class TestAsyncROMCache:
             with QMutexLocker(self.async_cache._save_mutex):
                 return len(self.async_cache._save_queue) < 10
 
-        qtbot.waitUntil(queue_flushed, timeout=1000)
+        qtbot.waitUntil(queue_flushed, timeout=signal_timeout(SHORT))
 
         with QMutexLocker(self.async_cache._save_mutex):
             # Queue should be empty or much smaller after immediate flush
@@ -406,7 +409,7 @@ class TestAsyncROMCache:
         self.async_cache.cache_error.connect(collect_error)
 
         # Wait for all errors to be received
-        qtbot.wait_until(lambda: len(received_ids) == 5, timeout=2000)
+        qtbot.wait_until(lambda: len(received_ids) == 5, timeout=signal_timeout())
 
         # Verify all request IDs were received
         assert set(received_ids) == set(request_ids)
@@ -432,7 +435,7 @@ class TestAsyncROMCache:
             with QMutexLocker(self.async_cache._request_mutex):
                 return len(self.async_cache._memory_cache) > 0
 
-        qtbot.waitUntil(cache_populated, timeout=1000)
+        qtbot.waitUntil(cache_populated, timeout=signal_timeout(SHORT))
 
         # Verify cache has entries
         with QMutexLocker(self.async_cache._request_mutex):
@@ -501,7 +504,7 @@ class TestAsyncROMCacheIntegration:
         """Clean up integration test environment"""
         if hasattr(self, 'async_cache'):
             # Explicitly shutdown to stop the worker thread before deleting
-            self.async_cache.shutdown(timeout=2000)
+            self.async_cache.shutdown(timeout=cleanup_timeout())
             del self.async_cache
         import shutil
         if self.temp_dir.exists():
@@ -523,7 +526,7 @@ class TestAsyncROMCacheIntegration:
         cache_key = self.async_cache._generate_cache_key(rom_path, offset)
 
         # Connect to worker's save_complete signal to wait for actual disk write
-        with qtbot.wait_signal(self.async_cache._worker.save_complete, timeout=3000) as save_blocker:
+        with qtbot.wait_signal(self.async_cache._worker.save_complete, timeout=dialog_timeout()) as save_blocker:
             self.async_cache.save_cached_async(rom_path, offset, test_data, metadata)
             # Force immediate flush to trigger save
             self.async_cache._flush_save_queue()
@@ -538,7 +541,7 @@ class TestAsyncROMCacheIntegration:
 
         # Step 3: Request cached data
         request_id = "integration_test"
-        with qtbot.wait_signal(self.async_cache.cache_ready, timeout=2000) as blocker:
+        with qtbot.wait_signal(self.async_cache.cache_ready, timeout=signal_timeout()) as blocker:
             self.async_cache.get_cached_async(rom_path, offset, request_id)
 
         # Step 4: Verify loaded data matches saved data
@@ -595,7 +598,7 @@ class TestAsyncROMCacheIntegration:
             self.async_cache._flush_save_queue()
 
             # Wait for all saves to complete
-            qtbot.wait_until(lambda: save_count >= expected_saves, timeout=5000)
+            qtbot.wait_until(lambda: save_count >= expected_saves, timeout=worker_timeout())
             save_time = time.perf_counter() - start_time
 
         finally:
@@ -614,7 +617,7 @@ class TestAsyncROMCacheIntegration:
             load_signals.append(self.async_cache.cache_ready)
 
         # Wait for all loads to complete
-        with qtbot.wait_signals(load_signals[:10], timeout=5000):  # Test first 10
+        with qtbot.wait_signals(load_signals[:10], timeout=worker_timeout()):  # Test first 10
             pass
 
         load_time = time.perf_counter() - load_start_time
@@ -633,7 +636,7 @@ class TestAsyncROMCacheIntegration:
 
         # Test 1: Request non-existent cache
         request_id_1 = "nonexistent_test"
-        with qtbot.wait_signal(self.async_cache.cache_error, timeout=1000) as blocker:
+        with qtbot.wait_signal(self.async_cache.cache_error, timeout=signal_timeout(SHORT)) as blocker:
             self.async_cache.get_cached_async(rom_path, 0x999999, request_id_1)
 
         args = blocker.args
@@ -647,7 +650,7 @@ class TestAsyncROMCacheIntegration:
 
         # Wait for save to complete properly
         cache_key = self.async_cache._generate_cache_key(rom_path, offset)
-        with qtbot.wait_signal(self.async_cache._worker.save_complete, timeout=3000) as save_blocker:
+        with qtbot.wait_signal(self.async_cache._worker.save_complete, timeout=dialog_timeout()) as save_blocker:
             self.async_cache.save_cached_async(rom_path, offset, test_data, metadata)
             self.async_cache._flush_save_queue()
 
@@ -659,7 +662,7 @@ class TestAsyncROMCacheIntegration:
         self.async_cache.clear_memory_cache()
 
         request_id_2 = "recovery_test"
-        with qtbot.wait_signal(self.async_cache.cache_ready, timeout=2000) as blocker:
+        with qtbot.wait_signal(self.async_cache.cache_ready, timeout=signal_timeout()) as blocker:
             self.async_cache.get_cached_async(rom_path, offset, request_id_2)
 
         # Should successfully recover and load data

@@ -47,13 +47,14 @@ pytestmark = [
     pytest.mark.performance,
     pytest.mark.slow,
 ]
+
+@pytest.fixture
+def test_data_repo() -> DataRepository:
+    """Provide test data repository for performance tests."""
+    return get_test_data_repository()
+
 class TestManagerPerformanceBenchmarksTDD:
     """TDD performance benchmarks for manager operations."""
-
-    @pytest.fixture
-    def test_data_repo(self) -> DataRepository:
-        """Provide test data repository for performance tests."""
-        return get_test_data_repository()
 
     @pytest.mark.benchmark
     def test_extraction_manager_initialization_performance_tdd(self, benchmark, isolated_managers):
@@ -177,7 +178,7 @@ class TestManagerPerformanceBenchmarksTDD:
                 # Emit multiple signals for performance testing
                 for i in range(10):
                     extraction_mgr.extraction_progress.emit(f"Progress {i}")
-                    injection_mgr.injection_progress.emit(50 + i, f"Injection {i}")
+                    injection_mgr.injection_progress.emit(f"Injection {50 + i}")
 
                 # Process Qt events
                 from PySide6.QtWidgets import QApplication
@@ -410,7 +411,7 @@ class TestManagerMemoryPerformanceTDD:
 
                     # Emit signals to test connection
                     extraction_mgr.extraction_progress.emit(f"Test {i}")
-                    injection_mgr.injection_progress.emit(i, f"Test {i}")
+                    injection_mgr.injection_progress.emit(f"Test {i}")
 
                     # Disconnect signals
                     extraction_mgr.extraction_progress.disconnect(temp_handler)

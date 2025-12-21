@@ -51,6 +51,7 @@ def _is_wsl_environment() -> bool:
 
 from utils.constants import (
     DATA_SIZE,
+    HAL_POOL_MIN_WORKER_RATIO,
     HAL_POOL_SIZE_DEFAULT,
     HAL_POOL_SIZE_MAX,
     HAL_POOL_SIZE_MIN,
@@ -467,14 +468,23 @@ class HALProcessPool:
                         # Worker didn't respond in time, continue to check others
                         break
 
+                # FIX T2.4: Require minimum ratio of workers to respond
+                min_required = max(1, int(pool_size * HAL_POOL_MIN_WORKER_RATIO))
+
                 if responses_received == 0:
                     raise HALPoolError("Pool communication test failed - no workers responded")
+                elif responses_received < min_required:
+                    # Insufficient workers - fail initialization
+                    raise HALPoolError(
+                        f"Insufficient pool workers: {responses_received}/{pool_size} responded "
+                        f"(minimum {min_required} required, ratio={HAL_POOL_MIN_WORKER_RATIO})"
+                    )
                 elif responses_received < pool_size:
-                    # Partial pool - some workers are non-responsive
+                    # Partial pool but meets minimum - warn and continue
                     safe_warning(
                         logger,
                         f"HAL pool partially initialized: {responses_received}/{pool_size} workers responded. "
-                        "Some operations may be slower or hang."
+                        f"Meets minimum threshold ({min_required}), but some operations may be slower."
                     )
                 else:
                     logger.debug(f"Pool communication test successful - all {pool_size} workers responded")

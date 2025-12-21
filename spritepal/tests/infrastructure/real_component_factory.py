@@ -708,11 +708,10 @@ class RealComponentFactory:
         self._created_components.clear()
 
         # Step 3: Process Qt events to allow deleteLater() calls to complete
-        # This ensures all QThread cleanup and signal disconnections are processed
+        # Single call is sufficient - Qt processes all pending events in one pass
         try:
             if QApplication.instance():
-                for _ in range(10):
-                    QApplication.processEvents()
+                QApplication.processEvents()
         except Exception as e:
             warnings.warn(
                 f"Failed to process Qt events during cleanup: {e}",
@@ -726,17 +725,9 @@ class RealComponentFactory:
         # Qt object cleanup is handled via deleteLater() and processEvents() above.
         # The Python GC will clean up remaining objects naturally when safe.
 
-        # Step 5: Allow time for OS thread cleanup
-        # Python's threading.active_count() may still see threads being destroyed
-        try:
-            import time
-            time.sleep(0.05)  # Brief wait for OS thread cleanup (reduced since no GC)
-        except Exception as e:
-            warnings.warn(
-                f"Failed to wait for thread cleanup: {e}",
-                ResourceWarning,
-                stacklevel=2,
-            )
+        # Step 5: Removed time.sleep(0.05)
+        # The explicit thread.wait(5000) calls above ensure threads have terminated.
+        # Additional sleep is redundant and adds unnecessary test overhead.
 
         # Step 6: Clean up temp directories
         import shutil

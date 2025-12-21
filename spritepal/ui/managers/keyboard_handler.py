@@ -92,11 +92,13 @@ class KeyboardShortcutHandler(QObject):
         # Focus shortcuts
         if event.modifiers() == Qt.KeyboardModifier.AltModifier:
             if event.key() == Qt.Key.Key_N:
-                # Alt+N: Focus output name field
-                self.output_settings_manager.output_name_edit.setFocus()
-                self.output_settings_manager.output_name_edit.selectAll()
-                event.accept()
-                return True
+                # Alt+N: Focus output name field (if inline UI exists)
+                output_edit = getattr(self.output_settings_manager, "output_name_edit", None)
+                if output_edit is not None:
+                    output_edit.setFocus()
+                    output_edit.selectAll()
+                    event.accept()
+                    return True
 
         return False
 

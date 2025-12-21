@@ -49,13 +49,13 @@ class OutputSettingsManager(QObject):
         self.parent_widget = parent
         self.actions_handler = actions_handler
 
-        # Widget references
-        self.output_group: QGroupBox
-        self.output_name_edit: QLineEdit
-        self.browse_button: QPushButton
-        self.grayscale_check: QCheckBox
-        self.metadata_check: QCheckBox
-        self.output_info_label: QLabel
+        # Widget references - initialized to None until create_output_settings_group() is called
+        self.output_group: QGroupBox | None = None
+        self.output_name_edit: QLineEdit | None = None
+        self.browse_button: QPushButton | None = None
+        self.grayscale_check: QCheckBox | None = None
+        self.metadata_check: QCheckBox | None = None
+        self.output_info_label: QLabel | None = None
 
     def create_output_settings_group(self) -> QGroupBox:
         """Create and return the output settings group box"""
@@ -146,6 +146,8 @@ class OutputSettingsManager(QObject):
 
     def _browse_output(self) -> None:
         """Browse for output location"""
+        if self.output_name_edit is None:
+            return
         # Get current directory from session
         current_vram_path = self.actions_handler.get_current_vram_path()
         if current_vram_path:
@@ -171,10 +173,14 @@ class OutputSettingsManager(QObject):
 
     def get_output_name(self) -> str:
         """Get current output name"""
+        if self.output_name_edit is None:
+            return ""
         return self.output_name_edit.text()
 
     def set_output_name(self, name: str) -> None:
         """Set output name without triggering signals"""
+        if self.output_name_edit is None:
+            return
         # Temporarily disconnect to avoid signal loops
         self.output_name_edit.textChanged.disconnect()
         self.output_name_edit.setText(name)
@@ -182,18 +188,26 @@ class OutputSettingsManager(QObject):
 
     def get_grayscale_enabled(self) -> bool:
         """Get grayscale checkbox state"""
+        if self.grayscale_check is None:
+            return False
         return self.grayscale_check.isChecked()
 
     def set_grayscale_enabled(self, enabled: bool) -> None:
         """Set grayscale checkbox state"""
+        if self.grayscale_check is None:
+            return
         self.grayscale_check.setChecked(enabled)
 
     def get_metadata_enabled(self) -> bool:
         """Get metadata checkbox state"""
+        if self.metadata_check is None:
+            return False
         return self.metadata_check.isChecked()
 
     def set_metadata_enabled(self, enabled: bool) -> None:
         """Set metadata checkbox state"""
+        if self.metadata_check is None:
+            return
         self.metadata_check.setChecked(enabled)
 
     def update_output_info_label(self, is_vram_tab: bool, is_grayscale_mode: bool) -> None:
@@ -206,18 +220,24 @@ class OutputSettingsManager(QObject):
         if not is_vram_tab:
             return
 
+        if self.output_info_label is None:
+            return
         if is_grayscale_mode:
             self.output_info_label.setText("Files to create: grayscale PNG only")
         else:
             files = ["PNG"]
-            if self.grayscale_check.isChecked():
+            if self.grayscale_check and self.grayscale_check.isChecked():
                 files.append("8 palette files (.pal.json)")
-            if self.metadata_check.isChecked():
+            if self.metadata_check and self.metadata_check.isChecked():
                 files.append("metadata.json")
             self.output_info_label.setText(f"Files to create: {', '.join(files)}")
 
     def set_rom_extraction_mode(self) -> None:
         """Configure for ROM extraction mode - all outputs enabled and forced on"""
+        if self.grayscale_check is None or self.metadata_check is None:
+            return
+        if self.output_info_label is None or self.output_group is None:
+            return
         # Force checkboxes on and disable them - ROM mode always creates all outputs
         self.grayscale_check.setChecked(True)
         self.grayscale_check.setEnabled(False)
@@ -239,6 +259,10 @@ class OutputSettingsManager(QObject):
 
     def set_vram_extraction_mode(self) -> None:
         """Configure for VRAM extraction mode - checkboxes enabled for user control"""
+        if self.grayscale_check is None or self.metadata_check is None:
+            return
+        if self.output_info_label is None or self.output_group is None:
+            return
         # Re-enable checkboxes with original tooltips
         self.grayscale_check.setEnabled(True)
         self.grayscale_check.setToolTip(
@@ -268,6 +292,8 @@ class OutputSettingsManager(QObject):
         Args:
             is_grayscale_mode: Whether in grayscale-only mode
         """
+        if self.grayscale_check is None or self.metadata_check is None:
+            return
         # Disable palette-related options in grayscale mode
         self.grayscale_check.setEnabled(not is_grayscale_mode)
         self.metadata_check.setEnabled(not is_grayscale_mode)
@@ -294,6 +320,8 @@ class OutputSettingsManager(QObject):
 
     def clear_output_name(self) -> None:
         """Clear output name field"""
+        if self.output_name_edit is None:
+            return
         self.output_name_edit.clear()
 
     def set_output_needs_attention(self, needs_attention: bool) -> None:
@@ -304,6 +332,8 @@ class OutputSettingsManager(QObject):
         Args:
             needs_attention: True to highlight (warning style), False to restore default
         """
+        if self.output_name_edit is None:
+            return
         if needs_attention and not self.output_name_edit.text():
             # Only highlight if field is actually empty
             self.output_name_edit.setStyleSheet(self._highlight_output_style)

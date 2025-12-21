@@ -62,7 +62,7 @@ from ui.zoomable_preview import PreviewPanel
 
 # Layout constants for consistent sizing and spacing
 MAIN_WINDOW_MIN_SIZE = (1000, 650)  # Much more compact
-DEFAULT_SPLITTER_RATIO = 0.45  # Give left panel a bit more space
+DEFAULT_SPLITTER_RATIO = 0.40  # Give more space to preview panel
 MIN_PANEL_WIDTH = 380  # Slightly smaller minimum
 LAYOUT_MARGINS = SPACING_SMALL  # 8px - standard margins
 LAYOUT_SPACING = SPACING_COMPACT_SMALL  # 6px - compact spacing
@@ -166,7 +166,7 @@ class MainWindow(QMainWindow):
         right_width = total_width - left_width
         main_splitter.setSizes([left_width, right_width])
         main_splitter.setStretchFactor(0, 1)  # Left panel stretches proportionally
-        main_splitter.setStretchFactor(1, 2)  # Right panel stretches more
+        main_splitter.setStretchFactor(1, 3)  # Right panel stretches more for preview
 
         # Set minimum sizes for panels
         self.left_panel.setMinimumWidth(MIN_PANEL_WIDTH)
@@ -235,14 +235,9 @@ class MainWindow(QMainWindow):
         self.action_zone.setObjectName("actionZone")
         self.action_zone.setStyleSheet(get_action_zone_style())
         action_zone_layout = QVBoxLayout(self.action_zone)
-        action_zone_layout.setContentsMargins(LAYOUT_MARGINS, 0, LAYOUT_MARGINS, LAYOUT_MARGINS)
-        action_zone_layout.setSpacing(LAYOUT_SPACING)
-
-        # Visual separator line
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
-        action_zone_layout.addWidget(separator)
+        # Tight top margin - CSS border-top provides visual separation
+        action_zone_layout.setContentsMargins(LAYOUT_MARGINS, SPACING_COMPACT_SMALL, LAYOUT_MARGINS, LAYOUT_MARGINS)
+        action_zone_layout.setSpacing(SPACING_COMPACT_SMALL)  # 6px - tighter for cohesion
 
         # Output settings and buttons will be added by managers in _setup_managers()
         
@@ -296,13 +291,10 @@ class MainWindow(QMainWindow):
         self.menu_bar_manager.create_menus()
         self.status_bar_manager.setup_status_bar_indicators()
 
-        # Add output settings and buttons to the pinned action zone
+        # Add action buttons to the pinned action zone
+        # Note: Output settings moved to dialog (shown on Extract click)
         action_zone_layout = self.action_zone.layout()
         if action_zone_layout is not None and isinstance(action_zone_layout, QVBoxLayout):
-            # Add output settings group to action zone
-            output_group = self.output_settings_manager.create_output_settings_group()
-            action_zone_layout.addWidget(output_group)
-
             # Add toolbar buttons
             button_layout = QGridLayout()
             button_layout.setContentsMargins(0, LAYOUT_SPACING, 0, 0)
@@ -322,13 +314,7 @@ class MainWindow(QMainWindow):
 
     def _update_initial_ui_state(self) -> None:
         """Update initial UI state after setup"""
-        # Update output info label
-        self.output_settings_manager.update_output_info_label(
-            is_vram_tab=False,  # ROM tab is default
-            is_grayscale_mode=False
-        )
-
-        # Update extraction mode
+        # Update extraction mode (for VRAM panel)
         self._on_extraction_mode_changed(self.extraction_panel.mode_combo.currentIndex())
 
     def _setup_status_bar_indicators(self) -> None:
@@ -402,11 +388,47 @@ class MainWindow(QMainWindow):
     # ToolbarActionsProtocol
     def on_extract_clicked(self) -> None:
         """Handle extract button click"""
-        # Check which tab is active
-        if self.tab_coordinator.is_rom_tab_active():
-            self._handle_rom_extraction()
+        from ui.dialogs import OutputSettingsDialog
+
+        # Determine if we're in ROM mode (affects dialog options)
+        is_rom_mode = self.tab_coordinator.is_rom_tab_active()
+
+        # Get suggested output name from the current state
+        suggested_name = self.output_settings_manager.get_output_name()
+
+        # Get default directory for browse
+        default_dir = self.get_current_vram_path() or str(Path.cwd())
+
+        # Show output settings dialog
+        settings = OutputSettingsDialog.get_output_settings(
+            parent=self,
+            suggested_name=suggested_name,
+            is_rom_mode=is_rom_mode,
+            default_directory=default_dir,
+        )
+
+        # User cancelled
+        if settings is None:
+            return
+
+        # Validate output name
+        if not settings.output_name:
+            QMessageBox.warning(
+                self,
+                "Missing Output Name",
+                "Please enter an output name for the extracted sprites."
+            )
+            return
+
+        # Proceed with extraction
+        if is_rom_mode:
+            self._handle_rom_extraction(settings.output_name)
         else:
-            self._handle_vram_extraction()
+            self._handle_vram_extraction(
+                settings.output_name,
+                settings.export_palette_files,
+                settings.include_metadata
+            )
 
     def on_open_editor_clicked(self) -> None:
         """Handle open in editor button click"""
@@ -469,12 +491,16 @@ class MainWindow(QMainWindow):
         """Open manual offset dialog"""
         self.rom_extraction_panel._open_manual_offset_dialog()
 
-    def _handle_rom_extraction(self) -> None:
-        """Handle ROM extraction"""
+    def _handle_rom_extraction(self, output_name: str) -> None:
+        """Handle ROM extraction
+
+        Args:
+            output_name: Output filename (without extension) from dialog
+        """
         params = self.rom_extraction_panel.get_extraction_params()
         if params:
-            # Use the shared output name
-            params["output_base"] = self.output_settings_manager.get_output_name()
+            # Use the output name from dialog
+            params["output_base"] = output_name
 
             # Validate parameters using extraction manager
             # Delayed import to avoid initialization order issues
@@ -503,10 +529,25 @@ class MainWindow(QMainWindow):
             self.toolbar_manager.set_extract_enabled(False)
             self.controller.start_rom_extraction(params)
 
-    def _handle_vram_extraction(self) -> None:
-        """Handle VRAM extraction"""
-        # VRAM extraction - validation will be handled by controller
-        self._output_path = self.output_settings_manager.get_output_name()
+    def _handle_vram_extraction(
+        self,
+        output_name: str,
+        export_palette_files: bool,
+        include_metadata: bool,
+    ) -> None:
+        """Handle VRAM extraction
+
+        Args:
+            output_name: Output filename (without extension) from dialog
+            export_palette_files: Whether to export palette files
+            include_metadata: Whether to include metadata
+        """
+        # Store settings for use in get_vram_extraction_params
+        self._vram_output_name = output_name
+        self._vram_export_palettes = export_palette_files
+        self._vram_include_metadata = include_metadata
+
+        self._output_path = output_name
         self.status_bar_manager.show_message("Extracting sprites from VRAM...")
         self.toolbar_manager.set_extract_enabled(False)
 
@@ -543,10 +584,8 @@ class MainWindow(QMainWindow):
             self._on_rom_output_name_changed
         )
 
-        # Connect output settings manager signals
-        # Note: No longer sync TO ROM panel - output name is now shared (ROM panel uses provider callback)
-        self.output_settings_manager.grayscale_toggled.connect(self._update_output_info_label)
-        self.output_settings_manager.metadata_toggled.connect(self._update_output_info_label)
+        # Note: Output settings are now shown in a dialog on Extract click
+        # The output_settings_manager just tracks the suggested output name
 
     def _on_files_changed(self) -> None:
         """Handle when input files change"""
@@ -576,21 +615,9 @@ class MainWindow(QMainWindow):
 
     def _on_extraction_mode_changed(self, mode_index: int) -> None:
         """Handle extraction mode change"""
-        # Update checkboxes based on mode
-        is_grayscale_mode = mode_index == 1
-
-        # Delegate to output settings manager
-        self.output_settings_manager.set_extraction_mode_options(is_grayscale_mode)
-
-        # Update output info label
-        self._update_output_info_label()
-
-    def _update_output_info_label(self) -> None:
-        """Update the label showing which files will be created"""
-        is_vram_tab = self.tab_coordinator.is_vram_tab_active()
-        is_grayscale_mode = self.extraction_panel.is_grayscale_mode()
-
-        self.output_settings_manager.update_output_info_label(is_vram_tab, is_grayscale_mode)
+        # Mode change just affects VRAM panel UI - output settings are in dialog now
+        # The dialog will handle grayscale mode options when shown
+        pass
 
     def _on_rom_extraction_ready(self, ready: bool, reason: str = "") -> None:
         """Handle ROM extraction ready state change"""
@@ -657,14 +684,15 @@ class MainWindow(QMainWindow):
 
     def get_extraction_params(self) -> VRAMExtractionParams:
         """Get extraction parameters from UI"""
+        # Use settings from dialog (stored in _handle_vram_extraction)
         return {
             "vram_path": self.extraction_panel.get_vram_path(),
             "cgram_path": self.extraction_panel.get_cgram_path() if not self.extraction_panel.is_grayscale_mode() else "",
             "oam_path": self.extraction_panel.get_oam_path(),
             "vram_offset": self.extraction_panel.get_vram_offset(),
-            "output_base": self.output_settings_manager.get_output_name(),
-            "create_grayscale": self.output_settings_manager.get_grayscale_enabled(),
-            "create_metadata": self.output_settings_manager.get_metadata_enabled(),
+            "output_base": getattr(self, "_vram_output_name", ""),
+            "create_grayscale": getattr(self, "_vram_export_palettes", True),
+            "create_metadata": getattr(self, "_vram_include_metadata", True),
             "grayscale_mode": self.extraction_panel.is_grayscale_mode(),
         }
 
@@ -786,23 +814,23 @@ class MainWindow(QMainWindow):
 
     @property
     def output_name_edit(self):
-        """Delegate to output settings manager"""
+        """Delegate to output settings manager (returns None if inline UI not created)"""
         if hasattr(self, "output_settings_manager"):
-            return self.output_settings_manager.output_name_edit
+            return getattr(self.output_settings_manager, "output_name_edit", None)
         return None
 
     @property
     def grayscale_check(self):
-        """Delegate to output settings manager"""
+        """Delegate to output settings manager (returns None if inline UI not created)"""
         if hasattr(self, "output_settings_manager"):
-            return self.output_settings_manager.grayscale_check
+            return getattr(self.output_settings_manager, "grayscale_check", None)
         return None
 
     @property
     def metadata_check(self):
-        """Delegate to output settings manager"""
+        """Delegate to output settings manager (returns None if inline UI not created)"""
         if hasattr(self, "output_settings_manager"):
-            return self.output_settings_manager.metadata_check
+            return getattr(self.output_settings_manager, "metadata_check", None)
         return None
 
     @property

@@ -27,7 +27,7 @@ from unittest.mock import patch
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QSignalSpy, QTest
-from PySide6.QtWidgets import QCheckBox, QLineEdit, QPushButton
+from PySide6.QtWidgets import QPushButton
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
@@ -48,6 +48,35 @@ from tests.infrastructure import (
 
 # Import real MainWindow (not mocked!)
 from ui.main_window import MainWindow
+from ui.dialogs.output_settings_dialog import OutputSettingsDialog
+
+
+def _apply_vram_output_settings(
+    qt_app,
+    main_window: MainWindow,
+    output_name: str,
+    export_palette_files: bool = True,
+    include_metadata: bool = True,
+):
+    """Configure output settings via dialog and apply to MainWindow state."""
+    dialog = OutputSettingsDialog(parent=main_window, suggested_name="")
+    if dialog.output_name_edit:
+        dialog.output_name_edit.clear()
+        QTest.keyClicks(dialog.output_name_edit, output_name)
+    if dialog.palette_check:
+        dialog.palette_check.setChecked(export_palette_files)
+    if dialog.metadata_check:
+        dialog.metadata_check.setChecked(include_metadata)
+    qt_app.processEvents()
+    settings = dialog.get_settings()
+    dialog.close()
+    qt_app.processEvents()
+    main_window._handle_vram_extraction(
+        settings.output_name,
+        settings.export_palette_files,
+        settings.include_metadata,
+    )
+    return settings
 
 
 class TestRealMainWindowStateIntegration:
@@ -103,15 +132,15 @@ class TestRealMainWindowStateIntegration:
             # Note: QMainWindow should NOT have a parent (it's a top-level window)
             assert main_window.parent() is None, "MainWindow should be a top-level window with no parent"
 
-            # Validate real Qt widgets exist (vs MockButton, MockOutputNameEdit)
+            # Validate real Qt widgets exist (vs MockButton)
             assert isinstance(main_window.extract_button, QPushButton), "Should have real QPushButton"
-            assert isinstance(main_window.output_name_edit, QLineEdit), "Should have real QLineEdit"
-            assert isinstance(main_window.grayscale_check, QCheckBox), "Should have real QCheckBox"
-            assert isinstance(main_window.metadata_check, QCheckBox), "Should have real QCheckBox"
 
             # Validate Qt widget hierarchy (MOCKS CAN'T TEST THIS)
             assert main_window.extract_button.parent() is not None, "Button should have Qt parent"
-            assert main_window.output_name_edit.parent() is not None, "LineEdit should have Qt parent"
+            # Output settings are now handled via dialog, not inline widgets
+            assert main_window.output_name_edit is None, "Output name edit should not be inline"
+            assert main_window.grayscale_check is None, "Grayscale checkbox should not be inline"
+            assert main_window.metadata_check is None, "Metadata checkbox should not be inline"
 
             # Validate real widget initial states (vs hand-coded mock states)
             # Note: Real MainWindow has complex state management - test actual behavior vs assumptions
@@ -139,36 +168,51 @@ class TestRealMainWindowStateIntegration:
             # Set up real test data (vs mock data)
             extraction_data = self.test_data.get_vram_extraction_data("medium")
 
+            # Output settings are handled via dialog; test real dialog UI instead
+            dialog = OutputSettingsDialog(parent=main_window, suggested_name="")
+            assert dialog.output_name_edit is not None, "Dialog should create output name edit"
+            assert dialog.palette_check is not None, "Dialog should create palette checkbox"
+
             # Test real UI input (vs MockOutputNameEdit simulation)
-            QTest.keyClicks(main_window.output_name_edit, "real_test_sprites")
-            assert main_window.output_name_edit.text() == "real_test_sprites"
+            dialog.output_name_edit.clear()
+            QTest.keyClicks(dialog.output_name_edit, "real_test_sprites")
+            assert dialog.output_name_edit.text() == "real_test_sprites"
 
             # Test real checkbox interaction (vs mock.setChecked simulation)
-            initial_grayscale = main_window.grayscale_check.isChecked()
+            initial_grayscale = dialog.palette_check.isChecked()
             print(f"Initial grayscale state: {initial_grayscale}")
-            print(f"Checkbox enabled: {main_window.grayscale_check.isEnabled()}")
+            print(f"Checkbox enabled: {dialog.palette_check.isEnabled()}")
 
             # Process events before click
             self.qt_app.processEvents()
 
             # Try mouse click
-            QTest.mouseClick(main_window.grayscale_check, Qt.MouseButton.LeftButton)
+            QTest.mouseClick(dialog.palette_check, Qt.MouseButton.LeftButton)
 
             # Process events to ensure click is handled
             self.qt_app.processEvents()
 
-            after_click = main_window.grayscale_check.isChecked()
+            after_click = dialog.palette_check.isChecked()
             print(f"After click state: {after_click}")
 
             # If click didn't work, try programmatic toggle for test continuity
             if after_click == initial_grayscale:
                 print("Mouse click didn't work, trying programmatic toggle")
-                main_window.grayscale_check.setChecked(not initial_grayscale)
-                after_toggle = main_window.grayscale_check.isChecked()
+                dialog.palette_check.setChecked(not initial_grayscale)
+                after_toggle = dialog.palette_check.isChecked()
                 print(f"After programmatic toggle: {after_toggle}")
                 assert after_toggle != initial_grayscale, "Programmatic toggle should work"
             else:
                 assert after_click != initial_grayscale, "Real checkbox should toggle"
+
+            settings = dialog.get_settings()
+            dialog.close()
+            self.qt_app.processEvents()
+            main_window._handle_vram_extraction(
+                settings.output_name,
+                settings.export_palette_files,
+                settings.include_metadata,
+            )
 
             # Test real button click interaction (vs mock click simulation)
             # Note: We can't easily trigger full extraction in test, but we can test the state logic
@@ -203,8 +247,8 @@ class TestRealMainWindowStateIntegration:
             QSignalSpy(main_window.inject_requested)
 
             # Prepare for extraction (real UI state vs mock state)
-            QTest.keyClicks(main_window.output_name_edit, "signal_test_sprites")
-            test_files = ["signal_test_sprites.png"]
+            settings = _apply_vram_output_settings(self.qt_app, main_window, "signal_test_sprites")
+            test_files = [f"{settings.output_name}.png"]
             main_window.extraction_complete(test_files)
 
             # Debug button state before click
@@ -213,13 +257,6 @@ class TestRealMainWindowStateIntegration:
 
             # DEBUG: Check what _output_path is set to
             print(f"MainWindow._output_path: '{main_window._output_path}'")
-
-            # DISCOVERED BUG: extraction_complete() enables button but doesn't set _output_path!
-            # This is a real architectural bug that mocks would hide.
-            # The button appears clickable but _on_open_editor_clicked() does nothing if _output_path is empty.
-
-            # FIX: Properly set _output_path to simulate real extraction workflow
-            main_window._output_path = "signal_test_sprites"
 
             # Test real signal emission from button clicks (vs mock signal.emit())
             QTest.mouseClick(main_window.open_editor_button, Qt.MouseButton.LeftButton)
@@ -261,25 +298,14 @@ class TestRealMainWindowStateIntegration:
         - Integration between multiple UI panels
         """
         with self.main_window_test() as main_window:
-            # Set up real UI values (vs mock.text.return_value simulation)
-            QTest.keyClicks(main_window.output_name_edit, "param_test_output")
-
-            # Set real checkbox states (vs mock.isChecked.return_value)
-            print(f"Initial checkbox states - grayscale: {main_window.grayscale_check.isChecked()}, metadata: {main_window.metadata_check.isChecked()}")
-
-            # Use programmatic control for reliable test setup (mouse clicks aren't working in test environment)
-            main_window.grayscale_check.setChecked(True)
-            main_window.metadata_check.setChecked(False)
-
-            print(f"After programmatic set - grayscale: {main_window.grayscale_check.isChecked()}, metadata: {main_window.metadata_check.isChecked()}")
-
-            # Process events to ensure state changes
-            self.qt_app.processEvents()
-
-            # ARCHITECTURAL DISCOVERY: get_extraction_params() uses _output_path, not output_name_edit.text()
-            # This reveals another UI/state inconsistency - the UI field and internal state can be out of sync
-            print(f"output_name_edit.text(): '{main_window.output_name_edit.text()}'")
-            print(f"_output_path: '{main_window._output_path}'")
+            # Set up real UI values via the output settings dialog
+            settings = _apply_vram_output_settings(
+                self.qt_app,
+                main_window,
+                "param_test_output",
+                export_palette_files=True,
+                include_metadata=False,
+            )
 
             # Test real parameter gathering (vs mock dictionary construction)
             params = main_window.get_extraction_params()
@@ -288,12 +314,9 @@ class TestRealMainWindowStateIntegration:
             assert isinstance(params, dict), "Should return real dictionary"
             assert "output_base" in params, "Should have output_base parameter"
 
-            # REAL BEHAVIOR: output_base comes from UI field, not _output_path
-            # This is how MainWindow actually works vs mocked assumptions
-            assert params["output_base"] == main_window.output_name_edit.text(), "output_base should match UI field"
-
-            # The UI field is separate from the parameter output (architectural inconsistency)
-            assert main_window.output_name_edit.text() == "param_test_output", "UI field should have our input"
+            # REAL BEHAVIOR: output_base comes from dialog-configured settings
+            assert params["output_base"] == settings.output_name, "output_base should match dialog settings"
+            assert settings.output_name == "param_test_output", "Dialog should have our input"
             assert "create_grayscale" in params, "Should have grayscale parameter"
             assert params["create_grayscale"] is True, "Should have real checkbox state"
             assert "create_metadata" in params, "Should have metadata parameter"
@@ -311,9 +334,6 @@ class TestRealMainWindowStateIntegration:
         - Real error dialog integration (mocked to prevent blocking in headless mode)
         """
         with self.main_window_test() as main_window:
-            # Set up initial state
-            QTest.keyClicks(main_window.output_name_edit, "error_test_sprites")
-
             # Simulate extraction error (using real method vs mock method)
             # Note: Error dialog is mocked to prevent blocking in headless mode
             error_message = "Real test error - file not found"
@@ -405,17 +425,17 @@ class TestRealMainWindowWorkflowIntegration:
             self.test_data.get_vram_extraction_data("medium")
 
             # Set up real UI for extraction (vs mock UI setup)
-            QTest.keyClicks(main_window.output_name_edit, "workflow_test")
+            settings = _apply_vram_output_settings(self.qt_app, main_window, "workflow_test")
 
             # Note: Full extraction workflow requires file loading which is complex in test
             # But we can test the UI workflow parts that mocks were simulating
 
             # Test parameter gathering from real UI
             params = main_window.get_extraction_params()
-            assert params["output_base"] == "workflow_test", "Real parameter from UI"
+            assert params["output_base"] == settings.output_name, "Real parameter from UI"
 
             # Test successful completion workflow
-            test_files = ["workflow_test.png", "workflow_test.pal.json"]
+            test_files = [f"{settings.output_name}.png", f"{settings.output_name}.pal.json"]
             main_window.extraction_complete(test_files)
 
             # Validate real UI state after completion
@@ -437,21 +457,24 @@ class TestRealMainWindowWorkflowIntegration:
             assert main_window.session_manager is not None, "Should have real session manager"
 
             # Test real UI state that would be saved/restored
-            QTest.keyClicks(main_window.output_name_edit, "session_test")
-
-            # Toggle checkboxes
-            if not main_window.grayscale_check.isChecked():
-                QTest.mouseClick(main_window.grayscale_check, Qt.MouseButton.LeftButton)
+            settings = _apply_vram_output_settings(
+                self.qt_app,
+                main_window,
+                "session_test",
+                export_palette_files=True,
+                include_metadata=False,
+            )
 
             # Test that real UI state can be gathered for session
             # (Real session save/restore would be complex to test, but UI integration is testable)
+            params = main_window.get_extraction_params()
             ui_state = {
-                "output_name": main_window.output_name_edit.text(),
-                "create_grayscale": main_window.grayscale_check.isChecked(),
-                "create_metadata": main_window.metadata_check.isChecked(),
+                "output_name": params["output_base"],
+                "create_grayscale": params["create_grayscale"],
+                "create_metadata": params["create_metadata"],
             }
 
-            assert ui_state["output_name"] == "session_test", "Real UI state gathering"
+            assert ui_state["output_name"] == settings.output_name, "Real UI state gathering"
             assert isinstance(ui_state["create_grayscale"], bool), "Real checkbox state"
 
     def test_real_menu_integration_vs_mocked_menus(self):
@@ -542,8 +565,8 @@ class TestBugDiscoveryRealVsMocked:
             QSignalSpy(main_window.extract_requested)
 
             # Set up UI and trigger signal
-            QTest.keyClicks(main_window.output_name_edit, "timing_test")
-            main_window.extraction_complete(["timing_test.png"])
+            settings = _apply_vram_output_settings(self.qt_app, main_window, "timing_test")
+            main_window.extraction_complete([f"{settings.output_name}.png"])
 
             # Click button to emit signal
             QTest.mouseClick(main_window.open_editor_button, Qt.MouseButton.LeftButton)

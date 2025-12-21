@@ -173,7 +173,10 @@ class ExtractionController(QObject):
                 logger.warning(f"VRAM file warning: {warning}")
 
         cgram_path = params.get("cgram_path", "")
-        if cgram_path:  # Only validate if CGRAM path was provided
+        grayscale_mode = params.get("grayscale_mode", False)
+        # Only validate CGRAM if path was provided AND not in grayscale mode
+        # Grayscale mode doesn't require CGRAM for color palette extraction
+        if cgram_path and not grayscale_mode:
             cgram_result = FileValidator.validate_cgram_file(cgram_path)
             if not cgram_result.is_valid:
                 self.main_window.extraction_failed(cgram_result.error_message or "CGRAM file validation failed")

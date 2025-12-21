@@ -3,6 +3,7 @@ Integration test fixtures that use real components without mocking.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -132,11 +133,27 @@ def real_kirby_rom():
 
     Returns None if ROM not available. Tests using this MUST handle None case
     by calling pytest.skip() or using test_rom_with_real_sprites fixture.
+
+    FIX T2.1: Uses multiple candidate paths for robustness under xdist.
+    Set SPRITEPAL_KIRBY_ROM env var in CI to specify exact location.
     """
-    # ROM is in parent directory (exhal-master/)
-    rom_path = Path("../Kirby Super Star (USA).sfc")
-    if rom_path.exists():
-        return rom_path
+    # Try multiple locations in order of preference
+    candidates = [
+        # Environment variable (CI/CD can set this)
+        Path(os.environ.get("SPRITEPAL_KIRBY_ROM", "")),
+        # Relative to this file (integration/conftest.py -> spritepal/ -> exhal-master/)
+        Path(__file__).parent.parent.parent.parent / "Kirby Super Star (USA).sfc",
+        # Relative to spritepal/ (legacy location)
+        Path(__file__).parent.parent.parent / "Kirby Super Star (USA).sfc",
+        # Legacy relative path (may work in some working directories)
+        Path("../Kirby Super Star (USA).sfc"),
+    ]
+
+    for path in candidates:
+        # Check path string is non-empty AND path exists AND is a file (not directory)
+        if str(path) and path.exists() and path.is_file():
+            return path.resolve()  # Return absolute path for reliability
+
     return None
 
 

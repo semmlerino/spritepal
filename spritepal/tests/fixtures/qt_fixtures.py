@@ -410,10 +410,17 @@ def _wait_for_threads(
     """Wait for leaked threads to finish, return any remaining leaks."""
     import time
 
-    elapsed = 0
-    leaked: dict[int, str] = {}
+    # Fast path: check immediately before entering wait loop
+    # Most tests have no leaked threads - exit without any waiting
+    leaked = _find_leaked_threads(
+        before_threads, _get_current_threads(), filter_pytest_timeout
+    )
+    if not leaked:
+        return {}
 
+    elapsed = 0
     while elapsed < max_wait_ms:
+        # Re-check in case threads finished during our initial check
         leaked = _find_leaked_threads(
             before_threads, _get_current_threads(), filter_pytest_timeout
         )
