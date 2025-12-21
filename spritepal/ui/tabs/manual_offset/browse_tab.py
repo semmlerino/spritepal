@@ -24,6 +24,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import (
+    SPACING_MEDIUM,
+    SPACING_SMALL,
+    SPACING_STANDARD,
+)
 from ui.styles import get_prominent_action_button_style
 from ui.styles.theme import COLORS
 
@@ -76,8 +81,8 @@ class SimpleBrowseTab(QWidget):
     def _setup_ui(self) -> None:
         """Set up the browse tab UI with improved layout and spacing."""
         layout = QVBoxLayout(self)
-        layout.setSpacing(8)  # Better spacing between sections
-        layout.setContentsMargins(12, 12, 12, 12)  # More comfortable margins
+        layout.setSpacing(SPACING_SMALL)  # Better spacing between sections
+        layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)  # More comfortable margins
 
         # Main control section with improved styling
         controls_frame = QFrame()
@@ -90,8 +95,8 @@ class SimpleBrowseTab(QWidget):
             }}
         """)
         controls_layout = QVBoxLayout(controls_frame)
-        controls_layout.setSpacing(12)  # Better spacing between controls
-        controls_layout.setContentsMargins(16, 16, 16, 16)  # Comfortable padding
+        controls_layout.setSpacing(SPACING_STANDARD)  # Better spacing between controls
+        controls_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)  # Comfortable padding
 
         # Section title with better styling
         title = self._create_section_title("ROM Offset Control")
@@ -146,7 +151,7 @@ class SimpleBrowseTab(QWidget):
 
         # Position info row with improved layout
         info_row = QHBoxLayout()
-        info_row.setSpacing(16)  # Better spacing between labels
+        info_row.setSpacing(SPACING_MEDIUM)  # Better spacing between labels
 
         self.position_label = QLabel(self._format_position(self._current_offset))
         position_font = QFont()
@@ -172,7 +177,7 @@ class SimpleBrowseTab(QWidget):
 
         # Navigation controls section with better grouping
         nav_row = QHBoxLayout()
-        nav_row.setSpacing(8)  # Better button spacing
+        nav_row.setSpacing(SPACING_SMALL)  # Better button spacing
 
         # Navigation buttons with improved styling
         button_style = f"""
@@ -243,15 +248,15 @@ class SimpleBrowseTab(QWidget):
 
         # Manual input section with better organization
         manual_section = QVBoxLayout()
-        manual_section.setSpacing(8)
+        manual_section.setSpacing(SPACING_SMALL)
 
         # Manual navigation row
         manual_row = QHBoxLayout()
-        manual_row.setSpacing(12)
+        manual_row.setSpacing(SPACING_STANDARD)
 
         # Go to offset group
         goto_group = QHBoxLayout()
-        goto_group.setSpacing(8)
+        goto_group.setSpacing(SPACING_SMALL)
 
         goto_label = QLabel("Jump to Offset:")
         goto_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
@@ -287,7 +292,7 @@ class SimpleBrowseTab(QWidget):
 
         # Step size control - moved to separate group
         step_group = QHBoxLayout()
-        step_group.setSpacing(8)
+        step_group.setSpacing(SPACING_SMALL)
 
         step_label = QLabel("Step Size:")
         step_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_muted']};")

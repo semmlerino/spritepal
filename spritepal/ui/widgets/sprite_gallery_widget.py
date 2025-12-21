@@ -83,8 +83,8 @@ class SpriteGalleryWidget(QWidget):
     def _setup_ui(self):
         """Setup the gallery UI."""
         layout = QVBoxLayout()
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(4)
+        layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
+        layout.setSpacing(SPACING_TINY)
 
         # Controls bar
         self.controls_widget = self._create_controls()

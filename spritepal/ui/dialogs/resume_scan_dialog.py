@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import SPACING_MEDIUM
 from ui.components.base import BaseDialog
 from ui.styles import get_bold_text_style, get_muted_text_style
 
@@ -54,7 +55,7 @@ class ResumeScanDialog(BaseDialog):
 
         # Create main content layout
         layout = QVBoxLayout()
-        layout.setSpacing(15)
+        layout.setSpacing(SPACING_MEDIUM)
 
         # Header with icon
         header_layout = QHBoxLayout()

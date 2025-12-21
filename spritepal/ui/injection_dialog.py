@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 # InjectionManager accessed via DI: inject(InjectionManagerProtocol)
 from core.sprite_validator import SpriteValidator
 from ui.common import WorkerManager
+from ui.common.spacing_constants import SPACING_SMALL
 from ui.components import (
     FileSelector,
     FormRow,
@@ -142,7 +143,7 @@ class InjectionDialog(TabbedDialog):
         container = QWidget()
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(8)
+        container_layout.setSpacing(SPACING_SMALL)
 
         # Add sprite selector at dialog level
         sprite_group = QGroupBox("Sprite to Inject")

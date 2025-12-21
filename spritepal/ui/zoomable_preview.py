@@ -44,6 +44,7 @@ from ui.common.spacing_constants import (
     MAX_ZOOM,
     PALETTE_SELECTOR_MIN_WIDTH,
     PREVIEW_MIN_SIZE,
+    SPACING_COMPACT_SMALL,
     TILE_GRID_THICKNESS,
 )
 from ui.styles.theme import COLORS
@@ -408,7 +409,7 @@ class PreviewPanel(QWidget):
 
         # Control buttons
         controls = QHBoxLayout()
-        controls.setContentsMargins(5, 5, 5, 5)
+        controls.setContentsMargins(SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL)
 
         # Palette application controls
         self.palette_toggle = QCheckBox("Apply Palette")

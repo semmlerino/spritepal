@@ -11,6 +11,7 @@ BASE_UNIT = 8
 # Spacing values (8px grid system)
 SPACING_TINY = BASE_UNIT // 2       # 4px - for very tight spacing
 SPACING_SMALL = BASE_UNIT           # 8px - for compact layouts
+SPACING_STANDARD = 12               # 12px - dialog/section spacing
 SPACING_MEDIUM = BASE_UNIT * 2      # 16px - standard spacing
 SPACING_LARGE = BASE_UNIT * 3       # 24px - generous spacing
 SPACING_XLARGE = BASE_UNIT * 4      # 32px - section separation

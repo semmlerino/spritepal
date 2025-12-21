@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ui.common.spacing_constants import SPACING_COMPACT_SMALL
 from ui.styles.theme import COLORS
 
 from .components import SplitterDialog
@@ -148,7 +149,7 @@ class RowArrangementDialog(SplitterDialog):
             self._on_available_selection_changed
         )
         # Add spacing between list items
-        self.available_list.setSpacing(6)
+        self.available_list.setSpacing(SPACING_COMPACT_SMALL)
         left_layout.addWidget(self.available_list)
 
         # Populate available rows
@@ -183,7 +184,7 @@ class RowArrangementDialog(SplitterDialog):
             self._on_arranged_selection_changed
         )
         # Add spacing between list items
-        self.arranged_list.setSpacing(6)
+        self.arranged_list.setSpacing(SPACING_COMPACT_SMALL)
         right_layout.addWidget(self.arranged_list)
 
         # Arrangement controls

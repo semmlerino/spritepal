@@ -13,7 +13,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from ui.common.spacing_constants import BORDER_THIN, PALETTE_PREVIEW_SIZE
+from ui.common.spacing_constants import BORDER_THIN, PALETTE_PREVIEW_SIZE, SPACING_TINY
 from ui.styles.theme import COLORS
 
 # Constants for collapsed view
@@ -140,7 +140,7 @@ class PaletteWidget(QFrame):
         # Layout - no spacing for seamless color grid
         layout = QGridLayout(self)
         layout.setSpacing(0)
-        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
 
         # Palette label
         self.label = QLabel(f"{palette_index}", self)
@@ -280,7 +280,7 @@ class PalettePreviewWidget(QWidget):
     def _setup_ui(self):
         """Set up the UI with expandable layout"""
         self._main_layout = QVBoxLayout(self)
-        self._main_layout.setSpacing(4)
+        self._main_layout.setSpacing(SPACING_TINY)
         self._main_layout.setContentsMargins(0, 0, 0, 0)
 
         # Expanded palette widget (shows full grid)

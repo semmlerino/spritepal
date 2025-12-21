@@ -69,6 +69,7 @@ from PySide6.QtWidgets import (
 
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.common.spacing_constants import SPACING_SMALL, SPACING_STANDARD
 from ui.styles.theme import COLORS
 
 _use_simple_preview = os.environ.get('SPRITEPAL_USE_SIMPLE_PREVIEW', '0').lower() in ('1', 'true', 'yes')
@@ -212,8 +213,8 @@ class UnifiedManualOffsetDialog(DialogBase):
                 pass
 
             def apply_standard_layout(self, layout: Any, spacing_type: str = 'normal') -> None:
-                layout.setSpacing(8)
-                layout.setContentsMargins(8, 8, 8, 8)
+                layout.setSpacing(SPACING_SMALL)
+                layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
             def remove_all_stretches(self, layout: Any) -> None:
                 pass
@@ -350,8 +351,8 @@ class UnifiedManualOffsetDialog(DialogBase):
         """Create the right panel with preview."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setSpacing(8)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(SPACING_SMALL)
+        layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)
 
         # Title with better styling
         title = QLabel("Sprite Preview")
@@ -369,7 +370,7 @@ class UnifiedManualOffsetDialog(DialogBase):
             }}
         """)
         preview_layout = QVBoxLayout(preview_frame)
-        preview_layout.setContentsMargins(8, 8, 8, 8)
+        preview_layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
         # Preview widget configured to expand within frame
         self.preview_widget = SpritePreviewWidget()

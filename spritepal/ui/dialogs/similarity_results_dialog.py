@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.visual_similarity_search import SimilarityMatch
+from ui.common.spacing_constants import SPACING_COMPACT_MEDIUM, SPACING_SMALL, SPACING_TINY
 from ui.components import BaseDialog
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
@@ -60,8 +61,8 @@ class SimilarityResultWidget(QFrame):
     def _setup_ui(self):
         """Setup the UI for this result widget."""
         layout = QVBoxLayout()
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(4)
+        layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
+        layout.setSpacing(SPACING_TINY)
 
         # Thumbnail
         thumbnail_label = QLabel()
@@ -177,7 +178,7 @@ class SimilarityResultsDialog(BaseDialog):
             # Grid widget
             grid_widget = QWidget()
             grid_layout = QGridLayout(grid_widget)
-            grid_layout.setSpacing(10)
+            grid_layout.setSpacing(SPACING_COMPACT_MEDIUM)
 
             # Add results in grid (3 columns)
             cols = 3
