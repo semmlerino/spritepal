@@ -151,10 +151,14 @@ class BaseManager(QObject):
         Returns:
             Result from the function
         """
-        if operation not in self._operation_locks:
-            self._operation_locks[operation] = threading.Lock()
+        # Atomic check-and-set under RLock to prevent race condition
+        # where two threads could create different Lock objects
+        with self._lock:
+            if operation not in self._operation_locks:
+                self._operation_locks[operation] = threading.Lock()
+            op_lock = self._operation_locks[operation]
 
-        with self._operation_locks[operation]:
+        with op_lock:
             return func()
 
     def _handle_error(self, error: Exception, operation: str | None = None) -> None:

@@ -10,6 +10,8 @@ from .dialog_protocols import (
     ArrangementDialogProtocol,
     DialogFactoryProtocol,
     InjectionDialogProtocol,
+    ManualOffsetDialogFactoryProtocol,
+    ManualOffsetDialogProtocol,
 )
 from .manager_protocols import (
     ApplicationStateManagerProtocol,
@@ -20,11 +22,11 @@ from .manager_protocols import (
     ROMExtractorProtocol,
     SettingsManagerProtocol,
 )
-from .worker_protocols import (
-    PreviewWorkerPoolProtocol,
-)
 from .preview_protocols import (
     PreviewCoordinatorProtocol,
+)
+from .worker_protocols import (
+    PreviewWorkerPoolProtocol,
 )
 
 __all__ = [
@@ -35,6 +37,8 @@ __all__ = [
     "ExtractionManagerProtocol",
     "InjectionDialogProtocol",
     "InjectionManagerProtocol",
+    "ManualOffsetDialogFactoryProtocol",
+    "ManualOffsetDialogProtocol",
     "PreviewCoordinatorProtocol",
     "PreviewWorkerPoolProtocol",
     "ROMCacheProtocol",

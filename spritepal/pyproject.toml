@@ -35,6 +35,7 @@ dev = [
     "memory-profiler>=0.60.0",  # Memory profiling
     "ruff>=0.1.0",
     "basedpyright>=1.8.0",
+    "pre-commit>=3.0.0",
 ]
 
 [build-system]
