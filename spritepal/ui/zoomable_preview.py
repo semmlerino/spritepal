@@ -138,13 +138,13 @@ class ZoomablePreviewWidget(QWidget):
                 self._draw_pixel_grid(painter, transform)
 
         else:
-            # Draw placeholder
-            # Light gray text for visibility on dark background
-            painter.setPen(QPen(QColor(150, 150, 150), PREVIEW_SCALE_FACTOR))
+            # Draw helpful empty state placeholder
+            # Muted text for visibility on dark background
+            painter.setPen(QPen(QColor(100, 100, 100), PREVIEW_SCALE_FACTOR))
             painter.drawText(
                 self.rect(),
                 Qt.AlignmentFlag.AlignCenter,
-                "Sprite preview will appear here",
+                "No sprites loaded",
             )
 
     def _draw_checkerboard(self, painter: Any, transform: Any) -> None:
@@ -443,11 +443,11 @@ class PreviewPanel(QWidget):
         _ = self.zoom_reset_btn.clicked.connect(self.preview.reset_view)
         self.zoom_reset_btn.setMaximumWidth(60)
 
-        # Help text
+        # Help text - slightly larger for readability
         help_label = QLabel(
             "Scroll: Zoom | Drag/MMB: Pan | Right-click: Reset | G: Grid | C: Palette | Ctrl+0: 4x | Ctrl+Shift+0: Fit"
         )
-        help_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 10px;")
+        help_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
 
         controls.addWidget(self.palette_toggle)
         controls.addWidget(self.palette_selector)

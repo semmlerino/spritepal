@@ -55,15 +55,42 @@ def get_button_style(
             "hover": COLORS["editor_hover"],
             "pressed": COLORS["editor_pressed"],
         },
+        "edit": {
+            "bg": COLORS["edit"],
+            "hover": COLORS["edit_hover"],
+            "pressed": COLORS["edit_pressed"],
+        },
+        "danger_action": {
+            "bg": COLORS["danger_action"],
+            "hover": COLORS["danger_action_hover"],
+            "pressed": COLORS["danger_action_pressed"],
+        },
         "default": {
             "bg": COLORS["light_gray"],
             "hover": COLORS["gray"],
             "pressed": COLORS["dark_gray"],
         },
+        "secondary_outline": {
+            "bg": "transparent",
+            "hover": COLORS["panel_background"],
+            "pressed": COLORS["background"],
+            "border": COLORS["border"],
+            "text": COLORS["text_secondary"],
+        },
     }
 
     colors = color_map.get(style_type, color_map["default"])
-    text_color = COLORS["white"] if style_type != "default" else COLORS["black"]
+
+    # Secondary outline uses different text color and transparent bg
+    if style_type == "secondary_outline":
+        text_color = colors.get("text", COLORS["text_secondary"])
+    elif style_type == "default":
+        text_color = COLORS["black"]
+    else:
+        text_color = COLORS["white"]
+
+    # Secondary outline uses explicit border color
+    border_color = colors.get("border", colors["bg"])
 
     return f"""
     QPushButton {{
@@ -72,7 +99,7 @@ def get_button_style(
         font-weight: {FONTS["bold_weight"]};
         font-size: {font_size};
         min-height: {min_height}px;
-        border: {DIMENSIONS["border_width"]}px solid {colors["bg"]};
+        border: {DIMENSIONS["border_width"]}px solid {border_color};
         border-radius: {DIMENSIONS["border_radius"]}px;
         padding: {DIMENSIONS["spacing_xs"]}px {DIMENSIONS["spacing_sm"]}px;
     }}
@@ -276,10 +303,11 @@ def get_muted_text_style(
     Returns:
         CSS string for muted text styling
     """
+    # All levels now meet WCAG AA (4.5:1 contrast on dark backgrounds)
     color_map = {
-        "light": "#b0b0b0",  # Brightened for WCAG AA contrast on dark backgrounds
-        "medium": COLORS["gray"],  # Standard gray
-        "dark": "#a0a0a0",   # Adjusted for dark theme visibility
+        "light": "#c8c8c8",  # Brightest - WCAG AA on #383838
+        "medium": COLORS["gray"],  # Standard gray (now #a0a0a0)
+        "dark": "#b0b0b0",   # Slightly muted - WCAG AA on dark backgrounds
     }
 
     color = color_map.get(color_level, COLORS["gray"])
@@ -899,6 +927,28 @@ def get_extraction_checklist_style() -> str:
     """
 
 
+def get_ready_status_style() -> str:
+    """
+    Get styling for ready/success status display.
+
+    Shows positive status with green accent to indicate extraction is ready.
+    Complements get_extraction_checklist_style() for the ready state.
+
+    Returns:
+        CSS string for ready status label styling
+    """
+    return f"""
+    QLabel {{
+        color: {COLORS["success"]};
+        font-size: {FONTS["small_size"]};
+        padding: {DIMENSIONS["spacing_sm"]}px {DIMENSIONS["spacing_md"]}px;
+        background-color: {COLORS["panel_background"]};
+        border-left: 3px solid {COLORS["success"]};
+        border-radius: {DIMENSIONS["border_radius_small"]}px;
+    }}
+    """
+
+
 def get_drop_zone_style(state: str = "empty", required: bool = True) -> str:
     """
     Get drop zone styling CSS based on state and requirement.
@@ -1064,3 +1114,44 @@ def get_drop_zone_badge_style(badge_type: str = "required") -> str:
         """,
     }
     return styles.get(badge_type, styles["required"])
+
+
+def get_danger_action_button_style() -> str:
+    """
+    Get styling for dangerous/destructive action buttons like 'Inject'.
+
+    Uses a warning red color to signal ROM-modifying actions that
+    should be used carefully. Matches height with primary Extract button.
+
+    Returns:
+        CSS string for danger action button styling
+    """
+    return f"""
+    QPushButton {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 {COLORS["danger_action_hover"]},
+            stop:1 {COLORS["danger_action"]});
+        color: {COLORS["white"]};
+        font-weight: {FONTS["bold_weight"]};
+        font-size: {FONTS["medium_size"]};
+        border-radius: {DIMENSIONS["border_radius_large"]}px;
+        padding: {DIMENSIONS["spacing_md"]}px {DIMENSIONS["spacing_lg"]}px;
+        border: 1px solid {COLORS["danger_action_pressed"]};
+    }}
+    QPushButton:hover {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 #ff7b7b,
+            stop:1 {COLORS["danger_action_hover"]});
+        border: 1px solid {COLORS["danger_action"]};
+    }}
+    QPushButton:pressed {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 {COLORS["danger_action_pressed"]},
+            stop:1 {COLORS["danger_action"]});
+    }}
+    QPushButton:disabled {{
+        background: {COLORS["disabled"]};
+        color: {COLORS["disabled_text"]};
+        border: 1px solid {COLORS["border"]};
+    }}
+    """

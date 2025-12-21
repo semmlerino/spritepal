@@ -57,14 +57,14 @@ class ROMFileWidget(BaseExtractionWidget):
         rom_group = self._create_group_box("ROM File")
         rom_layout = QVBoxLayout()
         rom_layout.setSpacing(SPACING_MEDIUM)
-        rom_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
+        rom_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
 
         # ROM path row with simple horizontal layout
         rom_row = QHBoxLayout()
         rom_row.setSpacing(SPACING_MEDIUM)
 
         rom_label = QLabel("ROM:")
-        rom_label.setMinimumWidth(50)
+        rom_label.setMinimumWidth(60)  # Match other extraction widget labels
         rom_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         rom_row.addWidget(rom_label)
 
@@ -113,20 +113,17 @@ class ROMFileWidget(BaseExtractionWidget):
         self.setLayout(layout)
 
     def _set_empty_state_guidance(self) -> None:
-        """Show helpful guidance message when no ROM is loaded"""
-        guidance_html = f"""
-        <div style="color: {COLORS['text_secondary']}; font-size: 12px; padding: 8px;
-                    background-color: {COLORS['input_background']}; border-radius: 4px;">
-            <b>Getting Started</b><br/>
-            <span style="color: {COLORS['text_muted']};">
-            1. Click <b>Browse</b> to select a SNES ROM file<br/>
-            2. Choose a preset sprite or explore manually<br/>
-            3. Click <b>Extract</b> to begin
-            </span>
-        </div>
-        """
+        """Show simple guidance when no ROM is loaded, with detailed tooltip"""
         if self.rom_info_label:
-            self.rom_info_label.setText(guidance_html)
+            self.rom_info_label.setText(
+                f'<span style="color: {COLORS["text_muted"]};">Select ROM file to begin</span>'
+            )
+            self.rom_info_label.setToolTip(
+                "Getting Started:\n"
+                "1. Click Browse to select a SNES ROM file\n"
+                "2. Choose a preset sprite or explore manually\n"
+                "3. Click Extract to begin"
+            )
 
     def set_rom_path(self, path: str):
         """Set the ROM path display"""
@@ -150,6 +147,7 @@ class ROMFileWidget(BaseExtractionWidget):
                 html += "<br>" + cache_html
         if self.rom_info_label:
             self.rom_info_label.setText(html)
+            self.rom_info_label.setToolTip("")  # Clear getting started tooltip
 
     def show_loading(self, message: str = "Loading ROM header..."):
         """Show loading indicator with optional message.

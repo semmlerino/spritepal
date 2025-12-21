@@ -7,10 +7,18 @@ from typing import Protocol
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QGridLayout, QLabel, QMenu, QPushButton, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QMenu, QPushButton, QWidget
 
 from ui.common.spacing_constants import BUTTON_HEIGHT
-from ui.styles import get_button_style, get_extraction_checklist_style
+from ui.styles import (
+    get_button_style,
+    get_danger_action_button_style,
+    get_extraction_checklist_style,
+    get_ready_status_style,
+)
+
+# Primary action button is taller for visual hierarchy
+PRIMARY_BUTTON_HEIGHT = BUTTON_HEIGHT + 8  # 36px for Extract button
 
 
 class ToolbarActionsProtocol(Protocol):
@@ -70,15 +78,30 @@ class ToolbarManager(QObject):
     def create_action_buttons(self, layout: QGridLayout) -> None:
         """Create action buttons and add them to the provided layout
 
+        Layout structure (with visual hierarchy):
+        - Row 0: Status label (span 2)
+        - Row 1: Extract button (span 2, prominent)
+        - Row 2: Separator line
+        - Row 3: Open Editor + Arrange side-by-side
+        - Row 4: Inject button (span 2)
+
         Args:
             layout: Grid layout to add buttons to
         """
         self._create_extraction_status_label(layout)
         self._create_extract_button(layout)
+        self._create_separator(layout)
         self._create_open_editor_button(layout)
         self._create_arrange_button(layout)
         self._create_inject_button(layout)
         self._connect_button_signals()
+
+    def _create_separator(self, layout: QGridLayout) -> None:
+        """Create visual separator between primary and secondary actions"""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(separator, 2, 0, 1, 2)  # Row 2, span both columns
 
     def _create_extraction_status_label(self, layout: QGridLayout) -> None:
         """Create inline status label showing extraction readiness"""
@@ -90,17 +113,17 @@ class ToolbarManager(QObject):
         layout.addWidget(self.extraction_status_label, 0, 0, 1, 2)
 
     def _create_extract_button(self, layout: QGridLayout) -> None:
-        """Create extract button"""
+        """Create extract button - primary action with visual emphasis"""
         self.extract_button = QPushButton("Extract")
-        self.extract_button.setMinimumHeight(BUTTON_HEIGHT)
+        self.extract_button.setMinimumHeight(PRIMARY_BUTTON_HEIGHT)  # Taller for emphasis
         self.extract_button.setShortcut(QKeySequence("Ctrl+E"))
         self.extract_button.setToolTip("Extract sprites for editing (Ctrl+E)")
         if self.extract_button:
             self.extract_button.setStyleSheet(get_button_style("extract"))
-        layout.addWidget(self.extract_button, 1, 0)  # Row 1 (status label at row 0)
+        layout.addWidget(self.extract_button, 1, 0, 1, 2)  # Row 1, span both columns
 
     def _create_open_editor_button(self, layout: QGridLayout) -> None:
-        """Create open editor button"""
+        """Create open editor button - secondary action with outline style"""
         self.open_editor_button = QPushButton("Open Editor")
         self.open_editor_button.setMinimumHeight(BUTTON_HEIGHT)
         if self.open_editor_button:
@@ -108,18 +131,18 @@ class ToolbarManager(QObject):
         self.open_editor_button.setShortcut(QKeySequence("Ctrl+O"))
         self.open_editor_button.setToolTip("Open extracted sprites in pixel editor (Ctrl+O)")
         if self.open_editor_button:
-            self.open_editor_button.setStyleSheet(get_button_style("editor"))
-        layout.addWidget(self.open_editor_button, 1, 1)  # Row 1 (status label at row 0)
+            self.open_editor_button.setStyleSheet(get_button_style("secondary_outline"))
+        layout.addWidget(self.open_editor_button, 3, 0)  # Row 3, first column
 
     def _create_arrange_button(self, layout: QGridLayout) -> None:
-        """Create consolidated arrange button with dropdown menu"""
+        """Create consolidated arrange button with dropdown menu - secondary action"""
         self.arrange_button = QPushButton("Arrange...")
         self.arrange_button.setMinimumHeight(BUTTON_HEIGHT)
         if self.arrange_button:
             self.arrange_button.setEnabled(False)
         self.arrange_button.setToolTip("Arrange sprites (Ctrl+R for rows, Ctrl+G for grid)")
         if self.arrange_button:
-            self.arrange_button.setStyleSheet(get_button_style("primary"))
+            self.arrange_button.setStyleSheet(get_button_style("secondary_outline"))
 
         # Create dropdown menu for arrange options
         self.arrange_menu = QMenu(self.parent_widget)
@@ -133,19 +156,21 @@ class ToolbarManager(QObject):
 
         self.arrange_button.setMenu(self.arrange_menu)
 
-        layout.addWidget(self.arrange_button, 2, 0, 1, 2)  # Row 2, span both columns
+        layout.addWidget(self.arrange_button, 3, 1)  # Row 3, second column
 
     def _create_inject_button(self, layout: QGridLayout) -> None:
-        """Create inject button"""
+        """Create inject button - writes to ROM, uses prominent warning color"""
         self.inject_button = QPushButton("Inject")
-        self.inject_button.setMinimumHeight(BUTTON_HEIGHT)
+        # Match Extract button height for visual balance
+        self.inject_button.setMinimumHeight(PRIMARY_BUTTON_HEIGHT)
         if self.inject_button:
             self.inject_button.setEnabled(False)
         self.inject_button.setShortcut(QKeySequence("Ctrl+I"))
         self.inject_button.setToolTip("Inject edited sprite back into VRAM or ROM (Ctrl+I)")
         if self.inject_button:
-            self.inject_button.setStyleSheet(get_button_style("accent"))
-        layout.addWidget(self.inject_button, 3, 0, 1, 2)  # Row 3, span both columns
+            # Use gradient danger style for visual prominence
+            self.inject_button.setStyleSheet(get_danger_action_button_style())
+        layout.addWidget(self.inject_button, 4, 0, 1, 2)  # Row 4, span both columns
 
     def _connect_button_signals(self) -> None:
         """Connect button signals to action handlers"""
@@ -170,13 +195,17 @@ class ToolbarManager(QObject):
         # Update inline status label visibility and text
         if hasattr(self, "extraction_status_label") and self.extraction_status_label:
             if enabled:
-                self.extraction_status_label.hide()
-                self.extraction_status_label.setText("")
+                # Show positive ready status with green accent
+                self.extraction_status_label.setText("✓ Ready to extract")
+                self.extraction_status_label.setStyleSheet(get_ready_status_style())
+                self.extraction_status_label.show()
             elif reason:
                 self.extraction_status_label.setText(f"⚠ {reason}")
+                self.extraction_status_label.setStyleSheet(get_extraction_checklist_style())
                 self.extraction_status_label.show()
             else:
                 self.extraction_status_label.setText("⚠ Requirements not met")
+                self.extraction_status_label.setStyleSheet(get_extraction_checklist_style())
                 self.extraction_status_label.show()
 
         # Also keep tooltip for accessibility

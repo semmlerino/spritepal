@@ -37,8 +37,8 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         # Sprite location selection with compact layout
         sprite_group = self._create_group_box("Sprite Selection")
         sprite_layout = QVBoxLayout()
-        sprite_layout.setSpacing(4)  # Reduce spacing
-        sprite_layout.setContentsMargins(8, 8, 8, 8)  # Reduce margins
+        sprite_layout.setSpacing(SPACING_MEDIUM)  # Use consistent spacing constant
+        sprite_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
 
         # Sprite selection row
         sprite_row = QHBoxLayout()
@@ -67,9 +67,10 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         offset_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         offset_row.addWidget(offset_label)
 
-        self.offset_label = QLabel("--")
-        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['border_focus']}; font-size: 14px;")
+        self.offset_label = QLabel("(select sprite)")
+        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
         self.offset_label.setMinimumWidth(100)
+        self.offset_label.setEnabled(False)  # Visually disabled until sprite selected
         offset_row.addWidget(self.offset_label)
 
         offset_row.addStretch()
@@ -100,7 +101,9 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.sprite_combo.clear()
         self.sprite_combo.addItem("Select ROM file first...", None)
         self.sprite_combo.setEnabled(False)
-        self.offset_label.setText("--")
+        self.offset_label.setText("(select sprite)")
+        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
+        self.offset_label.setEnabled(False)  # Visually disabled
         self.find_sprites_btn.setEnabled(False)
 
     def add_sprite(self, name: str, data: Any):
@@ -142,6 +145,9 @@ class SpriteSelectorWidget(BaseExtractionWidget):
     def set_offset_text(self, text: str):
         """Update the offset label"""
         self.offset_label.setText(text)
+        self.offset_label.setEnabled(True)  # Enable when value is set
+        # Use highlighted color for actual offset values
+        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['border_focus']}; font-size: 14px;")
 
     def set_find_button_enabled(self, enabled: bool):
         """Enable/disable find sprites button"""
@@ -154,3 +160,19 @@ class SpriteSelectorWidget(BaseExtractionWidget):
     def set_find_button_tooltip(self, tooltip: str):
         """Update find sprites button tooltip"""
         self.find_sprites_btn.setToolTip(tooltip)
+
+    def set_disabled_state(self, message: str = "Select ROM first") -> None:
+        """Show disabled state with explanation message.
+
+        Use this to clearly indicate why the sprite selector is unavailable.
+
+        Args:
+            message: Explanation shown in the combo placeholder
+        """
+        self.sprite_combo.clear()
+        self.sprite_combo.addItem(message, None)
+        self.sprite_combo.setEnabled(False)
+        self.offset_label.setText("(select sprite)")
+        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
+        self.offset_label.setEnabled(False)  # Visually disabled
+        self.find_sprites_btn.setEnabled(False)
