@@ -49,6 +49,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
         # Initialize with dummy values - actual values set per request
         super().__init__("", 0, "", None, None)  # type: ignore[arg-type]  # Dummy init, real values set via setup_request
         self._pool_ref = pool_ref
+        self._state_mutex = QMutex()  # Protects _current_request_id and _is_processing
         self._current_request_id = 0
         self._cancel_requested = threading.Event()
         self._is_processing = False
@@ -64,26 +65,45 @@ class PooledPreviewWorker(SpritePreviewWorker):
         self.extractor = extractor
         self.rom_cache = rom_cache  # Store ROM cache for potential use
         self.sprite_config = None
-        self._current_request_id = request.request_id
-        if self._cancel_requested:
-            self._cancel_requested.clear()
-        self._is_processing = True
+        # Thread-safe state updates
+        with QMutexLocker(self._state_mutex):
+            self._current_request_id = request.request_id
+            if self._cancel_requested:
+                self._cancel_requested.clear()
+            self._is_processing = True
 
     def cancel_current_request(self) -> None:
         """Cancel the current request."""
         self._cancel_requested.set()
-        logger.debug(f"Cancellation requested for worker processing request {self._current_request_id}")
+        with QMutexLocker(self._state_mutex):
+            request_id = self._current_request_id
+        logger.debug(f"Cancellation requested for worker processing request {request_id}")
+
+    def _get_request_id(self) -> int:
+        """Thread-safe getter for current request ID."""
+        with QMutexLocker(self._state_mutex):
+            return self._current_request_id
+
+    def _is_currently_processing(self) -> bool:
+        """Thread-safe getter for processing state."""
+        with QMutexLocker(self._state_mutex):
+            return self._is_processing
+
+    def _set_processing(self, value: bool) -> None:
+        """Thread-safe setter for processing state."""
+        with QMutexLocker(self._state_mutex):
+            self._is_processing = value
 
     @override
     def run(self) -> None:
         """Enhanced run method with cancellation support."""
-        if not self._is_processing:
+        if not self._is_currently_processing():
             return
 
         try:
             # Check for cancellation before starting
             if self._cancel_requested.is_set():
-                logger.debug(f"Request {self._current_request_id} cancelled before processing")
+                logger.debug(f"Request {self._get_request_id()} cancelled before processing")
                 return
 
             # Call parent run method with cancellation checks
@@ -91,10 +111,11 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
         except Exception as e:
             if not self._cancel_requested.is_set():
-                logger.exception(f"Error in pooled preview worker for request {self._current_request_id}")
-                self.preview_error.emit(self._current_request_id, str(e))
+                request_id = self._get_request_id()
+                logger.exception(f"Error in pooled preview worker for request {request_id}")
+                self.preview_error.emit(request_id, str(e))
         finally:
-            self._is_processing = False
+            self._set_processing(False)
             # Return worker to pool
             pool = self._pool_ref()
             if pool:
@@ -102,11 +123,12 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
     def _run_with_cancellation_checks(self) -> None:
         """Run preview generation with periodic cancellation checks."""
-        # Import validation functions from parent class
+        # Cache request ID for logging (reduces mutex contention)
+        request_id = self._get_request_id()
 
         # Check both Qt interruption and our cancel flag
         if self._cancel_requested.is_set() or self.isInterruptionRequested():
-            logger.debug(f"Request {self._current_request_id} cancelled before starting")
+            logger.debug(f"Request {request_id} cancelled before starting")
             return
 
         # Validate ROM path
@@ -117,7 +139,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
         try:
             # Check interruption before file I/O
             if self.isInterruptionRequested():
-                logger.debug(f"Request {self._current_request_id} interrupted before file read")
+                logger.debug(f"Request {request_id} interrupted before file read")
                 return
 
             with Path(self.rom_path).open("rb") as f:
@@ -127,7 +149,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
         # Check cancellation after file read
         if self._cancel_requested.is_set() or self.isInterruptionRequested():
-            logger.debug(f"Request {self._current_request_id} cancelled after file read")
+            logger.debug(f"Request {request_id} cancelled after file read")
             return
 
         # Validate ROM size and offset
@@ -139,7 +161,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
         # Check cancellation before decompression
         if self._cancel_requested.is_set() or self.isInterruptionRequested():
-            logger.debug(f"Request {self._current_request_id} cancelled before decompression")
+            logger.debug(f"Request {request_id} cancelled before decompression")
             return
 
         # Use conservative size for manual offsets during dragging
@@ -165,7 +187,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
             try:
                 # Check interruption right before decompression
                 if self.isInterruptionRequested():
-                    logger.debug(f"Request {self._current_request_id} interrupted before decompression")
+                    logger.debug(f"Request {request_id} interrupted before decompression")
                     return
 
                 if try_offset != self.offset:
@@ -202,7 +224,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
                 # Check interruption after decompression
                 if self.isInterruptionRequested():
-                    logger.debug(f"Request {self._current_request_id} interrupted after decompression")
+                    logger.debug(f"Request {request_id} interrupted after decompression")
                     return
 
             except Exception as decomp_error:
@@ -221,7 +243,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
             try:
                 # Check interruption
                 if self.isInterruptionRequested() or self._cancel_requested.is_set():
-                    logger.debug(f"Request {self._current_request_id} cancelled")
+                    logger.debug(f"Request {request_id} cancelled")
                     return
 
                 # Read raw bytes from ROM at the offset
@@ -239,13 +261,13 @@ class PooledPreviewWorker(SpritePreviewWorker):
             except Exception as e:
                 # Both HAL decompression and raw extraction failed
                 if self.isInterruptionRequested() or self._cancel_requested.is_set():
-                    logger.debug(f"Request {self._current_request_id} cancelled during extraction")
+                    logger.debug(f"Request {request_id} cancelled during extraction")
                     return
                 raise ValueError(f"Failed to extract sprite at 0x{self.offset:X}: {e}") from e
 
         # Check cancellation after decompression
         if self._cancel_requested.is_set() or self.isInterruptionRequested():
-            logger.debug(f"Request {self._current_request_id} cancelled after decompression")
+            logger.debug(f"Request {request_id} cancelled after decompression")
             return
 
         # Validate extracted data
@@ -267,10 +289,10 @@ class PooledPreviewWorker(SpritePreviewWorker):
             return
 
         # Emit success
-        logger.debug(f"[TRACE] PoolWorker emitting preview_ready: request_id={self._current_request_id}, "
+        logger.debug(f"[TRACE] PoolWorker emitting preview_ready: request_id={request_id}, "
                     f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, sprite_name={self.sprite_name}")
         logger.debug(f"[TRACE] Preview data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}")
-        self.preview_ready.emit(self._current_request_id, tile_data, width, height, self.sprite_name)
+        self.preview_ready.emit(request_id, tile_data, width, height, self.sprite_name)
         logger.debug("[TRACE] PoolWorker emitted preview_ready signal")
 
 class PreviewWorkerPool(QObject):

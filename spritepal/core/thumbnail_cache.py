@@ -57,6 +57,9 @@ class ThumbnailCache:
         self._memory_usage_bytes = 0
         self.max_memory_cache_bytes = int(max_memory_cache_mb * 1024 * 1024)
 
+        # Metadata mutex - protects metadata dict, counters, and file I/O
+        self._metadata_mutex = QMutex()
+
         # Cache metadata
         self.metadata_file = self.cache_dir / "cache_metadata.json"
         self.metadata = self._load_metadata()
@@ -172,13 +175,14 @@ class ThumbnailCache:
                     self._add_to_memory_cache(cache_key, pixmap)
 
                     # Update access time in metadata (debounced to reduce I/O)
-                    entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
-                    if cache_key in entries:
-                        entries[cache_key]["last_access"] = time.time()
-                        self._access_count += 1
-                        # Save metadata every 50 accesses to reduce disk writes
-                        if self._access_count % 50 == 0:
-                            self._save_metadata()
+                    with QMutexLocker(self._metadata_mutex):
+                        entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
+                        if cache_key in entries:
+                            entries[cache_key]["last_access"] = time.time()
+                            self._access_count += 1
+                            # Save metadata every 50 accesses to reduce disk writes
+                            if self._access_count % 50 == 0:
+                                self._save_metadata()
 
                     logger.debug(f"Thumbnail cache hit (disk): {cache_key}")
                     return pixmap
@@ -217,25 +221,29 @@ class ThumbnailCache:
             pixmap.save(str(cache_file), "PNG")
 
             # Update metadata with access timestamp for LRU eviction
-            entries = cast(dict[str, Any], self.metadata["entries"])  # pyright: ignore[reportExplicitAny] - JSON metadata entries
-            entries[cache_key] = {
-                "rom_hash": rom_hash,
-                "offset": offset,
-                "size": size,
-                "palette": palette_index,
-                "file": cache_file.name,
-                "last_access": time.time(),
-            }
-            self._save_metadata()
+            with QMutexLocker(self._metadata_mutex):
+                entries = cast(dict[str, Any], self.metadata["entries"])  # pyright: ignore[reportExplicitAny] - JSON metadata entries
+                entries[cache_key] = {
+                    "rom_hash": rom_hash,
+                    "offset": offset,
+                    "size": size,
+                    "palette": palette_index,
+                    "file": cache_file.name,
+                    "last_access": time.time(),
+                }
+                self._save_metadata()
 
-            # Add to memory cache
+                # Check for pruning periodically
+                self._save_count += 1
+                should_prune = self.auto_prune and self._save_count % PRUNE_CHECK_INTERVAL == 0
+
+            # Add to memory cache (outside metadata lock to avoid lock ordering issues)
             self._add_to_memory_cache(cache_key, pixmap)
 
             logger.debug(f"Thumbnail cached: {cache_key}")
 
-            # Check for pruning periodically
-            self._save_count += 1
-            if self.auto_prune and self._save_count % PRUNE_CHECK_INTERVAL == 0:
+            # Prune outside the lock to avoid long lock hold times
+            if should_prune:
                 self._maybe_prune()
 
         except Exception as e:
@@ -326,16 +334,20 @@ class ThumbnailCache:
         target_bytes = target_mb * 1024 * 1024
 
         # Get all cache files with their access times and sizes
-        entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
+        # Take a snapshot of entries under the lock
+        with QMutexLocker(self._metadata_mutex):
+            entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
+            entries_snapshot = dict(entries)  # Copy for iteration
+
         file_info: list[tuple[str, float, int]] = []  # (cache_key, last_access, size)
 
         for cache_file in self.cache_dir.glob("*.png"):
             cache_key = cache_file.stem
             try:
                 size = cache_file.stat().st_size
-                # Get access time from metadata, fallback to file mtime
-                if cache_key in entries and "last_access" in entries[cache_key]:
-                    last_access = entries[cache_key]["last_access"]
+                # Get access time from metadata snapshot, fallback to file mtime
+                if cache_key in entries_snapshot and "last_access" in entries_snapshot[cache_key]:
+                    last_access = entries_snapshot[cache_key]["last_access"]
                 else:
                     last_access = cache_file.stat().st_mtime
                 file_info.append((cache_key, last_access, size))
@@ -349,6 +361,8 @@ class ThumbnailCache:
         current_bytes = sum(info[2] for info in file_info)
 
         removed_count = 0
+        keys_to_remove: list[str] = []
+
         for cache_key, _, size in file_info:
             if current_bytes <= target_bytes:
                 break
@@ -358,15 +372,19 @@ class ThumbnailCache:
                 cache_file.unlink()
                 current_bytes -= size
                 removed_count += 1
-
-                # Remove from metadata
-                if cache_key in entries:
-                    del entries[cache_key]
+                keys_to_remove.append(cache_key)
             except Exception as e:
                 logger.error(f"Failed to remove cache file {cache_file}: {e}")
+                # Don't add to keys_to_remove if file deletion failed
 
-        if removed_count > 0:
-            self._save_metadata()
+        # Update metadata under lock
+        if keys_to_remove:
+            with QMutexLocker(self._metadata_mutex):
+                entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
+                for cache_key in keys_to_remove:
+                    if cache_key in entries:
+                        del entries[cache_key]
+                self._save_metadata()
             logger.info(f"LRU eviction removed {removed_count} files")
 
         return removed_count
@@ -385,9 +403,10 @@ class ThumbnailCache:
             except Exception as e:
                 logger.error(f"Failed to delete cache file {cache_file}: {e}")
 
-        # Clear metadata
-        self.metadata = {"version": "1.0", "entries": {}}
-        self._save_metadata()
+        # Clear metadata (thread-safe)
+        with QMutexLocker(self._metadata_mutex):
+            self.metadata = {"version": "1.0", "entries": {}}
+            self._save_metadata()
 
         logger.info("Thumbnail cache cleared")
 
@@ -400,6 +419,9 @@ class ThumbnailCache:
             memory_items = len(self.memory_cache)
             memory_bytes = self._memory_usage_bytes
 
+        with QMutexLocker(self._metadata_mutex):
+            total_items = len(self.metadata.get("entries", {}))
+
         return {
             "memory_items": memory_items,
             "memory_limit": self.memory_cache_limit,
@@ -407,7 +429,7 @@ class ThumbnailCache:
             "memory_limit_mb": self.max_memory_cache_bytes / (1024 * 1024),
             "disk_items": len(disk_files),
             "disk_size_mb": disk_size / (1024 * 1024),
-            "total_items": len(self.metadata.get("entries", {}))
+            "total_items": total_items
         }
 
     def prune_cache(self, max_age_days: int = 7):
@@ -421,24 +443,28 @@ class ThumbnailCache:
         max_age_seconds = max_age_days * 24 * 60 * 60
 
         removed_count = 0
+        keys_to_remove: list[str] = []
+
         for cache_file in self.cache_dir.glob("*.png"):
             try:
                 file_age = current_time - cache_file.stat().st_mtime
                 if file_age > max_age_seconds:
+                    cache_key = cache_file.stem
                     cache_file.unlink()
                     removed_count += 1
-
-                    # Remove from metadata
-                    cache_key = cache_file.stem
-                    entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
-                    if cache_key in entries:
-                        del entries[cache_key]
-
+                    keys_to_remove.append(cache_key)
             except Exception as e:
                 logger.error(f"Failed to prune cache file {cache_file}: {e}")
+                # Don't add to keys_to_remove if file deletion failed
 
-        if removed_count > 0:
-            self._save_metadata()
+        # Update metadata under lock
+        if keys_to_remove:
+            with QMutexLocker(self._metadata_mutex):
+                entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
+                for cache_key in keys_to_remove:
+                    if cache_key in entries:
+                        del entries[cache_key]
+                self._save_metadata()
             logger.info(f"Pruned {removed_count} old cache entries")
 
     def get_rom_hash(self, rom_path: str) -> str:
