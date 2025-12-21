@@ -21,7 +21,7 @@ class StateEntry:
     Tracks creation time, access patterns, and optional TTL for automatic expiry.
     """
 
-    def __init__(self, value: Any, ttl_seconds: float | None = None):
+    def __init__(self, value: Any, ttl_seconds: float | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Generic state value
         """
         Initialize a state entry.
 
@@ -67,7 +67,7 @@ class StateSnapshot:
     Used for save/restore points and undo functionality.
     """
 
-    def __init__(self, states: dict[str, Any], namespace: str | None = None):
+    def __init__(self, states: dict[str, Any], namespace: str | None = None) -> None:  # pyright: ignore[reportExplicitAny] - State dictionary
         """
         Create a state snapshot.
 

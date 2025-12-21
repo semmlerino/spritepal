@@ -12,8 +12,9 @@ import json
 import os
 import threading
 import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, cast, override
 
 from PIL import Image
 from PySide6.QtCore import QObject, QThread, Signal
@@ -437,7 +438,9 @@ class CoreOperationsManager(BaseManager):
             if started:
                 self._finish_operation(operation)
 
-    def validate_extraction_params(self, params: dict[str, Any]) -> bool:
+    def validate_extraction_params(
+        self, params: Mapping[str, object]
+    ) -> bool:
         """
         Validate extraction parameters.
 
@@ -459,9 +462,11 @@ class CoreOperationsManager(BaseManager):
         elif "rom_path" in params:
             # ROM extraction
             self._validate_required(params, ["rom_path", "offset", "output_base"])
-            FileValidator.validate_rom_file_exists_or_raise(params["rom_path"])
+            rom_path = cast(str, params["rom_path"])
+            FileValidator.validate_rom_file_exists_or_raise(rom_path)
             self._validate_type(params["offset"], "offset", int)
-            self._validate_range(params["offset"], "offset", min_val=0)
+            offset = cast(int, params["offset"])
+            self._validate_range(offset, "offset", min_val=0)
         else:
             raise ValidationError("Must provide either vram_path or rom_path")
 
@@ -478,7 +483,7 @@ class CoreOperationsManager(BaseManager):
                 )
 
         # Validate output_base is provided and not empty
-        output_base = params.get("output_base", "")
+        output_base = cast(str, params.get("output_base", ""))
         if not output_base or not output_base.strip():
             raise ValidationError("Output name is required for extraction")
 
@@ -540,7 +545,9 @@ class CoreOperationsManager(BaseManager):
             rom_path, sprite_offset, output_path, cgram_path
         )
 
-    def get_known_sprite_locations(self, rom_path: str) -> dict[str, Any]:
+    def get_known_sprite_locations(
+        self, rom_path: str
+    ) -> dict[str, object]:  # Pointer objects with .offset attribute
         """
         Get known sprite locations for a ROM with caching.
 
@@ -548,7 +555,7 @@ class CoreOperationsManager(BaseManager):
             rom_path: Path to ROM file
 
         Returns:
-            Dictionary of known sprite locations
+            Dictionary of known sprite locations (values are pointer objects with .offset)
 
         Raises:
             ExtractionError: If operation fails
@@ -569,7 +576,9 @@ class CoreOperationsManager(BaseManager):
                 self._handle_operation_error(e, "get_known_sprite_locations", ExtractionError, "getting sprite locations")
             raise
 
-    def read_rom_header(self, rom_path: str) -> dict[str, Any]:
+    def read_rom_header(
+        self, rom_path: str
+    ) -> dict[str, object]:  # ROM header with title, rom_type, checksum, etc.
         """
         Read ROM header information.
 
@@ -600,7 +609,9 @@ class CoreOperationsManager(BaseManager):
 
     # ========== Extraction Validation Helpers ==========
 
-    def _validate_rom_file(self, rom_path: str) -> dict[str, Any] | None:
+    def _validate_rom_file(
+        self, rom_path: str
+    ) -> dict[str, object] | None:  # Error dict with error and error_type keys
         """Validate ROM file exists, is readable, and has reasonable size.
 
         Returns:
@@ -631,7 +642,7 @@ class CoreOperationsManager(BaseManager):
 
     # ========== Injection Operations ==========
 
-    def start_injection(self, params: dict[str, Any]) -> bool:
+    def start_injection(self, params: Mapping[str, object]) -> bool:
         """
         Start injection process with unified interface.
 
@@ -684,28 +695,42 @@ class CoreOperationsManager(BaseManager):
             self._current_worker = None
 
             # Create appropriate worker based on mode
-            if params["mode"] == "vram":
+            mode = cast(str, params["mode"])
+            if mode == "vram":
+                sprite_path = cast(str, params["sprite_path"])
+                input_vram = cast(str, params["input_vram"])
+                output_vram = cast(str, params["output_vram"])
+                offset = cast(int, params["offset"])
+                metadata_path = cast(str | None, params.get("metadata_path"))
                 worker = InjectionWorker(
-                    params["sprite_path"],
-                    params["input_vram"],
-                    params["output_vram"],
-                    params["offset"],
-                    params.get("metadata_path")
+                    sprite_path,
+                    input_vram,
+                    output_vram,
+                    offset,
+                    metadata_path
                 )
-            elif params["mode"] == "rom":
+            elif mode == "rom":
+                # Build ROM params with type casts
+                sprite_path_val = cast(str, params["sprite_path"])
+                input_rom_val = cast(str, params["input_rom"])
+                output_rom_val = cast(str, params["output_rom"])
+                offset_val = cast(int, params["offset"])
+                fast_comp_val = cast(bool, params.get("fast_compression", False))
+                metadata_path_val = cast(str | None, params.get("metadata_path"))
+
                 rom_params: ROMInjectionParams = {
                     "mode": "rom",
-                    "sprite_path": params["sprite_path"],
-                    "input_rom": params["input_rom"],
-                    "output_rom": params["output_rom"],
-                    "offset": params["offset"],
-                    "fast_compression": params.get("fast_compression", False),
-                    "metadata_path": params.get("metadata_path"),
+                    "sprite_path": sprite_path_val,
+                    "input_rom": input_rom_val,
+                    "output_rom": output_rom_val,
+                    "offset": offset_val,
+                    "fast_compression": fast_comp_val,
+                    "metadata_path": metadata_path_val,
                 }
                 # Use self as the injection manager
                 worker = ROMInjectionWorker(rom_params, self)
             else:
-                _validate_injection_mode(params["mode"])
+                _validate_injection_mode(mode)
                 return False
 
             # Connect worker signals before starting
@@ -739,7 +764,9 @@ class CoreOperationsManager(BaseManager):
             if not self._current_worker or not self._current_worker.isRunning():
                 self._finish_operation(operation)
 
-    def validate_injection_params(self, params: dict[str, Any]) -> None:
+    def validate_injection_params(
+        self, params: Mapping[str, object]
+    ) -> None:
         """
         Validate injection parameters.
 
@@ -758,30 +785,35 @@ class CoreOperationsManager(BaseManager):
         self._validate_type(params["offset"], "offset", int)
 
         # Use FileValidator for sprite file validation
-        sprite_result = FileValidator.validate_image_file(params["sprite_path"])
+        sprite_path = cast(str, params["sprite_path"])
+        sprite_result = FileValidator.validate_image_file(sprite_path)
         if not sprite_result.is_valid:
             raise ValidationError(
                 f"Sprite file validation failed: {sprite_result.error_message}"
             )
 
-        self._validate_range(params["offset"], "offset", min_val=0)
+        offset = cast(int, params["offset"])
+        self._validate_range(offset, "offset", min_val=0)
 
         # Check mode-specific parameters
-        if params["mode"] == "vram":
+        mode = cast(str, params["mode"])
+        if mode == "vram":
             vram_required = ["input_vram", "output_vram"]
             self._validate_required(params, vram_required)
 
-            vram_result = FileValidator.validate_vram_file(params["input_vram"])
+            input_vram = cast(str, params["input_vram"])
+            vram_result = FileValidator.validate_vram_file(input_vram)
             if not vram_result.is_valid:
                 raise ValidationError(
                     f"Input VRAM file validation failed: {vram_result.error_message}"
                 )
 
-        elif params["mode"] == "rom":
+        elif mode == "rom":
             rom_required = ["input_rom", "output_rom"]
             self._validate_required(params, rom_required)
 
-            rom_result = FileValidator.validate_rom_file(params["input_rom"])
+            input_rom = cast(str, params["input_rom"])
+            rom_result = FileValidator.validate_rom_file(input_rom)
             if not rom_result.is_valid:
                 raise ValidationError(
                     f"Input ROM file validation failed: {rom_result.error_message}"
@@ -793,11 +825,13 @@ class CoreOperationsManager(BaseManager):
                     params["fast_compression"], "fast_compression", bool
                 )
         else:
-            raise ValidationError(f"Invalid injection mode: {params['mode']}")
+            raise ValidationError(f"Invalid injection mode: {mode}")
 
         # Validate optional metadata_path
-        if params.get("metadata_path"):
-            metadata_result = FileValidator.validate_json_file(params["metadata_path"])
+        metadata_path_val = params.get("metadata_path")
+        if metadata_path_val:
+            metadata_path = cast(str, metadata_path_val)
+            metadata_result = FileValidator.validate_json_file(metadata_path)
             if not metadata_result.is_valid:
                 raise ValidationError(
                     f"Metadata file validation failed: {metadata_result.error_message}"
@@ -902,9 +936,9 @@ class CoreOperationsManager(BaseManager):
         """Try to get VRAM path from extraction panel's current session."""
         try:
             session_manager = self._get_session_manager()
-            vram_path = session_manager.get("session", "vram_path", "")
+            vram_path = cast(str, session_manager.get("session", "vram_path", ""))
             if vram_path and Path(vram_path).exists():
-                return vram_path
+                return str(vram_path)
         except (OSError, ValueError):
             pass
         return ""
@@ -916,10 +950,10 @@ class CoreOperationsManager(BaseManager):
 
         try:
             with Path(metadata_path).open() as f:
-                metadata = json.load(f)
-            vram_path = metadata.get("source_vram", "")
+                metadata = cast(dict[str, object], json.load(f))
+            vram_path = cast(str, metadata.get("source_vram", ""))
             if vram_path and Path(vram_path).exists():
-                return vram_path
+                return str(vram_path)
         except (OSError, ValueError, json.JSONDecodeError):
             pass
         return ""
@@ -948,9 +982,9 @@ class CoreOperationsManager(BaseManager):
         """Try to get VRAM path from session data."""
         try:
             session_manager = self._get_session_manager()
-            vram_path = session_manager.get_setting("session", "vram_path", "")
+            vram_path = cast(str, session_manager.get_setting("session", "vram_path", ""))
             if vram_path and Path(vram_path).exists():
-                return vram_path
+                return str(vram_path)
         except (OSError, ValueError, TypeError):
             pass
         return ""
@@ -959,18 +993,20 @@ class CoreOperationsManager(BaseManager):
         """Try to get VRAM path from last injection settings."""
         try:
             session_manager = self._get_session_manager()
-            last_injection_vram = session_manager.get(
+            last_injection_vram = cast(str, session_manager.get(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, ""
-            )
+            ))
             if last_injection_vram and Path(last_injection_vram).exists():
-                return last_injection_vram
+                return str(last_injection_vram)
         except (OSError, ValueError, TypeError):
             pass
         return ""
 
     # ========== Metadata and ROM Info ==========
 
-    def load_metadata(self, metadata_path: str) -> dict[str, Any] | None:
+    def load_metadata(
+        self, metadata_path: str
+    ) -> dict[str, object] | None:  # Parsed extraction metadata with mixed types
         """
         Load and parse metadata file.
 
@@ -983,16 +1019,18 @@ class CoreOperationsManager(BaseManager):
         if not metadata_path or not Path(metadata_path).exists():
             return None
 
-        parsed_info = None
-        metadata = None
+        parsed_info: dict[str, object] | None = None
+        metadata: dict[str, object] | None = None
 
         try:
             with Path(metadata_path).open() as f:
-                metadata = json.load(f)
+                metadata = cast(dict[str, object], json.load(f))
 
             if "extraction" in metadata:
                 extraction = metadata["extraction"]
-                source_type = extraction.get("source_type", "vram")
+                if not isinstance(extraction, dict):
+                    return None
+                source_type = cast(str, extraction.get("source_type", "vram"))
 
                 parsed_info = {
                     "metadata": metadata,
@@ -1035,7 +1073,9 @@ class CoreOperationsManager(BaseManager):
                 "default_vram_offset": "0xC000"
             }
 
-    def load_rom_info(self, rom_path: str) -> dict[str, Any] | None:
+    def load_rom_info(
+        self, rom_path: str
+    ) -> dict[str, object] | None:  # ROM header, sprite locations, cached flag, or error info
         """
         Load ROM information and sprite locations with caching.
 
@@ -1045,7 +1085,7 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Dict containing header, sprite_locations, cached flag, or error info
         """
-        def _create_error_result(message: str, error_type: str) -> dict[str, Any]:
+        def _create_error_result(message: str, error_type: str) -> dict[str, object]:
             return {"error": message, "error_type": error_type}
 
         try:
@@ -1061,15 +1101,17 @@ class CoreOperationsManager(BaseManager):
 
             if cached_info:
                 self._logger.debug(f"Loaded ROM info from cache: {rom_path}")
-                cached_info["cached"] = True
-                return cached_info
+                # Convert Mapping to mutable dict
+                result_dict = dict(cached_info)
+                result_dict["cached"] = True
+                return result_dict
 
             # Cache miss - load from file
             self._logger.debug(f"Cache miss, loading ROM info from file: {rom_path}")
 
             header = self.read_rom_header(rom_path)
 
-            result: dict[str, Any] = {
+            result: dict[str, object] = {
                 "header": {
                     "title": header["title"],
                     "rom_type": header["rom_type"],
@@ -1080,15 +1122,17 @@ class CoreOperationsManager(BaseManager):
             }
 
             # Get sprite locations if this is Kirby Super Star
-            if "KIRBY" in header["title"].upper():
+            title = cast(str, header["title"])
+            if "KIRBY" in title.upper():
                 try:
-                    self._logger.info(f"Scanning ROM for sprite locations: {header['title']}")
+                    self._logger.info(f"Scanning ROM for sprite locations: {title}")
                     locations = self.get_known_sprite_locations(rom_path)
 
-                    sprite_dict = {}
+                    sprite_dict: dict[str, int] = {}
                     for name, pointer in locations.items():
                         display_name = name.replace("_", " ").title()
-                        sprite_dict[display_name] = pointer.offset
+                        # Pointer objects have .offset attribute (from ROM analysis)
+                        sprite_dict[display_name] = cast(object, pointer).offset  # type: ignore[attr-defined]
                     result["sprite_locations"] = sprite_dict
 
                     self._logger.info(f"Found {len(sprite_dict)} sprite locations")
@@ -1112,8 +1156,11 @@ class CoreOperationsManager(BaseManager):
 
     # ========== Path Suggestions ==========
 
-    def find_suggested_input_vram(self, sprite_path: str, metadata: dict[str, Any] | None = None,
-                                  suggested_vram: str = "") -> str:
+    def find_suggested_input_vram(
+        self, sprite_path: str,
+        metadata: dict[str, object] | None = None,
+        suggested_vram: str = ""
+    ) -> str:
         """
         Find the best suggestion for input VRAM path.
 
@@ -1130,12 +1177,14 @@ class CoreOperationsManager(BaseManager):
 
         # Try metadata first
         if metadata and metadata.get("extraction"):
-            vram_source = metadata["extraction"].get("vram_source", "")
-            if vram_source and sprite_path:
-                sprite_dir = Path(sprite_path).parent
-                possible_path = Path(sprite_dir) / vram_source
-                if possible_path.exists():
-                    return str(possible_path)
+            extraction = metadata["extraction"]
+            if isinstance(extraction, dict):
+                vram_source = cast(str, extraction.get("vram_source", ""))
+                if vram_source and sprite_path:
+                    sprite_dir = Path(sprite_path).parent
+                    possible_path = Path(sprite_dir) / vram_source
+                    if possible_path.exists():
+                        return str(possible_path)
 
         # Try to find VRAM file with same base name
         if sprite_path:
@@ -1164,16 +1213,16 @@ class CoreOperationsManager(BaseManager):
         session_manager = self._get_session_manager()
         session_data = session_manager.get_session_data()
         if SETTINGS_KEY_VRAM_PATH in session_data:
-            vram_path = session_data[SETTINGS_KEY_VRAM_PATH]
+            vram_path = cast(str, session_data[SETTINGS_KEY_VRAM_PATH])
             if vram_path and Path(vram_path).exists():
-                return vram_path
+                return str(vram_path)
 
         # Check last used injection VRAM
-        last_injection_vram = session_manager.get(
+        last_injection_vram = cast(str, session_manager.get(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, ""
-        )
+        ))
         if last_injection_vram and Path(last_injection_vram).exists():
-            return last_injection_vram
+            return str(last_injection_vram)
 
         return ""
 
@@ -1309,8 +1358,9 @@ class CoreOperationsManager(BaseManager):
         except Exception:
             self._logger.exception("Failed to save ROM injection parameters")
 
-    def load_rom_injection_defaults(self, sprite_path: str, metadata: dict[str, Any] | None = None
-                                   ) -> dict[str, Any]:
+    def load_rom_injection_defaults(
+        self, sprite_path: str, metadata: dict[str, object] | None = None
+    ) -> dict[str, object]:  # Config data with mixed types (str, int, bool, None)
         """
         Load ROM injection defaults from metadata or saved settings.
 
@@ -1322,7 +1372,7 @@ class CoreOperationsManager(BaseManager):
             Dict containing input_rom, output_rom, rom_offset, etc.
         """
         session_manager = self._get_session_manager()
-        result: dict[str, Any] = {
+        result: dict[str, object] = {
             "input_rom": "",
             "output_rom": "",
             "rom_offset": None,
@@ -1333,35 +1383,36 @@ class CoreOperationsManager(BaseManager):
 
         if metadata and metadata.get("rom_extraction_info"):
             rom_info = metadata["rom_extraction_info"]
-            rom_source = rom_info.get("rom_source", "")
-            rom_offset_str = rom_info.get("rom_offset", "0x0")
+            if isinstance(rom_info, dict):
+                rom_source = cast(str, rom_info.get("rom_source", ""))
+                rom_offset_str = cast(str, rom_info.get("rom_offset", "0x0"))
 
-            if rom_source and sprite_path:
-                sprite_dir = Path(sprite_path).parent
-                possible_rom_path = Path(sprite_dir) / rom_source
-                if possible_rom_path.exists():
-                    result["input_rom"] = str(possible_rom_path)
-                    result["output_rom"] = self.suggest_output_rom_path(str(possible_rom_path))
+                if rom_source and sprite_path:
+                    sprite_dir = Path(sprite_path).parent
+                    possible_rom_path = Path(sprite_dir) / rom_source
+                    if possible_rom_path.exists():
+                        result["input_rom"] = str(possible_rom_path)
+                        result["output_rom"] = self.suggest_output_rom_path(str(possible_rom_path))
 
-                    try:
-                        if rom_offset_str.startswith(("0x", "0X")):
-                            result["rom_offset"] = int(rom_offset_str, 16)
-                        else:
-                            result["rom_offset"] = int(rom_offset_str, 16)
-                        result["custom_offset"] = rom_offset_str
-                    except (ValueError, TypeError) as e:
-                        # FIX #3: Log parse failure and indicate error in result
-                        self._logger.warning(
-                            f"Failed to parse ROM offset '{rom_offset_str}': {e}"
-                        )
-                        result["offset_parse_error"] = str(e)
+                        try:
+                            if rom_offset_str.startswith(("0x", "0X")):
+                                result["rom_offset"] = int(rom_offset_str, 16)
+                            else:
+                                result["rom_offset"] = int(rom_offset_str, 16)
+                            result["custom_offset"] = rom_offset_str
+                        except (ValueError, TypeError) as e:
+                            # FIX #3: Log parse failure and indicate error in result
+                            self._logger.warning(
+                                f"Failed to parse ROM offset '{rom_offset_str}': {e}"
+                            )
+                            result["offset_parse_error"] = str(e)
 
-                    return result
+                        return result
 
         # Fall back to saved settings
-        last_input_rom = session_manager.get(
+        last_input_rom = cast(str, session_manager.get(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, ""
-        )
+        ))
         if last_input_rom and Path(last_input_rom).exists():
             result["input_rom"] = last_input_rom
             result["output_rom"] = self.suggest_output_rom_path(last_input_rom)
@@ -1376,8 +1427,10 @@ class CoreOperationsManager(BaseManager):
 
         return result
 
-    def restore_saved_sprite_location(self, extraction_vram_offset: str | None,
-                                     sprite_locations: dict[str, int]) -> dict[str, Any]:
+    def restore_saved_sprite_location(
+        self, extraction_vram_offset: str | None,
+        sprite_locations: dict[str, int]
+    ) -> dict[str, object]:  # Config data with sprite location name, index, custom offset
         """
         Restore saved sprite location selection.
 
@@ -1389,7 +1442,7 @@ class CoreOperationsManager(BaseManager):
             Dict containing sprite_location_name, sprite_location_index, custom_offset
         """
         session_manager = self._get_session_manager()
-        result: dict[str, str | int | None] = {
+        result: dict[str, object] = {
             "sprite_location_name": None,
             "sprite_location_index": None,
             "custom_offset": ""
@@ -1406,9 +1459,9 @@ class CoreOperationsManager(BaseManager):
                 result["custom_offset"] = f"0x{rom_offset:X}"
                 return result
 
-        last_sprite_location = session_manager.get(
+        last_sprite_location = cast(str, session_manager.get(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_SPRITE_LOCATION, ""
-        )
+        ))
         if last_sprite_location:
             saved_display_name = last_sprite_location.split(" (0x")[0] if " (0x" in last_sprite_location else last_sprite_location
 
@@ -1422,12 +1475,12 @@ class CoreOperationsManager(BaseManager):
 
     # ========== Cache Management ==========
 
-    def get_cache_stats(self) -> dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, object]:  # Cache stats with mixed types
         """Get ROM cache statistics."""
         from core.di_container import inject
         from core.protocols.manager_protocols import ROMCacheProtocol
         rom_cache = inject(ROMCacheProtocol)
-        return rom_cache.get_cache_stats()
+        return dict(rom_cache.get_cache_stats())  # Convert Mapping to dict
 
     def clear_rom_cache(self, older_than_days: int | None = None) -> int:
         """
@@ -1446,13 +1499,15 @@ class CoreOperationsManager(BaseManager):
         self._logger.info(f"ROM cache cleared: {removed_count} files removed")
         return removed_count
 
-    def get_scan_progress(self, rom_path: str, scan_params: dict[str, Any]) -> dict[str, Any] | None:
+    def get_scan_progress(
+        self, rom_path: str, scan_params: dict[str, int]
+    ) -> dict[str, object] | None:  # Scan progress with found sprites, current offset, completed flag
         """
         Get cached scan progress for resumable scanning.
 
         Args:
             rom_path: Path to ROM file
-            scan_params: Scan parameters
+            scan_params: Scan parameters (int values like start offset, end offset)
 
         Returns:
             Dictionary with scan progress or None if not cached
@@ -1460,17 +1515,21 @@ class CoreOperationsManager(BaseManager):
         from core.di_container import inject
         from core.protocols.manager_protocols import ROMCacheProtocol
         rom_cache = inject(ROMCacheProtocol)
-        return rom_cache.get_partial_scan_results(rom_path, scan_params)
+        result = rom_cache.get_partial_scan_results(rom_path, scan_params)
+        return dict(result) if result else None  # Convert Mapping to dict
 
-    def save_scan_progress(self, rom_path: str, scan_params: dict[str, Any],
-                          found_sprites: list[dict[str, Any]], current_offset: int,
-                          completed: bool = False) -> bool:
+    def save_scan_progress(
+        self, rom_path: str, scan_params: dict[str, int],
+        found_sprites: list[Mapping[str, object]],  # Sprite data dicts
+        current_offset: int,
+        completed: bool = False
+    ) -> bool:
         """
         Save partial scan results for resumable scanning.
 
         Args:
             rom_path: Path to ROM file
-            scan_params: Scan parameters
+            scan_params: Scan parameters (int values like start offset, end offset)
             found_sprites: List of sprites found so far
             current_offset: Current scan position
             completed: Whether the scan is complete
@@ -1485,8 +1544,10 @@ class CoreOperationsManager(BaseManager):
             rom_path, scan_params, found_sprites, current_offset, completed
         )
 
-    def clear_scan_progress(self, rom_path: str | None = None,
-                           scan_params: dict[str, Any] | None = None) -> int:
+    def clear_scan_progress(
+        self, rom_path: str | None = None,
+        scan_params: dict[str, int] | None = None
+    ) -> int:
         """
         Clear scan progress caches.
 

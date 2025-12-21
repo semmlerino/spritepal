@@ -75,12 +75,12 @@ class SpriteInjector:
     """Handles sprite injection back to VRAM"""
 
     def __init__(self) -> None:
-        self.metadata: dict[str, Any] | None = None
+        self.metadata: dict[str, Any] | None = None  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
         self.sprite_path: str | None = None
         self.vram_data: bytearray | None = None
         logger.debug("SpriteInjector initialized")
 
-    def load_metadata(self, metadata_path: str) -> dict[str, Any]:
+    def load_metadata(self, metadata_path: str) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
         """Load extraction metadata from JSON file"""
         logger.debug(f"Loading metadata from {metadata_path}")
         with Path(metadata_path).open() as f:
@@ -121,7 +121,7 @@ class SpriteInjector:
                 if img.mode == "P":
                     # Indexed mode - count actual unique colors used
                     # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                    unique_colors = len(set(cast(Any, img.getdata())))
+                    unique_colors = len(set(cast(Any, img.getdata())))  # pyright: ignore[reportExplicitAny] - PIL's ImagingCore not properly typed
                     logger.debug(f"Indexed mode with {unique_colors} unique colors")
                     if unique_colors > 16:
                         logger.error(f"Too many colors: {unique_colors} (max 16)")
@@ -130,7 +130,7 @@ class SpriteInjector:
                 elif img.mode == "L":
                     # Grayscale mode - verify values are valid (0-255)
                     # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                    pixels = list(cast(Any, img.getdata()))
+                    pixels = list(cast(Any, img.getdata()))  # pyright: ignore[reportExplicitAny] - PIL's ImagingCore not properly typed
                     max_val = max(pixels) if pixels else 0
                     if max_val > 255:
                         logger.error(f"Invalid grayscale value: {max_val}")
@@ -275,7 +275,7 @@ class SpriteInjector:
             logger.exception("Sprite injection failed")
             return False, f"Error injecting sprite: {e!s}"
 
-    def get_extraction_info(self) -> dict[str, Any] | None:
+    def get_extraction_info(self) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
         """Get extraction information from metadata"""
         if self.metadata and "extraction" in self.metadata:
             extraction_info = self.metadata["extraction"]

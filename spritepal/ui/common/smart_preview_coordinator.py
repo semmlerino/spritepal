@@ -27,7 +27,7 @@ import time
 import weakref
 from collections.abc import Callable
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
@@ -52,7 +52,7 @@ class PreviewRequest:
     """Represents a preview request with priority and cancellation support."""
 
     def __init__(self, request_id: int, offset: int, rom_path: str,
-                 priority: int = 0, callback: Callable[..., Any] | None = None):
+                 priority: int = 0, callback: Callable[..., object] | None = None):
         self.request_id = request_id
         self.offset = offset
         self.rom_path = rom_path
@@ -107,7 +107,7 @@ class SmartPreviewCoordinator(QObject):
         self._mutex = QMutex()
 
         # Slider reference (weak to prevent circular references)
-        self._slider_ref: weakref.ReferenceType[Any] | None = None
+        self._slider_ref: weakref.ReferenceType[Any] | None = None  # pyright: ignore[reportExplicitAny] - Weak reference to QSlider
 
         # Timing configuration optimized for 60 FPS real-time updates
         self._drag_debounce_ms = REFRESH_RATE_60FPS  # 16ms for 60 FPS drag updates
@@ -163,7 +163,7 @@ class SmartPreviewCoordinator(QObject):
 
         # Callbacks for external integration
         self._ui_update_callback: Callable[[int | None], None] | None = None
-        self._rom_data_provider: Callable[[], tuple[str, Any, Any] | None] | None = None
+        self._rom_data_provider: Callable[[], tuple[str, object, object] | None] | None = None
 
         cache_info = "with ROM cache" if rom_cache else "memory only"
         logger.debug(f"SmartPreviewCoordinator initialized ({cache_info})")
@@ -191,7 +191,7 @@ class SmartPreviewCoordinator(QObject):
         """Set callback for immediate UI updates during dragging."""
         self._ui_update_callback = callback  # type: ignore[assignment]
 
-    def set_rom_data_provider(self, provider: Callable[[], tuple[str, Any, Any]]) -> None:
+    def set_rom_data_provider(self, provider: Callable[[], tuple[str, object, object]]) -> None:
         """Set provider for ROM data needed for preview generation.
 
         Args:
@@ -479,10 +479,10 @@ class SmartPreviewCoordinator(QObject):
             if not preview_data:
                 return (b"", 0, 0, None)
 
-            # Extract data components
-            tile_data = preview_data["tile_data"]
-            width = preview_data["width"]
-            height = preview_data["height"]
+            # Extract data components with proper type casts
+            tile_data = cast(bytes, preview_data["tile_data"])
+            width = cast(int, preview_data["width"])
+            height = cast(int, preview_data["height"])
 
             # Generate sprite name from offset
             # Use "manual_" prefix so SpritePreviewWorker knows to extract raw tiles
@@ -637,7 +637,11 @@ class SmartPreviewCoordinator(QObject):
             if provider_result is None:
                 logger.warning("[DEBUG] ROM data provider returned None!")
                 return
-            rom_path, extractor, rom_cache = provider_result
+            rom_path, extractor_obj, rom_cache_obj = provider_result
+            # Cast from object to proper protocol types
+            from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
+            extractor: ROMExtractorProtocol = cast(ROMExtractorProtocol, extractor_obj)
+            rom_cache: ROMCacheProtocol | None = cast(ROMCacheProtocol, rom_cache_obj) if rom_cache_obj else None
             logger.debug(f"[DEBUG] Got ROM data: path={bool(rom_path)}, extractor={bool(extractor)}, cache={bool(rom_cache)}")
 
             # Check if ROM data is actually valid before proceeding
@@ -756,7 +760,7 @@ class SmartPreviewCoordinator(QObject):
         self._ui_update_callback = None
         self._rom_data_provider = None
 
-    def get_cache_statistics(self) -> dict[str, Any]:
+    def get_cache_statistics(self) -> dict[str, object]:
         """
         Get comprehensive cache statistics.
 

@@ -4,24 +4,26 @@ These protocols define the interfaces that managers must implement.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from PIL import Image
+    from PySide6.QtCore import Signal
 
 
 class ExtractionManagerProtocol(Protocol):
     """Protocol for extraction manager."""
 
     # Signals (accessed via attributes)
-    cache_operation_started: Any  # Signal(str, str) - operation_type, description
-    cache_hit: Any  # Signal(str, float) - cache_key, time_saved
-    cache_miss: Any  # Signal(str) - cache_key
-    cache_saved: Any  # Signal(str, int) - cache_key, size_bytes
-    palettes_extracted: Any  # Signal(list) - extracted palettes
-    active_palettes_found: Any  # Signal(list) - active palettes
-    preview_generated: Any  # Signal(Image, int) - preview image, tile count
+    cache_operation_started: Signal  # Signal(str, str) - operation_type, description
+    cache_hit: Signal  # Signal(str, float) - cache_key, time_saved
+    cache_miss: Signal  # Signal(str) - cache_key
+    cache_saved: Signal  # Signal(str, int) - cache_key, size_bytes
+    palettes_extracted: Signal  # Signal(list) - extracted palettes
+    active_palettes_found: Signal  # Signal(list) - active palettes
+    preview_generated: Signal  # Signal(Image, int) - preview image, tile count
 
     def extract_from_rom(
         self,
@@ -46,7 +48,7 @@ class ExtractionManagerProtocol(Protocol):
         """
         ...
 
-    def read_rom_header(self, rom_path: str) -> dict[str, Any]:
+    def read_rom_header(self, rom_path: str) -> Mapping[str, object]:
         """
         Read ROM header from file path.
 
@@ -58,7 +60,7 @@ class ExtractionManagerProtocol(Protocol):
         """
         ...
 
-    def get_known_sprite_locations(self, rom_path: str) -> dict[str, Any]:
+    def get_known_sprite_locations(self, rom_path: str) -> Mapping[str, object]:
         """
         Get known sprite locations for ROM.
 
@@ -70,7 +72,7 @@ class ExtractionManagerProtocol(Protocol):
         """
         ...
 
-    def validate_extraction_params(self, params: dict[str, Any]) -> bool:
+    def validate_extraction_params(self, params: dict[str, Any]) -> bool:  # pyright: ignore[reportExplicitAny] - params are dynamic extraction config
         """
         Validate extraction parameters.
 
@@ -85,7 +87,7 @@ class ExtractionManagerProtocol(Protocol):
         """
         ...
 
-    def get_rom_extractor(self) -> Any:
+    def get_rom_extractor(self) -> object:
         """
         Get the ROM extractor instance for advanced operations.
 
@@ -131,11 +133,11 @@ class InjectionManagerProtocol(Protocol):
     """Protocol for injection manager."""
 
     # Signals (accessed via attributes)
-    injection_progress: Any  # Signal(str) - progress message
-    injection_finished: Any  # Signal(bool, str) - success, message
-    cache_saved: Any  # Signal(str, int) - cache_key, size_bytes
+    injection_progress: Signal  # Signal(str) - progress message
+    injection_finished: Signal  # Signal(bool, str) - success, message
+    cache_saved: Signal  # Signal(str, int) - cache_key, size_bytes
 
-    def start_injection(self, params: dict[str, Any]) -> bool:
+    def start_injection(self, params: Mapping[str, object]) -> bool:
         """
         Start injection process with given parameters.
 
@@ -147,7 +149,7 @@ class InjectionManagerProtocol(Protocol):
         """
         ...
 
-    def validate_injection_params(self, params: dict[str, Any]) -> None:
+    def validate_injection_params(self, params: Mapping[str, object]) -> None:
         """
         Validate injection parameters.
 
@@ -185,7 +187,7 @@ class InjectionManagerProtocol(Protocol):
         """
         ...
 
-    def load_metadata(self, metadata_path: str) -> dict[str, Any] | None:
+    def load_metadata(self, metadata_path: str) -> Mapping[str, object] | None:
         """
         Load and parse metadata file.
 
@@ -197,7 +199,7 @@ class InjectionManagerProtocol(Protocol):
         """
         ...
 
-    def load_rom_info(self, rom_path: str) -> dict[str, Any] | None:
+    def load_rom_info(self, rom_path: str) -> Mapping[str, object] | None:
         """
         Load ROM information and sprite locations.
 
@@ -209,7 +211,7 @@ class InjectionManagerProtocol(Protocol):
         """
         ...
 
-    def find_suggested_input_vram(self, sprite_path: str, metadata: dict[str, Any] | None = None,
+    def find_suggested_input_vram(self, sprite_path: str, metadata: Mapping[str, object] | None = None,
                                   suggested_vram: str = "") -> str:
         """Find the best suggestion for input VRAM path.
 
@@ -245,8 +247,8 @@ class InjectionManagerProtocol(Protocol):
         """
         ...
 
-    def load_rom_injection_defaults(self, sprite_path: str, metadata: dict[str, Any] | None = None
-                                    ) -> dict[str, Any]:
+    def load_rom_injection_defaults(self, sprite_path: str, metadata: Mapping[str, object] | None = None
+                                    ) -> Mapping[str, object]:
         """Load ROM injection defaults from metadata or saved settings.
 
         Args:
@@ -259,7 +261,7 @@ class InjectionManagerProtocol(Protocol):
         ...
 
     def restore_saved_sprite_location(self, extraction_vram_offset: str | None,
-                                      sprite_locations: dict[str, int]) -> dict[str, Any]:
+                                      sprite_locations: Mapping[str, int]) -> Mapping[str, object]:
         """Restore saved sprite location selection.
 
         Args:
@@ -297,31 +299,31 @@ class SettingsManagerProtocol(Protocol):
         """Save settings to file."""
         ...
 
-    def get(self, category: str, key: str, default: Any = None) -> Any:
+    def get(self, category: str, key: str, default: object = None) -> object:
         """Get a setting value."""
         ...
 
-    def set(self, category: str, key: str, value: Any) -> None:
+    def set(self, category: str, key: str, value: object) -> None:
         """Set a setting value."""
         ...
 
-    def get_session_data(self) -> dict[str, Any]:
+    def get_session_data(self) -> Mapping[str, object]:
         """Get all session data."""
         ...
 
-    def save_session_data(self, session_data: dict[str, Any]) -> None:
+    def save_session_data(self, session_data: Mapping[str, object]) -> None:
         """Save session data."""
         ...
 
-    def get_ui_data(self) -> dict[str, Any]:
+    def get_ui_data(self) -> Mapping[str, object]:
         """Get UI settings."""
         ...
 
-    def save_ui_data(self, ui_data: dict[str, Any]) -> None:
+    def save_ui_data(self, ui_data: Mapping[str, object]) -> None:
         """Save UI settings."""
         ...
 
-    def validate_file_paths(self) -> dict[str, str]:
+    def validate_file_paths(self) -> Mapping[str, str]:
         """Validate and return existing file paths from session."""
         ...
 
@@ -341,7 +343,7 @@ class SettingsManagerProtocol(Protocol):
         """Set the last used directory."""
         ...
 
-    def get_cache_settings(self) -> dict[str, Any]:
+    def get_cache_settings(self) -> Mapping[str, object]:
         """Get all cache settings."""
         ...
 
@@ -381,21 +383,21 @@ class SettingsManagerProtocol(Protocol):
 class ROMExtractorProtocol(Protocol):
     """Protocol for the ROM extractor."""
 
-    rom_injector: Any  # ROMInjector instance for compression/decompression operations
+    rom_injector: object  # ROMInjector instance for compression/decompression operations
 
     def extract_sprite_data(
-        self, rom_path: str, sprite_offset: int, sprite_config: dict[str, Any] | None = None
+        self, rom_path: str, sprite_offset: int, sprite_config: Mapping[str, object] | None = None
     ) -> bytes:
         """Extract raw sprite data from ROM at specified offset."""
         ...
 
     def extract_sprite_from_rom(
         self, rom_path: str, sprite_offset: int, output_base: str, sprite_name: str = ""
-    ) -> tuple[str, dict[str, str | int | bool]]:
+    ) -> tuple[str, Mapping[str, str | int | bool]]:
         """Extract sprite from ROM at specified offset."""
         ...
 
-    def get_known_sprite_locations(self, rom_path: str) -> dict[str, Any]:
+    def get_known_sprite_locations(self, rom_path: str) -> Mapping[str, object]:
         """Get known sprite locations for the given ROM."""
         ...
 
@@ -408,17 +410,17 @@ class ROMCacheProtocol(Protocol):
         """Get whether caching is enabled."""
         ...
 
-    def save_partial_scan_results(self, rom_path: str, scan_params: dict[str, int],
-                                 found_sprites: list[dict[str, Any]],
+    def save_partial_scan_results(self, rom_path: str, scan_params: Mapping[str, int],
+                                 found_sprites: list[Mapping[str, object]],
                                  current_offset: int, completed: bool = False) -> bool:
         """Save partial scan results for incremental progress."""
         ...
 
-    def get_partial_scan_results(self, rom_path: str, scan_params: dict[str, int]) -> dict[str, Any] | None:
+    def get_partial_scan_results(self, rom_path: str, scan_params: Mapping[str, int]) -> Mapping[str, object] | None:
         """Get partial scan results for resuming."""
         ...
 
-    def get_cache_stats(self) -> dict[str, Any]:
+    def get_cache_stats(self) -> Mapping[str, object]:
         """Get cache statistics with error handling."""
         ...
 
@@ -426,25 +428,25 @@ class ROMCacheProtocol(Protocol):
         """Clear cache files and hash cache with error handling."""
         ...
 
-    def get_sprite_locations(self, rom_path: str) -> dict[str, Any] | None:
+    def get_sprite_locations(self, rom_path: str) -> Mapping[str, object] | None:
         """Get cached sprite locations for ROM."""
         ...
 
-    def save_sprite_locations(self, rom_path: str, sprite_locations: dict[str, Any],
-                            rom_header: dict[str, Any] | None = None) -> bool:
+    def save_sprite_locations(self, rom_path: str, sprite_locations: Mapping[str, object],
+                            rom_header: Mapping[str, object] | None = None) -> bool:
         """Save sprite locations to cache."""
         ...
 
-    def get_rom_info(self, rom_path: str) -> dict[str, Any] | None:
+    def get_rom_info(self, rom_path: str) -> Mapping[str, object] | None:
         """Get cached ROM information (header, etc.)."""
         ...
 
-    def save_rom_info(self, rom_path: str, rom_info: dict[str, Any]) -> bool:
+    def save_rom_info(self, rom_path: str, rom_info: Mapping[str, object]) -> bool:
         """Save ROM information to cache."""
         ...
 
     def clear_scan_progress_cache(self, rom_path: str | None = None,
-                                 scan_params: dict[str, int] | None = None) -> int:
+                                 scan_params: Mapping[str, int] | None = None) -> int:
         """Clear scan progress caches."""
         ...
 
@@ -453,21 +455,21 @@ class ROMCacheProtocol(Protocol):
         ...
 
     def save_preview_data(self, rom_path: str, offset: int, tile_data: bytes,
-                         width: int, height: int, params: dict[str, Any] | None = None) -> bool:
+                         width: int, height: int, params: Mapping[str, object] | None = None) -> bool:
         """Save preview tile data to cache with compression."""
         ...
 
     def get_preview_data(self, rom_path: str, offset: int,
-                        params: dict[str, Any] | None = None) -> dict[str, Any] | None:
+                        params: Mapping[str, object] | None = None) -> Mapping[str, object] | None:
         """Get cached preview data for ROM and offset."""
         ...
 
-    def save_preview_batch(self, rom_path: str, preview_data_dict: dict[int, dict[str, Any]]) -> bool:
+    def save_preview_batch(self, rom_path: str, preview_data_dict: Mapping[int, Mapping[str, object]]) -> bool:
         """Save multiple preview data entries in batch for efficiency."""
         ...
 
     def get_offset_suggestions(self, rom_path: str, current_offset: int | None = None,
-                              limit: int = 10) -> list[dict[str, Any]]:
+                              limit: int = 10) -> list[Mapping[str, object]]:
         """Get offset suggestions based on cached scan results and preview data."""
         ...
 
@@ -484,17 +486,17 @@ class ROMServiceProtocol(Protocol):
     """
 
     # Signals (accessed via attributes)
-    extraction_progress: Any  # Signal(str) - progress message
-    extraction_warning: Any  # Signal(str) - warning message (partial success)
-    preview_generated: Any  # Signal(object, int) - PIL Image, tile count
-    palettes_extracted: Any  # Signal(dict) - palette data
-    active_palettes_found: Any  # Signal(list) - active palette indices
-    files_created: Any  # Signal(list) - list of created files
-    cache_operation_started: Any  # Signal(str, str) - operation type, cache type
-    cache_hit: Any  # Signal(str, float) - cache type, time saved
-    cache_miss: Any  # Signal(str) - cache type
-    cache_saved: Any  # Signal(str, int) - cache type, number of items
-    error_occurred: Any  # Signal(str) - error message
+    extraction_progress: Signal  # Signal(str) - progress message
+    extraction_warning: Signal  # Signal(str) - warning message (partial success)
+    preview_generated: Signal  # Signal(object, int) - PIL Image, tile count
+    palettes_extracted: Signal  # Signal(dict) - palette data
+    active_palettes_found: Signal  # Signal(list) - active palette indices
+    files_created: Signal  # Signal(list) - list of created files
+    cache_operation_started: Signal  # Signal(str, str) - operation type, cache type
+    cache_hit: Signal  # Signal(str, float) - cache type, time saved
+    cache_miss: Signal  # Signal(str) - cache type
+    cache_saved: Signal  # Signal(str, int) - cache type, number of items
+    error_occurred: Signal  # Signal(str) - error message
 
     def cleanup(self) -> None:
         """Cleanup service resources."""
@@ -564,7 +566,7 @@ class ROMServiceProtocol(Protocol):
         """
         ...
 
-    def get_known_sprite_locations(self, rom_path: str) -> dict[str, Any]:
+    def get_known_sprite_locations(self, rom_path: str) -> Mapping[str, object]:
         """Get known sprite locations for a ROM with caching.
 
         Args:
@@ -575,7 +577,7 @@ class ROMServiceProtocol(Protocol):
         """
         ...
 
-    def read_rom_header(self, rom_path: str) -> dict[str, Any]:
+    def read_rom_header(self, rom_path: str) -> Mapping[str, object]:
         """Read ROM header information.
 
         Args:
@@ -594,13 +596,13 @@ class VRAMServiceProtocol(Protocol):
     """
 
     # Signals (accessed via attributes)
-    extraction_progress: Any  # Signal(str) - progress message
-    extraction_warning: Any  # Signal(str) - warning message (partial success)
-    preview_generated: Any  # Signal(object, int) - PIL Image, tile count
-    palettes_extracted: Any  # Signal(dict) - palette data
-    active_palettes_found: Any  # Signal(list) - active palette indices
-    files_created: Any  # Signal(list) - list of created files
-    error_occurred: Any  # Signal(str) - error message
+    extraction_progress: Signal  # Signal(str) - progress message
+    extraction_warning: Signal  # Signal(str) - warning message (partial success)
+    preview_generated: Signal  # Signal(object, int) - PIL Image, tile count
+    palettes_extracted: Signal  # Signal(dict) - palette data
+    active_palettes_found: Signal  # Signal(list) - active palette indices
+    files_created: Signal  # Signal(list) - list of created files
+    error_occurred: Signal  # Signal(str) - error message
 
     def cleanup(self) -> None:
         """Cleanup service resources."""
@@ -728,33 +730,33 @@ class ApplicationStateManagerProtocol(Protocol):
 
     # Signals (accessed via attributes)
     # State signals
-    state_changed: Any  # Signal(str, dict) - category, data
-    workflow_state_changed: Any  # Signal(object, object) - old_state, new_state
-    application_state_snapshot: Any  # Signal(dict) - full state for debugging
+    state_changed: Signal  # Signal(str, dict) - category, data
+    workflow_state_changed: Signal  # Signal(object, object) - old_state, new_state
+    application_state_snapshot: Signal  # Signal(dict) - full state for debugging
 
     # Session signals
-    session_changed: Any  # Signal() - session data modified
-    files_updated: Any  # Signal(dict) - file paths changed
-    settings_saved: Any  # Signal() - settings persisted to disk
-    session_restored: Any  # Signal(dict) - session loaded from disk
+    session_changed: Signal  # Signal() - session data modified
+    files_updated: Signal  # Signal(dict) - file paths changed
+    settings_saved: Signal  # Signal() - settings persisted to disk
+    session_restored: Signal  # Signal(dict) - session loaded from disk
 
     # History signals
-    history_updated: Any  # Signal(list) - list of sprite offsets
-    sprite_added: Any  # Signal(int, float) - offset, quality_score
+    history_updated: Signal  # Signal(list) - list of sprite offsets
+    sprite_added: Signal  # Signal(int, float) - offset, quality_score
 
     # Cache signals
-    cache_stats_updated: Any  # Signal(dict) - updated cache metrics
+    cache_stats_updated: Signal  # Signal(dict) - updated cache metrics
 
     # UI coordination signals
-    current_offset_changed: Any  # Signal(int) - ROM offset changed
-    preview_ready: Any  # Signal(int, QImage) - offset, preview_image
+    current_offset_changed: Signal  # Signal(int) - ROM offset changed
+    preview_ready: Signal  # Signal(int, QImage) - offset, preview_image
 
     # ========== Settings management ==========
-    def get_setting(self, category: str, key: str, default: Any = None) -> Any:
+    def get_setting(self, category: str, key: str, default: object = None) -> object:
         """Get a persistent setting value."""
         ...
 
-    def set_setting(self, category: str, key: str, value: Any) -> None:
+    def set_setting(self, category: str, key: str, value: object) -> None:
         """Set a persistent setting value."""
         ...
 
@@ -771,7 +773,7 @@ class ApplicationStateManagerProtocol(Protocol):
         """Load session state from file."""
         ...
 
-    def get_session_data(self) -> dict[str, Any]:
+    def get_session_data(self) -> Mapping[str, object]:
         """Get current session data."""
         ...
 
@@ -779,33 +781,33 @@ class ApplicationStateManagerProtocol(Protocol):
         """Clear current session data."""
         ...
 
-    def update_session_data(self, data: dict[str, Any]) -> None:
+    def update_session_data(self, data: Mapping[str, object]) -> None:
         """Update multiple session values at once."""
         ...
 
-    def get(self, category: str, key: str, default: Any = None) -> Any:
+    def get(self, category: str, key: str, default: object = None) -> object:
         """Get a setting value by category and key."""
         ...
 
-    def set(self, category: str, key: str, value: Any) -> None:
+    def set(self, category: str, key: str, value: object) -> None:
         """Set a setting value by category and key."""
         ...
 
-    def get_window_geometry(self) -> dict[str, int | list[int]]:
+    def get_window_geometry(self) -> Mapping[str, int | list[int]]:
         """Get saved window geometry including splitter sizes."""
         ...
 
-    def update_window_state(self, geometry: dict[str, int | float | list[int]]) -> None:
+    def update_window_state(self, geometry: Mapping[str, int | float | list[int]]) -> None:
         """Update window geometry in settings including splitter sizes."""
         ...
 
     # Runtime state management
-    def get_state(self, namespace: str, key: str, default: Any = None) -> Any:
+    def get_state(self, namespace: str, key: str, default: object = None) -> object:
         """Get runtime state value (not persisted)."""
         ...
 
     def set_state(
-        self, namespace: str, key: str, value: Any, ttl_seconds: float | None = None
+        self, namespace: str, key: str, value: object, ttl_seconds: float | None = None
     ) -> None:
         """Set runtime state value."""
         ...
@@ -816,7 +818,7 @@ class ApplicationStateManagerProtocol(Protocol):
 
     # Workflow state
     @property
-    def workflow_state(self) -> Any:
+    def workflow_state(self) -> object:
         """Get current workflow state (ExtractionState)."""
         ...
 
@@ -831,7 +833,7 @@ class ApplicationStateManagerProtocol(Protocol):
         ...
 
     def transition_workflow(
-        self, new_state: Any, error_message: str | None = None
+        self, new_state: object, error_message: str | None = None
     ) -> bool:
         """Attempt to transition to a new workflow state."""
         ...
@@ -845,16 +847,16 @@ class ApplicationStateManagerProtocol(Protocol):
         """Record a cache miss in session statistics."""
         ...
 
-    def get_cache_session_stats(self) -> dict[str, int]:
+    def get_cache_session_stats(self) -> Mapping[str, int]:
         """Get current cache session statistics."""
         ...
 
     # Unified state snapshot
-    def get_full_state_snapshot(self) -> dict[str, Any]:
+    def get_full_state_snapshot(self) -> Mapping[str, object]:
         """Get a complete snapshot of all application state."""
         ...
 
-    def emit_state_snapshot(self) -> dict[str, Any]:
+    def emit_state_snapshot(self) -> Mapping[str, object]:
         """Emit a state snapshot signal and return the snapshot."""
         ...
 

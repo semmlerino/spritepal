@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 
 from core.visual_similarity_search import SimilarityMatch
 from ui.common.spacing_constants import SPACING_COMPACT_MEDIUM, SPACING_SMALL, SPACING_TINY
-from ui.components import BaseDialog
+from ui.components import DialogBase
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
@@ -126,13 +126,13 @@ class SimilarityResultWidget(QFrame):
         self.setLayout(layout)
 
     @override
-    def mousePressEvent(self, event: Any):
+    def mousePressEvent(self, event: Any):  # pyright: ignore[reportExplicitAny] - Qt mouse event
         """Handle mouse clicks to select sprite."""
         if event.button() == Qt.MouseButton.LeftButton:
             self.sprite_selected.emit(self.match.offset)
         super().mousePressEvent(event)
 
-class SimilarityResultsDialog(BaseDialog):
+class SimilarityResultsDialog(DialogBase):
     """Dialog showing visual similarity search results."""
 
     sprite_selected = Signal(int)  # Emitted when user selects a sprite

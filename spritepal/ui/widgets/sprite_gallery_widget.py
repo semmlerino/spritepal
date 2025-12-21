@@ -4,7 +4,10 @@ Provides efficient virtual scrolling using Model/View architecture.
 """
 from __future__ import annotations
 
-from typing import Any, override
+from typing import TYPE_CHECKING, override
+
+if TYPE_CHECKING:
+    from PySide6.QtCore import QModelIndex
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap, QResizeEvent, QShowEvent
@@ -334,7 +337,7 @@ class SpriteGalleryWidget(QWidget):
         controls.setLayout(layout)
         return controls
 
-    def set_sprites(self, sprites: list[dict[str, Any]]):
+    def set_sprites(self, sprites: list[dict[str, object]]):
         """
         Set the sprites to display in the gallery.
 
@@ -418,7 +421,7 @@ class SpriteGalleryWidget(QWidget):
         self.viewport_timer.stop()
         self.viewport_timer.start()
 
-    def _on_item_clicked(self, index: Any) -> None:
+    def _on_item_clicked(self, index: QModelIndex) -> None:
         """Handle item click."""
         if not index.isValid():
             return
@@ -427,7 +430,7 @@ class SpriteGalleryWidget(QWidget):
         if offset is not None:
             self.sprite_selected.emit(offset)
 
-    def _on_item_double_clicked(self, index: Any) -> None:
+    def _on_item_double_clicked(self, index: QModelIndex) -> None:
         """Handle item double click."""
         if not index.isValid():
             return
@@ -534,7 +537,7 @@ class SpriteGalleryWidget(QWidget):
         # Trigger thumbnail loading when widget becomes visible
         self.viewport_timer.start()
 
-    def get_selected_sprites(self) -> list[dict[str, Any]]:
+    def get_selected_sprites(self) -> list[dict[str, object]]:
         """Get information for all selected sprites."""
         if self.model:
             return self.model.get_selected_sprites()
@@ -548,7 +551,8 @@ class SpriteGalleryWidget(QWidget):
                 offset = selected[0].get('offset', 0)
                 if isinstance(offset, str):
                     return int(offset, 16) if offset.startswith('0x') else int(offset)
-                return offset
+                if isinstance(offset, int):
+                    return offset
         return None
 
     def force_layout_update(self):
@@ -574,9 +578,9 @@ class SpriteGalleryWidget(QWidget):
 
     # Backward compatibility property
     @property
-    def thumbnails(self) -> dict[int, Any]:
+    def thumbnails(self) -> dict[int, object]:
         """Backward compatibility: return dict with offset as key."""
-        result: dict[int, Any] = {}
+        result: dict[int, object] = {}
         if self.model:
             # Create a minimal compatibility dict
             for i in range(self.model.rowCount()):

@@ -11,7 +11,7 @@ Moved from utils/type_aliases.py to fix layer boundary violations
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, NotRequired, TypeAlias, TypedDict
+from typing import NotRequired, TypeAlias, TypedDict
 
 from PIL import Image
 from PySide6.QtGui import QPixmap
@@ -44,7 +44,7 @@ PreviewSize: TypeAlias = tuple[int, int]
 TileCount: TypeAlias = int
 
 # Worker and callback types
-WorkerCallback: TypeAlias = Callable[[Any], None]
+WorkerCallback: TypeAlias = Callable[[object], None]
 ProgressCallback: TypeAlias = Callable[[int, str], None]
 ErrorCallback: TypeAlias = Callable[[str, Exception], None]
 
@@ -83,16 +83,16 @@ class ROMExtractionParams(TypedDict):
 
 
 # Configuration and settings types
-ConfigDict: TypeAlias = dict[str, Any]
-SettingsValue: TypeAlias = Any
+ConfigDict: TypeAlias = dict[str, object]
+SettingsValue: TypeAlias = object
 ValidationResult: TypeAlias = tuple[bool, str | None]
 
 # Signal types for Qt
 StringSignal: TypeAlias = str
 IntSignal: TypeAlias = int
 BoolSignal: TypeAlias = bool
-ListSignal: TypeAlias = list[Any]
-DictSignal: TypeAlias = dict[str, Any]
+ListSignal: TypeAlias = list[object]
+DictSignal: TypeAlias = dict[str, object]
 
 # Manager operation types
 OperationName: TypeAlias = str
@@ -101,13 +101,13 @@ OperationProgress: TypeAlias = tuple[int, int]  # (current, total)
 
 # Cache types
 CacheKey: TypeAlias = str
-CacheData: TypeAlias = Any
+CacheData: TypeAlias = object
 CacheStats: TypeAlias = dict[str, int | float]
 
 # Navigation types (for smart sprite discovery)
-NavigationHint: TypeAlias = dict[str, Any]
-SpriteLocation: TypeAlias = dict[str, Any]
-RegionMap: TypeAlias = dict[str, Any]
+NavigationHint: TypeAlias = dict[str, object]
+SpriteLocation: TypeAlias = dict[str, object]
+RegionMap: TypeAlias = dict[str, object]
 
 # Re-export for backward compatibility
 __all__ = [

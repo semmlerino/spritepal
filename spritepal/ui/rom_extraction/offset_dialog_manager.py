@@ -41,11 +41,18 @@ class _ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDia
     @override
     def _create_instance(
         cls,
-        manager: OffsetDialogManager | None = None,
+        *args: object,
+        **kwargs: object,
     ) -> UnifiedManualOffsetDialog:
-        """Create the dialog instance."""
+        """Create the dialog instance.
+
+        Args:
+            *args: First argument should be OffsetDialogManager if provided
+            **kwargs: Ignored
+        """
         from ui.dialogs import UnifiedManualOffsetDialog
 
+        manager = args[0] if args and isinstance(args[0], OffsetDialogManager) else None
         parent = manager._parent_widget if manager else None
         dialog = UnifiedManualOffsetDialog(parent=parent)
         cls._creator_manager = manager
@@ -214,7 +221,7 @@ class OffsetDialogManager(QObject):
         """Handle offset change from dialog."""
         self.offset_changed.emit(offset)
 
-    def _on_sprite_found(self, sprite_data: dict[str, Any]) -> None:
+    def _on_sprite_found(self, sprite_data: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
         """Handle sprite found from dialog."""
         self.sprite_found.emit(sprite_data)
 

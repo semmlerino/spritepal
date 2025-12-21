@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
     from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_injector import ROMInjector
 
 from PySide6.QtCore import Signal
 
@@ -28,7 +29,7 @@ class SpritePreviewWorker(BaseWorker):
     preview_error = Signal(str)
     """Emitted on preview error. Args: error_message."""
 
-    def __init__(self, rom_path: str, offset: int, sprite_name: str, extractor: ROMExtractorProtocol, sprite_config: Any = None, parent: QObject | None = None):
+    def __init__(self, rom_path: str, offset: int, sprite_name: str, extractor: ROMExtractorProtocol, sprite_config: Any = None, parent: QObject | None = None):  # pyright: ignore[reportExplicitAny] - Optional sprite config
         super().__init__(parent)
         self.rom_path = rom_path
         self.offset = offset
@@ -154,9 +155,11 @@ class SpritePreviewWorker(BaseWorker):
                     logger.debug(f"Using default expected size: {expected_size} bytes")
 
                 # Try to decompress
+                from typing import cast
+                rom_injector = cast("ROMInjector", self.extractor.rom_injector)
                 if offset_variants:
                     compressed_size, tile_data, successful_offset = (
-                        self.extractor.rom_injector.find_compressed_sprite_with_fallback(
+                        rom_injector.find_compressed_sprite_with_fallback(
                             rom_data, self.offset, offset_variants, expected_size
                         )
                     )
@@ -164,7 +167,7 @@ class SpritePreviewWorker(BaseWorker):
                         logger.info(f"Used alternate offset 0x{successful_offset:X} for {self.sprite_name}")
                 else:
                     compressed_size, tile_data = (
-                        self.extractor.rom_injector.find_compressed_sprite(
+                        rom_injector.find_compressed_sprite(
                             rom_data, self.offset, expected_size
                         )
                     )

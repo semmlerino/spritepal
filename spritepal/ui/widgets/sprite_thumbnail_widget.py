@@ -45,7 +45,7 @@ class SpriteThumbnailWidget(QWidget):
         self.sprite_pixmap: QPixmap | None = None
         self.is_selected = False
         self.is_hovered = False
-        self.sprite_info: dict[str, Any] = {}
+        self.sprite_info: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny] - sprite metadata
 
         # Thumbnail display label
         self.thumbnail_label: QLabel | None = None
@@ -121,7 +121,7 @@ class SpriteThumbnailWidget(QWidget):
     def set_sprite_data(
         self,
         pixmap: QPixmap,
-        sprite_info: dict[str, Any] | None = None
+        sprite_info: dict[str, object] | None = None
     ):
         """
         Set the sprite thumbnail data.
@@ -316,6 +316,6 @@ class SpriteThumbnailWidget(QWidget):
         """Get the sprite offset."""
         return self.offset
 
-    def get_sprite_info(self) -> dict[str, Any]:
+    def get_sprite_info(self) -> dict[str, object]:
         """Get the sprite metadata."""
         return self.sprite_info

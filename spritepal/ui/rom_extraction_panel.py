@@ -9,8 +9,9 @@ This panel coordinates ROM-based sprite extraction using:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, cast, override
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent
@@ -28,7 +29,8 @@ from ui.common.file_dialogs import browse_for_open_file
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import ExtractionManagerProtocol
+    from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
+    from core.rom_validator import ROMHeader
 
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.managers.workflow_manager import ExtractionState
@@ -78,17 +80,17 @@ class ROMExtractionPanel(QWidget):
 
     def __init__(
         self,
-        parent: Any | None = None,
+        parent: QWidget | None = None,
         *,
         extraction_manager: ExtractionManagerProtocol,
-    ):
+    ) -> None:
         super().__init__(parent)
 
         self.rom_path = ""
-        self.sprite_locations: dict[str, Any] = {}
+        self.sprite_locations: dict[str, Mapping[str, object]] = {}
         # Use injected extraction manager
         self.extraction_manager = extraction_manager
-        self.rom_extractor = self.extraction_manager.get_rom_extractor()
+        self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()  # type: ignore[assignment]
         self.rom_size = 0  # Track ROM size for slider limits
         self._manual_offset_mode = False  # Default to preset mode (sprite picker visible)
 
@@ -305,12 +307,12 @@ class ROMExtractionPanel(QWidget):
         if filename:
             self._load_rom_file(filename)
 
-    def _on_partial_scan_detected(self, scan_info: dict[str, Any]):
+    def _on_partial_scan_detected(self, scan_info: Mapping[str, object]) -> None:
         """Handle detection of partial scan cache"""
         from ui.dialogs import ResumeScanDialog  # Lazy import to avoid cross-UI coupling
 
         # Show resume dialog to ask user what to do
-        user_choice = ResumeScanDialog.show_resume_dialog(scan_info, self)
+        user_choice = ResumeScanDialog.show_resume_dialog(dict(scan_info), self)
 
         if user_choice == ResumeScanDialog.RESUME:
             # User wants to resume - trigger scan dialog
@@ -336,7 +338,7 @@ class ROMExtractionPanel(QWidget):
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, ""
             )
 
-            if last_rom and Path(last_rom).exists():
+            if last_rom and isinstance(last_rom, str) and Path(last_rom).exists():
                 logger.info(f"Loading last used ROM: {last_rom}")
                 self._load_rom_file(last_rom)
             elif last_rom:
@@ -400,7 +402,7 @@ class ROMExtractionPanel(QWidget):
             self.rom_path = ""
             self.rom_file_widget.set_rom_path("")
 
-    def _on_header_loaded(self, result: dict[str, Any]) -> None:
+    def _on_header_loaded(self, result: Mapping[str, object]) -> None:
         """Handle ROM header loaded from orchestrator.
 
         Args:
@@ -409,7 +411,7 @@ class ROMExtractionPanel(QWidget):
         # Hide loading indicator
         self.rom_file_widget.hide_loading()
 
-        header = result.get("header")
+        header = cast("ROMHeader | None", result.get("header"))
         sprite_configs = result.get("sprite_configs")
 
         if header is None:
@@ -477,9 +479,9 @@ class ROMExtractionPanel(QWidget):
         self._check_extraction_ready()
         # Preview now handled in manual offset dialog
 
-    def _on_dialog_sprite_found(self, sprite_data: dict[str, Any]):
+    def _on_dialog_sprite_found(self, sprite_data: Mapping[str, object]) -> None:
         """Handle sprite found signal from dialog"""
-        offset = sprite_data.get("offset", 0)
+        offset = cast(int, sprite_data.get("offset", 0))
         self._manual_offset = offset
         self._manual_offset_mode = True  # User chose manual offset mode via dialog
         # Check extraction readiness
@@ -523,7 +525,7 @@ class ROMExtractionPanel(QWidget):
         # Use orchestrator to load sprite locations
         self._worker_orchestrator.load_sprite_locations(self.rom_path, self.rom_extractor)
 
-    def _on_sprite_locations_loaded(self, locations: list[dict[str, Any]]) -> None:
+    def _on_sprite_locations_loaded(self, locations: list[Mapping[str, object]]) -> None:
         """Handle sprite locations loaded from orchestrator.
 
         Args:
@@ -535,9 +537,9 @@ class ROMExtractionPanel(QWidget):
         is_from_cache = getattr(self, '_is_sprites_from_cache', False)
 
         # Convert list to dict format expected by sprite selector
-        locations_dict: dict[str, Any] = {}
+        locations_dict: dict[str, Mapping[str, object]] = {}
         for loc in locations:
-            name = loc.get("name", f"sprite_0x{loc.get('offset', 0):X}")
+            name = cast(str, loc.get("name", f"sprite_0x{cast(int, loc.get('offset', 0)):X}"))
             locations_dict[name] = loc
 
         if locations_dict:
@@ -551,7 +553,7 @@ class ROMExtractionPanel(QWidget):
             self.sprite_selector_widget.insert_separator(1)
 
             for name, info in locations_dict.items():
-                offset = info.get("offset", 0)
+                offset = cast(int, info.get("offset", 0))
                 display_name = name.replace("_", " ").title()
                 # Add cache indicator if sprites came from cache
                 cache_indicator = " \U0001F4BE" if is_from_cache else ""  # floppy disk emoji
@@ -610,9 +612,9 @@ class ROMExtractionPanel(QWidget):
         """Handle similarity indexing progress updates"""
         logger.debug(f"Indexing sprites: {message}")
 
-    def _on_sprite_indexed(self, sprite_data: dict[str, Any]):
+    def _on_sprite_indexed(self, sprite_data: Mapping[str, object]) -> None:
         """Handle individual sprite indexing completion"""
-        offset = sprite_data.get("offset", 0)
+        offset = cast(int, sprite_data.get("offset", 0))
         logger.debug(f"Sprite at 0x{offset:X} indexed for similarity search")
 
     def _on_index_saved(self, index_path: str):
@@ -715,8 +717,12 @@ class ROMExtractionPanel(QWidget):
             logger.exception("Error in _check_extraction_ready")
             self.extraction_ready.emit(False, "Internal error")
 
-    def get_extraction_params(self) -> dict[str, Any] | None:
-        """Get parameters for ROM extraction"""
+    def get_extraction_params(self) -> dict[str, object] | None:
+        """Get parameters for ROM extraction.
+
+        Returns:
+            Dict with keys: rom_path, sprite_offset, sprite_name, output_base, cgram_path
+        """
         if not self.rom_path:
             return None
 

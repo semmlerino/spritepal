@@ -85,7 +85,7 @@ class SearchWorker(QThread):
     question_requested = Signal(str, str)  # title, question
     info_requested = Signal(str, str)  # title, message
 
-    def __init__(self, search_type: str, params: dict[str, Any]):
+    def __init__(self, search_type: str, params: dict[str, Any]):  # pyright: ignore[reportExplicitAny] - search parameters can be varied types
         super().__init__()
         self.search_type = search_type
         self.params = params
@@ -124,10 +124,11 @@ class SearchWorker(QThread):
 
     def _run_parallel_search(self):
         """Run parallel sprite search."""
-        rom_path = self.params["rom_path"]
-        start = self.params.get("start_offset", 0)
-        end = self.params.get("end_offset", None)
-        filters = self.params.get("filters", SearchFilter(
+        rom_path = str(self.params["rom_path"])
+        start = int(self.params.get("start_offset", 0))
+        end_val = self.params.get("end_offset", None)
+        end = int(end_val) if end_val is not None else None
+        filters_val = self.params.get("filters", SearchFilter(
             min_size=MIN_SPRITE_SIZE,
             max_size=MAX_SPRITE_SIZE,
             min_tiles=1,
@@ -137,11 +138,21 @@ class SearchWorker(QThread):
             include_uncompressed=False,
             confidence_threshold=0.5
         ))
+        filters = filters_val if isinstance(filters_val, SearchFilter) else SearchFilter(
+            min_size=MIN_SPRITE_SIZE,
+            max_size=MAX_SPRITE_SIZE,
+            min_tiles=1,
+            max_tiles=1024,
+            alignment=1,
+            include_compressed=True,
+            include_uncompressed=False,
+            confidence_threshold=0.5
+        )
 
         # Create parallel finder
         self.finder = ParallelSpriteFinder(
-            num_workers=self.params.get("num_workers", 4),
-            step_size=self.params.get("step_size", 0x100)
+            num_workers=int(self.params.get("num_workers", 4)),
+            step_size=int(self.params.get("step_size", 0x100))
         )
 
         # Search with progress callback
@@ -165,9 +176,9 @@ class SearchWorker(QThread):
     def _run_visual_search(self):
         """Run visual similarity search."""
         try:
-            rom_path = self.params["rom_path"]
-            ref_offset = self.params["reference_offset"]
-            similarity_threshold = self.params["similarity_threshold"]
+            rom_path = str(self.params["rom_path"])
+            ref_offset = int(self.params["reference_offset"])
+            similarity_threshold = float(self.params["similarity_threshold"])
             self.params["search_scope"]
 
             # Initialize similarity engine
@@ -188,7 +199,7 @@ class SearchWorker(QThread):
                 return
 
             # Search for similar sprites
-            max_results = self.params.get("max_results", 50)
+            max_results = int(self.params.get("max_results", 50))
 
             if ref_offset not in similarity_engine.sprite_database:
                 self.error.emit(f"Reference sprite at 0x{ref_offset:X} not found in index")
@@ -230,14 +241,15 @@ class SearchWorker(QThread):
     def _run_pattern_search(self):
         """Run pattern-based search with hex patterns and regex support."""
         try:
-            rom_path = self.params["rom_path"]
-            patterns = self.params.get("patterns", [])
-            pattern_type = self.params.get("pattern_type", "hex")
-            case_sensitive = self.params.get("case_sensitive", False)
-            alignment = self.params.get("alignment", 1)
-            context_bytes = self.params.get("context_bytes", 16)
-            max_results = self.params.get("max_results", 1000)
-            operation = self.params.get("operation", "Single Pattern")
+            rom_path = str(self.params["rom_path"])
+            patterns_val = self.params.get("patterns", [])
+            patterns = list(patterns_val) if isinstance(patterns_val, list) else []
+            pattern_type = str(self.params.get("pattern_type", "hex"))
+            case_sensitive = bool(self.params.get("case_sensitive", False))
+            alignment = int(self.params.get("alignment", 1))
+            context_bytes = int(self.params.get("context_bytes", 16))
+            max_results = int(self.params.get("max_results", 1000))
+            operation = str(self.params.get("operation", "Single Pattern"))
 
             if not patterns:
                 self.error.emit("No patterns specified")
@@ -832,7 +844,7 @@ class SearchWorker(QThread):
         """Thread-safe method to show info message to user from main thread."""
         self.info_requested.emit(title, message)
 
-    def _set_user_response(self, response: Any) -> None:
+    def _set_user_response(self, response: object) -> None:
         """Called from main thread to provide user response."""
         self._user_response_mutex.lock()
         try:
@@ -1529,11 +1541,14 @@ class AdvancedSearchDialog(QDialog):
         self.current_results.append(result)
 
         # Create display text based on result type
-        if result.metadata.get("pattern_type") in ["hex", "regex"]:
+        metadata: Any = result.metadata  # pyright: ignore[reportExplicitAny] - SearchResult.metadata is dict[str, Any] at runtime
+        if metadata.get("pattern_type") in ["hex", "regex"]:
             # Pattern search result
-            pattern_type = result.metadata["pattern_type"].upper()
-            pattern = result.metadata.get("pattern", "")[:30] + ("..." if len(result.metadata.get("pattern", "")) > 30 else "")
-            match_data = result.metadata.get("match_data", "")[:20] + ("..." if len(result.metadata.get("match_data", "")) > 20 else "")
+            pattern_type = str(metadata["pattern_type"]).upper()
+            pattern_str = str(metadata.get("pattern", ""))
+            pattern = pattern_str[:30] + ("..." if len(pattern_str) > 30 else "")
+            match_data_str = str(metadata.get("match_data", ""))
+            match_data = match_data_str[:20] + ("..." if len(match_data_str) > 20 else "")
 
             display_text = (
                 f"0x{result.offset:08X} - {pattern_type} Pattern: {pattern} "
@@ -1541,17 +1556,18 @@ class AdvancedSearchDialog(QDialog):
             )
 
             # Add context information for tooltip
-            context_data = result.metadata.get("context_data", "")
+            context_data = str(metadata.get("context_data", ""))
             if context_data:
                 context_preview = context_data[:32] + ("..." if len(context_data) > 32 else "")
                 tooltip_text = (
-                    f"Pattern: {result.metadata.get('pattern', '')}\n"
+                    f"Pattern: {metadata.get('pattern', '')}\n"
                     f"Match at: 0x{result.offset:08X}\n"
                     f"Size: {result.size} bytes\n"
                     f"Context: {context_preview}"
                 )
-                if result.metadata.get("match_text"):
-                    tooltip_text += f"\nText: {result.metadata['match_text'][:50]}"
+                match_text = metadata.get("match_text")
+                if match_text:
+                    tooltip_text += f"\nText: {str(match_text)[:50]}"
             else:
                 tooltip_text = f"Pattern match at 0x{result.offset:08X}"
         else:
@@ -1572,11 +1588,11 @@ class AdvancedSearchDialog(QDialog):
             self.results_list.addItem(item)
 
         # Update count with appropriate label
-        result_type = "patterns" if result.metadata.get("pattern_type") else "sprites"
+        result_type = "patterns" if metadata.get("pattern_type") else "sprites"
         if self.results_label:
             self.results_label.setText(f"Found {len(self.current_results)} {result_type}")
 
-    def _search_complete(self, results: list[Any]):
+    def _search_complete(self, results: list[Any]):  # pyright: ignore[reportExplicitAny] - SearchResult list from worker
         """Handle search completion."""
         if self.search_button:
             self.search_button.setEnabled(True)
@@ -1778,7 +1794,7 @@ class AdvancedSearchDialog(QDialog):
             if self.ref_preview_label:
                 self.ref_preview_label.setPixmap(QPixmap())
 
-    def _show_visual_search_results(self, results: list[Any]):
+    def _show_visual_search_results(self, results: list[Any]):  # pyright: ignore[reportExplicitAny] - SearchResult list from worker
         """Show visual search results in similarity dialog."""
         try:
             # Convert SearchResult objects back to SimilarityMatch for the dialog
@@ -1787,11 +1803,14 @@ class AdvancedSearchDialog(QDialog):
 
             matches = []
             for result in results:
+                # Runtime type is SearchResult, but typed as Any to avoid object issues
+                result_typed: Any = result  # pyright: ignore[reportExplicitAny] - worker result list contains SearchResult objects
+                metadata = result_typed.metadata if hasattr(result_typed, 'metadata') else {}
                 match = SimilarityMatch(
-                    offset=result.offset,
-                    similarity_score=result.confidence,
-                    hash_distance=result.metadata.get("hash_distance", 0) if result.metadata else 0,
-                    metadata=result.metadata or {}
+                    offset=result_typed.offset,
+                    similarity_score=result_typed.confidence,
+                    hash_distance=int(metadata.get("hash_distance", 0)) if metadata else 0,
+                    metadata=metadata or {}
                 )
                 matches.append(match)
 
@@ -1948,7 +1967,7 @@ class AdvancedSearchDialog(QDialog):
             logger.exception(f"Failed to load search history: {e}")
 
     @override
-    def closeEvent(self, event: Any):
+    def closeEvent(self, event: Any):  # pyright: ignore[reportExplicitAny] - Qt event can be QCloseEvent
         """Handle dialog close event with proper thread cleanup."""
         # Stop any running search worker using safe cleanup (never terminate)
         if self.search_worker and self.search_worker.isRunning():

@@ -14,7 +14,6 @@ to fix layer boundary violations (core was importing from ui).
 from __future__ import annotations
 
 import contextlib
-from typing import Any
 
 from PySide6.QtCore import QThread
 
@@ -188,10 +187,10 @@ class WorkerManager:
     @staticmethod
     def create_and_start(
         worker_class: type,
-        *args: Any,
+        *args: object,
         cleanup_existing: QThread | None = None,
         cleanup_timeout: int = DEFAULT_CLEANUP_TIMEOUT,
-        **kwargs: Any
+        **kwargs: object
     ) -> QThread:
         """
         Create and start a worker in one call.

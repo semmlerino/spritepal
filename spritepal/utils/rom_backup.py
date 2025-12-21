@@ -165,7 +165,7 @@ class ROMBackupManager:
     @classmethod
     def list_backups(
         cls, rom_path: str, backup_dir: str | None = None
-    ) -> list[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Backup metadata
         """
         List all backups for a ROM.
 

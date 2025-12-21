@@ -143,10 +143,10 @@ class PaletteManager:
         self,
         output_base: str,
         palette_files: dict[int, str],
-        extraction_params: dict[str, Any] | None = None,
+        extraction_params: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - extraction params can contain various types
     ) -> str:
         """Create metadata.json for palette switching and reinsertion"""
-        metadata: dict[str, Any] = {
+        metadata: dict[str, Any] = {  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
             "format_version": "1.0",
             "description": "Sprite palettes extracted by SpritePal",
             "palettes": {},

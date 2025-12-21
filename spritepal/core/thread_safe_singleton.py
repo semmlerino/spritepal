@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar, override
+from typing import Generic, TypeVar, override
 
 from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QApplication
@@ -61,7 +61,7 @@ class ThreadSafeSingleton(Generic[T]):
     _instance: T | None = None
     _lock: threading.Lock = threading.Lock()
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
+    def __init_subclass__(cls, **kwargs: object) -> None:
         """Ensure each subclass gets its own instance and lock."""
         super().__init_subclass__(**kwargs)
         # Each subclass needs its own _instance and _lock to avoid sharing
@@ -71,7 +71,7 @@ class ThreadSafeSingleton(Generic[T]):
             cls._lock = threading.Lock()
 
     @classmethod
-    def get(cls, *args: Any, **kwargs: Any) -> T:
+    def get(cls, *args: object, **kwargs: object) -> T:
         """
         Get or create the singleton instance (thread-safe).
 
@@ -100,7 +100,7 @@ class ThreadSafeSingleton(Generic[T]):
             return cls._instance
 
     @classmethod
-    def _create_instance(cls, *args: Any, **kwargs: Any) -> T:
+    def _create_instance(cls, *args: object, **kwargs: object) -> T:
         """
         Create a new instance of the singleton.
 

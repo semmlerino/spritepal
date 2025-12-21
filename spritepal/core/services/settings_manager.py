@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from utils.constants import (
     CACHE_EXPIRATION_MAX_DAYS,
@@ -57,41 +57,42 @@ class SettingsManager:
         """Save settings to file (alias for save_settings)"""
         self.save_settings()
 
-    def get(self, category: str, key: str, default: Any = None) -> Any:
+    def get(self, category: str, key: str, default: object = None) -> object:
         """Get a setting value"""
         return self._session_manager.get(category, key, default)
 
-    def get_value(self, category: str, key: str, default: Any = None) -> Any:
+    def get_value(self, category: str, key: str, default: object = None) -> object:
         """Get a setting value (alias for get method)"""
         return self.get(category, key, default)
 
-    def set(self, category: str, key: str, value: Any) -> None:
+    def set(self, category: str, key: str, value: object) -> None:
         """Set a setting value"""
         self._session_manager.set(category, key, value)
 
-    def set_value(self, category: str, key: str, value: Any) -> None:
+    def set_value(self, category: str, key: str, value: object) -> None:
         """Set a setting value (alias for set method)"""
         self.set(category, key, value)
 
-    def get_session_data(self) -> dict[str, Any]:
+    def get_session_data(self) -> dict[str, object]:
         """Get all session data"""
-        return self._session_manager.get_session_data()
+        # Protocol returns Mapping, need to convert to dict
+        return dict(self._session_manager.get_session_data())
 
-    def save_session_data(self, session_data: dict[str, Any]) -> None:
+    def save_session_data(self, session_data: dict[str, object]) -> None:
         """Save session data"""
         self._session_manager.update_session_data(session_data)
 
-    def get_ui_data(self) -> dict[str, Any]:
+    def get_ui_data(self) -> dict[str, object]:
         """Get UI settings"""
         # Get all UI settings from SessionManager
-        ui_data = {}
+        ui_data: dict[str, object] = {}
         for key in ["window_width", "window_height", "window_x", "window_y", "restore_position", "theme"]:
             value = self._session_manager.get("ui", key)
             if value is not None:
                 ui_data[key] = value
         return ui_data
 
-    def save_ui_data(self, ui_data: dict[str, Any]) -> None:
+    def save_ui_data(self, ui_data: dict[str, object]) -> None:
         """Save UI settings"""
         for key, value in ui_data.items():
             self._session_manager.set("ui", key, value)
@@ -103,7 +104,7 @@ class SettingsManager:
         validated_paths = {}
 
         for key in ["vram_path", "cgram_path", "oam_path"]:
-            path = session.get(key, "")
+            path = str(session.get(key, ""))  # Cast object to str
             if path and Path(path).exists():
                 validated_paths[key] = path
             else:
@@ -147,7 +148,7 @@ class SettingsManager:
             self.set("paths", "last_used_dir", directory)
             self.save_settings()
 
-    def get_cache_settings(self) -> dict[str, Any]:
+    def get_cache_settings(self) -> dict[str, object]:
         """Get all cache settings"""
         return {
             "enabled": self.get("cache", "enabled", True),
@@ -178,7 +179,8 @@ class SettingsManager:
 
     def get_cache_max_size_mb(self) -> int:
         """Get maximum cache size in MB"""
-        return int(self.get("cache", "max_size_mb", 500))
+        value = self.get("cache", "max_size_mb", 500)
+        return int(value) if value is not None else 500  # pyright: ignore[reportArgumentType] - runtime ensures int/str
 
     def set_cache_max_size_mb(self, size_mb: int) -> None:
         """Set maximum cache size in MB"""
@@ -187,7 +189,8 @@ class SettingsManager:
 
     def get_cache_expiration_days(self) -> int:
         """Get cache expiration in days"""
-        return int(self.get("cache", "expiration_days", 30))
+        value = self.get("cache", "expiration_days", 30)
+        return int(value) if value is not None else 30  # pyright: ignore[reportArgumentType] - runtime ensures int/str
 
     def set_cache_expiration_days(self, days: int) -> None:
         """Set cache expiration in days"""

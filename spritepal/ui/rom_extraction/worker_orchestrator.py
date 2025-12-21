@@ -72,7 +72,7 @@ class ROMWorkerOrchestrator(QObject):
 
         # State tracking
         self._is_scanning = False
-        self._found_sprites: list[dict[str, Any]] = []
+        self._found_sprites: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - Sprite result dicts
 
         logger.debug("ROMWorkerOrchestrator initialized")
 
@@ -80,9 +80,12 @@ class ROMWorkerOrchestrator(QObject):
 
     def load_header(self, rom_path: str, extractor: ROMExtractorProtocol) -> None:
         """Load ROM header information asynchronously."""
+        from typing import cast
+
+        from core.rom_injector import ROMInjector
         self._cleanup_header_worker()
 
-        self._header_worker = ROMHeaderLoaderWorker(rom_path, extractor.rom_injector)
+        self._header_worker = ROMHeaderLoaderWorker(rom_path, cast(ROMInjector, extractor.rom_injector))
         self._header_thread = QThread()
         self._header_worker.moveToThread(self._header_thread)
 
@@ -94,7 +97,7 @@ class ROMWorkerOrchestrator(QObject):
         WorkerManager.start_worker(self._header_worker, self._header_thread)
         logger.debug(f"Started header loading for: {rom_path}")
 
-    def _on_header_loaded(self, header_data: dict[str, Any]) -> None:
+    def _on_header_loaded(self, header_data: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
         """Handle header load completion."""
         self.header_loaded.emit(header_data)
         self._cleanup_header_worker()
@@ -141,7 +144,7 @@ class ROMWorkerOrchestrator(QObject):
         WorkerManager.start_worker(self._info_worker, self._info_thread)
         logger.debug(f"Started sprite location loading for: {rom_path}")
 
-    def _on_locations_loaded(self, locations: list[dict[str, Any]]) -> None:
+    def _on_locations_loaded(self, locations: list[dict[str, Any]]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
         """Handle sprite locations load completion."""
         self.sprite_locations_loaded.emit(locations)
         self._cleanup_info_worker()
@@ -178,7 +181,7 @@ class ROMWorkerOrchestrator(QObject):
         self._scan_worker.moveToThread(self._scan_thread)
 
         # Connect signals
-        self._scan_worker.scan_progress.connect(self._on_scan_progress)
+        self._scan_worker.progress_detailed.connect(self._on_scan_progress)
         self._scan_worker.sprite_found.connect(self._on_sprite_found)
         self._scan_worker.finished.connect(self._on_scan_finished)
         self._scan_worker.error.connect(self._on_scan_error)
@@ -198,7 +201,7 @@ class ROMWorkerOrchestrator(QObject):
         percent = int((current / total) * 100) if total > 0 else 0
         self.scan_progress.emit(current, total, f"Scanning... {percent}%")
 
-    def _on_sprite_found(self, sprite_data: dict[str, Any]) -> None:
+    def _on_sprite_found(self, sprite_data: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
         """Handle sprite found during scan."""
         self._found_sprites.append(sprite_data)
         self.sprite_found.emit(sprite_data)
@@ -228,7 +231,7 @@ class ROMWorkerOrchestrator(QObject):
     def start_similarity_indexing(
         self,
         rom_path: str,
-        sprites: list[dict[str, Any]],
+        sprites: list[dict[str, Any]],  # pyright: ignore[reportExplicitAny] - Sprite data dicts
     ) -> None:
         """Start similarity indexing for sprites.
 
@@ -287,7 +290,7 @@ class ROMWorkerOrchestrator(QObject):
         return self._is_scanning
 
     @property
-    def found_sprites(self) -> list[dict[str, Any]]:
+    def found_sprites(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Sprite result dicts
         """Get the list of sprites found during the current/last scan."""
         return self._found_sprites
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from threading import RLock
-from typing import Any, TypeVar
+from typing import TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,8 @@ class DIContainer:
 
     def __init__(self):
         """Initialize the DI container."""
-        self._singletons: dict[type, Any] = {}
-        self._factories: dict[type, Callable[[], Any]] = {}
+        self._singletons: dict[type, object] = {}
+        self._factories: dict[type, Callable[[], object]] = {}
         self._lock = RLock()
         logger.debug("DIContainer initialized")
 
@@ -72,7 +72,7 @@ class DIContainer:
         with self._lock:
             # Check singletons first
             if interface in self._singletons:
-                return self._singletons[interface]
+                return cast(T, self._singletons[interface])
 
             # Check factories
             if interface in self._factories:
@@ -80,7 +80,7 @@ class DIContainer:
                 instance = self._factories[interface]()
                 self._singletons[interface] = instance
                 logger.debug(f"Created singleton from factory: {interface.__name__}")
-                return instance
+                return cast(T, instance)
 
             raise ValueError(f"No registration for {interface.__name__}")
 
@@ -180,7 +180,7 @@ def reset_container() -> None:
     _container.clear()
 
 def configure_container(
-    configuration_service: Any = None,
+    configuration_service: object = None,
 ) -> None:
     """
     Configure the DI container with non-manager dependencies.
@@ -255,7 +255,7 @@ def configure_container(
 
 
 def register_managers(
-    core_operations_manager: Any,
+    core_operations_manager: object,
 ) -> None:
     """
     Register CoreOperationsManager with the DI container.

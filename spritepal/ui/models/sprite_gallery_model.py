@@ -36,13 +36,13 @@ class SpriteGalleryModel(QAbstractListModel):
     thumbnail_needed = Signal(int, int)  # offset, priority
     selection_changed = Signal(list)  # list of selected offsets
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: object | None = None):
         """Initialize the sprite gallery model."""
-        super().__init__(parent)
+        super().__init__(parent)  # type: ignore[arg-type]
 
         # Sprite data storage
-        self._sprites: list[dict[str, Any]] = []
-        self._filtered_sprites: list[dict[str, Any]] = []
+        self._sprites: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite data
+        self._filtered_sprites: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite data
         self._thumbnails: dict[int, QPixmap] = {}  # offset -> pixmap cache
         self._selected_offsets: set[int] = set()
 
@@ -75,7 +75,7 @@ class SpriteGalleryModel(QAbstractListModel):
         return self._columns
 
     @override
-    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> object:
         """Return data for the given index and role."""
         if not index.isValid():
             return None
@@ -128,7 +128,7 @@ class SpriteGalleryModel(QAbstractListModel):
         return None
 
     @override
-    def setData(self, index: QModelIndex | QPersistentModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex | QPersistentModelIndex, value: object, role: int = Qt.ItemDataRole.EditRole) -> bool:
         """Set data for the given index and role."""
         if not index.isValid():
             return False
@@ -163,7 +163,7 @@ class SpriteGalleryModel(QAbstractListModel):
 
         return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
 
-    def set_sprites(self, sprites: list[dict[str, Any]]):
+    def set_sprites(self, sprites: list[dict[str, Any]]):  # pyright: ignore[reportExplicitAny] - sprite data
         """
         Set the sprite data for the model.
 
@@ -266,14 +266,14 @@ class SpriteGalleryModel(QAbstractListModel):
 
         self.endResetModel()
 
-    def get_sprite_at_row(self, row: int) -> dict[str, Any | None] | None:
+    def get_sprite_at_row(self, row: int) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - sprite data
         """Get sprite data at the given row."""
         sprites = self._filtered_sprites if self._use_filtering else self._sprites
         if 0 <= row < len(sprites):
             return sprites[row]
         return None
 
-    def get_selected_sprites(self) -> list[dict[str, Any]]:
+    def get_selected_sprites(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - sprite data
         """Get all selected sprites."""
         selected = []
         for sprite in self._sprites:
@@ -383,7 +383,7 @@ class SpriteGalleryModel(QAbstractListModel):
             )
 
     @staticmethod
-    def _get_offset(sprite: dict[str, Any]) -> int:
+    def _get_offset(sprite: dict[str, Any]) -> int:  # pyright: ignore[reportExplicitAny] - sprite data
         """Extract offset from sprite data."""
         offset = sprite.get('offset', 0)
         if isinstance(offset, str):

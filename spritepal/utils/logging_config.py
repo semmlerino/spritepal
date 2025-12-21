@@ -76,13 +76,13 @@ def setup_logging(
                 pass
             def close(self) -> None:
                 pass
-            def seek(self, *args: Any) -> int:
+            def seek(self, *args: Any) -> int:  # pyright: ignore[reportExplicitAny] - Stream seek args
                 return 0
             def tell(self) -> int:
                 return 0
             def __enter__(self) -> PermanentNullStream:
                 return self
-            def __exit__(self, *args: Any) -> None:
+            def __exit__(self, *args: Any) -> None:  # pyright: ignore[reportExplicitAny] - Context manager args
                 pass
 
         _null_stream = PermanentNullStream()
@@ -109,7 +109,7 @@ def setup_logging(
                     return False
 
             @override
-            def _open(self) -> Any:
+            def _open(self) -> Any:  # pyright: ignore[reportExplicitAny] - File stream object
                 try:
                     # Check if log directory still exists before opening
                     log_dir = Path(self.baseFilename).parent

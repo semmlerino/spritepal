@@ -40,8 +40,8 @@ class TabbedDialog(DialogBase):
         size: tuple[int, int] | None = None,
         with_status_bar: bool = False,
         with_button_box: bool = True,
-        tab_position: Any = QTabWidget.TabPosition.North,
-        **kwargs: Any
+        tab_position: QTabWidget.TabPosition = QTabWidget.TabPosition.North,
+        **kwargs: Any  # pyright: ignore[reportExplicitAny] - compatibility kwargs
     ) -> None:
         """
         Initialize tabbed dialog.
@@ -180,9 +180,9 @@ class SplitterDialog(DialogBase):
         size: tuple[int, int] | None = None,
         with_status_bar: bool = False,
         with_button_box: bool = True,
-        orientation: Any = Qt.Orientation.Horizontal,
+        orientation: Qt.Orientation = Qt.Orientation.Horizontal,
         splitter_handle_width: int = 8,
-        **kwargs: Any
+        **kwargs: Any  # pyright: ignore[reportExplicitAny] - compatibility kwargs
     ) -> None:
         """
         Initialize splitter dialog.
@@ -259,7 +259,7 @@ class SplitterDialog(DialogBase):
         self._main_splitter.addWidget(widget)
         return self._main_splitter.count() - 1
 
-    def set_orientation(self, orientation: Any) -> None:
+    def set_orientation(self, orientation: Qt.Orientation) -> None:
         """
         Set the splitter orientation.
 
@@ -293,11 +293,8 @@ class SplitterDialog(DialogBase):
         if self._main_splitter is not None:
             self._main_splitter.setStretchFactor(pane_index, stretch_factor)
 
-# Create aliases for backward compatibility
-BaseDialog = DialogBase
-
 __all__ = [
-    "BaseDialog",
+    "DialogBase",
     "FileSelector",
     "FormRow",
     "HexOffsetInput",

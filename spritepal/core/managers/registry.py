@@ -4,7 +4,7 @@ Registry for accessing manager instances
 from __future__ import annotations
 
 import threading
-from typing import Any
+from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
@@ -202,8 +202,8 @@ class ManagerRegistry:
     def initialize_managers(
         self,
         app_name: str = "SpritePal",
-        settings_path: Any = None,
-        configuration_service: Any = None,
+        settings_path: Path | None = None,
+        configuration_service: object = None,
     ) -> None:
         """
         Initialize all managers with proper error handling and cleanup.
@@ -403,7 +403,7 @@ class ManagerRegistry:
             "It is only used internally for manager monitoring."
         )
 
-    def _get_manager_by_protocol(self, protocol: type, expected_type: type) -> Any:
+    def _get_manager_by_protocol(self, protocol: type, expected_type: type) -> object:
         """
         Get a manager by protocol with type checking and dependency validation
 
@@ -459,11 +459,11 @@ class ManagerRegistry:
         """
         return cls._instance is None
 
-    def get_all_managers(self) -> dict[str, Any]:
+    def get_all_managers(self) -> dict[str, object]:
         """Get all registered managers (for testing/debugging)"""
         from core.di_container import get_container
         container = get_container()
-        result: dict[str, Any] = {}
+        result: dict[str, object] = {}
         for protocol in self._lifecycle_order:
             manager = container.get_optional(protocol)
             if manager is not None:
@@ -558,8 +558,8 @@ def _ensure_registry() -> ManagerRegistry:
 
 def initialize_managers(
     app_name: str = "SpritePal",
-    settings_path: Any = None,
-    configuration_service: Any = None,
+    settings_path: Path | None = None,
+    configuration_service: object = None,
 ) -> None:
     """
     Initialize all managers with consolidated architecture.

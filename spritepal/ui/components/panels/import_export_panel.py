@@ -230,7 +230,7 @@ class ImportExportPanel(QWidget):
             if file_size > 10 * 1024 * 1024:  # 10MB limit
                 raise ValueError(f"File too large: {file_size / 1024 / 1024:.1f}MB (max 10MB)")
 
-        def _validate_import_format(import_data: dict[str, Any]) -> list[Any]:
+        def _validate_import_format(import_data: dict[str, Any]) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - JSON data
             """Validate import data format and return sprites data"""
             if "sprites" not in import_data:
                 raise ValueError("Invalid file format: missing 'sprites' key")

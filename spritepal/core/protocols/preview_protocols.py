@@ -7,9 +7,10 @@ enabling dependency injection and better testability.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    from PySide6.QtCore import Signal
     from PySide6.QtWidgets import QSlider
 
 
@@ -21,9 +22,9 @@ class PreviewCoordinatorProtocol(Protocol):
     """
 
     # Signals (accessed via attributes)
-    preview_ready: Any  # Signal(bytes, int, int, str) - tile_data, width, height, name
-    preview_cached: Any  # Signal(bytes, int, int, str) - cached preview displayed
-    preview_error: Any  # Signal(str) - error message
+    preview_ready: Signal  # Signal(bytes, int, int, str) - tile_data, width, height, name
+    preview_cached: Signal  # Signal(bytes, int, int, str) - cached preview displayed
+    preview_error: Signal  # Signal(str) - error message
 
     def connect_slider(self, slider: QSlider) -> None:
         """Connect to slider signals for preview coordination.
@@ -42,7 +43,7 @@ class PreviewCoordinatorProtocol(Protocol):
         ...
 
     def set_rom_data_provider(
-        self, provider: Callable[[], tuple[str, Any, Any] | None]
+        self, provider: Callable[[], tuple[str, object, object] | None]
     ) -> None:
         """Set provider for ROM data needed for preview generation.
 

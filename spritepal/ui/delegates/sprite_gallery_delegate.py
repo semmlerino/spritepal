@@ -4,9 +4,19 @@ Handles efficient painting of sprites with selection and hover effects.
 """
 from __future__ import annotations
 
-from typing import Any, cast, override
+from typing import cast, override
 
-from PySide6.QtCore import QAbstractItemModel, QEvent, QModelIndex, QPersistentModelIndex, QRect, QRectF, QSize, Qt
+from PySide6.QtCore import (
+    QAbstractItemModel,
+    QEvent,
+    QModelIndex,
+    QObject,
+    QPersistentModelIndex,
+    QRect,
+    QRectF,
+    QSize,
+    Qt,
+)
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -24,7 +34,7 @@ logger = get_logger(__name__)
 class SpriteGalleryDelegate(QStyledItemDelegate):
     """Custom delegate for rendering sprites in gallery view."""
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: QObject | None = None):
         """Initialize the sprite gallery delegate."""
         super().__init__(parent)
 

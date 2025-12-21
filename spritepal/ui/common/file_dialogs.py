@@ -44,7 +44,7 @@ class FileDialogHelper:
             start_dir = initial_dir
         elif settings_key:
             # Try to restore from settings
-            saved_dir = settings.get(settings_namespace, settings_key, "")
+            saved_dir = str(settings.get(settings_namespace, settings_key, ""))
             start_dir = saved_dir if saved_dir and Path(saved_dir).exists() else settings.get_default_directory()
         else:
             start_dir = settings.get_default_directory()
@@ -53,7 +53,7 @@ class FileDialogHelper:
         directory = QFileDialog.getExistingDirectory(
             parent,
             title,
-            start_dir,
+            str(start_dir),
             QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks
         )
 
@@ -85,7 +85,7 @@ class FileDialogHelper:
             start_path = initial_path if Path(initial_path).is_file() else initial_path
         elif settings_key:
             # Try to restore from settings
-            saved_path = settings.get(settings_namespace, settings_key, "")
+            saved_path = str(settings.get(settings_namespace, settings_key, ""))
             if saved_path and Path(saved_path).exists():
                 start_path = saved_path
             else:
@@ -97,7 +97,7 @@ class FileDialogHelper:
         filename, _ = QFileDialog.getOpenFileName(
             parent,
             title,
-            start_path,
+            str(start_path),
             file_filter
         )
 
@@ -139,7 +139,7 @@ class FileDialogHelper:
             start_path = initial_path
         elif settings_key:
             # Try to restore from settings
-            saved_path = settings.get(settings_namespace, settings_key, "")
+            saved_path = str(settings.get(settings_namespace, settings_key, ""))
             if saved_path and Path(saved_path).parent.exists():
                 start_path = saved_path
             else:
@@ -151,7 +151,7 @@ class FileDialogHelper:
         filename, _ = QFileDialog.getSaveFileName(
             parent,
             title,
-            start_path,
+            str(start_path),
             file_filter
         )
 
@@ -194,7 +194,7 @@ class FileDialogHelper:
 
         # Check fallback setting
         if fallback_setting:
-            saved_dir = settings.get(fallback_namespace, fallback_setting, "")
+            saved_dir = str(settings.get(fallback_namespace, fallback_setting, ""))
             if saved_dir and Path(saved_dir).exists():
                 return saved_dir
 

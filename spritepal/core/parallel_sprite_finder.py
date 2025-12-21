@@ -13,7 +13,6 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from core.sprite_finder import SpriteFinder
 from utils.constants import (
@@ -42,7 +41,7 @@ class SearchResult:
     tile_count: int
     compressed_size: int
     confidence: float
-    metadata: dict[str, Any]
+    metadata: dict[str, object]
 
 class ParallelSpriteFinder:
     """

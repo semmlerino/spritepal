@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
+    from core.rom_injector import SpritePointer
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QPixmap
+from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QPixmap, QShowEvent
 from PySide6.QtWidgets import (
     QDialog,
     QLabel,
@@ -72,7 +73,7 @@ class DetachedGalleryWindow(QMainWindow):
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window)
 
         # State
-        self.sprites_data: list[dict[str, Any]] = []
+        self.sprites_data: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite metadata
         self.rom_path: str | None = None
         self.rom_size: int = 0
         self.scan_worker: SpriteScanWorker | None = None
@@ -83,7 +84,9 @@ class DetachedGalleryWindow(QMainWindow):
 
         # Core managers (B.3: Using injected manager)
         self.extraction_manager = extraction_manager
-        self.rom_extractor = self.extraction_manager.get_rom_extractor()
+        self.rom_extractor: ROMExtractorProtocol = cast(
+            "ROMExtractorProtocol", self.extraction_manager.get_rom_extractor()
+        )
         self.settings_manager: SettingsManagerProtocol = inject(SettingsManagerProtocol)
         self.rom_cache: ROMCacheProtocol = inject(ROMCacheProtocol)
 
@@ -117,27 +120,11 @@ class DetachedGalleryWindow(QMainWindow):
         self.gallery_widget = SpriteGalleryWidget(self)
 
         # For detached window, we want the gallery to fill available space
-        # and handle scrolling properly
+        # and handle scrolling properly (uses QListView with virtual scrolling)
         self.gallery_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding,  # Fill horizontal space
             QSizePolicy.Policy.Expanding   # Fill vertical space too
         )
-
-        # Check if old API (QScrollArea-based) or new API (QListView-based)
-        if hasattr(self.gallery_widget, 'setWidgetResizable'):
-            # Old implementation - QScrollArea based
-            self.gallery_widget.setWidgetResizable(True)  # type: ignore[attr-defined]
-
-            # Also update the container widget's size policy for proper display
-            if hasattr(self.gallery_widget, 'container_widget') and self.gallery_widget.container_widget:  # type: ignore[attr-defined]
-                self.gallery_widget.container_widget.setSizePolicy(  # type: ignore[attr-defined]
-                    QSizePolicy.Policy.Expanding,
-                    QSizePolicy.Policy.Preferred  # Use preferred height based on content
-                )
-        else:
-            # New implementation - QListView based (virtual scrolling)
-            # No need for setWidgetResizable as QListView handles its own scrolling
-            pass
 
         # Connect signals
         self.gallery_widget.sprite_selected.connect(self.sprite_selected.emit)
@@ -407,7 +394,7 @@ class DetachedGalleryWindow(QMainWindow):
         extract_action.triggered.connect(self._extract_selected_sprite)
         toolbar.addAction(extract_action)
 
-    def set_sprites(self, sprites: list[dict[str, Any]]):
+    def set_sprites(self, sprites: list[dict[str, object]]):
         """
         Set the sprites to display.
 
@@ -417,29 +404,6 @@ class DetachedGalleryWindow(QMainWindow):
         self.sprites_data = sprites
         if self.gallery_widget:
             self.gallery_widget.set_sprites(sprites)
-
-            # Ensure proper settings for detached display
-            if hasattr(self.gallery_widget, 'setWidgetResizable'):
-                self.gallery_widget.setWidgetResizable(True)  # type: ignore[attr-defined]
-
-            # Update container widget policy after sprites are set
-            if hasattr(self.gallery_widget, 'container_widget') and self.gallery_widget.container_widget:  # type: ignore[attr-defined]
-                self.gallery_widget.container_widget.setSizePolicy(  # type: ignore[attr-defined]
-                    QSizePolicy.Policy.Expanding,
-                    QSizePolicy.Policy.Preferred
-                )
-
-            # Update the main widget policy too if needed (old API)
-            if hasattr(self.gallery_widget, 'widget') and self.gallery_widget.widget():  # type: ignore[attr-defined]
-                self.gallery_widget.widget().setSizePolicy(  # type: ignore[attr-defined]
-                    QSizePolicy.Policy.Preferred,
-                    QSizePolicy.Policy.Preferred
-                )
-
-            # Force proper layout update if method exists
-            if hasattr(self.gallery_widget, 'force_layout_update'):
-                self.gallery_widget.force_layout_update()
-
             logger.info(f"Detached gallery loaded {len(sprites)} sprites")
 
     def copy_thumbnails_from(self, source_gallery: SpriteGalleryWidget | None):
@@ -452,17 +416,25 @@ class DetachedGalleryWindow(QMainWindow):
         if not self.gallery_widget or not source_gallery:
             return
 
-        copied_count = 0
-        for offset, source_thumbnail in source_gallery.thumbnails.items():
-            if offset in self.gallery_widget.thumbnails:
-                dest_thumbnail = self.gallery_widget.thumbnails[offset]
+        # New API: Access thumbnails through the model
+        if not source_gallery.model or not self.gallery_widget.model:
+            logger.warning("Cannot copy thumbnails: model not available")
+            return
 
-                # Copy the pixmap if it exists and is valid
-                if hasattr(source_thumbnail, 'sprite_pixmap') and source_thumbnail.sprite_pixmap and not source_thumbnail.sprite_pixmap.isNull():
-                    dest_thumbnail.set_sprite_data(
-                        source_thumbnail.sprite_pixmap,
-                        source_thumbnail.sprite_info
-                    )
+        copied_count = 0
+        # Iterate through sprites in source gallery and copy cached thumbnails
+        for i in range(source_gallery.model.rowCount()):
+            sprite = source_gallery.model.get_sprite_at_row(i)
+            if sprite:
+                offset = sprite.get('offset', 0)
+                if isinstance(offset, str):
+                    offset = int(offset, 16) if offset.startswith('0x') else int(offset)
+
+                # Get cached thumbnail from source
+                pixmap = source_gallery.model.get_sprite_pixmap(offset)
+                if pixmap and not pixmap.isNull():
+                    # Set it in destination
+                    self.gallery_widget.set_thumbnail(offset, pixmap)
                     copied_count += 1
 
         logger.info(f"Copied {copied_count} thumbnails to detached gallery")
@@ -494,9 +466,11 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _fit_to_window(self):
         """Adjust gallery to fit window width."""
-        if self.gallery_widget and hasattr(self.gallery_widget, '_update_columns'):
-            # Force column recalculation (old API)
-            self.gallery_widget._update_columns()  # type: ignore[attr-defined]
+        # New API: Gallery uses QListView which auto-adjusts layout
+        # No manual column recalculation needed
+        if self.gallery_widget:
+            # Force a repaint to ensure layout is current
+            self.gallery_widget.update()
 
     def _reset_view(self):
         """Reset to default view settings."""
@@ -509,9 +483,8 @@ class DetachedGalleryWindow(QMainWindow):
             self.gallery_widget.filter_input.clear()
             self.gallery_widget.compressed_check.setChecked(False)
 
-            # Update display (old API)
-            if hasattr(self.gallery_widget, '_update_columns'):
-                self.gallery_widget._update_columns()  # type: ignore[attr-defined]
+            # Force update to apply changes
+            self.gallery_widget.update()
 
     def _create_status_bar(self):
         """Create the status bar."""
@@ -549,7 +522,7 @@ class DetachedGalleryWindow(QMainWindow):
                 ""
             )
 
-            if last_rom and Path(last_rom).exists():
+            if last_rom and isinstance(last_rom, str) and Path(last_rom).exists():
                 logger.info(f"Auto-loading last ROM: {last_rom}")
                 self._set_rom_file(last_rom)
                 self.status_bar.showMessage(f"Auto-loaded: {Path(last_rom).name}")
@@ -589,7 +562,8 @@ class DetachedGalleryWindow(QMainWindow):
             settings = self.settings_manager
 
             # Get current recent ROMs list
-            recent_roms = settings.get("gallery", "recent_roms", [])
+            recent_roms_raw = settings.get("gallery", "recent_roms", [])
+            recent_roms: list[str] = recent_roms_raw if isinstance(recent_roms_raw, list) else []
 
             # Remove if already exists to avoid duplicates
             if rom_path in recent_roms:
@@ -620,7 +594,8 @@ class DetachedGalleryWindow(QMainWindow):
 
         try:
             settings = self.settings_manager
-            recent_roms = settings.get("gallery", "recent_roms", [])
+            recent_roms_raw = settings.get("gallery", "recent_roms", [])
+            recent_roms: list[str] = recent_roms_raw if isinstance(recent_roms_raw, list) else []
 
             # Filter out non-existent files
             valid_roms = [rom for rom in recent_roms if Path(rom).exists()]
@@ -707,7 +682,9 @@ class DetachedGalleryWindow(QMainWindow):
 
                 # Convert to sprite data format
                 self.sprites_data = []
-                for name, pointer in locations.items():
+                for name, pointer_obj in locations.items():
+                    # Cast to SpritePointer for proper type checking
+                    pointer = cast("SpritePointer", pointer_obj)
                     sprite = {
                         'offset': pointer.offset,
                         'decompressed_size': 0,  # Will be determined during thumbnail generation
@@ -865,7 +842,7 @@ class DetachedGalleryWindow(QMainWindow):
                 WorkerManager.cleanup_worker(self.scan_worker)
                 self.scan_worker = None
 
-    def _on_sprite_found(self, sprite_info: dict[str, Any]):
+    def _on_sprite_found(self, sprite_info: dict[str, object]):
         """Handle sprite found during scan."""
         # Convert to the format expected by gallery
         sprite = {
@@ -1200,32 +1177,9 @@ class DetachedGalleryWindow(QMainWindow):
         if not self.gallery_widget:
             return
 
-        # Check if using new API (virtual scrolling with model) or old API
-        if hasattr(self.gallery_widget, 'set_thumbnail'):
-            # New API - just pass the thumbnail to the gallery widget
-            self.gallery_widget.set_thumbnail(offset, pixmap)
-            logger.debug(f"Set thumbnail for sprite at 0x{offset:06X}")
-        elif hasattr(self.gallery_widget, 'thumbnails'):
-            # Old API - direct thumbnail dict access
-            if offset not in self.gallery_widget.thumbnails:
-                return
-
-            thumbnail = self.gallery_widget.thumbnails[offset]
-
-            # Find sprite info for this offset
-            sprite_info = None
-            for info in self.sprites_data:
-                info_offset = info.get('offset', 0)
-                if isinstance(info_offset, str):
-                    info_offset = int(info_offset, 16) if info_offset.startswith('0x') else int(info_offset)
-                if info_offset == offset:
-                    sprite_info = info
-                    break
-
-            # Set the actual sprite thumbnail
-            if sprite_info and not pixmap.isNull():
-                thumbnail.set_sprite_data(pixmap, sprite_info)
-                logger.debug(f"Set thumbnail for sprite at 0x{offset:06X} using old API")
+        # Use new API (virtual scrolling with model)
+        self.gallery_widget.set_thumbnail(offset, pixmap)
+        logger.debug(f"Set thumbnail for sprite at 0x{offset:06X}")
 
     def _on_thumbnail_progress(self, percent: int, message: str):
         """Handle thumbnail generation progress."""
@@ -1243,12 +1197,9 @@ class DetachedGalleryWindow(QMainWindow):
 
         logger.info("Refreshing thumbnails")
 
-        # Clear existing thumbnail pixmaps to force regeneration
-        if self.gallery_widget:
-            for thumbnail in self.gallery_widget.thumbnails.values():
-                # Reset to placeholder
-                thumbnail.sprite_pixmap = None
-                thumbnail.update()
+        # Clear existing thumbnail cache to force regeneration
+        if self.gallery_widget and self.gallery_widget.model:
+            self.gallery_widget.model.clear_thumbnail_cache()
 
         # Regenerate all thumbnails
         self._generate_thumbnails()
@@ -1469,7 +1420,7 @@ class DetachedGalleryWindow(QMainWindow):
         super().closeEvent(event)
 
     @override
-    def showEvent(self, event: Any):
+    def showEvent(self, event: QShowEvent):
         """Handle show event to ensure proper layout."""
         super().showEvent(event)
 

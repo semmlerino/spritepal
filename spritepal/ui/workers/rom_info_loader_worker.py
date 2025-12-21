@@ -83,14 +83,15 @@ class ROMInfoLoaderWorker(BaseWorker):
         # Check for cancellation early
         self.check_cancellation()
 
-        results: dict[str, Any] = {"rom_path": self.rom_path}
+        results: dict[str, Any] = {"rom_path": self.rom_path}  # pyright: ignore[reportExplicitAny] - Mixed result types
 
         # Load ROM header info via injection manager (used by injection dialog)
         if self.load_header and self.injection_manager is not None:
             self.emit_progress(20, "Reading ROM header...")
             self.check_cancellation()
 
-            rom_info = self.injection_manager.load_rom_info(self.rom_path)
+            rom_info_raw = self.injection_manager.load_rom_info(self.rom_path)
+            rom_info: dict[str, Any] = dict(rom_info_raw) if rom_info_raw else {}  # pyright: ignore[reportExplicitAny] - ROM info
             results["rom_info"] = rom_info
 
             if rom_info:
@@ -134,7 +135,7 @@ class ROMHeaderLoaderWorker(BaseWorker):
         self,
         rom_path: str,
         rom_injector: ROMInjector,
-        sprite_config_loader: Any | None = None,
+        sprite_config_loader: Any | None = None,  # pyright: ignore[reportExplicitAny] - Optional sprite config loader
     ) -> None:
         """
         Initialize header loader worker.

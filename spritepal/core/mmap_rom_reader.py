@@ -12,7 +12,7 @@ import mmap
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Protocol, override
+from typing import TYPE_CHECKING, BinaryIO, Protocol, override
 
 if TYPE_CHECKING:
     class Decompressor(Protocol):
@@ -134,7 +134,7 @@ class MemoryMappedROMReader:
         with self.open_mmap() as rom_data:
             return bytes(rom_data[offset:offset + actual_size])
 
-    def read_header(self) -> dict[str, Any]:
+    def read_header(self) -> dict[str, object]:
         """
         Read SNES ROM header information.
 

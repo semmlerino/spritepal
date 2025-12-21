@@ -5,7 +5,7 @@ Provides user interface for configuring application preferences
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -23,8 +23,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.types import WidgetParent
 from ui.common.file_dialogs import browse_for_directory
-from ui.components.base import BaseDialog
+from ui.components.base import DialogBase
 from ui.styles import get_button_style, get_muted_text_style
 
 # from utils.rom_cache import get_rom_cache # Removed due to DI
@@ -34,18 +35,18 @@ if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 
 
-class SettingsDialog(BaseDialog):
+class SettingsDialog(DialogBase):
     """Dialog for configuring SpritePal settings"""
 
     # Signals
     settings_changed = Signal()
     cache_cleared = Signal()
 
-    def __init__(self, parent: Any | None = None, *,
+    def __init__(self, parent: WidgetParent = None, *,
                  settings_manager: SettingsManagerProtocol,
                  rom_cache: ROMCacheProtocol):
         # Store original settings to detect changes
-        self._original_settings: dict[str, Any] = {}
+        self._original_settings: dict[str, object] = {}
 
         super().__init__(
             parent=parent,
@@ -254,13 +255,13 @@ class SettingsDialog(BaseDialog):
         """Load current settings into UI"""
         # General settings
         self.restore_window_check.setChecked(
-            self.settings_manager.get("ui", "restore_position", True)
+            bool(self.settings_manager.get("ui", "restore_position", True))
         )
         self.auto_save_session_check.setChecked(
-            self.settings_manager.get("session", "auto_save", True)
+            bool(self.settings_manager.get("session", "auto_save", True))
         )
         self.dumps_dir_edit.setText(
-            self.settings_manager.get("paths", "default_dumps_dir", "")
+            str(self.settings_manager.get("paths", "default_dumps_dir", ""))
         )
 
         # Cache settings
@@ -269,10 +270,10 @@ class SettingsDialog(BaseDialog):
         self.cache_size_spin.setValue(self.settings_manager.get_cache_max_size_mb())
         self.cache_expiry_spin.setValue(self.settings_manager.get_cache_expiration_days())
         self.auto_cleanup_check.setChecked(
-            self.settings_manager.get("cache", "auto_cleanup", True)
+            bool(self.settings_manager.get("cache", "auto_cleanup", True))
         )
         self.show_indicators_check.setChecked(
-            self.settings_manager.get("cache", "show_indicators", True)
+            bool(self.settings_manager.get("cache", "show_indicators", True))
         )
 
         # Update original settings to reflect what was just loaded
@@ -305,17 +306,22 @@ class SettingsDialog(BaseDialog):
             stats = self.rom_cache.get_cache_stats()
 
             # Update directory
-            cache_dir = stats.get("cache_dir", "Unknown")
+            cache_dir_val = stats.get("cache_dir", "Unknown")
+            cache_dir = str(cache_dir_val)
             if cache_dir and len(cache_dir) > 50:
                 # Truncate long paths
                 cache_dir = "..." + cache_dir[-47:]
             self.cache_dir_label.setText(cache_dir)
 
             # Update file count
-            total_files = stats.get("total_files", 0)
-            sprite_caches = stats.get("sprite_location_caches", 0)
-            rom_caches = stats.get("rom_info_caches", 0)
-            scan_caches = stats.get("scan_progress_caches", 0)
+            total_files_val = stats.get("total_files", 0)
+            total_files = int(total_files_val) if isinstance(total_files_val, (int, float)) else 0
+            sprite_caches_val = stats.get("sprite_location_caches", 0)
+            sprite_caches = int(sprite_caches_val) if isinstance(sprite_caches_val, (int, float)) else 0
+            rom_caches_val = stats.get("rom_info_caches", 0)
+            rom_caches = int(rom_caches_val) if isinstance(rom_caches_val, (int, float)) else 0
+            scan_caches_val = stats.get("scan_progress_caches", 0)
+            scan_caches = int(scan_caches_val) if isinstance(scan_caches_val, (int, float)) else 0
 
             file_text = f"{total_files} files"
             if total_files > 0:
@@ -323,7 +329,8 @@ class SettingsDialog(BaseDialog):
             self.cache_files_label.setText(file_text)
 
             # Update size
-            size_bytes = stats.get("total_size_bytes", 0)
+            size_bytes_val = stats.get("total_size_bytes", 0)
+            size_bytes = int(size_bytes_val) if isinstance(size_bytes_val, (int, float)) else 0
             size_mb = size_bytes / (1024 * 1024)
             self.cache_size_label.setText(f"{size_mb:.1f} MB")
 

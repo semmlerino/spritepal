@@ -28,7 +28,7 @@ class SpriteHistoryManager:
             max_history: Maximum number of history items (default: 50)
         """
         self._max_history = max_history or self.MAX_HISTORY
-        self._found_sprites: list[dict[str, Any]] = []
+        self._found_sprites: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - Sprite history dict
 
     def add_sprite(self, offset: int, quality: float = 1.0) -> bool:
         """
@@ -85,7 +85,7 @@ class SpriteHistoryManager:
         """
         return [(s["offset"], s["quality"]) for s in self._found_sprites]
 
-    def get_sprite_info(self, offset: int) -> dict[str, Any] | None:
+    def get_sprite_info(self, offset: int) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - Sprite info dict
         """
         Get detailed info for a specific sprite.
 

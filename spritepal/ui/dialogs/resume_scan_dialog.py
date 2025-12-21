@@ -4,7 +4,7 @@ Provides options to resume from cached progress or start fresh
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -16,11 +16,11 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.spacing_constants import SPACING_MEDIUM
-from ui.components.base import BaseDialog
+from ui.components.base import DialogBase
 from ui.styles import get_bold_text_style, get_muted_text_style
 
 
-class ResumeScanDialog(BaseDialog):
+class ResumeScanDialog(DialogBase):
     """Dialog that allows users to resume interrupted sprite scans"""
 
     # Dialog result codes
@@ -28,7 +28,7 @@ class ResumeScanDialog(BaseDialog):
     START_FRESH: int = 2
     CANCEL: int = 0
 
-    def __init__(self, scan_info: dict[str, Any], parent: QWidget | None = None) -> None:
+    def __init__(self, scan_info: dict[str, object], parent: QWidget | None = None) -> None:
         """
         Initialize resume scan dialog.
 
@@ -50,7 +50,7 @@ class ResumeScanDialog(BaseDialog):
             with_button_box=False,  # Custom buttons
         )
 
-        self.scan_info: dict[str, Any] = scan_info
+        self.scan_info: dict[str, object] = scan_info
         self.user_choice: int = self.CANCEL
 
         # Create main content layout
@@ -127,11 +127,11 @@ class ResumeScanDialog(BaseDialog):
 
     def _format_progress_info(self) -> str:
         """Format scan progress information for display"""
-        scan_range: dict[str, Any] = self.scan_info.get("scan_range", {})
-        start: int = scan_range.get("start", 0)
-        end: int = scan_range.get("end", 0)
-        current: int = self.scan_info.get("current_offset", start)
-        found: int = self.scan_info.get("total_found", 0)
+        scan_range = cast(dict[str, Any], self.scan_info.get("scan_range", {}))  # pyright: ignore[reportExplicitAny] - scan data from cache
+        start = int(scan_range.get("start", 0) or 0)
+        end = int(scan_range.get("end", 0) or 0)
+        current = int(self.scan_info.get("current_offset", start) or start)  # type: ignore[arg-type]
+        found = int(self.scan_info.get("total_found", 0) or 0)  # type: ignore[arg-type]
 
         # Calculate percentage
         if end > start:
@@ -169,7 +169,7 @@ class ResumeScanDialog(BaseDialog):
         return self.user_choice
 
     @staticmethod
-    def show_resume_dialog(scan_info: dict[str, Any], parent: QWidget | None = None) -> int:
+    def show_resume_dialog(scan_info: dict[str, object], parent: QWidget | None = None) -> int:
         """
         Convenience method to show resume dialog and get user choice.
 

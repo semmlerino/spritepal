@@ -34,7 +34,7 @@ class ROMFileWidget(BaseExtractionWidget):
     cache_status_changed = Signal(dict)  # Emitted when cache status changes
     partial_scan_detected = Signal(dict)  # Emitted when partial scan cache found
 
-    def __init__(self, parent: Any | None = None, *, rom_cache: ROMCacheProtocol):
+    def __init__(self, parent: Any | None = None, *, rom_cache: ROMCacheProtocol) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
         super().__init__(parent)
         self._rom_path = ""
         self._cache_status = {"has_cache": False, "cache_type": None}
@@ -230,7 +230,7 @@ class ROMFileWidget(BaseExtractionWidget):
 
         return " | ".join(cache_parts) if cache_parts else ""
 
-    def get_cache_status(self) -> dict[str, Any]:
+    def get_cache_status(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Cache status dict
         """Get the current cache status"""
         return self._cache_status.copy()
 

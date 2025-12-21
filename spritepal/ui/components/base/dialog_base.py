@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QLayout,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -57,9 +58,9 @@ class DialogBase(QDialog):
         with_status_bar: bool = False,
         with_button_box: bool = True,
         default_tab: int | None = None,
-        orientation: Any = None,  # For splitter dialogs
+        orientation: Qt.Orientation | None = None,  # For splitter dialogs
         splitter_handle_width: int = 8,  # For splitter dialogs
-        **kwargs: Any  # Accept any additional keyword arguments
+        **kwargs: Any  # pyright: ignore[reportExplicitAny] - compatibility kwargs
     ) -> None:
         """
         Initialize the dialog base.
@@ -161,15 +162,14 @@ class DialogBase(QDialog):
         """
         # Optional method - subclasses can implement if needed
 
-    def set_content_layout(self, layout: Any) -> None:
+    def set_content_layout(self, layout: QLayout) -> None:
         """
         Set the content layout for the dialog.
 
         Args:
             layout: The layout to set as the dialog's content
         """
-        if hasattr(layout, "setContentsMargins"):
-            layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.addLayout(layout)
 
     def add_tab(self, widget: QWidget, label: str) -> None:
@@ -192,7 +192,7 @@ class DialogBase(QDialog):
             if self._tab_widget:
                 self._tab_widget.setCurrentIndex(self._default_tab)
 
-    def add_horizontal_splitter(self, handle_width: int | None = None) -> Any:
+    def add_horizontal_splitter(self, handle_width: int | None = None) -> QSplitter:
         """
         Add a horizontal splitter to the dialog (for splitter dialogs).
 
@@ -235,7 +235,7 @@ class DialogBase(QDialog):
             # Otherwise add to main layout
             self.main_layout.addWidget(widget, stretch_factor)
 
-    def add_button(self, text: str, callback: Any = None) -> Any:
+    def add_button(self, text: str, callback: object | None = None) -> QPushButton:
         """
         Add a button to the dialog.
 

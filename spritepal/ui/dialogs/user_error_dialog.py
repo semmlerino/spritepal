@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.spacing_constants import SPACING_MEDIUM
-from ui.components.base import BaseDialog
+from ui.components.base import DialogBase
 from ui.styles import (
     get_bold_text_style,
     get_dialog_button_box_style,
@@ -26,7 +26,7 @@ from ui.styles import (
 )
 
 
-class UserErrorDialog(BaseDialog):
+class UserErrorDialog(DialogBase):
     """Dialog that displays user-friendly error messages with recovery suggestions"""
 
     # Common error mappings

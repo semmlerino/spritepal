@@ -16,7 +16,7 @@ import threading
 import time
 import weakref
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 
@@ -45,7 +45,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
     preview_ready = Signal(int, bytes, int, int, str)  # request_id, tile_data, width, height, name
     preview_error = Signal(int, str)  # request_id, error_msg
 
-    def __init__(self, pool_ref: ReferenceType[Any]):
+    def __init__(self, pool_ref: ReferenceType[Any]) -> None:  # pyright: ignore[reportExplicitAny] - Weak reference to pool
         # Initialize with dummy values - actual values set per request
         super().__init__("", 0, "", None, None)  # type: ignore[arg-type]  # Dummy init, real values set via setup_request
         self._pool_ref = pool_ref
@@ -55,7 +55,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
         self._signals_connected = False
         self._being_destroyed = False  # Flag to prevent signal processing during cleanup
 
-    def setup_request(self, request: Any, extractor: ROMExtractorProtocol, rom_cache: ROMCacheProtocol | None = None) -> None:
+    def setup_request(self, request: Any, extractor: ROMExtractorProtocol, rom_cache: ROMCacheProtocol | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Request object
         """Setup worker for new request with optional ROM cache."""
         self.rom_path = request.rom_path
         self.offset = request.offset
@@ -174,10 +174,10 @@ class PooledPreviewWorker(SpritePreviewWorker):
                     logger.debug(f"[TRACE] Attempting HAL decompression at offset 0x{try_offset:X}")
 
                 # Try to extract as compressed sprite
-                compressed_size, tile_data = (
-                    self.extractor.rom_injector.find_compressed_sprite(
-                        rom_data, try_offset, expected_size
-                    )
+                from core.rom_injector import ROMInjector
+                rom_injector = cast(ROMInjector, self.extractor.rom_injector)
+                compressed_size, tile_data = rom_injector.find_compressed_sprite(
+                    rom_data, try_offset, expected_size
                 )
 
                 if tile_data and len(tile_data) > 0:
@@ -320,7 +320,7 @@ class PreviewWorkerPool(QObject):
 
         logger.debug(f"PreviewWorkerPool initialized with max_workers={max_workers}")
 
-    def submit_request(self, request: Any, extractor: ROMExtractorProtocol, rom_cache: ROMCacheProtocol | None = None) -> None:
+    def submit_request(self, request: Any, extractor: ROMExtractorProtocol, rom_cache: ROMCacheProtocol | None = None) -> None:  # pyright: ignore[reportExplicitAny] - PreviewRequest object
         """
         Submit a preview request to the worker pool.
 

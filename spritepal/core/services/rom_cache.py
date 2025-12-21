@@ -8,8 +8,9 @@ import threading
 import time
 import uuid
 import zlib
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 
 try:
     from utils.logging_config import get_logger
@@ -246,7 +247,9 @@ class ROMCache:
 
         return rom_mtime <= cache_mtime
 
-    def _save_cache_data(self, cache_file: Path, cache_data: dict[str, Any]) -> bool:
+    def _save_cache_data(
+        self, cache_file: Path, cache_data: Mapping[str, object]
+    ) -> bool:
         """Safely save cache data with error handling and unique temp files."""
         if not self._cache_enabled:
             return False
@@ -284,7 +287,9 @@ class ROMCache:
         except (OSError, FileNotFoundError):
             pass  # Ignore cleanup errors
 
-    def _load_cache_data(self, cache_file: Path, max_retries: int = 3) -> dict[str, Any] | None:
+    def _load_cache_data(
+        self, cache_file: Path, max_retries: int = 3
+    ) -> dict[str, object] | None:
         """Safely load cache data with error handling and retry logic."""
         for attempt in range(max_retries):
             try:
@@ -302,9 +307,14 @@ class ROMCache:
                 return None
         return None
 
-    def save_partial_scan_results(self, rom_path: str, scan_params: dict[str, int],
-                                 found_sprites: list[dict[str, Any]],
-                                 current_offset: int, completed: bool = False) -> bool:
+    def save_partial_scan_results(
+        self,
+        rom_path: str,
+        scan_params: dict[str, int],
+        found_sprites: list[dict[str, object]],
+        current_offset: int,
+        completed: bool = False,
+    ) -> bool:
         """Save partial scan results for incremental progress."""
         if not self._cache_enabled:
             return False
@@ -342,7 +352,9 @@ class ROMCache:
             logger.warning(f"Failed to save scan progress: {e}")
             return False
 
-    def get_partial_scan_results(self, rom_path: str, scan_params: dict[str, int]) -> dict[str, Any] | None:
+    def get_partial_scan_results(
+        self, rom_path: str, scan_params: dict[str, int]
+    ) -> dict[str, object] | None:
         """Get partial scan results for resuming."""
         if not self._cache_enabled:
             return None
@@ -364,7 +376,9 @@ class ROMCache:
                 "scan_progress" not in cache_data):
                 return None
 
-            return cache_data["scan_progress"]
+            scan_progress = cache_data["scan_progress"]
+            # Runtime guarantees this is dict[str, object] from JSON
+            return scan_progress if isinstance(scan_progress, dict) else None
 
         except Exception as e:
             logger.warning(f"Failed to load scan progress: {e}")
@@ -378,7 +392,7 @@ class ROMCache:
         logger.debug(f"Scan ID for params {scan_params}: {scan_id}")
         return scan_id
 
-    def get_cache_stats(self) -> dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, object]:
         """Get cache statistics with error handling."""
         try:
             if not self._cache_enabled or not self.cache_dir.exists():
@@ -450,7 +464,9 @@ class ROMCache:
 
         return removed_count
 
-    def get_sprite_locations(self, rom_path: str) -> dict[str, Any] | None:
+    def get_sprite_locations(
+        self, rom_path: str
+    ) -> dict[str, object] | None:
         """Get cached sprite locations for ROM.
 
         Args:
@@ -483,6 +499,8 @@ class ROMCache:
             sprite_locations = cache_data["sprite_locations"]
             restored_locations = {}
 
+            # Type assertion: sprite_locations is a dict from JSON
+            assert isinstance(sprite_locations, dict)
             for name, location_data in sprite_locations.items():
                 if isinstance(location_data, dict) and "offset" in location_data:
                     # Import SpritePointer only when needed to avoid circular imports.
@@ -513,8 +531,12 @@ class ROMCache:
 
         return restored_locations
 
-    def save_sprite_locations(self, rom_path: str, sprite_locations: dict[str, Any],
-                            rom_header: dict[str, Any] | None = None) -> bool:
+    def save_sprite_locations(
+        self,
+        rom_path: str,
+        sprite_locations: Mapping[str, object],
+        rom_header: Mapping[str, object] | None = None,
+    ) -> bool:
         """Save sprite locations to cache.
 
         Args:
@@ -550,8 +572,9 @@ class ROMCache:
             for name, location in sprite_locations.items():
                 if hasattr(location, "offset"):
                     # This is a SpritePointer object - capture all fields
+                    # Safe to access attributes after hasattr check
                     serializable_locations[name] = {
-                        "offset": location.offset,
+                        "offset": cast(object, location).offset,  # type: ignore[attr-defined]
                         "bank": getattr(location, "bank", 0),
                         "address": getattr(location, "address", 0),
                         "compressed_size": getattr(location, "compressed_size", None),
@@ -569,7 +592,9 @@ class ROMCache:
             logger.warning(f"Failed to save sprite locations to cache: {e}")
             return False
 
-    def get_rom_info(self, rom_path: str) -> dict[str, Any] | None:
+    def get_rom_info(
+        self, rom_path: str
+    ) -> dict[str, object] | None:
         """Get cached ROM information (header, etc.).
 
         Args:
@@ -598,13 +623,16 @@ class ROMCache:
                 "rom_info" not in cache_data):
                 return None
 
-            return cache_data["rom_info"]
+            rom_info = cache_data["rom_info"]
+            return cast(dict[str, object], rom_info) if isinstance(rom_info, dict) else None
 
         except Exception as e:
             logger.warning(f"Failed to load ROM info from cache: {e}")
             return None
 
-    def save_rom_info(self, rom_path: str, rom_info: dict[str, Any]) -> bool:
+    def save_rom_info(
+        self, rom_path: str, rom_info: Mapping[str, object]
+    ) -> bool:
         """Save ROM information to cache.
 
         Args:
@@ -720,7 +748,9 @@ class ROMCache:
 
         return removed_count
 
-    def _get_cache_key(self, rom_hash: str, offset: int, params: dict[str, Any] | None = None) -> str:
+    def _get_cache_key(
+        self, rom_hash: str, offset: int, params: Mapping[str, object] | None = None
+    ) -> str:
         """Generate consistent cache key for preview data.
 
         Args:
@@ -741,8 +771,15 @@ class ROMCache:
 
         return "_".join(key_components)
 
-    def save_preview_data(self, rom_path: str, offset: int, tile_data: bytes,
-                         width: int, height: int, params: dict[str, Any] | None = None) -> bool:
+    def save_preview_data(
+        self,
+        rom_path: str,
+        offset: int,
+        tile_data: bytes,
+        width: int,
+        height: int,
+        params: Mapping[str, object] | None = None,
+    ) -> bool:
         """Save preview tile data to cache with compression.
 
         Args:
@@ -793,8 +830,9 @@ class ROMCache:
             logger.warning(f"Failed to save preview data: {e}")
             return False
 
-    def get_preview_data(self, rom_path: str, offset: int,
-                        params: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    def get_preview_data(
+        self, rom_path: str, offset: int, params: Mapping[str, object] | None = None
+    ) -> dict[str, object] | None:
         """Get cached preview data for ROM and offset.
 
         Args:
@@ -826,6 +864,8 @@ class ROMCache:
                 return None
 
             preview_data = cache_data["preview_data"]
+            # Type assertion: preview_data is a dict from JSON
+            assert isinstance(preview_data, dict)
 
             # Decompress tile data
             try:
@@ -852,7 +892,9 @@ class ROMCache:
             logger.warning(f"Failed to load preview data: {e}")
             return None
 
-    def save_preview_batch(self, rom_path: str, preview_data_dict: dict[int, dict[str, Any]]) -> bool:
+    def save_preview_batch(
+        self, rom_path: str, preview_data_dict: Mapping[int, Mapping[str, object]]
+    ) -> bool:
         """Save multiple preview data entries in batch for efficiency.
 
         Args:
@@ -922,8 +964,9 @@ class ROMCache:
             logger.warning(f"Failed to save preview batch: {e}")
             return False
 
-    def get_offset_suggestions(self, rom_path: str, current_offset: int | None = None,
-                              limit: int = 10) -> list[dict[str, Any]]:
+    def get_offset_suggestions(
+        self, rom_path: str, current_offset: int | None = None, limit: int = 10
+    ) -> list[dict[str, object]]:
         """Get offset suggestions based on cached scan results and preview data.
 
         Analyzes cached data to suggest offsets that are likely to contain sprites,
@@ -949,8 +992,9 @@ class ROMCache:
             logger.warning(f"Failed to generate offset suggestions: {e}")
             return []
 
-    def _collect_offset_sources(self, rom_hash: str, rom_path: str,
-                               current_offset: int | None) -> dict[int, dict[str, Any]]:
+    def _collect_offset_sources(
+        self, rom_hash: str, rom_path: str, current_offset: int | None
+    ) -> dict[int, dict[str, object]]:
         """Collect offset data from all cache sources.
 
         Args:
@@ -961,7 +1005,7 @@ class ROMCache:
         Returns:
             Dictionary mapping offsets to their source data
         """
-        offset_sources: dict[int, dict[str, Any]] = {}
+        offset_sources: dict[int, dict[str, object]] = {}
 
         # Collect from scan progress caches
         self._collect_scan_cache_offsets(rom_hash, rom_path, current_offset, offset_sources)
@@ -974,9 +1018,13 @@ class ROMCache:
 
         return offset_sources
 
-    def _collect_scan_cache_offsets(self, rom_hash: str, rom_path: str,
-                                   current_offset: int | None,
-                                   offset_sources: dict[int, dict[str, Any]]) -> None:
+    def _collect_scan_cache_offsets(
+        self,
+        rom_hash: str,
+        rom_path: str,
+        current_offset: int | None,
+        offset_sources: dict[int, dict[str, object]],
+    ) -> None:
         """Collect offsets from scan progress caches.
 
         Args:
@@ -995,9 +1043,12 @@ class ROMCache:
             except Exception as e:
                 logger.debug(f"Error processing scan cache {cache_file}: {e}")
 
-    def _process_scan_cache_data(self, cache_data: dict[str, Any],
-                                current_offset: int | None,
-                                offset_sources: dict[int, dict[str, Any]]) -> None:
+    def _process_scan_cache_data(
+        self,
+        cache_data: Mapping[str, object],
+        current_offset: int | None,
+        offset_sources: dict[int, dict[str, object]],
+    ) -> None:
         """Process data from a scan cache file.
 
         Args:
@@ -1006,6 +1057,8 @@ class ROMCache:
             offset_sources: Dictionary to update with found offsets
         """
         scan_progress = cache_data.get("scan_progress", {})
+        # Type assertion: scan_progress is a dict from JSON
+        assert isinstance(scan_progress, dict)
         found_sprites = scan_progress.get("found_sprites", [])
 
         for sprite in found_sprites:
@@ -1018,9 +1071,13 @@ class ROMCache:
                                   source="scan_result",
                                   metadata={"sprite_info": sprite})
 
-    def _collect_preview_cache_offsets(self, rom_hash: str, rom_path: str,
-                                      current_offset: int | None,
-                                      offset_sources: dict[int, dict[str, Any]]) -> None:
+    def _collect_preview_cache_offsets(
+        self,
+        rom_hash: str,
+        rom_path: str,
+        current_offset: int | None,
+        offset_sources: dict[int, dict[str, object]],
+    ) -> None:
         """Collect offsets from preview data caches.
 
         Args:
@@ -1039,9 +1096,12 @@ class ROMCache:
             except Exception as e:
                 logger.debug(f"Error processing preview cache {cache_file}: {e}")
 
-    def _process_preview_cache_data(self, cache_data: dict[str, Any],
-                                   current_offset: int | None,
-                                   offset_sources: dict[int, dict[str, Any]]) -> None:
+    def _process_preview_cache_data(
+        self,
+        cache_data: Mapping[str, object],
+        current_offset: int | None,
+        offset_sources: dict[int, dict[str, object]],
+    ) -> None:
         """Process data from a preview cache file.
 
         Args:
@@ -1053,21 +1113,24 @@ class ROMCache:
         if not preview_data:
             return
 
+        # Type assertion: preview_data is a dict from JSON
+        assert isinstance(preview_data, dict)
         offset = preview_data.get("offset")
         if offset is None or offset == current_offset:
             return
 
-        metadata = {
-            "preview_size": (preview_data.get("width"), preview_data.get("height"))
-        }
         self._add_offset_source(offset_sources, offset,
                               confidence=0.6,
                               source="preview_cache",
-                              metadata=metadata)
+                              metadata={"preview_size": (preview_data.get("width"), preview_data.get("height"))})
 
-    def _collect_batch_preview_offsets(self, rom_hash: str, rom_path: str,
-                                      current_offset: int | None,
-                                      offset_sources: dict[int, dict[str, Any]]) -> None:
+    def _collect_batch_preview_offsets(
+        self,
+        rom_hash: str,
+        rom_path: str,
+        current_offset: int | None,
+        offset_sources: dict[int, dict[str, object]],
+    ) -> None:
         """Collect offsets from batch preview cache.
 
         Args:
@@ -1085,24 +1148,31 @@ class ROMCache:
             if not cache_data or not cache_data.get("batch_preview_data"):
                 return
 
-            for offset_str, data in cache_data["batch_preview_data"].items():
+            batch_preview_data = cache_data["batch_preview_data"]
+            # Type assertion: batch_preview_data is a dict from JSON
+            assert isinstance(batch_preview_data, dict)
+            for offset_str, data in batch_preview_data.items():
                 offset = int(offset_str)
                 if offset == current_offset:
                     continue
 
-                metadata = {
-                    "batch_size": (data.get("width"), data.get("height"))
-                }
+                # Type assertion: data is a dict from JSON
+                assert isinstance(data, dict)
                 self._add_offset_source(offset_sources, offset,
                                       confidence=0.5,
                                       source="batch_preview",
-                                      metadata=metadata)
+                                      metadata={"batch_size": (data.get("width"), data.get("height"))})
         except Exception as e:
             logger.debug(f"Error processing batch preview cache: {e}")
 
-    def _add_offset_source(self, offset_sources: dict[int, dict[str, Any]],
-                          offset: int, confidence: float, source: str,
-                          metadata: dict[str, Any] | None = None) -> None:
+    def _add_offset_source(
+        self,
+        offset_sources: dict[int, dict[str, object]],
+        offset: int,
+        confidence: float,
+        source: str,
+        metadata: Mapping[str, object] | None = None,
+    ) -> None:
         """Add or update an offset source entry.
 
         Args:
@@ -1119,13 +1189,23 @@ class ROMCache:
                 "metadata": {}
             }
 
-        offset_sources[offset]["confidence"] += confidence
-        offset_sources[offset]["sources"].append(source)
+        # Type assertions for dict value access (validated by initialization above)
+        confidence_val = offset_sources[offset]["confidence"]
+        assert isinstance(confidence_val, (int, float))
+        offset_sources[offset]["confidence"] = confidence_val + confidence
+
+        sources_list = offset_sources[offset]["sources"]
+        assert isinstance(sources_list, list)
+        sources_list.append(source)
 
         if metadata:
-            offset_sources[offset]["metadata"].update(metadata)
+            metadata_dict = offset_sources[offset]["metadata"]
+            assert isinstance(metadata_dict, dict)
+            metadata_dict.update(metadata)
 
-    def _build_suggestions(self, offset_sources: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
+    def _build_suggestions(
+        self, offset_sources: Mapping[int, Mapping[str, object]]
+    ) -> list[dict[str, object]]:
         """Build and score suggestion list from collected offset sources.
 
         Args:
@@ -1151,7 +1231,9 @@ class ROMCache:
         suggestions.sort(key=lambda x: x["confidence"], reverse=True)
         return suggestions
 
-    def _calculate_confidence(self, source_data: dict[str, Any]) -> float:
+    def _calculate_confidence(
+        self, source_data: Mapping[str, object]
+    ) -> float:
         """Calculate final confidence score for an offset.
 
         Args:
@@ -1161,10 +1243,14 @@ class ROMCache:
             Normalized confidence score (0.0 to 1.0)
         """
         # Cap confidence at 1.0
-        confidence = min(source_data["confidence"], 1.0)
+        base_confidence = source_data["confidence"]
+        assert isinstance(base_confidence, (int, float))
+        confidence = min(base_confidence, 1.0)
 
         # Boost confidence for multiple unique sources
-        source_count = len(set(source_data["sources"]))
+        sources = source_data["sources"]
+        assert isinstance(sources, list)
+        source_count = len(set(sources))
         if source_count > 1:
             confidence = min(confidence * 1.2, 1.0)
 

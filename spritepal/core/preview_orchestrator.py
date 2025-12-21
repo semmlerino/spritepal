@@ -63,7 +63,7 @@ class PreviewRequest:
     priority: Priority = Priority.NORMAL
     timestamp: float = field(default_factory=time.time)
     cancelled: bool = False
-    callback: Callable[[PreviewData], None] | None = None
+    callback: Callable[[PreviewData], None] | None = None  # Optional callback for async notification
 
     def __lt__(self, other: PreviewRequest) -> bool:
         """Support priority queue ordering"""
@@ -80,7 +80,7 @@ class PreviewData:
     height: int = 0
     offset: int = 0
     rom_path: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)  # pyright: ignore[reportExplicitAny] - dynamic metadata
     generated_at: float = field(default_factory=time.time)
     cache_key: str = ""
 
@@ -96,7 +96,7 @@ class PreviewError:
     request_id: str = ""
     error_type: ErrorType = ErrorType.UNKNOWN
     message: str = ""
-    details: dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)  # pyright: ignore[reportExplicitAny] - error details dict
     recoverable: bool = True
     retry_after: float | None = None
     timestamp: float = field(default_factory=time.time)
@@ -157,7 +157,7 @@ class PreviewOrchestrator(QObject):
     def __init__(
         self,
         parent: QObject | None = None,
-        worker_pool_factory: Callable[[], Any] | None = None,
+        worker_pool_factory: Callable[[], Any] | None = None,  # pyright: ignore[reportExplicitAny] - worker pool factory returns dynamic type
     ):
         """
         Initialize the preview orchestrator.
@@ -184,7 +184,7 @@ class PreviewOrchestrator(QObject):
         self._last_preview: PreviewData | None = None
 
         # Worker management (initialized lazily via factory)
-        self._worker_pool: Any | None = None
+        self._worker_pool: Any | None = None  # pyright: ignore[reportExplicitAny] - dynamic worker pool type
         self._worker_pool_factory = worker_pool_factory
 
         # Performance tracking
@@ -211,7 +211,7 @@ class PreviewOrchestrator(QObject):
 
     def request_preview(self, rom_path: str, offset: int,
                        priority: Priority = Priority.NORMAL,
-                       callback: Callable[[PreviewData], None] | None = None) -> str:
+                       callback: Callable[[PreviewData], None] | None = None) -> str:  # Optional callback for async notification
         """
         Request a preview with specified priority.
 
@@ -379,7 +379,7 @@ class PreviewOrchestrator(QObject):
         self,
         request_id: str,
         preview_data: PreviewData,
-        callback: Callable[[PreviewData], None] | None = None
+        callback: Callable[[PreviewData], None] | None = None  # Optional callback for async notification
     ) -> None:
         """Deliver preview to requestor"""
         # Update L1 cache
@@ -406,7 +406,7 @@ class PreviewOrchestrator(QObject):
         # Clean up
         self._active_requests.pop(request_id, None)
 
-    def _on_cache_ready(self, request_id: str, data: bytes, metadata: dict[str, Any]) -> None:
+    def _on_cache_ready(self, request_id: str, data: bytes, metadata: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - cache metadata dict
         """Handle cache hit from async cache"""
         if request := self._active_requests.get(request_id):
             if not request.cancelled:

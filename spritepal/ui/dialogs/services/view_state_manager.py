@@ -239,7 +239,7 @@ class ViewStateManager(QObject):
 
             # Convert to integers and validate
             try:
-                x, y, width, height = int(x), int(y), int(width), int(height)
+                x, y, width, height = int(x), int(y), int(width), int(height)  # type: ignore[arg-type]
             except (ValueError, TypeError):
                 logger.debug("Invalid saved position data types - using safe positioning")
                 return False

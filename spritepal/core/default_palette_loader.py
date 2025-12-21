@@ -27,7 +27,8 @@ class DefaultPaletteLoader:
             palette_path: Path to default palettes file (uses default if None)
         """
         self.palette_path: str = palette_path or self.DEFAULT_PALETTE_PATH
-        self.palette_data: dict[str, Any] = {}
+        # JSON data is inherently untyped; structure validated at runtime
+        self.palette_data: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny]
         self.load_palettes()
 
     def load_palettes(self) -> None:
@@ -44,7 +45,7 @@ class DefaultPaletteLoader:
         except Exception:
             logger.exception("Failed to load default palettes")
 
-    def get_sprite_palettes(self, sprite_name: str) -> list[dict[str, Any]]:
+    def get_sprite_palettes(self, sprite_name: str) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny]
         """
         Get default palettes for a specific sprite.
 

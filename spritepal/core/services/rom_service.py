@@ -16,7 +16,7 @@ from __future__ import annotations
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
@@ -344,7 +344,7 @@ class ROMService(QObject):
             self.error_occurred.emit(f"Sprite extraction failed: {e}")
             return False
 
-    def get_known_sprite_locations(self, rom_path: str) -> dict[str, Any]:
+    def get_known_sprite_locations(self, rom_path: str) -> dict[str, object]:
         """
         Get known sprite locations for a ROM with caching.
 
@@ -375,7 +375,7 @@ class ROMService(QObject):
                 time_saved = 2.5  # Estimated time saved by not scanning ROM
                 self._logger.debug(f"Loaded sprite locations from cache: {rom_path}")
                 self.cache_hit.emit("sprite_locations", time_saved)
-                return cached_locations
+                return dict(cached_locations)  # Convert Mapping to dict
 
             # Cache miss - scan ROM file
             self._logger.debug(f"Cache miss, scanning ROM for sprite locations: {rom_path}")
@@ -395,7 +395,7 @@ class ROMService(QObject):
                     )
                     self.cache_saved.emit("sprite_locations", len(locations))
 
-            return locations
+            return dict(locations)  # Convert Mapping to dict
 
         except (OSError, PermissionError) as e:
             error_msg = f"File I/O error getting sprite locations: {e}"
@@ -413,7 +413,7 @@ class ROMService(QObject):
             self.error_occurred.emit(error_msg)
             raise ExtractionError(error_msg) from e
 
-    def read_rom_header(self, rom_path: str) -> dict[str, Any]:
+    def read_rom_header(self, rom_path: str) -> dict[str, object]:
         """
         Read ROM header information.
 
@@ -430,7 +430,8 @@ class ROMService(QObject):
             # Validate ROM file exists
             FileValidator.validate_rom_file_exists_or_raise(rom_path)
 
-            header = self._rom_extractor.rom_injector.read_rom_header(rom_path)
+            # Protocol defines rom_injector as object, runtime has read_rom_header method
+            header = self._rom_extractor.rom_injector.read_rom_header(rom_path)  # pyright: ignore[reportAttributeAccessIssue] - runtime type is ROMInjector
             return asdict(header)
         except (OSError, PermissionError) as e:
             error_msg = f"File I/O error reading ROM header: {e}"

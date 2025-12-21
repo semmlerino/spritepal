@@ -12,6 +12,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import time
+from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -249,7 +250,7 @@ class OptimizedROMExtractor(ROMExtractor):
         self,
         rom_path: str,
         sprite_offset: int,
-        sprite_config: dict[str, Any | None] | None = None,
+        sprite_config: Mapping[str, object] | None = None,
         use_cache: bool = True
     ) -> bytes:
         """
@@ -306,7 +307,7 @@ class OptimizedROMExtractor(ROMExtractor):
         self,
         rom_path: str,
         offsets: list[int],
-        sprite_configs: dict[int, dict[str, Any] | None] | None = None
+        sprite_configs: dict[int, dict[str, Any] | None] | None = None  # pyright: ignore[reportExplicitAny] - sprite config can contain various types
     ) -> dict[int, ExtractionResult]:
         """
         Extract multiple sprites in parallel for better performance.
@@ -371,7 +372,7 @@ class OptimizedROMExtractor(ROMExtractor):
         self,
         rom_path: str,
         offset: int,
-        config: dict[str, Any] | None = None
+        config: dict[str, Any] | None = None  # pyright: ignore[reportExplicitAny] - sprite config can contain various types
     ) -> ExtractionResult:
         """Extract a single sprite and measure performance."""
         start_time = time.perf_counter()
@@ -488,7 +489,7 @@ class OptimizedROMExtractor(ROMExtractor):
 
         return False
 
-    def get_cache_stats(self) -> dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - stats dict contains mixed types (int, float, bool)
         """Get cache performance statistics."""
         cache = self._decompression_cache
         total_requests = cache.hits + cache.misses
@@ -513,7 +514,7 @@ class OptimizedROMExtractor(ROMExtractor):
         logger.info("Cleared all extractor caches")
 
 
-def benchmark_extraction(rom_path: str, offsets: list[int]) -> dict[str, Any]:
+def benchmark_extraction(rom_path: str, offsets: list[int]) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - benchmark results contain mixed types
     """
     Benchmark extraction performance comparing original vs optimized.
 

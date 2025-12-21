@@ -11,7 +11,10 @@ Provides a comprehensive dashboard for viewing monitoring data including:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, override
+from typing import TYPE_CHECKING, Any, cast, override
+
+if TYPE_CHECKING:
+    from PySide6.QtGui import QCloseEvent
 
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QFont
@@ -105,7 +108,7 @@ class MetricWidget(QFrame):
 class PerformanceTab(QWidget):
     """Tab for performance monitoring."""
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.logger = get_logger("monitoring_dashboard")
         self.setup_ui()
@@ -146,9 +149,10 @@ class PerformanceTab(QWidget):
 
     def update_data(self, hours: int = 24):
         """Update performance data."""
-        monitoring_manager = get_monitoring_manager()
-        if not monitoring_manager:
+        mgr = get_monitoring_manager()
+        if not mgr:
             return
+        monitoring_manager = cast(Any, mgr)  # pyright: ignore[reportExplicitAny] - monitoring manager from DI
 
         # Update metrics
         operations = ['rom_loading', 'extraction', 'thumbnail_generation', 'injection']
@@ -219,7 +223,7 @@ class PerformanceTab(QWidget):
 class ErrorsTab(QWidget):
     """Tab for error monitoring."""
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setup_ui()
 
@@ -258,9 +262,10 @@ class ErrorsTab(QWidget):
 
     def update_data(self, hours: int = 24):
         """Update error data."""
-        monitoring_manager = get_monitoring_manager()
-        if not monitoring_manager:
+        mgr = get_monitoring_manager()
+        if not mgr:
             return
+        monitoring_manager = cast(Any, mgr)  # pyright: ignore[reportExplicitAny] - monitoring manager from DI
 
         error_summary = monitoring_manager.get_error_summary(hours)
 
@@ -307,7 +312,7 @@ class ErrorsTab(QWidget):
 class UsageTab(QWidget):
     """Tab for usage analytics."""
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setup_ui()
 
@@ -346,9 +351,10 @@ class UsageTab(QWidget):
 
     def update_data(self, hours: int = 24):
         """Update usage data."""
-        monitoring_manager = get_monitoring_manager()
-        if not monitoring_manager:
+        mgr = get_monitoring_manager()
+        if not mgr:
             return
+        monitoring_manager = cast(Any, mgr)  # pyright: ignore[reportExplicitAny] - monitoring manager from DI
 
         usage_stats = monitoring_manager.get_usage_stats(hours)
 
@@ -397,7 +403,7 @@ class UsageTab(QWidget):
 class HealthTab(QWidget):
     """Tab for system health monitoring."""
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setup_ui()
 
@@ -434,9 +440,10 @@ class HealthTab(QWidget):
 
     def update_data(self, hours: int = 24):
         """Update health data."""
-        monitoring_manager = get_monitoring_manager()
-        if not monitoring_manager:
+        mgr = get_monitoring_manager()
+        if not mgr:
             return
+        monitoring_manager = cast(Any, mgr)  # pyright: ignore[reportExplicitAny] - monitoring manager from DI
 
         health_status = monitoring_manager.get_health_status()
 
@@ -479,7 +486,7 @@ class HealthTab(QWidget):
 class InsightsTab(QWidget):
     """Tab for monitoring insights and recommendations."""
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setup_ui()
 
@@ -511,9 +518,10 @@ class InsightsTab(QWidget):
 
     def update_data(self, hours: int = 24):
         """Update insights data."""
-        monitoring_manager = get_monitoring_manager()
-        if not monitoring_manager:
+        mgr = get_monitoring_manager()
+        if not mgr:
             return
+        monitoring_manager = cast(Any, mgr)  # pyright: ignore[reportExplicitAny] - monitoring manager from DI
 
         # Get insights
         insights = monitoring_manager.generate_insights(hours)
@@ -545,10 +553,11 @@ class InsightsTab(QWidget):
 class MonitoringDashboard(QDialog):
     """Real-time monitoring dashboard for SpritePal."""
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.logger = get_logger("monitoring_dashboard")
-        self.monitoring_manager = get_monitoring_manager()
+        mgr = get_monitoring_manager()
+        self.monitoring_manager = cast(Any, mgr)  # pyright: ignore[reportExplicitAny] - monitoring manager from DI
 
         if not self.monitoring_manager:
             self.logger.warning("Monitoring manager not available")
@@ -691,7 +700,7 @@ class MonitoringDashboard(QDialog):
             self.status_label.setText(f"Export failed: {e!s}")
 
     @override
-    def closeEvent(self, event: Any):
+    def closeEvent(self, event: QCloseEvent):
         """Handle dialog close."""
         self.refresh_timer.stop()
         super().closeEvent(event)

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
 
-from typing import override
+from typing import Any, override
 
 from PySide6.QtCore import Signal
 
@@ -48,10 +48,6 @@ class SpriteScanWorker(BaseWorker):
     # For compatibility with existing code that expects (current, total) progress
     progress_detailed = Signal(int, int)
     """Emitted with detailed progress. Args: current_offset, total_offsets."""
-
-    # Alias for compatibility with code expecting scan_progress
-    scan_progress = Signal(int, int)
-    """Alias for progress_detailed. Args: current_step, total_steps."""
 
     def __init__(self, rom_path: str, extractor: ROMExtractorProtocol | None = None, use_cache: bool = True,
                  start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None, *,
@@ -115,8 +111,10 @@ class SpriteScanWorker(BaseWorker):
             rom_cache = self.rom_cache
             self.cache_status.emit("Checking cache...")
             logger.debug(f"Checking cache with params: {scan_params}")
-            partial_cache = rom_cache.get_partial_scan_results(self.rom_path, scan_params)
-            logger.debug(f"Cache lookup result: {partial_cache is not None}")
+            partial_cache_raw = rom_cache.get_partial_scan_results(self.rom_path, scan_params)
+            logger.debug(f"Cache lookup result: {partial_cache_raw is not None}")
+
+            partial_cache: dict[str, Any] = dict(partial_cache_raw) if partial_cache_raw else {}  # pyright: ignore[reportExplicitAny] - scan cache
 
             if partial_cache:
                 # Resume from cache - use correct field names
@@ -169,9 +167,8 @@ class SpriteScanWorker(BaseWorker):
             current_step = int(current_range // 0x100) if total_range >= 0x100 else int(current_range)
             total_steps = max(1, int(total_range // 0x100)) if total_range >= 0x100 else max(1, int(total_range))
 
-            # Emit both legacy and new progress signals
+            # Emit progress signal
             self.progress_detailed.emit(current_step, total_steps)
-            self.scan_progress.emit(current_step, total_steps)  # Compatibility alias
             percent = int((current_progress / 100) * 100)  # Already a percentage
             self.emit_progress(percent, f"Scanning... ({current_step}/{total_steps})")
 

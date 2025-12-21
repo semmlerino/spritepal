@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 from ui.common.file_dialogs import browse_for_save_file
 from ui.common.spacing_constants import SPACING_STANDARD
-from ui.components.base import BaseDialog
+from ui.components.base import DialogBase
 from ui.styles import get_muted_text_style
 from ui.styles.theme import COLORS
 
@@ -34,7 +34,7 @@ class OutputSettings(NamedTuple):
     include_metadata: bool
 
 
-class OutputSettingsDialog(BaseDialog):
+class OutputSettingsDialog(DialogBase):
     """Dialog for configuring extraction output settings.
 
     This dialog is shown before extraction begins, allowing users to:

@@ -61,7 +61,7 @@ class SpriteGalleryTab(QWidget):
         self.rom_path: str | None = None
         self.rom_size: int = 0
         self.rom_extractor = None
-        self.sprites_data: list[dict[str, Any]] = []
+        self.sprites_data: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - Sprite metadata
 
         # Workers
         self.thumbnail_controller: ThumbnailWorkerController | None = None
@@ -71,7 +71,7 @@ class SpriteGalleryTab(QWidget):
         self.gallery_widget: SpriteGalleryWidget  # Always initialized
         self.toolbar: QToolBar  # Always initialized
         self.progress_dialog: QProgressDialog | None = None
-        self.detached_window: Any | None = None  # DetachedGalleryWindow
+        self.detached_window: Any | None = None  # pyright: ignore[reportExplicitAny] - DetachedGalleryWindow, avoid circular import
 
         self._setup_ui()
 
@@ -457,9 +457,12 @@ class SpriteGalleryTab(QWidget):
         # Create controller if needed
         if not self.thumbnail_controller:
             logger.info("Creating ThumbnailWorkerController for on-demand requests")
+            from typing import cast
+
+            from core.protocols.manager_protocols import ROMExtractorProtocol
             self.thumbnail_controller = ThumbnailWorkerController(self)
             self.thumbnail_controller.thumbnail_ready.connect(self._on_thumbnail_ready)
-            self.thumbnail_controller.start_worker(self.rom_path, self.rom_extractor)
+            self.thumbnail_controller.start_worker(self.rom_path, cast(ROMExtractorProtocol, self.rom_extractor))
 
         # Queue thumbnail with priority
         self.thumbnail_controller.queue_thumbnail(offset, 128, priority)
@@ -795,7 +798,12 @@ class SpriteGalleryTab(QWidget):
 
                 # Find the thumbnail widget and set its pixmap
                 if offset in self.gallery_widget.thumbnails:
-                    thumbnail_widget = self.gallery_widget.thumbnails[offset]
+                    from typing import TYPE_CHECKING, cast
+                    if TYPE_CHECKING:
+                        from ui.widgets.sprite_thumbnail_widget import SpriteThumbnailWidget
+                    thumbnail_widget_obj = self.gallery_widget.thumbnails[offset]
+                    # Cast to access set_sprite_data method
+                    thumbnail_widget = cast("SpriteThumbnailWidget", thumbnail_widget_obj)
                     thumbnail_widget.set_sprite_data(pixmap, sprite_info)
 
             logger.info(f"Generated mock thumbnails for {len(self.sprites_data)} sprites")

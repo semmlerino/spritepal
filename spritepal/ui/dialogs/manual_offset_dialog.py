@@ -18,7 +18,7 @@ import contextlib
 import time
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, cast, override
 
 with contextlib.suppress(ImportError):
     pass
@@ -30,11 +30,11 @@ if TYPE_CHECKING:
         ROMExtractorProtocol,
         SettingsManagerProtocol,
     )
-    from core.protocols.preview_protocols import PreviewCoordinatorProtocol
 
 from PySide6.QtCore import (
     QMutex,
     QMutexLocker,
+    QPoint,
     Qt,
     QThread,
     QTimer,
@@ -42,14 +42,15 @@ from PySide6.QtCore import (
 )
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent
+    from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent, QMoveEvent, QResizeEvent, QShowEvent
 else:
-    from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent
+    from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent, QMoveEvent, QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QDialogButtonBox,
     QFrame,
+    QHBoxLayout,
     QInputDialog,
     QLabel,
     QListWidget,
@@ -154,7 +155,7 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # rom_extractor can be obtained from extraction_manager
         if rom_extractor is None:
-            self.rom_extractor = self.extraction_manager.get_rom_extractor()
+            self.rom_extractor: ROMExtractorProtocol | None = cast('ROMExtractorProtocol | None', self.extraction_manager.get_rom_extractor())
         else:
             self.rom_extractor = rom_extractor
 
@@ -182,7 +183,7 @@ class UnifiedManualOffsetDialog(DialogBase):
         self._scan_progress_dialog: QProgressDialog | None = None
 
         # Preview coordinator handles preview generation (Smart or Simple based on env flag)
-        self._smart_preview_coordinator: PreviewCoordinatorProtocol | None = None
+        self._smart_preview_coordinator: SmartPreviewCoordinator | None = None
 
         # Preview update timer (legacy - kept for compatibility)
         self._preview_timer: QTimer | None = None
@@ -197,20 +198,20 @@ class UnifiedManualOffsetDialog(DialogBase):
             MAX_MINI_MAP_HEIGHT = 60
             MIN_MINI_MAP_HEIGHT = 40
 
-            def configure_splitter(self, *args: Any) -> None:
+            def configure_splitter(self, *args: object) -> None:
                 pass
 
             def fix_empty_space_issue(self) -> None:
                 pass
 
-            def apply_standard_layout(self, layout: Any, spacing_type: str = 'normal') -> None:
+            def apply_standard_layout(self, layout: QVBoxLayout | QHBoxLayout, spacing_type: str = 'normal') -> None:
                 layout.setSpacing(SPACING_SMALL)
                 layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
-            def remove_all_stretches(self, layout: Any) -> None:
+            def remove_all_stretches(self, layout: object) -> None:
                 pass
 
-            def create_section_title(self, title: str, subtitle: str = "") -> Any:
+            def create_section_title(self, title: str, subtitle: str = "") -> QLabel:
                 from PySide6.QtWidgets import QLabel
                 label = QLabel(title)
                 label.setStyleSheet(f"font-weight: bold; font-size: 12px; color: {COLORS['text_primary']};")
@@ -222,7 +223,7 @@ class UnifiedManualOffsetDialog(DialogBase):
             def update_for_tab(self, index: int, width: int) -> None:
                 pass
 
-            def handle_resize(self, event: Any) -> None:
+            def handle_resize(self, event: object) -> None:
                 pass
 
         self.layout_manager = DialogLayoutManager()
@@ -427,28 +428,31 @@ class UnifiedManualOffsetDialog(DialogBase):
 
     def _setup_smart_preview_coordinator(self):
         """Set up SmartPreviewCoordinator for efficient preview generation."""
-        self._smart_preview_coordinator = SmartPreviewCoordinator(self, rom_cache=self.rom_cache)  # type: ignore[arg-type]
+        from core.services.rom_cache import ROMCache
+        # SmartPreviewCoordinator expects concrete ROMCache type, not protocol
+        coordinator = SmartPreviewCoordinator(self, rom_cache=cast(ROMCache | None, self.rom_cache))
+        self._smart_preview_coordinator = coordinator
         assert self._smart_preview_coordinator is not None  # Just assigned
 
         # Use AutoConnection (default) to let Qt choose the best connection type
         # This will use DirectConnection when called from main thread (avoiding queue delays)
         # and QueuedConnection when called from worker threads (for thread safety)
-        self._smart_preview_coordinator.preview_ready.connect(
+        coordinator.preview_ready.connect(
             self._on_smart_preview_ready
         )
-        self._smart_preview_coordinator.preview_cached.connect(
+        coordinator.preview_cached.connect(
             self._on_smart_preview_cached
         )
-        self._smart_preview_coordinator.preview_error.connect(
+        coordinator.preview_error.connect(
             self._on_smart_preview_error
         )
 
         # Setup ROM data provider with cache support
-        self._smart_preview_coordinator.set_rom_data_provider(self._get_rom_data_for_preview)
+        coordinator.set_rom_data_provider(self._get_rom_data_for_preview)
 
         # Connect cache-related signals
-        self._smart_preview_coordinator.preview_ready.connect(self._on_cache_miss)
-        self._smart_preview_coordinator.preview_cached.connect(self._on_cache_hit)
+        coordinator.preview_ready.connect(self._on_cache_miss)
+        coordinator.preview_cached.connect(self._on_cache_hit)
 
         logger.debug("Smart preview coordinator setup complete with ROM cache integration")
 
@@ -471,7 +475,7 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # Connect smart preview coordinator to browse tab
         if self._smart_preview_coordinator:
-            self.browse_tab.connect_smart_preview_coordinator(self._smart_preview_coordinator)  # type: ignore[arg-type]
+            self.browse_tab.connect_smart_preview_coordinator(self._smart_preview_coordinator)
 
         # Smart tab signals
         self.smart_tab.smart_mode_changed.connect(self._on_smart_mode_changed)
@@ -604,13 +608,14 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # Create search worker for forward search
         with QMutexLocker(self._manager_mutex):
-            if self.rom_extractor is not None:
+            extractor = self.rom_extractor
+            if extractor is not None:
                 self.search_worker = SpriteSearchWorker(
                     self.rom_path,
                     current_offset,
                     self.rom_size,
                     1,  # Forward direction
-                    self.rom_extractor,
+                    extractor,
                     parent=self
                 )
                 self.search_worker.sprite_found.connect(self._on_search_sprite_found)
@@ -633,13 +638,14 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # Create search worker for backward search
         with QMutexLocker(self._manager_mutex):
-            if self.rom_extractor is not None:
+            extractor = self.rom_extractor
+            if extractor is not None:
                 self.search_worker = SpriteSearchWorker(
                     self.rom_path,
                     current_offset,
                     0,  # Search back to start
                     -1,  # Backward direction
-                    self.rom_extractor,
+                    extractor,
                     parent=self
                 )
                 self.search_worker.sprite_found.connect(self._on_search_sprite_found)
@@ -669,10 +675,11 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # Create new preview worker
         with QMutexLocker(self._manager_mutex):
-            if self.rom_extractor is not None:
+            extractor = self.rom_extractor
+            if extractor is not None:
                 sprite_name = f"manual_0x{current_offset:X}"
                 self.preview_worker = SpritePreviewWorker(
-                    self.rom_path, current_offset, sprite_name, self.rom_extractor, None, parent=self
+                    self.rom_path, current_offset, sprite_name, extractor, None, parent=self
                 )
                 self.preview_worker.preview_ready.connect(self._on_preview_ready)
                 self.preview_worker.preview_error.connect(self._on_preview_error)
@@ -710,9 +717,8 @@ class UnifiedManualOffsetDialog(DialogBase):
             self.status_panel.update_status(message)
 
             # Add cache performance tooltip if available
-            if hasattr(self.status_panel, "status_label"):
-                tooltip = self._build_cache_tooltip()
-                self.status_panel.status_label.setToolTip(tooltip)  # type: ignore[attr-defined]
+            tooltip = self._build_cache_tooltip()
+            self.status_panel.detection_info.setToolTip(tooltip)
 
     def _has_rom_data(self) -> bool:
         """Check if ROM data is available."""
@@ -755,8 +761,8 @@ class UnifiedManualOffsetDialog(DialogBase):
         self.blockSignals(True)
 
         # Block signals on child widgets that might emit during cleanup
-        if self._smart_preview_coordinator is not None and hasattr(self._smart_preview_coordinator, 'blockSignals'):
-            self._smart_preview_coordinator.blockSignals(True)  # type: ignore[union-attr]
+        if isinstance(self._smart_preview_coordinator, SmartPreviewCoordinator):
+            self._smart_preview_coordinator.blockSignals(True)
         if self.browse_tab is not None and _is_valid_qt(self.browse_tab):
             self.browse_tab.blockSignals(True)
         if self.smart_tab is not None and _is_valid_qt(self.smart_tab):
@@ -796,7 +802,7 @@ class UnifiedManualOffsetDialog(DialogBase):
             _safe_disconnect(self.preview_widget.similarity_search_requested)
 
         # Disconnect smart preview coordinator
-        if self._smart_preview_coordinator is not None:
+        if isinstance(self._smart_preview_coordinator, SmartPreviewCoordinator):
             _safe_disconnect(self._smart_preview_coordinator.preview_ready)
             _safe_disconnect(self._smart_preview_coordinator.preview_cached)
             _safe_disconnect(self._smart_preview_coordinator.preview_error)
@@ -830,7 +836,7 @@ class UnifiedManualOffsetDialog(DialogBase):
             self.rom_path = rom_path
             self.rom_size = rom_size
             self.extraction_manager = extraction_manager
-            self.rom_extractor = extraction_manager.get_rom_extractor()
+            self.rom_extractor = cast('ROMExtractorProtocol | None', extraction_manager.get_rom_extractor())
 
         # Update tabs with new ROM data
         if self.browse_tab is not None:
@@ -838,8 +844,10 @@ class UnifiedManualOffsetDialog(DialogBase):
             self.browse_tab.set_rom_path(rom_path)
 
         # Update gallery tab with ROM data
-        if self.gallery_tab is not None:
-            self.gallery_tab.set_rom_data(rom_path, rom_size, self.rom_extractor)
+        if self.gallery_tab is not None and self.rom_extractor is not None:
+            from core.rom_extractor import ROMExtractor
+            # Gallery tab expects concrete ROMExtractor type, not protocol
+            self.gallery_tab.set_rom_data(rom_path, rom_size, cast(ROMExtractor, self.rom_extractor))
 
         # Update mini ROM map
         if self.mini_rom_map is not None:
@@ -887,7 +895,7 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         # Create and start worker
         self._sprite_scan_worker = SpriteScanWorker(self.rom_path, step=0x1000, rom_cache=self.rom_cache)
-        self._sprite_scan_worker.scan_progress.connect(self._on_sprite_scan_progress)
+        self._sprite_scan_worker.progress_detailed.connect(self._on_sprite_scan_progress)
         self._sprite_scan_worker.sprites_found.connect(self._on_sprite_scan_complete)
         self._sprite_scan_worker.error.connect(self._on_sprite_scan_error)
         self._sprite_scan_worker.start()
@@ -906,7 +914,7 @@ class UnifiedManualOffsetDialog(DialogBase):
             percent = int((current / total) * 100)
             self._scan_progress_dialog.setValue(percent)
 
-    def _on_sprite_scan_complete(self, found_sprites: list[dict[str, Any]]) -> None:
+    def _on_sprite_scan_complete(self, found_sprites: list[dict[str, object]]) -> None:
         """Handle sprite scan completion."""
         logger.info(f"Sprite scan complete: found {len(found_sprites)} sprites")
 
@@ -945,7 +953,7 @@ class UnifiedManualOffsetDialog(DialogBase):
 
         QMessageBox.critical(self, "Scan Error", f"Error scanning ROM: {message}")
 
-    def _show_sprite_scan_results(self, sprites: list[dict[str, Any]]) -> None:
+    def _show_sprite_scan_results(self, sprites: list[dict[str, object]]) -> None:
         """Show sprite scan results in a dialog."""
         # Create results dialog
         dialog = QDialog(self)
@@ -1237,11 +1245,11 @@ class UnifiedManualOffsetDialog(DialogBase):
         except Exception as e:
             logger.debug(f"Error preloading offset 0x{offset:06X}: {e}")
 
-    def _on_cache_hit(self, *args: Any) -> None:
+    def _on_cache_hit(self, *args: object) -> None:
         """Handle cache hit event."""
         self._cache_stats["hits"] += 1
 
-    def _on_cache_miss(self, *args: Any) -> None:
+    def _on_cache_miss(self, *args: object) -> None:
         """Handle cache miss event."""
         self._cache_stats["misses"] += 1
 
@@ -1297,8 +1305,7 @@ class UnifiedManualOffsetDialog(DialogBase):
                 current_title = self.status_collapsible.title()
                 if "[Cache:" not in current_title:
                     new_title = f"{current_title} {cache_status}"
-                    # setTitle is available on CollapsibleGroupBox
-                    self.status_collapsible.setTitle(new_title)  # type: ignore[attr-defined]
+                    self.status_collapsible.set_title(new_title)
 
         except Exception as e:
             logger.debug(f"Error updating cache status display: {e}")
@@ -1316,7 +1323,7 @@ class UnifiedManualOffsetDialog(DialogBase):
         except Exception as e:
             logger.debug(f"Error setting up cache context menu: {e}")
 
-    def _show_cache_context_menu(self, position: Any) -> None:
+    def _show_cache_context_menu(self, position: QPoint) -> None:
         """Show cache management context menu."""
         if not self.rom_cache.cache_enabled:
             return
@@ -1348,7 +1355,8 @@ class UnifiedManualOffsetDialog(DialogBase):
             session_stats = self._cache_stats
 
             # Format cache size
-            size_bytes = stats.get("total_size_bytes", 0)
+            size_bytes_val = stats.get("total_size_bytes", 0)
+            size_bytes = int(size_bytes_val) if isinstance(size_bytes_val, (int, float)) else 0
             if size_bytes > 1024 * 1024:
                 size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
             elif size_bytes > 1024:
@@ -1463,7 +1471,7 @@ Cache Misses: {session_stats['misses']}"""
             super().hideEvent(event)
 
     @override
-    def showEvent(self, event: Any) -> None:
+    def showEvent(self, event: QShowEvent) -> None:
         """Handle show event - set up initial splitter sizes here."""
         logger.debug(f"Dialog {self._debug_id} showing")
         super().showEvent(event)
@@ -1491,7 +1499,7 @@ Cache Misses: {session_stats['misses']}"""
         return self.layout_manager.create_section_title(text)
 
     @override
-    def resizeEvent(self, event: Any) -> None:
+    def resizeEvent(self, event: QResizeEvent) -> None:
         """Handle resize event - adjust splitter proportionally."""
         super().resizeEvent(event)
 
@@ -1500,7 +1508,7 @@ Cache Misses: {session_stats['misses']}"""
             self.layout_manager.handle_resize(event.size().width())
 
     @override
-    def moveEvent(self, event: Any) -> None:
+    def moveEvent(self, event: QMoveEvent) -> None:
         """Handle dialog move event - constrain to screen bounds"""
         super().moveEvent(event)
 
@@ -1533,11 +1541,10 @@ Cache Misses: {session_stats['misses']}"""
                 dialog_height = self.height()
 
                 # Verify all values are numeric before arithmetic (defensive check for mocks)
-                if not all(
-                    isinstance(v, int | float)  # type: ignore[arg-type]  # defensive mock check
-                    for v in [available_x, available_y, available_width, available_height,
-                              dialog_width, dialog_height]
-                ):
+                # Note: Qt geometry methods always return int, but this guards against test mocks
+                values = [available_x, available_y, available_width, available_height,
+                          dialog_width, dialog_height]
+                if not all(isinstance(v, (int, float)) for v in values):  # type: ignore[reportUnnecessaryIsInstance]
                     # Skip validation if any values are not numeric (likely mocks)
                     return
 

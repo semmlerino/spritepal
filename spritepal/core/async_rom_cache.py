@@ -104,7 +104,7 @@ class CacheWorker(QObject):
             self.load_error.emit(request_id, str(e))
 
     @Slot(str, bytes, dict)
-    def save_to_cache(self, cache_key: str, data: bytes, metadata: dict[str, Any]) -> None:
+    def save_to_cache(self, cache_key: str, data: bytes, metadata: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
         """Save data to cache file"""
         if self._stop_requested.is_set():
             return
@@ -215,14 +215,14 @@ class AsyncROMCache(QObject):
         self._request_mutex = QMutex()
 
         # Batch save queue
-        self._save_queue: list[tuple[str, bytes, dict[str, Any]]] = []
+        self._save_queue: list[tuple[str, bytes, dict[str, Any]]] = []  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
         self._save_mutex = QRecursiveMutex()  # Use recursive mutex to allow nested locking
         self._save_timer = QTimer(self)
         self._save_timer.timeout.connect(self._flush_save_queue)
         self._save_timer.setInterval(1000)  # Flush every second
 
         # Memory cache for recent items
-        self._memory_cache: dict[str, tuple[bytes, dict[str, Any], float]] = {}
+        self._memory_cache: dict[str, tuple[bytes, dict[str, Any], float]] = {}  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
         self._memory_cache_max = 10
 
         # Start worker thread and register with WorkerManager for proper cleanup tracking
@@ -265,7 +265,7 @@ class AsyncROMCache(QObject):
         self._request_load.emit(request_id, cache_key)
 
     def save_cached_async(self, rom_path: str, offset: int, data: bytes,
-                         metadata: dict[str, Any] | None = None) -> None:
+                         metadata: dict[str, Any] | None = None) -> None:  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
         """
         Save data to cache asynchronously.
 
@@ -330,7 +330,7 @@ class AsyncROMCache(QObject):
         for cache_key, data, metadata in saves_to_process:
             self._request_save.emit(cache_key, data, metadata)
 
-    def _on_data_loaded(self, request_id: str, data: bytes, metadata: dict[str, Any]) -> None:
+    def _on_data_loaded(self, request_id: str, data: bytes, metadata: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
         """Handle successful cache load"""
         with QMutexLocker(self._request_mutex):
             if request_id in self._pending_requests:

@@ -463,7 +463,7 @@ class MainWindow(QMainWindow):
         return str(vram_path) if vram_path else ""
 
     # TabCoordinatorActionsProtocol
-    def get_rom_extraction_params(self) -> dict[str, Any] | None:
+    def get_rom_extraction_params(self) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - Extraction configuration
         """Get ROM extraction parameters"""
         return self.rom_extraction_panel.get_extraction_params()
 
@@ -881,11 +881,17 @@ class MainWindow(QMainWindow):
 
     def _on_controller_preview_ready(self, result: object, tile_count: int) -> None:
         """Handle preview ready signal from controller."""
-        self.sprite_preview.set_preview(result, tile_count)
+        from typing import cast
+
+        from PySide6.QtGui import QPixmap
+        self.sprite_preview.set_preview(cast(QPixmap, result), tile_count)
 
     def _on_controller_grayscale_ready(self, image: object) -> None:
         """Handle grayscale image ready signal from controller."""
-        self.sprite_preview.set_grayscale_image(image)
+        from typing import cast
+
+        from PIL.Image import Image as PILImage
+        self.sprite_preview.set_grayscale_image(cast(PILImage, image))
 
     def _on_controller_palettes_ready(self, palettes: object) -> None:
         """Handle palettes ready signal from controller."""

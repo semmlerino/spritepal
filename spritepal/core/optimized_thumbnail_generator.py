@@ -21,7 +21,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Protocol, TypedDict
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMExtractorProtocol
@@ -33,13 +33,44 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
+
+# Type alias for thumbnail callbacks
+ThumbnailCallback = Callable[[int, Image.Image], None]
+
+
+class SpriteRendererProtocol(Protocol):
+    """Protocol for sprite renderers used in thumbnail generation."""
+    def render_sprite(self, sprite_data: bytes) -> Image.Image | None:
+        """Render sprite data to an image."""
+        ...
+
+
+class ThumbnailCacheStats(TypedDict):
+    """Statistics from ThumbnailCache.get_stats()."""
+    memory_hits: int
+    disk_hits: int
+    misses: int
+    hit_rate: float
+    memory_size: int
+    disk_files: int
+
+
+class GeneratorStats(TypedDict):
+    """Statistics from OptimizedThumbnailGenerator.get_stats()."""
+    generated: int
+    average_time_ms: float
+    total_time_ms: float
+    pending_tasks: int
+    active_tasks: int
+    cache_stats: ThumbnailCacheStats
+
 @dataclass(order=True)
 class ThumbnailTask:
     """Task for thumbnail generation with priority."""
     priority: int
     offset: int = field(compare=False)
     size: tuple[int, int] = field(compare=False)
-    callback: Callable[..., Any] | None = field(compare=False, default=None)
+    callback: ThumbnailCallback | None = field(compare=False, default=None)
     cache_key: str = field(compare=False, default="")
 
     def __post_init__(self):
@@ -162,7 +193,7 @@ class ThumbnailCache:
 
             self._memory_cache[key] = image.copy()
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> ThumbnailCacheStats:
         """Get cache statistics."""
         total_hits = sum(self._hits.values())
         total_requests = total_hits + self._misses
@@ -270,7 +301,7 @@ class OptimizedThumbnailGenerator:
         offset: int,
         size: tuple[int, int] = (128, 128),
         priority: int = 100,
-        callback: Callable[..., Any] | None = None,
+        callback: ThumbnailCallback | None = None,
         use_cache: bool = True
     ) -> Image.Image | None:
         """
@@ -302,9 +333,11 @@ class OptimizedThumbnailGenerator:
                 # Already generating, add callback if provided
                 if callback:
                     future = self._active_futures[cache_key]
-                    future.add_done_callback(
-                        lambda f: callback(offset, f.result()) if f.result() else None
-                    )
+                    def on_ready(f: concurrent.futures.Future[Image.Image | None]) -> None:
+                        result = f.result()
+                        if result is not None:
+                            callback(offset, result)
+                    future.add_done_callback(on_ready)
                 return None
 
         # Queue for generation
@@ -333,7 +366,7 @@ class OptimizedThumbnailGenerator:
         offsets: list[int],
         size: tuple[int, int] = (128, 128),
         priority_start: int = 100,
-        callback: Callable[..., Any] | None = None,
+        callback: ThumbnailCallback | None = None,
         parallel: bool = True
     ) -> dict[int, Image.Image | None]:
         """
@@ -476,7 +509,7 @@ class OptimizedThumbnailGenerator:
                 future.cancel()
             self._active_futures.clear()
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> GeneratorStats:
         """Get generation statistics."""
         avg_time = self._total_time_ms / max(self._generated_count, 1)
 
@@ -508,7 +541,7 @@ class OptimizedThumbnailGenerator:
 
 def create_optimized_generator(
     rom_extractor: ROMExtractorProtocol,
-    tile_renderer: Any,
+    tile_renderer: SpriteRendererProtocol,
     rom_path: str | Path,
     max_workers: int = 4
 ) -> OptimizedThumbnailGenerator:

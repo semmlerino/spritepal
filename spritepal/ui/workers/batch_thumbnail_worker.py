@@ -17,6 +17,7 @@ from PIL import Image
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_injector import ROMInjector
 from PySide6.QtCore import (
     QMutex,
     QMutexLocker,
@@ -130,7 +131,7 @@ class LRUCache:
         with QMutexLocker(self._mutex):
             return len(self._cache)
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Cache statistics dict
         """Get cache statistics."""
         with QMutexLocker(self._mutex):
             total = self._hits + self._misses
@@ -197,7 +198,7 @@ class BatchThumbnailWorker(QObject):
         self._cache_mutex = QMutex()  # Separate mutex for cache
 
         # Request queue
-        self._request_queue: PriorityQueue[Any] = PriorityQueue()
+        self._request_queue: PriorityQueue[Any] = PriorityQueue()  # pyright: ignore[reportExplicitAny] - Generic queue type
         self._pending_count = 0
         self._completed_count = 0
 
@@ -630,10 +631,12 @@ class BatchThumbnailWorker(QObject):
             if self.rom_extractor and hasattr(self.rom_extractor, 'rom_injector'):
                 # Try HAL decompression
                 try:
+                    from typing import cast
                     # Read chunk for decompression
                     chunk = self._read_rom_chunk(request.offset, 0x10000)  # Read up to 64KB
                     if chunk:
-                        _, decompressed_data = self.rom_extractor.rom_injector.find_compressed_sprite(
+                        rom_injector = cast("ROMInjector", self.rom_extractor.rom_injector)
+                        _, decompressed_data = rom_injector.find_compressed_sprite(
                             chunk,
                             0,  # Offset within chunk
                             expected_size=None

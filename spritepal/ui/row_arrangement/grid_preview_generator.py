@@ -311,7 +311,7 @@ class GridPreviewGenerator(PreviewGenerator):
 
     def create_arrangement_preview_data(
         self, manager: GridArrangementManager, processor: GridImageProcessor
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Arrangement configuration
         """Create data structure describing the arrangement for saving/loading
 
         Args:

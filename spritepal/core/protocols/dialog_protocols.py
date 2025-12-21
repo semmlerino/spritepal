@@ -6,7 +6,8 @@ enabling the core layer to use dialogs without importing from the UI layer.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
@@ -16,7 +17,7 @@ class ArrangementDialogProtocol(Protocol):
     """Protocol for arrangement dialogs (row and grid)."""
 
     def set_palettes(
-        self, palettes_dict: dict[int, Any]
+        self, palettes_dict: Mapping[int, object]
     ) -> None:
         """Set available palettes for the dialog."""
         ...
@@ -37,7 +38,7 @@ class InjectionDialogProtocol(Protocol):
         """Execute the dialog modally and return result code."""
         ...
 
-    def get_parameters(self) -> dict[str, Any] | None:
+    def get_parameters(self) -> Mapping[str, object] | None:
         """Get injection parameters, or None if validation failed."""
         ...
 

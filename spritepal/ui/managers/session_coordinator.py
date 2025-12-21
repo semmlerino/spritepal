@@ -50,7 +50,7 @@ class SessionCoordinator(QObject):
     def restore_session(self) -> bool:
         """Restore the previous session"""
         # Validate file paths
-        session_data = self.session_manager.get_session_data()
+        session_data: dict[str, Any] = dict(self.session_manager.get_session_data())  # pyright: ignore[reportExplicitAny] - session state
         validated_paths = {}
 
         for key in ["vram_path", "cgram_path", "oam_path"]:
@@ -84,7 +84,7 @@ class SessionCoordinator(QObject):
 
         settings_manager = self.settings_manager
         if settings_manager.get("ui", "restore_position", False):
-            window_geometry = self.session_manager.get_window_geometry()
+            window_geometry: dict[str, Any] = dict(self.session_manager.get_window_geometry())  # pyright: ignore[reportExplicitAny] - window state
 
             # Extract scalar values with type narrowing
             width_val = window_geometry.get("width")
@@ -141,6 +141,6 @@ class SessionCoordinator(QObject):
         """Clear session data"""
         self.session_manager.clear_session()
 
-    def get_session_data(self) -> dict[str, Any]:
+    def get_session_data(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Session state dict
         """Get current session data"""
-        return self.session_manager.get_session_data()
+        return dict(self.session_manager.get_session_data())

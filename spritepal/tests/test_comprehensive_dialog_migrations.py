@@ -19,7 +19,7 @@ from PIL import Image
 
 from core.di_container import inject
 from core.protocols.manager_protocols import InjectionManagerProtocol
-from ui.components import BaseDialog, SplitterDialog, TabbedDialog
+from ui.components import DialogBase, SplitterDialog, TabbedDialog
 from ui.dialogs.user_error_dialog import UserErrorDialog
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
@@ -66,26 +66,26 @@ class TestComprehensiveDialogMigrations:
             # Test UserErrorDialog inherits from BaseDialog
             error_dialog = UserErrorDialog("Test error")
             qtbot.addWidget(error_dialog)
-            assert isinstance(error_dialog, BaseDialog)
+            assert isinstance(error_dialog, DialogBase)
 
             # Test InjectionDialog inherits from TabbedDialog
             injection_dialog = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
             qtbot.addWidget(injection_dialog)
             assert isinstance(injection_dialog, TabbedDialog)
-            assert isinstance(injection_dialog, BaseDialog)  # TabbedDialog inherits from BaseDialog
+            assert isinstance(injection_dialog, DialogBase)  # TabbedDialog inherits from DialogBase
 
             # Test RowArrangementDialog inherits from SplitterDialog
             row_dialog = RowArrangementDialog(test_sprite_image)
             qtbot.addWidget(row_dialog)
             assert isinstance(row_dialog, SplitterDialog)
-            assert isinstance(row_dialog, BaseDialog)  # SplitterDialog inherits from BaseDialog
+            assert isinstance(row_dialog, DialogBase)  # SplitterDialog inherits from DialogBase
 
             # Test GridArrangementDialog inherits from SplitterDialog
             with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
                 grid_dialog = GridArrangementDialog(test_sprite_image)
             qtbot.addWidget(grid_dialog)
             assert isinstance(grid_dialog, SplitterDialog)
-            assert isinstance(grid_dialog, BaseDialog)  # SplitterDialog inherits from BaseDialog
+            assert isinstance(grid_dialog, DialogBase)  # SplitterDialog inherits from DialogBase
 
             # Clean up
             for dialog in [error_dialog, injection_dialog, row_dialog, grid_dialog]:

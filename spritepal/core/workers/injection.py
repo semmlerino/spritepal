@@ -7,7 +7,7 @@ to the InjectionManager while providing consistent threading interfaces.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 try:
     from typing import override
@@ -193,13 +193,13 @@ class WorkerOwnedVRAMInjectionWorker(InjectionWorkerBase, WorkerOwnedManagerMixi
     def __init__(
         self,
         params: VRAMInjectionParams,
-        manager_factory: Any | None = None,
+        manager_factory: object | None = None,
         parent: QObject | None = None
     ) -> None:
-        # Create manager using standardized worker-owned pattern
+        # Create manager using standardized worker-owned pattern (factory parameter is deprecated)
         manager = self.create_worker_owned_manager(
             manager_factory,
-            lambda factory, parent: factory.create_operations_manager(parent=parent),
+            lambda factory, parent: factory.create_operations_manager(parent=parent),  # type: ignore[attr-defined]  # Factory parameter is deprecated, ignored
             parent
         )
 
@@ -271,13 +271,13 @@ class WorkerOwnedROMInjectionWorker(InjectionWorkerBase, WorkerOwnedManagerMixin
     def __init__(
         self,
         params: ROMInjectionParams,
-        manager_factory: Any | None = None,
+        manager_factory: object | None = None,
         parent: QObject | None = None
     ) -> None:
-        # Create manager using standardized worker-owned pattern
+        # Create manager using standardized worker-owned pattern (factory parameter is deprecated)
         manager = self.create_worker_owned_manager(
             manager_factory,
-            lambda factory, parent: factory.create_operations_manager(parent=parent),
+            lambda factory, parent: factory.create_operations_manager(parent=parent),  # type: ignore[attr-defined]  # Factory parameter is deprecated, ignored
             parent
         )
 

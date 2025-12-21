@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TypeVar
 
 # Type variable for generic _ensure_component method
 T = TypeVar("T")
@@ -140,7 +140,7 @@ class BaseManager(QObject):
                 self.operation_finished.emit(operation)
                 self._logger.debug(f"Finished operation: {operation}")
 
-    def _with_operation_lock(self, operation: str, func: Callable[[], Any]) -> Any:
+    def _with_operation_lock(self, operation: str, func: Callable[[], object]) -> object:
         """
         Execute a function with operation-specific locking
 
@@ -253,7 +253,7 @@ class BaseManager(QObject):
         else:
             self._logger.error(f"{operation.title()} failed: {message}")
 
-    def _validate_required(self, params: dict[str, Any], required: list[str]) -> None:
+    def _validate_required(self, params: Mapping[str, object], required: list[str]) -> None:
         """
         Validate that required parameters are present
 
@@ -268,7 +268,7 @@ class BaseManager(QObject):
         if missing:
             raise ValidationError(f"Missing required parameters: {', '.join(missing)}")
 
-    def _validate_type(self, value: Any, name: str, expected_type: type[Any]) -> None:
+    def _validate_type(self, value: object, name: str, expected_type: type[object]) -> None:
         """
         Validate parameter type
 

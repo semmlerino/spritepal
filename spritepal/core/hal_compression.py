@@ -21,8 +21,9 @@ import time
 import uuid
 import weakref
 from enum import Enum
+from multiprocessing.managers import SyncManager
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 
 class HALResultStatus(Enum):
@@ -358,7 +359,7 @@ class HALProcessPool:
         self._initialized = True
         self._pool_lock: threading.RLock = threading.RLock()
         self._pool_initialized = False  # Use a boolean flag for initialization status
-        self._manager: Any | None = None
+        self._manager: SyncManager | None = None
         self._request_queue: mp.Queue[HALRequest | None] | None = None
         self._result_queue: mp.Queue[HALResult] | None = None
         self._processes: list[mp.Process] = []
@@ -413,8 +414,8 @@ class HALProcessPool:
 
                 # Create multiprocessing manager for queues
                 self._manager = mp.Manager()
-                self._request_queue = self._manager.Queue()
-                self._result_queue = self._manager.Queue()
+                self._request_queue = self._manager.Queue()  # type: ignore[assignment]
+                self._result_queue = self._manager.Queue()  # type: ignore[assignment]
 
                 # Start worker processes (daemon=False to prevent zombie processes)
                 logger.info(f"Starting HAL process pool with {pool_size} workers")
@@ -1479,7 +1480,7 @@ class HALCompressor:
         return results
 
     @property
-    def pool_status(self) -> dict[str, Any]:
+    def pool_status(self) -> dict[str, object]:
         """Get status information about the HAL process pool."""
         if not self._pool:
             return {

@@ -1,6 +1,6 @@
-from typing import Any
-
 """Mode selector widget for ROM extraction"""
+
+from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel
@@ -21,7 +21,7 @@ class ModeSelectorWidget(BaseExtractionWidget):
     # Signals
     mode_changed = Signal(int)  # Emitted when mode changes
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: Any | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
         super().__init__(parent)
         self._setup_ui()
 

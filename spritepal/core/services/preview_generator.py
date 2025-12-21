@@ -26,7 +26,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from PIL import Image
@@ -57,7 +57,7 @@ class PreviewRequest:
     sprite_name: str = ""  # Optional sprite name
     palette: PaletteData | None = None  # Optional palette data
     size: tuple[int, int] = (128, 128)  # Preview size (width, height)
-    sprite_config: Any = None  # Optional sprite configuration
+    sprite_config: object = None  # Optional sprite configuration
 
     def cache_key(self) -> str:
         """Generate a cache key for this request."""
@@ -227,7 +227,7 @@ class LRUCache:
             self._current_bytes = 0
             logger.debug("Preview cache cleared")
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> dict[str, object]:
         """Get cache statistics including memory usage."""
         with self._lock:
             total_requests = self._stats["hits"] + self._stats["misses"]
@@ -513,10 +513,11 @@ class PreviewGenerator(QObject):
             progress_callback(20, "Reading ROM data...")
 
         # Use ROM extractor to extract sprite data
+        # sprite_config is object but extract_sprite_data accepts Mapping[str, object] | None
         sprite_data = rom_extractor.extract_sprite_data(
             request.data_path,
             request.offset,
-            request.sprite_config
+            request.sprite_config  # pyright: ignore[reportArgumentType] - PreviewRequest stores as object
         )
 
         if progress_callback:
@@ -687,7 +688,7 @@ class PreviewGenerator(QObject):
         self.cache_stats_changed.emit(self._cache.get_stats())
         logger.debug("Preview cache cleared")
 
-    def get_cache_stats(self) -> dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, object]:
         """Get current cache statistics."""
         return self._cache.get_stats()
 
@@ -806,7 +807,7 @@ def create_vram_preview_request(vram_path: str,
 def create_rom_preview_request(rom_path: str,
                               offset: int,
                               sprite_name: str = "",
-                              sprite_config: Any = None,
+                              sprite_config: object = None,
                               size: tuple[int, int] = (128, 128)) -> PreviewRequest:
     """Create a ROM preview request."""
     return PreviewRequest(

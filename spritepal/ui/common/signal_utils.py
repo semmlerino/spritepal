@@ -9,7 +9,7 @@ import warnings
 from typing import Any
 
 
-def safe_disconnect(signal: Any) -> None:
+def safe_disconnect(signal: Any) -> None:  # pyright: ignore[reportExplicitAny] - Qt signal object
     """Disconnect all slots from a signal, ignoring warnings if no connections exist.
 
     PySide6 emits RuntimeWarning when disconnect() is called on a signal
@@ -31,7 +31,7 @@ def safe_disconnect(signal: Any) -> None:
             pass  # Already disconnected or no connections
 
 
-def is_valid_qt(obj: Any) -> bool:
+def is_valid_qt(obj: Any) -> bool:  # pyright: ignore[reportExplicitAny] - Qt object or None
     """Check if a Qt object is still valid (not deleted on the C++ side).
 
     Args:

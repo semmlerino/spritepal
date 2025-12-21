@@ -75,7 +75,7 @@ class RowImageProcessor:
 
         return tile_width, tile_height
 
-    def extract_rows(self, image: Image.Image, tiles_per_row: int) -> list[dict[str, Any]]:
+    def extract_rows(self, image: Image.Image, tiles_per_row: int) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Row metadata dicts
         """Extract individual rows from sprite sheet
 
         Args:
@@ -115,7 +115,7 @@ class RowImageProcessor:
 
     def process_sprite_sheet(
         self, sprite_path: str, tiles_per_row: int
-    ) -> tuple[Image.Image, list[dict[str, Any]]]:
+    ) -> tuple[Image.Image, list[dict[str, Any]]]:  # pyright: ignore[reportExplicitAny] - Row metadata
         """Complete sprite processing pipeline
 
         Args:

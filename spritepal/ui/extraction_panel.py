@@ -85,7 +85,7 @@ class DropZone(QWidget):
     def __init__(
         self,
         file_type: str,
-        parent: Any | None = None,
+        parent: Any | None = None,  # pyright: ignore[reportExplicitAny] - Qt parent type
         settings_manager: SettingsManagerProtocol | None = None,
         required: bool = True,
     ) -> None:
@@ -327,7 +327,7 @@ class ExtractionPanel(QGroupBox):
     offset_changed = Signal(int)  # Emitted when VRAM offset changes
     mode_changed = Signal(int)  # Emitted when extraction mode changes
 
-    def __init__(self, settings_manager: SettingsManagerProtocol, parent: Any | None = None):
+    def __init__(self, settings_manager: SettingsManagerProtocol, parent: Any | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
         super().__init__("Input Files", parent)
         # Timer for debouncing offset changes
         self._offset_timer = QTimer(self)  # Parent this timer to prevent crashes
@@ -645,11 +645,12 @@ class ExtractionPanel(QGroupBox):
         found_any = False
 
         # Try directories in order: default (Mesen2), last used, current
-        directories_to_try = [
+        directories_to_try_raw: list[object] = [
             settings.get("paths", "default_dumps_dir", ""),
             settings.get("paths", "last_used_dir", ""),
             str(Path.cwd()),
         ]
+        directories_to_try = [d for d in directories_to_try_raw if isinstance(d, str)]
 
         for directory_str in directories_to_try:
             if not directory_str or not Path(directory_str).exists():
@@ -918,7 +919,7 @@ class ExtractionPanel(QGroupBox):
         # Custom Range
         return self.offset_spinbox.value()
 
-    def restore_session_files(self, file_paths: dict[str, Any]) -> None:
+    def restore_session_files(self, file_paths: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - File path configuration
         """Restore file paths from session data"""
         # Restore extraction mode first
         if "extraction_mode" in file_paths:

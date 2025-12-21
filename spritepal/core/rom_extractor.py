@@ -5,8 +5,9 @@ Extracts sprites directly from ROM files using HAL decompression
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 if TYPE_CHECKING:
     import logging
@@ -21,6 +22,7 @@ from core.default_palette_loader import DefaultPaletteLoader
 from core.hal_compression import HALCompressionError, HALCompressor
 from core.rom_injector import ROMInjector, SpritePointer
 from core.rom_palette_extractor import ROMPaletteExtractor
+from core.rom_validator import ROMHeader
 from core.sprite_config_loader import SpriteConfigLoader
 from utils.constants import (
     BUFFER_SIZE_1KB,
@@ -60,6 +62,19 @@ from utils.rom_exceptions import ROMCompressionError
 
 logger: logging.Logger = get_logger(__name__)
 
+
+class SpriteInfo(TypedDict):
+    """Information about a sprite found during ROM scanning."""
+
+    offset: int
+    offset_hex: str
+    compressed_size: int
+    decompressed_size: int
+    tile_count: int
+    alignment: str
+    quality: float
+
+
 class ROMExtractor:
     """Handles sprite extraction directly from ROM files"""
 
@@ -79,7 +94,7 @@ class ROMExtractor:
         logger.info("ROMExtractor initialized with HAL compression and palette extraction support")
 
     def extract_sprite_data(
-        self, rom_path: str, sprite_offset: int, sprite_config: dict[str, Any] | None = None
+        self, rom_path: str, sprite_offset: int, sprite_config: Mapping[str, object] | None = None
     ) -> bytes:
         """
         Extract raw sprite data from ROM at specified offset.
@@ -113,7 +128,7 @@ class ROMExtractor:
 
     def extract_sprite_from_rom(
         self, rom_path: str, sprite_offset: int, output_base: str, sprite_name: str = ""
-    ) -> tuple[str, dict[str, str | int | bool]]:
+    ) -> tuple[str, dict[str, object]]:
         """
         Extract sprite from ROM at specified offset.
 
@@ -186,7 +201,7 @@ class ROMExtractor:
 
             return output_path, extraction_info
 
-    def _validate_and_read_rom(self, rom_path: str) -> tuple[Any, bytes]:
+    def _validate_and_read_rom(self, rom_path: str) -> tuple[ROMHeader, bytes]:
         """
         Validate ROM header and read ROM data.
 
@@ -208,7 +223,7 @@ class ROMExtractor:
 
         return header, rom_data
 
-    def _load_sprite_configuration(self, sprite_name: str, header: Any) -> int | None:
+    def _load_sprite_configuration(self, sprite_name: str, header: ROMHeader) -> int | None:
         """
         Load sprite configuration to get expected size.
 
@@ -262,7 +277,7 @@ class ROMExtractor:
         return compressed_size, sprite_data
 
     def _extract_rom_palettes(
-        self, rom_path: str, sprite_name: str, header: Any, output_base: str
+        self, rom_path: str, sprite_name: str, header: ROMHeader, output_base: str
     ) -> tuple[list[str], bool]:
         """
         Extract palettes from ROM for the sprite.
@@ -293,7 +308,7 @@ class ROMExtractor:
         logger.debug(f"Getting palette configuration for {sprite_name}")
         palette_offset, palette_indices = (
             self.rom_palette_extractor.get_palette_config_from_sprite_config(
-                game_config, sprite_name
+                cast(dict[str, Any], game_config), sprite_name  # type: ignore[reportExplicitAny] - interface with palette extractor
             )
         )
 
@@ -317,7 +332,7 @@ class ROMExtractor:
 
         return palette_files, rom_palettes_used
 
-    def _find_game_configuration(self, header: Any) -> dict[str, Any] | None:
+    def _find_game_configuration(self, header: ROMHeader) -> Mapping[str, object] | None:
         """
         Find game configuration matching the ROM header.
 
@@ -363,8 +378,8 @@ class ROMExtractor:
     def _create_extraction_metadata(
         self, rom_path: str, sprite_offset: int, sprite_name: str,
         compressed_size: int, tile_count: int, sprite_data: bytes,
-        header: Any, rom_palettes_used: bool, palette_files: list[str]
-    ) -> dict[str, Any]:
+        header: ROMHeader, rom_palettes_used: bool, palette_files: list[str]
+    ) -> dict[str, object]:
         """
         Create extraction metadata dictionary.
 
@@ -521,7 +536,7 @@ class ROMExtractor:
 
     def scan_for_sprites(
         self, rom_path: str, start_offset: int, end_offset: int, step: int = ROM_SCAN_STEP_DEFAULT
-    ) -> list[dict[str, Any]]:
+    ) -> list[SpriteInfo]:
         """
         Scan ROM for valid sprite data within a range of offsets with resumable caching.
 
@@ -562,7 +577,7 @@ class ROMExtractor:
             # Sort by quality and save results
             found_sprites.sort(key=lambda x: x["quality"], reverse=True)
             rom_cache.save_partial_scan_results(
-                rom_path, scan_params, found_sprites, end_offset, completed=True
+                rom_path, cast(Mapping[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), end_offset, completed=True
             )
 
             return found_sprites
@@ -575,7 +590,7 @@ class ROMExtractor:
                 logger.info(f"Returning {len(found_sprites)} sprites found before error")
             return found_sprites
 
-    def _create_scan_params(self, start_offset: int, end_offset: int, step: int) -> dict[str, Any]:
+    def _create_scan_params(self, start_offset: int, end_offset: int, step: int) -> dict[str, object]:
         """Create scan parameters dictionary for caching.
 
         Args:
@@ -593,7 +608,9 @@ class ROMExtractor:
             "scan_type": "sprite_scan"
         }
 
-    def _load_cached_scan(self, rom_cache: Any, rom_path: str, scan_params: dict[str, Any]) -> list[dict[str, Any]] | None:
+    def _load_cached_scan(
+        self, rom_cache: ROMCacheProtocol, rom_path: str, scan_params: Mapping[str, object]
+    ) -> list[SpriteInfo] | None:
         """Load completed scan from cache if available.
 
         Args:
@@ -604,13 +621,15 @@ class ROMExtractor:
         Returns:
             Cached sprites list or None if not complete
         """
-        cached_progress = rom_cache.get_partial_scan_results(rom_path, scan_params)
+        cached_progress = rom_cache.get_partial_scan_results(rom_path, cast(Mapping[str, int], scan_params))
         if cached_progress and cached_progress.get("completed", False):
             logger.info("Found completed scan in cache, returning cached results")
-            return cached_progress.get("found_sprites", [])
+            return cast(list[SpriteInfo], cached_progress.get("found_sprites", []))
         return None
 
-    def _get_resume_state(self, rom_cache: Any, rom_path: str, scan_params: dict[str, Any], start_offset: int) -> tuple[list[dict[str, Any]], int]:
+    def _get_resume_state(
+        self, rom_cache: ROMCacheProtocol, rom_path: str, scan_params: Mapping[str, object], start_offset: int
+    ) -> tuple[list[SpriteInfo], int]:
         """Get resume state from cached progress.
 
         Args:
@@ -622,11 +641,11 @@ class ROMExtractor:
         Returns:
             Tuple of (found_sprites list, resume_offset)
         """
-        cached_progress = rom_cache.get_partial_scan_results(rom_path, scan_params)
+        cached_progress = rom_cache.get_partial_scan_results(rom_path, cast(Mapping[str, int], scan_params))
 
         if cached_progress and not cached_progress.get("completed", False):
-            found_sprites = cached_progress.get("found_sprites", [])
-            resume_offset = cached_progress.get("current_offset", start_offset)
+            found_sprites = cast(list[SpriteInfo], cached_progress.get("found_sprites", []))
+            resume_offset = cast(int, cached_progress.get("current_offset", start_offset))
             logger.info(f"Resuming scan from cached progress: {len(found_sprites)} sprites found, "
                        f"resuming from offset 0x{resume_offset:X}")
             return found_sprites, resume_offset
@@ -663,8 +682,10 @@ class ROMExtractor:
             return rom_size
         return end_offset
 
-    def _perform_scan(self, rom_data: bytes, resume_offset: int, end_offset: int, step: int,
-                     found_sprites: list[dict[str, Any]], rom_cache: Any, rom_path: str, scan_params: dict[str, Any]) -> list[dict[str, Any]]:
+    def _perform_scan(
+        self, rom_data: bytes, resume_offset: int, end_offset: int, step: int,
+        found_sprites: list[SpriteInfo], rom_cache: ROMCacheProtocol, rom_path: str, scan_params: Mapping[str, object]
+    ) -> list[SpriteInfo]:
         """Perform the actual sprite scanning.
 
         Args:
@@ -702,7 +723,7 @@ class ROMExtractor:
             # Save progress periodically
             if scan_count % save_progress_interval == 0:
                 rom_cache.save_partial_scan_results(
-                    rom_path, scan_params, found_sprites, offset, completed=False
+                    rom_path, cast(Mapping[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), offset, completed=False
                 )
 
             # Try to find sprite at this offset
@@ -728,7 +749,7 @@ class ROMExtractor:
         logger.info(f"Scan complete: checked {scan_count} offsets, found {len(found_sprites)} valid sprites")
         return found_sprites
 
-    def _try_extract_sprite_at_offset(self, rom_data: bytes, offset: int) -> dict[str, Any] | None:
+    def _try_extract_sprite_at_offset(self, rom_data: bytes, offset: int) -> SpriteInfo | None:
         """Try to extract and validate sprite at given offset.
 
         Args:
@@ -759,7 +780,7 @@ class ROMExtractor:
             logger.debug(f"Unexpected error at offset 0x{offset:X}: {e}")
             return None
 
-    def _validate_sprite_data(self, sprite_data: bytes, offset: int, compressed_size: int) -> dict[str, Any] | None:
+    def _validate_sprite_data(self, sprite_data: bytes, offset: int, compressed_size: int) -> SpriteInfo | None:
         """Validate sprite data and create info dictionary.
 
         Args:
@@ -790,8 +811,10 @@ class ROMExtractor:
             "quality": self._assess_sprite_quality(sprite_data)
         }
 
-    def _handle_scan_error(self, error: Exception, found_sprites: list[dict[str, Any]], rom_cache: Any,
-                          rom_path: str, scan_params: dict[str, Any], resume_offset: int) -> None:
+    def _handle_scan_error(
+        self, error: Exception, found_sprites: list[SpriteInfo], rom_cache: ROMCacheProtocol,
+        rom_path: str, scan_params: Mapping[str, object], resume_offset: int
+    ) -> None:
         """Handle errors during scanning and save partial results.
 
         Args:
@@ -809,7 +832,7 @@ class ROMExtractor:
         if found_sprites:
             try:
                 rom_cache.save_partial_scan_results(
-                    rom_path, scan_params, found_sprites, resume_offset, completed=False
+                    rom_path, cast(Mapping[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), resume_offset, completed=False
                 )
             except Exception as cache_error:
                 logger.warning(f"Failed to save partial results on scan failure: {cache_error}")

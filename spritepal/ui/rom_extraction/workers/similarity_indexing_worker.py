@@ -82,7 +82,7 @@ class SimilarityIndexingWorker(BaseWorker):
         # Indexing state
         self._indexed_count = 0
         self._total_to_index = 0
-        self._pending_sprites: dict[int, dict[str, Any]] = {}
+        self._pending_sprites: dict[int, dict[str, Any]] = {}  # pyright: ignore[reportExplicitAny] - Dynamic sprite data
         self._index_lock = threading.Lock()
 
         # Load existing index if available
@@ -130,7 +130,7 @@ class SimilarityIndexingWorker(BaseWorker):
         with automatic conversion to JSON.
         """
         # Use Any since json.load/pickle.load return Any - isinstance narrows it
-        index_data: Any = None
+        index_data: Any = None  # pyright: ignore[reportExplicitAny] - json.load/pickle.load return Any
 
         # Try JSON first (new format)
         if self.index_file.exists():
@@ -200,12 +200,12 @@ class SimilarityIndexingWorker(BaseWorker):
 
         try:
             # Prepare index data
-            sprite_hashes: dict[str, Any] = {}
+            sprite_hashes: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny] - Dynamic sprite hash data
             # Convert sprite database to serializable format
             for offset, sprite_hash in self.similarity_engine.sprite_database.items():
                 sprite_hashes[str(offset)] = sprite_hash
 
-            index_data: dict[str, Any] = {
+            index_data: dict[str, Any] = {  # pyright: ignore[reportExplicitAny] - Index metadata and hashes
                 "version": "1.0",
                 "rom_hash": self.rom_hash,
                 "rom_path": str(self.rom_path),
@@ -227,7 +227,7 @@ class SimilarityIndexingWorker(BaseWorker):
                 with contextlib.suppress(Exception):
                     temp_file.unlink()
 
-    def _save_index_json(self, index_data: dict[str, Any]) -> None:
+    def _save_index_json(self, index_data: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Index data dict
         """Save index data as JSON with atomic write.
 
         Args:
@@ -242,7 +242,7 @@ class SimilarityIndexingWorker(BaseWorker):
         temp_file.replace(self.index_file)
 
     @Slot(dict)
-    def on_sprite_found(self, sprite_info: dict[str, Any]) -> None:
+    def on_sprite_found(self, sprite_info: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
         """
         Handle sprite_found signal by indexing the sprite.
 

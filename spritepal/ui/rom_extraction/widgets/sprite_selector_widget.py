@@ -1,6 +1,6 @@
-from typing import Any
-
 """Sprite selector widget for ROM extraction"""
+
+from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence
@@ -25,7 +25,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
     sprite_changed = Signal(int)  # Emitted when sprite selection changes
     find_sprites_clicked = Signal()  # Emitted when find sprites button clicked
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: Any | None = None):  # pyright: ignore[reportExplicitAny] - Qt parent type
         super().__init__(parent)
         self._setup_ui()
 
@@ -97,7 +97,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.offset_label.setEnabled(False)  # Visually disabled
         self.find_sprites_btn.setEnabled(False)
 
-    def add_sprite(self, name: str, data: Any):
+    def add_sprite(self, name: str, data: Any) -> None:  # pyright: ignore[reportExplicitAny] - Sprite metadata
         """Add a sprite to the combo box"""
         self.sprite_combo.addItem(name, data)
 

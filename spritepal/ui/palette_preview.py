@@ -7,7 +7,7 @@ collapsed palettes show compact single-row previews.
 
 from __future__ import annotations
 
-from typing import Any, override
+from typing import override
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen
@@ -122,7 +122,7 @@ class PaletteColorWidget(QWidget):
 class PaletteWidget(QFrame):
     """Widget for displaying a single palette (expanded view)"""
 
-    def __init__(self, palette_index: int, name: str = "", parent: Any | None = None) -> None:
+    def __init__(self, palette_index: int, name: str = "", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.palette_index = palette_index
         self.name = name
@@ -189,7 +189,7 @@ class CollapsedPaletteRow(QFrame):
 
     clicked = Signal(int)  # palette_index when row is clicked
 
-    def __init__(self, palette_index: int, parent: Any | None = None) -> None:
+    def __init__(self, palette_index: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.palette_index = palette_index
         self.colors: list[tuple[int, int, int]] = []

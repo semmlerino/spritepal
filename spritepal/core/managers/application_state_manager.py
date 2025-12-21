@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 # Enum import no longer needed - ExtractionState imported from workflow_manager
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, ClassVar, TypeVar, override
+from typing import ClassVar, TypedDict, TypeVar, cast, override
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
@@ -28,6 +28,18 @@ from utils.state_manager import StateEntry, StateSnapshot
 from .base_manager import BaseManager
 
 T = TypeVar("T")
+
+
+# ========== Type Definitions ==========
+
+
+class SpriteInfoDict(TypedDict):
+    """Type definition for sprite history entries."""
+
+    offset: int
+    quality: float
+    timestamp: str
+    metadata: dict[str, object]
 
 
 # ========== Workflow State Machine ==========
@@ -136,7 +148,7 @@ class ApplicationStateManager(BaseManager):
 
     def __init__(self, app_name: str = "SpritePal", settings_path: Path | None = None,
                  parent: QObject | None = None,
-                 configuration_service: Any = None) -> None:
+                 configuration_service: object = None) -> None:
         """
         Initialize application state manager.
 
@@ -168,19 +180,19 @@ class ApplicationStateManager(BaseManager):
                     from core.configuration_service import get_configuration_service
                     config = get_configuration_service()
 
-            self._settings_file = config.settings_file
+            self._settings_file = cast(Path, config.settings_file)  # type: ignore[reportAttributeAccessIssue]
 
-        # Persistent settings (saved to disk)
-        self._settings: dict[str, Any] = {}
+        # Persistent settings (saved to disk) - JSON-serializable values
+        self._settings: dict[str, dict[str, object]] = {}
         self._session_dirty = False
 
-        # Runtime state (temporary, not saved)
-        self._runtime_state: dict[str, dict[str, Any]] = {}
+        # Runtime state (temporary, not saved) - dynamic namespaces with varied shapes
+        self._runtime_state: dict[str, dict[str, object]] = {}
         self._state_snapshots: dict[str, StateSnapshot] = OrderedDict()
         self._max_snapshots = 10
 
-        # Sprite history
-        self._sprite_history: list[dict[str, Any]] = []
+        # Sprite history - structured entries with known fields
+        self._sprite_history: list[SpriteInfoDict] = []
         self._max_history = 50
 
         # Workflow state machine
@@ -273,7 +285,7 @@ class ApplicationStateManager(BaseManager):
 
     # ========== Settings Management (Persistent) ==========
 
-    def get_setting(self, category: str, key: str, default: Any = None) -> Any:
+    def get_setting(self, category: str, key: str, default: object = None) -> object:
         """
         Get a persistent setting value.
 
@@ -290,7 +302,7 @@ class ApplicationStateManager(BaseManager):
                 return self._settings[category][key]
             return default
 
-    def set_setting(self, category: str, key: str, value: Any) -> None:
+    def set_setting(self, category: str, key: str, value: object) -> None:
         """
         Set a persistent setting value.
 
@@ -339,7 +351,7 @@ class ApplicationStateManager(BaseManager):
             self._handle_error(e, "save_settings")
             return False
 
-    def _load_settings(self) -> dict[str, Any]:
+    def _load_settings(self) -> dict[str, dict[str, object]]:
         """Load settings from file."""
         if self._settings_file.exists():
             try:
@@ -351,13 +363,14 @@ class ApplicationStateManager(BaseManager):
                             self._logger.info("Detected old settings format, migrating...")
                             return self._migrate_old_settings(data)
                         self._logger.info("Settings loaded successfully")
-                        return self._merge_with_defaults(data)
+                        # Cast to expected structure after validation
+                        return self._merge_with_defaults(cast(dict[str, dict[str, object]], data))
             except (OSError, json.JSONDecodeError) as e:
                 self._logger.warning(f"Could not load settings: {e}")
 
         return self._get_default_settings()
 
-    def _get_default_settings(self) -> dict[str, Any]:
+    def _get_default_settings(self) -> dict[str, dict[str, object]]:
         """Get default settings structure."""
         return {
             "session": {
@@ -408,43 +421,48 @@ class ApplicationStateManager(BaseManager):
             }
         }
 
-    def _merge_with_defaults(self, data: dict[str, Any]) -> dict[str, Any]:
+    def _merge_with_defaults(
+        self, data: dict[str, dict[str, object]]
+    ) -> dict[str, dict[str, object]]:
         """Merge loaded settings with defaults."""
         defaults = self._get_default_settings()
 
         for category, values in defaults.items():
             if category not in data:
                 data[category] = values
-            elif isinstance(values, dict):
+            else:
+                # Merge category values with defaults
                 for key, default_value in values.items():
                     if key not in data[category]:
                         data[category][key] = default_value
 
         return data
 
-    def _is_old_format(self, data: dict[str, Any]) -> bool:
+    def _is_old_format(self, data: dict[str, object]) -> bool:
         """Check if settings data is in old flat format.
-        
+
         Old format has flat keys like 'vram_path', 'window_width'.
         New format has categories like 'session', 'ui', 'paths'.
         """
-        old_keys = {"vram_path", "cgram_path", "oam_path", "output_name", 
+        old_keys = {"vram_path", "cgram_path", "oam_path", "output_name",
                     "window_width", "window_height", "window_x", "window_y",
                     "theme", "last_export_dir"}
-        
+
         # If any old-style flat keys exist at top level, it's old format
         if old_keys & data.keys():
             return True
-        
+
         # If no categories exist, it might be old format or empty
         new_categories = {"session", "ui", "paths"}
         if not (new_categories & data.keys()):
             # Only consider it old if it has any keys at all
             return bool(data)
-        
+
         return False
 
-    def _migrate_old_settings(self, old_data: dict[str, Any]) -> dict[str, Any]:
+    def _migrate_old_settings(
+        self, old_data: dict[str, object]
+    ) -> dict[str, dict[str, object]]:
         """Migrate old flat settings format to new categorized format."""
         # Start with defaults
         new_settings = self._get_default_settings()
@@ -478,7 +496,9 @@ class ApplicationStateManager(BaseManager):
 
     # ========== SessionManagerProtocol Methods ==========
 
-    def get(self, category: str, key: str, default: Any = None) -> Any:
+    def get(
+        self, category: str, key: str, default: object = None
+    ) -> object:
         """
         Get a setting value (alias for get_setting for SessionManagerProtocol).
 
@@ -492,7 +512,7 @@ class ApplicationStateManager(BaseManager):
         """
         return self.get_setting(category, key, default)
 
-    def set(self, category: str, key: str, value: Any) -> None:
+    def set(self, category: str, key: str, value: object) -> None:
         """
         Set a setting value (alias for set_setting for SessionManagerProtocol).
 
@@ -565,7 +585,7 @@ class ApplicationStateManager(BaseManager):
             self._logger.warning(f"Could not load session: {e}")
             return False
 
-    def restore_session(self) -> dict[str, Any]:
+    def restore_session(self) -> dict[str, object]:
         """
         Restore session from file.
 
@@ -593,13 +613,13 @@ class ApplicationStateManager(BaseManager):
         finally:
             self._finish_operation(operation)
 
-    def get_session_data(self) -> dict[str, Any]:
+    def get_session_data(self) -> dict[str, object]:
         """Get all session data."""
         with self._lock:
             session = self._settings.get("session", {})
-            return session if isinstance(session, dict) else {}
+            return session
 
-    def update_session_data(self, data: dict[str, Any]) -> None:
+    def update_session_data(self, data: Mapping[str, object]) -> None:
         """
         Update multiple session values at once.
 
@@ -684,13 +704,18 @@ class ApplicationStateManager(BaseManager):
         """Get saved window geometry including splitter sizes."""
         with self._lock:
             ui_settings = self._settings.get("ui", {})
-            # Use 'or' to handle both missing keys and None values
+            width = ui_settings.get("window_width")
+            height = ui_settings.get("window_height")
+            x = ui_settings.get("window_x")
+            y = ui_settings.get("window_y")
+            splitter_sizes = ui_settings.get("splitter_sizes", [])
+
             return {
-                "width": ui_settings.get("window_width") or 900,
-                "height": ui_settings.get("window_height") or 600,
-                "x": ui_settings.get("window_x") if ui_settings.get("window_x") is not None else -1,
-                "y": ui_settings.get("window_y") if ui_settings.get("window_y") is not None else -1,
-                "splitter_sizes": ui_settings.get("splitter_sizes", []),
+                "width": width if isinstance(width, int) else 900,
+                "height": height if isinstance(height, int) else 600,
+                "x": x if isinstance(x, int) else -1,
+                "y": y if isinstance(y, int) else -1,
+                "splitter_sizes": splitter_sizes if isinstance(splitter_sizes, list) else [],
             }
 
     def clear_session(self) -> None:
@@ -788,22 +813,29 @@ class ApplicationStateManager(BaseManager):
             if file_type not in recent:
                 recent[file_type] = []
 
+            # Get the list for this file type and validate it's a list
+            file_list_obj = recent[file_type]
+            if not isinstance(file_list_obj, list):
+                file_list_obj = []
+                recent[file_type] = file_list_obj
+
             # Remove if already in list
-            if file_path in recent[file_type]:
-                recent[file_type].remove(file_path)
+            if file_path in file_list_obj:
+                file_list_obj.remove(file_path)
 
             # Add to front
-            recent[file_type].insert(0, file_path)
+            file_list_obj.insert(0, file_path)
 
             # Limit size
-            max_recent = recent.get("max_recent", 10)
-            recent[file_type] = recent[file_type][:max_recent]
+            max_recent_obj = recent.get("max_recent", 10)
+            max_recent = max_recent_obj if isinstance(max_recent_obj, int) else 10
+            recent[file_type] = file_list_obj[:max_recent]
 
             self._session_dirty = True
 
     # ========== State Management (Runtime/Temporary) ==========
 
-    def get_state(self, namespace: str, key: str, default: Any = None) -> Any:
+    def get_state(self, namespace: str, key: str, default: object = None) -> object:
         """
         Get runtime state value (not persisted).
 
@@ -828,7 +860,7 @@ class ApplicationStateManager(BaseManager):
                     return entry
             return default
 
-    def set_state(self, namespace: str, key: str, value: Any,
+    def set_state(self, namespace: str, key: str, value: object,
                   ttl_seconds: float | None = None) -> None:
         """
         Set runtime state value.
@@ -919,7 +951,7 @@ class ApplicationStateManager(BaseManager):
     # ========== History Management ==========
 
     def add_sprite_to_history(self, offset: int, quality: float = 1.0,
-                             metadata: dict[str, Any] | None = None) -> bool:
+                             metadata: dict[str, object] | None = None) -> bool:
         """
         Add sprite to history.
 
@@ -936,12 +968,12 @@ class ApplicationStateManager(BaseManager):
             if any(s["offset"] == offset for s in self._sprite_history):
                 return False
 
-            # Create sprite info
-            sprite_info = {
+            # Create sprite info (explicit TypedDict construction)
+            sprite_info: SpriteInfoDict = {
                 "offset": offset,
                 "quality": quality,
                 "timestamp": datetime.now(tz=UTC).isoformat(),
-                "metadata": metadata or {}
+                "metadata": metadata or {},
             }
 
             # Add to history
@@ -957,10 +989,10 @@ class ApplicationStateManager(BaseManager):
 
             return True
 
-    def get_sprite_history(self) -> Sequence[dict[str, Any]]:
+    def get_sprite_history(self) -> Sequence[SpriteInfoDict]:
         """Get full sprite history (read-only snapshot)."""
         with self._lock:
-            return tuple(self._sprite_history)
+            return list(self._sprite_history)
 
     def clear_sprite_history(self) -> None:
         """Clear sprite history."""
@@ -992,11 +1024,19 @@ class ApplicationStateManager(BaseManager):
     def get_recent_files(self, max_files: int = 10) -> list[str]:
         """Get list of recent files."""
         recent = self.get_setting("session", "recent_files", [])
-        return recent[:max_files]
+        if isinstance(recent, list):
+            return recent[:max_files]
+        return []
 
     def add_recent_file(self, file_path: str) -> None:
         """Add file to recent files list."""
-        recent = self.get_setting("session", "recent_files", [])
+        recent_obj = self.get_setting("session", "recent_files", [])
+
+        # Ensure we have a list to work with
+        if not isinstance(recent_obj, list):
+            recent: list[str] = []
+        else:
+            recent = list(recent_obj)
 
         # Remove if already in list
         if file_path in recent:
@@ -1226,7 +1266,7 @@ class ApplicationStateManager(BaseManager):
 
     # ========== Unified State Snapshot ==========
 
-    def get_full_state_snapshot(self) -> dict[str, Any]:
+    def get_full_state_snapshot(self) -> dict[str, object]:
         """Get a complete snapshot of all application state.
 
         This provides a unified view of the application state for debugging,
@@ -1243,7 +1283,7 @@ class ApplicationStateManager(BaseManager):
         with self._state_lock:
             with self._workflow_lock:
                 with self._cache_stats_lock:
-                    snapshot = {
+                    snapshot: dict[str, object] = {
                         "workflow": {
                             "state": self._workflow_state.name,
                             "error": self._workflow_error,
@@ -1271,7 +1311,7 @@ class ApplicationStateManager(BaseManager):
                     }
                     return snapshot
 
-    def emit_state_snapshot(self) -> dict[str, Any]:
+    def emit_state_snapshot(self) -> dict[str, object]:
         """Emit a state snapshot signal and return the snapshot.
 
         This method is useful for triggering state synchronization across
@@ -1299,7 +1339,10 @@ class ApplicationStateManager(BaseManager):
         Returns:
             Current offset or None if not set
         """
-        return self.get_state("ui", "current_offset")
+        offset = self.get_state("ui", "current_offset")
+        if isinstance(offset, int):
+            return offset
+        return None
 
     def emit_preview_ready(self, offset: int, image: QImage) -> None:
         """Emit signal that a preview is ready for display.

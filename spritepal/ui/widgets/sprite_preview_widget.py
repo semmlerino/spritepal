@@ -4,7 +4,13 @@ Shows visual preview of sprites with optional palette support
 """
 from __future__ import annotations
 
-from typing import Any, override
+from typing import TYPE_CHECKING, override
+
+if TYPE_CHECKING:
+    from PySide6.QtCore import QPoint
+
+    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.visual_similarity_search import SimilarityMatch
 
 from PIL import Image
 from PySide6.QtCore import QSize, Qt, QThread, QTimer, Signal
@@ -590,11 +596,12 @@ class SpritePreviewWidget(QWidget):
                 return
 
             # Try to get ROM extractor - handle case where it's not available
+            extractor: ROMExtractorProtocol | None
             try:
                 from core.di_container import inject
                 from core.protocols.manager_protocols import ExtractionManagerProtocol
                 extraction_manager = inject(ExtractionManagerProtocol)
-                extractor = extraction_manager.get_rom_extractor()
+                extractor = extraction_manager.get_rom_extractor()  # type: ignore[assignment]
                 logger.debug(f"[SPRITE_DISPLAY] Got extractor: {bool(extractor)}")
             except Exception as e:
                 logger.warning(f"[SPRITE_DISPLAY] ROM extractor not available: {e}")
@@ -647,7 +654,7 @@ class SpritePreviewWidget(QWidget):
                 for y in range(8):
                     for x in range(8):
                         if decode_method == "rom_extractor":
-                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y) if extractor else 0
+                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y) if extractor else 0  # type: ignore[attr-defined]
                         else:
                             # Fallback 4bpp decoding method
                             pixel = self._decode_4bpp_pixel_fallback(tile_bytes, x, y)
@@ -718,7 +725,7 @@ class SpritePreviewWidget(QWidget):
     def clear(self) -> None:
         """Clear the preview and show visible placeholder"""
         logger.debug("[DEBUG] SpritePreviewWidget.clear() called")
-        def _is_valid(widget: Any) -> bool:
+        def _is_valid(widget: object) -> bool:
             if widget is None:
                 return False
             try:
@@ -935,7 +942,7 @@ class SpritePreviewWidget(QWidget):
         """Set the current sprite offset for similarity search."""
         self.current_offset = offset
 
-    def _show_context_menu(self, position: Any) -> None:
+    def _show_context_menu(self, position: QPoint) -> None:
         """Show context menu with similarity search option."""
         # Only show context menu if we have a sprite loaded
         if self.sprite_pixmap is None or self.sprite_pixmap.isNull():
@@ -1074,7 +1081,7 @@ class SpritePreviewWidget(QWidget):
                 f"Similarity search failed: {e!s}"
             )
 
-    def _show_similarity_results(self, matches: Any) -> None:
+    def _show_similarity_results(self, matches: list[SimilarityMatch]) -> None:
         """Show similarity search results."""
 
         if not matches:

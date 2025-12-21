@@ -7,7 +7,22 @@ scan dialog creation, and result formatting.
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
+
+
+class SpriteInfoDict(TypedDict):
+    """Sprite scan result data structure."""
+    offset: int
+    offset_hex: str
+    compressed_size: int
+    decompressed_size: int
+    tile_count: int
+    alignment: str
+    quality: float
+    size_limit_used: NotRequired[int]
+    size: NotRequired[int]
+    name: NotRequired[str]
 
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -46,14 +61,15 @@ class ScanDialog(QDialog):
         self.results_text: QTextEdit
         self.button_box: QDialogButtonBox
         self.apply_btn: QPushButton | None
-        self.rom_cache: Any = None  # Cache object, type depends on implementation
+        # Cache reference set at runtime during scan initialization
+        self.rom_cache: ROMCacheProtocol | None = None
 
 
 class ScanContext:
     """Context object for sharing data between scan event handlers."""
 
     def __init__(self) -> None:
-        self.found_offsets: list[dict[str, Any]] = []
+        self.found_offsets: list[SpriteInfoDict] = []
         self.selected_offset: int | None = None
 
 
@@ -95,8 +111,8 @@ class ScanController(QObject):
         self._cache = cache
         self._state_manager = state_manager
         self._current_rom_path: str | None = None
-        self._scan_params: dict[str, Any] = {}
-        
+        self._scan_params: Mapping[str, int] = {}
+
         # Workflow state
         self._scan_worker: SpriteScanWorker | None = None
         self._current_dialog: ScanDialog | None = None
@@ -345,7 +361,7 @@ class ScanController(QObject):
             # Show resume dialog
             parent_widget = dialog.parent() if dialog.parent() else dialog
             user_choice = ResumeScanDialog.show_resume_dialog(
-                partial_cache, cast(QWidget, parent_widget)
+                dict(partial_cache), cast(QWidget, parent_widget)
             )
 
             if user_choice == ResumeScanDialog.CANCEL:
@@ -418,7 +434,7 @@ class ScanController(QObject):
         dialog.progress_bar.setFormat(f"Scanning... {current}/{total}")
         self.scan_progress.emit(current, total)
 
-    def _on_sprite_found(self, dialog: ScanDialog, sprite_info: dict[str, Any]) -> None:
+    def _on_sprite_found(self, dialog: ScanDialog, sprite_info: SpriteInfoDict) -> None:
         """Handle sprite found during scan."""
         if self._scan_context is None:
             return
@@ -525,8 +541,8 @@ class ScanController(QObject):
     def check_cache(
         self,
         rom_path: str,
-        scan_params: dict[str, Any] | None = None,
-    ) -> tuple[bool, list[dict[str, Any]]]:
+        scan_params: Mapping[str, int] | None = None,
+    ) -> tuple[bool, list[Mapping[str, object]]]:
         """
         Check if scan results exist in cache.
 
@@ -544,13 +560,12 @@ class ScanController(QObject):
         self._scan_params = scan_params or {}
 
         try:
-            # Protocol expects dict[str, int] for scan_params
-            cache_params = cast(dict[str, int], scan_params) if scan_params else {}
-            cached = self._cache.get_partial_scan_results(rom_path, cache_params)
+            cached = self._cache.get_partial_scan_results(rom_path, scan_params or {})
             if cached:
                 self.cache_status_changed.emit("Cache hit", "cache-hit")
                 # Extract the sprites list from the cached result dict
-                sprites = cached.get("found_sprites", [])
+                sprites_obj = cached.get("found_sprites", [])
+                sprites = cast(list[Mapping[str, object]], sprites_obj)
                 return True, sprites
             self.cache_status_changed.emit("No cache", "cache-miss")
             return False, []
@@ -562,8 +577,8 @@ class ScanController(QObject):
     def save_results(
         self,
         rom_path: str,
-        sprites: list[dict[str, Any]],
-        scan_params: dict[str, Any] | None = None,
+        sprites: list[Mapping[str, object]],
+        scan_params: Mapping[str, int] | None = None,
         current_offset: int = 0,
         completed: bool = True,
     ) -> bool:
@@ -585,11 +600,9 @@ class ScanController(QObject):
             return False
 
         try:
-            # Protocol expects dict[str, int] for scan_params
-            cache_params = cast(dict[str, int], scan_params) if scan_params else {}
             self._cache.save_partial_scan_results(
                 rom_path,
-                cache_params,
+                scan_params or {},
                 sprites,
                 current_offset,
                 completed,
@@ -602,19 +615,19 @@ class ScanController(QObject):
             self.cache_status_changed.emit("Save failed", "cache-error")
             return False
 
-    def _save_scan_results_to_cache(self, dialog: ScanDialog, found_offsets: list[Any]) -> None:
+    def _save_scan_results_to_cache(self, dialog: ScanDialog, found_offsets: list[SpriteInfoDict]) -> None:
         """Save scan results to cache."""
         self._update_cache_status(dialog, "saving", "\U0001F4BE Saving results to cache...")
         # Defer actual save to next event loop iteration to allow UI update
         QTimer.singleShot(0, lambda: self._do_cache_save(dialog, found_offsets))
 
-    def _do_cache_save(self, dialog: ScanDialog, found_offsets: list[Any]) -> None:
+    def _do_cache_save(self, dialog: ScanDialog, found_offsets: list[SpriteInfoDict]) -> None:
         """Perform the actual cache save operation."""
         if self._current_rom_path is None:
             return
             
         # Convert to cache format
-        sprite_locations: dict[str, dict[str, Any]] = {}
+        sprite_locations: dict[str, Mapping[str, object]] = {}
         for sprite in found_offsets:
             name = f"scanned_0x{sprite['offset']:X}"
             sprite_locations[name] = {
@@ -643,7 +656,7 @@ class ScanController(QObject):
                 current_text + "\n\u26A0\uFE0F Could not save results to cache.\n"
             )
 
-    def get_cache_key(self, rom_path: str, scan_params: dict[str, Any] | None = None) -> str:
+    def get_cache_key(self, rom_path: str, scan_params: Mapping[str, int] | None = None) -> str:
         """Generate a cache key for the given ROM and scan parameters."""
         params_str = str(sorted((scan_params or {}).items()))
         key_data = f"{rom_path}:{params_str}"
@@ -651,7 +664,7 @@ class ScanController(QObject):
 
     # ========== Result Formatting ==========
 
-    def format_sprite_info(self, sprite: dict[str, Any]) -> str:
+    def format_sprite_info(self, sprite: Mapping[str, object]) -> str:
         """
         Format a sprite dictionary for display (simple format).
 
@@ -661,9 +674,9 @@ class ScanController(QObject):
         Returns:
             Formatted string for display
         """
-        offset = sprite.get("offset", 0)
-        size = sprite.get("size", 0)
-        name = sprite.get("name", "Unknown")
+        offset = cast(int, sprite.get("offset", 0))
+        size = cast(int, sprite.get("size", 0))
+        name = cast(str, sprite.get("name", "Unknown"))
 
         # Format offset as hex
         offset_str = f"0x{offset:06X}"
@@ -676,7 +689,7 @@ class ScanController(QObject):
 
         return f"{name} @ {offset_str} ({size_str})"
 
-    def _format_sprite_info_detailed(self, sprite_info: dict[str, Any]) -> str:
+    def _format_sprite_info_detailed(self, sprite_info: SpriteInfoDict) -> str:
         """Format sprite info for display (detailed format for scan results)."""
         text = f"Found sprite at {sprite_info['offset_hex']}:\n"
         text += f"  - Tiles: {sprite_info['tile_count']}\n"
@@ -690,7 +703,7 @@ class ScanController(QObject):
 
     def format_scan_summary(
         self,
-        sprites: list[dict[str, Any]],
+        sprites: list[Mapping[str, object]],
         scan_time: float | None = None,
         from_cache: bool = False,
     ) -> str:
@@ -716,7 +729,7 @@ class ScanController(QObject):
             lines.append(f"Scan completed in {scan_time:.1f}s")
 
         # Add size summary
-        total_size = sum(s.get("size", 0) for s in sprites)
+        total_size = sum(cast(int, s.get("size", 0)) for s in sprites)
         if total_size > 0:
             if total_size >= 1024 * 1024:
                 size_str = f"{total_size / (1024 * 1024):.1f} MB"
@@ -728,7 +741,7 @@ class ScanController(QObject):
 
         return "\n".join(lines)
 
-    def _format_scan_summary_detailed(self, found_offsets: list[Any]) -> str:
+    def _format_scan_summary_detailed(self, found_offsets: list[SpriteInfoDict]) -> str:
         """Format scan completion summary (detailed format for scan results)."""
         from operator import itemgetter
         
@@ -749,96 +762,3 @@ class ScanController(QObject):
             text += "\nNo valid sprites found in scanned range.\n"
 
         return text
-
-    # ========== Legacy Dialog Methods (for backward compatibility) ==========
-
-    def create_scan_dialog(
-        self,
-        parent: QWidget | None = None,
-        title: str = "Sprite Scanner",
-    ) -> QDialog:
-        """
-        Create a scan progress dialog (legacy method).
-
-        Args:
-            parent: Parent widget
-            title: Dialog title
-
-        Returns:
-            Configured QDialog for scan progress
-        """
-        dialog = QDialog(parent)
-        dialog.setWindowTitle(title)
-        dialog.setMinimumWidth(500)
-        dialog.setMinimumHeight(400)
-
-        layout = QVBoxLayout(dialog)
-
-        # Cache status label
-        cache_label = QLabel("Checking cache...")
-        cache_label.setObjectName("cache_status_label")
-        cache_label.setStyleSheet(get_cache_status_style("checking"))
-        layout.addWidget(cache_label)
-
-        # Progress bar
-        progress = QProgressBar()
-        progress.setObjectName("progress_bar")
-        progress.setRange(0, 100)
-        progress.setValue(0)
-        layout.addWidget(progress)
-
-        # Results text area
-        results = QTextEdit()
-        results.setObjectName("results_text")
-        results.setReadOnly(True)
-        layout.addWidget(results)
-
-        # Button box
-        button_box = QDialogButtonBox()
-        button_box.setObjectName("button_box")
-
-        apply_btn = QPushButton("Apply Selected")
-        apply_btn.setEnabled(False)
-        button_box.addButton(apply_btn, QDialogButtonBox.ButtonRole.AcceptRole)
-        button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
-
-        layout.addWidget(button_box)
-
-        # Store references
-        dialog.cache_status_label = cache_label  # type: ignore[attr-defined]
-        dialog.progress_bar = progress  # type: ignore[attr-defined]
-        dialog.results_text = results  # type: ignore[attr-defined]
-        dialog.button_box = button_box  # type: ignore[attr-defined]
-        dialog.apply_btn = apply_btn  # type: ignore[attr-defined]
-
-        return dialog
-
-    def update_dialog_progress(
-        self,
-        dialog: QDialog,
-        current: int,
-        total: int,
-        message: str | None = None,
-    ) -> None:
-        """Update the progress bar in a scan dialog."""
-        progress_bar = dialog.findChild(QProgressBar, "progress_bar")
-        if progress_bar:
-            percent = int((current / total) * 100) if total > 0 else 0
-            progress_bar.setValue(percent)
-
-        if message:
-            results_text = dialog.findChild(QTextEdit, "results_text")
-            if results_text:
-                results_text.append(message)
-
-    def update_dialog_cache_status(
-        self,
-        dialog: QDialog,
-        status: str,
-        style_class: str = "default",
-    ) -> None:
-        """Update the cache status label in a scan dialog."""
-        cache_label = dialog.findChild(QLabel, "cache_status_label")
-        if cache_label:
-            cache_label.setText(status)
-            cache_label.setStyleSheet(get_cache_status_style(style_class))

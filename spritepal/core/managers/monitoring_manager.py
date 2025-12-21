@@ -19,11 +19,12 @@ import threading
 import time
 import uuid
 from collections import defaultdict, deque
+from collections.abc import Mapping
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, override
 from weakref import WeakSet
 
 import psutil
@@ -45,7 +46,7 @@ class PerformanceMetric:
     memory_after_mb: float
     timestamp: datetime
     thread_id: int
-    context: dict[str, Any] = field(default_factory=dict)
+    context: dict[str, object] = field(default_factory=dict)
     success: bool = True
     error_type: str | None = None
 
@@ -59,7 +60,7 @@ class ErrorEvent:
     timestamp: datetime
     fingerprint: str  # For deduplication
     stack_trace: str | None = None
-    context: dict[str, Any] = field(default_factory=dict)
+    context: dict[str, object] = field(default_factory=dict)
     severity: str = "ERROR"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
     count: int = 1
 
@@ -72,7 +73,7 @@ class UsageEvent:
     timestamp: datetime
     duration_ms: float | None = None
     success: bool = True
-    context: dict[str, Any] = field(default_factory=dict)
+    context: dict[str, object] = field(default_factory=dict)
     user_workflow: str | None = None
 
 
@@ -85,7 +86,7 @@ class HealthMetric:
     unit: str = ""
     threshold_warning: float | None = None
     threshold_critical: float | None = None
-    context: dict[str, Any] = field(default_factory=dict)
+    context: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -94,10 +95,10 @@ class MonitoringReport:
     report_id: str
     generated_at: datetime
     time_range: dict[str, datetime]
-    performance_summary: dict[str, Any]
-    error_summary: dict[str, Any]
-    usage_summary: dict[str, Any]
-    health_summary: dict[str, Any]
+    performance_summary: dict[str, object]
+    error_summary: dict[str, object]
+    usage_summary: dict[str, object]
+    health_summary: dict[str, object]
     insights: list[str]
     recommendations: list[str]
 
@@ -108,9 +109,9 @@ class PerformanceCollector:
     def __init__(self, max_entries: int = 10000):
         self.metrics: deque[PerformanceMetric] = deque(maxlen=max_entries)
         self._lock = threading.RLock()
-        self._active_operations: dict[str, dict[str, Any]] = {}
+        self._active_operations: dict[str, dict[str, object]] = {}
 
-    def start_operation(self, operation: str, context: dict[str, Any] | None = None) -> str:
+    def start_operation(self, operation: str, context: Mapping[str, object] | None = None) -> str:
         """Start tracking a performance operation."""
         operation_id = str(uuid.uuid4())
 
@@ -120,7 +121,7 @@ class PerformanceCollector:
                 'start_time': time.perf_counter(),
                 'start_memory': self._get_memory_usage(),
                 'thread_id': threading.get_ident(),
-                'context': context or {}
+                'context': dict(context) if context else {}
             }
 
         return operation_id
@@ -136,23 +137,34 @@ class PerformanceCollector:
                 return
 
             start_data = self._active_operations.pop(operation_id)
-            duration_ms = (end_time - start_data['start_time']) * 1000
+            start_time = start_data['start_time']
+            assert isinstance(start_time, float)
+            duration_ms = (end_time - start_time) * 1000
+
+            operation_name = start_data['operation']
+            assert isinstance(operation_name, str)
+            start_memory = start_data['start_memory']
+            assert isinstance(start_memory, float)
+            thread_id = start_data['thread_id']
+            assert isinstance(thread_id, int)
+            context = start_data['context']
+            assert isinstance(context, dict)
 
             metric = PerformanceMetric(
-                operation=start_data['operation'],
+                operation=operation_name,
                 duration_ms=duration_ms,
-                memory_before_mb=start_data['start_memory'],
+                memory_before_mb=start_memory,
                 memory_after_mb=end_memory,
                 timestamp=datetime.now(UTC),
-                thread_id=start_data['thread_id'],
-                context=start_data['context'],
+                thread_id=thread_id,
+                context=context,
                 success=success,
                 error_type=error_type
             )
 
             self.metrics.append(metric)
 
-    def get_operation_stats(self, operation: str, hours: int = 24) -> dict[str, Any]:
+    def get_operation_stats(self, operation: str, hours: int = 24) -> dict[str, object]:
         """Get performance statistics for an operation."""
         cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
@@ -207,7 +219,7 @@ class ErrorTracker:
         self._error_counts: dict[str, int] = defaultdict(int)
 
     def track_error(self, error_type: str, error_message: str, operation: str,
-                   stack_trace: str | None = None, context: dict[str, Any] | None = None,
+                   stack_trace: str | None = None, context: Mapping[str, object] | None = None,
                    severity: str = "ERROR") -> None:
         """Track an error event."""
         # Create fingerprint for deduplication
@@ -234,14 +246,14 @@ class ErrorTracker:
                     timestamp=datetime.now(UTC),
                     fingerprint=fingerprint,
                     stack_trace=stack_trace,
-                    context=context or {},
+                    context=dict(context) if context else {},
                     severity=severity
                 )
                 self.errors.append(error_event)
 
             self._error_counts[fingerprint] += 1
 
-    def get_error_summary(self, hours: int = 24) -> dict[str, Any]:
+    def get_error_summary(self, hours: int = 24) -> dict[str, object]:
         """Get error statistics for a time period."""
         cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
@@ -292,7 +304,7 @@ class UsageAnalytics:
 
     def track_feature_usage(self, feature: str, action: str, success: bool = True,
                           duration_ms: float | None = None,
-                          context: dict[str, Any] | None = None,
+                          context: Mapping[str, object] | None = None,
                           workflow: str | None = None) -> None:
         """Track a feature usage event."""
         event = UsageEvent(
@@ -301,7 +313,7 @@ class UsageAnalytics:
             timestamp=datetime.now(UTC),
             duration_ms=duration_ms,
             success=success,
-            context=context or {},
+            context=dict(context) if context else {},
             user_workflow=workflow
         )
 
@@ -318,7 +330,7 @@ class UsageAnalytics:
                 if len(self._active_workflows[workflow]) > 100:
                     self._active_workflows[workflow] = self._active_workflows[workflow][-50:]
 
-    def get_usage_stats(self, hours: int = 24) -> dict[str, Any]:
+    def get_usage_stats(self, hours: int = 24) -> dict[str, object]:
         """Get usage statistics for a time period."""
         cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
@@ -362,7 +374,7 @@ class UsageAnalytics:
             'active_workflows': len(self._active_workflows)
         }
 
-    def get_workflow_analysis(self, workflow: str) -> dict[str, Any]:
+    def get_workflow_analysis(self, workflow: str) -> dict[str, object]:
         """Analyze a specific user workflow."""
         with self._lock:
             if workflow not in self._active_workflows:
@@ -400,7 +412,7 @@ class HealthMonitor:
     def record_metric(self, metric_name: str, value: float, unit: str = "",
                      threshold_warning: float | None = None,
                      threshold_critical: float | None = None,
-                     context: dict[str, Any] | None = None) -> None:
+                     context: Mapping[str, object] | None = None) -> None:
         """Record a health metric."""
         metric = HealthMetric(
             metric_name=metric_name,
@@ -409,13 +421,13 @@ class HealthMonitor:
             unit=unit,
             threshold_warning=threshold_warning,
             threshold_critical=threshold_critical,
-            context=context or {}
+            context=dict(context) if context else {}
         )
 
         with self._lock:
             self.metrics.append(metric)
 
-    def get_current_health(self) -> dict[str, Any]:
+    def get_current_health(self) -> dict[str, object]:
         """Get current system health status."""
         try:
             process = psutil.Process(os.getpid())
@@ -456,7 +468,7 @@ class HealthMonitor:
         except Exception as e:
             return {'error': str(e), 'healthy': False}
 
-    def get_health_trends(self, hours: int = 24) -> dict[str, Any]:
+    def get_health_trends(self, hours: int = 24) -> dict[str, object]:
         """Get health metric trends over time."""
         cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
@@ -519,10 +531,13 @@ class MonitoringManager(BaseManager):
         # Check if monitoring is enabled
         try:
             settings = self.settings_manager
-            self._enabled = settings.get("monitoring", "enabled", True)
-            self._health_check_interval = settings.get("monitoring", "health_check_interval_ms", 60000)  # 1 minute
-            self._export_format = settings.get("monitoring", "export_format", "json")
-            self._retention_hours = settings.get("monitoring", "retention_hours", 168)  # 1 week
+            self._enabled = bool(settings.get("monitoring", "enabled", True))
+            health_interval = settings.get("monitoring", "health_check_interval_ms", 60000)
+            self._health_check_interval = int(health_interval) if isinstance(health_interval, (int, float)) else 60000
+            export_fmt = settings.get("monitoring", "export_format", "json")
+            self._export_format = str(export_fmt) if isinstance(export_fmt, str) else "json"
+            retention = settings.get("monitoring", "retention_hours", 168)
+            self._retention_hours = int(retention) if isinstance(retention, (int, float)) else 168
         except Exception as e:
             self._logger.warning(f"Could not load monitoring settings: {e}")
             self._enabled = True
@@ -610,7 +625,7 @@ class MonitoringManager(BaseManager):
             logging.raiseExceptions = old_raise
 
     @contextmanager
-    def monitor_operation(self, operation: str, context: dict[str, Any] | None = None):
+    def monitor_operation(self, operation: str, context: Mapping[str, object] | None = None):
         """Context manager for monitoring an operation's performance."""
         if not self._enabled:
             yield
@@ -632,7 +647,7 @@ class MonitoringManager(BaseManager):
             self._performance_collector.finish_operation(operation_id, success, error_type)
 
     def track_error(self, error_type: str, error_message: str, operation: str,
-                   stack_trace: str | None = None, context: dict[str, Any] | None = None,
+                   stack_trace: str | None = None, context: Mapping[str, object] | None = None,
                    severity: str = "ERROR") -> None:
         """Track an error event."""
         if not self._enabled:
@@ -646,7 +661,7 @@ class MonitoringManager(BaseManager):
 
     def track_feature_usage(self, feature: str, action: str, success: bool = True,
                           duration_ms: float | None = None,
-                          context: dict[str, Any] | None = None,
+                          context: Mapping[str, object] | None = None,
                           workflow: str | None = None) -> None:
         """Track feature usage."""
         if not self._enabled:
@@ -655,19 +670,19 @@ class MonitoringManager(BaseManager):
         self._usage_analytics.track_feature_usage(feature, action, success,
                                                 duration_ms, context, workflow)
 
-    def get_performance_stats(self, operation: str, hours: int = 24) -> dict[str, Any]:
+    def get_performance_stats(self, operation: str, hours: int = 24) -> dict[str, object]:
         """Get performance statistics for an operation."""
         return self._performance_collector.get_operation_stats(operation, hours)
 
-    def get_error_summary(self, hours: int = 24) -> dict[str, Any]:
+    def get_error_summary(self, hours: int = 24) -> dict[str, object]:
         """Get error summary for a time period."""
         return self._error_tracker.get_error_summary(hours)
 
-    def get_usage_stats(self, hours: int = 24) -> dict[str, Any]:
+    def get_usage_stats(self, hours: int = 24) -> dict[str, object]:
         """Get usage statistics for a time period."""
         return self._usage_analytics.get_usage_stats(hours)
 
-    def get_health_status(self) -> dict[str, Any]:
+    def get_health_status(self) -> dict[str, object]:
         """Get current system health status."""
         current_health = self._health_monitor.get_current_health()
         health_trends = self._health_monitor.get_health_trends()
@@ -692,33 +707,44 @@ class MonitoringManager(BaseManager):
                 perf_stats[op] = stats
 
                 # Check for performance issues
-                if stats['duration_stats']['p95_ms'] > 5000:  # 5 seconds
-                    insights.append(f"Performance concern: {op} P95 latency is {stats['duration_stats']['p95_ms']:.0f}ms")
+                duration_stats = stats.get('duration_stats')
+                if isinstance(duration_stats, dict):
+                    p95_ms = duration_stats.get('p95_ms')
+                    if isinstance(p95_ms, (int, float)) and p95_ms > 5000:  # 5 seconds
+                        insights.append(f"Performance concern: {op} P95 latency is {p95_ms:.0f}ms")
 
-                if stats['success_rate'] < 0.9:
-                    insights.append(f"Reliability concern: {op} success rate is {stats['success_rate']:.1%}")
+                success_rate = stats.get('success_rate')
+                if isinstance(success_rate, (int, float)) and success_rate < 0.9:
+                    insights.append(f"Reliability concern: {op} success rate is {success_rate:.1%}")
 
         # Error insights
         error_summary = self.get_error_summary(hours)
-        if error_summary.get('total_occurrences', 0) > 10:
-            insights.append(f"High error rate: {error_summary['total_occurrences']} errors in last {hours}h")
+        total_occurrences = error_summary.get('total_occurrences', 0)
+        if isinstance(total_occurrences, (int, float)) and total_occurrences > 10:
+            insights.append(f"High error rate: {int(total_occurrences)} errors in last {hours}h")
 
         # Top error types
-        if error_summary.get('by_type'):
-            top_error = max(error_summary['by_type'].items(), key=lambda x: x[1])
-            if top_error[1] > 5:
-                insights.append(f"Most common error: {top_error[0]} ({top_error[1]} occurrences)")
+        by_type = error_summary.get('by_type')
+        if isinstance(by_type, dict) and by_type:
+            top_error = max(by_type.items(), key=lambda x: int(x[1]) if isinstance(x[1], (int, float)) else 0)
+            if isinstance(top_error[1], (int, float)) and top_error[1] > 5:
+                insights.append(f"Most common error: {top_error[0]} ({int(top_error[1])} occurrences)")
 
         # Health insights
         health_trends = self._health_monitor.get_health_trends(hours)
-        for metric, trend in health_trends.items():
-            if trend['trend'] == 'increasing' and metric in ['memory_mb', 'cpu_percent']:
-                insights.append(f"Resource usage trending up: {metric} increased to {trend['current']:.1f}{trend['unit']}")
+        for metric, trend_obj in health_trends.items():
+            if isinstance(trend_obj, dict):
+                trend = trend_obj.get('trend')
+                current = trend_obj.get('current')
+                unit = trend_obj.get('unit', '')
+                if trend == 'increasing' and metric in ['memory_mb', 'cpu_percent'] and isinstance(current, (int, float)):
+                    insights.append(f"Resource usage trending up: {metric} increased to {current:.1f}{unit}")
 
         # Usage insights
         usage_stats = self.get_usage_stats(hours)
-        if usage_stats.get('most_used_features'):
-            top_feature = next(iter(usage_stats['most_used_features'].items()))
+        most_used = usage_stats.get('most_used_features')
+        if isinstance(most_used, dict) and most_used:
+            top_feature = next(iter(most_used.items()))
             insights.append(f"Most used feature: {top_feature[0]} ({top_feature[1]} uses)")
 
         return insights
@@ -764,20 +790,30 @@ class MonitoringManager(BaseManager):
         health_trends = self._health_monitor.get_health_trends(hours)
         if 'memory_mb' in health_trends:
             mem_trend = health_trends['memory_mb']
-            if mem_trend['current'] > 500:  # 500MB threshold
-                recommendations.append("Consider implementing more aggressive caching cleanup")
-            if mem_trend['trend'] == 'increasing':
-                recommendations.append("Monitor for potential memory leaks in recent operations")
+            if isinstance(mem_trend, dict):
+                current = mem_trend.get('current')
+                trend = mem_trend.get('trend')
+                if isinstance(current, (int, float)) and current > 500:  # 500MB threshold
+                    recommendations.append("Consider implementing more aggressive caching cleanup")
+                if trend == 'increasing':
+                    recommendations.append("Monitor for potential memory leaks in recent operations")
 
         # Error recommendations
         error_summary = self.get_error_summary(hours)
-        if error_summary.get('total_occurrences', 0) > 20:
+        total_occ = error_summary.get('total_occurrences', 0)
+        if isinstance(total_occ, (int, float)) and total_occ > 20:
             recommendations.append("High error rate detected - review error handling and user input validation")
 
         # Cache recommendations
         self.get_usage_stats(hours)
-        if 'thumbnail_generation' in perf_stats and perf_stats['thumbnail_generation']['duration_stats']['mean_ms'] > 1000:
-            recommendations.append("Thumbnail generation is slow - consider cache prewarming or optimization")
+        if 'thumbnail_generation' in perf_stats:
+            thumb_stats = perf_stats['thumbnail_generation']
+            if isinstance(thumb_stats, dict):
+                duration_stats = thumb_stats.get('duration_stats')
+                if isinstance(duration_stats, dict):
+                    mean_ms = duration_stats.get('mean_ms')
+                    if isinstance(mean_ms, (int, float)) and mean_ms > 1000:
+                        recommendations.append("Thumbnail generation is slow - consider cache prewarming or optimization")
 
         return recommendations
 
@@ -805,7 +841,7 @@ class MonitoringManager(BaseManager):
     def _export_json(self, report: MonitoringReport, output_path: Path) -> None:
         """Export report as JSON."""
         # Convert dataclass to dict with custom serialization
-        def serialize_datetime(obj: Any) -> str:
+        def serialize_datetime(obj: object) -> str:
             if isinstance(obj, datetime):
                 return obj.isoformat()
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
@@ -826,7 +862,9 @@ class MonitoringManager(BaseManager):
                            'Total Usage Events', 'System Health', 'Top Insight'])
 
             # Data row
-            health_status = 'Healthy' if report.health_summary.get('current', {}).get('healthy') else 'Degraded'
+            current_health = report.health_summary.get('current', {})
+            is_healthy = isinstance(current_health, dict) and current_health.get('healthy')
+            health_status = 'Healthy' if is_healthy else 'Degraded'
             top_insight = report.insights[0] if report.insights else 'None'
 
             writer.writerow([

@@ -35,7 +35,7 @@ def is_logging_available() -> bool:
         # Logging system is in an invalid state
         return False
 
-def safe_log(logger: logging.Logger, level: int, message: str, *args: Any, **kwargs: Any) -> None:
+def safe_log(logger: logging.Logger, level: int, message: str, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny] - Logging args
     """
     Safely log a message, checking if logging is still active.
 
@@ -55,30 +55,30 @@ def safe_log(logger: logging.Logger, level: int, message: str, *args: Any, **kwa
         # Logging system is shut down or in invalid state
         pass
 
-def safe_debug(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:
+def safe_debug(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny] - Logging args
     """Safely log a debug message."""
     safe_log(logger, logging.DEBUG, message, *args, **kwargs)
 
-def safe_info(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:
+def safe_info(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny] - Logging args
     """Safely log an info message."""
     safe_log(logger, logging.INFO, message, *args, **kwargs)
 
-def safe_warning(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:
+def safe_warning(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny] - Logging args
     """Safely log a warning message."""
     safe_log(logger, logging.WARNING, message, *args, **kwargs)
 
-def safe_error(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:
+def safe_error(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny] - Logging args
     """Safely log an error message."""
     safe_log(logger, logging.ERROR, message, *args, **kwargs)
 
-def suppress_logging_errors(func: Callable[..., Any]) -> Callable[..., Any]:
+def suppress_logging_errors(func: Callable[..., Any]) -> Callable[..., Any]:  # pyright: ignore[reportExplicitAny] - Decorator pattern
     """
     Decorator to suppress logging errors during cleanup operations.
 
     This decorator catches ValueError exceptions that occur when logging
     to closed file handles and suppresses them during cleanup.
     """
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportExplicitAny] - Wrapper args and return
         try:
             return func(*args, **kwargs)
         except ValueError as e:

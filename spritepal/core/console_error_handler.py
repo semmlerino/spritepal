@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 import traceback
-from typing import Any, override
+from typing import override
 
 from utils.logging_config import get_logger
 
@@ -107,7 +107,7 @@ class ConsoleErrorHandler:
         error: Exception,
         context_info: str,
         user_input: str | None = None,
-        **context_kwargs: Any
+        **context_kwargs: object
     ) -> None:
         """
         Handle a validation error with context.

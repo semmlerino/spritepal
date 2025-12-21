@@ -10,7 +10,7 @@ import weakref
 from abc import abstractmethod
 from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, override
+from typing import TYPE_CHECKING, ParamSpec, TypeVar, override
 
 from PySide6.QtCore import QMetaObject, QThread, Signal
 
@@ -119,7 +119,7 @@ def handle_worker_errors(
 class WorkerMeta(type(QThread)):
     """Metaclass that properly combines QThread and ABC functionality."""
 
-    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any) -> type:
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, object], **kwargs: object) -> type:
         # First create the class with QThread metaclass
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
 
@@ -196,7 +196,7 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
         self._signal_connections.clear()
         logger.debug(f"{self._operation_name}: Cleaned up {connection_count} signal connections")
 
-    def connect_signal_with_tracking(self, signal: Signal, slot: Callable[..., Any]) -> QMetaObject.Connection:
+    def connect_signal_with_tracking(self, signal: Signal, slot: Callable[..., object]) -> QMetaObject.Connection:
         """Connect a signal and track the connection for cleanup"""
         connection = signal.connect(slot)  # type: ignore[attr-defined]  # Signal.connect exists at runtime
         self._signal_connections.append(connection)
@@ -343,7 +343,7 @@ class ManagedWorker(BaseWorker):
     def __init__(
         self,
         manager: BaseManager | None = None,
-        manager_factory: Any | None = None,
+        manager_factory: object | None = None,
         parent: QObject | None = None
     ) -> None:
         super().__init__(parent)
@@ -359,7 +359,7 @@ class ManagedWorker(BaseWorker):
         self.manager = manager
         self._manager_factory = manager_factory
         self._connections: list[QMetaObject.Connection] = []
-        self._weak_manager_ref: weakref.ReferenceType[Any] | None = None
+        self._weak_manager_ref: weakref.ReferenceType[object] | None = None
 
         # Store weak reference to manager to avoid circular references
         if manager is not None:

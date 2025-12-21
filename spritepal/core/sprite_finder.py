@@ -7,9 +7,12 @@ import json
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from PIL import Image
+
+if TYPE_CHECKING:
+    from core.rom_injector import ROMInjector
 
 from core.region_analyzer import EmptyRegionConfig, EmptyRegionDetector
 from core.sprite_visual_validator import SpriteVisualValidator
@@ -36,6 +39,18 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
+class SpriteInfo(TypedDict):
+    """Metadata for a sprite found at a specific ROM offset."""
+    offset: int
+    offset_hex: str
+    compressed_size: int
+    decompressed_size: int
+    tile_count: int
+    quality: float
+    alignment: str
+
+
 @dataclass
 class SpriteCandidate:
     """Represents a potential sprite found in ROM"""
@@ -47,7 +62,8 @@ class SpriteCandidate:
     visual_metrics: dict[str, float]
     preview_path: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
+        """Convert to dictionary for JSON serialization."""
         return {
             "offset": f"0x{self.offset:06X}",
             "offset_int": self.offset,
@@ -75,7 +91,7 @@ class ScanResult:
     tile_validation_score: float
     visual_metrics: dict[str, float] | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Convert to dictionary for metadata/serialization."""
         return {
             "offset": self.offset,
@@ -226,7 +242,9 @@ class SpriteFinder:
 
         # Step 2: Try decompression
         try:
-            compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
+            # Access rom_injector implementation detail (typed as object in protocol)
+            rom_injector = cast("ROMInjector", self.extractor.rom_injector)
+            compressed_size, sprite_data = rom_injector.find_compressed_sprite(
                 rom_data, offset, expected_size=None
             )
             if len(sprite_data) == 0:
@@ -396,7 +414,9 @@ class SpriteFinder:
             compressed_size = 0
             sprite_data = b""
             try:
-                compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
+                # Access rom_injector implementation detail (typed as object in protocol)
+                rom_injector = cast("ROMInjector", self.extractor.rom_injector)
+                compressed_size, sprite_data = rom_injector.find_compressed_sprite(
                     rom_data, offset, expected_size=None
                 )
 
@@ -571,7 +591,7 @@ class SpriteFinder:
 
         return all_candidates
 
-    def find_sprite_at_offset(self, rom_data: bytes, offset: int) -> dict[str, Any] | None:
+    def find_sprite_at_offset(self, rom_data: bytes, offset: int) -> SpriteInfo | None:
         """
         Try to find and validate a sprite at a specific offset.
 
@@ -586,7 +606,9 @@ class SpriteFinder:
         sprite_data = b""
         try:
             # Try to decompress sprite at this offset
-            compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
+            # Access rom_injector implementation detail (typed as object in protocol)
+            rom_injector = cast("ROMInjector", self.extractor.rom_injector)
+            compressed_size, sprite_data = rom_injector.find_compressed_sprite(
                 rom_data, offset, expected_size=None
             )
 
@@ -621,7 +643,7 @@ class SpriteFinder:
             # Decompression or validation failed
             return None
 
-    def check_offset_for_sprite(self, rom_path: str, offset: int) -> dict[str, Any] | None:
+    def check_offset_for_sprite(self, rom_path: str, offset: int) -> SpriteInfo | None:
         """
         Check if a specific ROM file offset contains valid sprite data.
 

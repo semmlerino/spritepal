@@ -25,7 +25,7 @@ class PreviewGenerator:
     def create_arranged_image(
         self,
         original_image: Image.Image,
-        tile_rows: list[dict[str, Any]],
+        tile_rows: list[dict[str, Any]],  # pyright: ignore[reportExplicitAny] - Row metadata
         arranged_indices: list[int],
         tile_height: int,
         row_spacing_ratio: float = 0.75

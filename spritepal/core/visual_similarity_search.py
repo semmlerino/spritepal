@@ -24,7 +24,7 @@ class SpriteHash:
     phash: np.ndarray
     dhash: np.ndarray
     histogram: np.ndarray
-    metadata: dict[str, Any]
+    metadata: dict[str, Any]  # pyright: ignore[reportExplicitAny] - sprite metadata can contain various types
 
 @dataclass
 class SimilarityMatch:
@@ -32,7 +32,7 @@ class SimilarityMatch:
     offset: int
     similarity_score: float
     hash_distance: int
-    metadata: dict[str, Any]
+    metadata: dict[str, Any]  # pyright: ignore[reportExplicitAny] - sprite metadata can contain various types
 
 class VisualSimilarityEngine:
     """
@@ -55,7 +55,7 @@ class VisualSimilarityEngine:
 
         logger.info(f"Initialized VisualSimilarityEngine with hash_size={hash_size}")
 
-    def index_sprite(self, offset: int, image: Image.Image, metadata: dict[str, Any] | None = None) -> SpriteHash:
+    def index_sprite(self, offset: int, image: Image.Image, metadata: dict[str, Any] | None = None) -> SpriteHash:  # pyright: ignore[reportExplicitAny] - sprite metadata can contain various types
         """
         Index a sprite for similarity search.
 

@@ -11,30 +11,67 @@ import time
 import traceback
 from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 from utils.logging_config import get_logger
 
-# Type variable for decorators
-F = TypeVar('F', bound=Callable[..., Any])
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class _MonitoringManagerProtocol(Protocol):
+        """Minimal protocol for monitoring manager interface."""
+        def monitor_operation(
+            self, operation: str, context: dict[str, Any] | None = None  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+        ) -> Any: ...  # pyright: ignore[reportExplicitAny] - Context manager with dynamic monitoring operations
+        def track_error(
+            self,
+            error_type: str,
+            error_message: str,
+            operation: str,
+            stack_trace: str | None = None,
+            context: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+        ) -> None: ...
+        def track_feature_usage(
+            self,
+            feature: str,
+            action: str,
+            success: bool = True,
+            duration_ms: float | None = None,
+            context: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+            workflow: str | None = None,
+        ) -> None: ...
+        def get_health_status(self) -> dict[str, Any]: ...  # pyright: ignore[reportExplicitAny] - Dynamic monitoring data structure
+        def get_performance_stats(self, operation: str, hours: int) -> dict[str, Any]: ...  # pyright: ignore[reportExplicitAny] - Dynamic monitoring data structure
+        def register_manager_monitoring(self, manager: object) -> None: ...
+        def export_data(self, export_format: str, hours: int) -> Any: ...  # pyright: ignore[reportExplicitAny] - Returns Path, str, or format-specific data
+
+# Type variables for decorators using ParamSpec pattern
+P = ParamSpec('P')
+R = TypeVar('R')
 
 logger = get_logger("monitoring")
 
 
-def get_monitoring_manager():
+def get_monitoring_manager() -> _MonitoringManagerProtocol | None:
     """Get the monitoring manager instance."""
     try:
         from core.managers.registry import ManagerRegistry
         registry = ManagerRegistry()
         # Try to get monitoring manager if it exists
         managers = registry.get_all_managers()
-        return managers.get("monitoring")
+        manager = managers.get("monitoring")
+        if manager is not None:
+            return cast("_MonitoringManagerProtocol", manager)
+        return None
     except Exception:
         return None
 
 
 @contextmanager
-def monitor_performance(operation: str, context: dict[str, Any] | None = None):
+def monitor_performance(
+    operation: str,
+    context: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+):
     """Context manager for monitoring operation performance.
 
     Usage:
@@ -51,8 +88,11 @@ def monitor_performance(operation: str, context: dict[str, Any] | None = None):
         yield
 
 
-def monitor_operation(operation: str | None = None, track_usage: bool = True,
-                     context: dict[str, Any] | None = None):
+def monitor_operation(
+    operation: str | None = None,
+    track_usage: bool = True,
+    context: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+):
     """Decorator for monitoring function/method performance and usage.
 
     Args:
@@ -65,9 +105,12 @@ def monitor_operation(operation: str | None = None, track_usage: bool = True,
         def extract_sprites(self, rom_path: str):
             # Function implementation
     """
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(
+            *args: P.args,
+            **kwargs: P.kwargs,
+        ) -> R:
             # Determine operation name
             op_name = operation or f"{func.__module__}.{func.__qualname__}"
 
@@ -117,7 +160,7 @@ def monitor_operation(operation: str | None = None, track_usage: bool = True,
 
             return result
 
-        return wrapper  # type: ignore[return-value]  # ParamSpec decorator typing limitation
+        return wrapper
     return decorator
 
 
@@ -134,9 +177,12 @@ def track_feature_usage(feature: str, action: str | None = None, workflow: str |
         def on_thumbnail_clicked(self, index):
             # Handle click
     """
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(
+            *args: P.args,
+            **kwargs: P.kwargs,
+        ) -> R:
             action_name = action or func.__name__
 
             start_time = time.perf_counter()
@@ -162,7 +208,7 @@ def track_feature_usage(feature: str, action: str | None = None, workflow: str |
 
             return result
 
-        return wrapper  # type: ignore[return-value]  # ParamSpec decorator typing limitation
+        return wrapper
     return decorator
 
 
@@ -174,9 +220,12 @@ def monitor_cache_performance(cache_name: str):
         def get_cached_thumbnail(self, key):
             # Cache lookup logic
     """
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(
+            *args: P.args,
+            **kwargs: P.kwargs,
+        ) -> R:
             start_time = time.perf_counter()
 
             result = func(*args, **kwargs)
@@ -204,7 +253,7 @@ def monitor_cache_performance(cache_name: str):
 
             return result
 
-        return wrapper  # type: ignore[return-value]  # ParamSpec decorator typing limitation
+        return wrapper
     return decorator
 
 
@@ -225,7 +274,11 @@ class WorkflowTracker:
         self.steps = []
         self.monitoring_manager = get_monitoring_manager()
 
-    def step(self, step_name: str, context: dict[str, Any] | None = None):
+    def step(
+        self,
+        step_name: str,
+        context: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+    ):
         """Record a workflow step."""
         step_time = time.perf_counter()
 
@@ -307,14 +360,22 @@ class MonitoringMixin:
         self._component_name = component_name
         self._monitoring_manager = get_monitoring_manager()
 
-    def monitor(self, operation: str, context: dict[str, Any] | None = None):
+    def monitor(
+        self,
+        operation: str,
+        context: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+    ):
         """Create a monitoring context for an operation."""
         full_operation = f"{self._component_name}.{operation}"
         return monitor_performance(full_operation, context)
 
-    def track_usage(self, action: str, success: bool = True,
-                   duration_ms: float | None = None,
-                   context: dict[str, Any] | None = None):
+    def track_usage(
+        self,
+        action: str,
+        success: bool = True,
+        duration_ms: float | None = None,
+        context: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+    ):
         """Track feature usage for this component."""
         if self._monitoring_manager:
             self._monitoring_manager.track_feature_usage(
@@ -325,8 +386,13 @@ class MonitoringMixin:
                 context=context
             )
 
-    def track_error(self, error_type: str, error_message: str, operation: str,
-                   context: dict[str, Any] | None = None):
+    def track_error(
+        self,
+        error_type: str,
+        error_message: str,
+        operation: str,
+        context: dict[str, Any] | None = None,  # pyright: ignore[reportExplicitAny] - Arbitrary monitoring context data
+    ):
         """Track an error for this component."""
         if self._monitoring_manager:
             self._monitoring_manager.track_error(
@@ -339,7 +405,7 @@ class MonitoringMixin:
 
 # Convenience functions for common monitoring patterns
 
-def monitor_rom_operation(func: F) -> F:
+def monitor_rom_operation(func: Callable[P, R]) -> Callable[P, R]:
     """Decorator specifically for ROM operations."""
     return monitor_operation("rom_operation", track_usage=True)(func)
 
@@ -349,7 +415,7 @@ def monitor_ui_interaction(feature: str):
     return track_feature_usage(feature, workflow="ui_interaction")
 
 
-def monitor_file_operation(func: F) -> F:
+def monitor_file_operation(func: Callable[P, R]) -> Callable[P, R]:
     """Decorator for file I/O operations."""
     return monitor_operation("file_operation", track_usage=True,
                            context={'operation_type': 'file_io'})(func)
@@ -369,7 +435,10 @@ def check_memory_health(threshold_mb: float = 500.0) -> bool:
     return current_memory < threshold_mb
 
 
-def get_performance_summary(operation: str, hours: int = 24) -> dict[str, Any]:
+def get_performance_summary(
+    operation: str,
+    hours: int = 24,
+) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Dynamic monitoring data structure
     """Get performance summary for an operation."""
     monitoring_manager = get_monitoring_manager()
     if not monitoring_manager:
@@ -380,7 +449,9 @@ def get_performance_summary(operation: str, hours: int = 24) -> dict[str, Any]:
 
 # Integration utilities
 
-def setup_monitoring_for_manager(manager: Any) -> None:
+def setup_monitoring_for_manager(
+    manager: object,
+) -> None:
     """Set up automatic monitoring for a manager instance."""
     monitoring_manager = get_monitoring_manager()
     if monitoring_manager:

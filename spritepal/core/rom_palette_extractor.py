@@ -128,7 +128,7 @@ class ROMPaletteExtractor:
         return colors
 
     def get_palette_config_from_sprite_config(
-        self, game_config: dict[str, Any], sprite_name: str
+        self, game_config: dict[str, Any], sprite_name: str  # pyright: ignore[reportExplicitAny]  # JSON config
     ) -> tuple[int | None, list[int] | None]:
         """
         Get palette offset and indices for a specific sprite.

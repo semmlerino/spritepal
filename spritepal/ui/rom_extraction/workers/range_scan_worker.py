@@ -81,9 +81,9 @@ class RangeScanWorker(BaseWorker):
         # Cache integration
         self.rom_cache = rom_cache
 
-        self.found_sprites: list[dict[str, Any]] = []
+        self.found_sprites: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - Sprite result dicts
         self.current_offset = start_offset
-        self.scan_params: dict[str, Any] = {}
+        self.scan_params: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny] - Scan configuration
 
     @handle_worker_errors("range scanning")
     def run(self):
@@ -109,7 +109,8 @@ class RangeScanWorker(BaseWorker):
                 "max_sprite_size": self.max_sprite_size
             }
 
-            cached_progress = self.rom_cache.get_partial_scan_results(self.rom_path, self.scan_params)
+            cached_progress_raw = self.rom_cache.get_partial_scan_results(self.rom_path, self.scan_params)
+            cached_progress: dict[str, Any] = dict(cached_progress_raw) if cached_progress_raw else {}  # pyright: ignore[reportExplicitAny] - scan cache
             if cached_progress and not cached_progress.get("completed", False):
                 # Resume from cached progress
                 self.found_sprites = cached_progress.get("found_sprites", [])
@@ -274,13 +275,15 @@ class RangeScanWorker(BaseWorker):
         """Check if scan is currently stopping"""
         return self._should_stop or self.is_cancelled
 
-    def _save_progress(self, scan_params: dict[str, Any], completed: bool = False) -> bool:
+    def _save_progress(self, scan_params: dict[str, Any], completed: bool = False) -> bool:  # pyright: ignore[reportExplicitAny] - Scan params dict
         """Save current scan progress to cache"""
         try:
+            from collections.abc import Mapping
+            from typing import cast
             return self.rom_cache.save_partial_scan_results(
                 self.rom_path,
-                scan_params,
-                self.found_sprites,
+                cast(dict[str, int], scan_params),
+                cast(list[Mapping[str, object]], self.found_sprites),
                 self.current_offset,
                 completed
             )

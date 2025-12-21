@@ -114,7 +114,11 @@ class StatusBarManager:
                 # Update info
                 total_files = stats.get("total_files", 0)
                 size_bytes = stats.get("total_size_bytes", 0)
-                size_mb = size_bytes / (1024 * 1024)
+                # Ensure size_bytes is an int for arithmetic
+                if isinstance(size_bytes, int):
+                    size_mb = size_bytes / (1024 * 1024)
+                else:
+                    size_mb = 0.0
 
                 if self.cache_info_label is not None:
                     self.cache_info_label.setText(f"{total_files} items, {size_mb:.1f}MB")

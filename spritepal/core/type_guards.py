@@ -7,7 +7,7 @@ better error detection.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, TypeGuard, TypeVar
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -89,7 +89,7 @@ def is_qobject_with_parent(obj: object) -> TypeGuard[QObject]:
     except ImportError:
         return False
 
-def is_complete_extraction_params(params: dict[str, Any]) -> TypeGuard[ROMExtractionParams]:
+def is_complete_extraction_params(params: dict[str, object]) -> TypeGuard[ROMExtractionParams]:
     """
     Type guard to check if a dict contains complete ROM extraction parameters.
 

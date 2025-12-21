@@ -23,7 +23,7 @@ class BaseExtractionWidget(QWidget):
         self._setup_widget_with_group("Group Title", inner_layout)
     """
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: Any | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
         super().__init__(parent)
 
     def _setup_widget_with_group(self, title: str, inner_layout: QLayout) -> None:

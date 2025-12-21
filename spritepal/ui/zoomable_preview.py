@@ -3,30 +3,23 @@ Zoomable sprite preview widget for SpritePal
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt
+from PySide6.QtGui import (
+    QColor,
+    QMouseEvent,
+    QPainter,
+    QPen,
+    QPixmap,
+    QTransform,
+    QWheelEvent,
+)
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import (
-        QColor,
-        QMouseEvent,
-        QPainter,
-        QPen,
-        QPixmap,
-        QTransform,
-        QWheelEvent,
-    )
+    pass
 else:
-    from PySide6.QtGui import (
-        QColor,
-        QMouseEvent,
-        QPainter,
-        QPen,
-        QPixmap,
-        QTransform,
-        QWheelEvent,
-    )
+    pass
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -39,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.services.image_utils import pil_to_qpixmap
+from core.types import PILImage
 from ui.common.spacing_constants import (
     BORDER_THIN,
     MAX_ZOOM,
@@ -93,7 +87,7 @@ class ZoomablePreviewWidget(QWidget):
         )
 
     @override
-    def paintEvent(self, a0: Any) -> None:
+    def paintEvent(self, a0: object) -> None:
         """Paint the preview with zoom and pan"""
         painter = QPainter(self)
         # Use a dark background for better contrast with sprites in dark theme
@@ -148,7 +142,7 @@ class ZoomablePreviewWidget(QWidget):
                 "No sprites loaded",
             )
 
-    def _draw_checkerboard(self, painter: Any, transform: Any) -> None:
+    def _draw_checkerboard(self, painter: QPainter, transform: QTransform) -> None:
         """Draw a checkerboard background for transparency visibility"""
         if self._pixmap is None:
             return
@@ -176,7 +170,7 @@ class ZoomablePreviewWidget(QWidget):
                 else:
                     painter.fillRect(x, y, tile_size, tile_size, QColor(220, 220, 220))
 
-    def _draw_pixel_grid(self, painter: Any, transform: Any) -> None:
+    def _draw_pixel_grid(self, painter: QPainter, transform: QTransform) -> None:
         """Draw a pixel grid when zoomed in"""
         if self._pixmap is None:
             return
@@ -297,30 +291,30 @@ class ZoomablePreviewWidget(QWidget):
             self.update()
 
     @override
-    def keyPressEvent(self, a0: Any) -> None:
+    def keyPressEvent(self, a0: object) -> None:
         """Handle keyboard input"""
-        if a0.key() == Qt.Key.Key_G:
+        if a0.key() == Qt.Key.Key_G:  # type: ignore[attr-defined]
             self._grid_visible = not self._grid_visible
             self.update()
-        elif a0.key() == Qt.Key.Key_F:
+        elif a0.key() == Qt.Key.Key_F:  # type: ignore[attr-defined]
             # F: Zoom to fit
             self.zoom_to_fit()
-        elif a0.key() == Qt.Key.Key_0:
-            if a0.modifiers() == Qt.KeyboardModifier.ControlModifier:
+        elif a0.key() == Qt.Key.Key_0:  # type: ignore[attr-defined]
+            if a0.modifiers() == Qt.KeyboardModifier.ControlModifier:  # type: ignore[attr-defined]
                 # Ctrl+0: Reset zoom to default (4x zoom for pixel art)
                 self._zoom = 4.0
                 self._pan_offset = QPointF(0, 0)
                 self.update()
-            elif a0.modifiers() == (
+            elif a0.modifiers() == (  # type: ignore[attr-defined]
                 Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
             ):
                 # Ctrl+Shift+0: Zoom to fit
                 self.zoom_to_fit()
         else:
-            super().keyPressEvent(a0)
+            super().keyPressEvent(a0)  # type: ignore[arg-type]
 
     def set_preview(
-        self, pixmap: Any, tile_count: int = 0, tiles_per_row: int = 0
+        self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0
     ) -> None:
         """Set the preview pixmap"""
         self._pixmap = pixmap
@@ -328,7 +322,7 @@ class ZoomablePreviewWidget(QWidget):
         self._tiles_per_row = tiles_per_row
         self.reset_view()
 
-    def update_pixmap(self, pixmap: Any) -> None:
+    def update_pixmap(self, pixmap: QPixmap | None) -> None:
         """Update the preview pixmap without resetting view"""
         self._pixmap = pixmap
         self.update()
@@ -376,8 +370,8 @@ class PreviewPanel(QWidget):
 
     def __init__(self) -> None:
         super().__init__()
-        self._grayscale_image = None
-        self._colorized_image = None
+        self._grayscale_image: PILImage | None = None
+        self._colorized_image: PILImage | None = None
         self._apply_transparency = True  # Toggle for transparency
 
         # Initialize colorizer component
@@ -518,12 +512,18 @@ class PreviewPanel(QWidget):
             # Convert grayscale to RGBA for transparency
             rgba_image = self._grayscale_image.convert("RGBA")
             pixels = rgba_image.load()
+            if pixels is None:
+                return
             width, height = rgba_image.size
 
             # Make palette index 0 transparent
             for y in range(height):
                 for x in range(width):
                     pixel_value = self._grayscale_image.getpixel((x, y))
+                    # Narrow type - getpixel should return int for grayscale/palette images
+                    if not isinstance(pixel_value, int):
+                        continue
+
                     # For palette mode images, pixel value is already the palette index
                     if self._grayscale_image.mode == "P":
                         palette_index = pixel_value
@@ -552,13 +552,13 @@ class PreviewPanel(QWidget):
             self.preview.update_pixmap(pixmap)
 
     def set_preview(
-        self, pixmap: Any, tile_count: int = 0, tiles_per_row: int = 0
+        self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0
     ) -> None:
         """Set the preview pixmap"""
         self.preview.set_preview(pixmap, tile_count, tiles_per_row)
 
     def update_preview(
-        self, pixmap: Any, tile_count: int = 0, tiles_per_row: int = 0
+        self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0
     ) -> None:
         """Update the preview pixmap without resetting view (for real-time updates)"""
         self.preview.update_pixmap(pixmap)
@@ -594,13 +594,13 @@ class PreviewPanel(QWidget):
         """Get tile information from the preview widget"""
         return self.preview.get_tile_info()
 
-    def set_grayscale_image(self, pil_image: Any) -> None:
+    def set_grayscale_image(self, pil_image: PILImage) -> None:
         """Set the grayscale PIL image for palette application"""
         self._grayscale_image = pil_image
 
-    def set_palettes(self, palettes_dict: Any) -> None:
+    def set_palettes(self, palettes_dict: object) -> None:
         """Set the available palettes"""
-        self.colorizer.set_palettes(palettes_dict)
+        self.colorizer.set_palettes(palettes_dict)  # type: ignore[arg-type]
 
         # Enable palette controls if we have both image and palettes
         has_data = self._grayscale_image is not None and self.colorizer.has_palettes()
@@ -610,19 +610,19 @@ class PreviewPanel(QWidget):
         if self.palette_toggle.isChecked() and has_data:
             self._apply_current_palette()
 
-    def _pil_to_pixmap(self, pil_image: Any) -> Any | None:
+    def _pil_to_pixmap(self, pil_image: object) -> QPixmap | None:
         """Convert PIL image to QPixmap using enhanced utility function"""
-        return pil_to_qpixmap(pil_image)
+        return pil_to_qpixmap(pil_image)  # type: ignore[return-value]
 
     @override
-    def keyPressEvent(self, a0: Any) -> None:
+    def keyPressEvent(self, a0: object) -> None:
         """Handle keyboard input"""
-        if a0.key() == Qt.Key.Key_C:
+        if a0.key() == Qt.Key.Key_C:  # type: ignore[attr-defined]
             # Toggle palette application
             if self.palette_toggle:
                 self.palette_toggle.setChecked(not self.palette_toggle.isChecked())
         else:
-            super().keyPressEvent(a0)
+            super().keyPressEvent(a0)  # type: ignore[arg-type]
 
     def _on_colorizer_palette_mode_changed(self, enabled: bool) -> None:
         """Handle palette mode change from colorizer"""
@@ -641,10 +641,10 @@ class PreviewPanel(QWidget):
                 break
 
     @override
-    def mousePressEvent(self, a0: Any) -> None:
+    def mousePressEvent(self, a0: object) -> None:
         """Handle mouse press to ensure focus"""
         self.setFocus()
-        super().mousePressEvent(a0)
+        super().mousePressEvent(a0)  # type: ignore[arg-type]
 
     def get_palettes(self) -> dict[int, list[tuple[int, int, int]]]:
         """Get the current palette data

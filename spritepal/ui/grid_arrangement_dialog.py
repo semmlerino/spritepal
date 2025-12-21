@@ -19,8 +19,10 @@ from PySide6.QtGui import (
     QFocusEvent,
     QImage,
     QKeyEvent,
+    QMouseEvent,
     QPen,
     QPixmap,
+    QWheelEvent,
 )
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -69,7 +71,7 @@ class GridGraphicsView(QGraphicsView):
     selection_completed = Signal()
     zoom_changed = Signal(float)  # Zoom level changed
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.tile_width = 8
         self.tile_height = 8
@@ -159,7 +161,7 @@ class GridGraphicsView(QGraphicsView):
                     self.selection_rects[tile_pos] = rect
 
     @override
-    def mousePressEvent(self, event: Any):
+    def mousePressEvent(self, event: QMouseEvent | None):
         """Handle mouse press"""
         if event and event.button() == Qt.MouseButton.LeftButton:
             # Check if we should pan instead of select
@@ -192,10 +194,11 @@ class GridGraphicsView(QGraphicsView):
             self.last_pan_point = event.pos()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
-        super().mousePressEvent(event)
+        if event:
+            super().mousePressEvent(event)
 
     @override
-    def mouseMoveEvent(self, event: Any):
+    def mouseMoveEvent(self, event: QMouseEvent | None):
         """Handle mouse move"""
         if event and self.is_panning and self.last_pan_point is not None:
             # Pan the view
@@ -203,9 +206,9 @@ class GridGraphicsView(QGraphicsView):
             h_bar = self.horizontalScrollBar()
             v_bar = self.verticalScrollBar()
             if h_bar:
-                h_bar.setValue(h_bar - delta.x())
+                h_bar.setValue(h_bar.value() - delta.x())
             if v_bar:
-                v_bar.setValue(v_bar - delta.y())
+                v_bar.setValue(v_bar.value() - delta.y())
             self.last_pan_point = event.pos()
         elif event:
             pos = self.mapToScene(event.pos())
@@ -220,16 +223,17 @@ class GridGraphicsView(QGraphicsView):
                 tile_pos and self._is_valid_tile(tile_pos) and self.selection_start):
                 self._update_rectangle_selection(self.selection_start, tile_pos)
 
-        super().mouseMoveEvent(event)
+        if event:
+            super().mouseMoveEvent(event)
 
     @override
-    def wheelEvent(self, event: Any):
+    def wheelEvent(self, event: QWheelEvent | None):
         """Handle mouse wheel for zooming"""
         if event and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             # Zoom with Ctrl+Wheel
             zoom_factor = 1.15 if event.angleDelta().y() > 0 else 1.0 / 1.15
             self._zoom_at_point(event.position().toPoint(), zoom_factor)
-        else:
+        elif event:
             # Default scroll behavior
             super().wheelEvent(event)
 
@@ -288,7 +292,7 @@ class GridGraphicsView(QGraphicsView):
         else:
             super().keyPressEvent(a0)
 
-    def _zoom_at_point(self, point: Any, zoom_factor: float) -> None:
+    def _zoom_at_point(self, point: Any, zoom_factor: float) -> None:  # pyright: ignore[reportExplicitAny] - Qt point type
         """Zoom at a specific point"""
         # Calculate new zoom level
         new_zoom = self.zoom_level * zoom_factor
@@ -367,7 +371,7 @@ class GridGraphicsView(QGraphicsView):
         return self.zoom_level
 
     @override
-    def mouseReleaseEvent(self, event: Any):
+    def mouseReleaseEvent(self, event: QMouseEvent | None):
         """Handle mouse release"""
         if event and event.button() == Qt.MouseButton.LeftButton:
             if self.is_panning:
@@ -384,7 +388,8 @@ class GridGraphicsView(QGraphicsView):
             self.last_pan_point = None
             self.setCursor(Qt.CursorShape.CrossCursor)
 
-        super().mouseReleaseEvent(event)
+        if event:
+            super().mouseReleaseEvent(event)
 
     def _pos_to_tile(self, pos: QPointF) -> TilePosition | None:
         """Convert scene position to tile position"""
@@ -720,7 +725,7 @@ class GridArrangementDialog(SplitterDialog):
             size=(1600, 900),
             with_status_bar=True,
             # Don't use automatic splitter creation - create explicitly in _setup_ui
-            orientation=None,
+            orientation=None,  # type: ignore[arg-type]
             splitter_handle_width=8,
         )
 
@@ -1342,7 +1347,7 @@ class GridArrangementDialog(SplitterDialog):
             self._update_zoom_level_display()
             super().keyPressEvent(a0)
 
-    def set_palettes(self, palettes_dict: dict[int, Any]):
+    def set_palettes(self, palettes_dict: dict[int, Any]):  # pyright: ignore[reportExplicitAny] - palette data
         """Set available palettes for colorization"""
         self.colorizer.set_palettes(palettes_dict)
         self._update_displays()

@@ -177,7 +177,7 @@ class PreviewCache:
             if entry_count > 0:
                 logger.debug(f"Cleared {entry_count} cache entries")
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Cache statistics dict
         """
         Get cache statistics.
 

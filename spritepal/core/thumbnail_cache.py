@@ -73,7 +73,7 @@ class ThumbnailCache:
         if self.auto_prune:
             self._maybe_prune()
 
-    def _load_metadata(self) -> dict[str, Any]:
+    def _load_metadata(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - JSON metadata dict
         """Load cache metadata from disk, migrating entries if needed."""
         if self.metadata_file.exists():
             try:
@@ -172,7 +172,7 @@ class ThumbnailCache:
                     self._add_to_memory_cache(cache_key, pixmap)
 
                     # Update access time in metadata (debounced to reduce I/O)
-                    entries = cast(dict[str, Any], self.metadata.get("entries", {}))
+                    entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
                     if cache_key in entries:
                         entries[cache_key]["last_access"] = time.time()
                         self._access_count += 1
@@ -217,7 +217,7 @@ class ThumbnailCache:
             pixmap.save(str(cache_file), "PNG")
 
             # Update metadata with access timestamp for LRU eviction
-            entries = cast(dict[str, Any], self.metadata["entries"])
+            entries = cast(dict[str, Any], self.metadata["entries"])  # pyright: ignore[reportExplicitAny] - JSON metadata entries
             entries[cache_key] = {
                 "rom_hash": rom_hash,
                 "offset": offset,
@@ -326,7 +326,7 @@ class ThumbnailCache:
         target_bytes = target_mb * 1024 * 1024
 
         # Get all cache files with their access times and sizes
-        entries = cast(dict[str, Any], self.metadata.get("entries", {}))
+        entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
         file_info: list[tuple[str, float, int]] = []  # (cache_key, last_access, size)
 
         for cache_file in self.cache_dir.glob("*.png"):
@@ -430,7 +430,7 @@ class ThumbnailCache:
 
                     # Remove from metadata
                     cache_key = cache_file.stem
-                    entries = cast(dict[str, Any], self.metadata.get("entries", {}))
+                    entries = cast(dict[str, Any], self.metadata.get("entries", {}))  # pyright: ignore[reportExplicitAny] - JSON metadata entries
                     if cache_key in entries:
                         del entries[cache_key]
 

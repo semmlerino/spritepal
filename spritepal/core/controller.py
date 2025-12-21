@@ -80,7 +80,7 @@ class ExtractionController(QObject):
 
     def __init__(
         self,
-        main_window: Any,  # MainWindow - no protocol defined
+        main_window: Any,  # pyright: ignore[reportExplicitAny] - MainWindow has no protocol
         extraction_manager: ExtractionManagerProtocol,
         session_manager: ApplicationStateManagerProtocol,
         injection_manager: InjectionManagerProtocol,
@@ -88,7 +88,7 @@ class ExtractionController(QObject):
         dialog_factory: DialogFactoryProtocol,
     ) -> None:
         super().__init__()
-        self.main_window: Any = main_window  # MainWindow - no protocol defined
+        self.main_window: Any = main_window  # pyright: ignore[reportExplicitAny] - MainWindow has no protocol
         self.extraction_manager = extraction_manager
         self.session_manager = session_manager
         self.injection_manager = injection_manager
@@ -116,16 +116,18 @@ class ExtractionController(QObject):
             self.update_preview_with_offset
         )
 
-        # Connect injection manager signals
-        _ = self.injection_manager.injection_progress.connect(self._on_injection_progress)
-        _ = self.injection_manager.injection_finished.connect(self._on_injection_finished)
-        _ = self.injection_manager.cache_saved.connect(self._on_cache_saved)
+        # Connect injection manager signals - cast to concrete type for signal access
+        injection_mgr = cast(CoreOperationsManager, self.injection_manager)
+        _ = injection_mgr.injection_progress.connect(self._on_injection_progress)
+        _ = injection_mgr.injection_finished.connect(self._on_injection_finished)
+        _ = injection_mgr.cache_saved.connect(self._on_cache_saved)
 
-        # Connect extraction manager cache signals
-        _ = self.extraction_manager.cache_operation_started.connect(self._on_cache_operation_started)
-        _ = self.extraction_manager.cache_hit.connect(self._on_cache_hit)
-        _ = self.extraction_manager.cache_miss.connect(self._on_cache_miss)
-        _ = self.extraction_manager.cache_saved.connect(self._on_cache_saved)
+        # Connect extraction manager cache signals - cast to concrete type for signal access
+        extraction_mgr = cast(CoreOperationsManager, self.extraction_manager)
+        _ = extraction_mgr.cache_operation_started.connect(self._on_cache_operation_started)
+        _ = extraction_mgr.cache_hit.connect(self._on_cache_hit)
+        _ = extraction_mgr.cache_miss.connect(self._on_cache_miss)
+        _ = extraction_mgr.cache_saved.connect(self._on_cache_saved)
 
         # Initialize preview generator with managers
         self.preview_generator = get_preview_generator()
@@ -594,9 +596,11 @@ class ExtractionController(QObject):
             # Save injection parameters for future use if it was a ROM injection
             current_injection_params = self.session_manager.get("workflow", "current_injection_params")
 
+            # Cast to Any for .get() method access (dynamic session data)
+            params_dict: Any = current_injection_params  # pyright: ignore[reportExplicitAny] - session data is dynamic
             if (
                 current_injection_params
-                and current_injection_params.get("mode") == "rom"
+                and params_dict.get("mode") == "rom"
                 and self._current_injection_dialog
                 and hasattr(
                     self._current_injection_dialog, "save_rom_injection_parameters"
@@ -655,7 +659,7 @@ class ExtractionController(QObject):
             self.status_message_timed.emit(message, 5000)
             self.cache_refresh_requested.emit()
 
-    def start_rom_extraction(self, params: dict[str, Any]) -> None:
+    def start_rom_extraction(self, params: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - params are dynamic extraction config
         """Start ROM sprite extraction process"""
         # Convert validated params dict to ROMExtractionParams TypedDict
         rom_extraction_params: ROMExtractionParams = {

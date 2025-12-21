@@ -48,7 +48,7 @@ class SignalConnectionHelper:
         self.manager = worker.manager
         self._connections = worker._connections
 
-    def validate_manager_type(self, expected_manager_getter: Callable[[], Any], operation_type: str) -> bool:
+    def validate_manager_type(self, expected_manager_getter: Callable[[], object], operation_type: str) -> bool:
         """
         Validate that the manager is of the expected type.
 
@@ -109,9 +109,10 @@ class SignalConnectionHelper:
         if not hasattr(self.worker, "palettes_ready"):
             return
 
-        # Connect palette signals
-        connection1 = extraction_manager.palettes_extracted.connect(self.worker.palettes_ready.emit)
-        connection2 = extraction_manager.active_palettes_found.connect(self.worker.active_palettes_ready.emit)
+        # Connect palette signals - cast to Any for signal access (protocols can't express Signal descriptors)
+        mgr: Any = extraction_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
+        connection1 = mgr.palettes_extracted.connect(self.worker.palettes_ready.emit)
+        connection2 = mgr.active_palettes_found.connect(self.worker.active_palettes_ready.emit)
         self._connections.extend([connection1, connection2])
         logger.debug("Connected extraction-specific signals")
 
@@ -140,34 +141,37 @@ class SignalConnectionHelper:
                 logger.exception(f"Unexpected error emitting preview image: {e}")
                 self.worker.emit_warning(f"Preview generation failed: {e}")
 
-        connection = extraction_manager.preview_generated.connect(on_preview_generated)
+        # Cast to Any for signal access (protocols can't express Signal descriptors)
+        mgr: Any = extraction_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
+        connection = mgr.preview_generated.connect(on_preview_generated)
         self._connections.append(connection)
         logger.debug("Connected preview generation signals")
 
-    def connect_injection_signals(self, injection_manager: Any) -> None:
+    def connect_injection_signals(self, injection_manager: object) -> None:
         """
         Connect injection-specific signals.
 
         Args:
-            injection_manager: The injection manager instance (typed as Any because
+            injection_manager: The injection manager instance (typed as object because
                 Qt signals cannot be expressed in Protocol types)
         """
         if not hasattr(self.worker, "injection_finished"):
             return
 
-        # Connect injection-specific signals
-        connection1 = injection_manager.injection_finished.connect(self.worker.injection_finished.emit)
-        connection2 = injection_manager.progress_percent.connect(self.worker.progress_percent.emit)
-        connection3 = injection_manager.compression_info.connect(self.worker.compression_info.emit)
+        # Connect injection-specific signals - cast to Any for signal access
+        mgr: Any = injection_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
+        connection1 = mgr.injection_finished.connect(self.worker.injection_finished.emit)
+        connection2 = mgr.progress_percent.connect(self.worker.progress_percent.emit)
+        connection3 = mgr.compression_info.connect(self.worker.compression_info.emit)
         self._connections.extend([connection1, connection2, connection3])
         logger.debug("Connected injection-specific signals")
 
-    def connect_completion_signals(self, injection_manager: Any) -> None:
+    def connect_completion_signals(self, injection_manager: object) -> None:
         """
         Connect injection completion signals to worker operation completion.
 
         Args:
-            injection_manager: The injection manager instance (typed as Any because
+            injection_manager: The injection manager instance (typed as object because
                 Qt signals cannot be expressed in Protocol types)
         """
         def on_injection_finished(success: bool, message: str) -> None:
@@ -177,7 +181,9 @@ class SignalConnectionHelper:
                 f"Injection {'completed' if success else 'failed'}: {message}"
             )
 
-        connection = injection_manager.injection_finished.connect(on_injection_finished)
+        # Cast to Any for signal access
+        mgr: Any = injection_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
+        connection = mgr.injection_finished.connect(on_injection_finished)
         self._connections.append(connection)
         logger.debug("Connected injection completion signals")
 
@@ -197,8 +203,8 @@ class WorkerOwnedManagerMixin:
 
     @staticmethod
     def create_worker_owned_manager(
-        manager_factory: Any | None,
-        manager_creator_func: Callable[[Any, QObject | None], BaseManager],
+        manager_factory: object | None,
+        manager_creator_func: Callable[[object, QObject | None], BaseManager],
         parent: QObject | None = None
     ) -> BaseManager:
         """
@@ -293,7 +299,7 @@ class ScanWorkerBase(BaseWorker):
         super().__init__(parent)
         self._operation_name = "ScanWorker"
 
-    def emit_item_found(self, item_info: dict[str, Any]) -> None:
+    def emit_item_found(self, item_info: dict[str, object]) -> None:
         """
         Emit when an item is found during scanning.
 
@@ -333,7 +339,7 @@ class PreviewWorkerBase(BaseWorker):
         super().__init__(parent)
         self._operation_name = "PreviewWorker"
 
-    def emit_preview_ready(self, preview: Any) -> None:
+    def emit_preview_ready(self, preview: object) -> None:
         """
         Emit when preview is ready.
 

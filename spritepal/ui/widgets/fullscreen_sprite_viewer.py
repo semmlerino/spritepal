@@ -76,7 +76,7 @@ class FullscreenSpriteViewer(QWidget):
         super().__init__(parent)
 
         # Data
-        self.sprites_data: list[dict[str, Any]] = []
+        self.sprites_data: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite metadata
         self.current_index: int = 0
         self.rom_path: str | None = None
         self.rom_extractor: ROMExtractorProtocol | None = None
@@ -216,7 +216,7 @@ class FullscreenSpriteViewer(QWidget):
         self.cursor_timer.timeout.connect(hide_cursor)
         self.cursor_timer.start(3000)
 
-    def set_sprite_data(self, sprites_data: list[dict[str, Any]], current_offset: int,
+    def set_sprite_data(self, sprites_data: list[dict[str, Any]], current_offset: int,  # pyright: ignore[reportExplicitAny] - sprite metadata
                        rom_path: str, rom_extractor: ROMExtractorProtocol | None) -> bool:
         """
         Set the sprite data for the viewer.

@@ -25,7 +25,7 @@ import weakref
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from PySide6.QtCore import SignalInstance
@@ -80,7 +80,7 @@ class SignalRegistry:
         if self._initialized:
             return
 
-        self._connections: list[tuple[weakref.ref[Any] | None, Callable[..., Any], ConnectionInfo]] = []
+        self._connections: list[tuple[weakref.ref[object] | None, Callable[..., object], ConnectionInfo]] = []
         self._connection_lock = threading.RLock()
         self._enabled = True
         self._initialized = True
@@ -88,7 +88,7 @@ class SignalRegistry:
     def connect(
         self,
         signal: SignalInstance,
-        slot: Callable[..., Any],
+        slot: Callable[..., object],
         description: str = "",
     ) -> bool:
         """Connect a signal to a slot and register the connection.

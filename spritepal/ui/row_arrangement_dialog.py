@@ -45,12 +45,12 @@ if TYPE_CHECKING:
 class RowArrangementDialog(SplitterDialog):
     """Dialog for arranging sprite rows with intuitive drag-and-drop interface"""
 
-    def __init__(self, sprite_path: str, tiles_per_row: int = 16, parent: Any | None = None) -> None:
+    def __init__(self, sprite_path: str, tiles_per_row: int = 16, parent: Any | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path: str | None = sprite_path
         self.tiles_per_row: int = tiles_per_row
         self.original_image: Image.Image | None = None
-        self.tile_rows: list[dict[str, Any]] = []
+        self.tile_rows: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - Tile arrangement metadata
         self.output_path: str | None = None
         self.tile_width: int | None = None  # Will be calculated based on image width
         self.tile_height: int | None = None  # Will be calculated based on tile width

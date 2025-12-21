@@ -40,7 +40,8 @@ class SpriteConfigLoader:
             config_path: Path to configuration file (uses default if None)
         """
         self.config_path: str = config_path or self.DEFAULT_CONFIG_PATH
-        self.config_data: dict[str, Any] = {}
+        # JSON data is inherently untyped; structure validated at runtime
+        self.config_data: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny]
         self.load_config()
 
     def load_config(self) -> None:

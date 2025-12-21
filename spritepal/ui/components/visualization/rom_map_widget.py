@@ -6,15 +6,13 @@ Visual representation of ROM with sprite locations for manual offset exploration
 
 from __future__ import annotations
 
-from typing import Any
-
 try:
     from typing import override
 except ImportError:
     from typing import override
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen
+from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen, QShowEvent
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from ui.styles.theme import COLORS
@@ -147,7 +145,7 @@ class ROMMapWidget(QWidget):
             self._needs_update = True
 
     @override
-    def showEvent(self, event: Any):
+    def showEvent(self, event: QShowEvent):
         """Handle widget becoming visible"""
         super().showEvent(event)
         if self._needs_update:

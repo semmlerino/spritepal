@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class TabCoordinatorActionsProtocol(Protocol):
     """Protocol defining the interface for tab coordinator actions"""
 
-    def get_rom_extraction_params(self) -> dict[str, Any] | None:
+    def get_rom_extraction_params(self) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - Extraction configuration
         """Get ROM extraction parameters"""
         ...
 

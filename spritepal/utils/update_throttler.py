@@ -26,7 +26,7 @@ class UpdateThrottler(Generic[T]):
     Thread-safe implementation using locks.
     """
 
-    def __init__(self, delay_ms: int = 200, callback: Callable[[T], Any] | None = None):
+    def __init__(self, delay_ms: int = 200, callback: Callable[[T], Any] | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Callback return type
         """
         Initialize the update throttler.
 
@@ -231,8 +231,8 @@ class BatchUpdateCollector(Generic[T]):
         self,
         batch_size: int = 10,
         batch_delay_ms: int = 500,
-        callback: Callable[[list[T]], Any] | None = None
-    ):
+        callback: Callable[[list[T]], Any] | None = None  # pyright: ignore[reportExplicitAny] - Callback return type
+    ) -> None:
         """
         Initialize the batch collector.
 

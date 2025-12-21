@@ -20,7 +20,7 @@ class OutputNameWidget(BaseExtractionWidget):
     # Signals
     text_changed = Signal(str)  # Emitted when output name changes
 
-    def __init__(self, parent: Any | None = None):
+    def __init__(self, parent: Any | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Qt parent type
         super().__init__(parent)
         self._setup_ui()
 

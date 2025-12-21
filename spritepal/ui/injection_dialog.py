@@ -4,9 +4,9 @@ Allows users to configure sprite injection parameters
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, cast, override
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import InjectionManagerProtocol
@@ -62,9 +62,9 @@ class InjectionDialog(TabbedDialog):
         self.sprite_path = sprite_path
         self.metadata_path = metadata_path
         self.suggested_input_vram = input_vram
-        self.metadata = None
-        self.extraction_vram_offset = None
-        self.rom_extraction_info = None
+        self.metadata: Mapping[str, object] | None = None
+        self.extraction_vram_offset: str | None = None
+        self.rom_extraction_info: Mapping[str, object] | None = None
         self.injection_manager = injection_manager
 
         # Initialize UI components that will be created in setup methods
@@ -520,16 +520,19 @@ class InjectionDialog(TabbedDialog):
 
     def _load_metadata(self) -> None:
         """Load metadata if available"""
-        metadata_info = self.injection_manager.load_metadata(self.metadata_path)
+        metadata_info: Mapping[str, object] | None = self.injection_manager.load_metadata(self.metadata_path)
 
         if metadata_info:
-            self.metadata = metadata_info.get("metadata")
-            self.extraction_vram_offset = metadata_info.get("extraction_vram_offset")
-            self.rom_extraction_info = metadata_info.get("rom_extraction_info")
+            metadata_raw = metadata_info.get("metadata")
+            self.metadata = cast(Mapping[str, object], metadata_raw) if isinstance(metadata_raw, dict) else None
+            vram_offset_raw = metadata_info.get("extraction_vram_offset")
+            self.extraction_vram_offset = vram_offset_raw if isinstance(vram_offset_raw, str) else None
+            rom_info_raw = metadata_info.get("rom_extraction_info")
+            self.rom_extraction_info = cast(Mapping[str, object], rom_info_raw) if isinstance(rom_info_raw, dict) else None
 
             # Display extraction info
             if metadata_info.get("extraction"):
-                extraction = metadata_info["extraction"]
+                extraction = cast(Mapping[str, object], metadata_info["extraction"])
                 source_type = metadata_info["source_type"]
 
                 if source_type == "rom" and self.rom_extraction_info:
@@ -549,7 +552,8 @@ class InjectionDialog(TabbedDialog):
 
                     # Set default VRAM offset
                     if self.vram_offset_input:
-                        self.vram_offset_input.set_text(metadata_info.get("default_vram_offset", "0xC000"))
+                        default_vram_offset = metadata_info.get("default_vram_offset", "0xC000")
+                        self.vram_offset_input.set_text(cast(str, default_vram_offset))
                 else:
                     # VRAM extraction metadata
                     info_text = f"Original VRAM: {extraction.get('vram_source', 'Unknown')}\n"
@@ -662,7 +666,7 @@ class InjectionDialog(TabbedDialog):
         logger.debug(f"Starting async ROM info load for: {rom_path}")
         self._rom_info_loader.start()
 
-    def _on_rom_info_loaded(self, rom_info: dict[str, Any]) -> None:
+    def _on_rom_info_loaded(self, rom_info: Mapping[str, object]) -> None:
         """Handle ROM info loaded from background worker."""
         # Guard: skip if dialog is closing to prevent crash on deleted widget
         if self._is_closing:
@@ -698,7 +702,7 @@ class InjectionDialog(TabbedDialog):
             return
 
         # Display ROM info
-        header = rom_info["header"]
+        header = cast(Mapping[str, object], rom_info["header"])
         info_text = f"Title: {header['title']}\n"
         info_text += f"ROM Type: 0x{header['rom_type']:02X}\n"
         info_text += f"Checksum: 0x{header['checksum']:04X}"
@@ -708,7 +712,7 @@ class InjectionDialog(TabbedDialog):
             self.rom_info_group.show()
 
         # Populate sprite locations
-        sprite_locations = rom_info.get("sprite_locations", {})
+        sprite_locations = cast(Mapping[str, int], rom_info.get("sprite_locations", {}))
         if sprite_locations:
             if self.sprite_location_combo:
                 # Clear any existing items first to prevent duplicates
@@ -736,7 +740,7 @@ class InjectionDialog(TabbedDialog):
             except Exception as restore_error:
                 logger.warning(f"Failed to restore sprite location: {restore_error}")
         # Not a Kirby ROM or no sprite locations
-        elif "KIRBY" not in header["title"].upper():
+        elif "KIRBY" not in cast(str, header["title"]).upper():
             if self.sprite_location_combo:
                 self.sprite_location_combo.addItem(f"No sprite data available for: {header['title']}", None)
         elif self.sprite_location_combo:
@@ -794,7 +798,7 @@ class InjectionDialog(TabbedDialog):
             return "Please select a sprite file"
         return None
 
-    def _validate_vram_inputs(self) -> tuple[str | None, dict[str, Any] | None]:
+    def _validate_vram_inputs(self) -> tuple[str | None, dict[str, object] | None]:
         """Validate VRAM injection inputs and build parameters.
 
         Returns:
@@ -820,7 +824,7 @@ class InjectionDialog(TabbedDialog):
             return error_msg, None
 
         # Build parameters dictionary
-        params = {
+        params: dict[str, object] = {
             "mode": "vram",
             "sprite_path": self.sprite_file_selector.get_path() if self.sprite_file_selector else "",
             "input_vram": self.input_vram_selector.get_path() if self.input_vram_selector else "",
@@ -831,7 +835,7 @@ class InjectionDialog(TabbedDialog):
 
         return None, params
 
-    def _validate_rom_inputs(self) -> tuple[str | None, dict[str, Any] | None]:
+    def _validate_rom_inputs(self) -> tuple[str | None, dict[str, object] | None]:
         """Validate ROM injection inputs and build parameters.
 
         Returns:
@@ -865,7 +869,7 @@ class InjectionDialog(TabbedDialog):
             return "Please select a sprite location or enter a custom offset", None
 
         # Build parameters dictionary
-        params = {
+        params: dict[str, object] = {
             "mode": "rom",
             "sprite_path": self.sprite_file_selector.get_path() if self.sprite_file_selector else "",
             "input_rom": self.input_rom_selector.get_path() if self.input_rom_selector else "",
@@ -877,7 +881,7 @@ class InjectionDialog(TabbedDialog):
 
         return None, params
 
-    def get_parameters(self) -> dict[str, Any] | None:
+    def get_parameters(self) -> dict[str, object] | None:
         """Get injection parameters if dialog accepted.
 
         Validates all inputs and returns parameters dictionary for injection,
@@ -935,7 +939,7 @@ class InjectionDialog(TabbedDialog):
 
     def _set_rom_injection_defaults(self) -> None:
         """Set ROM injection parameters from saved settings or metadata"""
-        metadata_dict = None
+        metadata_dict: dict[str, object] | None = None
         if hasattr(self, "metadata"):
             metadata_dict = {
                 "metadata": self.metadata,
@@ -943,37 +947,42 @@ class InjectionDialog(TabbedDialog):
                 "extraction_vram_offset": self.extraction_vram_offset
             }
 
-        defaults = self.injection_manager.load_rom_injection_defaults(self.sprite_path, metadata_dict)
+        defaults: Mapping[str, object] = self.injection_manager.load_rom_injection_defaults(self.sprite_path, metadata_dict)
 
         # Set input ROM
-        if defaults["input_rom"] and self.input_rom_selector:
-            self.input_rom_selector.set_path(defaults["input_rom"])
-            if defaults["output_rom"] and self.output_rom_selector:
-                self.output_rom_selector.set_path(defaults["output_rom"])
+        input_rom = cast(str, defaults["input_rom"]) if defaults["input_rom"] else ""
+        if input_rom and self.input_rom_selector:
+            self.input_rom_selector.set_path(input_rom)
+            output_rom = cast(str, defaults["output_rom"]) if defaults["output_rom"] else ""
+            if output_rom and self.output_rom_selector:
+                self.output_rom_selector.set_path(output_rom)
 
             # Store pending offset to restore after async ROM info load completes
             # This fixes a race condition where we tried to match offsets in the
             # combo box before it was populated by the background worker
-            if defaults["rom_offset"] is not None:
-                self._pending_rom_offset = defaults["rom_offset"]
-                self._pending_custom_offset = defaults["custom_offset"]
+            rom_offset = defaults["rom_offset"]
+            if rom_offset is not None:
+                self._pending_rom_offset = cast(int, rom_offset)
+                custom_offset = defaults["custom_offset"]
+                self._pending_custom_offset = cast(str, custom_offset) if custom_offset else None
             elif defaults["custom_offset"]:
-                self._pending_custom_offset = defaults["custom_offset"]
+                self._pending_custom_offset = cast(str, defaults["custom_offset"])
 
             # Load ROM info to populate sprite locations (async)
             # The pending offset will be applied in _on_rom_info_loaded()
-            self._load_rom_info(defaults["input_rom"])
+            self._load_rom_info(input_rom)
         else:
             # No ROM to load, but still restore other settings
             self._restore_saved_sprite_location()
 
         # Set custom offset if we don't have a ROM offset match
-        if defaults["custom_offset"] and defaults["rom_offset"] is None and self.rom_offset_input:
-            self.rom_offset_input.set_text(defaults["custom_offset"])
+        custom_offset = defaults["custom_offset"]
+        if custom_offset and defaults["rom_offset"] is None and self.rom_offset_input:
+            self.rom_offset_input.set_text(cast(str, custom_offset))
 
         # Set fast compression
         if self.fast_compression_check:
-            self.fast_compression_check.setChecked(defaults["fast_compression"])
+            self.fast_compression_check.setChecked(cast(bool, defaults["fast_compression"]))
 
     def _apply_pending_offset(self) -> None:
         """Apply pending offset that was stored before async ROM info load.
@@ -1016,21 +1025,24 @@ class InjectionDialog(TabbedDialog):
                     display_name = text.split(" (0x")[0] if " (0x" in text else text
                     sprite_locations[display_name] = offset
 
-        restore_info = self.injection_manager.restore_saved_sprite_location(
+        restore_info: Mapping[str, object] = self.injection_manager.restore_saved_sprite_location(
             self.extraction_vram_offset,
             sprite_locations
         )
 
-        if restore_info["sprite_location_index"] is not None:
+        sprite_location_index = restore_info["sprite_location_index"]
+        if sprite_location_index is not None:
             if self.sprite_location_combo:
-                idx = restore_info["sprite_location_index"]
+                idx = cast(int, sprite_location_index)
                 # Bounds check before setting index
                 if 0 <= idx < self.sprite_location_combo.count():
                     self.sprite_location_combo.setCurrentIndex(idx)
                 else:
                     logger.warning(f"Saved sprite location index {idx} out of bounds (count: {self.sprite_location_combo.count()})")
-        elif restore_info["custom_offset"] and self.rom_offset_input:
-            self.rom_offset_input.set_text(restore_info["custom_offset"])
+        else:
+            custom_offset = restore_info["custom_offset"]
+            if custom_offset and self.rom_offset_input:
+                self.rom_offset_input.set_text(cast(str, custom_offset))
 
     def save_rom_injection_parameters(self) -> None:
         """Save ROM injection parameters to settings for future use"""
@@ -1050,9 +1062,11 @@ class InjectionDialog(TabbedDialog):
 
         try:
             # Try to detect sprite name from metadata or filename
-            sprite_name = None
+            sprite_name: str | None = None
             if self.metadata and "extraction" in self.metadata:
-                sprite_name = self.metadata["extraction"].get("sprite_name", "")
+                extraction_data = cast(Mapping[str, object], self.metadata["extraction"])
+                sprite_name_raw = extraction_data.get("sprite_name", "")
+                sprite_name = cast(str, sprite_name_raw) if sprite_name_raw else None
 
             if not sprite_name:
                 # Extract from filename (e.g., "kirby_normal_sprites.png" -> "kirby_normal")

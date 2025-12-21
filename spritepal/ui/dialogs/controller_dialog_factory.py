@@ -45,7 +45,7 @@ class ControllerDialogFactory:
         """
         from ui.row_arrangement_dialog import RowArrangementDialog
 
-        return RowArrangementDialog(sprite_path, tiles_per_row, parent)
+        return RowArrangementDialog(sprite_path, tiles_per_row, parent)  # type: ignore[return-value]
 
     def create_grid_arrangement_dialog(
         self,
@@ -66,7 +66,7 @@ class ControllerDialogFactory:
         """
         from ui.grid_arrangement_dialog import GridArrangementDialog
 
-        return GridArrangementDialog(sprite_path, tiles_per_row, parent)
+        return GridArrangementDialog(sprite_path, tiles_per_row, parent)  # type: ignore[return-value]
 
     def create_injection_dialog(
         self,

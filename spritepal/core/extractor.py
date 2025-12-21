@@ -4,7 +4,7 @@ Core sprite extraction functionality
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from PIL import Image
 
@@ -262,7 +262,7 @@ class SpriteExtractor:
         create_grayscale: bool = True,
         create_metadata: bool = True,
         create_palette_files: bool = True,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Extract sprite from VRAM with full metadata.
 
         Wrapper providing the interface expected by CoreOperationsManager.
@@ -293,7 +293,7 @@ class SpriteExtractor:
             vram_path, output_path, offset=vram_offset
         )
 
-        result: dict[str, Any] = {
+        result: dict[str, object] = {
             "success": True,
             "image": image,
             "tile_count": tile_count,

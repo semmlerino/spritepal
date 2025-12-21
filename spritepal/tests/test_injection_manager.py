@@ -727,16 +727,16 @@ class TestInjectionManagerVRAMSuggestion:
 
     @patch.object(CoreOperationsManager, "_get_session_manager")
     def test_try_session_vram_recent_files(self, mock_get_session, tmp_path):
-        """Test session VRAM strategy with recent files"""
+        """Test session VRAM strategy with session vram_path setting"""
         manager = CoreOperationsManager()
 
         # Create VRAM file
         vram_file = tmp_path / "recent_vram.dmp"
         vram_file.write_text("fake vram data")
 
-        # Mock session manager
+        # Mock session manager - get_setting is what _try_session_vram actually calls
         mock_session = Mock()
-        mock_session.get_recent_files.return_value = [str(vram_file)]
+        mock_session.get_setting.return_value = str(vram_file)
         mock_get_session.return_value = mock_session
 
         result = manager._try_session_vram()
