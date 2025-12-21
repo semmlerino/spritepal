@@ -476,6 +476,175 @@ class ROMCacheProtocol(Protocol):
         ...
 
 
+class ROMServiceProtocol(Protocol):
+    """Protocol for ROM-based sprite extraction service.
+
+    Provides ROM sprite extraction with palette support, preview generation,
+    sprite location discovery with caching, and ROM header reading.
+    """
+
+    # Signals (accessed via attributes)
+    extraction_progress: Any  # Signal(str) - progress message
+    extraction_warning: Any  # Signal(str) - warning message (partial success)
+    preview_generated: Any  # Signal(object, int) - PIL Image, tile count
+    palettes_extracted: Any  # Signal(dict) - palette data
+    active_palettes_found: Any  # Signal(list) - active palette indices
+    files_created: Any  # Signal(list) - list of created files
+    cache_operation_started: Any  # Signal(str, str) - operation type, cache type
+    cache_hit: Any  # Signal(str, float) - cache type, time saved
+    cache_miss: Any  # Signal(str) - cache type
+    cache_saved: Any  # Signal(str, int) - cache type, number of items
+    error_occurred: Any  # Signal(str) - error message
+
+    def cleanup(self) -> None:
+        """Cleanup service resources."""
+        ...
+
+    def get_rom_extractor(self) -> ROMExtractorProtocol:
+        """Get the ROM extractor instance for advanced operations."""
+        ...
+
+    def extract_from_rom(
+        self,
+        rom_path: str,
+        offset: int,
+        output_base: str,
+        sprite_name: str,
+        cgram_path: str | None = None,
+    ) -> list[str]:
+        """Extract sprites from ROM at specific offset.
+
+        Args:
+            rom_path: Path to ROM file
+            offset: Offset in ROM to extract from
+            output_base: Base name for output files
+            sprite_name: Name of the sprite being extracted
+            cgram_path: CGRAM dump for palette extraction
+
+        Returns:
+            List of created file paths
+        """
+        ...
+
+    def get_sprite_preview(
+        self,
+        rom_path: str,
+        offset: int,
+        sprite_name: str | None = None,
+    ) -> tuple[bytes, int, int]:
+        """Get a preview of sprite data from ROM without saving files.
+
+        Args:
+            rom_path: Path to ROM file
+            offset: Offset in ROM
+            sprite_name: Sprite name for logging
+
+        Returns:
+            Tuple of (tile_data, width, height)
+        """
+        ...
+
+    def extract_sprite_to_png(
+        self,
+        rom_path: str,
+        sprite_offset: int,
+        output_path: str,
+        cgram_path: str | None = None,
+    ) -> bool:
+        """Extract a single sprite to PNG file.
+
+        Args:
+            rom_path: Path to ROM file
+            sprite_offset: Offset of sprite in ROM
+            output_path: Full path where PNG should be saved
+            cgram_path: Optional CGRAM file for palette data
+
+        Returns:
+            True if extraction successful, False otherwise
+        """
+        ...
+
+    def get_known_sprite_locations(self, rom_path: str) -> dict[str, Any]:
+        """Get known sprite locations for a ROM with caching.
+
+        Args:
+            rom_path: Path to ROM file
+
+        Returns:
+            Dictionary of known sprite locations
+        """
+        ...
+
+    def read_rom_header(self, rom_path: str) -> dict[str, Any]:
+        """Read ROM header information.
+
+        Args:
+            rom_path: Path to ROM file
+
+        Returns:
+            Dictionary containing ROM header information
+        """
+        ...
+
+
+class VRAMServiceProtocol(Protocol):
+    """Protocol for VRAM-based sprite extraction service.
+
+    Provides VRAM sprite extraction with palette support and preview generation.
+    """
+
+    # Signals (accessed via attributes)
+    extraction_progress: Any  # Signal(str) - progress message
+    extraction_warning: Any  # Signal(str) - warning message (partial success)
+    preview_generated: Any  # Signal(object, int) - PIL Image, tile count
+    palettes_extracted: Any  # Signal(dict) - palette data
+    active_palettes_found: Any  # Signal(list) - active palette indices
+    files_created: Any  # Signal(list) - list of created files
+    error_occurred: Any  # Signal(str) - error message
+
+    def cleanup(self) -> None:
+        """Cleanup service resources."""
+        ...
+
+    def extract_from_vram(
+        self,
+        vram_path: str,
+        output_base: str,
+        cgram_path: str | None = None,
+        oam_path: str | None = None,
+        vram_offset: int | None = None,
+        create_grayscale: bool = True,
+        create_metadata: bool = True,
+        grayscale_mode: bool = False,
+    ) -> list[str]:
+        """Extract sprites from VRAM dump.
+
+        Args:
+            vram_path: Path to VRAM dump file
+            output_base: Base name for output files (without extension)
+            cgram_path: Path to CGRAM dump for palette extraction
+            oam_path: Path to OAM dump for palette analysis
+            vram_offset: Offset in VRAM (default: 0xC000)
+            create_grayscale: Create grayscale palette files
+            create_metadata: Create metadata JSON file
+            grayscale_mode: Skip palette extraction entirely
+
+        Returns:
+            List of created file paths
+        """
+        ...
+
+    def generate_preview(self, vram_path: str, offset: int) -> tuple[Image.Image, int]:
+        """Generate a preview image from VRAM at the specified offset.
+
+        Args:
+            vram_path: Path to VRAM dump file
+            offset: Offset in VRAM to start extracting from
+
+        Returns:
+            Tuple of (PIL image, tile count)
+        """
+        ...
 
 
 class ConfigurationServiceProtocol(Protocol):
@@ -558,13 +727,27 @@ class ApplicationStateManagerProtocol(Protocol):
     """
 
     # Signals (accessed via attributes)
-    state_changed: Any  # Signal(str, dict)
-    workflow_state_changed: Any  # Signal(object, object)
-    session_changed: Any  # Signal()
-    cache_stats_updated: Any  # Signal(dict)
-    current_offset_changed: Any  # Signal(int)
-    preview_ready: Any  # Signal(int, QImage)
-    application_state_snapshot: Any  # Signal(dict)
+    # State signals
+    state_changed: Any  # Signal(str, dict) - category, data
+    workflow_state_changed: Any  # Signal(object, object) - old_state, new_state
+    application_state_snapshot: Any  # Signal(dict) - full state for debugging
+
+    # Session signals
+    session_changed: Any  # Signal() - session data modified
+    files_updated: Any  # Signal(dict) - file paths changed
+    settings_saved: Any  # Signal() - settings persisted to disk
+    session_restored: Any  # Signal(dict) - session loaded from disk
+
+    # History signals
+    history_updated: Any  # Signal(list) - list of sprite offsets
+    sprite_added: Any  # Signal(int, float) - offset, quality_score
+
+    # Cache signals
+    cache_stats_updated: Any  # Signal(dict) - updated cache metrics
+
+    # UI coordination signals
+    current_offset_changed: Any  # Signal(int) - ROM offset changed
+    preview_ready: Any  # Signal(int, QImage) - offset, preview_image
 
     # ========== Settings management ==========
     def get_setting(self, category: str, key: str, default: Any = None) -> Any:
@@ -608,12 +791,12 @@ class ApplicationStateManagerProtocol(Protocol):
         """Set a setting value by category and key."""
         ...
 
-    def get_window_geometry(self) -> dict[str, int]:
-        """Get saved window geometry."""
+    def get_window_geometry(self) -> dict[str, int | list[int]]:
+        """Get saved window geometry including splitter sizes."""
         ...
 
-    def update_window_state(self, geometry: dict[str, int | float]) -> None:
-        """Update window geometry in settings."""
+    def update_window_state(self, geometry: dict[str, int | float | list[int]]) -> None:
+        """Update window geometry in settings including splitter sizes."""
         ...
 
     # Runtime state management
@@ -682,4 +865,204 @@ class ApplicationStateManagerProtocol(Protocol):
 
     def get_current_offset(self) -> int | None:
         """Get the current ROM offset."""
+        ...
+
+
+# ========== Extracted Service Protocols ==========
+
+
+class StateSnapshotServiceProtocol(Protocol):
+    """Protocol for state snapshot service.
+
+    Manages creation, storage, and restoration of state snapshots
+    for undo/restore functionality.
+    """
+
+    # Signals
+    snapshot_created: Any  # Signal(str) - snapshot_id
+    snapshot_restored: Any  # Signal(str) - snapshot_id
+
+    def create_snapshot(
+        self,
+        states: dict[str, Any],
+        namespace: str | None = None,
+    ) -> str:
+        """Create a snapshot of the provided state."""
+        ...
+
+    def restore_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        """Retrieve state from a snapshot."""
+        ...
+
+    def get_snapshot_namespace(self, snapshot_id: str) -> str | None:
+        """Get the namespace of a snapshot."""
+        ...
+
+    def list_snapshots(self) -> list[str]:
+        """List all snapshot IDs in creation order."""
+        ...
+
+    def delete_snapshot(self, snapshot_id: str) -> bool:
+        """Delete a specific snapshot."""
+        ...
+
+    def clear(self) -> None:
+        """Clear all snapshots."""
+        ...
+
+    @property
+    def count(self) -> int:
+        """Get the number of stored snapshots."""
+        ...
+
+    def cleanup(self) -> None:
+        """Clean up resources."""
+        ...
+
+
+class WorkflowManagerProtocol(Protocol):
+    """Protocol for workflow state machine management.
+
+    Manages the extraction workflow state machine including state
+    transitions, busy states, and capability queries.
+    """
+
+    # Signals
+    workflow_state_changed: Any  # Signal(str, str) - old_state, new_state
+    workflow_error: Any  # Signal(str) - error message
+
+    @property
+    def workflow_state(self) -> Any:
+        """Get current workflow state."""
+        ...
+
+    @property
+    def is_workflow_busy(self) -> bool:
+        """Check if workflow is in a busy state."""
+        ...
+
+    @property
+    def can_extract(self) -> bool:
+        """Check if extraction can be started."""
+        ...
+
+    @property
+    def can_preview(self) -> bool:
+        """Check if preview can be generated."""
+        ...
+
+    @property
+    def can_search(self) -> bool:
+        """Check if search can be performed."""
+        ...
+
+    @property
+    def can_scan(self) -> bool:
+        """Check if scan can be started."""
+        ...
+
+    @property
+    def workflow_error_message(self) -> str | None:
+        """Get current workflow error message."""
+        ...
+
+    def transition_workflow(
+        self, new_state: Any, error_message: str | None = None
+    ) -> bool:
+        """Attempt to transition to a new workflow state."""
+        ...
+
+    def reset_workflow(self) -> None:
+        """Reset workflow to IDLE state."""
+        ...
+
+    # Convenience transition methods
+    def start_loading_rom(self) -> bool:
+        """Transition to LOADING_ROM state."""
+        ...
+
+    def finish_loading_rom(self, success: bool = True, error: str | None = None) -> bool:
+        """Transition from LOADING_ROM to IDLE or ERROR."""
+        ...
+
+    def start_scanning(self) -> bool:
+        """Transition to SCANNING_SPRITES state."""
+        ...
+
+    def finish_scanning(self, success: bool = True, error: str | None = None) -> bool:
+        """Transition from SCANNING_SPRITES to IDLE or ERROR."""
+        ...
+
+    def start_preview(self) -> bool:
+        """Transition to PREVIEWING_SPRITE state."""
+        ...
+
+    def finish_preview(self, success: bool = True, error: str | None = None) -> bool:
+        """Transition from PREVIEWING_SPRITE to IDLE or ERROR."""
+        ...
+
+    def start_extraction(self) -> bool:
+        """Transition to EXTRACTING state."""
+        ...
+
+    def finish_extraction(self, success: bool = True, error: str | None = None) -> bool:
+        """Transition from EXTRACTING to IDLE or ERROR."""
+        ...
+
+    def cleanup(self) -> None:
+        """Clean up resources."""
+        ...
+
+
+class HistoryManagerProtocol(Protocol):
+    """Protocol for sprite history and recent files management.
+
+    Manages sprite history tracking and recent files list.
+    """
+
+    # Signals
+    history_changed: Any  # Signal() - emitted when history changes
+    recent_files_changed: Any  # Signal() - emitted when recent files change
+
+    def add_sprite_to_history(
+        self,
+        offset: int,
+        rom_path: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a sprite to history."""
+        ...
+
+    def get_sprite_history(self) -> list[dict[str, Any]]:
+        """Get sprite history list."""
+        ...
+
+    def clear_sprite_history(self) -> None:
+        """Clear sprite history."""
+        ...
+
+    def add_recent_file(self, file_path: str) -> None:
+        """Add a file to recent files list."""
+        ...
+
+    def get_recent_files(self) -> list[str]:
+        """Get recent files list."""
+        ...
+
+    def clear_recent_files(self) -> None:
+        """Clear recent files list."""
+        ...
+
+    @property
+    def history_count(self) -> int:
+        """Get number of items in sprite history."""
+        ...
+
+    @property
+    def recent_files_count(self) -> int:
+        """Get number of recent files."""
+        ...
+
+    def cleanup(self) -> None:
+        """Clean up resources."""
         ...

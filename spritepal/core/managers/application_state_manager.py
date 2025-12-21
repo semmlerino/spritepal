@@ -12,7 +12,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from enum import Enum, auto
+# Enum import no longer needed - ExtractionState imported from workflow_manager
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, ClassVar, TypeVar, override
@@ -30,21 +30,13 @@ T = TypeVar("T")
 
 
 # ========== Workflow State Machine ==========
+# ExtractionState is now defined in workflow_manager.py
+# Re-exported here for backward compatibility
+from core.managers.workflow_manager import ExtractionState
 
-class ExtractionState(Enum):
-    """States for the extraction workflow.
+# Re-export at module level for backward compatibility
+__all__ = ["ExtractionState", "ApplicationStateManager"]
 
-    This enum is the canonical source for workflow states, consolidated from
-    ui/rom_extraction/state_manager.py for centralized state management.
-    """
-
-    IDLE = auto()  # No operation in progress
-    LOADING_ROM = auto()  # Loading ROM file
-    SCANNING_SPRITES = auto()  # Scanning for sprite locations
-    PREVIEWING_SPRITE = auto()  # Loading sprite preview
-    SEARCHING_SPRITE = auto()  # Searching for next/prev sprite
-    EXTRACTING = auto()  # Performing extraction
-    ERROR = auto()  # Error state
 
 class ApplicationStateManager(BaseManager):
     """
@@ -142,7 +134,8 @@ class ApplicationStateManager(BaseManager):
     preview_ready = Signal(int, QImage)  # offset, preview_image
 
     def __init__(self, app_name: str = "SpritePal", settings_path: Path | None = None,
-                 parent: QObject | None = None) -> None:
+                 parent: QObject | None = None,
+                 configuration_service: Any = None) -> None:
         """
         Initialize application state manager.
 
@@ -150,6 +143,7 @@ class ApplicationStateManager(BaseManager):
             app_name: Application name for settings file
             settings_path: Optional custom path for settings file
             parent: Qt parent object
+            configuration_service: Optional ConfigurationService (uses DI if not provided)
         """
         # Initialize state components
         self._app_name = app_name
@@ -158,9 +152,21 @@ class ApplicationStateManager(BaseManager):
         else:
             # Use ConfigurationService for consistent path resolution
             # This ensures settings file location is relative to app root, not CWD
-            from core.configuration_service import get_configuration_service
+            config = configuration_service
+            if config is None:
+                # Try DI injection first (preferred method)
+                try:
+                    from core.di_container import get_container
+                    from core.protocols.manager_protocols import ConfigurationServiceProtocol
+                    config = get_container().get_optional(ConfigurationServiceProtocol)
+                except (ImportError, ValueError):
+                    config = None
 
-            config = get_configuration_service()
+                # Fall back to singleton only if DI not available
+                if config is None:
+                    from core.configuration_service import get_configuration_service
+                    config = get_configuration_service()
+
             self._settings_file = config.settings_file
 
         # Persistent settings (saved to disk)
@@ -618,12 +624,12 @@ class ApplicationStateManager(BaseManager):
         if updates:
             self.update_session_data(updates)
 
-    def update_window_state(self, geometry: dict[str, int | float]) -> None:
+    def update_window_state(self, geometry: dict[str, int | float | list[int]]) -> None:
         """
         Update window geometry in settings.
 
         Args:
-            geometry: Dictionary with width, height, x, y
+            geometry: Dictionary with width, height, x, y, and optionally splitter_sizes
         """
         with self._lock:
             if "ui" not in self._settings:
@@ -637,11 +643,18 @@ class ApplicationStateManager(BaseManager):
                         self._settings["ui"][setting_key] = geometry[key]
                         changed = True
 
+            # Handle splitter sizes separately (list type)
+            if "splitter_sizes" in geometry:
+                sizes = geometry["splitter_sizes"]
+                if isinstance(sizes, list) and self._settings["ui"].get("splitter_sizes") != sizes:
+                    self._settings["ui"]["splitter_sizes"] = sizes
+                    changed = True
+
             if changed:
                 self._session_dirty = True
 
-    def get_window_geometry(self) -> dict[str, int]:
-        """Get saved window geometry."""
+    def get_window_geometry(self) -> dict[str, int | list[int]]:
+        """Get saved window geometry including splitter sizes."""
         with self._lock:
             ui_settings = self._settings.get("ui", {})
             # Use 'or' to handle both missing keys and None values
@@ -650,6 +663,7 @@ class ApplicationStateManager(BaseManager):
                 "height": ui_settings.get("window_height") or 600,
                 "x": ui_settings.get("window_x") if ui_settings.get("window_x") is not None else -1,
                 "y": ui_settings.get("window_y") if ui_settings.get("window_y") is not None else -1,
+                "splitter_sizes": ui_settings.get("splitter_sizes", []),
             }
 
     def clear_session(self) -> None:

@@ -29,6 +29,8 @@ from .base_manager import BaseManager
 
 # Consolidated managers (NEW - these hold the actual logic)
 from .core_operations_manager import CoreOperationsManager
+from .workflow_manager import ExtractionState, WorkflowManager
+from .history_manager import HistoryManager
 from .exceptions import (
     ExtractionError,
     FileOperationError,
@@ -63,6 +65,11 @@ __all__ = [
     "BaseManager",
     # Consolidated Managers
     "CoreOperationsManager",
+    # Workflow
+    "ExtractionState",
+    "WorkflowManager",
+    # History
+    "HistoryManager",
     # Exceptions
     "ExtractionError",
     "FileOperationError",

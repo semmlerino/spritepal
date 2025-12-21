@@ -33,6 +33,7 @@ from core.services.rom_cache import ROMCache
 from core.services.rom_service import ROMService
 from core.services.settings_manager import SettingsManager
 from core.services.signal_registry import ConnectionInfo, SignalRegistry
+from core.services.state_snapshot_service import StateSnapshotService
 from core.services.vram_service import VRAMService
 from core.services.worker_lifecycle import WorkerManager
 
@@ -52,6 +53,8 @@ __all__ = [
     "SettingsManager",
     # Signal tracking
     "SignalRegistry",
+    # State snapshot
+    "StateSnapshotService",
     "VRAMService",
     # Worker lifecycle
     "WorkerManager",

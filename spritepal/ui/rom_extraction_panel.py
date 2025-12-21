@@ -9,7 +9,6 @@ This panel coordinates ROM-based sprite extraction using:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
@@ -32,7 +31,7 @@ if TYPE_CHECKING:
     from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
-from core.managers.application_state_manager import ExtractionState
+from core.managers.workflow_manager import ExtractionState
 
 # Import extracted components
 from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
@@ -115,8 +114,8 @@ class ROMExtractionPanel(QWidget):
         self._offset_dialog_manager.offset_changed.connect(self._on_dialog_offset_changed)
         self._offset_dialog_manager.sprite_found.connect(self._on_dialog_sprite_found)
 
-        # Output name provider callback (injected from main window)
-        self._output_name_provider: Callable[[], str] | None = None
+        # Output name (set via signal from OutputSettingsManager)
+        self._output_name: str = ""
 
         # Manual offset tracking
         self._manual_offset = 0x200000  # Default offset
@@ -146,23 +145,21 @@ class ROMExtractionPanel(QWidget):
         self._worker_orchestrator.similarity_finished.connect(self._on_similarity_finished)
         self._worker_orchestrator.similarity_error.connect(self._on_similarity_error)
 
-    def set_output_name_provider(self, provider: Callable[[], str]) -> None:
-        """Set the callback to get output name from shared OutputSettingsManager.
+    def set_output_name(self, name: str) -> None:
+        """Set the output name (slot for OutputSettingsManager.output_name_changed signal).
 
         Args:
-            provider: Callable that returns the current output name string
+            name: The current output name string
         """
-        self._output_name_provider = provider
+        self._output_name = name
 
     def _get_output_name(self) -> str:
-        """Get the current output name from the shared provider.
+        """Get the current output name.
 
         Returns:
-            Output name string, or empty string if provider not set
+            Output name string, or empty string if not set
         """
-        if self._output_name_provider:
-            return self._output_name_provider()
-        return ""
+        return self._output_name
 
     def _setup_ui(self):
         """Initialize the user interface"""
