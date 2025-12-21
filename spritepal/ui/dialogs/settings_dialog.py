@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, override
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
-    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -24,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.file_dialogs import browse_for_directory
 from ui.components.base import BaseDialog
 from ui.styles import get_button_style, get_muted_text_style
 
@@ -371,11 +371,10 @@ class SettingsDialog(BaseDialog):
         """Browse for default dumps directory"""
         current_dir = self.dumps_dir_edit.text() or str(Path.home())
 
-        dir_path = QFileDialog.getExistingDirectory(
+        dir_path = browse_for_directory(
             self,
             "Select Default Dumps Directory",
-            current_dir,
-            QFileDialog.Option.ShowDirsOnly
+            current_dir
         )
 
         if dir_path:
@@ -385,11 +384,10 @@ class SettingsDialog(BaseDialog):
         """Browse for cache directory"""
         current_dir = self.cache_location_edit.text() or str(Path.home())
 
-        dir_path = QFileDialog.getExistingDirectory(
+        dir_path = browse_for_directory(
             self,
             "Select Cache Directory",
-            current_dir,
-            QFileDialog.Option.ShowDirsOnly
+            current_dir
         )
 
         if dir_path:

@@ -11,7 +11,6 @@ from typing import NamedTuple
 
 from PySide6.QtWidgets import (
     QCheckBox,
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -20,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.file_dialogs import browse_for_save_file
 from ui.common.spacing_constants import SPACING_STANDARD
 from ui.components.base import BaseDialog
 from ui.styles import get_muted_text_style
@@ -173,11 +173,11 @@ class OutputSettingsDialog(BaseDialog):
         current_name = self.output_name_edit.text()
         suggested_path = str(Path(self._default_directory) / f"{current_name}.png")
 
-        filename, _ = QFileDialog.getSaveFileName(
+        filename = browse_for_save_file(
             self,
             "Save Sprites As",
-            suggested_path,
             "PNG Files (*.png)",
+            suggested_path
         )
 
         if filename:

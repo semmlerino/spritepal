@@ -10,10 +10,9 @@ Usage:
 """
 from __future__ import annotations
 
-from .dialog_base import DialogBase, InitializationOrderError
+from .dialog_base import DialogBase
 
 # Export the implementation
 __all__ = [
     "DialogBase",
-    "InitializationOrderError",
 ]

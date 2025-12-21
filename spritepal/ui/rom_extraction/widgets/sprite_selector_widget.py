@@ -32,11 +32,6 @@ class SpriteSelectorWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface"""
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Sprite location selection with compact layout
-        sprite_group = self._create_group_box("Sprite Selection")
         sprite_layout = QVBoxLayout()
         sprite_layout.setSpacing(SPACING_MEDIUM)  # Use consistent spacing constant
         sprite_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
@@ -91,10 +86,8 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         offset_row.addWidget(self.find_sprites_btn)
 
         sprite_layout.addLayout(offset_row)
-        sprite_group.setLayout(sprite_layout)
 
-        layout.addWidget(sprite_group)
-        self.setLayout(layout)
+        self._setup_widget_with_group("Sprite Selection", sprite_layout)
 
     def _on_sprite_changed(self, index: int):
         """Handle internal sprite change"""

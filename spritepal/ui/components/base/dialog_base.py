@@ -1,13 +1,15 @@
 """
-Base dialog class for SpritePal that enforces proper initialization patterns.
+Base dialog class for SpritePal.
 
-This class ensures that instance variables are declared before setup methods are called,
-preventing the common bug where widgets created in setup methods are overwritten by
-late instance variable declarations.
+This class provides a standardized base for all dialogs with common features
+like button boxes, status bars, tabs, and splitters.
+
+IMPORTANT: Subclasses MUST declare instance variables BEFORE calling super().__init__()
+to avoid overwriting widgets created in _setup_ui(). See CLAUDE.md for details.
 """
 from __future__ import annotations
 
-from typing import Any, ClassVar, override
+from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -22,25 +24,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from utils.logging_config import get_logger
 
-logger = get_logger(__name__)
-
-class InitializationOrderError(Exception):
-    """Raised when initialization order requirements are violated."""
-
-# In PySide6, we should not inherit from type(QDialog) directly
-# Instead, we'll use a simpler approach without metaclass
 class DialogBase(QDialog):
     """
-    Base class for all SpritePal dialogs with enforced initialization patterns.
+    Base class for all SpritePal dialogs.
 
     Subclasses MUST follow this pattern:
 
     ```python
     class MyDialog(DialogBase):
         def __init__(self, parent: QWidget | None = None):
-            # Step 1: Declare instance variables
+            # Step 1: Declare instance variables BEFORE super()
             self.my_widget: QWidget | None = None
             self.my_data: list[str] = []
 
@@ -52,14 +46,6 @@ class DialogBase(QDialog):
             self.my_widget = QWidget()
     ```
     """
-
-    # Class-level registry of known widget attributes to check
-    _WIDGET_ATTRIBUTES: ClassVar[list[str]] = [
-        "rom_map", "offset_widget", "scan_controls", "import_export",
-        "status_panel", "preview_widget", "mode_selector", "status_label",
-        "dumps_dir_edit", "cache_enabled_check", "source_list", "arranged_list",
-        "available_list"
-    ]
 
     def __init__(
         self,
@@ -94,24 +80,10 @@ class DialogBase(QDialog):
         # Call Qt's init FIRST - required for PySide6
         super().__init__(parent)
 
-        # Now initialize tracking after Qt init
-        self._initialization_phase = "during_init"
-        self._declared_variables: set[str] = set()
-        self._setup_called = False
-
         # Store configuration for subclasses
         self._default_tab = default_tab
         self._orientation = orientation
         self._splitter_handle_width = splitter_handle_width
-
-        # Record all instance variables that exist now
-        try:
-            for attr_name in dir(self):
-                if not attr_name.startswith("_") and hasattr(self, attr_name):
-                    self._declared_variables.add(attr_name)
-        except RuntimeError:
-            # Can't access attributes, that's ok
-            pass
 
         # Set standard dialog properties
         if modal:
@@ -175,64 +147,7 @@ class DialogBase(QDialog):
 
         # Call setup method if it exists
         if hasattr(self, "_setup_ui"):
-            self._initialization_phase = "setup"
             self._setup_ui()
-            self._setup_called = True
-
-        # Verify no widget attributes were overwritten
-        self._verify_initialization()
-        self._initialization_phase = "complete"
-
-    @override
-    def __setattr__(self, name: str, value: Any) -> None:
-        """
-        Override setattr to catch initialization order bugs.
-
-        This detects when instance variables are assigned None after setup methods,
-        which would overwrite already-created widgets.
-        """
-        # Allow private attributes and initialization tracking
-        if name.startswith("_"):
-            super().__setattr__(name, value)
-            return
-
-        # During initialization phase, track what's happening
-        if hasattr(self, "_initialization_phase"):
-            phase = self._initialization_phase
-
-            # Check for suspicious patterns
-            if (phase == "setup" and
-                value is None and
-                name in self._WIDGET_ATTRIBUTES):
-                logger.warning(
-                    f"{self.__class__.__name__}: Assigning None to '{name}' "
-                    f"during setup phase - possible initialization order bug!"
-                )
-
-            # After setup, check for late assignments
-            elif (phase == "complete" and
-                  value is None and
-                  name not in self._declared_variables and
-                  name in self._WIDGET_ATTRIBUTES):
-                raise InitializationOrderError(
-                    f"{self.__class__.__name__}: Cannot assign None to '{name}' "
-                    f"after setup - this would overwrite an existing widget! "
-                    f"Declare '{name}' before calling super().__init__()"
-                )
-
-        super().__setattr__(name, value)
-
-    def _verify_initialization(self) -> None:
-        """Verify that initialization followed the correct pattern."""
-        # Check for common widget attributes that should not be None
-        for attr_name in self._WIDGET_ATTRIBUTES:
-            if hasattr(self, attr_name):
-                value = getattr(self, attr_name)
-                if value is None and attr_name not in self._declared_variables:
-                    logger.warning(
-                        f"{self.__class__.__name__}: Widget attribute '{attr_name}' "
-                        f"is None after initialization - was it properly created?"
-                    )
 
     def _setup_ui(self) -> None:
         """

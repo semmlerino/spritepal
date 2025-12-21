@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Any, override
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -25,6 +24,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui.common.file_dialogs import browse_for_open_file
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
@@ -295,15 +296,9 @@ class ROMExtractionPanel(QWidget):
 
     def _browse_rom(self):
         """Browse for ROM file"""
-        from core.di_container import inject
-        from core.protocols.manager_protocols import SettingsManagerProtocol
-        settings = inject(SettingsManagerProtocol)
-        default_dir = settings.get_default_directory()
-
-        filename, _ = QFileDialog.getOpenFileName(
+        filename = browse_for_open_file(
             self,
             "Select ROM File",
-            default_dir,
             "SNES ROM Files (*.sfc *.smc);;All Files (*.*)"
         )
 
@@ -492,27 +487,18 @@ class ROMExtractionPanel(QWidget):
 
     def _browse_cgram(self):
         """Browse for CGRAM file"""
-        from core.di_container import inject
-        from core.protocols.manager_protocols import SettingsManagerProtocol
-        settings = inject(SettingsManagerProtocol)
-
         # Try to use ROM directory as default
-        default_dir = (
-            str(Path(self.rom_path).parent)
-            if self.rom_path
-            else settings.get_default_directory()
-        )
+        initial_path = str(Path(self.rom_path).parent) if self.rom_path else ""
 
-        filename, _ = QFileDialog.getOpenFileName(
+        filename = browse_for_open_file(
             self,
-            "Select CGRAM File ()",
-            default_dir,
-            "CGRAM Files (*.dmp *.bin);;All Files (*.*)"
+            "Select CGRAM File",
+            "CGRAM Files (*.dmp *.bin);;All Files (*.*)",
+            initial_path
         )
 
         if filename:
             self.cgram_selector_widget.set_cgram_path(filename)
-            settings.set_last_used_directory(str(Path(filename).parent))
 
     def _load_rom_sprites(self):
         """Load known sprite locations from ROM using orchestrator."""

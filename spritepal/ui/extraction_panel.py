@@ -36,7 +36,6 @@ else:
     )
 from PySide6.QtWidgets import (
     QComboBox,
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -46,6 +45,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui.common.file_dialogs import browse_for_open_file
 
 from ui.common.spacing_constants import (
     BORDER_THICK,
@@ -248,17 +249,12 @@ class DropZone(QWidget):
 
     def _browse_file(self):
         """Browse for file"""
-        settings = self.settings_manager
-        default_dir = settings.get_default_directory()
-
         file_filter = f"{self.file_type} Files (*.dmp);;All Files (*)"
-        filename, _ = QFileDialog.getOpenFileName(
-            self, f"Select {self.file_type} File", default_dir, file_filter
+        filename = browse_for_open_file(
+            self, f"Select {self.file_type} File", file_filter
         )
 
         if filename:
-            # Update last used directory
-            settings.set_last_used_directory(str(Path(filename).parent))
             self.set_file(filename)
 
     def set_file(self, file_path: str):

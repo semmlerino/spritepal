@@ -16,7 +16,6 @@ from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -29,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.rom_extractor import ROMExtractor
+from ui.common.file_dialogs import browse_for_directory, browse_for_save_file
 from core.sprite_finder import SpriteFinder
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
@@ -495,11 +495,9 @@ class SpriteGalleryTab(QWidget):
             return
 
         # Get export directory
-        export_dir = QFileDialog.getExistingDirectory(
+        export_dir = browse_for_directory(
             self,
-            "Select Export Directory",
-            "",
-            QFileDialog.Option.ShowDirsOnly
+            "Select Export Directory"
         )
 
         if not export_dir:
@@ -541,11 +539,11 @@ class SpriteGalleryTab(QWidget):
             return
 
         # Get save location
-        filepath, _ = QFileDialog.getSaveFileName(
+        filepath = browse_for_save_file(
             self,
             "Save Sprite Sheet",
-            "sprite_sheet.png",
-            "PNG Files (*.png)"
+            "PNG Files (*.png)",
+            "sprite_sheet.png"
         )
 
         if not filepath:

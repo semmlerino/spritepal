@@ -26,11 +26,6 @@ class ModeSelectorWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface"""
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Mode selection (Preset vs Manual)
-        mode_group = self._create_group_box("Extraction Mode")
         mode_layout = QHBoxLayout()
         mode_layout.setSpacing(SPACING_MEDIUM)
         mode_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
@@ -49,10 +44,7 @@ class ModeSelectorWidget(BaseExtractionWidget):
         mode_layout.addWidget(self.mode_combo)
         mode_layout.addStretch()
 
-        mode_group.setLayout(mode_layout)
-        layout.addWidget(mode_group)
-
-        self.setLayout(layout)
+        self._setup_widget_with_group("Extraction Mode", mode_layout)
 
     def get_current_mode(self) -> int:
         """Get the current mode index (0=preset, 1=manual)"""

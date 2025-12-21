@@ -23,6 +23,9 @@ from .manager_protocols import (
 from .worker_protocols import (
     PreviewWorkerPoolProtocol,
 )
+from .preview_protocols import (
+    PreviewCoordinatorProtocol,
+)
 
 __all__ = [
     "ApplicationStateManagerProtocol",
@@ -32,6 +35,7 @@ __all__ = [
     "ExtractionManagerProtocol",
     "InjectionDialogProtocol",
     "InjectionManagerProtocol",
+    "PreviewCoordinatorProtocol",
     "PreviewWorkerPoolProtocol",
     "ROMCacheProtocol",
     "ROMExtractorProtocol",

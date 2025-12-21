@@ -50,11 +50,6 @@ class ROMFileWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface"""
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # ROM file selection
-        rom_group = self._create_group_box("ROM File")
         rom_layout = QVBoxLayout()
         rom_layout.setSpacing(SPACING_MEDIUM)
         rom_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
@@ -101,10 +96,7 @@ class ROMFileWidget(BaseExtractionWidget):
         self.loading_progress.hide()
         rom_layout.addWidget(self.loading_progress)
 
-        rom_group.setLayout(rom_layout)
-        layout.addWidget(rom_group)
-
-        self.setLayout(layout)
+        self._setup_widget_with_group("ROM File", rom_layout)
 
     def _set_empty_state_guidance(self) -> None:
         """Show simple guidance when no ROM is loaded, with detailed tooltip"""

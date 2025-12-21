@@ -30,11 +30,6 @@ class OutputNameWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface"""
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Output name group
-        output_group = self._create_group_box("Output")
         output_layout = QHBoxLayout()
         output_layout.setSpacing(SPACING_MEDIUM)
         output_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
@@ -50,10 +45,7 @@ class OutputNameWidget(BaseExtractionWidget):
         _ = self.output_name_edit.textChanged.connect(self.text_changed.emit)
         output_layout.addWidget(self.output_name_edit, 1)
 
-        output_group.setLayout(output_layout)
-        layout.addWidget(output_group)
-
-        self.setLayout(layout)
+        self._setup_widget_with_group("Output", output_layout)
 
     def get_output_name(self) -> str:
         """Get the current output name"""

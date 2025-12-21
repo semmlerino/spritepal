@@ -28,11 +28,6 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface"""
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # CGRAM for palettes - cleaner title
-        cgram_group = self._create_group_box("Optional Palette Override")
         cgram_layout = QVBoxLayout()
         cgram_layout.setSpacing(SPACING_MEDIUM)
         cgram_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
@@ -66,10 +61,8 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         cgram_row.addWidget(self.browse_cgram_btn)
 
         cgram_layout.addLayout(cgram_row)
-        cgram_group.setLayout(cgram_layout)
-        layout.addWidget(cgram_group)
 
-        self.setLayout(layout)
+        self._setup_widget_with_group("Optional Palette Override", cgram_layout)
 
     def get_cgram_path(self) -> str:
         """Get the current CGRAM path"""

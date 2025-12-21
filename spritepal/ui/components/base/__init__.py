@@ -1,10 +1,7 @@
 """Base UI components for SpritePal"""
 from __future__ import annotations
 
-from .dialog_selector import (
-    DialogBase,
-    InitializationOrderError,
-)
+from .dialog_selector import DialogBase
 from .help_icon_button import HelpIconButton, HelpLabel, InfoBanner
 
 # Maintain backward compatibility alias
@@ -16,5 +13,4 @@ __all__ = [
     "HelpIconButton",
     "HelpLabel",
     "InfoBanner",
-    "InitializationOrderError",
 ]

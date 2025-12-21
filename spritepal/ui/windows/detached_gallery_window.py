@@ -15,7 +15,6 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
-    QFileDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -28,6 +27,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 
 from core.di_container import inject
 from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
@@ -528,13 +529,9 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _load_rom(self):
         """Load a ROM file."""
-        settings = self.settings_manager
-        default_dir = settings.get_default_directory()
-
-        filename, _ = QFileDialog.getOpenFileName(
+        filename = browse_for_open_file(
             self,
             "Select ROM File",
-            default_dir,
             "SNES ROM Files (*.sfc *.smc);;All Files (*.*)"
         )
 
@@ -1280,11 +1277,11 @@ class DetachedGalleryWindow(QMainWindow):
         rom_name = Path(self.rom_path).stem if self.rom_path else "sprite"
         default_name = f"{rom_name}_0x{selected_offset:06X}"
 
-        filename, _ = QFileDialog.getSaveFileName(
+        filename = browse_for_save_file(
             self,
             "Save Extracted Sprite",
-            default_name,
-            "PNG Files (*.png);;All Files (*.*)"
+            "PNG Files (*.png);;All Files (*.*)",
+            default_name
         )
 
         if not filename:

@@ -13,7 +13,6 @@ from typing import Any
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -22,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
 from ui.components.visualization import ROMMapWidget
 from ui.styles import get_panel_style
@@ -103,11 +103,11 @@ class ImportExportPanel(QWidget):
 
         # Get save file path
         default_name = f"sprite_offsets_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.json"
-        file_path, _ = QFileDialog.getSaveFileName(
+        file_path = browse_for_save_file(
             self,
             "Export Sprite Offsets",
-            default_name,
-            "JSON Files (*.json);;All Files (*)"
+            "JSON Files (*.json);;All Files (*)",
+            default_name
         )
 
         if not file_path:
@@ -208,10 +208,9 @@ class ImportExportPanel(QWidget):
     def _import_offsets(self):
         """Import offsets from file"""
         # Get file path
-        file_path, _ = QFileDialog.getOpenFileName(
+        file_path = browse_for_open_file(
             self,
             "Import Sprite Offsets",
-            "",
             "JSON Files (*.json);;All Files (*)"
         )
 

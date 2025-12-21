@@ -9,7 +9,6 @@ from typing import Protocol
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -18,6 +17,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui.common.file_dialogs import browse_for_save_file
 
 from ui.styles import get_muted_text_style
 from ui.styles.theme import COLORS
@@ -159,11 +160,11 @@ class OutputSettingsManager(QObject):
             Path(default_dir) / (self.output_name_edit.text() + ".png")
         )
 
-        filename, _ = QFileDialog.getSaveFileName(
+        filename = browse_for_save_file(
             self.parent_widget,
             "Save Sprites As",
-            suggested_path,
-            "PNG Files (*.png)"
+            "PNG Files (*.png)",
+            suggested_path
         )
 
         if filename:

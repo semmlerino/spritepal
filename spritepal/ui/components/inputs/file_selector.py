@@ -18,13 +18,14 @@ from typing import override
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QWidget,
 )
+
+from ui.common.file_dialogs import FileDialogHelper
 
 # from utils.settings_manager import get_settings_manager # Removed due to DI
 
@@ -113,56 +114,35 @@ class FileSelector(QWidget):
         """
         Browse for file using appropriate dialog.
 
-        Exactly replicates the file browsing logic from InjectionDialog.
+        Uses FileDialogHelper for consistent dialog behavior and settings persistence.
         """
-        settings = self.settings_manager
-
-        # Determine initial directory
+        # Get current path for initial directory
         current_path = self.path_edit.text()
-        current_path_obj = Path(current_path) if current_path else None
-        if current_path_obj and current_path_obj.exists():
-            if current_path_obj.is_file():
-                default_dir = str(current_path_obj.parent)
-                initial_path = current_path
-            else:
-                default_dir = current_path
-                initial_path = current_path
-        else:
-            default_dir = settings.get_default_directory()
-            initial_path = default_dir
 
-        # Show appropriate file dialog
+        # Show appropriate file dialog using FileDialogHelper
         filename = None
         if self._mode == "open":
-            filename, _ = QFileDialog.getOpenFileName(
+            filename = FileDialogHelper.browse_open_file(
                 self,
                 self._dialog_title,
-                initial_path,
-                self._file_filter
+                self._file_filter,
+                current_path,
+                self._settings_key,
+                self._settings_namespace or "file_selector"
             )
         elif self._mode == "save":
-            # For save dialogs, use current text as initial suggestion if available
-            initial_path = current_path if current_path else initial_path
-            filename, _ = QFileDialog.getSaveFileName(
+            filename = FileDialogHelper.browse_save_file(
                 self,
                 self._dialog_title,
-                initial_path,
-                self._file_filter
+                self._file_filter,
+                current_path,
+                self._settings_key,
+                self._settings_namespace or "file_selector"
             )
 
         if filename:
             # Update the path
             self.path_edit.setText(filename)
-
-            # Update settings manager with last used directory
-            settings.set_last_used_directory(str(Path(filename).parent))
-
-            # Save to specific settings key if provided
-            if self._settings_key and self._settings_namespace:
-                settings.set(self._settings_namespace, self._settings_key, filename)
-            elif self._settings_key:
-                # Use default namespace if only key provided
-                settings.set("file_selector", self._settings_key, filename)
 
             # Emit signal
             self.file_selected.emit(filename)
