@@ -7,8 +7,7 @@ which can hide real bugs and don't provide proper Qt functionality.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING
 
 import pytest
 from PySide6.QtCore import Qt
@@ -19,8 +18,6 @@ if TYPE_CHECKING:
 
     from PySide6.QtGui import QCloseEvent, QShowEvent
 
-# Type variable for widget factory
-WidgetT = TypeVar('WidgetT', bound=QWidget)
 
 class ParentWidget(QWidget):
     """
@@ -72,56 +69,6 @@ def parent_widget(qapp: QApplication) -> Iterator[ParentWidget]:
     # Process events to ensure deletion
     QApplication.processEvents()
 
-@pytest.fixture
-def widget_factory(qapp: QApplication) -> Iterator[Callable[..., WidgetT]]:
-    """
-    Factory fixture for creating widgets with proper parents.
-
-    This fixture helps create multiple widgets in a test with proper
-    parent management and cleanup.
-
-    Args:
-        qapp: The Qt application fixture
-
-    Yields:
-        callable: Factory function for creating widgets
-    """
-    created_widgets = []
-
-    def _create_widget(widget_class: type[WidgetT], *args: Any, **kwargs: Any) -> WidgetT:
-        """
-        Create a widget with a proper test parent.
-
-        Args:
-            widget_class: The widget class to instantiate
-            *args: Positional arguments for the widget
-            **kwargs: Keyword arguments for the widget
-
-        Returns:
-            The created widget instance
-        """
-        # Create a parent if not provided
-        if "parent" not in kwargs or kwargs["parent"] is None:
-            parent = ParentWidget()
-            created_widgets.append(parent)
-            kwargs["parent"] = parent
-
-        widget = widget_class(*args, **kwargs)
-        created_widgets.append(widget)
-        return widget
-
-    yield _create_widget
-
-    # Cleanup all created widgets
-    for widget in reversed(created_widgets):
-        if widget and not widget.isHidden():
-            widget.hide()
-        widget.close()
-        widget.deleteLater()
-
-    # Process events to ensure deletion
-    QApplication.processEvents()
-
 def ensure_qt_app() -> QApplication:
     """
     Ensure a QApplication instance exists for testing.
@@ -134,49 +81,3 @@ def ensure_qt_app() -> QApplication:
         app.setApplicationName("SpritePal-Test")
         return app
     return QApplication.instance()
-
-class MockableParentWidget(ParentWidget):
-    """
-    A parent widget that can have some methods mocked while maintaining Qt functionality.
-
-    This is useful when you need to mock specific behaviors while keeping
-    the core Qt parent functionality intact.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        # These can be overridden in tests
-        self.mock_width = None
-        self.mock_height = None
-
-    def width(self) -> int:
-        """Return mocked width if set, otherwise real width."""
-        if self.mock_width is not None:
-            return self.mock_width
-        return super().width()
-
-    def height(self) -> int:
-        """Return mocked height if set, otherwise real height."""
-        if self.mock_height is not None:
-            return self.mock_height
-        return super().height()
-
-@pytest.fixture
-def mockable_parent_widget(qapp: QApplication) -> Iterator[MockableParentWidget]:
-    """
-    Fixture providing a parent widget that supports selective mocking.
-
-    This allows tests to mock specific behaviors while maintaining
-    core Qt functionality.
-
-    Args:
-        qapp: The Qt application fixture
-
-    Yields:
-        MockableParentWidget: A parent widget with mockable methods
-    """
-    widget = MockableParentWidget()
-    yield widget
-    widget.close()
-    widget.deleteLater()
-    QApplication.processEvents()

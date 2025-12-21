@@ -89,9 +89,9 @@
   },
   "manual_offset_dialog": {
     "x": 100,
-    "y": 100,
+    "y": 106,
     "width": 900,
-    "height": 600
+    "height": 594
   },
   "experimental": {
     "use_composed_dialogs": true

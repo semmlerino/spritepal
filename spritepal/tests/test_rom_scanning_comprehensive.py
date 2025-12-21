@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from core.rom_extractor import ROMExtractor
-from tests.infrastructure.test_doubles import MockHALCompressor
+from tests.infrastructure.mock_hal import MockHALCompressor
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [

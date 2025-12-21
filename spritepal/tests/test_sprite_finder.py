@@ -14,9 +14,20 @@ import pytest
 from PIL import Image
 
 from core.sprite_finder import SpriteCandidate, SpriteFinder
-from tests.infrastructure.test_doubles import (
-    DoubleFactory,
-)
+
+
+def _create_mock_rom_data(size: int = 0x400000) -> bytes:
+    """Create mock ROM data for testing (replaces DoubleFactory)."""
+    data = bytearray(size)
+    for i in range(size):
+        data[i] = i % 256
+    # Add sprite-like data at common offsets
+    for offset in [0x200000, 0x210000, 0x220000, 0x240000]:
+        if offset + 0x1000 < size:
+            for j in range(0x1000):
+                data[offset + j] = (j % 64) + 128
+    return bytes(data)
+
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Refactored sprite finder tests may create background threads"),
@@ -85,12 +96,12 @@ class TestSpriteFinderWithRealComponents:
     @pytest.fixture
     def test_rom_with_sprites(self, tmp_path):
         """Create a test ROM file with known sprite patterns."""
-        # Use test double factory to create ROM with sprite data
-        rom_file = DoubleFactory.create_rom_file(rom_type="standard")
+        # Create ROM with sprite data
+        rom_data = _create_mock_rom_data()
 
         # Write to actual file for testing
         rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(rom_file._data)
+        rom_path.write_bytes(rom_data)
 
         return str(rom_path)
 
@@ -251,7 +262,7 @@ class TestSpriteFinderIntegration:
         """Test sprite finder with real visual validation."""
         # Setup: Create test environment
         rom_path = tmp_path / "test.sfc"
-        rom_data = DoubleFactory.create_rom_file()._data
+        rom_data = _create_mock_rom_data()
         rom_path.write_bytes(rom_data)
 
         output_dir = tmp_path / "output"

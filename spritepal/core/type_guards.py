@@ -61,31 +61,27 @@ def is_manager_instance(obj: object, manager_type: type[T]) -> TypeGuard[T]:
         manager_type: Expected manager class
 
     Returns:
-        True if obj is an instance of the manager type with required methods
+        True if obj is an instance of the manager type
     """
-    return (
-        isinstance(obj, manager_type)
-        and hasattr(obj, 'cleanup')
-        and callable(obj.cleanup)
-    )
+    # Note: cleanup() is guaranteed by BaseManager (abstract method),
+    # so we only need the isinstance check
+    return isinstance(obj, manager_type)
 
 def is_qobject_with_parent(obj: object) -> TypeGuard[QObject]:
     """
-    Type guard to check if an object is a QObject that can have parent set.
+    Type guard to check if an object is a QObject.
 
     Args:
         obj: Object to check
 
     Returns:
-        True if obj is a QObject with setParent method
+        True if obj is a QObject (which always has setParent)
     """
     try:
         from PySide6.QtCore import QObject
-        return (
-            isinstance(obj, QObject)
-            and hasattr(obj, 'setParent')
-            and callable(obj.setParent)
-        )
+        # Note: setParent is always available on QObject,
+        # so we only need the isinstance check
+        return isinstance(obj, QObject)
     except ImportError:
         return False
 

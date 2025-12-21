@@ -14,10 +14,25 @@ to fix layer boundary violations (core was importing from ui).
 from __future__ import annotations
 
 import contextlib
+from typing import Protocol, cast, runtime_checkable
 
 from PySide6.QtCore import QThread
 
 from utils.logging_config import get_logger
+
+
+@runtime_checkable
+class CancellableWorker(Protocol):
+    """Protocol for workers that support cancel() method."""
+
+    def cancel(self) -> None:
+        """Request cancellation of the worker."""
+        ...
+
+
+def _is_cancellable(worker: QThread) -> bool:
+    """Check if a worker has a cancel() method (BaseWorker pattern)."""
+    return isinstance(worker, CancellableWorker)
 
 logger = get_logger(__name__)
 
@@ -38,8 +53,7 @@ class WorkerManager:
 
     CRITICAL: Never uses QThread.terminate() which can corrupt Qt's internal state.
     Instead uses a multi-stage shutdown process:
-    1. Call if hasattr(worker, "cancel"):
-     worker.cancel()  # type: ignore[attr-defined] if available (BaseWorker pattern)
+    1. Call worker.cancel() if available (BaseWorker pattern, checked via _is_cancellable)
     2. Use Qt's requestInterruption() mechanism
     3. Call quit() and wait() for clean shutdown
     4. Log warnings for unresponsive workers
@@ -112,10 +126,10 @@ class WorkerManager:
         logger.debug(f"Stopping {worker_name} safely")
 
         # Stage 1: Request cancellation via cancel() if available (BaseWorker pattern)
-        if hasattr(worker, "cancel") and callable(getattr(worker, "cancel", None)):
+        if _is_cancellable(worker):
             logger.debug(f"{worker_name}: Requesting cancellation via cancel()")
             try:
-                worker.cancel()  # type: ignore[attr-defined] - BaseWorker has cancel(), QThread doesn't
+                cast(CancellableWorker, worker).cancel()
             except Exception as e:
                 logger.warning(f"{worker_name}: Error calling cancel(): {e}")
 
@@ -245,10 +259,10 @@ class WorkerManager:
         logger.debug(f"{worker_name}: Requesting cancellation")
 
         # Stage 1: Call cancel() if available (BaseWorker pattern)
-        if hasattr(worker, "cancel") and callable(getattr(worker, "cancel", None)):
+        if _is_cancellable(worker):
             logger.debug(f"{worker_name}: Calling cancel()")
             try:
-                worker.cancel()  # type: ignore[attr-defined] - BaseWorker has cancel(), QThread doesn't
+                cast(CancellableWorker, worker).cancel()
             except Exception as e:
                 logger.warning(f"{worker_name}: Error during cancel(): {e}")
 
@@ -262,16 +276,13 @@ class WorkerManager:
             return True
 
         # Stage 4: Check if worker is respecting interruption requests
-        if check_interruption and hasattr(worker, "isInterruptionRequested"):
-            try:
-                if worker.isInterruptionRequested():
-                    logger.debug(f"{worker_name}: Interruption acknowledged, waiting longer")
-                    remaining_timeout = timeout - initial_wait
-                    if worker.wait(remaining_timeout):
-                        logger.debug(f"{worker_name}: Cancelled after interruption")
-                        return True
-            except Exception as e:
-                logger.warning(f"{worker_name}: Error checking interruption status: {e}")
+        # Note: isInterruptionRequested is always available on QThread
+        if check_interruption and worker.isInterruptionRequested():
+            logger.debug(f"{worker_name}: Interruption acknowledged, waiting longer")
+            remaining_timeout = timeout - initial_wait
+            if worker.wait(remaining_timeout):
+                logger.debug(f"{worker_name}: Cancelled after interruption")
+                return True
 
         # Worker didn't respond to cancellation
         logger.warning(
@@ -311,10 +322,9 @@ class WorkerManager:
         # Test interruption responsiveness
         logger.debug(f"{worker_name}: Testing responsiveness")
 
-        # Store original interruption state if possible
-        if hasattr(worker, "isInterruptionRequested"):
-            with contextlib.suppress(Exception):
-                worker.isInterruptionRequested()
+        # Check current interruption state (always available on QThread)
+        with contextlib.suppress(Exception):
+            worker.isInterruptionRequested()
 
         try:
             # Request interruption for testing
