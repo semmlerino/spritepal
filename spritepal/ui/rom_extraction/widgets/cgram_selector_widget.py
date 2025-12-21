@@ -3,7 +3,7 @@ from typing import Any
 """CGRAM file selector widget for ROM extraction"""
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
@@ -11,7 +11,6 @@ from ui.common.spacing_constants import (
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
-from ui.styles.theme import COLORS
 
 from .base_widget import BaseExtractionWidget
 
@@ -27,15 +26,10 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        """Initialize the user interface"""
+        """Initialize the user interface - collapsible section, starts collapsed"""
         cgram_layout = QVBoxLayout()
         cgram_layout.setSpacing(SPACING_MEDIUM)
-        cgram_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
-
-        # Condensed caption instead of dense info box
-        caption = QLabel("Override ROM palettes with a custom palette file")
-        caption.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
-        cgram_layout.addWidget(caption)
+        cgram_layout.setContentsMargins(0, 0, 0, 0)
 
         # CGRAM path row
         cgram_row = QHBoxLayout()
@@ -43,7 +37,7 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
 
         self.cgram_path_edit = QLineEdit()
         self.cgram_path_edit.setPlaceholderText(
-            "Select palette file (optional)..."
+            "Select custom palette file..."
         )
         self.cgram_path_edit.setReadOnly(True)
         self.cgram_path_edit.setMinimumWidth(250)
@@ -62,7 +56,10 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
 
         cgram_layout.addLayout(cgram_row)
 
-        self._setup_widget_with_group("Optional Palette Override", cgram_layout)
+        # Use collapsible group box, starts collapsed since this is optional
+        self._collapsible = self._setup_widget_collapsible(
+            "Palette Override (optional)", cgram_layout, collapsed=True
+        )
 
     def get_cgram_path(self) -> str:
         """Get the current CGRAM path"""

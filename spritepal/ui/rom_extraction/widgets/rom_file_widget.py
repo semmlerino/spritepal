@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout
 
 from ui.styles.theme import COLORS
@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
     CONTROL_PANEL_BUTTON_WIDTH,
+    CONTROL_PANEL_LABEL_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
@@ -49,14 +50,20 @@ class ROMFileWidget(BaseExtractionWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        """Initialize the user interface"""
+        """Initialize the user interface - flat layout without group box"""
         rom_layout = QVBoxLayout()
         rom_layout.setSpacing(SPACING_MEDIUM)
-        rom_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
+        rom_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ROM path row with simple horizontal layout
+        # ROM path row: Label + Path + Browse button
         rom_row = QHBoxLayout()
         rom_row.setSpacing(SPACING_MEDIUM)
+
+        # ROM label to match other rows in the panel
+        rom_label = QLabel("ROM:")
+        rom_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
+        rom_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        rom_row.addWidget(rom_label)
 
         self.rom_path_edit = QLineEdit()
         self.rom_path_edit.setPlaceholderText("Select ROM file...")
@@ -75,6 +82,7 @@ class ROMFileWidget(BaseExtractionWidget):
         # ROM info display (shows ROM details after loading)
         self.rom_info_label = QLabel()
         self.rom_info_label.setWordWrap(True)
+        self.rom_info_label.setContentsMargins(CONTROL_PANEL_LABEL_WIDTH + SPACING_MEDIUM, 0, 0, 0)  # Align with path field
         rom_layout.addWidget(self.rom_info_label)
 
         # Loading progress bar (hidden by default)
@@ -96,7 +104,8 @@ class ROMFileWidget(BaseExtractionWidget):
         self.loading_progress.hide()
         rom_layout.addWidget(self.loading_progress)
 
-        self._setup_widget_with_group("ROM File", rom_layout)
+        # Use flat layout without group box for cleaner appearance
+        self._setup_widget_flat(rom_layout, with_separator=True)
 
     def _set_empty_state_guidance(self) -> None:
         """Show simple guidance when no ROM is loaded, with detailed tooltip"""

@@ -238,7 +238,7 @@ class ROMExtractionPanel(QWidget):
         advanced_row.setContentsMargins(0, 0, 0, 0)
 
         self.advanced_toggle = QToolButton()
-        self.advanced_toggle.setText("Browse All Sprites (Advanced)")
+        self.advanced_toggle.setText("Manual Offset Browser")
         self.advanced_toggle.setCheckable(True)
         self.advanced_toggle.setChecked(False)
         self.advanced_toggle.setArrowType(Qt.ArrowType.RightArrow)

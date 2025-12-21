@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.file_dialogs import browse_for_save_file
-
 from ui.styles import get_muted_text_style
 from ui.styles.theme import COLORS
 
@@ -128,6 +127,13 @@ class OutputSettingsManager(QObject):
 
     def _connect_signals(self) -> None:
         """Connect internal widget signals"""
+        if (
+            self.output_name_edit is None
+            or self.browse_button is None
+            or self.grayscale_check is None
+            or self.metadata_check is None
+        ):
+            return
         self.output_name_edit.textChanged.connect(self._on_output_name_changed)
         self.browse_button.clicked.connect(self._browse_output)
         self.grayscale_check.toggled.connect(self._on_grayscale_toggled)
@@ -239,24 +245,18 @@ class OutputSettingsManager(QObject):
             return
         if self.output_info_label is None or self.output_group is None:
             return
-        # Force checkboxes on and disable them - ROM mode always creates all outputs
+        # Force checkboxes on and hide them - ROM mode always creates all outputs
+        # Hiding them reduces clutter since they can't be changed anyway
         self.grayscale_check.setChecked(True)
-        self.grayscale_check.setEnabled(False)
-        self.grayscale_check.setToolTip(
-            "Palette files are always created in ROM extraction mode."
-        )
+        self.grayscale_check.hide()
 
         self.metadata_check.setChecked(True)
-        self.metadata_check.setEnabled(False)
-        self.metadata_check.setToolTip(
-            "Metadata is always created in ROM extraction mode."
-        )
+        self.metadata_check.hide()
 
-        self.output_info_label.setText(
-            "ROM extraction always creates: PNG, palette files, metadata"
-        )
+        # Compact info text
+        self.output_info_label.setText("Creates: PNG + palettes + metadata")
 
-        self.output_group.setTitle("Output Settings (ROM Mode)")
+        self.output_group.setTitle("Output")
 
     def set_vram_extraction_mode(self) -> None:
         """Configure for VRAM extraction mode - checkboxes enabled for user control"""
@@ -264,13 +264,15 @@ class OutputSettingsManager(QObject):
             return
         if self.output_info_label is None or self.output_group is None:
             return
-        # Re-enable checkboxes with original tooltips
+        # Show and re-enable checkboxes (may have been hidden in ROM mode)
+        self.grayscale_check.show()
         self.grayscale_check.setEnabled(True)
         self.grayscale_check.setToolTip(
             "Creates 8 separate palette files for applying different color schemes.\n"
             "Required for palette switching in the editor."
         )
 
+        self.metadata_check.show()
         self.metadata_check.setEnabled(True)
         self.metadata_check.setToolTip(
             "Creates a .metadata.json file that enables palette switching.\n"

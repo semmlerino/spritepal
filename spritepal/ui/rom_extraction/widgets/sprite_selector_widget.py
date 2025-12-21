@@ -4,11 +4,10 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
-    CONTROL_PANEL_BUTTON_WIDTH,
     CONTROL_PANEL_LABEL_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
@@ -52,14 +51,9 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.sprite_combo.currentIndexChanged.connect(self._on_sprite_changed)
         sprite_row.addWidget(self.sprite_combo, 1)
 
-        # Spacer to align with Find Sprites button in offset row
-        sprite_spacer = QWidget()
-        sprite_spacer.setFixedWidth(CONTROL_PANEL_BUTTON_WIDTH)
-        sprite_row.addWidget(sprite_spacer)
-
         sprite_layout.addLayout(sprite_row)
 
-        # Offset and Find button row
+        # Offset display row (simplified - no button)
         offset_row = QHBoxLayout()
         offset_row.setSpacing(SPACING_MEDIUM)
 
@@ -68,24 +62,24 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         offset_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         offset_row.addWidget(offset_label)
 
-        self.offset_label = QLabel("(select sprite)")
+        self.offset_label = QLabel("--")
         self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
         self.offset_label.setMinimumWidth(100)
         self.offset_label.setEnabled(False)  # Visually disabled until sprite selected
         offset_row.addWidget(self.offset_label, 1)  # Stretch factor fills space
 
-        # Find Sprites button - prominent styling for discoverability
-        self.find_sprites_btn = QPushButton("Find Sprites (Ctrl+F)")
-        self.find_sprites_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.find_sprites_btn.setFixedWidth(CONTROL_PANEL_BUTTON_WIDTH)
+        sprite_layout.addLayout(offset_row)
+
+        # Find Sprites button - on its own row for prominence
+        # This is the primary discovery action, so it deserves visual prominence
+        self.find_sprites_btn = QPushButton("🔍 Find Sprites in ROM (Ctrl+F)")
+        self.find_sprites_btn.setMinimumHeight(BUTTON_MIN_HEIGHT + 4)  # Slightly taller
         self.find_sprites_btn.setShortcut(QKeySequence("Ctrl+F"))
         self.find_sprites_btn.setToolTip("Scan ROM for valid sprite offsets\n\nKeyboard shortcut: Ctrl+F")
         self.find_sprites_btn.setStyleSheet(get_prominent_action_button_style())
         _ = self.find_sprites_btn.clicked.connect(self.find_sprites_clicked.emit)
         self.find_sprites_btn.setEnabled(False)
-        offset_row.addWidget(self.find_sprites_btn)
-
-        sprite_layout.addLayout(offset_row)
+        sprite_layout.addWidget(self.find_sprites_btn)
 
         self._setup_widget_with_group("Sprite Selection", sprite_layout)
 
@@ -98,7 +92,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.sprite_combo.clear()
         self.sprite_combo.addItem("Select ROM file first...", None)
         self.sprite_combo.setEnabled(False)
-        self.offset_label.setText("(select sprite)")
+        self.offset_label.setText("--")
         self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
         self.offset_label.setEnabled(False)  # Visually disabled
         self.find_sprites_btn.setEnabled(False)
@@ -169,7 +163,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.sprite_combo.clear()
         self.sprite_combo.addItem(message, None)
         self.sprite_combo.setEnabled(False)
-        self.offset_label.setText("(select sprite)")
+        self.offset_label.setText("--")
         self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
         self.offset_label.setEnabled(False)  # Visually disabled
         self.find_sprites_btn.setEnabled(False)

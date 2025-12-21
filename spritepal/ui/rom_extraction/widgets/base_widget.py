@@ -5,7 +5,9 @@ from typing import Any
 
 from PySide6.QtWidgets import QGroupBox, QLayout, QSizePolicy, QVBoxLayout, QWidget
 
-from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL
+from ui.common.collapsible_group_box import CollapsibleGroupBox
+
+from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_MEDIUM
 from ui.styles.theme import COLORS
 
 
@@ -72,3 +74,51 @@ class BaseExtractionWidget(QWidget):
         """)
         group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         return group
+
+    def _setup_widget_flat(self, inner_layout: QLayout, with_separator: bool = True) -> None:
+        """Set up the widget with a flat layout (no group box wrapper).
+
+        Use this for header-style sections that don't need visual boxing.
+
+        Args:
+            inner_layout: The layout containing the widget's content
+            with_separator: If True, adds bottom margin for visual separation
+        """
+        # Create outer layout with appropriate spacing
+        outer_layout = QVBoxLayout()
+        outer_layout.setContentsMargins(0, 0, 0, SPACING_MEDIUM if with_separator else 0)
+        outer_layout.setSpacing(0)
+
+        # Create a container widget for the inner layout
+        container = QWidget()
+        container.setLayout(inner_layout)
+        outer_layout.addWidget(container)
+
+        self.setLayout(outer_layout)
+
+    def _setup_widget_collapsible(
+        self, title: str, inner_layout: QLayout, collapsed: bool = True
+    ) -> CollapsibleGroupBox:
+        """Set up the widget with a collapsible group box wrapper.
+
+        Use this for optional sections that can be hidden by default.
+
+        Args:
+            title: The group box title
+            inner_layout: The layout containing the widget's content
+            collapsed: Whether to start collapsed (default True)
+
+        Returns:
+            The CollapsibleGroupBox instance for external control
+        """
+        outer_layout = QVBoxLayout()
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        # Create collapsible group box
+        collapsible = CollapsibleGroupBox(title=title, collapsed=collapsed, parent=self)
+        collapsible.add_layout(inner_layout)
+        outer_layout.addWidget(collapsible)
+
+        self.setLayout(outer_layout)
+        return collapsible
