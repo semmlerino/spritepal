@@ -180,9 +180,10 @@ class ParallelSpriteFinder:
         all_results.sort(key=lambda x: x.offset)
 
         elapsed = time.time() - start_time
+        rate = len(all_results) / elapsed if elapsed > 0 else 0.0
         logger.info(
             f"Parallel search complete: found {len(all_results)} sprites "
-            f"in {elapsed:.2f}s ({len(all_results)/elapsed:.1f} sprites/sec)"
+            f"in {elapsed:.2f}s ({rate:.1f} sprites/sec)"
         )
 
         return all_results
