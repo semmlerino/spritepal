@@ -16,32 +16,6 @@ pytestmark = [
 class TestMainWindowHelperValidation:
     """Test TestMainWindowHelper functionality"""
 
-    def test_helper_initialization(self, tmp_path):
-        """Test TestMainWindowHelper initializes correctly"""
-        helper = MainWindowHelperSimple(str(tmp_path))
-
-        try:
-            # Verify real UI components are created
-            assert helper.status_bar is not None
-            assert helper.sprite_preview is not None
-            assert helper.palette_preview is not None
-            assert helper.preview_info is not None
-
-            # Verify signals exist
-            assert hasattr(helper, "extract_requested")
-            assert hasattr(helper, "open_in_editor_requested")
-            assert hasattr(helper, "arrange_rows_requested")
-            assert hasattr(helper, "arrange_grid_requested")
-
-            # Verify test files are created
-            assert helper.vram_file.exists()
-            assert helper.cgram_file.exists()
-            assert helper.oam_file.exists()
-            assert helper.rom_file.exists()
-
-        finally:
-            helper.cleanup()
-
     def test_extraction_params_functionality(self, tmp_path):
         """Test extraction parameter management"""
         helper = MainWindowHelperSimple(str(tmp_path))

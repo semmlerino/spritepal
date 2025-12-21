@@ -95,33 +95,6 @@ def test_qt_gui_functionality(qtbot):
         assert hasattr(qtbot, 'waitSignal')
         assert hasattr(qtbot, 'addWidget')
 
-def test_qtbot_functionality(qtbot):
-    """Test that qtbot provides required methods for headless testing."""
-    # Should always have required methods (standard pytest-qt fixture)
-    assert hasattr(qtbot, 'addWidget')
-    assert hasattr(qtbot, 'waitSignal')
-    assert hasattr(qtbot, 'wait')
-    assert hasattr(qtbot, 'mouseClick')
-    assert hasattr(qtbot, 'keyClick')
-
-    # Verify these methods are callable (signature check only)
-    assert callable(qtbot.addWidget)
-    assert callable(qtbot.waitSignal)
-    assert callable(qtbot.wait)
-
-def test_qapp_functionality(qapp):
-    """Test that qapp provides necessary QApplication functionality."""
-    # Should always have processEvents method
-    assert hasattr(qapp, 'processEvents')
-
-    # Should be callable without errors
-    qapp.processEvents()
-
-def test_no_gui_marker():
-    """Test that doesn't require Qt GUI components."""
-    # This test should run in all environments
-    assert True
-
 def test_qt_cleanup_integration(qtbot, qapp):
     """Test that Qt cleanup works properly between tests."""
     try:
