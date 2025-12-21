@@ -198,6 +198,12 @@ For integration tests and real component testing:
 | `test_extraction_manager` | function | Context-based extraction manager |
 | `real_extraction_manager` | function | Direct real extraction manager |
 | `real_injection_manager` | function | Direct real injection manager |
+| `real_session_manager` | function | Direct real session manager |
+| `isolated_data_repository` | function | Clean DataRepository per test |
+| `rom_cache` | function | ROM cache for extraction tests |
+| `mock_rom_cache` | function | Mock ROM cache |
+| `mock_settings_manager` | function | Mock settings manager |
+| `mock_file_dialogs` | function | Patches QFileDialog for testing |
 
 ### Test Markers
 
@@ -279,6 +285,61 @@ The codebase passes basedpyright with zero errors. To maintain this:
 - Qt signals need type annotations: `finished = Signal(str, int)`
 - For widgets that may not exist yet: `self.widget: QWidget | None = None`
 
+### Taking UI Screenshots
+
+For visual debugging and UI iteration, use this script to capture the app window:
+
+```bash
+uv run python -c "
+import sys
+import os
+os.environ['QT_QPA_PLATFORM'] = 'xcb'
+
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QTimer
+
+from core.managers import initialize_managers
+from core.configuration_service import ConfigurationService
+
+config_service = ConfigurationService()
+config_service.ensure_directories_exist()
+initialize_managers('SpritePal', settings_path=config_service.settings_file, configuration_service=config_service)
+from ui import register_ui_factories
+register_ui_factories()
+
+from launch_spritepal import SpritePalApp
+app = SpritePalApp(sys.argv)
+
+window = app.main_window
+window.show()
+window.resize(1000, 900)
+
+app.processEvents()
+app.processEvents()
+
+def capture():
+    pixmap = window.grab()
+    pixmap.save('/tmp/spritepal_screenshot.png')
+    print(f'Screenshot saved: {pixmap.width()}x{pixmap.height()}')
+    app.quit()
+
+QTimer.singleShot(500, capture)
+app.exec()
+" 2>&1 | tail -5
+```
+
+**Key points:**
+- Uses `xcb` platform for WSL X11 forwarding (not `offscreen`)
+- `window.grab()` captures widget directly (more reliable than `screen.grabWindow()`)
+- 500ms delay allows layout to stabilize before capture
+- View screenshot with: `Read /tmp/spritepal_screenshot.png`
+
+**For debug borders** (visualize widget boundaries):
+```python
+panel = window.rom_extraction_panel
+panel.setStyleSheet('QWidget { border: 1px solid red; }')
+```
+
 ## Documentation Pointers
 
 | When you need... | Read |
@@ -312,12 +373,18 @@ spritepal/
 | Looking for... | Location |
 |----------------|----------|
 | Manager protocols | `core/protocols/manager_protocols.py` |
+| Dialog protocols | `core/protocols/dialog_protocols.py` |
+| Preview protocols | `core/protocols/preview_protocols.py` |
+| Worker protocols | `core/protocols/worker_protocols.py` |
+| All protocols (exports) | `core/protocols/__init__.py` |
 | ExtractionManager, InjectionManager | `core/managers/` |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
 | DI container, `inject()` | `core/di_container.py` |
 | Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
-| MockDialog, test mocks | `tests/infrastructure/mock_dialogs.py` |
+| MockDialog, Qt mocks | `tests/infrastructure/mock_dialogs.py`, `tests/infrastructure/qt_mocks.py` |
 | ThreadSafeTestImage | `tests/infrastructure/thread_safe_test_image.py` |
+| RealComponentFactory | `tests/infrastructure/real_component_factory.py` |
+| Test data repository | `tests/infrastructure/data_repository.py` |
 
 ### Import Rules
 
@@ -361,4 +428,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: December 20, 2025*
+*Last updated: December 21, 2025*
