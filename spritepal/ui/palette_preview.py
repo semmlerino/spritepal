@@ -37,6 +37,8 @@ class PaletteColorWidget(QWidget):
         self.setFixedSize(QSize(size, size))
         self.setToolTip(f"Color {index}: RGB({color[0]}, {color[1]}, {color[2]})")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Ensure proper repaint behavior - prevents ghosting artifacts
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
 
     @override
     def paintEvent(self, a0: QPaintEvent | None) -> None:
@@ -125,7 +127,7 @@ class PaletteWidget(QFrame):
         self.palette_index = palette_index
         self.name = name
         self.colors: list[tuple[int, int, int]] = []
-        self.setFrameStyle(QFrame.Shape.StyledPanel)
+        # Note: Don't use setFrameStyle - it conflicts with stylesheet borders
         self.setStyleSheet(
             f"""
             PaletteWidget {{
@@ -142,11 +144,11 @@ class PaletteWidget(QFrame):
         layout.setSpacing(0)
         layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
 
-        # Palette label
+        # Palette label - fixed height prevents overlap with color grid
         self.label = QLabel(f"{palette_index}", self)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if self.label:
-            self.label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
+        self.label.setFixedHeight(20)
+        self.label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
         layout.addWidget(self.label, 0, 0, 1, 4)
 
         # Color swatches
@@ -191,7 +193,7 @@ class CollapsedPaletteRow(QFrame):
         super().__init__(parent)
         self.palette_index = palette_index
         self.colors: list[tuple[int, int, int]] = []
-        self.setFrameStyle(QFrame.Shape.StyledPanel)
+        # Note: Don't use setFrameStyle - it conflicts with stylesheet borders
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._update_style(highlighted=False)
 
@@ -234,6 +236,7 @@ class CollapsedPaletteRow(QFrame):
             }}
         """
         )
+        self.update()  # Force repaint after style change
 
     def set_palette(self, colors: list[tuple[int, int, int]]) -> None:
         """Set the palette colors"""
@@ -384,6 +387,7 @@ class PalettePreviewWidget(QWidget):
                 }}
             """
             )
+        self._expanded_widget.update()  # Force repaint after style change
 
     def set_palette(self, palette_index: int, colors: list[tuple[int, int, int]], name: str = "") -> None:
         """Set a specific palette's colors"""

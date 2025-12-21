@@ -19,7 +19,8 @@ logger = get_logger(__name__)
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
-    EXTRACTION_BUTTON_MAX_WIDTH as BUTTON_MAX_WIDTH,
+    CONTROL_PANEL_BUTTON_WIDTH,
+    CONTROL_PANEL_LABEL_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
@@ -64,7 +65,7 @@ class ROMFileWidget(BaseExtractionWidget):
         rom_row.setSpacing(SPACING_MEDIUM)
 
         rom_label = QLabel("ROM:")
-        rom_label.setMinimumWidth(60)  # Match other extraction widget labels
+        rom_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
         rom_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         rom_row.addWidget(rom_label)
 
@@ -76,7 +77,7 @@ class ROMFileWidget(BaseExtractionWidget):
 
         self.browse_rom_btn = QPushButton("Browse...")
         self.browse_rom_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.browse_rom_btn.setFixedWidth(BUTTON_MAX_WIDTH)
+        self.browse_rom_btn.setFixedWidth(CONTROL_PANEL_BUTTON_WIDTH)
         _ = self.browse_rom_btn.clicked.connect(self.browse_clicked.emit)
         rom_row.addWidget(self.browse_rom_btn)
 

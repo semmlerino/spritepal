@@ -7,7 +7,8 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBox
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
-    EXTRACTION_BUTTON_MAX_WIDTH as BUTTON_MAX_WIDTH,
+    CONTROL_PANEL_BUTTON_WIDTH,
+    CONTROL_PANEL_LABEL_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
@@ -35,10 +36,10 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         cgram_group = self._create_group_box("Optional Palette Override")
         cgram_layout = QVBoxLayout()
         cgram_layout.setSpacing(SPACING_MEDIUM)
-        cgram_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
+        cgram_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
 
         # Condensed caption instead of dense info box
-        caption = QLabel("Override ROM palettes with custom CGRAM file")
+        caption = QLabel("Override ROM palettes with a custom palette file")
         caption.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
         cgram_layout.addWidget(caption)
 
@@ -46,14 +47,14 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         cgram_row = QHBoxLayout()
         cgram_row.setSpacing(SPACING_MEDIUM)
 
-        cgram_label = QLabel("CGRAM:")
-        cgram_label.setMinimumWidth(60)
+        cgram_label = QLabel("File:")
+        cgram_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
         cgram_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         cgram_row.addWidget(cgram_label)
 
         self.cgram_path_edit = QLineEdit()
         self.cgram_path_edit.setPlaceholderText(
-            "Select CGRAM file for custom palettes (optional)..."
+            "Select palette file (optional)..."
         )
         self.cgram_path_edit.setReadOnly(True)
         self.cgram_path_edit.setMinimumWidth(250)
@@ -61,11 +62,11 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
 
         self.browse_cgram_btn = QPushButton("Browse...")
         self.browse_cgram_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.browse_cgram_btn.setFixedWidth(BUTTON_MAX_WIDTH)
+        self.browse_cgram_btn.setFixedWidth(CONTROL_PANEL_BUTTON_WIDTH)
         self.browse_cgram_btn.setToolTip(
             "Palettes are extracted from ROM when available.\n"
             "Common sprites have default palette fallbacks.\n"
-            "Use CGRAM for custom palette overrides."
+            "Use this to load custom palette overrides."
         )
         _ = self.browse_cgram_btn.clicked.connect(self.browse_clicked.emit)
         cgram_row.addWidget(self.browse_cgram_btn)

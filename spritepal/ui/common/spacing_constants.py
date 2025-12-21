@@ -28,6 +28,10 @@ EXTRACTION_COMBO_MIN_WIDTH = 200    # Minimum combo box width
 EXTRACTION_BUTTON_MAX_WIDTH = 150   # Maximum button width
 EXTRACTION_LABEL_MIN_WIDTH = 120    # Minimum label width for alignment
 
+# Control panel sizing (uniform for visual consistency)
+CONTROL_PANEL_LABEL_WIDTH = 60       # Uniform label width for control panels
+CONTROL_PANEL_BUTTON_WIDTH = 180     # Uniform button width (fits "Find Sprites (Ctrl+F)")
+
 # Widget heights
 BUTTON_HEIGHT = BASE_UNIT * 5       # 40px - standard button height
 COMPACT_BUTTON_HEIGHT = BASE_UNIT * 4  # 32px - compact button height
