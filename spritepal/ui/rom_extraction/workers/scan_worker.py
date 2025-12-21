@@ -21,11 +21,20 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 class SpriteScanWorker(BaseWorker):
-    """Worker thread for scanning ROM for sprite offsets"""
+    """Worker thread for scanning ROM for sprite offsets.
+
+    This worker supports two usage patterns:
+    1. Simple mode: SpriteScanWorker(rom_path, step=0x1000) - for quick scans
+    2. Advanced mode: SpriteScanWorker(rom_path, extractor, use_cache=True, ...) - for parallel scans with caching
+    """
 
     # Custom signals (BaseWorker provides progress, error, warning, operation_finished)
     sprite_found = Signal(dict)
     """Emitted when a valid sprite is found. Args: sprite_info (dict with 'offset', 'quality' keys)."""
+
+    # Compatibility signal: emits all sprites at once when scan completes
+    sprites_found = Signal(list)
+    """Emitted when scan completes with all found sprites. Args: list of sprite_info dicts."""
 
     finished = Signal()
     """Legacy compatibility signal - emitted when scan completes."""
@@ -40,10 +49,15 @@ class SpriteScanWorker(BaseWorker):
     progress_detailed = Signal(int, int)
     """Emitted with detailed progress. Args: current_offset, total_offsets."""
 
-    def __init__(self, rom_path: str, extractor: Any, use_cache: bool = True,
+    # Alias for compatibility with code expecting scan_progress
+    scan_progress = Signal(int, int)
+    """Alias for progress_detailed. Args: current_step, total_steps."""
+
+    def __init__(self, rom_path: str, extractor: Any = None, use_cache: bool = True,
                  start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None,
                  rom_cache: ROMCacheProtocol | None = None,
-                 parallel_finder: ParallelSpriteFinder | None = None):
+                 parallel_finder: ParallelSpriteFinder | None = None,
+                 step: int | None = None):
         super().__init__(parent)
         self.rom_path = rom_path
         self.extractor = extractor
@@ -162,6 +176,7 @@ class SpriteScanWorker(BaseWorker):
 
             # Emit both legacy and new progress signals
             self.progress_detailed.emit(current_step, total_steps)
+            self.scan_progress.emit(current_step, total_steps)  # Compatibility alias
             percent = int((current_progress / 100) * 100)  # Already a percentage
             self.emit_progress(percent, f"Scanning... ({current_step}/{total_steps})")
 
@@ -249,6 +264,9 @@ class SpriteScanWorker(BaseWorker):
                 logger.info(f"Parallel scan complete. Found {len(found_sprites)} sprites (from cache)")
         else:
             logger.info("Parallel scan complete. No valid sprites found.")
+
+        # Emit compatibility signal with all found sprites
+        self.sprites_found.emit(list(found_sprites.values()))
 
         self.finished.emit()
         self.operation_finished.emit(True, f"Scan complete. Found {len(found_sprites)} sprites.")

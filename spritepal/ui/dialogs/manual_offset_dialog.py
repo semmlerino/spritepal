@@ -30,6 +30,7 @@ if TYPE_CHECKING:
         ROMExtractorProtocol,
         SettingsManagerProtocol,
     )
+    from core.protocols.preview_protocols import PreviewCoordinatorProtocol
 
 from PySide6.QtCore import (
     QMutex,
@@ -92,7 +93,7 @@ from ui.dialogs.services import ViewStateManager
 from ui.rom_extraction.workers import SpritePreviewWorker, SpriteSearchWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
-from ui.workers.sprite_scan_worker import SpriteScanWorker
+from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 from utils.logging_config import get_logger
 
 # from utils.rom_cache import get_rom_cache # Removed due to DI
@@ -191,7 +192,7 @@ class UnifiedManualOffsetDialog(DialogBase):
         self._scan_progress_dialog: QProgressDialog | None = None
 
         # Preview coordinator handles preview generation (Smart or Simple based on env flag)
-        self._smart_preview_coordinator: PreviewCoordinator | None = None
+        self._smart_preview_coordinator: PreviewCoordinatorProtocol | None = None
 
         # Preview update timer (legacy - kept for compatibility)
         self._preview_timer: QTimer | None = None

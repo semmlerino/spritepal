@@ -29,6 +29,7 @@ from ui.common.spacing_constants import (
     SPACING_SMALL,
     SPACING_STANDARD,
 )
+from ui.common.widget_factory import create_section_title
 from ui.styles import get_prominent_action_button_style
 from ui.styles.theme import COLORS
 
@@ -99,7 +100,7 @@ class SimpleBrowseTab(QWidget):
         controls_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)  # Comfortable padding
 
         # Section title with better styling
-        title = self._create_section_title("ROM Offset Control")
+        title = create_section_title("ROM Offset Control")
         title.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLORS['highlight']};")
         controls_layout.addWidget(title)
 
@@ -570,21 +571,3 @@ class SimpleBrowseTab(QWidget):
 
             self.position_slider.blockSignals(False)
             self.manual_spinbox.blockSignals(False)
-
-    def _create_section_title(self, text: str) -> QLabel:
-        """
-        Create a styled section title label.
-
-        Args:
-            text: Title text
-
-        Returns:
-            Styled label widget
-        """
-        title = QLabel(text)
-        title_font = QFont()
-        title_font.setBold(True)
-        title_font.setPointSize(11)
-        title.setFont(title_font)
-        title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
-        return title

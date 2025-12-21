@@ -13,7 +13,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 from ui.common import WorkerManager
 from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
 from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoaderWorker
-from ui.workers.sprite_scan_worker import SpriteScanWorker
+from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -176,8 +176,8 @@ class ROMWorkerOrchestrator(QObject):
 
         # Connect signals
         self._scan_worker.scan_progress.connect(self._on_scan_progress)
-        self._scan_worker.item_found.connect(self._on_sprite_found)
-        self._scan_worker.scan_finished.connect(self._on_scan_finished)
+        self._scan_worker.sprite_found.connect(self._on_sprite_found)
+        self._scan_worker.finished.connect(self._on_scan_finished)
         self._scan_worker.error.connect(self._on_scan_error)
         self._scan_thread.started.connect(self._scan_worker.run)
 

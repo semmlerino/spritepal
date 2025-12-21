@@ -10,6 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
@@ -22,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from ui.common.file_dialogs import FileDialogHelper
 from ui.styles import get_muted_text_style
+from ui.styles.theme import COLORS
 
 
 class WidgetFactory:
@@ -265,3 +267,21 @@ class WidgetFactory:
             )
             if filename:
                 path_edit.setText(filename)
+
+
+def create_section_title(text: str) -> QLabel:
+    """Create a styled section title label.
+
+    Args:
+        text: Title text
+
+    Returns:
+        Styled label widget
+    """
+    title = QLabel(text)
+    title_font = QFont()
+    title_font.setBold(True)
+    title_font.setPointSize(11)
+    title.setFont(title_font)
+    title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
+    return title
