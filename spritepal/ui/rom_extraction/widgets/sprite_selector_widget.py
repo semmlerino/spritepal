@@ -4,7 +4,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
@@ -56,6 +56,11 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.sprite_combo.setEnabled(False)
         self.sprite_combo.currentIndexChanged.connect(self._on_sprite_changed)
         sprite_row.addWidget(self.sprite_combo, 1)
+
+        # Spacer to align with Find Sprites button in offset row
+        sprite_spacer = QWidget()
+        sprite_spacer.setFixedWidth(CONTROL_PANEL_BUTTON_WIDTH)
+        sprite_row.addWidget(sprite_spacer)
 
         sprite_layout.addLayout(sprite_row)
 

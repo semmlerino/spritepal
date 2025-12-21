@@ -2,13 +2,12 @@ from typing import Any
 
 """CGRAM file selector widget for ROM extraction"""
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
     CONTROL_PANEL_BUTTON_WIDTH,
-    CONTROL_PANEL_LABEL_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
@@ -46,11 +45,6 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         # CGRAM path row
         cgram_row = QHBoxLayout()
         cgram_row.setSpacing(SPACING_MEDIUM)
-
-        cgram_label = QLabel("File:")
-        cgram_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
-        cgram_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        cgram_row.addWidget(cgram_label)
 
         self.cgram_path_edit = QLineEdit()
         self.cgram_path_edit.setPlaceholderText(

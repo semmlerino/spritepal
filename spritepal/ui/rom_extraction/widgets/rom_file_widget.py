@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout
 
 from ui.styles.theme import COLORS
@@ -20,7 +20,6 @@ logger = get_logger(__name__)
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
     CONTROL_PANEL_BUTTON_WIDTH,
-    CONTROL_PANEL_LABEL_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
@@ -64,11 +63,6 @@ class ROMFileWidget(BaseExtractionWidget):
         rom_row = QHBoxLayout()
         rom_row.setSpacing(SPACING_MEDIUM)
 
-        rom_label = QLabel("ROM:")
-        rom_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
-        rom_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        rom_row.addWidget(rom_label)
-
         self.rom_path_edit = QLineEdit()
         self.rom_path_edit.setPlaceholderText("Select ROM file...")
         self.rom_path_edit.setReadOnly(True)
@@ -83,10 +77,9 @@ class ROMFileWidget(BaseExtractionWidget):
 
         rom_layout.addLayout(rom_row)
 
-        # ROM info display with helpful empty state guidance
+        # ROM info display (shows ROM details after loading)
         self.rom_info_label = QLabel()
         self.rom_info_label.setWordWrap(True)
-        self._set_empty_state_guidance()
         rom_layout.addWidget(self.rom_info_label)
 
         # Loading progress bar (hidden by default)
@@ -172,8 +165,9 @@ class ROMFileWidget(BaseExtractionWidget):
         self._cache_status = {"has_cache": False, "cache_type": None}
         if self.rom_path_edit:
             self.rom_path_edit.clear()
-        # Restore empty state guidance
-        self._set_empty_state_guidance()
+        if self.rom_info_label:
+            self.rom_info_label.setText("")
+            self.rom_info_label.setToolTip("")
 
     def _check_cache_status(self):
         """Check cache status for the current ROM"""

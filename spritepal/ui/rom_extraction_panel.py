@@ -10,24 +10,17 @@ This panel coordinates ROM-based sprite extraction using:
 from __future__ import annotations
 
 from collections.abc import Callable
-from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
-    QProgressBar,
     QPushButton,
-    QSizePolicy,
-    QSpacerItem,
-    QTextEdit,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -47,10 +40,7 @@ from ui.rom_extraction.widgets import (
     ROMFileWidget,
     SpriteSelectorWidget,
 )
-
-# Dialog imports moved to lazy imports in methods that use them (see _on_partial_scan_detected, _open_manual_offset_dialog, _find_sprites, _check_scan_cache)
-from ui.rom_extraction.workers import SpriteScanWorker
-from ui.styles.components import get_cache_status_style, get_manual_offset_button_style
+from ui.styles.components import get_manual_offset_button_style
 from ui.styles.theme import COLORS
 from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
@@ -63,31 +53,9 @@ logger = get_logger(__name__)
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
     BUTTON_HEIGHT,
-    SPACING_COMPACT_LARGE as SPACING_LARGE,
-    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
+    SPACING_COMPACT_MEDIUM as SPACING_SECTION,  # 10px between sections
+    SPACING_COMPACT_SMALL as SPACING_INTERNAL,  # 6px for internal margins
 )
-
-
-class ScanDialog(QDialog):
-    """Dialog for sprite scanning with typed attributes."""
-
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__(parent)
-        # Typed attributes that will be set during initialization
-        self.cache_status_label: QLabel
-        self.progress_bar: QProgressBar
-        self.results_text: QTextEdit
-        self.button_box: QDialogButtonBox
-        self.apply_btn: QPushButton | None
-        self.rom_cache: Any = None  # Cache object, type depends on implementation
-
-
-class ScanContext:
-    """Context object for sharing data between scan event handlers."""
-
-    def __init__(self):
-        self.found_offsets: list[dict[str, Any]] = []
-        self.selected_offset: int | None = None
 
 
 class ROMExtractionPanel(QWidget):
@@ -133,7 +101,11 @@ class ROMExtractionPanel(QWidget):
         # Initialize extracted components
         self._worker_orchestrator = ROMWorkerOrchestrator(self)
         self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
-        self._scan_controller: ScanController | None = None  # Created on first use
+        self._scan_controller = ScanController(
+            state_manager=self.state_manager, parent=self
+        )
+        self._scan_controller.sprite_selected.connect(self._add_selected_sprite)
+        self.scan_worker = None
 
         # Connect orchestrator signals
         self._connect_orchestrator_signals()
@@ -141,9 +113,6 @@ class ROMExtractionPanel(QWidget):
         # Connect dialog manager signals
         self._offset_dialog_manager.offset_changed.connect(self._on_dialog_offset_changed)
         self._offset_dialog_manager.sprite_found.connect(self._on_dialog_sprite_found)
-
-        # Legacy worker reference for scan worker (still managed locally for now)
-        self.scan_worker: SpriteScanWorker | None = None
 
         # Output name provider callback (injected from main window)
         self._output_name_provider: Callable[[], str] | None = None
@@ -212,8 +181,8 @@ class ROMExtractionPanel(QWidget):
         """
         main_panel = QWidget(self)
         layout = QVBoxLayout()
-        layout.setSpacing(SPACING_LARGE)
-        layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
+        layout.setSpacing(SPACING_SECTION)  # 10px between sections (tighter than before)
+        layout.setContentsMargins(SPACING_INTERNAL, SPACING_INTERNAL, SPACING_INTERNAL, SPACING_INTERNAL)
 
         # Add all widget groups
         self._add_rom_controls(layout)
@@ -221,8 +190,7 @@ class ROMExtractionPanel(QWidget):
         self._add_manual_offset_controls(layout)
         self._add_output_controls(layout)
 
-        # Add vertical spacer at the bottom
-        layout.addItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred))
+        # No spacer needed here - main_window handles vertical expansion via scroll area
         main_panel.setLayout(layout)
         return main_panel
 
@@ -269,14 +237,20 @@ class ROMExtractionPanel(QWidget):
         advanced_row.setContentsMargins(0, 0, 0, 0)
 
         self.advanced_toggle = QToolButton()
-        self.advanced_toggle.setText("Advanced: Manual Offset Exploration")
+        self.advanced_toggle.setText("Browse All Sprites (Advanced)")
         self.advanced_toggle.setCheckable(True)
         self.advanced_toggle.setChecked(False)
         self.advanced_toggle.setArrowType(Qt.ArrowType.RightArrow)
         self.advanced_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.advanced_toggle.setToolTip(
+            "Manually browse sprites at any ROM offset\n"
+            "instead of using the preset sprite list above"
+        )
         self.advanced_toggle.setStyleSheet(
             "QToolButton { border: none; padding: 4px; font-weight: bold; }"
             "QToolButton:hover { background-color: rgba(255, 255, 255, 0.1); }"
+            "QToolButton::right-arrow { subcontrol-position: center left; }"
+            "QToolButton::down-arrow { subcontrol-position: center left; }"
         )
         self.advanced_toggle.toggled.connect(self._on_advanced_toggled)
         advanced_row.addWidget(self.advanced_toggle)
@@ -801,381 +775,23 @@ class ROMExtractionPanel(QWidget):
 
     # ========== Sprite Scanning ==========
 
-    def _find_sprites(self):
-        """Open dialog to scan for sprite offsets"""
-        from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
+    def _find_sprites(self) -> None:
+        """Open dialog to scan for sprite offsets.
 
+        Delegates to ScanController which handles:
+        - State manager coordination
+        - Dialog creation and management
+        - Worker lifecycle
+        - Cache operations
+        """
         if not self.rom_path:
             return
 
-        # Check if we can start scanning
-        if not self.state_manager.can_scan:
-            logger.warning("Cannot start scan - another operation is in progress")
-            return
-
-        # Transition to scanning state
-        if not self.state_manager.start_scanning():
-            logger.error("Failed to transition to scanning state")
-            return
-
-        try:
-            dialog = self._create_scan_dialog()
-            self._setup_scan_worker(dialog)
-            dialog.exec()
-        except Exception as e:
-            logger.exception("Error in sprite scanning")
-            self.state_manager.finish_scanning(success=False, error=str(e))
-            UserErrorDialog.display_error(
-                self,
-                "Failed to scan for sprites",
-                f"Technical details: {e!s}"
-            )
-
-    def _create_scan_dialog(self) -> ScanDialog:
-        """Create and configure the sprite scanning dialog.
-
-        Returns:
-            Configured ScanDialog instance
-        """
-        dialog = ScanDialog(self)
-        dialog.setWindowTitle("Find Sprites")
-        dialog.setMinimumSize(600, 400)
-
-        # Build dialog UI
-        layout = QVBoxLayout()
-
-        # Create UI components
-        cache_status_label = self._create_cache_status_label()
-        progress_bar = self._create_progress_bar()
-        results_text = self._create_results_text()
-        button_box = self._create_button_box()
-
-        # Add to layout
-        layout.addWidget(cache_status_label)
-        layout.addWidget(progress_bar)
-        layout.addWidget(results_text)
-        layout.addWidget(button_box)
-
-        dialog.setLayout(layout)
-
-        # Store references for later access
-        dialog.cache_status_label = cache_status_label
-        dialog.progress_bar = progress_bar
-        dialog.results_text = results_text
-        dialog.button_box = button_box
-        dialog.apply_btn = button_box.button(QDialogButtonBox.StandardButton.Apply)
-
-        return dialog
-
-    def _create_cache_status_label(self) -> QLabel:
-        """Create the cache status label."""
-        label = QLabel("Checking cache...")
-        label.setStyleSheet(get_cache_status_style("checking"))
-        return label
-
-    def _create_progress_bar(self) -> QProgressBar:
-        """Create the progress bar."""
-        progress_bar = QProgressBar()
-        progress_bar.setTextVisible(True)
-        return progress_bar
-
-    def _create_results_text(self) -> QTextEdit:
-        """Create the results text area."""
-        results_text = QTextEdit()
-        results_text.setReadOnly(True)
-        results_text.setPlainText("Starting sprite scan...\n\n")
-        return results_text
-
-    def _create_button_box(self) -> QDialogButtonBox:
-        """Create the button box with Close and Apply buttons."""
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Close | QDialogButtonBox.StandardButton.Apply
+        self._scan_controller.start_scan(
+            rom_path=self.rom_path,
+            extractor=self.rom_extractor,
+            parent_widget=self,
         )
-        apply_btn = button_box.button(QDialogButtonBox.StandardButton.Apply)
-        if apply_btn:
-            apply_btn.setText("Use Selected Offset")
-            apply_btn.setEnabled(False)
-        return button_box
-
-    def _setup_scan_worker(self, dialog: ScanDialog) -> None:
-        """Set up the scan worker and connect signals.
-
-        Args:
-            dialog: The scan dialog containing UI elements
-        """
-        from ui.common import WorkerManager
-
-        # Clean up any existing scan worker
-        WorkerManager.cleanup_worker(self.scan_worker)
-
-        # Check cache and get user preference
-        use_cache = self._check_scan_cache(dialog)
-        if use_cache is None:
-            # User cancelled
-            dialog.reject()
-            return
-
-        # Create scan worker
-        self.scan_worker = SpriteScanWorker(self.rom_path, self.rom_extractor, use_cache=use_cache, parent=self)
-
-        # Create scan context to pass data between handlers
-        scan_context = ScanContext()
-
-        # Connect worker signals
-        self._connect_scan_signals(dialog, scan_context)
-
-        # Connect dialog signals
-        self._connect_dialog_signals(dialog, scan_context)
-
-        # Start scanning
-        self.scan_worker.start()
-
-    def _check_scan_cache(self, dialog: ScanDialog) -> bool | None:
-        """Check for cached scan results and get user preference.
-
-        Args:
-            dialog: The scan dialog
-
-        Returns:
-            True to use cache, False to start fresh, None if cancelled
-        """
-        from core.di_container import inject  # Delayed import
-        from core.protocols.manager_protocols import ROMCacheProtocol
-        from ui.dialogs import ResumeScanDialog  # Lazy import to avoid cross-UI coupling
-        rom_cache = inject(ROMCacheProtocol)
-
-        # Define scan parameters (must match SpriteScanWorker)
-        scan_params = {
-            "start_offset": 0xC0000,
-            "end_offset": 0xF0000,
-            "alignment": 0x100
-        }
-
-        partial_cache = rom_cache.get_partial_scan_results(self.rom_path, scan_params)
-
-        # Store cache reference for later use
-        dialog.rom_cache = rom_cache
-
-        if partial_cache and not partial_cache.get("completed", False):
-            # Show resume dialog
-            user_choice = ResumeScanDialog.show_resume_dialog(partial_cache, self)
-
-            if user_choice == ResumeScanDialog.CANCEL:
-                return None
-            if user_choice == ResumeScanDialog.START_FRESH:
-                self._update_cache_status(dialog, "fresh", "Starting fresh scan (ignoring cache)")
-                return False
-            # RESUME
-            self._update_cache_status(dialog, "resuming", "\U0001F4CA Resuming from cached progress...")
-            return True
-        self._update_cache_status(dialog, "fresh", "No cache found - starting fresh scan")
-        return True
-
-    def _update_cache_status(self, dialog: ScanDialog, status: str, text: str) -> None:
-        """Update the cache status label.
-
-        Args:
-            dialog: The scan dialog
-            status: Status type for styling
-            text: Status text to display
-        """
-        dialog.cache_status_label.setText(text)
-        dialog.cache_status_label.setStyleSheet(get_cache_status_style(status))
-
-    def _connect_scan_signals(self, dialog: ScanDialog, context: ScanContext) -> None:
-        """Connect scan worker signals to handlers.
-
-        Args:
-            dialog: The scan dialog
-            context: Scan context for sharing data
-        """
-        if self.scan_worker:
-            self.scan_worker.progress_detailed.connect(
-                lambda c, t: self._on_scan_progress(dialog, c, t)
-            )
-            self.scan_worker.sprite_found.connect(
-                lambda info: self._on_sprite_found(dialog, context, info)
-            )
-            self.scan_worker.finished.connect(
-                lambda: self._on_scan_complete(dialog, context)
-            )
-            self.scan_worker.cache_status.connect(
-                lambda status: self._on_cache_status(dialog, status)
-            )
-            self.scan_worker.cache_progress.connect(
-                lambda progress: self._on_cache_progress(dialog, progress)
-            )
-
-    def _on_scan_progress(self, dialog: ScanDialog, current: int, total: int) -> None:
-        """Handle scan progress update."""
-        dialog.progress_bar.setValue(int((current / total) * 100))
-        dialog.progress_bar.setFormat(f"Scanning... {current}/{total}")
-
-    def _on_sprite_found(self, dialog: ScanDialog, context: ScanContext, sprite_info: dict[str, Any]) -> None:
-        """Handle sprite found during scan."""
-        context.found_offsets.append(sprite_info)
-
-        # Update results text
-        text = self._format_sprite_info(sprite_info)
-        current_text = dialog.results_text.toPlainText()
-        dialog.results_text.setPlainText(current_text + text)
-
-        # Enable apply button after first find
-        if len(context.found_offsets) == 1 and dialog.apply_btn:
-            dialog.apply_btn.setEnabled(True)
-
-    def _format_sprite_info(self, sprite_info: dict[str, Any]) -> str:
-        """Format sprite info for display."""
-        text = f"Found sprite at {sprite_info['offset_hex']}:\n"
-        text += f"  - Tiles: {sprite_info['tile_count']}\n"
-        text += f"  - Alignment: {sprite_info['alignment']}\n"
-        text += f"  - Quality: {sprite_info['quality']:.2f}\n"
-        text += f"  - Size: {sprite_info['compressed_size']} bytes compressed\n"
-        if "size_limit_used" in sprite_info:
-            text += f"  - Size limit: {sprite_info['size_limit_used']} bytes\n"
-        text += "\n"
-        return text
-
-    def _on_scan_complete(self, dialog: ScanDialog, context: ScanContext) -> None:
-        """Handle scan completion."""
-        dialog.progress_bar.setValue(100)
-        dialog.progress_bar.setFormat("Scan complete")
-
-        # Update results text
-        summary_text = self._format_scan_summary(context.found_offsets)
-        current_text = dialog.results_text.toPlainText()
-        dialog.results_text.setPlainText(current_text + summary_text)
-
-        if context.found_offsets:
-            # Save results to cache
-            self._save_scan_results_to_cache(dialog, context.found_offsets)
-        # No sprites found
-        elif dialog.apply_btn:
-            dialog.apply_btn.setEnabled(False)
-
-    def _format_scan_summary(self, found_offsets: list[Any]) -> str:
-        """Format scan completion summary."""
-        text = f"\nScan complete! Found {len(found_offsets)} valid sprite locations.\n"
-
-        if found_offsets:
-            text += "\nBest quality sprites:\n"
-            # Sort by quality
-            sorted_sprites = sorted(found_offsets, key=itemgetter("quality"), reverse=True)
-
-            for i, sprite in enumerate(sorted_sprites[:5]):
-                size_info = ""
-                if "size_limit_used" in sprite:
-                    size_info = f", {sprite['size_limit_used']/1024:.0f}KB limit"
-                text += (f"{i+1}. {sprite['offset_hex']} - Quality: {sprite['quality']:.2f}, "
-                        f"{sprite['tile_count']} tiles{size_info}\n")
-        else:
-            text += "\nNo valid sprites found in scanned range.\n"
-
-        return text
-
-    def _save_scan_results_to_cache(self, dialog: ScanDialog, found_offsets: list[Any]) -> None:
-        """Save scan results to cache."""
-        self._update_cache_status(dialog, "saving", "\U0001F4BE Saving results to cache...")
-        # Defer actual save to next event loop iteration to allow UI update
-        QTimer.singleShot(0, lambda: self._do_cache_save(dialog, found_offsets))
-
-    def _do_cache_save(self, dialog: ScanDialog, found_offsets: list[Any]) -> None:
-        """Perform the actual cache save operation."""
-        # Convert to cache format
-        sprite_locations = {}
-        for sprite in found_offsets:
-            name = f"scanned_0x{sprite['offset']:X}"
-            sprite_locations[name] = {
-                "offset": sprite["offset"],
-                "compressed_size": sprite.get("compressed_size"),
-                "quality": sprite.get("quality", 0.0)
-            }
-
-        # Save to cache
-        if dialog.rom_cache and dialog.rom_cache.save_sprite_locations(self.rom_path, sprite_locations):
-            self._update_cache_status(dialog, "saved",
-                                     f"\u2705 Saved {len(found_offsets)} sprites to cache")
-            # Update results text
-            current_text = dialog.results_text.toPlainText()
-            dialog.results_text.setPlainText(
-                current_text + "\n\u2705 Results saved to cache for faster future scans.\n"
-            )
-        else:
-            dialog.cache_status_label.setText("\u26A0\uFE0F Could not save to cache")
-            current_text = dialog.results_text.toPlainText()
-            dialog.results_text.setPlainText(
-                current_text + "\n\u26A0\uFE0F Could not save results to cache.\n"
-            )
-
-    def _on_cache_status(self, dialog: ScanDialog, status: str) -> None:
-        """Handle cache status update."""
-        dialog.cache_status_label.setText(f"\U0001F4BE {status}")
-
-        # Update style based on status
-        if "Saving" in status:
-            style_type = "saving"
-        elif "Resuming" in status:
-            style_type = "resuming"
-        else:
-            style_type = "checking"
-
-        dialog.cache_status_label.setStyleSheet(get_cache_status_style(style_type))
-
-    def _on_cache_progress(self, dialog: ScanDialog, progress: int) -> None:
-        """Handle cache progress update."""
-        if progress > 0:
-            dialog.cache_status_label.setText(f"\U0001F4BE Saving progress ({progress}%)...")
-
-    def _connect_dialog_signals(self, dialog: ScanDialog, context: ScanContext) -> None:
-        """Connect dialog button signals.
-
-        Args:
-            dialog: The scan dialog
-            context: Scan context for sharing data
-        """
-        # Connect dialog finished signal
-        dialog.finished.connect(lambda result: self._on_dialog_finished(dialog, result, context))
-
-        # Connect button box signals
-        dialog.button_box.rejected.connect(dialog.reject)
-
-        if dialog.apply_btn:
-            dialog.apply_btn.clicked.connect(lambda: self._on_apply_clicked(dialog, context))
-
-    def _on_apply_clicked(self, dialog: ScanDialog, context: ScanContext) -> None:
-        """Handle Apply button click."""
-        if context.found_offsets:
-            # Use the best quality offset
-            context.selected_offset = context.found_offsets[0]["offset"]
-            dialog.accept()
-
-    def _on_dialog_finished(self, dialog: ScanDialog, result: int, context: ScanContext) -> None:
-        """Handle dialog close."""
-        from ui.common import WorkerManager
-
-        # Disconnect signals BEFORE cleanup to prevent crashes from queued signals
-        if self.scan_worker:
-            self.scan_worker.blockSignals(True)
-            # Disconnect lambda signals to prevent accessing deleted dialog
-            try:
-                self.scan_worker.progress_detailed.disconnect()
-                self.scan_worker.sprite_found.disconnect()
-                self.scan_worker.finished.disconnect()
-                self.scan_worker.cache_status.disconnect()
-                self.scan_worker.cache_progress.disconnect()
-            except (RuntimeError, TypeError):
-                pass  # Already disconnected
-
-        # NOW safe to cleanup
-        WorkerManager.cleanup_worker(self.scan_worker)
-        self.scan_worker = None
-
-        # Transition back to idle state
-        self.state_manager.finish_scanning()
-
-        # Handle accepted dialog with selected offset
-        if result == QDialog.DialogCode.Accepted and context.selected_offset is not None:
-            self._add_selected_sprite(context.selected_offset)
 
     def _add_selected_sprite(self, offset: int) -> None:
         """Add the selected sprite to the combo box.

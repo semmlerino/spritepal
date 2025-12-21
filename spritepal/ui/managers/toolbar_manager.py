@@ -9,7 +9,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QMenu, QPushButton, QWidget
 
-from ui.common.spacing_constants import BUTTON_HEIGHT
+from ui.common.spacing_constants import BUTTON_HEIGHT, SPACING_MEDIUM
 from ui.styles import (
     get_button_style,
     get_danger_action_button_style,
@@ -88,6 +88,9 @@ class ToolbarManager(QObject):
         Args:
             layout: Grid layout to add buttons to
         """
+        # Add horizontal margins to align with form content above
+        layout.setContentsMargins(SPACING_MEDIUM, 0, SPACING_MEDIUM, 0)
+
         self._create_extraction_status_label(layout)
         self._create_extract_button(layout)
         self._create_separator(layout)

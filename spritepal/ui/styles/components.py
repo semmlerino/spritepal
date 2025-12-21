@@ -271,6 +271,9 @@ def get_tab_style() -> str:
         border: {DIMENSIONS["border_width"]}px solid {COLORS["border"]};
         border-radius: {DIMENSIONS["border_radius"]}px;
     }}
+    QTabBar {{
+        margin-left: {DIMENSIONS["spacing_sm"]}px;
+    }}
     QTabBar::tab {{
         background-color: {COLORS["light_gray"]};
         border: {DIMENSIONS["border_width"]}px solid {COLORS["border"]};
