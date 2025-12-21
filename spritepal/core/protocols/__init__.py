@@ -17,15 +17,12 @@ from .manager_protocols import (
     ApplicationStateManagerProtocol,
     ConfigurationServiceProtocol,
     ExtractionManagerProtocol,
-    HistoryManagerProtocol,
     InjectionManagerProtocol,
     ROMCacheProtocol,
     ROMExtractorProtocol,
     ROMServiceProtocol,
     SettingsManagerProtocol,
-    StateSnapshotServiceProtocol,
     VRAMServiceProtocol,
-    WorkflowManagerProtocol,
 )
 from .preview_protocols import (
     PreviewCoordinatorProtocol,
@@ -40,7 +37,6 @@ __all__ = [
     "ConfigurationServiceProtocol",
     "DialogFactoryProtocol",
     "ExtractionManagerProtocol",
-    "HistoryManagerProtocol",
     "InjectionDialogProtocol",
     "InjectionManagerProtocol",
     "ManualOffsetDialogFactoryProtocol",
@@ -51,7 +47,5 @@ __all__ = [
     "ROMExtractorProtocol",
     "ROMServiceProtocol",
     "SettingsManagerProtocol",
-    "StateSnapshotServiceProtocol",
     "VRAMServiceProtocol",
-    "WorkflowManagerProtocol",
 ]

@@ -68,12 +68,8 @@ class ScanController(QObject):
     - Result formatting for display
     """
 
-    # === Existing Signals ===
+    # Signals
     cache_status_changed = Signal(str, str)  # status, style_class
-    cache_hit = Signal(list)  # cached sprites
-    scan_requested = Signal(str, int)  # rom_path, step size
-
-    # === New Signals for workflow ===
     scan_started = Signal()  # Notify that scanning began
     scan_progress = Signal(int, int)  # current, total
     sprite_found = Signal(dict)  # sprite_info dict

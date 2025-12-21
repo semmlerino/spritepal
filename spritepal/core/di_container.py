@@ -246,21 +246,6 @@ def configure_container(
         lambda: ROMExtractor(rom_cache=inject(ROMCacheProtocol))
     )
 
-    # Register extracted services (Phase 2 refactoring)
-    from core.managers.history_manager import HistoryManager
-    from core.managers.workflow_manager import WorkflowManager
-    from core.protocols.manager_protocols import (
-        HistoryManagerProtocol,
-        StateSnapshotServiceProtocol,
-        WorkflowManagerProtocol,
-    )
-    from core.services.state_snapshot_service import StateSnapshotService
-
-    # These are standalone services with no dependencies
-    register_singleton(StateSnapshotServiceProtocol, StateSnapshotService())
-    register_singleton(WorkflowManagerProtocol, WorkflowManager())
-    register_singleton(HistoryManagerProtocol, HistoryManager())
-
     # NOTE: UI factory registrations (ManualOffsetDialogFactoryProtocol, DialogFactoryProtocol)
     # are handled by ui.register_ui_factories() called by application entry points
     # AFTER initialize_managers() completes. This keeps UI dependencies out of core/ layer.

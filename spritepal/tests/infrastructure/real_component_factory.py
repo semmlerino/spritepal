@@ -32,30 +32,17 @@ import os
 import tempfile
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
+import contextlib
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QApplication, QWidget
 
 from core.managers.application_state_manager import ApplicationStateManager
-from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.managers.registry import ManagerRegistry
 from ui.common import WorkerManager
-from ui.common.error_handler import ErrorHandler
 from ui.main_window import MainWindow
-from ui.rom_extraction_panel import ROMExtractionPanel
-
-# Import widget classes for factory methods
-try:
-    from ui.row_arrangement_dialog import RowArrangementDialog
-    from ui.zoomable_preview import PreviewPanel, ZoomablePreviewWidget
-except ImportError:
-    # Fallback for testing environments
-    ZoomablePreviewWidget = QWidget
-    PreviewPanel = QWidget
-    RowArrangementDialog = QWidget
-import contextlib
 
 from core.services.rom_cache import ROMCache
 
@@ -64,16 +51,7 @@ from .data_repository import DataRepository, get_test_data_repository
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
     from core.tile_renderer import TileRenderer
-    from core.workers import (
-        ROMExtractionWorker,
-        ROMInjectionWorker,
-        VRAMExtractionWorker,
-        VRAMInjectionWorker,
-    )
-
-# Type variables for generic manager handling
-M = TypeVar("M", bound=BaseManager)
-W = TypeVar("W", bound=QThread)
+    from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 
 class RealComponentFactory:
     """
@@ -222,32 +200,6 @@ class RealComponentFactory:
         _ = app_name
         return self._get_session_manager_from_registry()
 
-    def create_manager_registry(self, populate: bool = True) -> ManagerRegistry:
-        """
-        Create a ManagerRegistry with real managers.
-
-        Args:
-            populate: Whether to populate with default managers
-
-        Returns:
-            ManagerRegistry instance with real managers
-
-        Note:
-            Uses isolated temp settings path to avoid polluting repo
-            with .testapp_settings.json in the project root.
-        """
-        registry = ManagerRegistry()
-
-        if populate:
-            # Initialize real managers via registry with isolated settings
-            registry.initialize_managers("TestApp", settings_path=self._settings_path)
-
-            # Register UI factories with DI container (after managers are initialized)
-            from ui import register_ui_factories
-            register_ui_factories()
-
-        return registry
-
     def create_main_window(self, with_managers: bool = True) -> MainWindow:
         """
         Create a real MainWindow for testing.
@@ -297,33 +249,6 @@ class RealComponentFactory:
 
         return window
 
-    def create_rom_extraction_panel(self, parent: QWidget | None = None) -> ROMExtractionPanel:
-        """
-        Create a real ROMExtractionPanel for testing.
-
-        Args:
-            parent: Optional parent widget
-
-        Returns:
-            Real ROMExtractionPanel instance
-        """
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ExtractionManagerProtocol
-
-        panel = ROMExtractionPanel(
-            parent,
-            extraction_manager=inject(ExtractionManagerProtocol),
-        )
-        self._created_components.append(panel)
-
-        # Set up with test ROM data
-        test_data = self._data_repo.get_rom_extraction_data("medium")
-
-        if hasattr(panel, "rom_path_edit") and panel.rom_path_edit:
-            panel.rom_path_edit.setText(test_data["rom_path"])
-
-        return panel
-
     def create_extraction_worker(self, params: dict[str, Any] | None = None, worker_type: str = "vram") -> VRAMExtractionWorker | ROMExtractionWorker:
         """
         Create a real extraction worker for testing.
@@ -354,74 +279,6 @@ class RealComponentFactory:
 
         self._created_components.append(worker)
 
-        return worker
-
-    def create_injection_worker(self, params: dict[str, Any] | None = None, worker_type: str = "vram") -> VRAMInjectionWorker | ROMInjectionWorker:
-        """
-        Create a real injection worker for testing.
-
-        Args:
-            params: Optional injection parameters
-            worker_type: Type of worker - "vram" or "rom"
-
-        Returns:
-            Real VRAMInjectionWorker or ROMInjectionWorker instance
-        """
-        from core.di_container import inject
-        from core.protocols.manager_protocols import InjectionManagerProtocol
-        from core.workers import ROMInjectionWorker, VRAMInjectionWorker
-
-        if params is None:
-            params = self._data_repo.get_injection_data("small")
-
-        injection_manager = inject(InjectionManagerProtocol)
-
-        if worker_type == "vram":
-            worker = VRAMInjectionWorker(params, injection_manager=injection_manager)
-        else:
-            worker = ROMInjectionWorker(params, injection_manager=injection_manager)
-
-        self._created_components.append(worker)
-
-        return worker
-
-    def create_typed_manager(self, manager_class: type[M], **kwargs: Any) -> M:
-        """
-        Create a typed manager instance with type safety.
-
-        Args:
-            manager_class: The manager class to instantiate
-            **kwargs: Arguments to pass to manager constructor
-
-        Returns:
-            Typed manager instance
-        """
-        manager = manager_class(**kwargs)
-        self._created_components.append(manager)
-        return manager
-
-    def create_typed_worker(self, worker_class: type[W], params: dict[str, Any] | None = None) -> W:
-        """
-        Create a typed worker instance with type safety.
-
-        Args:
-            worker_class: The worker class to instantiate
-            params: Optional parameters for the worker
-
-        Returns:
-            Typed worker instance
-        """
-        if params is None:
-            # Use appropriate test data based on worker type
-            if "Extraction" in worker_class.__name__:
-                params = self._data_repo.get_vram_extraction_data("small")
-            elif "Injection" in worker_class.__name__:
-                params = self._data_repo.get_injection_data("small")
-            else:
-                params = {}
-
-        worker = worker_class(params)
-        self._created_components.append(worker)
         return worker
 
     def create_rom_cache(self, cache_dir: Path | None = None) -> ROMCache:
@@ -473,135 +330,6 @@ class RealComponentFactory:
             "getSaveFileName": Mock(return_value=(str(Path(tempfile.gettempdir()) / "output.png"), "PNG files (*.png)")),
             "getExistingDirectory": Mock(return_value=str(Path(tempfile.gettempdir()))),
         }
-
-    def create_error_handler(self, parent: QWidget | None = None) -> ErrorHandler:
-        """
-        Create a real error handler for testing.
-
-        Args:
-            parent: Optional parent widget
-
-        Returns:
-            Real ErrorHandler instance
-        """
-        handler = ErrorHandler(parent)
-        self._created_components.append(handler)
-
-        # Configure for testing (no modal dialogs)
-        if hasattr(handler, "_show_dialogs"):
-            handler._show_dialogs = False
-
-        return handler
-
-    def create_worker_manager(self) -> WorkerManager:
-        """
-        Create a real WorkerManager for testing.
-
-        Returns:
-            Real WorkerManager instance
-        """
-        return WorkerManager()
-
-    def create_zoomable_preview_widget(self) -> ZoomablePreviewWidget:
-        """
-        Create a real ZoomablePreviewWidget for testing.
-
-        Returns:
-            Real ZoomablePreviewWidget instance
-        """
-        from ui.zoomable_preview import ZoomablePreviewWidget
-
-        widget = ZoomablePreviewWidget()
-        self._created_components.append(widget)
-        return widget
-
-    def create_preview_panel(self) -> PreviewPanel:
-        """
-        Create a real PreviewPanel for testing.
-
-        Returns:
-            Real PreviewPanel instance
-        """
-        from ui.zoomable_preview import PreviewPanel
-
-        panel = PreviewPanel()
-        self._created_components.append(panel)
-        return panel
-
-    def create_row_arrangement_dialog(self, sprite_path: str, tiles_per_row: int = 16) -> RowArrangementDialog:
-        """
-        Create a real RowArrangementDialog for testing.
-
-        Args:
-            sprite_path: Path to the sprite file
-            tiles_per_row: Number of tiles per row
-
-        Returns:
-            Real RowArrangementDialog instance
-        """
-        from ui.row_arrangement_dialog import RowArrangementDialog
-
-        dialog = RowArrangementDialog(sprite_path, tiles_per_row)
-        self._created_components.append(dialog)
-        return dialog
-
-    def create_test_widget(self, qtbot: Any, widget_class: type[QWidget] | None = None) -> QWidget:
-        """
-        Create a test widget for generic Qt component testing.
-
-        Args:
-            qtbot: pytest-qt's qtbot fixture for widget management
-            widget_class: Optional specific widget class to create
-
-        Returns:
-            Real Qt widget instance managed by qtbot
-        """
-        if widget_class is None:
-            widget_class = QWidget
-
-        widget = widget_class()
-        qtbot.addWidget(widget)
-        self._created_components.append(widget)
-        return widget
-
-    def inject_test_data(self, component: Any, data_size: str = "medium") -> None:
-        """
-        Inject test data into a component.
-
-        Args:
-            component: Component to inject data into
-            data_size: Size of test data to use
-        """
-        component_type = type(component).__name__
-
-        if "Extraction" in component_type:
-            test_data = self._data_repo.get_vram_extraction_data(data_size)
-            self._inject_data(component, test_data)
-        elif "Injection" in component_type:
-            test_data = self._data_repo.get_injection_data(data_size)
-            self._inject_data(component, test_data)
-        elif "Rom" in component_type or "ROM" in component_type:
-            test_data = self._data_repo.get_rom_extraction_data(data_size)
-            self._inject_data(component, test_data)
-
-    def _inject_data(self, component: Any, data: dict[str, Any]) -> None:
-        """
-        Helper to inject data into component attributes.
-
-        Args:
-            component: Component to inject into
-            data: Data dictionary to inject
-        """
-        for key, value in data.items():
-            # Try to set as attribute
-            if hasattr(component, key):
-                setattr(component, key, value)
-            # Try to set with underscore prefix
-            elif hasattr(component, f"_{key}"):
-                setattr(component, f"_{key}", value)
-            # Try to find a setter method
-            elif hasattr(component, f"set_{key}"):
-                getattr(component, f"set_{key}")(value)
 
     def create_tile_renderer(self) -> TileRenderer:
         """
@@ -784,173 +512,3 @@ class RealComponentFactory:
             for leak in self._leaked_resources:
                 warnings.warn(leak, ResourceWarning, stacklevel=2)
 
-class TypedManagerFactory(Generic[M]):
-    """
-    Generic factory for creating typed managers with compile-time type safety.
-
-    This eliminates the need for unsafe cast() operations in tests.
-    """
-
-    def __init__(
-        self,
-        manager_class: type[M],
-        *,
-        factory: RealComponentFactory | None = None,
-        manager_registry: ManagerRegistry | None = None,
-    ):
-        """
-        Initialize typed manager factory.
-
-        Args:
-            manager_class: The manager class to create instances of
-            factory: Optional RealComponentFactory to use (takes precedence over manager_registry)
-            manager_registry: ManagerRegistry to use if factory not provided
-        """
-        if factory is None and manager_registry is None:
-            raise TypeError(
-                "TypedManagerFactory requires either factory or manager_registry parameter. "
-                "Use: TypedManagerFactory(ExtractionManager, manager_registry=isolated_managers)"
-            )
-        self._manager_class = manager_class
-        self._factory = factory or RealComponentFactory(manager_registry=manager_registry)  # type: ignore[arg-type]
-
-    def create(self, **kwargs: Any) -> M:
-        """
-        Create a typed manager instance.
-
-        Args:
-            **kwargs: Arguments for manager creation
-
-        Returns:
-            Typed manager instance
-        """
-        return self._factory.create_typed_manager(self._manager_class, **kwargs)
-
-    def create_with_test_data(self, data_size: str = "medium") -> M:
-        """
-        Create a manager with test data injected.
-
-        Args:
-            data_size: Size of test data to inject
-
-        Returns:
-            Typed manager with test data
-        """
-        manager = self.create()
-        self._factory.inject_test_data(manager, data_size)
-        return manager
-
-class TypedWorkerFactory(Generic[W]):
-    """
-    Generic factory for creating typed workers with compile-time type safety.
-    """
-
-    def __init__(
-        self,
-        worker_class: type[W],
-        *,
-        factory: RealComponentFactory | None = None,
-        manager_registry: ManagerRegistry | None = None,
-    ):
-        """
-        Initialize typed worker factory.
-
-        Args:
-            worker_class: The worker class to create instances of
-            factory: Optional RealComponentFactory to use (takes precedence over manager_registry)
-            manager_registry: ManagerRegistry to use if factory not provided
-        """
-        if factory is None and manager_registry is None:
-            raise TypeError(
-                "TypedWorkerFactory requires either factory or manager_registry parameter. "
-                "Use: TypedWorkerFactory(ExtractionWorker, manager_registry=isolated_managers)"
-            )
-        self._worker_class = worker_class
-        self._factory = factory or RealComponentFactory(manager_registry=manager_registry)  # type: ignore[arg-type]
-
-    def create(self, params: dict[str, Any] | None = None) -> W:
-        """
-        Create a typed worker instance.
-
-        Args:
-            params: Optional parameters for the worker
-
-        Returns:
-            Typed worker instance
-        """
-        return self._factory.create_typed_worker(self._worker_class, params)
-
-    def create_with_test_data(self, data_size: str = "small") -> W:
-        """
-        Create a worker with test data parameters.
-
-        Args:
-            data_size: Size of test data to use
-
-        Returns:
-            Typed worker with test parameters
-        """
-        # Determine appropriate test data based on worker type
-        if "Extraction" in self._worker_class.__name__:
-            params = self._factory._data_repo.get_vram_extraction_data(data_size)
-        elif "Injection" in self._worker_class.__name__:
-            params = self._factory._data_repo.get_injection_data(data_size)
-        else:
-            params = {}
-
-        return self.create(params)
-
-# Convenience functions for common manager types
-def create_extraction_manager_factory(
-    manager_registry: ManagerRegistry | None = None,
-) -> TypedManagerFactory[CoreOperationsManager]:
-    """Create a typed factory for extraction manager (CoreOperationsManager).
-
-    Args:
-        manager_registry: Required ManagerRegistry for proper test isolation
-
-    Raises:
-        TypeError: If manager_registry not provided
-    """
-    if manager_registry is None:
-        raise TypeError(
-            "create_extraction_manager_factory() requires manager_registry parameter. "
-            "Use: create_extraction_manager_factory(manager_registry=isolated_managers)"
-        )
-    return TypedManagerFactory(CoreOperationsManager, manager_registry=manager_registry)
-
-def create_injection_manager_factory(
-    manager_registry: ManagerRegistry | None = None,
-) -> TypedManagerFactory[CoreOperationsManager]:
-    """Create a typed factory for injection manager (CoreOperationsManager).
-
-    Args:
-        manager_registry: Required ManagerRegistry for proper test isolation
-
-    Raises:
-        TypeError: If manager_registry not provided
-    """
-    if manager_registry is None:
-        raise TypeError(
-            "create_injection_manager_factory() requires manager_registry parameter. "
-            "Use: create_injection_manager_factory(manager_registry=isolated_managers)"
-        )
-    return TypedManagerFactory(CoreOperationsManager, manager_registry=manager_registry)
-
-def create_session_manager_factory(
-    manager_registry: ManagerRegistry | None = None,
-) -> TypedManagerFactory[ApplicationStateManager]:
-    """Create a typed factory for session manager (ApplicationStateManager).
-
-    Args:
-        manager_registry: Required ManagerRegistry for proper test isolation
-
-    Raises:
-        TypeError: If manager_registry not provided
-    """
-    if manager_registry is None:
-        raise TypeError(
-            "create_session_manager_factory() requires manager_registry parameter. "
-            "Use: create_session_manager_factory(manager_registry=isolated_managers)"
-        )
-    return TypedManagerFactory(ApplicationStateManager, manager_registry=manager_registry)

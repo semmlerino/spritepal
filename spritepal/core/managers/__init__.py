@@ -37,7 +37,6 @@ from .base_manager import BaseManager
 
 # Consolidated managers (NEW - these hold the actual logic)
 from .core_operations_manager import CoreOperationsManager
-from .history_manager import HistoryManager
 
 # NOTE: ExtractionManager and InjectionManager have been removed.
 # Use CoreOperationsManager via dependency injection:
@@ -52,21 +51,14 @@ from .registry import (
     initialize_managers,
     validate_manager_dependencies,
 )
-from .workflow_manager import ExtractionState, WorkflowManager
+from .workflow_manager import ExtractionState
 
 __all__ = [
     "ApplicationStateManager",
-    # Base classes
     "BaseManager",
-    # Consolidated Managers
     "CoreOperationsManager",
-    # Workflow
-    "ExtractionState",
-    "WorkflowManager",
-    # History
-    "HistoryManager",
-    # Exceptions
     "ExtractionError",
+    "ExtractionState",
     "FileOperationError",
     "InjectionError",
     "ManagerError",
@@ -74,7 +66,6 @@ __all__ = [
     "PreviewError",
     "SessionError",
     "ValidationError",
-    # Manager lifecycle functions (use inject() for manager access)
     "cleanup_managers",
     "initialize_managers",
     "validate_manager_dependencies",

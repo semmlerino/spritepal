@@ -191,9 +191,15 @@ class ManagerTestContext:
                 params = self._data_repo.get_vram_extraction_data("small")
             worker = self._factory.create_extraction_worker(params)
         elif manager_type == "injection":
+            # Create injection worker inline (factory method removed for simplification)
+            from core.di_container import inject
+            from core.protocols.manager_protocols import InjectionManagerProtocol
+            from core.workers import VRAMInjectionWorker
+
             if params is None:
                 params = self._data_repo.get_injection_data("small")
-            worker = self._factory.create_injection_worker(params)
+            injection_manager = inject(InjectionManagerProtocol)
+            worker = VRAMInjectionWorker(params, injection_manager=injection_manager)
         else:
             raise ValueError(f"No worker type for manager: {manager_type}")
 
