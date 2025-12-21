@@ -187,11 +187,11 @@ def reset_all_singletons() -> None:
         SignalRegistry.reset_instance()
     _try_reset("SignalRegistry", reset_signal_registry)
 
-    # Clear WorkerManager thread registry
-    def clear_worker_registry() -> None:
+    # Cleanup all workers and clear registry (waits for thread termination)
+    def cleanup_worker_registry() -> None:
         from core.services.worker_lifecycle import WorkerManager
-        WorkerManager._worker_registry.clear()
-    _try_reset("WorkerManager", clear_worker_registry)
+        WorkerManager.cleanup_all(timeout=500)  # Wait up to 500ms for each worker
+    _try_reset("WorkerManager", cleanup_worker_registry)
 
     # Reset MonitoringManager (has daemon health timer that needs explicit cleanup)
     def reset_monitoring() -> None:

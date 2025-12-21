@@ -208,10 +208,15 @@ class ApplicationStateManager(BaseManager):
         self._cache_session_stats: dict[str, int] = {"hits": 0, "misses": 0, "total_requests": 0}
         self._preloaded_offsets: set[int] = set()  # Track preloaded offsets
 
-        # Thread safety
+        # Thread safety - Lock hierarchy documentation
+        # LOCK ORDERING (always acquire in this order to prevent deadlock):
+        #   1. _state_lock     - protects general state (_settings, _runtime_state, etc.)
+        #   2. _workflow_lock  - protects workflow transitions (_workflow_state)
+        #   3. _cache_stats_lock - protects cache statistics (_cache_session_stats)
+        # RULE: Never acquire a lower-numbered lock while holding a higher-numbered lock.
         self._state_lock = threading.RLock()
-        self._workflow_lock = threading.RLock()  # Separate lock for workflow transitions
-        self._cache_stats_lock = threading.RLock()  # Lock for cache stats
+        self._workflow_lock = threading.RLock()
+        self._cache_stats_lock = threading.RLock()
 
         super().__init__("ApplicationStateManager", parent)
 

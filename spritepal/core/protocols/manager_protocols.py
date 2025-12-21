@@ -124,7 +124,10 @@ class ExtractionManagerProtocol(Protocol):
             cgram_path: Optional CGRAM file for palette data
 
         Returns:
-            True if extraction successful, False otherwise
+            True if extraction successful
+
+        Raises:
+            ExtractionError: If operation fails (service not initialized, etc.)
         """
         ...
 

@@ -177,23 +177,30 @@ class CoreOperationsManager(BaseManager):
     @override
     def cleanup(self) -> None:
         """Cleanup all core operation resources."""
-        # Clean up any active operations
+        # Acquire worker reference under lock to prevent race with start_injection
+        worker_to_cleanup = None
+        rom_service_to_cleanup = None
+        vram_service_to_cleanup = None
+
         with self._lock:
             self._active_operations.clear()
+            # Capture references and clear them under lock
+            worker_to_cleanup = self._current_worker
+            self._current_worker = None
+            rom_service_to_cleanup = self._rom_service
+            vram_service_to_cleanup = self._vram_service
 
-        # Stop any active workers
-        if self._current_worker:
+        # Cleanup captured references OUTSIDE lock to avoid blocking
+        if worker_to_cleanup:
             from core.services.worker_lifecycle import WorkerManager
 
             self._logger.info("Stopping active worker")
-            WorkerManager.cleanup_worker(self._current_worker, timeout=5000)
-            self._current_worker = None
+            WorkerManager.cleanup_worker(worker_to_cleanup, timeout=5000)
 
-        # Cleanup services
-        if self._rom_service:
-            self._rom_service.cleanup()
-        if self._vram_service:
-            self._vram_service.cleanup()
+        if rom_service_to_cleanup:
+            rom_service_to_cleanup.cleanup()
+        if vram_service_to_cleanup:
+            vram_service_to_cleanup.cleanup()
 
         # Mark injection operation as finished so new injections can start
         self._finish_operation("injection")
@@ -536,11 +543,13 @@ class CoreOperationsManager(BaseManager):
             cgram_path: Optional CGRAM file for palette data
 
         Returns:
-            True if extraction successful, False otherwise
+            True if extraction successful
+
+        Raises:
+            ExtractionError: If operation fails (service not initialized, etc.)
         """
         if self._rom_service is None:
-            self.error_occurred.emit("ROMService not initialized")
-            return False
+            raise ExtractionError("ROMService not initialized")
         return self._rom_service.extract_sprite_to_png(
             rom_path, sprite_offset, output_path, cgram_path
         )
@@ -1249,7 +1258,7 @@ class CoreOperationsManager(BaseManager):
         path = Path(input_path)
         base = path.stem.removesuffix(suffix)
         ext = extension if extension else path.suffix
-        parent = path.parent if preserve_parent else Path(".")
+        parent = path.parent if preserve_parent else Path()
 
         # Try base name with suffix
         suggested = parent / f"{base}{suffix}{ext}"
