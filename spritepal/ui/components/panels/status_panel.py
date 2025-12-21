@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QVBoxLayout, QWidget
 
+from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
 from ui.styles import get_muted_text_style, get_panel_style
 from ui.styles.theme import COLORS
 
@@ -43,20 +44,20 @@ class StatusPanel(QWidget):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        """Initialize the compact status panel UI"""
+        """Initialize the status panel UI with improved readability"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(6, 4, 6, 4)  # More compact padding
-        layout.setSpacing(2)  # Very tight spacing
+        layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
+        layout.setSpacing(SPACING_TINY)
 
         # CRITICAL FIX: Set proper parent for all child widgets to prevent Qt lifecycle bugs
         status_label = QLabel("Status", parent=self)
-        status_label.setStyleSheet("font-weight: bold; font-size: 11px; margin-bottom: 2px;")  # Smaller title
+        status_label.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 4px;")  # Readable title
         layout.addWidget(status_label)
 
         self.detection_info = QLabel("Ready", parent=self)
         self.detection_info.setWordWrap(True)
         if self.detection_info:
-            self.detection_info.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 10px;")  # Smaller text
+            self.detection_info.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px;")  # Readable text
         layout.addWidget(self.detection_info)
 
         # Progress bar (initially hidden) - set proper parent
@@ -110,24 +111,24 @@ class StatusPanel(QWidget):
         # Cache status widget - CRITICAL FIX: Set proper parent for all widgets
         self.cache_status_widget = QWidget(parent=self)
         cache_layout = QHBoxLayout()
-        cache_layout.setContentsMargins(0, 2, 0, 0)  # Minimal top margin
-        cache_layout.setSpacing(3)  # Tighter spacing
+        cache_layout.setContentsMargins(0, SPACING_TINY, 0, 0)
+        cache_layout.setSpacing(SPACING_COMPACT_SMALL)
 
         # Cache status label - set proper parent
         cache_label = QLabel("Cache:", parent=self.cache_status_widget)
-        cache_label.setStyleSheet("font-weight: bold; font-size: 10px;")  # Smaller font
+        cache_label.setStyleSheet("font-weight: bold; font-size: 12px;")  # Readable font
         cache_layout.addWidget(cache_label)
 
         # Cache icon - set proper parent
         self.cache_icon_label = QLabel(parent=self.cache_status_widget)
         if self.cache_icon_label:
-            self.cache_icon_label.setStyleSheet("font-size: 10px;")  # Smaller icon
+            self.cache_icon_label.setStyleSheet("font-size: 12px;")  # Readable icon
         cache_layout.addWidget(self.cache_icon_label)
 
         # Cache info label - set proper parent
         self.cache_info_label = QLabel(parent=self.cache_status_widget)
         if self.cache_info_label:
-            self.cache_info_label.setStyleSheet(get_muted_text_style() + " font-size: 9px;")  # Smaller text
+            self.cache_info_label.setStyleSheet(get_muted_text_style() + " font-size: 11px;")  # Readable text
         cache_layout.addWidget(self.cache_info_label)
 
         # Add stretch to push content to left

@@ -8,8 +8,9 @@ from typing import Any, override
 
 from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QEnterEvent, QFont, QMouseEvent, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
+from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
@@ -61,27 +62,31 @@ class SpriteThumbnailWidget(QWidget):
         """Setup the thumbnail UI."""
         # Adjust label height based on thumbnail size
         label_height = 40 if self.thumbnail_size >= 256 else 30
-        self.setFixedSize(self.thumbnail_size, self.thumbnail_size + label_height)
 
-        # Main layout with better spacing for larger thumbnails
+        # Use minimum size + Fixed policy instead of setFixedSize for better Qt compatibility
+        self.setMinimumSize(self.thumbnail_size, self.thumbnail_size + label_height)
+        self.setMaximumSize(self.thumbnail_size, self.thumbnail_size + label_height)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        # Main layout with spacing from constants
         layout = QVBoxLayout()
-        margin = 4 if self.thumbnail_size >= 256 else 2
+        margin = SPACING_TINY if self.thumbnail_size >= 256 else SPACING_TINY // 2
         layout.setContentsMargins(margin, margin, margin, margin)
-        layout.setSpacing(4)
+        layout.setSpacing(SPACING_TINY)
 
         # Thumbnail display - leave room for label
         self.thumbnail_label = QLabel()
-        self.thumbnail_label.setFixedSize(
-            self.thumbnail_size - (margin * 2),
-            self.thumbnail_size - label_height - 4
-        )
+        thumb_width = self.thumbnail_size - (margin * 2)
+        thumb_height = self.thumbnail_size - label_height - SPACING_TINY
+        self.thumbnail_label.setMinimumSize(thumb_width, thumb_height)
+        self.thumbnail_label.setMaximumSize(thumb_width, thumb_height)
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if self.thumbnail_label:
             self.thumbnail_label.setStyleSheet(f"""
             QLabel {{
                 background-color: {COLORS["input_background"]};
                 border: 2px solid {COLORS["border"]};
-                border-radius: 4px;
+                border-radius: {SPACING_TINY}px;
             }}
         """)
         # Don't use setScaledContents - it stretches and distorts sprites
@@ -101,7 +106,7 @@ class SpriteThumbnailWidget(QWidget):
                 font-weight: bold;
             }}
         """)
-        self.info_label.setFixedHeight(label_height - 8)
+        self.info_label.setMinimumHeight(label_height - SPACING_SMALL)
         layout.addWidget(self.info_label)
 
         self.setLayout(layout)

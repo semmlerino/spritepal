@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common import WorkerManager
+from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
 from ui.components.dialogs import RangeScanDialog
 from ui.components.visualization import ROMMapWidget
 from ui.rom_extraction.workers import RangeScanWorker
@@ -90,8 +91,8 @@ class ScanControlsPanel(QWidget):
     def _setup_ui(self) -> None:
         """Initialize the scan controls UI"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(8, 6, 8, 6)  # Reduced padding
-        layout.setSpacing(4)  # Tighter spacing
+        layout.setContentsMargins(SPACING_SMALL, SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_COMPACT_SMALL)
+        layout.setSpacing(SPACING_TINY)
 
         label = QLabel("Enhanced Controls")
         label.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 4px;")  # Smaller and tighter

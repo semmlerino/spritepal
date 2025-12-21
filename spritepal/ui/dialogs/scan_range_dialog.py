@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import TAB_MIN_WIDTH
 from ui.styles.theme import COLORS
 
 # from typing_extensions import override
@@ -42,7 +43,7 @@ class ScanRangeDialog(QDialog):
 
         self.setWindowTitle("Custom Scan Range")
         self.setModal(True)
-        self.setFixedWidth(400)
+        self.setMinimumWidth(TAB_MIN_WIDTH)  # 400px minimum, but can grow
 
         self._setup_ui()
 

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
 from ui.components.visualization import ROMMapWidget
 from ui.styles import get_panel_style
 
@@ -51,8 +52,8 @@ class ImportExportPanel(QWidget):
     def _setup_ui(self) -> None:
         """Initialize the import/export panel UI"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(8, 6, 8, 6)  # Reduced padding
-        layout.setSpacing(4)  # Tighter spacing
+        layout.setContentsMargins(SPACING_SMALL, SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_COMPACT_SMALL)
+        layout.setSpacing(SPACING_TINY)
 
         label = QLabel("Import/Export")
         label.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 4px;")

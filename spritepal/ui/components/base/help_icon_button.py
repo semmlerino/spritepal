@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
 from ui.styles.theme import COLORS
 
 
@@ -148,7 +149,7 @@ class HelpLabel(QWidget):
 
         h_layout = QHBoxLayout()
         h_layout.setContentsMargins(0, 0, 0, 0)
-        h_layout.setSpacing(4)
+        h_layout.setSpacing(SPACING_TINY)
 
         # Label
         self.label = QLabel(text)
@@ -200,7 +201,7 @@ class InfoBanner(QFrame):
         )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
         # Message label
         self.message_label = QLabel(self._message)

@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
 from ui.components.navigation.region_jump_widget import RegionJumpWidget
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.rom_extraction.workers import SpritePreviewWorker
@@ -86,10 +87,10 @@ class SpriteThumbnail(QWidget):
             self.offset_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         self.offset_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Layout
+        # Layout - very tight spacing for compact thumbnails
         layout = QVBoxLayout(self)
-        layout.setSpacing(2)
-        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(SPACING_TINY // 2)
+        layout.setContentsMargins(SPACING_TINY // 2, SPACING_TINY // 2, SPACING_TINY // 2, SPACING_TINY // 2)
         layout.addWidget(self.preview_label)
         layout.addWidget(self.offset_label)
 
@@ -224,7 +225,7 @@ class SpriteNavigator(QWidget):
     def _setup_ui(self) -> None:
         """Create the UI layout"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(8)
+        layout.setSpacing(SPACING_SMALL)
         layout.setContentsMargins(0, 0, 0, 0)
 
         # Main navigation frame
@@ -294,7 +295,7 @@ class SpriteNavigator(QWidget):
 
         # Map controls
         map_controls = QHBoxLayout()
-        map_controls.setSpacing(4)
+        map_controls.setSpacing(SPACING_TINY)
 
         density_label = QLabel("Sprite Density:")
         density_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
@@ -324,7 +325,7 @@ class SpriteNavigator(QWidget):
 
         # Quick navigation buttons
         button_row = QHBoxLayout()
-        button_row.setSpacing(4)
+        button_row.setSpacing(SPACING_TINY)
 
         self.prev_button = QPushButton("◀ Previous Sprite")
         self.prev_button.setMinimumHeight(32)
@@ -379,7 +380,7 @@ class SpriteNavigator(QWidget):
         # Thumbnail container
         self.thumbnail_container = QWidget()
         thumbnail_layout = QHBoxLayout(self.thumbnail_container)
-        thumbnail_layout.setSpacing(4)
+        thumbnail_layout.setSpacing(SPACING_TINY)
 
         # Create thumbnail widgets
         for _i in range(MAX_THUMBNAILS):

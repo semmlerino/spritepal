@@ -21,6 +21,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import (
+    MEDIUM_WIDTH,
+    SPACING_LARGE,
+    SPACING_TINY,
+)
 from ui.delegates.sprite_gallery_delegate import SpriteGalleryDelegate
 from ui.models.sprite_gallery_model import SpriteGalleryModel
 from ui.styles.theme import COLORS
@@ -264,7 +269,7 @@ class SpriteGalleryWidget(QWidget):
         """Create the controls bar for the gallery."""
         controls = QWidget()
         layout = QHBoxLayout()
-        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
 
         # Thumbnail size slider
         size_label = QLabel("Size:")
@@ -275,16 +280,16 @@ class SpriteGalleryWidget(QWidget):
         self.size_slider.setValue(self.thumbnail_size)
         self.size_slider.setTickInterval(64)  # Bigger steps for bigger range
         self.size_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.size_slider.setFixedWidth(200)  # Slightly wider for bigger range
+        self.size_slider.setMinimumWidth(MEDIUM_WIDTH)  # Use minimum instead of fixed
         self.size_slider.valueChanged.connect(self._on_size_changed)
         layout.addWidget(self.size_slider)
 
         # Size display
         self.size_label = QLabel(f"{self.thumbnail_size}px")
-        self.size_label.setFixedWidth(40)
+        self.size_label.setMinimumWidth(40)  # Use minimum instead of fixed
         layout.addWidget(self.size_label)
 
-        layout.addSpacing(20)
+        layout.addSpacing(SPACING_LARGE)
 
         # Filter controls
         filter_label = QLabel("Filter:")
@@ -292,7 +297,7 @@ class SpriteGalleryWidget(QWidget):
 
         self.filter_input = QLineEdit()
         self.filter_input.setPlaceholderText("Search by offset...")
-        self.filter_input.setFixedWidth(150)
+        self.filter_input.setMinimumWidth(150)  # Use minimum instead of fixed
         self.filter_input.textChanged.connect(self._apply_filters)
         layout.addWidget(self.filter_input)
 
@@ -300,7 +305,7 @@ class SpriteGalleryWidget(QWidget):
         self.compressed_check.toggled.connect(self._apply_filters)
         layout.addWidget(self.compressed_check)
 
-        layout.addSpacing(20)
+        layout.addSpacing(SPACING_LARGE)
 
         # Sort controls
         sort_label = QLabel("Sort:")

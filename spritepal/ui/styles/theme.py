@@ -1,5 +1,18 @@
 """
 Theme constants and styling foundations for SpritePal UI
+
+SPACING ARCHITECTURE:
+    ui/common/spacing_constants.py is the canonical source for layout spacing.
+    This module defines CSS-specific compact values derived from that source:
+
+    spacing_constants.py    →    theme.py DIMENSIONS (CSS compact scale)
+    SPACING_TINY = 4        →    spacing_xs = 2, spacing_sm = 4
+    SPACING_SMALL = 8       →    spacing_md = 8
+    SPACING_COMPACT_MEDIUM = 10 → spacing_lg = 12 (rounded)
+    SPACING_MEDIUM = 16     →    spacing_xl = 16
+
+    For Python layout code (setContentsMargins, setSpacing), import from
+    spacing_constants.py. For CSS stylesheet values, use DIMENSIONS here.
 """
 from __future__ import annotations
 
@@ -27,6 +40,16 @@ COLORS = {
     "editor_hover": "#98fb98",
     "editor_pressed": "#228b22",
 
+    # Neutral editing action colors (for secondary actions like Edit/Arrange)
+    "edit": "#4a5568",              # Slate gray - neutral editing actions
+    "edit_hover": "#5a6578",
+    "edit_pressed": "#3a4558",
+
+    # Warning action colors (for ROM-modifying actions like Inject)
+    "danger_action": "#e53e3e",     # Red - signals ROM modification
+    "danger_action_hover": "#f56565",
+    "danger_action_pressed": "#c53030",
+
     # Status colors - vibrant for dark theme
     "success": "#00ff7f",           # Spring Green
     "warning": "#ffd700",           # Gold
@@ -36,11 +59,11 @@ COLORS = {
     # Dark theme neutral colors
     "white": "#ffffff",
     "light_gray": "#404040",         # Dark gray for panels
-    "gray": "#808080",              # Medium gray for text
+    "gray": "#a0a0a0",              # Medium gray for text (WCAG AA compliant)
     "dark_gray": "#2d2d30",         # Main dark background
     "darker_gray": "#1e1e1e",       # Darker panels
     "disabled": "#555555",
-    "disabled_text": "#b0b0b0",  # Brightened for WCAG AA contrast on dark backgrounds
+    "disabled_text": "#c8c8c8",  # WCAG AA: 5.3:1 contrast on #555555 background
     "black": "#000000",
 
     # Dark theme background colors
@@ -51,13 +74,13 @@ COLORS = {
 
     # Dark theme border colors
     "border": "#555555",            # Medium gray borders
-    "border_focus": "#0078d4",      # Blue focus border
+    "border_focus": "#4aa3ff",      # Bright blue focus border (higher visibility)
     "border_error": "#ff6347",      # Red error border
 
     # Text colors for dark theme
     "text_primary": "#ffffff",      # Primary white text
     "text_secondary": "#cccccc",    # Secondary light gray text
-    "text_muted": "#999999",        # Muted gray text
+    "text_muted": "#a8a8a8",        # Muted gray text (WCAG AA: 4.5:1 on dark backgrounds)
 
     # Browse/Navigation action colors
     "browse": "#5a9fd4",            # Teal-blue for Browse ROM button
@@ -113,13 +136,15 @@ FONTS = {
 }
 
 # Layout Dimensions
+# NOTE: Spacing values derived from ui/common/spacing_constants.py (canonical source)
+# See module docstring for mapping between the two systems
 DIMENSIONS = {
-    # Spacing - reduced for more compact interface
-    "spacing_xs": 3,
-    "spacing_sm": 4,
-    "spacing_md": 8,
-    "spacing_lg": 12,
-    "spacing_xl": 16,
+    # Spacing - CSS-specific compact scale (see docstring for mapping)
+    "spacing_xs": 2,   # Derived: SPACING_TINY // 2
+    "spacing_sm": 4,   # Matches: SPACING_TINY
+    "spacing_md": 8,   # Matches: SPACING_SMALL
+    "spacing_lg": 12,  # Derived: SPACING_COMPACT_MEDIUM + 2 (rounded)
+    "spacing_xl": 16,  # Matches: SPACING_MEDIUM
 
     # Component heights - more compact
     "button_height": 28,

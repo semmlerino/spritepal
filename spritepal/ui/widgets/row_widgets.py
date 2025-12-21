@@ -18,9 +18,13 @@ from PySide6.QtGui import (
     QPaintEvent,
     QPen,
 )
-from PySide6.QtWidgets import QListWidget, QWidget
+from PySide6.QtWidgets import QListWidget, QSizePolicy, QWidget
 
 from core.services.image_utils import pil_to_qpixmap
+
+# Row widget constants
+ROW_WIDGET_HEIGHT = 85  # Height for row preview widgets
+ROW_WIDGET_MIN_WIDTH = 350  # Minimum width for row widgets
 
 
 class RowPreviewWidget(QWidget):
@@ -40,8 +44,10 @@ class RowPreviewWidget(QWidget):
         self.tiles_per_row = tiles_per_row
         self.is_selected = is_selected
         self.is_hovered = False
-        self.setFixedHeight(85)  # Increased height for much better visibility
-        self.setMinimumWidth(350)  # Slightly wider for better layout
+        # Use minimum height + policy for better Qt layout compatibility
+        self.setMinimumHeight(ROW_WIDGET_HEIGHT)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMinimumWidth(ROW_WIDGET_MIN_WIDTH)
         self.setMouseTracking(True)
 
     def update_image(self, new_image: Image.Image) -> None:
