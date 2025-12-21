@@ -45,10 +45,6 @@ if TYPE_CHECKING:
     from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent
 else:
     from PySide6.QtGui import QAction, QCloseEvent, QHideEvent, QKeyEvent
-# Preview coordinator selection - SmartPreviewCoordinator re-enabled after signal lifecycle fixes
-# Set SPRITEPAL_USE_SIMPLE_PREVIEW=1 to fall back to SimplePreviewCoordinator if issues occur
-import os
-
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -70,15 +66,9 @@ from PySide6.QtWidgets import (
 
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.common.spacing_constants import SPACING_SMALL, SPACING_STANDARD
 from ui.styles.theme import COLORS
-
-_use_simple_preview = os.environ.get('SPRITEPAL_USE_SIMPLE_PREVIEW', '0').lower() in ('1', 'true', 'yes')
-
-if _use_simple_preview:
-    from ui.common.simple_preview_coordinator import SimplePreviewCoordinator as PreviewCoordinator
-else:
-    from ui.common.smart_preview_coordinator import SmartPreviewCoordinator as PreviewCoordinator
 
 
 def get_main_thread():
@@ -91,9 +81,9 @@ from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.dialogs.services import ViewStateManager
 from ui.rom_extraction.workers import SpritePreviewWorker, SpriteSearchWorker
+from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
-from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 from utils.logging_config import get_logger
 
 # from utils.rom_cache import get_rom_cache # Removed due to DI
@@ -107,7 +97,7 @@ from ui.common.signal_utils import is_valid_qt as _is_valid_qt, safe_disconnect 
 # Import tab widgets from the new module
 from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmartTab
 
-# SmartPreviewCoordinator re-enabled with signal lifecycle fixes (QueuedConnection, blockSignals)
+# SmartPreviewCoordinator used exclusively (SimplePreviewCoordinator removed for DRY)
 
 # SimpleBrowseTab, SimpleSmartTab, SimpleHistoryTab removed - now imported from ui.tabs.manual_offset
 
@@ -433,8 +423,9 @@ class UnifiedManualOffsetDialog(DialogBase):
     # _setup_signal_coordinator removed - SmartPreviewCoordinator handles all coordination
 
     def _setup_smart_preview_coordinator(self):
-        """Set up preview coordination (Smart or Simple based on env flag)."""
-        self._smart_preview_coordinator = PreviewCoordinator(self, rom_cache=self.rom_cache)  # type: ignore[arg-type]
+        """Set up SmartPreviewCoordinator for efficient preview generation."""
+        self._smart_preview_coordinator = SmartPreviewCoordinator(self, rom_cache=self.rom_cache)  # type: ignore[arg-type]
+        assert self._smart_preview_coordinator is not None  # Just assigned
 
         # Use AutoConnection (default) to let Qt choose the best connection type
         # This will use DirectConnection when called from main thread (avoiding queue delays)
@@ -761,8 +752,8 @@ class UnifiedManualOffsetDialog(DialogBase):
         self.blockSignals(True)
 
         # Block signals on child widgets that might emit during cleanup
-        if self._smart_preview_coordinator is not None:
-            self._smart_preview_coordinator.blockSignals(True)
+        if self._smart_preview_coordinator is not None and hasattr(self._smart_preview_coordinator, 'blockSignals'):
+            self._smart_preview_coordinator.blockSignals(True)  # type: ignore[union-attr]
         if self.browse_tab is not None and _is_valid_qt(self.browse_tab):
             self.browse_tab.blockSignals(True)
         if self.smart_tab is not None and _is_valid_qt(self.smart_tab):

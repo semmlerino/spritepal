@@ -37,7 +37,7 @@ from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from ui.common.simple_preview_coordinator import SimplePreviewCoordinator
+    from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
     from ui.dialogs.advanced_search_dialog import AdvancedSearchDialog
 
 logger = get_logger(__name__)
@@ -75,7 +75,7 @@ class SimpleBrowseTab(QWidget):
         self._step_size: int = 0x1000
         self._rom_path: str = ""
         self._advanced_search_dialog: AdvancedSearchDialog | None = None
-        self._smart_preview_coordinator: SimplePreviewCoordinator | None = None
+        self._smart_preview_coordinator: SmartPreviewCoordinator | None = None
 
         self._setup_ui()
 
@@ -459,7 +459,7 @@ class SimpleBrowseTab(QWidget):
         if self.next_button:
             self.next_button.setEnabled(enabled)
 
-    def connect_smart_preview_coordinator(self, coordinator: SimplePreviewCoordinator) -> None:
+    def connect_smart_preview_coordinator(self, coordinator: SmartPreviewCoordinator) -> None:
         """
         Connect smart preview coordinator for enhanced preview updates.
 

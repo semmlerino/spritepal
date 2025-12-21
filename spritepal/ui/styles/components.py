@@ -3,7 +3,173 @@ Component-specific styling functions for SpritePal UI
 """
 from __future__ import annotations
 
+from typing import TypedDict
+
 from .theme import COLORS, DIMENSIONS, FONTS, get_disabled_state_style
+
+
+# =============================================================================
+# Internal helper functions for DRY styling
+# =============================================================================
+
+
+def _build_gradient_button_style(
+    *,
+    gradient_start: str,
+    gradient_end: str,
+    border_color: str,
+    hover_start: str,
+    hover_end: str,
+    hover_border: str,
+    pressed_start: str,
+    pressed_end: str,
+    include_disabled: bool = False,
+    min_height: int | None = 36,
+) -> str:
+    """
+    Build gradient button CSS with configurable colors.
+
+    Internal helper to eliminate duplication between prominent action buttons,
+    manual offset buttons, and danger action buttons.
+
+    Args:
+        gradient_start: Top color of normal state gradient
+        gradient_end: Bottom color of normal state gradient
+        border_color: Normal state border color
+        hover_start: Top color of hover state gradient
+        hover_end: Bottom color of hover state gradient
+        hover_border: Hover state border color
+        pressed_start: Top color of pressed state gradient
+        pressed_end: Bottom color of pressed state gradient
+        include_disabled: Whether to include :disabled pseudo-selector
+        min_height: Minimum button height in pixels (None to omit)
+
+    Returns:
+        CSS string for QPushButton styling
+    """
+    min_height_css = f"min-height: {min_height}px;" if min_height else ""
+
+    base_css = f"""
+    QPushButton {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 {gradient_start},
+            stop:1 {gradient_end});
+        color: {COLORS["white"]};
+        font-weight: {FONTS["bold_weight"]};
+        font-size: {FONTS["medium_size"]};
+        border-radius: {DIMENSIONS["border_radius_large"]}px;
+        padding: {DIMENSIONS["spacing_md"]}px {DIMENSIONS["spacing_lg"]}px;
+        border: 1px solid {border_color};
+        {min_height_css}
+    }}
+    QPushButton:hover {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 {hover_start},
+            stop:1 {hover_end});
+        border: 1px solid {hover_border};
+    }}
+    QPushButton:pressed {{
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+            stop:0 {pressed_start},
+            stop:1 {pressed_end});
+    }}"""
+
+    if include_disabled:
+        base_css += f"""
+    QPushButton:disabled {{
+        background: {COLORS["disabled"]};
+        color: {COLORS["disabled_text"]};
+        border: 1px solid {COLORS["border"]};
+    }}"""
+
+    return base_css + "\n    "
+
+
+class BadgeStyleConfig(TypedDict, total=False):
+    """Configuration for badge/status label styling."""
+
+    background_color: str
+    border_color: str
+    text_color: str
+    border_width: int  # Default: 1
+    border_radius: int | str  # Can be int px or str like "12px"
+    padding: str  # CSS padding value
+    font_weight: str  # e.g., "bold"
+    font_size: str  # e.g., "12px"
+    min_width: int | None  # For fixed-size badges
+    max_width: int | None
+    min_height: int | None
+    max_height: int | None
+    alignment: str | None  # Qt property e.g., "AlignCenter"
+
+
+def _build_badge_style(config: BadgeStyleConfig) -> str:
+    """
+    Build QLabel badge/status CSS from configuration.
+
+    Internal helper to eliminate duplication between cache status styles
+    and step badge styles.
+
+    Args:
+        config: BadgeStyleConfig with styling parameters
+
+    Returns:
+        CSS string for QLabel styling
+    """
+    parts = ["QLabel {"]
+
+    # Background
+    if "background_color" in config:
+        parts.append(f"    background-color: {config['background_color']};")
+
+    # Border
+    border_width = config.get("border_width", 1)
+    if "border_color" in config:
+        parts.append(f"    border: {border_width}px solid {config['border_color']};")
+
+    # Border radius
+    if "border_radius" in config:
+        radius = config["border_radius"]
+        if isinstance(radius, int):
+            parts.append(f"    border-radius: {radius}px;")
+        else:
+            parts.append(f"    border-radius: {radius};")
+
+    # Padding
+    if "padding" in config:
+        parts.append(f"    padding: {config['padding']};")
+
+    # Font
+    if "font_weight" in config:
+        parts.append(f"    font-weight: {config['font_weight']};")
+    if "font_size" in config:
+        parts.append(f"    font-size: {config['font_size']};")
+
+    # Text color
+    if "text_color" in config:
+        parts.append(f"    color: {config['text_color']};")
+
+    # Dimensions (for fixed-size badges)
+    if config.get("min_width") is not None:
+        parts.append(f"    min-width: {config['min_width']}px;")
+    if config.get("max_width") is not None:
+        parts.append(f"    max-width: {config['max_width']}px;")
+    if config.get("min_height") is not None:
+        parts.append(f"    min-height: {config['min_height']}px;")
+    if config.get("max_height") is not None:
+        parts.append(f"    max-height: {config['max_height']}px;")
+
+    # Alignment (Qt property)
+    if config.get("alignment"):
+        parts.append(f"    qproperty-alignment: {config['alignment']};")
+
+    parts.append("}")
+    return "\n            ".join(parts)
+
+
+# =============================================================================
+# Public styling functions
+# =============================================================================
 
 
 def get_button_style(
@@ -772,28 +938,18 @@ def get_manual_offset_button_style() -> str:
     Returns:
         CSS string for manual offset button styling
     """
-    return f"""
-    QPushButton {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 {COLORS["browse_gradient_start"]}, stop:1 {COLORS["browse_gradient_end"]});
-        color: {COLORS["white"]};
-        font-weight: {FONTS["bold_weight"]};
-        font-size: {FONTS["medium_size"]};
-        border-radius: {DIMENSIONS["border_radius_large"]}px;
-        padding: {DIMENSIONS["spacing_md"]}px {DIMENSIONS["spacing_lg"]}px;
-        border: 1px solid {COLORS["browse_pressed"]};
-        min-height: 36px;
-    }}
-    QPushButton:hover {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 {COLORS["browse_hover"]}, stop:1 {COLORS["browse"]});
-        border: 1px solid {COLORS["highlight"]};
-    }}
-    QPushButton:pressed {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 {COLORS["browse_pressed"]}, stop:1 {COLORS["browse_gradient_end"]});
-    }}
-    """
+    return _build_gradient_button_style(
+        gradient_start=COLORS["browse_gradient_start"],
+        gradient_end=COLORS["browse_gradient_end"],
+        border_color=COLORS["browse_pressed"],
+        hover_start=COLORS["browse_hover"],
+        hover_end=COLORS["browse"],
+        hover_border=COLORS["highlight"],
+        pressed_start=COLORS["browse_pressed"],
+        pressed_end=COLORS["browse_gradient_end"],
+        include_disabled=False,
+        min_height=36,
+    )
 
 
 def get_cache_status_style(status: str) -> str:
@@ -809,60 +965,49 @@ def get_cache_status_style(status: str) -> str:
     Returns:
         CSS string for cache status label styling
     """
-    # Dark theme compatible: uses theme colors for consistency
-    styles = {
-        "checking": f"""
-            QLabel {{
-                background-color: {COLORS["cache_checking_bg"]};
-                border: 1px solid {COLORS["cache_checking_border"]};
-                border-radius: {DIMENSIONS["border_radius"]}px;
-                padding: {DIMENSIONS["spacing_md"]}px;
-                font-weight: {FONTS["bold_weight"]};
-                color: {COLORS["cache_checking_text"]};
-            }}
-        """,
-        "resuming": f"""
-            QLabel {{
-                background-color: {COLORS["cache_resuming_bg"]};
-                border: 1px solid {COLORS["cache_resuming_border"]};
-                border-radius: {DIMENSIONS["border_radius"]}px;
-                padding: {DIMENSIONS["spacing_md"]}px;
-                font-weight: {FONTS["bold_weight"]};
-                color: {COLORS["cache_resuming_text"]};
-            }}
-        """,
-        "fresh": f"""
-            QLabel {{
-                background-color: {COLORS["cache_fresh_bg"]};
-                border: 1px solid {COLORS["cache_fresh_border"]};
-                border-radius: {DIMENSIONS["border_radius"]}px;
-                padding: {DIMENSIONS["spacing_md"]}px;
-                font-weight: {FONTS["bold_weight"]};
-                color: {COLORS["cache_fresh_text"]};
-            }}
-        """,
-        "saving": f"""
-            QLabel {{
-                background-color: {COLORS["cache_saving_bg"]};
-                border: 1px solid {COLORS["cache_saving_border"]};
-                border-radius: {DIMENSIONS["border_radius"]}px;
-                padding: {DIMENSIONS["spacing_md"]}px;
-                font-weight: {FONTS["bold_weight"]};
-                color: {COLORS["cache_saving_text"]};
-            }}
-        """,
-        "saved": f"""
-            QLabel {{
-                background-color: {COLORS["cache_resuming_bg"]};
-                border: 1px solid {COLORS["cache_resuming_border"]};
-                border-radius: {DIMENSIONS["border_radius"]}px;
-                padding: {DIMENSIONS["spacing_md"]}px;
-                font-weight: {FONTS["bold_weight"]};
-                color: {COLORS["cache_resuming_text"]};
-            }}
-        """,
+    # Common style properties for all cache statuses
+    common: BadgeStyleConfig = {
+        "border_radius": DIMENSIONS["border_radius"],
+        "padding": f"{DIMENSIONS['spacing_md']}px",
+        "font_weight": FONTS["bold_weight"],
     }
-    return styles.get(status, styles["checking"])
+
+    # Status-specific color configurations
+    configs: dict[str, BadgeStyleConfig] = {
+        "checking": {
+            **common,
+            "background_color": COLORS["cache_checking_bg"],
+            "border_color": COLORS["cache_checking_border"],
+            "text_color": COLORS["cache_checking_text"],
+        },
+        "resuming": {
+            **common,
+            "background_color": COLORS["cache_resuming_bg"],
+            "border_color": COLORS["cache_resuming_border"],
+            "text_color": COLORS["cache_resuming_text"],
+        },
+        "fresh": {
+            **common,
+            "background_color": COLORS["cache_fresh_bg"],
+            "border_color": COLORS["cache_fresh_border"],
+            "text_color": COLORS["cache_fresh_text"],
+        },
+        "saving": {
+            **common,
+            "background_color": COLORS["cache_saving_bg"],
+            "border_color": COLORS["cache_saving_border"],
+            "text_color": COLORS["cache_saving_text"],
+        },
+        "saved": {
+            **common,
+            "background_color": COLORS["cache_resuming_bg"],
+            "border_color": COLORS["cache_resuming_border"],
+            "text_color": COLORS["cache_resuming_text"],
+        },
+    }
+
+    config = configs.get(status, configs["checking"])
+    return _build_badge_style(config)
 
 
 def get_prominent_action_button_style() -> str:
@@ -875,36 +1020,18 @@ def get_prominent_action_button_style() -> str:
     Returns:
         CSS string for prominent action button styling
     """
-    return f"""
-    QPushButton {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 {COLORS["browse_gradient_start"]},
-            stop:1 {COLORS["browse_gradient_end"]});
-        color: {COLORS["white"]};
-        font-weight: {FONTS["bold_weight"]};
-        font-size: {FONTS["medium_size"]};
-        border-radius: {DIMENSIONS["border_radius_large"]}px;
-        padding: {DIMENSIONS["spacing_md"]}px {DIMENSIONS["spacing_lg"]}px;
-        border: 1px solid {COLORS["browse_pressed"]};
-        min-height: 36px;
-    }}
-    QPushButton:hover {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 {COLORS["browse_hover"]},
-            stop:1 {COLORS["browse"]});
-        border: 1px solid {COLORS["highlight"]};
-    }}
-    QPushButton:pressed {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 {COLORS["browse_pressed"]},
-            stop:1 {COLORS["browse_gradient_end"]});
-    }}
-    QPushButton:disabled {{
-        background: {COLORS["disabled"]};
-        color: {COLORS["disabled_text"]};
-        border: 1px solid {COLORS["border"]};
-    }}
-    """
+    return _build_gradient_button_style(
+        gradient_start=COLORS["browse_gradient_start"],
+        gradient_end=COLORS["browse_gradient_end"],
+        border_color=COLORS["browse_pressed"],
+        hover_start=COLORS["browse_hover"],
+        hover_end=COLORS["browse"],
+        hover_border=COLORS["highlight"],
+        pressed_start=COLORS["browse_pressed"],
+        pressed_end=COLORS["browse_gradient_end"],
+        include_disabled=True,
+        min_height=36,
+    )
 
 
 def get_extraction_checklist_style() -> str:
@@ -1017,57 +1144,44 @@ def get_step_badge_style(state: str = "pending") -> str:
     Returns:
         CSS string for step badge styling
     """
-    styles = {
-        "pending": f"""
-            QLabel {{
-                color: {COLORS["text_muted"]};
-                background-color: {COLORS["dark_gray"]};
-                border: 2px solid {COLORS["text_muted"]};
-                border-radius: 12px;
-                padding: 2px;
-                min-width: 24px;
-                max-width: 24px;
-                min-height: 24px;
-                max-height: 24px;
-                font-weight: bold;
-                font-size: 12px;
-                qproperty-alignment: AlignCenter;
-            }}
-        """,
-        "active": f"""
-            QLabel {{
-                color: {COLORS["white"]};
-                background-color: {COLORS["highlight"]};
-                border: 2px solid {COLORS["highlight_border"]};
-                border-radius: 12px;
-                padding: 2px;
-                min-width: 24px;
-                max-width: 24px;
-                min-height: 24px;
-                max-height: 24px;
-                font-weight: bold;
-                font-size: 12px;
-                qproperty-alignment: AlignCenter;
-            }}
-        """,
-        "completed": f"""
-            QLabel {{
-                color: {COLORS["white"]};
-                background-color: {COLORS["editor"]};
-                border: 2px solid {COLORS["editor"]};
-                border-radius: 12px;
-                padding: 2px;
-                min-width: 24px;
-                max-width: 24px;
-                min-height: 24px;
-                max-height: 24px;
-                font-weight: bold;
-                font-size: 12px;
-                qproperty-alignment: AlignCenter;
-            }}
-        """,
+    # Common style properties for all step badges (circular, fixed size)
+    common: BadgeStyleConfig = {
+        "border_radius": "12px",
+        "border_width": 2,
+        "padding": "2px",
+        "min_width": 24,
+        "max_width": 24,
+        "min_height": 24,
+        "max_height": 24,
+        "font_weight": "bold",
+        "font_size": "12px",
+        "alignment": "AlignCenter",
     }
-    return styles.get(state, styles["pending"])
+
+    # State-specific color configurations
+    configs: dict[str, BadgeStyleConfig] = {
+        "pending": {
+            **common,
+            "text_color": COLORS["text_muted"],
+            "background_color": COLORS["dark_gray"],
+            "border_color": COLORS["text_muted"],
+        },
+        "active": {
+            **common,
+            "text_color": COLORS["white"],
+            "background_color": COLORS["highlight"],
+            "border_color": COLORS["highlight_border"],
+        },
+        "completed": {
+            **common,
+            "text_color": COLORS["white"],
+            "background_color": COLORS["editor"],
+            "border_color": COLORS["editor"],
+        },
+    }
+
+    config = configs.get(state, configs["pending"])
+    return _build_badge_style(config)
 
 
 def get_drop_zone_badge_style(badge_type: str = "required") -> str:
@@ -1129,32 +1243,15 @@ def get_danger_action_button_style() -> str:
     Returns:
         CSS string for danger action button styling
     """
-    return f"""
-    QPushButton {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 {COLORS["danger_action_hover"]},
-            stop:1 {COLORS["danger_action"]});
-        color: {COLORS["white"]};
-        font-weight: {FONTS["bold_weight"]};
-        font-size: {FONTS["medium_size"]};
-        border-radius: {DIMENSIONS["border_radius_large"]}px;
-        padding: {DIMENSIONS["spacing_md"]}px {DIMENSIONS["spacing_lg"]}px;
-        border: 1px solid {COLORS["danger_action_pressed"]};
-    }}
-    QPushButton:hover {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 #ff7b7b,
-            stop:1 {COLORS["danger_action_hover"]});
-        border: 1px solid {COLORS["danger_action"]};
-    }}
-    QPushButton:pressed {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-            stop:0 {COLORS["danger_action_pressed"]},
-            stop:1 {COLORS["danger_action"]});
-    }}
-    QPushButton:disabled {{
-        background: {COLORS["disabled"]};
-        color: {COLORS["disabled_text"]};
-        border: 1px solid {COLORS["border"]};
-    }}
-    """
+    return _build_gradient_button_style(
+        gradient_start=COLORS["danger_action_hover"],
+        gradient_end=COLORS["danger_action"],
+        border_color=COLORS["danger_action_pressed"],
+        hover_start="#ff7b7b",  # Lighter red for hover
+        hover_end=COLORS["danger_action_hover"],
+        hover_border=COLORS["danger_action"],
+        pressed_start=COLORS["danger_action_pressed"],
+        pressed_end=COLORS["danger_action"],
+        include_disabled=True,
+        min_height=None,  # No min-height for danger buttons
+    )

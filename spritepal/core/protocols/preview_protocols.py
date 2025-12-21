@@ -6,7 +6,8 @@ enabling dependency injection and better testability.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Protocol
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QSlider
@@ -15,9 +16,8 @@ if TYPE_CHECKING:
 class PreviewCoordinatorProtocol(Protocol):
     """Protocol for preview coordinators.
 
-    This protocol defines the common interface shared by SmartPreviewCoordinator
-    and SimplePreviewCoordinator, enabling type-safe usage without coupling to
-    a specific implementation.
+    This protocol defines the interface for SmartPreviewCoordinator,
+    enabling type-safe usage and better testability through dependency injection.
     """
 
     # Signals (accessed via attributes)
@@ -51,12 +51,12 @@ class PreviewCoordinatorProtocol(Protocol):
         """
         ...
 
-    def request_preview(self, offset: int, force: bool = False) -> None:
+    def request_preview(self, offset: int, priority: int = 0) -> None:
         """Request a preview at the given offset.
 
         Args:
             offset: The ROM offset to generate preview for
-            force: Whether to force regeneration even if cached
+            priority: Priority for the request (lower = higher priority, -1 for background)
         """
         ...
 
