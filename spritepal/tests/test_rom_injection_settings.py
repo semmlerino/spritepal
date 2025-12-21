@@ -1,25 +1,16 @@
 """
 Tests for ROM injection settings persistence
 
-NOTE: This file creates SessionManager instances directly for testing with isolated sessions.
-The deprecation warning is suppressed.
+This file creates ApplicationStateManager instances directly for testing with isolated sessions.
 """
 from __future__ import annotations
 
 import os
 import tempfile
-import warnings
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-
-# Suppress deprecation warning for direct SessionManager instantiation
-warnings.filterwarnings(
-    "ignore",
-    message=r"Direct SessionManager instantiation is deprecated",
-    category=DeprecationWarning,
-)
 
 from core.di_container import inject
 from core.managers.core_operations_manager import CoreOperationsManager
@@ -62,15 +53,14 @@ class TestROMInjectionSettingsPersistence:
     @pytest.fixture
     def settings_manager(self, temp_settings_file):
         """Create a settings manager with temporary file"""
-        # Mock the SessionManager to use temporary storage
         import json
 
-        from core.managers.session_manager import SessionManager
+        from core.managers.application_state_manager import ApplicationStateManager
 
-        # Create a session manager with temporary file storage
-        real_session_manager = SessionManager(settings_path=Path(temp_settings_file))
+        # Create an ApplicationStateManager with temporary file storage
+        real_session_manager = ApplicationStateManager(settings_path=Path(temp_settings_file))
 
-        # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
+        # Pass session_manager directly to SettingsManager
         manager = SettingsManager("SpritePal", session_manager=real_session_manager)
 
         # Add _settings property for test compatibility
@@ -216,7 +206,7 @@ class TestROMInjectionSettingsPersistence:
         settings_manager.save()
 
         # Create a new settings manager to verify persistence
-        # The settings should persist through the SessionManager
+        # The settings should persist through the ApplicationStateManager
         assert (
             settings_manager.get_value(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM

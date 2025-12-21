@@ -25,8 +25,8 @@ from unittest.mock import Mock, patch
 import pytest
 from PIL import Image
 
-from core.managers.core_operations_manager import CoreOperationsManager
 from core.exceptions import ValidationError
+from core.managers.core_operations_manager import CoreOperationsManager
 
 # Real Component Testing Infrastructure (using available components)
 from tests.fixtures.test_data_factory import TestDataFactory

@@ -1,23 +1,15 @@
 """Tests for settings manager
 
-NOTE: This file creates SessionManager instances directly for testing SettingsManager
-integration. The deprecation warning is suppressed since we need isolated sessions.
+This file creates ApplicationStateManager instances directly for testing SettingsManager
+integration with isolated sessions.
 """
 from __future__ import annotations
 
 import json
 import tempfile
-import warnings
 from pathlib import Path
 
 import pytest
-
-# Suppress deprecation warning for direct SessionManager instantiation
-warnings.filterwarnings(
-    "ignore",
-    message=r"Direct SessionManager instantiation is deprecated",
-    category=DeprecationWarning,
-)
 
 from core.di_container import inject
 from core.protocols.manager_protocols import SettingsManagerProtocol
@@ -49,13 +41,13 @@ class TestSettingsManager:
     @pytest.fixture
     def settings_manager(self, temp_dir):
         """Create a SettingsManager in temp directory"""
-        from core.managers.session_manager import SessionManager
+        from core.managers.application_state_manager import ApplicationStateManager
 
         # Create temp settings file path
         settings_file = Path(temp_dir) / ".testapp_settings.json"
 
-        # Create a session manager with our temp settings file
-        session_manager = SessionManager(settings_path=settings_file)
+        # Create an ApplicationStateManager with our temp settings file
+        session_manager = ApplicationStateManager(settings_path=settings_file)
 
         # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
         manager = SettingsManager("TestApp", session_manager=session_manager)
@@ -83,12 +75,12 @@ class TestSettingsManager:
 
     def test_settings_file_path(self, temp_dir):
         """Test settings file path generation"""
-        from core.managers.session_manager import SessionManager
+        from core.managers.application_state_manager import ApplicationStateManager
 
         settings_file = Path(temp_dir) / ".testapp_settings.json"
 
         # Pass session_manager directly (replaces deprecated get_session_manager patch)
-        session_manager = SessionManager(settings_path=settings_file)
+        session_manager = ApplicationStateManager(settings_path=settings_file)
         manager = SettingsManager("TestApp", session_manager=session_manager)
         # Force saving to create the file
         manager.save_settings()
@@ -97,7 +89,7 @@ class TestSettingsManager:
 
     def test_load_existing_settings(self, temp_dir):
         """Test loading existing settings file"""
-        from core.managers.session_manager import SessionManager
+        from core.managers.application_state_manager import ApplicationStateManager
 
         # Create settings file
         settings_data = {
@@ -108,8 +100,8 @@ class TestSettingsManager:
         with open(settings_file, "w") as f:
             json.dump(settings_data, f)
 
-        # Load settings - pass session_manager directly (replaces deprecated get_session_manager patch)
-        session_manager = SessionManager(settings_path=settings_file)
+        # Load settings - pass session_manager directly
+        session_manager = ApplicationStateManager(settings_path=settings_file)
         manager = SettingsManager("TestApp", session_manager=session_manager)
 
         assert manager.get("session", "vram_path") == "/test/vram.dmp"
@@ -117,15 +109,15 @@ class TestSettingsManager:
 
     def test_load_corrupted_settings(self, temp_dir):
         """Test loading corrupted settings file"""
-        from core.managers.session_manager import SessionManager
+        from core.managers.application_state_manager import ApplicationStateManager
 
         # Create corrupted settings file
         settings_file = Path(temp_dir) / ".testapp_settings.json"
         with open(settings_file, "w") as f:
             f.write("{ invalid json }")
 
-        # Should return default settings - pass session_manager directly (replaces deprecated patch)
-        session_manager = SessionManager(settings_path=settings_file)
+        # Should return default settings - pass session_manager directly
+        session_manager = ApplicationStateManager(settings_path=settings_file)
         manager = SettingsManager("TestApp", session_manager=session_manager)
 
         assert manager.get("session", "vram_path") == ""

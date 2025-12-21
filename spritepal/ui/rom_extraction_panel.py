@@ -818,12 +818,6 @@ class ROMExtractionPanel(QWidget):
         # Add separator
         self.sprite_selector_widget.add_sprite("-- Scanner Results (now cached) --", None)
 
-    def _on_mode_changed(self, index: int):
-        """Handle extraction mode change (legacy - kept for compatibility)."""
-        # This method is no longer used since we removed the mode combo.
-        # Mode is now determined by whether user selects preset sprite or manual offset.
-        pass
-
     def _on_advanced_toggled(self, expanded: bool):
         """Handle advanced section expand/collapse.
 

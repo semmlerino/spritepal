@@ -150,7 +150,7 @@ class TestRealMainWindowStateIntegration:
 
             # These buttons should definitely start disabled (no extraction completed yet)
             assert main_window.open_editor_button.isEnabled() is False, "Editor button should start disabled"
-            assert main_window.arrange_rows_button.isEnabled() is False, "Arrange button should start disabled"
+            assert main_window.arrange_button.isEnabled() is False, "Arrange button should start disabled"
             assert main_window.inject_button.isEnabled() is False, "Inject button should start disabled"
 
 
@@ -224,8 +224,7 @@ class TestRealMainWindowStateIntegration:
 
             # Validate real Qt widget state changes (vs mock state tracking)
             assert main_window.open_editor_button.isEnabled() is True, "Real button should be enabled after extraction"
-            assert main_window.arrange_rows_button.isEnabled() is True, "Real arrange button should be enabled"
-            assert main_window.arrange_grid_button.isEnabled() is True, "Real grid button should be enabled"
+            assert main_window.arrange_button.isEnabled() is True, "Real arrange button should be enabled"
             assert main_window.inject_button.isEnabled() is True, "Real inject button should be enabled"
 
     def test_real_signal_propagation_vs_mocked_signals(self):
@@ -352,7 +351,7 @@ class TestRealMainWindowStateIntegration:
 
             # Validate real recovery state
             assert main_window.open_editor_button.isEnabled() is True, "Should recover to enabled state"
-            assert main_window.arrange_rows_button.isEnabled() is True, "Should recover arrange button"
+            assert main_window.arrange_button.isEnabled() is True, "Should recover arrange button"
 
     def test_real_ui_component_integration_vs_mocked_components(self):
         """

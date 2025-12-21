@@ -448,8 +448,3 @@ class PalettePreviewWidget(QWidget):
         if active_indices and active_indices[0] != self._expanded_index:
             self._set_expanded(active_indices[0])
 
-    # Legacy compatibility - expose palette_widgets for any external code
-    @property
-    def palette_widgets(self) -> dict[int, PaletteWidget]:
-        """Legacy property for backward compatibility"""
-        return self._expanded_widgets

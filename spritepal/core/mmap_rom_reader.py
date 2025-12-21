@@ -247,38 +247,12 @@ class MemoryMappedROMReader:
 
             # For HAL compression, we might need to read until end marker
             # or use the decompressor to determine compressed size
-            compressed_size = self._estimate_compressed_size(rom_data, offset)
+            # Use max size (64KB or remaining file) - the decompressor will
+            # only read what it needs from the data
+            compressed_size = min(0x10000, self.file_size - offset)
             compressed_data = bytes(rom_data[offset:offset + compressed_size])
 
             return decompressor.decompress(compressed_data)
-
-    def _estimate_compressed_size(self, rom_data: mmap.mmap, offset: int) -> int:
-        """
-        STUB: Returns max possible size (64KB or remaining file).
-
-        .. deprecated::
-            This stub always returns the maximum possible size, which is wasteful
-            and can cause timeouts on malformed data. Use
-            :meth:`ROMInjector._parse_hal_compressed_size` for accurate HAL
-            compression size determination.
-
-        Args:
-            rom_data: Memory-mapped ROM data
-            offset: Offset to compressed block
-
-        Returns:
-            Maximum possible size (not actual compressed size)
-        """
-        import warnings
-
-        warnings.warn(
-            "_estimate_compressed_size is a stub returning max size (64KB). "
-            "Use ROMInjector._parse_hal_compressed_size for accurate HAL parsing.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        max_size = min(0x10000, self.file_size - offset)  # Max 64KB
-        return max_size
 
     @contextmanager
     def batch_reader(self):

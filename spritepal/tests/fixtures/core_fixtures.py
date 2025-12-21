@@ -46,9 +46,9 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 if TYPE_CHECKING:
     from pytest import FixtureRequest, TempPathFactory
 
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.managers.registry import ManagerRegistry
-    from core.managers.session_manager import SessionManager
     from core.protocols.manager_protocols import InjectionManagerProtocol
     from core.services.rom_cache import ROMCache
     from tests.infrastructure.test_protocols import MockMainWindowProtocol

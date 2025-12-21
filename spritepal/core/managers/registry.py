@@ -8,6 +8,7 @@ from typing import Any
 
 from PySide6.QtWidgets import QApplication
 
+from core.exceptions import ManagerError
 from utils.logging_config import get_logger
 from utils.safe_logging import (
     safe_debug,
@@ -20,7 +21,6 @@ from .application_state_manager import ApplicationStateManager
 
 # Import consolidated managers
 from .core_operations_manager import CoreOperationsManager
-from core.exceptions import ManagerError
 from .monitoring_manager import MonitoringManager
 
 # NavigationManager import deferred to avoid circular imports

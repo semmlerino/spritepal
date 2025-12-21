@@ -288,7 +288,7 @@ class SmartPreviewCoordinator(QObject):
         self._release_timer.stop()
 
         # Try to show cached preview immediately
-        if self._try_show_cached_preview():
+        if self._try_show_cached_preview_dual_tier():
             logger.debug("Showed cached preview for drag start")
 
     def _on_drag_move(self, value: int) -> None:
@@ -343,7 +343,7 @@ class SmartPreviewCoordinator(QObject):
         logger.debug("Processing drag preview request")
 
         # Check cache first for instant display
-        if self._try_show_cached_preview():
+        if self._try_show_cached_preview_dual_tier():
             return
 
         # Request preview with medium priority
@@ -456,15 +456,6 @@ class SmartPreviewCoordinator(QObject):
             logger.warning(f"Error checking cached preview: {e}")
 
         return False
-
-    def _try_show_cached_preview(self) -> bool:
-        """
-        Legacy method for backward compatibility.
-
-        Returns:
-            bool: True if cached preview was shown
-        """
-        return self._try_show_cached_preview_dual_tier()
 
     def _check_rom_cache(self, rom_path: str, offset: int) -> tuple[bytes, int, int, str | None]:
         """

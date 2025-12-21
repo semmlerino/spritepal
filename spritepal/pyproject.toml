@@ -422,20 +422,6 @@ filterwarnings = [
     "ignore:.*QMouseEvent.*deprecated:DeprecationWarning",
     # multiprocessing fork warning in multi-threaded process (expected in tests)
     "ignore:.*multi-threaded.*use of fork.*:DeprecationWarning",
-    # NOTE: Mid-session cleanup warnings are NO LONGER suppressed to surface test pollution
-    # Service locator deprecation warnings (B.1 - transitioning to DI)
-    "ignore:.*get_session_manager.*is deprecated:DeprecationWarning",
-    "ignore:.*get_extraction_manager.*is deprecated:DeprecationWarning",
-    "ignore:.*get_injection_manager.*is deprecated:DeprecationWarning",
-    "ignore:.*get_settings_manager.*is deprecated:DeprecationWarning",
-    "ignore:.*get_rom_cache.*is deprecated:DeprecationWarning",
-    # Direct manager instantiation deprecation (test files testing deprecated API)
-    "ignore:Direct SessionManager instantiation is deprecated:DeprecationWarning",
-    "ignore:Direct ExtractionManager instantiation is deprecated:DeprecationWarning",
-    "ignore:Direct InjectionManager instantiation is deprecated:DeprecationWarning",
-    # NOTE: Worker constructor injection warnings (B.2) removed 2025-12-16
-    # NOTE: ROMInjectionWorker migrated from core.workers.rom_injection_worker to core.workers.injection
-    # NOTE: B.3-B.5 UI component migrations completed, all warnings removed 2025-12-16
 ]
 
 # Markers used in the test suite (consolidated from 65 to 16 based on actual usage)

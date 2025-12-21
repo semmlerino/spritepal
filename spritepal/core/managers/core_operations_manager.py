@@ -18,6 +18,10 @@ from typing import TYPE_CHECKING, Any, override
 from PIL import Image
 from PySide6.QtCore import QObject, QThread, Signal
 
+from core.exceptions import (
+    ExtractionError,
+    ValidationError,
+)
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.services import ROMService, VRAMService
@@ -33,15 +37,11 @@ from utils.constants import (
 from utils.file_validator import FileValidator
 
 from .base_manager import BaseManager
-from core.exceptions import (
-    ExtractionError,
-    ValidationError,
-)
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMExtractorProtocol
 
-    from .session_manager import SessionManager
+    from .application_state_manager import ApplicationStateManager
 
 
 class CoreOperationsManager(BaseManager):
@@ -248,7 +248,7 @@ class CoreOperationsManager(BaseManager):
             self._palette_manager, "Palette manager", ExtractionError
         )
 
-    def _get_session_manager(self) -> SessionManager:
+    def _get_session_manager(self) -> ApplicationStateManager:
         """Get session manager via dependency injection container."""
         from core.di_container import inject
         from core.protocols.manager_protocols import ApplicationStateManagerProtocol
@@ -662,8 +662,7 @@ class CoreOperationsManager(BaseManager):
 
         try:
             from core.services.worker_lifecycle import WorkerManager
-            from core.workers import ROMInjectionParams, ROMInjectionWorker
-            from core.workers.injection_worker import InjectionWorker
+            from core.workers import InjectionWorker, ROMInjectionParams, ROMInjectionWorker
 
             # Validate parameters
             self.validate_injection_params(params)
@@ -949,10 +948,10 @@ class CoreOperationsManager(BaseManager):
         """Try to get VRAM path from session data."""
         try:
             session_manager = self._get_session_manager()
-            recent_vram = session_manager.get_recent_files("vram")
-            if recent_vram and Path(recent_vram[0]).exists():
-                return recent_vram[0]
-        except (OSError, ValueError, IndexError, TypeError):
+            vram_path = session_manager.get_setting("session", "vram_path", "")
+            if vram_path and Path(vram_path).exists():
+                return vram_path
+        except (OSError, ValueError, TypeError):
             pass
         return ""
 

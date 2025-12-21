@@ -1,24 +1,15 @@
 """Integration tests for settings persistence across components
 
-NOTE: This file creates SessionManager instances directly for testing with isolated sessions.
-The deprecation warning is suppressed.
+This file creates ApplicationStateManager instances directly for testing with isolated sessions.
 """
 from __future__ import annotations
 
 import json
 import tempfile
-import warnings
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-# Suppress deprecation warning for direct SessionManager instantiation
-warnings.filterwarnings(
-    "ignore",
-    message=r"Direct SessionManager instantiation is deprecated",
-    category=DeprecationWarning,
-)
 
 from core.controller import ExtractionController
 from core.di_container import inject
@@ -250,12 +241,10 @@ class TestSettingsIntegration:
         with open(settings_file, "w") as f:
             json.dump(old_settings, f)
 
-        # Need to ensure SessionManager loads from our temp file
-        from core.managers.session_manager import SessionManager
+        # Create an ApplicationStateManager with our temp settings file
+        from core.managers.application_state_manager import ApplicationStateManager
 
-        # Create a session manager with our temp settings file
-        # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
-        session_manager = SessionManager(settings_path=settings_file)
+        session_manager = ApplicationStateManager(settings_path=settings_file)
         settings = SettingsManager("SpritePal", session_manager=session_manager)
 
         # Verify migration worked through the public API
@@ -282,12 +271,10 @@ class TestSettingsIntegration:
         with open(settings_file, "w") as f:
             f.write("{ corrupted json }")
 
-        # Need to ensure SessionManager loads from our temp file
-        from core.managers.session_manager import SessionManager
+        # Create an ApplicationStateManager with our temp settings file
+        from core.managers.application_state_manager import ApplicationStateManager
 
-        # Create a session manager with our temp settings file
-        # Pass session_manager directly to SettingsManager (replaces deprecated get_session_manager patch)
-        session_manager = SessionManager(settings_path=settings_file)
+        session_manager = ApplicationStateManager(settings_path=settings_file)
         settings = SettingsManager("SpritePal", session_manager=session_manager)
 
         # Should load defaults without crashing

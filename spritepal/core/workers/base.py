@@ -231,12 +231,6 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
         """
         return self._cancellation_requested or self.isInterruptionRequested()
 
-    # Backward compatibility alias
-    @property
-    def _is_cancelled(self) -> bool:
-        """Deprecated: Use is_cancelled property instead."""
-        return self._cancellation_requested or self.isInterruptionRequested()
-
     @property
     def is_paused(self) -> bool:
         """Check if operation is paused."""

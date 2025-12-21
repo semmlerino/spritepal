@@ -247,14 +247,14 @@ def configure_container(
     )
 
     # Register extracted services (Phase 2 refactoring)
+    from core.managers.history_manager import HistoryManager
+    from core.managers.workflow_manager import WorkflowManager
     from core.protocols.manager_protocols import (
+        HistoryManagerProtocol,
         StateSnapshotServiceProtocol,
         WorkflowManagerProtocol,
-        HistoryManagerProtocol,
     )
     from core.services.state_snapshot_service import StateSnapshotService
-    from core.managers.workflow_manager import WorkflowManager
-    from core.managers.history_manager import HistoryManager
 
     # These are standalone services with no dependencies
     register_singleton(StateSnapshotServiceProtocol, StateSnapshotService())

@@ -28,8 +28,8 @@ from PySide6.QtTest import QSignalSpy
 import core.controller
 from core.controller import ExtractionController
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.managers.session_manager import SessionManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
+from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 from core.services.settings_manager import SettingsManager
 from core.workers import VRAMExtractionWorker
 
@@ -130,7 +130,7 @@ def standard_mock_managers() -> tuple[Mock, Mock, Mock, Mock, Mock]:
     """
     extraction_manager = Mock(spec=CoreOperationsManager)
     injection_manager = Mock(spec=CoreOperationsManager)
-    session_manager = Mock(spec=SessionManager)
+    session_manager = Mock(spec=ApplicationStateManagerProtocol)
     settings_manager = Mock(spec=SettingsManager)
     dialog_factory = Mock(spec=DialogFactoryProtocol)
     return extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory

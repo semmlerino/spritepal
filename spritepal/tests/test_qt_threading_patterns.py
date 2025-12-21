@@ -660,7 +660,7 @@ class TestWorkerLifecycle:
             @handle_worker_errors()  # Note: decorator factory needs parentheses
             def run(self):
                 for i in range(50):  # Longer running to ensure still running when cleanup called
-                    if self._is_cancelled:
+                    if self.is_cancelled:
                         break
                     self.progress.emit(i)
                     time.sleep(0.02)  # sleep-ok: thread interleaving
@@ -689,7 +689,7 @@ class TestWorkerLifecycle:
 
         # Verify cancel was called (WorkerManager calls cancel if available)
         assert cancel_called
-        assert worker._is_cancelled
+        assert worker.is_cancelled
 
     def test_worker_error_handling(self, app):
         """Test worker error handling with decorator"""

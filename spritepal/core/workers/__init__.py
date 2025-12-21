@@ -34,6 +34,7 @@ from .injection import (
     WorkerOwnedROMInjectionWorker,
     WorkerOwnedVRAMInjectionWorker,
 )
+from .injection_worker import InjectionWorker
 from .specialized import (
     ExtractionWorkerBase,
     InjectionWorkerBase,
@@ -44,6 +45,7 @@ from .specialized import (
 __all__ = [
     "BaseWorker",
     "ExtractionWorkerBase",
+    "InjectionWorker",
     "InjectionWorkerBase",
     "ManagedWorker",
     "PreviewWorkerBase",

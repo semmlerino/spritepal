@@ -57,14 +57,6 @@ except ImportError:
     RowArrangementDialog = QWidget
 import contextlib
 
-# Suppress deprecation warnings for direct manager instantiation in test factory
-# This factory intentionally creates managers directly for testing purposes
-warnings.filterwarnings(
-    "ignore",
-    message=r"Direct SessionManager instantiation is deprecated",
-    category=DeprecationWarning,
-)
-
 from core.services.rom_cache import ROMCache
 
 from .data_repository import DataRepository, get_test_data_repository

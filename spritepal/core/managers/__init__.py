@@ -18,19 +18,9 @@ adapters. The recommended way to access managers is via dependency injection::
 Architecture:
     - ApplicationStateManager: Consolidated manager for session, settings, state
     - CoreOperationsManager: Consolidated manager for extraction, injection, palette
-    - SessionManager, ExtractionManager, InjectionManager: Legacy base classes for
-      adapters. These provide interface compatibility but all logic lives in the
-      consolidated managers.
 """
 from __future__ import annotations
 
-from .application_state_manager import ApplicationStateManager
-from .base_manager import BaseManager
-
-# Consolidated managers (NEW - these hold the actual logic)
-from .core_operations_manager import CoreOperationsManager
-from .workflow_manager import ExtractionState, WorkflowManager
-from .history_manager import HistoryManager
 from core.exceptions import (
     ExtractionError,
     FileOperationError,
@@ -41,6 +31,13 @@ from core.exceptions import (
     SessionError,
     ValidationError,
 )
+
+from .application_state_manager import ApplicationStateManager
+from .base_manager import BaseManager
+
+# Consolidated managers (NEW - these hold the actual logic)
+from .core_operations_manager import CoreOperationsManager
+from .history_manager import HistoryManager
 
 # NOTE: ExtractionManager and InjectionManager have been removed.
 # Use CoreOperationsManager via dependency injection:
@@ -55,9 +52,7 @@ from .registry import (
     initialize_managers,
     validate_manager_dependencies,
 )
-
-# DEPRECATED: See note above about legacy manager classes.
-from .session_manager import SessionManager
+from .workflow_manager import ExtractionState, WorkflowManager
 
 __all__ = [
     "ApplicationStateManager",
@@ -78,7 +73,6 @@ __all__ = [
     "NavigationError",
     "PreviewError",
     "SessionError",
-    "SessionManager",
     "ValidationError",
     # Manager lifecycle functions (use inject() for manager access)
     "cleanup_managers",

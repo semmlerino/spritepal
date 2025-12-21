@@ -12,6 +12,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+
 # Enum import no longer needed - ExtractionState imported from workflow_manager
 from pathlib import Path
 from types import MappingProxyType
@@ -20,11 +21,11 @@ from typing import Any, ClassVar, TypeVar, override
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
 
+from core.exceptions import SessionError, ValidationError
 from utils.file_validator import atomic_write
 from utils.state_manager import StateEntry, StateSnapshot
 
 from .base_manager import BaseManager
-from core.exceptions import SessionError, ValidationError
 
 T = TypeVar("T")
 
@@ -35,7 +36,7 @@ T = TypeVar("T")
 from core.managers.workflow_manager import ExtractionState
 
 # Re-export at module level for backward compatibility
-__all__ = ["ExtractionState", "ApplicationStateManager"]
+__all__ = ["ApplicationStateManager", "ExtractionState"]
 
 
 class ApplicationStateManager(BaseManager):
@@ -345,6 +346,10 @@ class ApplicationStateManager(BaseManager):
                 with self._settings_file.open() as f:
                     data = json.load(f)
                     if isinstance(data, dict):
+                        # Check if this is old flat format (has old keys, missing categories)
+                        if self._is_old_format(data):
+                            self._logger.info("Detected old settings format, migrating...")
+                            return self._migrate_old_settings(data)
                         self._logger.info("Settings loaded successfully")
                         return self._merge_with_defaults(data)
             except (OSError, json.JSONDecodeError) as e:
@@ -416,6 +421,28 @@ class ApplicationStateManager(BaseManager):
                         data[category][key] = default_value
 
         return data
+
+    def _is_old_format(self, data: dict[str, Any]) -> bool:
+        """Check if settings data is in old flat format.
+        
+        Old format has flat keys like 'vram_path', 'window_width'.
+        New format has categories like 'session', 'ui', 'paths'.
+        """
+        old_keys = {"vram_path", "cgram_path", "oam_path", "output_name", 
+                    "window_width", "window_height", "window_x", "window_y",
+                    "theme", "last_export_dir"}
+        
+        # If any old-style flat keys exist at top level, it's old format
+        if old_keys & data.keys():
+            return True
+        
+        # If no categories exist, it might be old format or empty
+        new_categories = {"session", "ui", "paths"}
+        if not (new_categories & data.keys()):
+            # Only consider it old if it has any keys at all
+            return bool(data)
+        
+        return False
 
     def _migrate_old_settings(self, old_data: dict[str, Any]) -> dict[str, Any]:
         """Migrate old flat settings format to new categorized format."""

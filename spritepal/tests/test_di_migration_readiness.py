@@ -24,8 +24,8 @@ from core.protocols.manager_protocols import (
 )
 
 if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.managers.session_manager import SessionManager
     from core.services.rom_cache import ROMCache
     from core.services.settings_manager import SettingsManager
 

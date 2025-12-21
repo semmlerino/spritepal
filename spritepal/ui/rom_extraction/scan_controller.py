@@ -284,7 +284,6 @@ class ScanController(QObject):
         """
         from core.di_container import inject
         from core.protocols.manager_protocols import ROMCacheProtocol
-
         from ui.common import WorkerManager
 
         # Clean up any existing scan worker
