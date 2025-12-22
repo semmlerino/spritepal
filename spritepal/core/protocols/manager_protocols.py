@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from PIL import Image
     from PySide6.QtCore import Signal
 
+    from core.types import SpritePreset
+
 
 class ExtractionManagerProtocol(Protocol):
     """Protocol for extraction manager."""
@@ -87,7 +89,7 @@ class ExtractionManagerProtocol(Protocol):
         """
         ...
 
-    def get_rom_extractor(self) -> object:
+    def get_rom_extractor(self) -> ROMExtractorProtocol:
         """
         Get the ROM extractor instance for advanced operations.
 
@@ -888,11 +890,11 @@ class SpritePresetManagerProtocol(Protocol):
     presets_imported: Signal  # Signal(int) - number imported
 
     # CRUD operations
-    def add_preset(self, preset: object) -> bool:
+    def add_preset(self, preset: SpritePreset) -> bool:
         """Add a new preset. Returns True if added."""
         ...
 
-    def update_preset(self, preset: object) -> bool:
+    def update_preset(self, preset: SpritePreset) -> bool:
         """Update an existing preset. Returns True if updated."""
         ...
 
@@ -900,23 +902,23 @@ class SpritePresetManagerProtocol(Protocol):
         """Remove a preset by name. Returns True if removed."""
         ...
 
-    def get_preset(self, name: str) -> object | None:
+    def get_preset(self, name: str) -> SpritePreset | None:
         """Get a preset by name."""
         ...
 
-    def get_all_presets(self) -> list[object]:
+    def get_all_presets(self) -> list[SpritePreset]:
         """Get all user presets."""
         ...
 
-    def get_presets_for_game(self, game_title: str) -> list[object]:
+    def get_presets_for_game(self, game_title: str) -> list[SpritePreset]:
         """Get all presets for a specific game."""
         ...
 
-    def get_presets_for_checksum(self, checksum: int) -> list[object]:
+    def get_presets_for_checksum(self, checksum: int) -> list[SpritePreset]:
         """Get all presets that match a ROM checksum."""
         ...
 
-    def get_presets_by_tag(self, tag: str) -> list[object]:
+    def get_presets_by_tag(self, tag: str) -> list[SpritePreset]:
         """Get all presets with a specific tag."""
         ...
 

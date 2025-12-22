@@ -25,9 +25,6 @@ from .manager_protocols import (
     SpritePresetManagerProtocol,
     VRAMServiceProtocol,
 )
-from .preview_protocols import (
-    PreviewCoordinatorProtocol,
-)
 from .worker_protocols import (
     PreviewWorkerPoolProtocol,
 )
@@ -42,7 +39,6 @@ __all__ = [
     "InjectionManagerProtocol",
     "ManualOffsetDialogFactoryProtocol",
     "ManualOffsetDialogProtocol",
-    "PreviewCoordinatorProtocol",
     "PreviewWorkerPoolProtocol",
     "ROMCacheProtocol",
     "ROMExtractorProtocol",
