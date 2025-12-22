@@ -81,7 +81,7 @@ class SearchFiltersWidget(QWidget):
         filters_changed: Emitted when any filter value changes
     """
 
-    filters_changed = Signal(object)  # Emits SearchFilter dataclass
+    filters_changed = Signal(SearchFilter)
 
     def __init__(
         self,

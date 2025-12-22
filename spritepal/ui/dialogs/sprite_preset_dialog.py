@@ -233,7 +233,7 @@ class SpritePresetDialog(DialogBase):
     """Dialog for managing sprite presets."""
 
     # Signals
-    preset_selected = Signal(object)  # SpritePreset
+    preset_selected = Signal(SpritePreset)
     presets_changed = Signal()
 
     def __init__(

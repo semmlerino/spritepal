@@ -31,6 +31,7 @@ from __future__ import annotations
 import contextlib
 import os
 import tempfile
+import uuid
 import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -101,7 +102,15 @@ class RealComponentFactory:
         self._leaked_resources: list[str] = []
         self._manage_registry = manage_registry
         self._initialized_registry = False  # Track if we initialized it
+        # Runtime validation - manager_registry is required for test isolation
+        if manager_registry is None:
+            raise ValueError(
+                "RealComponentFactory requires manager_registry. "
+                "Pass the isolated_managers or session_managers fixture."
+            )
         self._manager_registry = manager_registry  # Store provided registry for isolation
+        # Use UUID for guaranteed uniqueness (id() can be reused after object deletion)
+        self._unique_id = str(uuid.uuid4())
 
         # Set up isolated settings directory
         # Priority: explicit arg > SPRITEPAL_SETTINGS_DIR env var > tempfile
@@ -111,7 +120,7 @@ class RealComponentFactory:
             env_settings = os.environ.get("SPRITEPAL_SETTINGS_DIR")
             if env_settings:
                 # Under xdist, use a unique subdir per factory instance
-                self._settings_dir = Path(env_settings) / f"factory_{id(self)}"
+                self._settings_dir = Path(env_settings) / f"factory_{self._unique_id}"
                 self._settings_dir.mkdir(parents=True, exist_ok=True)
             else:
                 # Create temp settings dir for isolation
@@ -295,7 +304,7 @@ class RealComponentFactory:
             env_cache = os.environ.get("SPRITEPAL_CACHE_DIR")
             if env_cache:
                 # Under xdist, use a unique subdir per factory instance
-                cache_dir = Path(env_cache) / f"cache_{id(self)}"
+                cache_dir = Path(env_cache) / f"cache_{self._unique_id}"
                 cache_dir.mkdir(parents=True, exist_ok=True)
             else:
                 cache_dir = Path(tempfile.mkdtemp(prefix="spritepal_cache_"))

@@ -50,6 +50,17 @@ _LOCK_ORDER: dict[str, int] = {
     "_cache_stats_lock": 2,
 }
 
+# Warn if running in optimized mode (lock order checks disabled)
+if not __debug__:
+    import warnings
+
+    warnings.warn(
+        "Lock order enforcement is disabled (running with -O). "
+        "Lock order violations will not be detected.",
+        RuntimeWarning,
+        stacklevel=1,
+    )
+
 
 def _check_lock_order(lock_name: str) -> None:
     """

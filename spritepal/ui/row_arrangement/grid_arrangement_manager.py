@@ -52,8 +52,8 @@ class GridArrangementManager(QObject):
 
     # Signals
     arrangement_changed = Signal()
-    tile_added = Signal(object)  # TilePosition
-    tile_removed = Signal(object)  # TilePosition
+    tile_added = Signal(TilePosition)
+    tile_removed = Signal(TilePosition)
     group_added = Signal(str)  # Group ID
     group_removed = Signal(str)  # Group ID
     arrangement_cleared = Signal()

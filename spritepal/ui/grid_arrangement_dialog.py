@@ -76,8 +76,8 @@ class GridGraphicsView(QGraphicsView):
     """Custom graphics view for grid-based sprite selection"""
 
     # Signals
-    tile_clicked = Signal(object)  # TilePosition
-    tiles_selected = Signal(list)  # List of TilePosition
+    tile_clicked = Signal(TilePosition)
+    tiles_selected = Signal(list)  # list[TilePosition]
     selection_completed = Signal()
     zoom_changed = Signal(float)  # Zoom level changed
 

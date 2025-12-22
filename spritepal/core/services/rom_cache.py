@@ -72,6 +72,10 @@ class ROMCache:
                     if self._ensure_writable_cache_dir():
                         logger.info(f"Using fallback cache directory: {self.cache_dir}")
                     else:
+                        logger.warning(
+                            f"Fallback cache directory {fallback_dir} is not writable. "
+                            "ROM caching disabled."
+                        )
                         self._cache_enabled = False
                 except (OSError, PermissionError):
                     logger.exception("Failed to prepare fallback cache directory")
