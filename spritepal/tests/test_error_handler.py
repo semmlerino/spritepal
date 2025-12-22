@@ -13,7 +13,7 @@ from ui.common import get_error_handler, reset_error_handler
 pytestmark = [
     pytest.mark.gui,
     pytest.mark.slow,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="Pure error handling tests, no managers"),
 ]
 
 class TestErrorHandler:

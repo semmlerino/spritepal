@@ -45,7 +45,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.performance,
     pytest.mark.slow,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="HAL compression tests don't use managers"),
     pytest.mark.benchmark,
 ]
 

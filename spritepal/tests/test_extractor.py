@@ -12,7 +12,7 @@ import pytest
 # Mark this entire module for core logic tests
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="File extraction tests don't use managers"),
 ]
 
 from core.extractor import SpriteExtractor

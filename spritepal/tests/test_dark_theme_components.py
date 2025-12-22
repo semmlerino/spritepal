@@ -12,7 +12,7 @@ import pytest
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="UI tests may involve managers that spawn threads"),
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="UI tests may trigger Qt auto-registration"),
 ]
 
 from ui.styles.components import (

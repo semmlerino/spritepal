@@ -60,7 +60,7 @@ from utils.constants import BYTES_PER_TILE
 
 
 @pytest.mark.no_manager_setup
-@pytest.mark.allows_registry_state  # Uses manager_context for own lifecycle
+@pytest.mark.allows_registry_state(reason="Uses manager_context for own lifecycle")
 class TestExtractionManager:
     """TDD tests for ExtractionManager with real component integration.
     

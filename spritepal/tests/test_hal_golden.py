@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 pytestmark = [
     pytest.mark.golden_hal,
     pytest.mark.headless,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="Golden tests are stateless"),
     pytest.mark.no_qt,
 ]
 

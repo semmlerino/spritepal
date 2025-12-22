@@ -22,7 +22,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.real_hal,
     pytest.mark.skip_thread_cleanup(reason="Integration tests involve HAL pool that spawns background threads"),
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="Integration tests manage own lifecycle"),
 ]
 
 

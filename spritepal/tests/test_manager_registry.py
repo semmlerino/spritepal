@@ -67,7 +67,7 @@ def get_extraction_manager():
 
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="Tests ManagerRegistry lifecycle"),
 ]
 class TestManagerRegistry:
     """Test ManagerRegistry functionality"""
@@ -284,7 +284,7 @@ class TestManagerRegistry:
 
 @pytest.mark.usefixtures("isolated_managers")
 @pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads")
-@pytest.mark.allows_registry_state
+@pytest.mark.allows_registry_state(reason="Tests ManagerRegistry lifecycle")
 class TestTOCTOURaceConditionStability:
     """Test fixes for Time-of-Check-Time-of-Use race conditions.
 

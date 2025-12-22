@@ -36,7 +36,7 @@ skip_in_offscreen = pytest.mark.skipif(
 )
 
 # Module-level marker - tests don't use managers
-pytestmark = pytest.mark.allows_registry_state
+pytestmark = pytest.mark.allows_registry_state(reason="Integration tests manage own lifecycle")
 
 
 @pytest.fixture

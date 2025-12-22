@@ -32,7 +32,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.slow,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="Uses manager_context for own lifecycle"),
     pytest.mark.parallel_unsafe,
 ]
 

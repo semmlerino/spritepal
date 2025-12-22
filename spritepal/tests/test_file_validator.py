@@ -6,7 +6,7 @@ import pytest
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.no_manager_setup,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="File validation is stateless"),
 ]
 """
 Test suite for the refactored FileValidator with separated concerns.

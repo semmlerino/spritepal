@@ -47,7 +47,7 @@ def is_headless_environment():
 
 
 @pytest.mark.gui
-@pytest.mark.allows_registry_state  # Pure unit test, Qt import triggers registry
+@pytest.mark.allows_registry_state(reason="Pure unit test, Qt import triggers registry")
 @pytest.mark.skipif(not QT_AVAILABLE, reason="Qt not available")
 @pytest.mark.skipif(
     is_headless_environment(), reason="GUI tests skipped in headless environment"

@@ -20,7 +20,7 @@ from core.console_error_handler import ConsoleErrorHandler
 pytestmark = [
     pytest.mark.no_manager_setup,
     pytest.mark.headless,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="Pure unit test, no managers used"),
 ]
 
 class TestConsoleErrorHandler(unittest.TestCase):

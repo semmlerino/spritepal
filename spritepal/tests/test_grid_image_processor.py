@@ -19,7 +19,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.slow,
-    pytest.mark.allows_registry_state,
+    pytest.mark.allows_registry_state(reason="Image processing tests don't use managers"),
 ]
 class TestGridImageProcessor:
     """Test the GridImageProcessor class"""

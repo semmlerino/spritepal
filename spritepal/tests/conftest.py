@@ -457,6 +457,20 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
                     "Example: @pytest.mark.skip_thread_cleanup(reason='Uses session_managers which owns threads')"
                 )
 
+    # === Validate allows_registry_state markers ===
+    for item in items:
+        marker = item.get_closest_marker("allows_registry_state")
+        if marker is not None:
+            # Check if reason kwarg is provided
+            reason = marker.kwargs.get("reason")
+            if not reason:
+                raise pytest.UsageError(
+                    f"Test {item.nodeid} uses @pytest.mark.allows_registry_state "
+                    "without a reason. Add reason='...' explaining why registry "
+                    "state pollution is acceptable for this test.\n"
+                    "Example: @pytest.mark.allows_registry_state(reason='Tests ManagerRegistry lifecycle')"
+                )
+
     # === Auto-serialize session-dependent tests for xdist ===
     # Only apply when xdist plugin is active and -n option is used
     if not config.pluginmanager.has_plugin("xdist"):

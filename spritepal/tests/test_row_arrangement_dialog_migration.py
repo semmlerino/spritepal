@@ -23,7 +23,7 @@ pytestmark = [
     pytest.mark.requires_display,
     pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.allows_registry_state,  # Dialog initialization uses ManagerRegistry
+    pytest.mark.allows_registry_state(reason="Dialog initialization uses ManagerRegistry"),
 ]
 
 class TestRowArrangementDialogMigration:

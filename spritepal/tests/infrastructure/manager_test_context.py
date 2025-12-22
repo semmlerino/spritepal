@@ -65,12 +65,28 @@ class ManagerTestContext:
         # Store original registry state for restoration
         self._original_registry_state: dict[str, Any] = {}
 
-        # Initialize the global ManagerRegistry singleton
-        # This ensures managers are available when RealComponentFactory accesses them
-        from core.managers import initialize_managers
-        self._settings_dir = Path(tempfile.mkdtemp(prefix="manager_test_context_"))
-        settings_path = self._settings_dir / ".test_settings.json"
-        initialize_managers("ManagerTestContext", settings_path=settings_path)
+        # Check session state BEFORE attempting initialization
+        from tests.fixtures.core_fixtures import is_session_managers_active
+
+        if is_session_managers_active():
+            # Session managers own the registry - don't reinitialize
+            # Log warning for debugging but don't fail (backwards compatible)
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "ManagerTestContext: session_managers fixture is active. "
+                "Reusing session registry instead of creating isolated managers. "
+                "Consider using isolated_managers fixture directly."
+            )
+            self._settings_dir = None
+            self._owns_registry = False
+        else:
+            # Initialize the global ManagerRegistry singleton
+            # This ensures managers are available when RealComponentFactory accesses them
+            from core.managers import initialize_managers
+            self._settings_dir = Path(tempfile.mkdtemp(prefix="manager_test_context_"))
+            settings_path = self._settings_dir / ".test_settings.json"
+            initialize_managers("ManagerTestContext", settings_path=settings_path)
+            self._owns_registry = True
 
         # Register UI factories with DI container (after managers are initialized)
         from ui import register_ui_factories
@@ -261,20 +277,16 @@ class ManagerTestContext:
             self._original_registry_state.clear()
 
             # Reset global registry singleton to prevent state pollution
-            # BUT only if session_managers fixture is NOT active - otherwise
-            # the session fixture owns the registry lifecycle
-            try:
-                from tests.fixtures.core_fixtures import is_session_managers_active
-
-                if not is_session_managers_active():
-                    # Safe to reset - no session fixture is managing the registry
+            # Only reset if we own the registry (initialized it ourselves)
+            if getattr(self, '_owns_registry', True):
+                try:
                     from core.managers import cleanup_managers as registry_cleanup
                     from core.managers.registry import ManagerRegistry
 
                     registry_cleanup()
                     ManagerRegistry.reset_for_tests()
-            except Exception:
-                pass  # Best-effort cleanup
+                except Exception:
+                    pass  # Best-effort cleanup
 
     def cleanup(self) -> None:
         """Clean up all resources."""
