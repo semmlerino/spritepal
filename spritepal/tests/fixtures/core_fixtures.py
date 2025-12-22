@@ -208,6 +208,10 @@ def _reset_manager_caches(registry: Any) -> None:
     This function uses the public reset_state() methods on managers
     rather than introspecting private attributes, making it more
     maintainable and less fragile to internal changes.
+
+    Note: ApplicationStateManager receives full_reset=True to clear _settings
+    between tests (prevents settings leakage). Other managers use full_reset=False
+    to preserve services and initialized state within the session.
     """
     # List of (attribute_name, manager_instance) tuples
     manager_attrs = [
@@ -223,7 +227,13 @@ def _reset_manager_caches(registry: Any) -> None:
         manager = getattr(registry, attr, None)
         if manager is not None and hasattr(manager, 'reset_state'):
             with contextlib.suppress(Exception):
-                manager.reset_state()
+                # Use full_reset for ApplicationStateManager to clear _settings
+                # (prevents settings leakage between tests in session scope)
+                # BUT NOT for CoreOperationsManager (would clear services)
+                if attr == 'application_state_manager':
+                    manager.reset_state(full_reset=True)
+                else:
+                    manager.reset_state()
 
     # Also reset monitoring manager stats if available
     if hasattr(registry, 'monitoring_manager') and registry.monitoring_manager:
@@ -253,8 +263,16 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[ManagerRegis
     Uses isolated temp settings directory to avoid polluting repo root.
     State is stored in SessionState dataclass to avoid global mutable variables.
 
-    WARNING: Manager state persists across ALL tests. Use isolated_managers
-    if you need clean state.
+    Ordering semantics:
+        - Tests using this fixture get xdist_group("serial") marker automatically
+        - This co-locates tests on one worker but does NOT guarantee execution order
+        - Settings are fully reset between tests (via auto_reset_session_state)
+        - Services remain initialized for performance (not cleared between tests)
+        - Tests should be stateless and not rely on any particular execution order
+
+    WARNING: While settings are reset between tests, tests should still be
+    written to be order-independent. Use isolated_managers if you need
+    complete isolation or are modifying manager internals.
 
     Usage:
         def test_something(session_managers):
@@ -526,11 +544,16 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
 
 @pytest.fixture(autouse=True)
 def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, None]:
-    """Auto-reset session manager caches after tests using session_managers.
+    """Auto-reset session manager state after tests using session_managers.
 
-    Resets caches (extraction counts, cached data, etc.) after each test
-    without full re-initialization overhead. Only post-test reset is needed
-    since the previous test's cleanup already left state clean.
+    Runs after each test using session_managers to reset manager state:
+    - ApplicationStateManager: full_reset=True (clears _settings to defaults)
+    - Other managers: full_reset=False (preserves services, clears caches)
+
+    This prevents settings leakage between tests while preserving the
+    performance benefit of session-scoped services. Tests should still
+    be written to be order-independent since xdist_group("serial") only
+    co-locates tests on one worker, it does not guarantee execution order.
     """
     from core.managers.registry import ManagerRegistry
 
