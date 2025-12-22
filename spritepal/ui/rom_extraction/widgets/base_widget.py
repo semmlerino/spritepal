@@ -1,10 +1,11 @@
 """Base widget class for ROM extraction widgets"""
 from __future__ import annotations
 
-from PySide6.QtWidgets import QGroupBox, QLayout, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QGroupBox, QLabel, QLayout, QSizePolicy, QVBoxLayout, QWidget
 
 from ui.common.collapsible_group_box import CollapsibleGroupBox
-from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_MEDIUM
+from ui.common.spacing_constants import CONTROL_PANEL_LABEL_WIDTH, SPACING_COMPACT_SMALL, SPACING_MEDIUM
 from ui.styles.theme import COLORS
 
 
@@ -23,6 +24,20 @@ class BaseExtractionWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+
+    def _create_control_label(self, text: str) -> QLabel:
+        """Create a control label with consistent styling.
+
+        Args:
+            text: The label text
+
+        Returns:
+            QLabel with standard width and right-aligned text
+        """
+        label = QLabel(text)
+        label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
+        label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        return label
 
     def _setup_widget_with_group(self, title: str, inner_layout: QLayout) -> None:
         """Set up the widget with a standard outer layout and group box.

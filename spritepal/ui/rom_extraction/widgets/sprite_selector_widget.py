@@ -2,13 +2,12 @@
 
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
-    CONTROL_PANEL_LABEL_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
@@ -31,6 +30,16 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         super().__init__(parent)
         self._setup_ui()
 
+    def _set_offset_label_style(self, color_key: str = "disabled_text") -> None:
+        """Apply consistent monospace styling to offset label.
+
+        Args:
+            color_key: Key from COLORS dict - 'disabled_text' for inactive, 'border_focus' for active
+        """
+        self.offset_label.setStyleSheet(
+            f"font-family: monospace; color: {COLORS[color_key]}; font-size: 14px;"
+        )
+
     def _setup_ui(self):
         """Initialize the user interface"""
         sprite_layout = QVBoxLayout()
@@ -41,9 +50,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         sprite_row = QHBoxLayout()
         sprite_row.setSpacing(SPACING_MEDIUM)
 
-        sprite_label = QLabel("Sprite:")
-        sprite_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
-        sprite_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        sprite_label = self._create_control_label("Sprite:")
         sprite_row.addWidget(sprite_label)
 
         self.sprite_combo = QComboBox()
@@ -59,13 +66,11 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         offset_row = QHBoxLayout()
         offset_row.setSpacing(SPACING_MEDIUM)
 
-        offset_label = QLabel("Offset:")
-        offset_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
-        offset_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        offset_label = self._create_control_label("Offset:")
         offset_row.addWidget(offset_label)
 
         self.offset_label = QLabel("--")
-        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
+        self._set_offset_label_style()
         self.offset_label.setMinimumWidth(100)
         self.offset_label.setEnabled(False)  # Visually disabled until sprite selected
         offset_row.addWidget(self.offset_label, 1)  # Stretch factor fills space
@@ -111,7 +116,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.sprite_combo.addItem("Select ROM file first...", None)
         self.sprite_combo.setEnabled(False)
         self.offset_label.setText("--")
-        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
+        self._set_offset_label_style()
         self.offset_label.setEnabled(False)  # Visually disabled
         self.find_sprites_btn.setEnabled(False)
 
@@ -156,7 +161,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.offset_label.setText(text)
         self.offset_label.setEnabled(True)  # Enable when value is set
         # Use highlighted color for actual offset values
-        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['border_focus']}; font-size: 14px;")
+        self._set_offset_label_style("border_focus")
 
     def set_find_button_enabled(self, enabled: bool):
         """Enable/disable find sprites button"""
@@ -182,6 +187,6 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.sprite_combo.addItem(message, None)
         self.sprite_combo.setEnabled(False)
         self.offset_label.setText("--")
-        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['disabled_text']}; font-size: 14px;")
+        self._set_offset_label_style()
         self.offset_label.setEnabled(False)  # Visually disabled
         self.find_sprites_btn.setEnabled(False)

@@ -1,11 +1,10 @@
 """Output name widget for ROM extraction"""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QWidget
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QWidget
 
 from ui.common.spacing_constants import (
-    CONTROL_PANEL_LABEL_WIDTH,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
 
@@ -28,9 +27,7 @@ class OutputNameWidget(BaseExtractionWidget):
         output_layout.setSpacing(SPACING_MEDIUM)
         output_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
 
-        name_label = QLabel("Name:")
-        name_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
-        name_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        name_label = self._create_control_label("Name:")
         output_layout.addWidget(name_label)
 
         self.output_name_edit = QLineEdit()

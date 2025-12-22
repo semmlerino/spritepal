@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout, QWidget
 
 from ui.styles.theme import COLORS
@@ -54,9 +54,7 @@ class ROMFileWidget(BaseExtractionWidget):
         rom_row.setSpacing(SPACING_MEDIUM)
 
         # ROM label to match other rows in the panel
-        rom_label = QLabel("ROM:")
-        rom_label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
-        rom_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        rom_label = self._create_control_label("ROM:")
         rom_row.addWidget(rom_label)
 
         self.rom_path_edit = QLineEdit()

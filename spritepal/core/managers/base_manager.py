@@ -3,13 +3,16 @@ Base manager class providing common functionality for all managers
 """
 from __future__ import annotations
 
+import functools
 import logging
 import threading
 from collections.abc import Callable, Mapping
-from typing import TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 # Type variable for generic _ensure_component method
 T = TypeVar("T")
+# ParamSpec for decorator type preservation
+P = ParamSpec("P")
 
 from PySide6.QtCore import QObject, Signal
 
@@ -397,3 +400,69 @@ class BaseManager(QObject):
         self._handle_categorized_error(
             error, operation, operation.title(), context, error_class
         )
+
+
+def with_operation_handling(
+    operation: str,
+    context: str,
+    *,
+    with_progress: bool = True,
+    exclusive: bool = True,
+    target_error: type[Exception] | None = None,
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Decorator for operations with standardized error handling.
+
+    Handles:
+    - Operation lifecycle (start/finish)
+    - Progress updates (optional)
+    - Categorized exception handling for File I/O, data format, and general errors
+
+    Args:
+        operation: Operation identifier for tracking
+        context: Human-readable context for error messages
+        with_progress: If True, emit progress at 0% and 100%
+        exclusive: If True, raise if operation already in progress
+        target_error: Exception type for wrapping unexpected errors (default: Exception)
+
+    Usage:
+        @with_operation_handling("extraction", "file extraction", with_progress=True)
+        def extract(self, path: str) -> list[str]:
+            return self._service.extract(path)
+    """
+    final_target_error = target_error if target_error is not None else Exception
+
+    def decorator(method: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(method)
+        def wrapper(
+            self: BaseManager, *args: Any, **kwargs: Any  # pyright: ignore[reportExplicitAny] - generic decorator
+        ) -> T:
+            started = self._start_operation(operation)
+            if exclusive and not started:
+                raise final_target_error(f"{operation} already in progress")
+
+            try:
+                if with_progress:
+                    self._update_progress(operation, 0, 100)
+                result = method(self, *args, **kwargs)
+                if with_progress:
+                    self._update_progress(operation, 100, 100)
+                return result
+            except (OSError, PermissionError) as e:
+                self._handle_file_io_error(e, operation, context)
+                raise  # Handler already raises, but kept for safety/clarity
+            except (ValueError, TypeError) as e:
+                self._handle_data_format_error(e, operation, context)
+                raise
+            except ValidationError:
+                raise
+            except Exception as e:
+                if not isinstance(e, final_target_error):
+                    self._handle_operation_error(e, operation, final_target_error, context)
+                raise
+            finally:
+                if started:
+                    self._finish_operation(operation)
+
+        return wrapper
+
+    return decorator

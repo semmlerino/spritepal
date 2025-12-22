@@ -36,7 +36,7 @@ from utils.constants import (
 )
 from utils.file_validator import FileValidator
 
-from .base_manager import BaseManager
+from .base_manager import BaseManager, with_operation_handling
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMExtractorProtocol
@@ -283,6 +283,9 @@ class CoreOperationsManager(BaseManager):
 
     # ========== Extraction Operations ==========
 
+    @with_operation_handling(
+        "vram_extraction", "VRAM extraction", with_progress=True, exclusive=True, target_error=ExtractionError
+    )
     def extract_from_vram(self, vram_path: str, output_base: str,
                          cgram_path: str | None = None,
                          oam_path: str | None = None,
@@ -310,43 +313,23 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If extraction fails
             ValidationError: If parameters are invalid
         """
-        operation = "vram_extraction"
-
         if self._vram_service is None:
             raise ExtractionError("VRAMService not initialized")
 
-        if not self._start_operation(operation):
-            raise ExtractionError("VRAM extraction already in progress")
+        return self._vram_service.extract_from_vram(
+            vram_path=vram_path,
+            output_base=output_base,
+            cgram_path=cgram_path,
+            oam_path=oam_path,
+            vram_offset=vram_offset,
+            create_grayscale=create_grayscale,
+            create_metadata=create_metadata,
+            grayscale_mode=grayscale_mode,
+        )
 
-        try:
-            self._update_progress(operation, 0, 100)
-            result = self._vram_service.extract_from_vram(
-                vram_path=vram_path,
-                output_base=output_base,
-                cgram_path=cgram_path,
-                oam_path=oam_path,
-                vram_offset=vram_offset,
-                create_grayscale=create_grayscale,
-                create_metadata=create_metadata,
-                grayscale_mode=grayscale_mode,
-            )
-            self._update_progress(operation, 100, 100)
-            return result
-        except (OSError, PermissionError) as e:
-            self._handle_file_io_error(e, operation, "VRAM extraction")
-            raise
-        except (ValueError, TypeError) as e:
-            self._handle_data_format_error(e, operation, "VRAM extraction")
-            raise
-        except ValidationError:
-            raise
-        except Exception as e:
-            if not isinstance(e, ExtractionError):
-                self._handle_operation_error(e, operation, ExtractionError, "VRAM extraction")
-            raise
-        finally:
-            self._finish_operation(operation)
-
+    @with_operation_handling(
+        "rom_extraction", "ROM extraction", with_progress=True, exclusive=True, target_error=ExtractionError
+    )
     def extract_from_rom(self, rom_path: str, offset: int,
                         output_base: str, sprite_name: str,
                         cgram_path: str | None = None) -> list[str]:
@@ -367,40 +350,20 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If extraction fails
             ValidationError: If parameters are invalid
         """
-        operation = "rom_extraction"
-
         if self._rom_service is None:
             raise ExtractionError("ROMService not initialized")
 
-        if not self._start_operation(operation):
-            raise ExtractionError("ROM extraction already in progress")
+        return self._rom_service.extract_from_rom(
+            rom_path=rom_path,
+            offset=offset,
+            output_base=output_base,
+            sprite_name=sprite_name,
+            cgram_path=cgram_path,
+        )
 
-        try:
-            self._update_progress(operation, 0, 100)
-            result = self._rom_service.extract_from_rom(
-                rom_path=rom_path,
-                offset=offset,
-                output_base=output_base,
-                sprite_name=sprite_name,
-                cgram_path=cgram_path,
-            )
-            self._update_progress(operation, 100, 100)
-            return result
-        except (OSError, PermissionError) as e:
-            self._handle_file_io_error(e, operation, "ROM extraction")
-            raise
-        except (ValueError, TypeError) as e:
-            self._handle_data_format_error(e, operation, "ROM extraction")
-            raise
-        except ValidationError:
-            raise
-        except Exception as e:
-            if not isinstance(e, ExtractionError):
-                self._handle_operation_error(e, operation, ExtractionError, "ROM extraction")
-            raise
-        finally:
-            self._finish_operation(operation)
-
+    @with_operation_handling(
+        "sprite_preview", "preview generation", with_progress=False, exclusive=False, target_error=ExtractionError
+    )
     def get_sprite_preview(self, rom_path: str, offset: int,
                           sprite_name: str | None = None) -> tuple[bytes, int, int]:
         """
@@ -417,32 +380,10 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ExtractionError: If preview generation fails
         """
-        operation = "sprite_preview"
-
         if self._rom_service is None:
             raise ExtractionError("ROMService not initialized")
 
-        started = self._start_operation(operation)
-        if not started:
-            self._logger.debug("Preview operation already running, allowing concurrent preview")
-
-        try:
-            return self._rom_service.get_sprite_preview(rom_path, offset, sprite_name)
-        except (OSError, PermissionError) as e:
-            self._handle_file_io_error(e, operation, "preview generation")
-            raise
-        except (ValueError, TypeError) as e:
-            self._handle_data_format_error(e, operation, "preview generation")
-            raise
-        except ValidationError:
-            raise
-        except Exception as e:
-            if not isinstance(e, ExtractionError):
-                self._handle_operation_error(e, operation, ExtractionError, "preview generation")
-            raise
-        finally:
-            if started:
-                self._finish_operation(operation)
+        return self._rom_service.get_sprite_preview(rom_path, offset, sprite_name)
 
     def validate_extraction_params(
         self, params: Mapping[str, object]
