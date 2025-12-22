@@ -35,8 +35,6 @@ from ui.styles import get_panel_style
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
-# from utils.rom_cache import get_rom_cache # Removed due to DI
-
 logger = get_logger(__name__)
 
 class ScanControlsPanel(QWidget):
@@ -544,7 +542,7 @@ class ScanControlsPanel(QWidget):
                     "step": 0x100,
                     "quality_threshold": 0.5,
                     "min_sprite_size": 512,
-                    "max_sprite_size": 32768
+                    "max_sprite_size": 65536
                 },
                 # Full ROM scan parameters
                 {
@@ -553,7 +551,7 @@ class ScanControlsPanel(QWidget):
                     "step": 0x100,
                     "quality_threshold": 0.5,
                     "min_sprite_size": 512,
-                    "max_sprite_size": 32768
+                    "max_sprite_size": 65536
                 }
             ]
 
@@ -678,7 +676,7 @@ class ScanControlsPanel(QWidget):
                 "step": 0x100,
                 "quality_threshold": 0.5,
                 "min_sprite_size": 512,
-                "max_sprite_size": 32768
+                "max_sprite_size": 65536
             }
 
             # Check for cached partial scan

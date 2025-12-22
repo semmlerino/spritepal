@@ -113,7 +113,7 @@ MAX_BYTE_VALUE = 255      # Maximum 8-bit value
 PIXEL_SCALE_FACTOR = 17   # Scale 4-bit (0-15) to 8-bit (0-255): pixel * 17
 
 # Sprite analysis constants
-MIN_SPRITE_TILES = 16     # Minimum tiles for valid sprite
+MIN_SPRITE_TILES = 4      # Minimum tiles for valid sprite (2x2 tiles = 128 bytes)
 TYPICAL_SPRITE_MIN = 32   # Minimum tiles for typical Kirby sprite
 TYPICAL_SPRITE_MAX = 256  # Maximum tiles for typical Kirby sprite
 LARGE_SPRITE_MAX = 512    # Maximum tiles for large sprite
@@ -144,9 +144,10 @@ MAX_SPRITE_DIMENSION = 256         # Maximum sprite width/height in pixels
 PREVIEW_SCALE_FACTOR = 2           # Preview image scale factor
 
 # ROM scanning parameters
-ROM_SCAN_STEP_DEFAULT = 0x100      # Default ROM scan step (256 bytes)
+ROM_SCAN_STEP_DEFAULT = 0x80       # Default ROM scan step (128 bytes = 4 tiles)
 ROM_SCAN_STEP_QUICK = 0x1000       # Quick scan step (4KB)
-ROM_SCAN_STEP_FINE = 0x10          # Fine scan step (16 bytes)
+ROM_SCAN_STEP_TILE = 0x20          # Tile-aligned step (32 bytes = 1 tile)
+ROM_SCAN_STEP_FINE = 0x10          # Fine scan step (16 bytes, half a tile)
 ROM_SEARCH_RANGE_DEFAULT = 0x1000  # Default search range around sprite (4KB)
 ROM_ALIGNMENT_GAP_THRESHOLD = 0x10000  # Gap threshold for region detection (64KB)
 ROM_MIN_REGION_SIZE = 0x1000       # Minimum region size (4KB)
@@ -215,6 +216,97 @@ def get_sprite_search_areas(rom_size: int) -> list[tuple[int, int]]:
 ROM_HEADER_OFFSET_LOROM = 0x7FC0   # LoROM header offset
 ROM_HEADER_OFFSET_HIROM = 0xFFC0   # HiROM header offset
 ROM_CHECKSUM_COMPLEMENT_MASK = 0xFFFF  # Checksum complement verification mask
+
+
+def is_snes_address(address: int) -> bool:
+    """
+    Check if an address looks like an SNES address vs a file offset.
+
+    SNES addresses have the format: bank (8 bits) + address (16 bits)
+    - LoROM: banks $00-$7D or $80-$FF with addresses $8000-$FFFF
+    - File offsets are typically < 0x800000 (8MB max ROM)
+
+    Args:
+        address: The address to check
+
+    Returns:
+        True if this looks like an SNES address, False if file offset
+    """
+    # If address has bits set above 0x7FFFFF, it's likely SNES
+    if address > 0x7FFFFF:
+        return True
+
+    # Check for LoROM pattern: addresses $8000-$FFFF in low 16 bits
+    low_16 = address & 0xFFFF
+    if low_16 >= 0x8000:
+        # Could be SNES if bank portion exists
+        bank = address >> 16
+        if bank > 0:
+            return True
+
+    return False
+
+
+def snes_to_file_offset(snes_addr: int, *, has_smc_header: bool = False) -> int:
+    """
+    Convert SNES LoROM address to file offset.
+
+    LoROM mapping:
+    - Banks $00-$7D, addresses $8000-$FFFF → file offset
+    - Banks $80-$FF mirror $00-$7F
+
+    Args:
+        snes_addr: SNES address (e.g., 0x808000, 0xC08000)
+        has_smc_header: Whether ROM has 512-byte SMC header
+
+    Returns:
+        File offset in the ROM file
+    """
+    bank = (snes_addr >> 16) & 0xFF
+    addr = snes_addr & 0xFFFF
+
+    # Mirror banks $80-$FF to $00-$7F
+    if bank >= 0x80:
+        bank &= 0x7F
+
+    # LoROM: each bank maps 32KB from $8000-$FFFF
+    if addr >= 0x8000:
+        file_offset = (bank * 0x8000) + (addr - 0x8000)
+    else:
+        # Addresses below $8000 don't map to ROM in LoROM
+        file_offset = bank * 0x8000
+
+    # Add SMC header offset if present
+    if has_smc_header:
+        file_offset += 512
+
+    return file_offset
+
+
+def normalize_address(address: int, rom_size: int) -> int:
+    """
+    Normalize an address to a file offset.
+
+    Handles both SNES addresses and direct file offsets.
+    Automatically detects SMC headers based on ROM size.
+
+    Args:
+        address: Address that may be SNES or file offset
+        rom_size: Size of the ROM file in bytes
+
+    Returns:
+        File offset suitable for ROM access
+    """
+    has_smc_header = rom_size % 1024 == 512
+
+    if is_snes_address(address):
+        return snes_to_file_offset(address, has_smc_header=has_smc_header)
+
+    # Already a file offset - just add SMC header offset if needed
+    if has_smc_header:
+        return address + 512
+
+    return address
 
 # Valid ROM sizes (in bytes)
 ROM_SIZE_512KB = 0x80000   # 512KB (4 Mbit)

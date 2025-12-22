@@ -63,7 +63,11 @@ class TileRenderer:
                 palette = [[i * 17, i * 17, i * 17] for i in range(16)]  # 0-255 range
                 logger.debug("Using grayscale palette (palette_index=None)")
             elif palette_index not in self.default_palettes:
-                logger.debug(f"Palette index {palette_index} not found, using grayscale")
+                logger.warning(
+                    f"Palette index {palette_index} not found in loaded palettes "
+                    f"(available: {sorted(self.default_palettes.keys())}). "
+                    "Using grayscale fallback - sprite colors may be incorrect."
+                )
                 palette = [[i * 17, i * 17, i * 17] for i in range(16)]  # Grayscale fallback
             else:
                 # Get the specified palette

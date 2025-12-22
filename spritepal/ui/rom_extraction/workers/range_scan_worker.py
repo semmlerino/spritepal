@@ -17,8 +17,6 @@ from utils.constants import MAX_ROM_SIZE
 from utils.logging_config import get_logger
 from utils.rom_utils import detect_smc_offset
 
-# from utils.rom_cache import get_rom_cache # Removed due to DI
-
 logger = get_logger(__name__)
 
 class RangeScanWorker(BaseWorker):
@@ -74,7 +72,7 @@ class RangeScanWorker(BaseWorker):
         # Scan parameters
         self.quality_threshold = 0.5
         self.min_sprite_size = 512  # At least 16 tiles (32 bytes per tile)
-        self.max_sprite_size = 32768  # 32KB limit for decompression
+        self.max_sprite_size = 65536  # 64KB limit - HAL compression maximum
 
         # Control flag for stopping (pause is handled by BaseWorker)
         self._should_stop = False

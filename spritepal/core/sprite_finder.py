@@ -20,14 +20,18 @@ from core.tile_renderer import TileRenderer
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_TILES_PER_ROW,
+    LARGE_SPRITE_MAX,
     MAX_SPRITE_SIZE,
     MIN_SPRITE_SIZE,
+    MIN_SPRITE_TILES,
     ROM_SCAN_STEP_DEFAULT,
     ROM_SCAN_STEP_QUICK,
     ROM_SPRITE_AREA_1_START,
     get_sprite_search_areas,
+    normalize_address,
 )
 from utils.logging_config import get_logger
+from utils.rom_utils import detect_smc_offset, detect_smc_offset_from_size
 
 logger = get_logger(__name__)
 
@@ -130,8 +134,8 @@ class SpriteFinder:
         """
         Quick heuristic check to filter obvious non-sprites.
 
-        This avoids expensive decompression attempts by checking the first 16 bytes
-        for patterns that are unlikely to be valid compressed sprite data.
+        This avoids expensive decompression attempts by checking for patterns
+        that indicate valid HAL-compressed sprite data.
 
         Args:
             rom_data: ROM data bytes
@@ -146,13 +150,28 @@ class SpriteFinder:
 
         header = rom_data[offset:offset + 16]
 
-        # All zeros or all 0xFF - unlikely to be sprite
-        if all(b == 0 for b in header) or all(b == 0xFF for b in header):
+        # 0xFF is the HAL stream terminator - can't be first byte
+        if header[0] == 0xFF:
             return False
 
-        # Check for some data variation (need at least 3 unique bytes)
+        # All zeros - definitely not valid compressed data
+        if all(b == 0 for b in header):
+            return False
+
+        # All same value - not valid compressed data
+        if len(set(header)) == 1:
+            return False
+
+        # Check data variation - require at least 4 unique bytes
+        # (3 is too permissive for 16 bytes of real data)
         unique_bytes = len(set(header))
-        if unique_bytes < 3:  # Too uniform
+        if unique_bytes < 4:
+            return False
+
+        # Check for ASCII text patterns (unlikely to be sprite data)
+        # If most bytes are printable ASCII, probably not sprite data
+        printable_count = sum(1 for b in header if 0x20 <= b <= 0x7E)
+        if printable_count >= 12:  # 12+ of 16 bytes are printable
             return False
 
         return True
@@ -246,7 +265,7 @@ class SpriteFinder:
 
         # Step 3: Tile count validation
         tile_count = len(sprite_data) // BYTES_PER_TILE
-        if tile_count < 16 or tile_count > 2048:
+        if tile_count < MIN_SPRITE_TILES or tile_count > LARGE_SPRITE_MAX:
             return None
 
         # Step 4: Tile data validation
@@ -357,9 +376,8 @@ class SpriteFinder:
         with Path(rom_path).open("rb") as f:
             rom_data = f.read()
 
-        # Detect and strip SMC header (512 bytes present when file_size % 1024 == 512)
-        file_size = len(rom_data)
-        smc_offset = 512 if file_size % 1024 == 512 else 0
+        # Detect and strip SMC header
+        smc_offset = detect_smc_offset(rom_data)
         if smc_offset > 0:
             logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
             rom_data = rom_data[smc_offset:]
@@ -424,7 +442,7 @@ class SpriteFinder:
 
                 # Quick validation of tile data
                 tile_count = len(sprite_data) // BYTES_PER_TILE
-                if tile_count < 16 or tile_count > 2048:  # Reasonable sprite size
+                if tile_count < MIN_SPRITE_TILES or tile_count > LARGE_SPRITE_MAX:  # Reasonable sprite size
                     continue
 
                 # Quick pre-validation
@@ -569,7 +587,8 @@ class SpriteFinder:
 
         file_size = rom_file.stat().st_size
         # Adjust for SMC header if present
-        rom_size = file_size - 512 if file_size % 1024 == 512 else file_size
+        smc_offset = detect_smc_offset_from_size(file_size)
+        rom_size = file_size - smc_offset
 
         # Get search areas appropriate for this ROM size
         common_sprite_ranges = get_sprite_search_areas(rom_size)
@@ -629,7 +648,7 @@ class SpriteFinder:
 
             # Quick validation of tile data
             tile_count = len(sprite_data) // BYTES_PER_TILE
-            if tile_count < 16 or tile_count > 2048:  # Reasonable sprite size
+            if tile_count < MIN_SPRITE_TILES or tile_count > LARGE_SPRITE_MAX:  # Reasonable sprite size
                 return None
 
             # Quick pre-validation
@@ -662,17 +681,30 @@ class SpriteFinder:
         This method provides the missing interface needed for external validation
         of ROM offsets discovered by other tools (like Lua scripts).
 
+        Automatically handles SNES address to file offset conversion for
+        addresses that look like emulator addresses (e.g., $808000).
+
         Args:
             rom_path: Path to ROM file
-            offset: ROM file offset to check
+            offset: ROM file offset or SNES address to check
 
         Returns:
             Sprite info dict if valid sprite found, None otherwise
         """
         try:
-            with Path(rom_path).open('rb') as f:
+            rom_file = Path(rom_path)
+            rom_size = rom_file.stat().st_size
+
+            # Normalize address (handles SNES->file conversion and SMC headers)
+            file_offset = normalize_address(offset, rom_size)
+
+            with rom_file.open('rb') as f:
                 rom_data = f.read()
-            return self.find_sprite_at_offset(rom_data, offset)
+
+            logger.debug(
+                f"Checking offset: input=0x{offset:06X} -> file=0x{file_offset:06X}"
+            )
+            return self.find_sprite_at_offset(rom_data, file_offset)
         except Exception as e:
             logger.warning(f"Failed to check offset 0x{offset:06X}: {e}")
             return None

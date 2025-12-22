@@ -116,7 +116,7 @@ class ROMInjector(SpriteInjector):
             raise ValueError(f"Offset 0x{offset:X} exceeds ROM data size 0x{len(rom_data):X}")
 
         # Default size limit to prevent oversized decompression
-        default_max_sprite_size = 32768  # 32KB - reasonable max for SNES sprites
+        default_max_sprite_size = 65536  # 64KB - HAL compression limit
 
         if expected_size:
             logger.debug(f"Expected decompressed size: {expected_size} bytes")

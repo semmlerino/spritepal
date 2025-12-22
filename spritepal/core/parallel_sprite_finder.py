@@ -18,7 +18,9 @@ from core.sprite_finder import SpriteFinder
 from utils.constants import (
     DEFAULT_SCAN_STEP,
     MIN_SPRITE_SIZE,
+    ROM_SCAN_STEP_TILE,
 )
+from utils.rom_utils import detect_smc_offset
 
 logger = logging.getLogger(__name__)
 
@@ -116,9 +118,8 @@ class ParallelSpriteFinder:
         with Path(rom_path).open("rb") as f:
             rom_data = f.read()
 
-        # Detect and strip SMC header (512 bytes present when file_size % 1024 == 512)
-        file_size = len(rom_data)
-        smc_offset = 512 if file_size % 1024 == 512 else 0
+        # Detect and strip SMC header
+        smc_offset = detect_smc_offset(rom_data)
         if smc_offset > 0:
             logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
             rom_data = rom_data[smc_offset:]
@@ -275,8 +276,8 @@ class ParallelSpriteFinder:
         """
         Calculate adaptive step size based on chunk characteristics.
 
-        Dense sprite regions get smaller steps, sparse regions larger.
-        Uses SpriteFinder._quick_sprite_check for consistency.
+        Dense sprite regions get smaller steps (down to tile alignment),
+        sparse regions get larger steps for efficiency.
         """
         # Sample the chunk to estimate sprite density
         sample_size = min(0x4000, chunk.size)  # 16KB sample
@@ -284,7 +285,7 @@ class ParallelSpriteFinder:
 
         # Count potential sprite markers in sample
         potential_sprites = 0
-        for i in range(0, sample_size - 16, 0x100):
+        for i in range(0, sample_size - 16, 0x80):  # Check every 128 bytes
             offset = sample_offset + i
             if offset + 16 < len(rom_data):
                 if finder._quick_sprite_check(rom_data, offset):
@@ -294,10 +295,10 @@ class ParallelSpriteFinder:
         density = potential_sprites / (sample_size / 1024)
 
         # Adjust step based on density
-        if density > 0.5:  # High density
-            return max(0x40, self.step_size // 4)
+        if density > 0.5:  # High density - use tile-aligned step
+            return ROM_SCAN_STEP_TILE  # 32 bytes (1 tile)
         if density > 0.1:  # Medium density
-            return max(0x80, self.step_size // 2)
+            return max(ROM_SCAN_STEP_TILE, self.step_size // 2)
         if density < 0.01:  # Very sparse
             return min(0x1000, self.step_size * 4)
         # Normal density
