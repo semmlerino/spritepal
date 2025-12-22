@@ -22,17 +22,13 @@ import warnings
 from collections.abc import Generator, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 
 if TYPE_CHECKING:
     from pytest import FixtureRequest
     from pytestqt.qtbot import QtBot
-
-    from tests.infrastructure.test_protocols import (
-        MockMainWindowProtocol,
-    )
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
@@ -221,53 +217,6 @@ def qt_app() -> Any:
         )
 
 
-@pytest.fixture
-def fast_mock_main_window() -> MockMainWindowProtocol:
-    """Function-scoped MOCK main window for fast unit tests.
-
-    WARNING: Signals are MagicMock objects, NOT real Qt signals.
-    - DO NOT use qtbot.waitSignal() with these signals - it will timeout
-    - For real signal behavior, use `main_window` fixture instead
-    - For testing signal emission: check `window.extract_requested.emit.called`
-
-    Use this for unit tests that:
-    - Don't need real Qt signal behavior
-    - Use `.emit.called` or `.emit.assert_called_*()` patterns
-    - Need fast execution without Qt overhead
-
-    For integration tests, use `main_window` (real signals) instead.
-    """
-    # Create a simple mock window without spec to avoid issues
-    window = Mock()
-
-    # Add all required signals as MagicMocks to allow emission simulation
-    window.extract_requested = MagicMock()
-    window.open_in_editor_requested = MagicMock()
-    window.arrange_rows_requested = MagicMock()
-    window.arrange_grid_requested = MagicMock()
-    window.inject_requested = MagicMock()
-    window.extraction_completed = MagicMock()
-    window.extraction_error_occurred = MagicMock()
-
-    # Add all required attributes with proper mocks
-    window.extraction_panel = Mock()
-    window.rom_extraction_panel = Mock()
-    window.output_settings_manager = Mock()
-    window.toolbar_manager = Mock()
-    window.preview_coordinator = Mock()
-    window.status_bar_manager = Mock()
-    window.status_bar = Mock()
-    window.sprite_preview = Mock()
-    window.palette_preview = Mock()
-    window.extraction_tabs = Mock()
-
-    # Add state attributes
-    window._output_path = ""
-    window._extracted_files = []
-
-    return window  # pyright: ignore[reportReturnType]  # Mock conforms to protocol at runtime  # pyright: ignore[reportReturnType]  # Mock conforms to protocol at runtime
-
-
 @pytest.fixture(scope="function")
 def main_window(qtbot: Any) -> Any:
     """Main window with REAL Qt signals - the DEFAULT for all tests.
@@ -281,8 +230,6 @@ def main_window(qtbot: Any) -> Any:
     - Tests using qtbot.waitSignal() on main window signals
     - Testing signal-slot connections
     - Integration tests
-
-    For unit tests needing fast MagicMock signals, use `fast_mock_main_window`.
     """
     from tests.infrastructure.qt_mocks import RealTestMainWindow
 

@@ -683,16 +683,6 @@ def rom_cache(
     return cache
 
 
-@pytest.fixture
-def mock_rom_cache(rom_cache: ROMCache) -> ROMCache:
-    """Alias for rom_cache fixture for backward compatibility.
-
-    NOTE: This now returns the class-scoped rom_cache directly
-    instead of creating a new instance each time.
-    """
-    return rom_cache
-
-
 # ============================================================================
 # Mock Fixtures
 # ============================================================================

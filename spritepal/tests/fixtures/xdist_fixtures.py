@@ -155,32 +155,3 @@ def configure_worker_environment(worker_temp_root: Path) -> Iterator[None]:
         os.environ.pop("SPRITEPAL_LOG_DIR", None)
         os.environ.pop("SPRITEPAL_WORKER_ID", None)
 
-
-# ============================================================================
-# Validation Fixtures
-# ============================================================================
-
-
-@pytest.fixture
-def validate_parallel_isolation(request: pytest.FixtureRequest) -> None:
-    """Validate that tests using isolated_managers follow best practices.
-
-    Tests run in parallel by default; this fixture validates best practices for
-    tests using isolated_managers.
-
-    Checks:
-    1. Recommends tmp_path for file operations (soft warning, not failure)
-    """
-    # Get all fixture names used by this test
-    fixture_names = set(request.fixturenames)
-
-    # Recommend tmp_path if any file operations are likely
-    if "isolated_managers" in fixture_names and "tmp_path" not in fixture_names:
-        # This is a soft warning, not a failure
-        import warnings
-
-        warnings.warn(
-            f"Test {request.node.nodeid} uses isolated_managers but not tmp_path. "
-            "Consider using tmp_path for any file operations to ensure isolation.",
-            stacklevel=2,
-        )

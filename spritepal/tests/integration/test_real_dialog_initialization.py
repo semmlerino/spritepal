@@ -241,18 +241,3 @@ class TestRealDialogWithManagers:
             assert dialog.sprite_file_selector is not None
 
         dialog.close()
-
-    def test_monitoring_dashboard_real(
-        self, qtbot: MockQtBotProtocol, isolated_managers
-    ) -> None:
-        """Test MonitoringDashboard can be created with real managers."""
-        with contextlib.suppress(ImportError):
-            from ui.dialogs.monitoring_dashboard import MonitoringDashboard
-
-            dialog = MonitoringDashboard()
-            qtbot.addWidget(dialog)
-
-            # Verify dialog was created
-            assert dialog is not None
-
-            dialog.close()

@@ -856,15 +856,6 @@ class ApplicationStateManagerProtocol(Protocol):
         """Get current cache session statistics."""
         ...
 
-    # Unified state snapshot
-    def get_full_state_snapshot(self) -> Mapping[str, object]:
-        """Get a complete snapshot of all application state."""
-        ...
-
-    def emit_state_snapshot(self) -> Mapping[str, object]:
-        """Emit a state snapshot signal and return the snapshot."""
-        ...
-
     # Current offset
     def set_current_offset(self, offset: int) -> None:
         """Set the current ROM offset and emit signal."""

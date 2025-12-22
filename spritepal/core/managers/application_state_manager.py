@@ -1,7 +1,7 @@
 """
 Consolidated Application State Manager for SpritePal.
 
-This manager combines session, settings, state, history, and workflow management
+This manager combines session, settings, state, and workflow management
 into a single cohesive unit while maintaining backward compatibility.
 """
 
@@ -9,14 +9,10 @@ from __future__ import annotations
 
 import json
 import threading
-from collections import OrderedDict
-from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
-
-# Enum import no longer needed - ExtractionState imported from workflow_manager
+from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, ClassVar, TypedDict, TypeVar, cast, override
+from typing import TYPE_CHECKING, ClassVar, TypeVar, cast, override
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage
@@ -26,23 +22,11 @@ from core.exceptions import SessionError, ValidationError
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ConfigurationServiceProtocol
 from utils.file_validator import atomic_write
-from utils.state_manager import StateEntry, StateSnapshot
+from utils.state_manager import StateEntry
 
 from .base_manager import BaseManager
 
 T = TypeVar("T")
-
-
-# ========== Type Definitions ==========
-
-
-class SpriteInfoDict(TypedDict):
-    """Type definition for sprite history entries."""
-
-    offset: int
-    quality: float
-    timestamp: str
-    metadata: dict[str, object]
 
 
 # ========== Workflow State Machine ==========
@@ -60,7 +44,6 @@ class ApplicationStateManager(BaseManager):
     - Session management (persistent settings)
     - Settings management (configuration)
     - State management (temporary runtime state)
-    - History management (sprite history tracking)
     - Workflow management (extraction state machine)
 
     This manager provides a unified interface for all state-related operations
@@ -117,11 +100,9 @@ class ApplicationStateManager(BaseManager):
     # CANONICAL SIGNALS (use in new code):
     #   state_changed - Unified state change with category and data
     #   workflow_state_changed - Workflow state machine transitions
-    #   application_state_snapshot - Full state snapshot for debugging
     #
     # DOMAIN-SPECIFIC SIGNALS (simplified for specific use cases):
     #   session_changed, settings_saved - Persistence events
-    #   history_updated, sprite_added - History tracking
     #   preview_ready, current_offset_changed - UI updates
     #
     # Signal Registry: Use utils.signal_registry.SignalRegistry for debugging
@@ -130,17 +111,12 @@ class ApplicationStateManager(BaseManager):
     # Unified signals (canonical)
     state_changed = Signal(str, dict)  # category, data
     workflow_state_changed = Signal(object, object)  # old_state, new_state
-    application_state_snapshot = Signal(dict)  # full state for debugging
 
     # Session signals (persistence)
     session_changed = Signal()  # session data modified
-    files_updated = Signal(dict)  # file paths changed
+    files_updated = Signal(dict)  # file paths changed (emitted by update_session_data)
     settings_saved = Signal()  # settings persisted to disk
     session_restored = Signal(dict)  # session loaded from disk
-
-    # History signals (sprite tracking)
-    history_updated = Signal(list)  # list of sprite offsets
-    sprite_added = Signal(int, float)  # offset, quality_score
 
     # Cache signals (monitoring)
     cache_stats_updated = Signal(dict)  # updated cache metrics
@@ -193,12 +169,6 @@ class ApplicationStateManager(BaseManager):
 
         # Runtime state (temporary, not saved) - dynamic namespaces with varied shapes
         self._runtime_state: dict[str, dict[str, object]] = {}
-        self._state_snapshots: dict[str, StateSnapshot] = OrderedDict()
-        self._max_snapshots = 10
-
-        # Sprite history - structured entries with known fields
-        self._sprite_history: list[SpriteInfoDict] = []
-        self._max_history = 50
 
         # Workflow state machine
         self._workflow_state = ExtractionState.IDLE
@@ -206,7 +176,6 @@ class ApplicationStateManager(BaseManager):
 
         # Cache session statistics (per-session tracking, not persisted)
         self._cache_session_stats: dict[str, int] = {"hits": 0, "misses": 0, "total_requests": 0}
-        self._preloaded_offsets: set[int] = set()  # Track preloaded offsets
 
         # Thread safety - Lock hierarchy documentation
         # LOCK ORDERING (always acquire in this order to prevent deadlock):
@@ -252,8 +221,6 @@ class ApplicationStateManager(BaseManager):
         # Clear runtime state
         with self._state_lock:
             self._runtime_state.clear()
-            self._state_snapshots.clear()
-            self._sprite_history.clear()
 
         self._logger.info("ApplicationStateManager cleaned up")
 
@@ -261,9 +228,8 @@ class ApplicationStateManager(BaseManager):
         """Reset internal state for test isolation.
 
         This method resets mutable state without fully re-initializing the manager.
-        Use this for test isolation when you need to clear runtime state, snapshots,
-        history, and workflow state but don't want the overhead of full manager
-        re-initialization.
+        Use this for test isolation when you need to clear runtime state and workflow
+        state but don't want the overhead of full manager re-initialization.
 
         Args:
             full_reset: If True, also reset settings to defaults and clear the
@@ -273,8 +239,6 @@ class ApplicationStateManager(BaseManager):
         with self._state_lock:
             # Clear runtime state (always reset)
             self._runtime_state.clear()
-            self._state_snapshots.clear()
-            self._sprite_history.clear()
             self._session_dirty = False
 
             if full_reset:
@@ -289,7 +253,6 @@ class ApplicationStateManager(BaseManager):
         # Reset cache session stats
         with self._cache_stats_lock:
             self._cache_session_stats = {"hits": 0, "misses": 0, "total_requests": 0}
-            self._preloaded_offsets.clear()
 
         self._logger.debug("ApplicationStateManager state reset (full_reset=%s)", full_reset)
 
@@ -596,31 +559,6 @@ class ApplicationStateManager(BaseManager):
                 if file_updates:
                     self.files_updated.emit(file_updates)
 
-    def update_file_paths(self, vram: str | None = None,
-                         cgram: str | None = None,
-                         oam: str | None = None) -> None:
-        """
-        Update file paths in session.
-
-        Args:
-            vram: VRAM file path
-            cgram: CGRAM file path
-            oam: OAM file path
-        """
-        updates: dict[str, str] = {}
-        if vram is not None:
-            updates["vram_path"] = vram
-            self._add_recent_file("vram", vram)
-        if cgram is not None:
-            updates["cgram_path"] = cgram
-            self._add_recent_file("cgram", cgram)
-        if oam is not None:
-            updates["oam_path"] = oam
-            self._add_recent_file("oam", oam)
-
-        if updates:
-            self.update_session_data(updates)
-
     def update_window_state(self, geometry: dict[str, int | float | list[int]]) -> None:
         """
         Update window geometry in settings.
@@ -846,130 +784,7 @@ class ApplicationStateManager(BaseManager):
             else:
                 self._runtime_state.clear()
 
-    def create_snapshot(self, namespace: str | None = None) -> str:
-        """
-        Create a snapshot of current state.
-
-        Args:
-            namespace: Specific namespace to snapshot, or None for all
-
-        Returns:
-            Snapshot ID
-        """
-        with self._state_lock:
-            if namespace:
-                states = self._runtime_state.get(namespace, {}).copy()
-            else:
-                states = {ns: data.copy() for ns, data in self._runtime_state.items()}
-
-            snapshot = StateSnapshot(states, namespace)
-
-            # Limit number of snapshots
-            if len(self._state_snapshots) >= self._max_snapshots:
-                # Remove oldest snapshot
-                self._state_snapshots.popitem(last=False)  # type: ignore[call-arg]  # Python 3.7+ dict is ordered
-
-            self._state_snapshots[snapshot.id] = snapshot
-            return snapshot.id
-
-    def restore_snapshot(self, snapshot_id: str) -> bool:
-        """
-        Restore state from snapshot.
-
-        Args:
-            snapshot_id: ID of snapshot to restore
-
-        Returns:
-            True if restored successfully
-        """
-        with self._state_lock:
-            if snapshot_id not in self._state_snapshots:
-                return False
-
-            snapshot = self._state_snapshots[snapshot_id]
-
-            if snapshot.namespace:
-                # Restore specific namespace
-                self._runtime_state[snapshot.namespace] = snapshot.states.copy()
-            else:
-                # Restore all namespaces
-                self._runtime_state = snapshot.states.copy()
-
-            self.state_changed.emit("restored", {"snapshot_id": snapshot_id})
-            return True
-
-    # ========== History Management ==========
-
-    def add_sprite_to_history(self, offset: int, quality: float = 1.0,
-                             metadata: dict[str, object] | None = None) -> bool:
-        """
-        Add sprite to history.
-
-        Args:
-            offset: ROM offset of sprite
-            quality: Quality score (0.0 to 1.0)
-            metadata: Optional additional metadata
-
-        Returns:
-            True if added (not duplicate), False if duplicate
-        """
-        with self._lock:
-            # Check for duplicate
-            if any(s["offset"] == offset for s in self._sprite_history):
-                return False
-
-            # Create sprite info (explicit TypedDict construction)
-            sprite_info: SpriteInfoDict = {
-                "offset": offset,
-                "quality": quality,
-                "timestamp": datetime.now(tz=UTC).isoformat(),
-                "metadata": metadata or {},
-            }
-
-            # Add to history
-            self._sprite_history.append(sprite_info)
-
-            # Enforce limit
-            if len(self._sprite_history) > self._max_history:
-                self._sprite_history = self._sprite_history[-self._max_history:]
-
-            # Emit signals
-            self.sprite_added.emit(offset, quality)
-            self.history_updated.emit([s["offset"] for s in self._sprite_history])
-
-            return True
-
-    def get_sprite_history(self) -> Sequence[SpriteInfoDict]:
-        """Get full sprite history (read-only snapshot)."""
-        with self._lock:
-            return list(self._sprite_history)
-
-    def clear_sprite_history(self) -> None:
-        """Clear sprite history."""
-        with self._lock:
-            self._sprite_history.clear()
-            self.history_updated.emit([])
-
-    # ========== Session Management ==========
-
-    def update_session_file(self, file_type: str, file_path: str) -> None:
-        """
-        Update session with file path.
-
-        Args:
-            file_type: Type of file (e.g., "rom", "vram", "output")
-            file_path: File path to store
-        """
-        file_map = {
-            "rom": ("session", "last_rom_path"),
-            "vram": ("session", "last_vram_path"),
-            "output": ("session", "last_output_dir")
-        }
-
-        if file_type in file_map:
-            category, key = file_map[file_type]
-            self.set_setting(category, key, file_path)
-            self.files_updated.emit({file_type: file_path})
+    # ========== Recent Files ==========
 
     def get_recent_files(self, max_files: int = 10) -> list[str]:
         """Get list of recent files."""
@@ -1079,53 +894,13 @@ class ApplicationStateManager(BaseManager):
         """Reset workflow to idle state."""
         self.transition_workflow(ExtractionState.IDLE)
 
-    # Convenience methods for workflow transitions
-    def start_loading_rom(self) -> bool:
-        """Start loading ROM operation."""
-        return self.transition_workflow(ExtractionState.LOADING_ROM)
-
-    def finish_loading_rom(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish loading ROM operation."""
-        if success:
-            return self.transition_workflow(ExtractionState.IDLE)
-        return self.transition_workflow(ExtractionState.ERROR, error)
-
+    # Convenience methods for workflow transitions (only scanning is used)
     def start_scanning(self) -> bool:
         """Start sprite scanning operation."""
         return self.transition_workflow(ExtractionState.SCANNING_SPRITES)
 
     def finish_scanning(self, success: bool = True, error: str | None = None) -> bool:
         """Finish sprite scanning operation."""
-        if success:
-            return self.transition_workflow(ExtractionState.IDLE)
-        return self.transition_workflow(ExtractionState.ERROR, error)
-
-    def start_preview(self) -> bool:
-        """Start sprite preview operation."""
-        return self.transition_workflow(ExtractionState.PREVIEWING_SPRITE)
-
-    def finish_preview(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish sprite preview operation."""
-        if success:
-            return self.transition_workflow(ExtractionState.IDLE)
-        return self.transition_workflow(ExtractionState.ERROR, error)
-
-    def start_search(self) -> bool:
-        """Start sprite search operation."""
-        return self.transition_workflow(ExtractionState.SEARCHING_SPRITE)
-
-    def finish_search(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish sprite search operation."""
-        if success:
-            return self.transition_workflow(ExtractionState.IDLE)
-        return self.transition_workflow(ExtractionState.ERROR, error)
-
-    def start_extraction(self) -> bool:
-        """Start extraction operation."""
-        return self.transition_workflow(ExtractionState.EXTRACTING)
-
-    def finish_extraction(self, success: bool = True, error: str | None = None) -> bool:
-        """Finish extraction operation."""
         if success:
             return self.transition_workflow(ExtractionState.IDLE)
         return self.transition_workflow(ExtractionState.ERROR, error)
@@ -1177,102 +952,7 @@ class ApplicationStateManager(BaseManager):
                 return 0.0
             return (self._cache_session_stats["hits"] / total) * 100.0
 
-    # ========== Preloaded Offsets Tracking ==========
-
-    def add_preloaded_offset(self, offset: int) -> None:
-        """Track an offset that has been preloaded.
-
-        Args:
-            offset: ROM offset that was preloaded into cache
-        """
-        with self._cache_stats_lock:
-            self._preloaded_offsets.add(offset)
-
-    def is_offset_preloaded(self, offset: int) -> bool:
-        """Check if an offset has been preloaded.
-
-        Args:
-            offset: ROM offset to check
-
-        Returns:
-            True if offset was preloaded
-        """
-        with self._cache_stats_lock:
-            return offset in self._preloaded_offsets
-
-    def get_preloaded_offsets(self) -> frozenset[int]:
-        """Get set of all preloaded offsets (immutable snapshot).
-
-        Returns:
-            Immutable frozenset of preloaded offsets
-        """
-        with self._cache_stats_lock:
-            return frozenset(self._preloaded_offsets)
-
-    def clear_preloaded_offsets(self) -> None:
-        """Clear the preloaded offsets tracking."""
-        with self._cache_stats_lock:
-            self._preloaded_offsets.clear()
-
-    # ========== Unified State Snapshot ==========
-
-    def get_full_state_snapshot(self) -> dict[str, object]:
-        """Get a complete snapshot of all application state.
-
-        This provides a unified view of the application state for debugging,
-        logging, or state synchronization purposes.
-
-        Returns:
-            Dictionary containing:
-            - workflow: Current workflow state and error
-            - settings: All persistent settings
-            - runtime: All runtime state by namespace
-            - history: Sprite history summary
-            - cache_stats: Cache session statistics
-        """
-        with self._state_lock:
-            with self._workflow_lock:
-                with self._cache_stats_lock:
-                    snapshot: dict[str, object] = {
-                        "workflow": {
-                            "state": self._workflow_state.name,
-                            "error": self._workflow_error,
-                            "is_busy": self.is_workflow_busy,
-                            "can_extract": self.can_extract,
-                            "can_preview": self.can_preview,
-                            "can_search": self.can_search,
-                            "can_scan": self.can_scan,
-                        },
-                        "settings": self._settings.copy(),
-                        "runtime": {
-                            ns: {
-                                k: (v.value if isinstance(v, StateEntry) else v)
-                                for k, v in data.items()
-                            }
-                            for ns, data in self._runtime_state.items()
-                        },
-                        "history": {
-                            "count": len(self._sprite_history),
-                            "offsets": [s["offset"] for s in self._sprite_history],
-                        },
-                        "cache_stats": self._cache_session_stats.copy(),
-                        "preloaded_offsets_count": len(self._preloaded_offsets),
-                        "timestamp": datetime.now(tz=UTC).isoformat(),
-                    }
-                    return snapshot
-
-    def emit_state_snapshot(self) -> dict[str, object]:
-        """Emit a state snapshot signal and return the snapshot.
-
-        This method is useful for triggering state synchronization across
-        components that listen to the application_state_snapshot signal.
-
-        Returns:
-            The emitted state snapshot dictionary
-        """
-        snapshot = self.get_full_state_snapshot()
-        self.application_state_snapshot.emit(snapshot)
-        return snapshot
+    # ========== UI Coordination ==========
 
     def set_current_offset(self, offset: int) -> None:
         """Set the current ROM offset and emit signal.
