@@ -132,10 +132,12 @@ class SpriteFinder:
 
     def _quick_sprite_check(self, rom_data: bytes, offset: int) -> bool:
         """
-        Quick heuristic check to filter obvious non-sprites.
+        Quick heuristic check to filter definite non-sprites.
 
-        This avoids expensive decompression attempts by checking for patterns
-        that indicate valid HAL-compressed sprite data.
+        This is a minimal filter that only rejects offsets that CANNOT contain
+        valid HAL-compressed data. Previous implementation was too aggressive
+        and rejected valid sprites. Now we let decompression validation catch
+        invalid data instead of over-filtering here.
 
         Args:
             rom_data: ROM data bytes
@@ -144,36 +146,24 @@ class SpriteFinder:
         Returns:
             True if offset might contain a sprite, False if definitely not
         """
-        # Don't check beyond available data
-        if offset + 16 > len(rom_data):
+        # Need at least 4 bytes to attempt decompression
+        if offset + 4 > len(rom_data):
             return False
 
-        header = rom_data[offset:offset + 16]
+        # Only check first 4 bytes for definite non-starters
+        header = rom_data[offset:offset + 4]
 
         # 0xFF is the HAL stream terminator - can't be first byte
         if header[0] == 0xFF:
             return False
 
-        # All zeros - definitely not valid compressed data
+        # All zeros - no valid HAL command starts with 0x00
         if all(b == 0 for b in header):
             return False
 
-        # All same value - not valid compressed data
-        if len(set(header)) == 1:
-            return False
-
-        # Check data variation - require at least 4 unique bytes
-        # (3 is too permissive for 16 bytes of real data)
-        unique_bytes = len(set(header))
-        if unique_bytes < 4:
-            return False
-
-        # Check for ASCII text patterns (unlikely to be sprite data)
-        # If most bytes are printable ASCII, probably not sprite data
-        printable_count = sum(1 for b in header if 0x20 <= b <= 0x7E)
-        if printable_count >= 12:  # 12+ of 16 bytes are printable
-            return False
-
+        # Let decompression validation handle everything else
+        # Previous checks (unique bytes < 4, ASCII patterns) were too aggressive
+        # and rejected valid compressed data with low entropy headers
         return True
 
     def _calculate_quick_confidence(

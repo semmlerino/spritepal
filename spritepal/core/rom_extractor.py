@@ -46,6 +46,8 @@ from utils.constants import (
     ROM_SCAN_STEP_DEFAULT,
     ROM_SCAN_STEP_FINE,
     ROM_SEARCH_RANGE_DEFAULT,
+    SPRITE_ENTROPY_MAX,
+    SPRITE_ENTROPY_MIN,
     SPRITE_QUALITY_BONUS,
     SPRITE_QUALITY_THRESHOLD,
     TILE_ANALYSIS_SAMPLE,
@@ -983,7 +985,7 @@ class ROMExtractor:
         sample_size = min(ENTROPY_ANALYSIS_SAMPLE, data_size)
         entropy = self._calculate_entropy(sprite_data[:sample_size])
 
-        if 2.0 <= entropy <= 6.0:
+        if SPRITE_ENTROPY_MIN <= entropy <= SPRITE_ENTROPY_MAX:
             return 0.2  # Graphics data typically has moderate entropy
         return 0.0  # Too uniform or too random
 

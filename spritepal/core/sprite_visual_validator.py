@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PIL import Image
 
+from utils.constants import SPRITE_ENTROPY_MAX, SPRITE_ENTROPY_MIN
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -315,8 +316,8 @@ class SpriteVisualValidator:
         byte_counts = np.bincount(np.frombuffer(tile_data, dtype=np.uint8), minlength=256)
         entropy = -np.sum((byte_counts/len(tile_data)) * np.log2(byte_counts/len(tile_data) + 1e-10))
 
-        # Sprite data typically has entropy in range 4-7
-        if entropy < 3 or entropy > 7.5:
+        # Sprite data typically has moderate entropy (unified thresholds from constants)
+        if entropy < SPRITE_ENTROPY_MIN or entropy > SPRITE_ENTROPY_MAX:
             return False, 0.2
 
         return True, 0.8

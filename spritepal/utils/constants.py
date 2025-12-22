@@ -126,6 +126,12 @@ ENTROPY_ANALYSIS_SAMPLE = 1024      # Bytes to sample for entropy calculation
 TILE_ANALYSIS_SAMPLE = 10           # Number of tiles to analyze for quality
 MAX_ALIGNMENT_ERROR = 16            # Maximum bytes of misalignment allowed
 
+# Sprite entropy thresholds (unified across all validators)
+# Entropy is Shannon entropy on byte values (0-8 scale)
+# Graphics data typically has moderate entropy - not too uniform, not too random
+SPRITE_ENTROPY_MIN = 2.5            # Minimum entropy for sprite data
+SPRITE_ENTROPY_MAX = 7.0            # Maximum entropy for sprite data
+
 # Progress reporting intervals
 PROGRESS_LOG_INTERVAL = 100         # Log progress every 100 operations
 PROGRESS_SAVE_INTERVAL = 50         # Save progress every 50 operations
@@ -144,7 +150,8 @@ MAX_SPRITE_DIMENSION = 256         # Maximum sprite width/height in pixels
 PREVIEW_SCALE_FACTOR = 2           # Preview image scale factor
 
 # ROM scanning parameters
-ROM_SCAN_STEP_DEFAULT = 0x80       # Default ROM scan step (128 bytes = 4 tiles)
+ROM_SCAN_STEP_DEFAULT = 0x10       # Default ROM scan step (16 bytes = thorough)
+ROM_SCAN_STEP_FAST = 0x80          # Fast scan step (128 bytes = 4 tiles, legacy default)
 ROM_SCAN_STEP_QUICK = 0x1000       # Quick scan step (4KB)
 ROM_SCAN_STEP_TILE = 0x20          # Tile-aligned step (32 bytes = 1 tile)
 ROM_SCAN_STEP_FINE = 0x10          # Fine scan step (16 bytes, half a tile)

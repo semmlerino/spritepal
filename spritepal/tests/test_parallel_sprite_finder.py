@@ -202,21 +202,33 @@ class TestParallelSpriteFinder:
         assert sprite_finder._quick_sprite_check(valid_data, 0) is True
 
     def test_quick_sprite_check_invalid_patterns(self):
-        """Test quick sprite check with invalid patterns (now on SpriteFinder)."""
+        """Test quick sprite check with definite non-sprite patterns.
+
+        The quick check is now intentionally relaxed to only reject patterns that
+        CANNOT contain valid HAL data. Decompression validation catches invalid data.
+        Only two patterns are definitively rejected:
+        - First byte is 0xFF (HAL terminator cannot be first)
+        - All zeros in first 4 bytes (no valid HAL command starts with 0x00)
+        """
         parallel_finder = ParallelSpriteFinder()
         sprite_finder = parallel_finder.sprite_finders[0]
 
-        # All zeros
+        # All zeros - rejected (no valid HAL command)
         invalid_data = b"\x00" * 16
         assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
 
-        # All 0xFF
+        # Starts with 0xFF - rejected (HAL terminator can't be first)
         invalid_data = b"\xFF" * 16
         assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
 
-        # Too uniform (only 2 unique bytes)
-        invalid_data = b"\x00\xFF" * 8
+        # Starts with 0xFF followed by other bytes - still rejected
+        invalid_data = b"\xFF\x01\x02\x03" + b"\x00" * 12
         assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
+
+        # Alternating pattern - now PASSES (let decompression validate)
+        # This is intentional: we're less aggressive to avoid missing sprites
+        alternating_data = b"\x00\xFF" * 8
+        assert sprite_finder._quick_sprite_check(alternating_data, 0) is True
 
     def test_calculate_confidence_high_score(self):
         """Test confidence calculation with high-quality sprite (now on SpriteFinder)."""
@@ -247,7 +259,14 @@ class TestParallelSpriteFinder:
         assert confidence <= 0.3  # Should be low confidence
 
     def test_calculate_adaptive_step_high_density(self):
-        """Test adaptive step calculation with high sprite density."""
+        """Test adaptive step calculation with high sprite density.
+
+        With the thorough 16-byte default step, high-density areas use
+        tile-aligned stepping (32 bytes) for efficiency while still
+        maintaining good coverage.
+        """
+        from utils.constants import ROM_SCAN_STEP_TILE
+
         parallel_finder = ParallelSpriteFinder()
         sprite_finder = parallel_finder.sprite_finders[0]
 
@@ -256,7 +275,8 @@ class TestParallelSpriteFinder:
         chunk = SearchChunk(start=0x0, end=0x4000, chunk_id=0)
 
         step = parallel_finder._calculate_adaptive_step(sprite_finder, dense_data, chunk)
-        assert step < parallel_finder.step_size  # Should reduce step for dense areas
+        # High density uses tile-aligned step for efficiency
+        assert step == ROM_SCAN_STEP_TILE  # 32 bytes (1 tile)
 
     def test_calculate_adaptive_step_low_density(self):
         """Test adaptive step calculation with low sprite density."""
