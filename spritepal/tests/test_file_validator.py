@@ -343,7 +343,7 @@ class TestContentValidator:
             result = ContentValidator.validate_json_content(tmp.name)
             assert result.is_valid
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_json_content_invalid(self):
         """Test JSON content validation with invalid JSON."""

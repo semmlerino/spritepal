@@ -84,9 +84,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         # Core managers (B.3: Using injected manager)
         self.extraction_manager = extraction_manager
-        self.rom_extractor: ROMExtractorProtocol = cast(
-            "ROMExtractorProtocol", self.extraction_manager.get_rom_extractor()
-        )
+        self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()
         self.settings_manager: SettingsManagerProtocol = inject(SettingsManagerProtocol)
         self.rom_cache: ROMCacheProtocol = inject(ROMCacheProtocol)
 

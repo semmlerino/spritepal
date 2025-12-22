@@ -622,11 +622,7 @@ class SpriteNavigator(QWidget):
             self._cleanup_preview_workers()
 
             # Create preview worker
-            from typing import cast
-
-            from core.protocols.manager_protocols import ROMExtractorProtocol
-            rom_extractor_obj = self.extraction_manager.get_rom_extractor()
-            rom_extractor = cast(ROMExtractorProtocol, rom_extractor_obj)
+            rom_extractor = self.extraction_manager.get_rom_extractor()
             sprite_name = f"thumb_0x{offset:X}"
 
             worker = SpritePreviewWorker(

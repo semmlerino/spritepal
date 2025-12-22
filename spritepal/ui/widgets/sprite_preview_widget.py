@@ -33,6 +33,7 @@ from core.default_palette_loader import DefaultPaletteLoader
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.visual_similarity_search import VisualSimilarityEngine
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.common.signal_utils import is_valid_qt
 from ui.common.spacing_constants import (
     COMPACT_BUTTON_HEIGHT,
     SPACING_TINY,
@@ -343,7 +344,7 @@ class SpritePreviewWidget(QWidget):
         self.sprite_pixmap = pixmap
 
         # Guarantee the pixmap is displayed
-        self._guarantee_pixmap_display()
+        self._ensure_pixmap_displayed()
 
         # No palette selection for indexed sprites
         if self.palette_combo:
@@ -487,8 +488,8 @@ class SpritePreviewWidget(QWidget):
                 logger.debug(f"  - has alpha: {actual_pixmap.hasAlpha()}")
 
             # Guarantee the pixmap is displayed with validation
-            logger.debug("[DEBUG_SPRITE] Calling _guarantee_pixmap_display_with_validation")
-            self._guarantee_pixmap_display_with_validation()
+            logger.debug("[DEBUG_SPRITE] Calling _ensure_pixmap_displayed with validation")
+            self._ensure_pixmap_displayed(validate=True)
 
             # Force visibility as last resort
             logger.debug("[DEBUG_SPRITE] Calling _force_visibility as last resort")
@@ -601,7 +602,7 @@ class SpritePreviewWidget(QWidget):
                 from core.di_container import inject
                 from core.protocols.manager_protocols import ExtractionManagerProtocol
                 extraction_manager = inject(ExtractionManagerProtocol)
-                extractor = extraction_manager.get_rom_extractor()  # type: ignore[assignment]
+                extractor = extraction_manager.get_rom_extractor()
                 logger.debug(f"[SPRITE_DISPLAY] Got extractor: {bool(extractor)}")
             except Exception as e:
                 logger.warning(f"[SPRITE_DISPLAY] ROM extractor not available: {e}")
@@ -705,7 +706,7 @@ class SpritePreviewWidget(QWidget):
                 self.info_label.setText(info_text)
 
             # Final verification that pixmap was created and set
-            self._verify_pixmap_display()
+            self._ensure_pixmap_displayed()
 
         except (OSError, PermissionError):
             logger.exception("File I/O error loading 4bpp sprite")
@@ -725,38 +726,30 @@ class SpritePreviewWidget(QWidget):
     def clear(self) -> None:
         """Clear the preview and show visible placeholder"""
         logger.debug("[DEBUG] SpritePreviewWidget.clear() called")
-        def _is_valid(widget: object) -> bool:
-            if widget is None:
-                return False
-            try:
-                from shiboken6 import isValid
-                return isValid(widget)
-            except Exception:
-                return True
 
         # Only clear if there's actually content to clear
         # This prevents unnecessary flashing during rapid updates
-        preview_pixmap = self.preview_label.pixmap() if self.preview_label is not None and _is_valid(self.preview_label) else None
+        preview_pixmap = self.preview_label.pixmap() if self.preview_label is not None and is_valid_qt(self.preview_label) else None
         if self.sprite_pixmap is not None or preview_pixmap is not None:
-            if self.preview_label is not None and _is_valid(self.preview_label):
+            if self.preview_label is not None and is_valid_qt(self.preview_label):
                 self.preview_label.clear()
-            if self.preview_label is not None and _is_valid(self.preview_label):
+            if self.preview_label is not None and is_valid_qt(self.preview_label):
                 self.preview_label.setText("No preview available\n\nLoad a ROM and select an offset\nto view sprite data")
             # Reset to minimum size for visibility when empty
-            if self.preview_label is not None and _is_valid(self.preview_label):
+            if self.preview_label is not None and is_valid_qt(self.preview_label):
                 self.preview_label.setMinimumSize(100, 100)  # Space-efficient minimum
 
             # Apply visible empty state style
             self._apply_empty_state_style()
 
-            if self.palette_combo is not None and _is_valid(self.palette_combo):
+            if self.palette_combo is not None and is_valid_qt(self.palette_combo):
                 self.palette_combo.clear()
-            if self.palette_combo is not None and _is_valid(self.palette_combo):
+            if self.palette_combo is not None and is_valid_qt(self.palette_combo):
                 self.palette_combo.setEnabled(False)
             # Reset both info labels to cleared state
-            if self.essential_info_label is not None and _is_valid(self.essential_info_label):
+            if self.essential_info_label is not None and is_valid_qt(self.essential_info_label):
                 self.essential_info_label.setText("No sprite loaded")
-            if self.info_label is not None and _is_valid(self.info_label):
+            if self.info_label is not None and is_valid_qt(self.info_label):
                 self.info_label.setText("No sprite loaded")
             self.sprite_pixmap = None
             self.sprite_data = None
@@ -831,7 +824,7 @@ class SpritePreviewWidget(QWidget):
             self._apply_content_style()
 
             # Guarantee the pixmap is displayed
-            self._guarantee_pixmap_display()
+            self._ensure_pixmap_displayed()
 
             # Update sprite info with dimensions
             width = pixmap.width()
@@ -1186,7 +1179,7 @@ class SpritePreviewWidget(QWidget):
             self.info_label.setVisible(True)
 
         # Ensure it's displayed
-        self._guarantee_pixmap_display()
+        self._ensure_pixmap_displayed()
 
         # Disable palette selection for empty data
         if self.palette_combo:
@@ -1267,7 +1260,7 @@ class SpritePreviewWidget(QWidget):
         self._load_grayscale_sprite(img, sprite_name)
 
         # Then apply Qt-specific update guarantees
-        self._guarantee_pixmap_display()
+        self._ensure_pixmap_displayed()
 
     def _load_grayscale_sprite_with_validation_and_update(
         self, img: Image.Image, sprite_name: str | None = None
@@ -1292,29 +1285,36 @@ class SpritePreviewWidget(QWidget):
             self._load_grayscale_sprite(img, sprite_name)
 
             # Then apply Qt-specific update guarantees with validation
-            self._guarantee_pixmap_display_with_validation()
+            self._ensure_pixmap_displayed(validate=True)
 
         except Exception as e:
             logger.warning(f"[SPRITE_DISPLAY] Error in validation: {e}")
             # Fallback to standard method
             self._load_grayscale_sprite(img, sprite_name)
-            self._guarantee_pixmap_display()
+            self._ensure_pixmap_displayed()
 
-    def _guarantee_pixmap_display(self) -> None:
-        """Guarantee pixmap is displayed using Qt-specific update pattern."""
+    def _ensure_pixmap_displayed(self, validate: bool = False) -> None:
+        """Ensure pixmap is displayed with optional validation logging.
+
+        Consolidates the display guarantee and verification logic into a single method.
+
+        Args:
+            validate: If True, log detailed thread/visibility information for debugging.
+        """
         if self.preview_label is None:
-            logger.warning("[TRACE] Cannot guarantee display - preview_label is None")
+            logger.warning("[SPRITE_DISPLAY] Cannot display - preview_label is None")
             return
 
         pixmap = self.preview_label.pixmap()
-        # QLabel.pixmap() always returns QPixmap, check if it's null
         if pixmap.isNull():
-            logger.warning("[TRACE] Cannot guarantee display - no pixmap set")
+            logger.warning("[SPRITE_DISPLAY] Cannot display - no pixmap set")
             return
 
-        logger.debug(f"[TRACE] Guaranteeing pixmap display: {pixmap.width()}x{pixmap.height()}")
+        logger.debug(f"[SPRITE_DISPLAY] Ensuring pixmap display: {pixmap.width()}x{pixmap.height()}")
 
-        # Multi-stage Qt update pattern for maximum reliability
+        # Optional validation logging for debugging
+        if validate:
+            self._log_display_validation_info(pixmap)
 
         # Stage 0: Ensure widget is shown
         if not self.preview_label.isVisible():
@@ -1323,8 +1323,7 @@ class SpritePreviewWidget(QWidget):
             self.show()
 
         # Stage 1: Immediate widget update
-        if self.preview_label:
-            self.preview_label.update()
+        self.preview_label.update()
 
         # Stage 2: Force repaint if widget is visible
         if self.preview_label.isVisible():
@@ -1336,99 +1335,43 @@ class SpritePreviewWidget(QWidget):
             layout.update()
 
         # Stage 4: Delayed verification update (ensures display)
-        # Note: processEvents() removed to prevent reentrancy bugs;
-        # the timer-based verification handles deferred updates safely
         if self._update_timer is not None:
             self._update_timer.start(1)  # 1ms delayed update verification
 
-        logger.debug("[TRACE] Pixmap display guarantee complete")
+        # Update info label with size
+        if self.essential_info_label is not None:
+            self.essential_info_label.setText(f"{pixmap.width()}x{pixmap.height()} - Loaded")
 
-    def _guarantee_pixmap_display_with_validation(self) -> None:
-        """Guarantee pixmap is displayed with comprehensive validation."""
-        logger.debug("[DEBUG_SPRITE] _guarantee_pixmap_display_with_validation called")
+        logger.debug("[SPRITE_DISPLAY] Pixmap display complete")
 
-        if self.preview_label is None:
-            logger.error("[DEBUG_SPRITE] preview_label is None!")
-            return
+    def _log_display_validation_info(self, pixmap: QPixmap) -> None:
+        """Log detailed validation info for debugging display issues.
 
-        pixmap = self.preview_label.pixmap()
-        # QLabel.pixmap() always returns a QPixmap, check if it's null instead
-        if pixmap.isNull():
-            logger.error("[DEBUG_SPRITE] No pixmap set on preview_label!")
-            logger.error(f"[DEBUG_SPRITE] Label has text instead: '{self.preview_label.text()}'")
-            return
+        Args:
+            pixmap: The pixmap being displayed.
+        """
+        logger.debug(f"[DEBUG_SPRITE] Pixmap: {pixmap.width()}x{pixmap.height()}, visible={self.preview_label.isVisible() if self.preview_label else False}")
 
-        logger.debug(f"[DEBUG_SPRITE] Pixmap validation passed: {pixmap.width()}x{pixmap.height()}, visible={self.preview_label.isVisible()}")
-
-        # Check Qt thread context
+        # Thread context
         app = QApplication.instance()
-        if app:
-            logger.debug(f"[DEBUG_SPRITE] QApplication thread: {app.thread()}")
-            logger.debug(f"[DEBUG_SPRITE] Current thread: {QThread.currentThread()}")
-            logger.debug(f"[DEBUG_SPRITE] Label thread: {self.preview_label.thread()}")
+        if app and self.preview_label is not None:
+            logger.debug(f"[DEBUG_SPRITE] Threads: app={app.thread()}, current={QThread.currentThread()}, label={self.preview_label.thread()}")
+
+        # Widget hierarchy visibility
         parent = self.parent()
         parent_visible = parent.isVisible() if isinstance(parent, QWidget) else 'N/A'
-        logger.debug(f"[SPRITE_DISPLAY] Widget hierarchy visibility: widget={self.isVisible()}, parent={parent_visible}")
+        logger.debug(f"[DEBUG_SPRITE] Visibility: widget={self.isVisible()}, parent={parent_visible}")
 
-        # Apply the standard guarantee method
-        self._guarantee_pixmap_display()
-
-        # Additional validation checks
-        if not self.preview_label.isVisible():
-            logger.warning("[DEBUG_SPRITE] preview_label is not visible!")
-            logger.debug("[DEBUG_SPRITE] Trying to show label...")
-            self.preview_label.show()
-            logger.debug(f"[DEBUG_SPRITE] After show(): visible={self.preview_label.isVisible()}")
-
-        # Verify parent widget visibility chain
-        parent = self.preview_label.parent()
-        parent_chain = []
-        while parent:
-            parent_info = {
-                'class': parent.__class__.__name__,
-                'visible': parent.isVisible() if isinstance(parent, QWidget) else 'N/A',
-                'enabled': parent.isEnabled() if isinstance(parent, QWidget) else 'N/A'
-            }
-            parent_chain.append(parent_info)
-            if isinstance(parent, QWidget) and not parent.isVisible():
-                logger.warning(f"[DEBUG_SPRITE] Parent widget not visible: {parent.__class__.__name__}")
-            parent = parent.parent() if hasattr(parent, 'parent') else None
-
-        if parent_chain:
-            logger.debug(f"[DEBUG_SPRITE] Parent widget chain: {parent_chain}")
-
-    def _verify_pixmap_display(self) -> None:
-        """Final verification that pixmap is properly displayed."""
-        logger.debug("[SPRITE_DISPLAY] _verify_pixmap_display called")
-
-        if self.preview_label is None:
-            logger.error("[SPRITE_DISPLAY] VERIFICATION FAILED: preview_label is None")
-            return
-
-        pixmap = self.preview_label.pixmap()
-        # QLabel.pixmap() always returns a QPixmap, check if it's null
-        if pixmap.isNull():
-            logger.error("[SPRITE_DISPLAY] VERIFICATION FAILED: No valid pixmap")
-            return
-
-        # Check widget visibility
-        if not self.preview_label.isVisible():
-            logger.warning("[SPRITE_DISPLAY] VERIFICATION WARNING: preview_label not visible")
-
-        # Check if widget has proper size
-        widget_size = self.preview_label.size()
-        pixmap_size = pixmap.size()
-
-        logger.debug(f"[SPRITE_DISPLAY] VERIFICATION SUCCESS: pixmap={pixmap_size.width()}x{pixmap_size.height()}, widget={widget_size.width()}x{widget_size.height()}")
-
-        # Force final display update
-        # Note: processEvents() removed to prevent reentrancy bugs;
-        # update() schedules paint event that will be processed by event loop
-        self.preview_label.update()
-
-        # Set essential info to show successful display
-        if self.essential_info_label is not None:
-            self.essential_info_label.setText(f"{pixmap_size.width()}x{pixmap_size.height()} - Loaded")
+        # Parent chain (brief)
+        if self.preview_label is not None:
+            chain_parent = self.preview_label.parent()
+            chain_info = []
+            while chain_parent and len(chain_info) < 5:
+                if isinstance(chain_parent, QWidget):
+                    chain_info.append(f"{chain_parent.__class__.__name__}(vis={chain_parent.isVisible()})")
+                chain_parent = chain_parent.parent() if hasattr(chain_parent, 'parent') else None
+            if chain_info:
+                logger.debug(f"[DEBUG_SPRITE] Parent chain: {' -> '.join(chain_info)}")
 
     def diagnose_display_issue(self) -> str:
         """Diagnose why sprites might not be displaying."""

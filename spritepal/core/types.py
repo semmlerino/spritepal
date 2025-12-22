@@ -150,7 +150,7 @@ class SpritePreset:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "SpritePreset":
+    def from_dict(cls, data: dict[str, object]) -> SpritePreset:
         """Create a SpritePreset from a dictionary."""
         return cls(
             name=str(data.get("name", "")),

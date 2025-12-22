@@ -24,6 +24,7 @@ from core.exceptions import (
 )
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
+from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 from core.services import ROMService, VRAMService
 from utils.constants import (
     SETTINGS_KEY_FAST_COMPRESSION,
@@ -36,8 +37,6 @@ from utils.constants import (
 from utils.file_validator import FileValidator
 
 from .base_manager import BaseManager, with_operation_handling
-
-from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMExtractorProtocol

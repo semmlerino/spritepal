@@ -37,7 +37,6 @@ from .base_manager import BaseManager
 
 # Consolidated managers (NEW - these hold the actual logic)
 from .core_operations_manager import CoreOperationsManager
-from .sprite_preset_manager import SpritePresetManager
 
 # NOTE: ExtractionManager and InjectionManager have been removed.
 # Use CoreOperationsManager via dependency injection:
@@ -52,6 +51,7 @@ from .registry import (
     initialize_managers,
     validate_manager_dependencies,
 )
+from .sprite_preset_manager import SpritePresetManager
 from .workflow_manager import ExtractionState
 
 __all__ = [

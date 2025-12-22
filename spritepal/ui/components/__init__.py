@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QSplitter, QTabWidget, QWidget
 
 # Import all components from subdirectories
-from .base.dialog_selector import DialogBase
+from .base.dialog_base import DialogBase
 from .inputs.file_selector import FileSelector
 from .inputs.form_row import (
     FormRow,

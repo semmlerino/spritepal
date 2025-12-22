@@ -55,3 +55,24 @@ def is_valid_qt(obj: Any) -> bool:  # pyright: ignore[reportExplicitAny] - Qt ob
     except (ImportError, TypeError):
         # Not a Qt object or shiboken6 not available
         return True
+
+
+def is_valid_pixmap(pixmap: object) -> bool:
+    """Check if a QPixmap is valid and not null.
+
+    Args:
+        pixmap: A QPixmap object or None.
+
+    Returns:
+        True if pixmap is not None and not null, False otherwise.
+
+    Example:
+        from ui.common.signal_utils import is_valid_pixmap
+
+        if is_valid_pixmap(self.sprite_pixmap):
+            self.label.setPixmap(self.sprite_pixmap)
+    """
+    if pixmap is None:
+        return False
+    # QPixmap has isNull() method
+    return hasattr(pixmap, "isNull") and not pixmap.isNull()

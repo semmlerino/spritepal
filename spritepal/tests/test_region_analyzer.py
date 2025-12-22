@@ -24,9 +24,6 @@ from core.region_analyzer import (
     RegionAnalysis,
 )
 
-if TYPE_CHECKING:
-    pass
-
 # Test markers
 pytestmark = [
     pytest.mark.headless,
@@ -344,7 +341,7 @@ class TestAnalyzeRegionDecision:
         # The default threshold is 0.1, so we need entropy >= 0.1
         # Two bytes at 95/5 ratio gives entropy ~0.286
         data = b"\x00" * 95 + b"\xFF" * 5
-        result = detector.analyze_region(data, offset=0)
+        _result = detector.analyze_region(data, offset=0)
         # This will likely trigger high zero percentage instead
         # The point is we're testing the decision flow
 
@@ -365,7 +362,7 @@ class TestAnalyzeRegionDecision:
     ) -> None:
         """Exactly 90% zeros (threshold) is not empty (> not >=)."""
         data = b"\x00" * 90 + bytes(range(10))  # Exactly 90%
-        result = detector.analyze_region(data, offset=0)
+        _result = detector.analyze_region(data, offset=0)
         # 90% is not > 90%, so zero threshold shouldn't trigger
         # But might trigger on other criteria
 
@@ -402,7 +399,7 @@ class TestAnalyzeRegionDecision:
     ) -> None:
         """5 unique bytes doesn't trigger unique byte check."""
         data = b"\x00\x01\x02\x03\x04" * 20  # 5 unique bytes
-        result = detector.analyze_region(data, offset=0)
+        _result = detector.analyze_region(data, offset=0)
         # Should not trigger on unique bytes alone
         # May still be empty due to other criteria (pattern detection)
 

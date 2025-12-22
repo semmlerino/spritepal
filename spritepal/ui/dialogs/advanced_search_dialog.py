@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, override
 
+from PIL import Image
 from PySide6.QtCore import QMutex, Qt, QWaitCondition, Signal
 from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
@@ -38,8 +39,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from PIL import Image
 
 from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
 from core.services.preview_generator import PreviewGenerator, PreviewRequest

@@ -751,6 +751,27 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if self._adjacent_offsets_cache:
             self._adjacent_offsets_cache.clear()
 
+    def _block_child_widget_signals(self, block: bool) -> None:
+        """Block or unblock signals on child widgets.
+
+        Args:
+            block: True to block signals, False to unblock
+        """
+        widgets: list[QWidget | None] = [
+            self.browse_tab,
+            self.smart_tab,
+            self.history_tab,
+            self.gallery_tab,
+            self.preview_widget,
+        ]
+        for widget in widgets:
+            if widget is not None and _is_valid_qt(widget):
+                widget.blockSignals(block)
+
+        # Also handle coordinator (not a QWidget but has blockSignals)
+        if isinstance(self._smart_preview_coordinator, SmartPreviewCoordinator):
+            self._smart_preview_coordinator.blockSignals(block)
+
     def cleanup(self):
         """Clean up resources to prevent memory leaks."""
         logger.debug(f"Cleaning up UnifiedManualOffsetDialog {self._debug_id}")
@@ -760,18 +781,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self.blockSignals(True)
 
         # Block signals on child widgets that might emit during cleanup
-        if isinstance(self._smart_preview_coordinator, SmartPreviewCoordinator):
-            self._smart_preview_coordinator.blockSignals(True)
-        if self.browse_tab is not None and _is_valid_qt(self.browse_tab):
-            self.browse_tab.blockSignals(True)
-        if self.smart_tab is not None and _is_valid_qt(self.smart_tab):
-            self.smart_tab.blockSignals(True)
-        if self.history_tab is not None and _is_valid_qt(self.history_tab):
-            self.history_tab.blockSignals(True)
-        if self.gallery_tab is not None and _is_valid_qt(self.gallery_tab):
-            self.gallery_tab.blockSignals(True)
-        if self.preview_widget is not None and _is_valid_qt(self.preview_widget):
-            self.preview_widget.blockSignals(True)
+        self._block_child_widget_signals(True)
 
         # Stop and clean up workers BEFORE disconnecting signals
         # Workers are now blocked from emitting to this dialog

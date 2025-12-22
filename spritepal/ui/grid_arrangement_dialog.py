@@ -53,10 +53,10 @@ from .row_arrangement.grid_arrangement_manager import (
 from .row_arrangement.grid_image_processor import GridImageProcessor
 from .row_arrangement.grid_preview_generator import GridPreviewGenerator
 from .row_arrangement.undo_redo import (
+    AddColumnTilesCommand,
     AddGroupCommand,
     AddMultipleTilesCommand,
     AddRowTilesCommand,
-    AddColumnTilesCommand,
     ClearGridCommand,
     RemoveMultipleTilesCommand,
     UndoRedoStack,

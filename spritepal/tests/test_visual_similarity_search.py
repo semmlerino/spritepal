@@ -27,9 +27,6 @@ from core.visual_similarity_search import (
     VisualSimilarityEngine,
 )
 
-if TYPE_CHECKING:
-    pass
-
 # Test markers
 pytestmark = [
     pytest.mark.headless,

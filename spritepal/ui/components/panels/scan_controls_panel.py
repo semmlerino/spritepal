@@ -147,7 +147,7 @@ class ScanControlsPanel(QWidget):
             self.rom_path = rom_path
             self.rom_size = rom_size
             self.extraction_manager = extraction_manager
-            self.rom_extractor = cast(ROMExtractorProtocol, extraction_manager.get_rom_extractor())
+            self.rom_extractor = extraction_manager.get_rom_extractor()
 
         # Check for cached partial scan results
         self._check_for_cached_scans()

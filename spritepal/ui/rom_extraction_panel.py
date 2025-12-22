@@ -91,7 +91,7 @@ class ROMExtractionPanel(QWidget):
         self.sprite_locations: dict[str, Mapping[str, object]] = {}
         # Use injected extraction manager
         self.extraction_manager = extraction_manager
-        self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()  # type: ignore[assignment]
+        self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()
         self.rom_size = 0  # Track ROM size for slider limits
         self._manual_offset_mode = False  # Default to preset mode (sprite picker visible)
         self._current_header: ROMHeader | None = None  # Stored header for preset matching

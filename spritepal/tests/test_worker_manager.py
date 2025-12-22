@@ -16,8 +16,8 @@ import pytest
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtTest import QSignalSpy
 
-from ui.common import WorkerManager
 from tests.fixtures.timeouts import SHORT, signal_timeout
+from ui.common import WorkerManager
 from ui.common.timing_constants import (
     # Test characteristics: Real GUI components requiring display, Thread safety concerns
     SLEEP_MEDIUM,

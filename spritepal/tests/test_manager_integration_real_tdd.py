@@ -29,13 +29,13 @@ import pytest
 from PIL import Image
 
 from core.exceptions import ValidationError
+from tests.fixtures.timeouts import LONG, signal_timeout, worker_timeout
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
 )
-from tests.fixtures.timeouts import LONG, signal_timeout, worker_timeout
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
     manager_context,

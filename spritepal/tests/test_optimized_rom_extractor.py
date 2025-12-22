@@ -383,7 +383,7 @@ class TestOptimizedROMExtractorInit:
     def test_init_with_rom_cache(self, mock_rom_cache: Mock) -> None:
         """Initializer accepts ROMCacheProtocol and stores it."""
         with patch("core.optimized_rom_extractor.ROMExtractor.__init__"):
-            ext = OptimizedROMExtractor(rom_cache=mock_rom_cache)
+            _ext = OptimizedROMExtractor(rom_cache=mock_rom_cache)
             # Verify super().__init__ was called with the cache
             # (extractor stores it via parent class)
 

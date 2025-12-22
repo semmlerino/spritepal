@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QLayout,
-    QMessageBox,
     QPushButton,
     QSplitter,
     QStatusBar,
@@ -283,46 +282,4 @@ class DialogBase(QDialog):
             return self._tab_widget.currentIndex()
         return -1
 
-    def show_error(self, title: str, message: str) -> None:
-        """
-        Show an error message dialog.
 
-        Args:
-            title: Error dialog title
-            message: Error message to display
-        """
-        QMessageBox.critical(self, title, message)
-
-    def show_info(self, title: str, message: str) -> None:
-        """
-        Show an information message dialog.
-
-        Args:
-            title: Info dialog title
-            message: Info message to display
-        """
-        QMessageBox.information(self, title, message)
-
-    def show_warning(self, title: str, message: str) -> None:
-        """
-        Show a warning message dialog.
-
-        Args:
-            title: Warning dialog title
-            message: Warning message to display
-        """
-        QMessageBox.warning(self, title, message)
-
-    def confirm_action(self, title: str, message: str) -> bool:
-        """
-        Show a confirmation dialog.
-
-        Args:
-            title: Confirmation dialog title
-            message: Confirmation message
-
-        Returns:
-            True if user confirmed, False otherwise
-        """
-        reply = QMessageBox.question(self, title, message)
-        return reply == QMessageBox.StandardButton.Yes
