@@ -31,7 +31,6 @@ from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
     SETTINGS_KEY_LAST_INPUT_VRAM,
     SETTINGS_KEY_LAST_SPRITE_LOCATION,
-    SETTINGS_KEY_VRAM_PATH,
     SETTINGS_NS_ROM_INJECTION,
 )
 from utils.file_validator import FileValidator
@@ -852,15 +851,14 @@ class CoreOperationsManager(BaseManager):
         strip_editor_suffixes: bool = False,
     ) -> str:
         """
-        Unified internal method for finding VRAM path with all strategies.
+        Find VRAM path using multiple strategies in priority order.
 
-        Tries multiple sources in priority order:
-        1. Pre-suggested path (if exists)
-        2. Session manager current vram_path
+        Strategies (in order):
+        1. Pre-suggested path
+        2. Session manager vram_path
         3. Metadata file (source_vram or extraction.vram_source)
         4. Basename pattern matching
-        5. Session settings
-        6. Last injection settings
+        5. Last injection settings
 
         Args:
             sprite_path: Path to sprite file
@@ -872,11 +870,11 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested VRAM path or empty string if none found
         """
-        # Strategy 0: Pre-suggested path
+        # Strategy 1: Pre-suggested path
         if result := self._validate_vram_path(pre_suggested):
             return result
 
-        # Strategy 1: Session manager current vram_path
+        # Strategy 2: Session manager vram_path
         try:
             session_manager = self._get_session_manager()
             if result := self._validate_vram_path(
@@ -886,7 +884,7 @@ class CoreOperationsManager(BaseManager):
         except (OSError, ValueError, TypeError):
             pass
 
-        # Strategy 2a: Load metadata from file if path provided
+        # Strategy 3: Metadata file
         loaded_metadata = metadata
         if not loaded_metadata and metadata_path and Path(metadata_path).exists():
             try:
@@ -895,7 +893,6 @@ class CoreOperationsManager(BaseManager):
             except (OSError, ValueError, json.JSONDecodeError):
                 pass
 
-        # Strategy 2b: Check metadata for VRAM source
         if loaded_metadata:
             # Check top-level source_vram (absolute path)
             if result := self._validate_vram_path(cast(str, loaded_metadata.get("source_vram", ""))):
@@ -909,20 +906,18 @@ class CoreOperationsManager(BaseManager):
                     if result := self._validate_vram_path(str(sprite_dir / vram_source)):
                         return result
 
-        # Strategy 3: Basename pattern matching
+        # Strategy 4: Basename pattern matching
         if sprite_path:
             sprite_path_obj = Path(sprite_path)
             sprite_dir = sprite_path_obj.parent
             base_name = sprite_path_obj.stem
 
-            # Strip editor suffixes if requested
             if strip_editor_suffixes:
                 for suffix in ["_sprites_editor", "_sprites", "_editor", "Edited"]:
                     if base_name.endswith(suffix):
                         base_name = base_name[: -len(suffix)]
                         break
 
-            # Combined patterns from both methods (order by specificity)
             vram_patterns = [
                 f"{base_name}.dmp",
                 f"{base_name}_VRAM.dmp",
@@ -937,22 +932,6 @@ class CoreOperationsManager(BaseManager):
             for pattern in vram_patterns:
                 if result := self._validate_vram_path(str(sprite_dir / pattern)):
                     return result
-
-        # Strategy 4: Session settings
-        try:
-            session_manager = self._get_session_manager()
-            # Try get_setting variant
-            if result := self._validate_vram_path(
-                cast(str, session_manager.get_setting("session", "vram_path", ""))
-            ):
-                return result
-            # Try session_data variant
-            session_data = session_manager.get_session_data()
-            if SETTINGS_KEY_VRAM_PATH in session_data:
-                if result := self._validate_vram_path(cast(str, session_data[SETTINGS_KEY_VRAM_PATH])):
-                    return result
-        except (OSError, ValueError, TypeError):
-            pass
 
         # Strategy 5: Last injection settings
         try:
