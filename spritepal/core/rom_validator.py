@@ -13,6 +13,7 @@ from utils.constants import (
     ROM_CHECKSUM_PAL_EUROPE,
     ROM_CHECKSUM_PAL_JAPAN,
     ROM_CHECKSUM_PAL_USA,
+    ROM_HEADER_OFFSET_EXHIROM,
     ROM_HEADER_OFFSET_HIROM,
     ROM_HEADER_OFFSET_LOROM,
     ROM_SIZE_1_5MB,
@@ -23,6 +24,8 @@ from utils.constants import (
     ROM_SIZE_4MB,
     ROM_SIZE_6MB,
     ROM_SIZE_512KB,
+    ROM_TYPE_SA1_MAX,
+    ROM_TYPE_SA1_MIN,
 )
 from utils.logging_config import get_logger
 from utils.rom_exceptions import (
@@ -127,8 +130,33 @@ class ROMValidator:
             file_size = rom_path_obj.stat().st_size
             smc_header_offset = 512 if file_size % 1024 == 512 else 0
 
-            # Try both possible header locations
-            for base_offset in [ROM_HEADER_OFFSET_LOROM, ROM_HEADER_OFFSET_HIROM]:
+            # Validate SMC header content if detected by size
+            if smc_header_offset == 512:
+                f.seek(0)
+                smc_header = f.read(512)
+                if not cls._validate_smc_header_content(smc_header, file_size):
+                    logger.warning(
+                        "SMC header detected by size but content validation failed. "
+                        "This may be a non-standard header format or a headerless ROM "
+                        "with unusual size. Proceeding with header detection."
+                    )
+
+            # Try all possible header locations: LoROM, HiROM, ExHiROM
+            # ExHiROM is needed for large (>4MB) games like Tales of Phantasia
+            header_offsets = [
+                (ROM_HEADER_OFFSET_LOROM, "LoROM"),
+                (ROM_HEADER_OFFSET_HIROM, "HiROM"),
+            ]
+
+            # Only check ExHiROM if ROM is large enough (>4MB after SMC header)
+            if file_size - smc_header_offset > 0x400000:
+                header_offsets.append((ROM_HEADER_OFFSET_EXHIROM, "ExHiROM"))
+
+            for base_offset, mapping_type in header_offsets:
+                # Skip if offset would exceed file size
+                if smc_header_offset + base_offset + 32 > file_size:
+                    continue
+
                 f.seek(smc_header_offset + base_offset)
                 header_data = f.read(32)
 
@@ -148,6 +176,9 @@ class ROMValidator:
 
                 # Verify checksum format
                 if (checksum ^ checksum_complement) == ROM_CHECKSUM_COMPLEMENT_MASK:
+                    # Detect SA-1 chip (used by Kirby Super Star, Super Mario RPG, etc.)
+                    has_sa1 = ROM_TYPE_SA1_MIN <= rom_type <= ROM_TYPE_SA1_MAX
+
                     header = ROMHeader(
                         title=title,
                         rom_type=rom_type,
@@ -162,12 +193,60 @@ class ROMValidator:
                         version=version,
                     )
 
+                    chip_info = " [SA-1]" if has_sa1 else ""
                     logger.info(
-                        f"Found valid ROM header: {title} (checksum: 0x{checksum:04X})"
+                        f"Found valid {mapping_type} ROM header: {title}{chip_info} "
+                        f"(checksum: 0x{checksum:04X}, type: 0x{rom_type:02X})"
                     )
                     return header, smc_header_offset
 
         raise ROMHeaderError("Could not find valid SNES ROM header")
+
+    @classmethod
+    def _validate_smc_header_content(cls, smc_header: bytes, file_size: int) -> bool:
+        """
+        Validate SMC header content beyond just size detection.
+
+        SMC headers typically have these characteristics:
+        - Bytes 0-1: File size / 8KB (little-endian)
+        - Byte 2: Flags (usually 0x00 or specific values)
+        - Bytes 3-511: Usually zeros or metadata
+
+        Args:
+            smc_header: The 512-byte SMC header
+            file_size: Total file size including header
+
+        Returns:
+            True if header content looks valid, False otherwise
+        """
+        if len(smc_header) != 512:
+            return False
+
+        # Check if bytes 8-511 are mostly zeros (common in SMC headers)
+        # Allow some non-zero bytes for metadata
+        non_zero_count = sum(1 for b in smc_header[8:] if b != 0)
+        if non_zero_count > 64:  # More than 64 non-zero bytes is suspicious
+            logger.debug(
+                f"SMC header has {non_zero_count} non-zero bytes after offset 8, "
+                "which is unusual for a standard SMC header"
+            )
+            return False
+
+        # Check if size field is plausible (bytes 0-1 = size / 8KB)
+        # This is a heuristic - not all SMC headers follow this exactly
+        expected_rom_size = file_size - 512
+        size_field = smc_header[0] | (smc_header[1] << 8)
+        expected_size_field = expected_rom_size // 8192  # 8KB units
+
+        # Allow some tolerance (size field may not be exact)
+        if size_field > 0 and abs(size_field - expected_size_field) > 16:
+            logger.debug(
+                f"SMC size field ({size_field}) doesn't match expected "
+                f"({expected_size_field}) for ROM size {expected_rom_size}"
+            )
+            # Don't fail on this alone - it's just informational
+
+        return True
 
     @classmethod
     def calculate_checksum(

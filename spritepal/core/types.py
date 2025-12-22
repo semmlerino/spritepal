@@ -21,12 +21,6 @@ from PySide6.QtWidgets import QWidget
 # External library types for better type checking
 # Use concrete PIL Image type to avoid forward reference issues
 PILImage: TypeAlias = Image.Image
-ImageMode: TypeAlias = str  # "RGB", "RGBA", "L", "P"
-ImageSize: TypeAlias = tuple[int, int]
-
-# Complex data structures for sprite manipulation
-TileMatrix: TypeAlias = list[list[list[int]]]
-SpriteData: TypeAlias = tuple[TileMatrix, int]
 SimilarityScore: TypeAlias = float
 # Core sprite and ROM data types (defined early to avoid forward references)
 SpriteOffset: TypeAlias = int
@@ -108,13 +102,6 @@ ConfigDict: TypeAlias = dict[str, object]
 SettingsValue: TypeAlias = object
 ValidationResult: TypeAlias = tuple[bool, str | None]
 
-# Signal types for Qt
-StringSignal: TypeAlias = str
-IntSignal: TypeAlias = int
-BoolSignal: TypeAlias = bool
-ListSignal: TypeAlias = list[object]
-DictSignal: TypeAlias = dict[str, object]
-
 # Manager operation types
 OperationName: TypeAlias = str
 OperationResult: TypeAlias = bool
@@ -188,20 +175,14 @@ class SpritePreset:
 
 # Re-export for backward compatibility
 __all__ = [
-    "BoolSignal",
     "CacheData",
     "CacheKey",
     "CachePath",
     "CacheStats",
     "ConfigDict",
     "DialogResult",
-    "DictSignal",
     "ErrorCallback",
     "FilePath",
-    "ImageMode",
-    "ImageSize",
-    "IntSignal",
-    "ListSignal",
     "NavigationHint",
     "OperationName",
     "OperationProgress",
@@ -221,15 +202,12 @@ __all__ = [
     "SettingsValue",
     "SimilarityResult",
     "SimilarityScore",
-    "SpriteData",
     "SpriteInfo",
     "SpriteLocation",
     "SpriteOffset",
     "SpritePreset",
-    "StringSignal",
     "TileCount",
     "TileData",
-    "TileMatrix",
     "VRAMExtractionParams",
     "ValidationResult",
     "WidgetParent",

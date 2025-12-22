@@ -1,16 +1,14 @@
 """
-Lightweight state entry and snapshot classes for state management.
+Lightweight state entry class for state management.
 
 This module provides reusable building blocks for state management:
 - StateEntry: Wrapper for values with metadata (TTL, access tracking)
-- StateSnapshot: Immutable state snapshots for save/restore
 """
 from __future__ import annotations
 
 import pickle
 import sys
 import time
-import uuid
 from typing import Any
 
 
@@ -58,38 +56,3 @@ class StateEntry:
         """Update access time and increment counter."""
         self.accessed_at = time.time()
         self.access_count += 1
-
-
-class StateSnapshot:
-    """
-    Immutable snapshot of state at a point in time.
-
-    Used for save/restore points and undo functionality.
-    """
-
-    def __init__(self, states: dict[str, Any], namespace: str | None = None) -> None:  # pyright: ignore[reportExplicitAny] - State dictionary
-        """
-        Create a state snapshot.
-
-        Args:
-            states: Dictionary of state values
-            namespace: Optional namespace that was captured
-        """
-        self.id = str(uuid.uuid4())
-        self.timestamp = time.time()
-        self.namespace = namespace
-        # Deep copy the states to ensure immutability
-        try:
-            self.states = pickle.loads(pickle.dumps(states))
-        except (TypeError, pickle.PicklingError):
-            # Fall back to shallow copy for unpickleable objects
-            self.states = states.copy()
-
-    def get_age_seconds(self) -> float:
-        """
-        Get the age of this snapshot in seconds.
-
-        Returns:
-            Age in seconds
-        """
-        return time.time() - self.timestamp

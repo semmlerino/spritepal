@@ -216,6 +216,23 @@ class ROMInjector(SpriteInjector):
             # Falls back to conservative heuristic if parsing fails
             compressed_size = self._parse_hal_compressed_size(bytes(rom_data), offset)
 
+            # Validate compression ratio is reasonable (HAL typically achieves 30-70%)
+            # This helps detect parser errors like incorrect terminator detection
+            if original_size > 0:
+                compression_ratio = compressed_size / original_size
+                if compression_ratio < 0.05:
+                    logger.warning(
+                        f"Unusually low compression ratio ({compression_ratio:.2%}): "
+                        f"compressed={compressed_size}, decompressed={original_size}. "
+                        f"Parser may have found terminator too early."
+                    )
+                elif compression_ratio > 2.0:
+                    logger.warning(
+                        f"Compression ratio > 200% ({compression_ratio:.2%}): "
+                        f"compressed={compressed_size}, decompressed={original_size}. "
+                        f"Parser may have overestimated compressed size."
+                    )
+
             logger.debug(
                 f"Decompressed {original_size} bytes (truncated to {len(decompressed)} bytes), "
                 f"estimated compressed size: {compressed_size} bytes"
@@ -450,15 +467,23 @@ class ROMInjector(SpriteInjector):
         """
         Conservative fallback: require longer padding runs to reduce false positives.
 
-        Uses 32-byte runs of 0x00/0xFF instead of 16, reducing the chance that
-        legitimate compressed data containing these patterns triggers early termination.
+        Uses 64-byte runs of 0x00/0xFF to reduce the chance that legitimate
+        compressed data containing white sprite regions (0xFF) or empty areas (0x00)
+        triggers early termination.
+
+        This is a fallback when HAL parsing fails - results should be treated
+        as approximate and validated against actual decompression output.
         """
-        logger.debug(f"Using conservative size estimation at offset 0x{offset:X}")
+        logger.warning(
+            f"Using conservative size estimation at offset 0x{offset:X} - "
+            "HAL parsing failed, result may be inaccurate"
+        )
         max_size = min(0x10000, len(rom_data) - offset)  # Max 64KB
 
-        # Require 32 consecutive bytes of padding (vs 16 in old heuristic)
-        padding_threshold = 32
-        for i in range(32, max_size, 2):
+        # Require 64 consecutive bytes of padding to avoid truncating
+        # valid sprite data that contains white regions (0xFF) or empty areas
+        padding_threshold = 64
+        for i in range(64, max_size, 2):
             if rom_data[offset + i : offset + i + padding_threshold] == b"\xff" * padding_threshold:
                 logger.debug(f"Found 0xFF padding at offset+{i}")
                 return i
@@ -466,9 +491,9 @@ class ROMInjector(SpriteInjector):
                 logger.debug(f"Found 0x00 padding at offset+{i}")
                 return i
 
-        # Default estimate
-        logger.debug("Using default compressed size estimate: 4KB")
-        return 0x1000  # 4KB default
+        # Default estimate - use 8KB instead of 4KB to be more conservative
+        logger.debug("Using default compressed size estimate: 8KB")
+        return 0x2000  # 8KB default (was 4KB)
 
     def inject_sprite_to_rom(
         self,

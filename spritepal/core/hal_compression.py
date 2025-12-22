@@ -1157,7 +1157,17 @@ class HALCompressor:
             cmd = [self.exhal_path, rom_path, f"0x{offset:X}", output_path]
             logger.debug(f"Running command: {' '.join(cmd)}")
 
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            try:
+                result = subprocess.run(
+                    cmd, check=False, capture_output=True, text=True, timeout=30
+                )
+            except subprocess.TimeoutExpired:
+                logger.error(f"Decompression timed out at offset 0x{offset:X}")
+                raise HALCompressionError(
+                    f"Decompression timed out at offset 0x{offset:X} - "
+                    "data may be malformed or not HAL-compressed"
+                )
+
             logger.debug(f"Command completed with return code: {result.returncode}")
 
             if result.stdout:
@@ -1171,6 +1181,15 @@ class HALCompressor:
 
             # Read decompressed data
             data = Path(output_path).read_bytes()
+
+            # Validate decompressed size (HAL max is 64KB)
+            if len(data) > 65536:
+                logger.error(
+                    f"Decompression produced {len(data)} bytes, exceeds 64KB HAL limit"
+                )
+                raise HALCompressionError(
+                    f"Decompression bomb detected: {len(data)} bytes exceeds 64KB limit"
+                )
 
             logger.info(f"Successfully decompressed {len(data)} bytes from ROM offset 0x{offset:X}")
             return data

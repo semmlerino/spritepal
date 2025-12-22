@@ -97,7 +97,26 @@ class DIContainer:
                     logger.error(f"Factory for {interface.__name__} failed: {e}")
                     raise
 
-            raise ValueError(f"No registration for {interface.__name__}")
+            # Provide helpful error message with common fixes
+            protocol_name = interface.__name__
+            hints = []
+
+            # Check for common missing registrations
+            if "Manager" in protocol_name or "Protocol" in protocol_name:
+                hints.append("Ensure initialize_managers() was called before this code runs")
+            if "Dialog" in protocol_name or "Factory" in protocol_name:
+                hints.append("Ensure register_ui_factories() was called after initialize_managers()")
+            if "Application" in protocol_name or "State" in protocol_name:
+                hints.append("ApplicationStateManager must be created first in the init sequence")
+
+            hint_text = ""
+            if hints:
+                hint_text = "\n  Possible fixes:\n  - " + "\n  - ".join(hints)
+
+            raise ValueError(
+                f"No registration for {protocol_name}.{hint_text}\n"
+                f"  See docs/initialization_flow.md for the correct initialization order."
+            )
 
     def get_optional(self, interface: type[T]) -> T | None:
         """

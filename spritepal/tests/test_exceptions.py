@@ -7,15 +7,12 @@ from __future__ import annotations
 import pytest
 
 from core.exceptions import (
-    CGRAMError,
     ExtractionError,
     FileFormatError,
     InjectionError,
-    OAMError,
     SpritePalError,
     TileError,
     ValidationError,
-    VRAMError,
 )
 
 pytestmark = [
@@ -37,9 +34,6 @@ class TestExceptions:
     def test_exception_inheritance_chain(self):
         """Test that all custom exceptions inherit from SpritePalError."""
         exceptions = [
-            VRAMError("test"),
-            CGRAMError("test"),
-            OAMError("test"),
             ExtractionError("test"),
             InjectionError("test"),
             ValidationError("test"),

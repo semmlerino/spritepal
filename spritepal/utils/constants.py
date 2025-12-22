@@ -220,9 +220,15 @@ def get_sprite_search_areas(rom_size: int) -> list[tuple[int, int]]:
     return [(start, min(end, rom_size)) for start, end in areas if start < rom_size]
 
 # ROM header offsets
-ROM_HEADER_OFFSET_LOROM = 0x7FC0   # LoROM header offset
-ROM_HEADER_OFFSET_HIROM = 0xFFC0   # HiROM header offset
+ROM_HEADER_OFFSET_LOROM = 0x7FC0     # LoROM header offset
+ROM_HEADER_OFFSET_HIROM = 0xFFC0     # HiROM header offset
+ROM_HEADER_OFFSET_EXHIROM = 0x40FFC0  # ExHiROM header offset (extended HiROM)
 ROM_CHECKSUM_COMPLEMENT_MASK = 0xFFFF  # Checksum complement verification mask
+
+# ROM type values indicating special chips (byte at header offset +0x15)
+# SA-1 chip games: Kirby Super Star, Super Mario RPG, etc.
+ROM_TYPE_SA1_MIN = 0x34  # SA-1 chip type range start
+ROM_TYPE_SA1_MAX = 0x36  # SA-1 chip type range end
 
 
 def is_snes_address(address: int) -> bool:
@@ -329,7 +335,6 @@ ROM_SIZE_6MB = 0x600000    # 6MB (48 Mbit)
 ROM_CHECKSUM_PAL_USA = 0x8A5C
 ROM_CHECKSUM_PAL_JAPAN = 0x7F4C
 ROM_CHECKSUM_PAL_EUROPE = 0x8B5C
-# NOTE: Do not add placeholder/stub checksums - they can cause ROM misidentification
 
 # Sprite quality thresholds
 MAX_SPRITE_COUNT_HEADER = 50       # Maximum sprites in header region
@@ -368,8 +373,6 @@ MAX_SPRITE_SIZE = 0x10000          # Maximum sprite size (64KB, 2048 tiles)
 DEFAULT_SCAN_STEP = ROM_SCAN_STEP_DEFAULT  # Default scan step for sprite finding
 
 # Miscellaneous
-FILE_READ_HEADER_SIZE = 16         # Bytes to read for file header validation
-TILE_VALIDITY_THRESHOLD = 10       # Minimum valid tiles for sprite detection
 BYTE_FREQUENCY_SAMPLE_SIZE = 256   # Sample size for byte frequency analysis
 MAX_TILE_COUNT_DEFAULT = 8192      # Default maximum tile count validation
 

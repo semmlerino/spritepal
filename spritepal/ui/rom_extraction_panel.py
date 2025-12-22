@@ -889,39 +889,6 @@ class ROMExtractionPanel(QWidget):
         # Show/hide manual offset button
         self.manual_offset_button.setVisible(expanded)
 
-    def _find_next_sprite(self):
-        """Find next valid sprite offset - now handled by dialog"""
-        # Open dialog if not already open
-        if self._offset_dialog_manager.is_open():
-            # Dialog will handle the search
-            pass
-        else:
-            self._open_manual_offset_dialog()
-
-    def _find_prev_sprite(self):
-        """Find previous valid sprite offset - now handled by dialog"""
-        # Open dialog if not already open
-        if self._offset_dialog_manager.is_open():
-            # Dialog will handle the search
-            pass
-        else:
-            self._open_manual_offset_dialog()
-
-    def _on_search_sprite_found(self, offset: int, quality: float):
-        """Handle sprite found during search"""
-        self._manual_offset = offset
-        logger.debug(f"Found sprite at 0x{offset:06X} (quality: {quality:.2f})")
-        # Update dialog if open
-        current_dialog = self._offset_dialog_manager.get_current_dialog()
-        if current_dialog is not None:
-            current_dialog.set_offset(offset)
-            current_dialog.add_found_sprite(offset, quality)
-
-    def _on_search_complete(self, found: bool):
-        """Handle search completion"""
-        if not found:
-            logger.debug("No valid sprites found in search range")
-
     def _on_state_changed(self, old_state: ExtractionState, new_state: ExtractionState):
         """Handle state changes to update UI accordingly"""
         # Update UI elements based on state

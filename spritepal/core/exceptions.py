@@ -49,29 +49,8 @@ class CacheError(ManagerError):
         self.cache_path = cache_path
 
 
-class CacheCorruptionError(CacheError):
-    """Exception raised when cache database is corrupted."""
-
-
-class CachePermissionError(CacheError):
-    """Exception raised when cache access is denied due to permissions."""
-
-
 class NavigationError(ManagerError):
     """Exception raised during navigation operations."""
-
-
-# VRAM/Memory-related exceptions
-class VRAMError(SpritePalError):
-    """Raised for VRAM-related errors."""
-
-
-class CGRAMError(SpritePalError):
-    """Raised for CGRAM/palette-related errors."""
-
-
-class OAMError(SpritePalError):
-    """Raised for OAM-related errors."""
 
 
 # File and format exceptions
