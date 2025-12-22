@@ -194,4 +194,21 @@ __all__ = [
     "create_mock_file_dialogs",
     "create_mock_main_window",
     "create_mock_qimage",
+    # Test data fixtures (from test_data_fixtures.py)
+    "ROM_SIZES",
+    "test_rom_data_factory",
+    "test_rom_file",
+    "test_vram_file",
+    "simple_test_rom_file",
+    "simple_test_rom_data",
 ]
+
+# Re-export test data fixtures for convenience
+from tests.fixtures.test_data_fixtures import (
+    ROM_SIZES,
+    simple_test_rom_data,
+    simple_test_rom_file,
+    test_rom_data_factory,
+    test_rom_file,
+    test_vram_file,
+)
