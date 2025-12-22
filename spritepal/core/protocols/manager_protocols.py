@@ -553,104 +553,21 @@ class ConfigurationServiceProtocol(Protocol):
 # ========== Application State Manager Protocols (A.4) ==========
 
 
-class ApplicationStateManagerProtocol(Protocol):
-    """Protocol for the consolidated application state manager.
+# ========== Focused Protocols (A.4.1) ==========
+# These protocols provide fine-grained interfaces for specific concerns.
+# ApplicationStateManagerProtocol composes all of them for backward compatibility.
 
-    This protocol defines the full interface for ApplicationStateManager,
-    including settings, runtime state, workflow, session management, and cache statistics.
 
-    Note: This protocol consolidates SessionManagerProtocol functionality.
+class WorkflowStateProtocol(Protocol):
+    """Protocol for workflow state management.
+
+    Controls the extraction workflow state machine, tracking whether operations
+    are in progress and what transitions are valid.
     """
 
-    # Signals (accessed via attributes)
-    # State signals
-    state_changed: Signal  # Signal(str, dict) - category, data
+    # Signal
     workflow_state_changed: Signal  # Signal(object, object) - old_state, new_state
-    application_state_snapshot: Signal  # Signal(dict) - full state for debugging
 
-    # Session signals
-    session_changed: Signal  # Signal() - session data modified
-    files_updated: Signal  # Signal(dict) - file paths changed
-    settings_saved: Signal  # Signal() - settings persisted to disk
-    session_restored: Signal  # Signal(dict) - session loaded from disk
-
-    # History signals
-    history_updated: Signal  # Signal(list) - list of sprite offsets
-    sprite_added: Signal  # Signal(int, float) - offset, quality_score
-
-    # Cache signals
-    cache_stats_updated: Signal  # Signal(dict) - updated cache metrics
-
-    # UI coordination signals
-    current_offset_changed: Signal  # Signal(int) - ROM offset changed
-    preview_ready: Signal  # Signal(int, QImage) - offset, preview_image
-
-    # ========== Settings management ==========
-    def get_setting(self, category: str, key: str, default: object = None) -> object:
-        """Get a persistent setting value."""
-        ...
-
-    def set_setting(self, category: str, key: str, value: object) -> None:
-        """Set a persistent setting value."""
-        ...
-
-    def save_settings(self) -> bool:
-        """Save settings to disk."""
-        ...
-
-    # ========== Session management (from SessionManagerProtocol) ==========
-    def save_session(self, path: Path | None = None) -> bool:
-        """Save current session state."""
-        ...
-
-    def load_session(self, path: Path) -> bool:
-        """Load session state from file."""
-        ...
-
-    def get_session_data(self) -> Mapping[str, object]:
-        """Get current session data."""
-        ...
-
-    def clear_session(self) -> None:
-        """Clear current session data."""
-        ...
-
-    def update_session_data(self, data: Mapping[str, object]) -> None:
-        """Update multiple session values at once."""
-        ...
-
-    def get(self, category: str, key: str, default: object = None) -> object:
-        """Get a setting value by category and key."""
-        ...
-
-    def set(self, category: str, key: str, value: object) -> None:
-        """Set a setting value by category and key."""
-        ...
-
-    def get_window_geometry(self) -> Mapping[str, int | list[int]]:
-        """Get saved window geometry including splitter sizes."""
-        ...
-
-    def update_window_state(self, geometry: Mapping[str, int | float | list[int]]) -> None:
-        """Update window geometry in settings including splitter sizes."""
-        ...
-
-    # Runtime state management
-    def get_state(self, namespace: str, key: str, default: object = None) -> object:
-        """Get runtime state value (not persisted)."""
-        ...
-
-    def set_state(
-        self, namespace: str, key: str, value: object, ttl_seconds: float | None = None
-    ) -> None:
-        """Set runtime state value."""
-        ...
-
-    def clear_state(self, namespace: str | None = None) -> None:
-        """Clear runtime state."""
-        ...
-
-    # Workflow state
     @property
     def workflow_state(self) -> object:
         """Get current workflow state (ExtractionState)."""
@@ -672,7 +589,89 @@ class ApplicationStateManagerProtocol(Protocol):
         """Attempt to transition to a new workflow state."""
         ...
 
-    # Cache statistics
+
+class SessionPersistenceProtocol(Protocol):
+    """Protocol for session persistence operations.
+
+    Handles saving and loading session state (current files, offsets, etc.)
+    to enable resuming work across application restarts.
+    """
+
+    # Signals
+    session_changed: Signal  # Signal() - session data modified
+    files_updated: Signal  # Signal(dict) - file paths changed
+    session_restored: Signal  # Signal(dict) - session loaded from disk
+
+    def save_session(self, path: Path | None = None) -> bool:
+        """Save current session state."""
+        ...
+
+    def load_session(self, path: Path) -> bool:
+        """Load session state from file."""
+        ...
+
+    def get_session_data(self) -> Mapping[str, object]:
+        """Get current session data."""
+        ...
+
+    def clear_session(self) -> None:
+        """Clear current session data."""
+        ...
+
+    def update_session_data(self, data: Mapping[str, object]) -> None:
+        """Update multiple session values at once."""
+        ...
+
+
+class SettingsAccessProtocol(Protocol):
+    """Protocol for settings access (get/set operations).
+
+    Provides access to persistent user settings including window geometry,
+    application preferences, and other configuration values.
+    """
+
+    # Signal
+    settings_saved: Signal  # Signal() - settings persisted to disk
+
+    def get_setting(self, category: str, key: str, default: object = None) -> object:
+        """Get a persistent setting value."""
+        ...
+
+    def set_setting(self, category: str, key: str, value: object) -> None:
+        """Set a persistent setting value."""
+        ...
+
+    def save_settings(self) -> bool:
+        """Save settings to disk."""
+        ...
+
+    def get(self, category: str, key: str, default: object = None) -> object:
+        """Get a setting value by category and key."""
+        ...
+
+    def set(self, category: str, key: str, value: object) -> None:
+        """Set a setting value by category and key."""
+        ...
+
+    def get_window_geometry(self) -> Mapping[str, int | list[int]]:
+        """Get saved window geometry including splitter sizes."""
+        ...
+
+    def update_window_state(self, geometry: Mapping[str, int | float | list[int]]) -> None:
+        """Update window geometry in settings including splitter sizes."""
+        ...
+
+
+class CacheStatsProtocol(Protocol):
+    """Protocol for cache session statistics.
+
+    Tracks cache hit/miss rates during the current session for
+    performance monitoring and optimization.
+    """
+
+    # Signal
+    cache_stats_updated: Signal  # Signal(dict) - updated cache metrics
+
     def record_cache_hit(self) -> None:
         """Record a cache hit in session statistics."""
         ...
@@ -685,7 +684,43 @@ class ApplicationStateManagerProtocol(Protocol):
         """Get current cache session statistics."""
         ...
 
-    # Current offset
+
+class RuntimeStateProtocol(Protocol):
+    """Protocol for runtime (non-persisted) state management.
+
+    Manages ephemeral state that exists only during the current session,
+    such as temporary UI state or computed values with optional TTL.
+    """
+
+    # Signal
+    state_changed: Signal  # Signal(str, dict) - category, data
+
+    def get_state(self, namespace: str, key: str, default: object = None) -> object:
+        """Get runtime state value (not persisted)."""
+        ...
+
+    def set_state(
+        self, namespace: str, key: str, value: object, ttl_seconds: float | None = None
+    ) -> None:
+        """Set runtime state value."""
+        ...
+
+    def clear_state(self, namespace: str | None = None) -> None:
+        """Clear runtime state."""
+        ...
+
+
+class CurrentOffsetProtocol(Protocol):
+    """Protocol for current ROM offset coordination.
+
+    Manages the currently selected ROM offset and coordinates preview
+    generation across UI components.
+    """
+
+    # Signals
+    current_offset_changed: Signal  # Signal(int) - ROM offset changed
+    preview_ready: Signal  # Signal(int, QImage) - offset, preview_image
+
     def set_current_offset(self, offset: int) -> None:
         """Set the current ROM offset and emit signal."""
         ...
@@ -693,6 +728,42 @@ class ApplicationStateManagerProtocol(Protocol):
     def get_current_offset(self) -> int | None:
         """Get the current ROM offset."""
         ...
+
+
+# ========== Composite Protocol (A.4.2) ==========
+
+
+class ApplicationStateManagerProtocol(
+    WorkflowStateProtocol,
+    SessionPersistenceProtocol,
+    SettingsAccessProtocol,
+    CacheStatsProtocol,
+    RuntimeStateProtocol,
+    CurrentOffsetProtocol,
+    Protocol,
+):
+    """Composite protocol for the consolidated application state manager.
+
+    This protocol composes all focused state management protocols for backward
+    compatibility. Existing code can continue to depend on this protocol.
+
+    New code should prefer depending on specific focused protocols when only
+    a subset of functionality is needed:
+    - WorkflowStateProtocol: workflow state machine
+    - SessionPersistenceProtocol: save/load session
+    - SettingsAccessProtocol: get/set settings
+    - CacheStatsProtocol: cache hit/miss tracking
+    - RuntimeStateProtocol: ephemeral runtime state
+    - CurrentOffsetProtocol: current ROM offset coordination
+
+    All methods and signals are inherited from the focused protocols above.
+    Only additional signals not covered by focused protocols are defined here.
+    """
+
+    # Additional signals not in focused protocols
+    application_state_snapshot: Signal  # Signal(dict) - full state for debugging
+    history_updated: Signal  # Signal(list) - list of sprite offsets
+    sprite_added: Signal  # Signal(int, float) - offset, quality_score
 
 
 class SpritePresetManagerProtocol(Protocol):
