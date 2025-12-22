@@ -24,6 +24,7 @@ from core.services.preview_generator import (
     create_vram_preview_request,
     get_preview_generator,
 )
+from tests.fixtures.timeouts import signal_timeout
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 pytestmark = [
@@ -482,7 +483,7 @@ class TestPreviewGenerator:
             request = create_vram_preview_request("/path/to/vram.bin", 0x8000)
 
             # Test async generation with signal
-            with qtbot.waitSignal(generator.preview_ready, timeout=1000) as blocker:
+            with qtbot.waitSignal(generator.preview_ready, timeout=signal_timeout()) as blocker:
                 generator.generate_preview_async(request, use_debounce=False)
 
             result = blocker.args[0]

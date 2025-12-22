@@ -35,6 +35,7 @@ from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
 )
+from tests.fixtures.timeouts import LONG, signal_timeout, worker_timeout
 from tests.infrastructure.manager_test_context import (
     # Serial execution required: Thread safety concerns, Real Qt components
     manager_context,
@@ -88,7 +89,7 @@ class TestManagerIntegrationTDD:
             injection_mgr.injection_finished.connect(on_injection_complete)
 
             # Phase 1: Extract sprite from VRAM (real extraction)
-            with qtbot.waitSignal(extraction_mgr.files_created, timeout=10000):
+            with qtbot.waitSignal(extraction_mgr.files_created, timeout=worker_timeout(LONG)):
                 extracted_files = extraction_mgr.extract_from_vram(
                     vram_data["vram_path"],
                     vram_data["output_base"],
@@ -126,7 +127,7 @@ class TestManagerIntegrationTDD:
             injection_mgr.validate_injection_params(injection_params)
 
             # Wait for all Qt events to complete
-            qtbot.waitUntil(lambda: len(extraction_files) > 0, timeout=2000)
+            qtbot.waitUntil(lambda: len(extraction_files) > 0, timeout=signal_timeout())
 
             # Verify complete integration workflow
             assert len(extraction_files) > 0, "Should have extraction results"

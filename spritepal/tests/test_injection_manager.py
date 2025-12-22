@@ -30,6 +30,7 @@ from core.managers.core_operations_manager import CoreOperationsManager
 
 # Real Component Testing Infrastructure (using available components)
 from tests.fixtures.test_data_factory import TestDataFactory
+from tests.fixtures.timeouts import signal_timeout
 from tests.fixtures.worker_helper import WorkerHelper
 
 # Parallel-safe: Uses isolated_managers for per-test isolation
@@ -766,8 +767,8 @@ def test_complete_injection_workflow_tdd_real_components(tmp_path, qtbot):
     manager._on_worker_finished(True, "Test complete")
 
     # Wait for Qt event processing
-    qtbot.waitUntil(lambda: len(progress_messages) > 0, timeout=1000)
-    qtbot.waitUntil(lambda: len(finished_results) > 0, timeout=1000)
+    qtbot.waitUntil(lambda: len(progress_messages) > 0, timeout=signal_timeout())
+    qtbot.waitUntil(lambda: len(finished_results) > 0, timeout=signal_timeout())
 
     # Verify real signal behavior
     assert "Test progress" in progress_messages

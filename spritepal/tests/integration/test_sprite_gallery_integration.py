@@ -14,6 +14,7 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QSizePolicy
 
+from tests.fixtures.timeouts import signal_timeout
 from tests.infrastructure.real_component_factory import RealComponentFactory
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
@@ -102,7 +103,7 @@ class TestSpriteGalleryTab:
         gallery_tab.gallery_widget.set_sprites(test_sprites)
 
         # Wait for layout update
-        qtbot.waitUntil(lambda: len(gallery_tab.gallery_widget.thumbnails) == 17, timeout=1000)
+        qtbot.waitUntil(lambda: len(gallery_tab.gallery_widget.thumbnails) == 17, timeout=signal_timeout())
 
         # Check thumbnails were created
         assert len(gallery_tab.gallery_widget.thumbnails) == 17
@@ -138,7 +139,7 @@ class TestDetachedGalleryWindow:
         tab._open_detached_gallery()
 
         # Wait for window to appear
-        qtbot.waitUntil(lambda: tab.detached_window is not None, timeout=1000)
+        qtbot.waitUntil(lambda: tab.detached_window is not None, timeout=signal_timeout())
 
         # Check window was created
         assert tab.detached_window is not None
@@ -162,7 +163,7 @@ class TestDetachedGalleryWindow:
 
         # Open detached gallery
         tab._open_detached_gallery()
-        qtbot.waitUntil(lambda: tab.detached_window is not None, timeout=1000)
+        qtbot.waitUntil(lambda: tab.detached_window is not None, timeout=signal_timeout())
 
         detached_gallery = tab.detached_window.gallery_widget
 
@@ -185,7 +186,7 @@ class TestDetachedGalleryWindow:
 
         # Open detached gallery
         tab._open_detached_gallery()
-        qtbot.waitUntil(lambda: tab.detached_window is not None, timeout=1000)
+        qtbot.waitUntil(lambda: tab.detached_window is not None, timeout=signal_timeout())
 
         assert tab.detached_window is not None
 
@@ -302,7 +303,7 @@ class TestGalleryIntegration:
 
         # Open detached window
         tab._open_detached_gallery()
-        qtbot.waitUntil(lambda: tab.detached_window is not None, timeout=1000)
+        qtbot.waitUntil(lambda: tab.detached_window is not None, timeout=signal_timeout())
 
         # Verify detached window
         assert tab.detached_window is not None

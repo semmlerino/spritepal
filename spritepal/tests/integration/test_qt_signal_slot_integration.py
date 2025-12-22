@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 
+from tests.fixtures.timeouts import SHORT, signal_timeout
 from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 from ui.rom_extraction_panel import ROMExtractionPanel
 from utils.logging_config import get_logger
@@ -120,7 +121,7 @@ class TestDialogSignalConnections:
         qtbot.addWidget(dialog)
 
         # Create signal spy
-        with qtbot.waitSignal(dialog.offset_changed, timeout=1000) as blocker:
+        with qtbot.waitSignal(dialog.offset_changed, timeout=signal_timeout()) as blocker:
             # Trigger offset change
             dialog.set_offset(0x1000)
 
@@ -133,7 +134,7 @@ class TestDialogSignalConnections:
         qtbot.addWidget(dialog)
 
         # Create signal spy
-        with qtbot.waitSignal(dialog.sprite_found, timeout=1000) as blocker:
+        with qtbot.waitSignal(dialog.sprite_found, timeout=signal_timeout()) as blocker:
             # Trigger sprite found (simulate Apply button)
             dialog._apply_offset()
 
@@ -156,7 +157,7 @@ class TestDialogSignalConnections:
             dialog.set_offset(offset)
 
         # Wait for all signals to be processed
-        qtbot.waitUntil(lambda: recorder.count('offset_changed') == len(offsets), timeout=1000)
+        qtbot.waitUntil(lambda: recorder.count('offset_changed') == len(offsets), timeout=signal_timeout())
 
         # Verify all signals were received
         emissions = recorder.get_emissions('offset_changed')
@@ -184,7 +185,7 @@ class TestDialogSignalConnections:
         dialog._apply_offset()
 
         # Wait for queued connections to be processed
-        qtbot.waitUntil(lambda: recorder.count() == 2, timeout=1000)
+        qtbot.waitUntil(lambda: recorder.count() == 2, timeout=signal_timeout())
 
         # Verify both signals received
         assert recorder.count('offset_changed') == 1
@@ -215,7 +216,7 @@ class TestThreadSafetyAndTiming:
         # Emit from main thread
         emission_thread = QThread.currentThread()
         dialog.offset_changed.emit(0x1000)
-        qtbot.waitUntil(lambda: reception_thread is not None, timeout=500)
+        qtbot.waitUntil(lambda: reception_thread is not None, timeout=signal_timeout(SHORT))
 
         # Both should be in main thread for GUI operations
         assert emission_thread == main_thread
@@ -261,7 +262,7 @@ class TestThreadSafetyAndTiming:
         thread.start()
 
         # Wait for cross-thread signal to be received in main thread
-        qtbot.waitUntil(lambda: len(main_receptions) > 0, timeout=1000)
+        qtbot.waitUntil(lambda: len(main_receptions) > 0, timeout=signal_timeout())
         thread.quit()
         thread.wait()
 
@@ -284,13 +285,13 @@ class TestThreadSafetyAndTiming:
         time.time()
 
         dialog.offset_changed.emit(0x1000)
-        qtbot.waitUntil(lambda: recorder.count() >= 1, timeout=500)
+        qtbot.waitUntil(lambda: recorder.count() >= 1, timeout=signal_timeout(SHORT))
 
         dialog.offset_changed.emit(0x2000)
-        qtbot.waitUntil(lambda: recorder.count() >= 2, timeout=500)
+        qtbot.waitUntil(lambda: recorder.count() >= 2, timeout=signal_timeout(SHORT))
 
         dialog.sprite_found.emit(0x2000, "sprite_1")
-        qtbot.waitUntil(lambda: recorder.count() >= 3, timeout=500)
+        qtbot.waitUntil(lambda: recorder.count() >= 3, timeout=signal_timeout(SHORT))
 
         # Verify order and timing
         emissions = recorder.emissions
@@ -325,7 +326,7 @@ class TestThreadSafetyAndTiming:
             dialog.offset_changed.emit(i * 100)
 
         # Wait for all signals to be received
-        qtbot.waitUntil(lambda: received_count == emission_count, timeout=2000)
+        qtbot.waitUntil(lambda: received_count == emission_count, timeout=signal_timeout())
 
         # All signals should be received
         assert received_count == emission_count
@@ -357,7 +358,7 @@ class TestSignalBlockingAndError:
         # Unblock and emit
         dialog.blockSignals(False)
         dialog.offset_changed.emit(0x2000)
-        qtbot.waitUntil(lambda: recorder.count() == 1, timeout=500)
+        qtbot.waitUntil(lambda: recorder.count() == 1, timeout=signal_timeout(SHORT))
 
         # Now should receive
         assert recorder.count() == 1
@@ -427,7 +428,7 @@ class TestSignalBlockingAndError:
 
         # Emit with valid receiver
         dialog.offset_changed.emit(0x1000)
-        qtbot.waitUntil(lambda: len(receptions) > 0, timeout=500)
+        qtbot.waitUntil(lambda: len(receptions) > 0, timeout=signal_timeout(SHORT))
         assert receptions == [0x1000]
 
         # Delete receiver and wait for actual deletion
@@ -437,7 +438,7 @@ class TestSignalBlockingAndError:
         gc.collect()  # Force garbage collection
 
         # Wait until the weak reference is dead
-        qtbot.waitUntil(lambda: weak_receiver() is None, timeout=1000)
+        qtbot.waitUntil(lambda: weak_receiver() is None, timeout=signal_timeout())
 
         # Emit again - should not crash (receiver is now deleted)
         dialog.offset_changed.emit(0x2000)

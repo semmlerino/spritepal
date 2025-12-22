@@ -17,6 +17,7 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtTest import QSignalSpy
 
 from ui.common import WorkerManager
+from tests.fixtures.timeouts import SHORT, signal_timeout
 from ui.common.timing_constants import (
     # Test characteristics: Real GUI components requiring display, Thread safety concerns
     SLEEP_MEDIUM,
@@ -179,7 +180,7 @@ class TestWorkerManagerReal:
         assert worker.isRunning()
 
         # Wait for some progress
-        qtbot.waitUntil(lambda: progress_spy.count() > 0, timeout=1000)
+        qtbot.waitUntil(lambda: progress_spy.count() > 0, timeout=signal_timeout())
 
         # Verify progress signals were emitted
         assert progress_spy.count() > 0
@@ -195,7 +196,7 @@ class TestWorkerManagerReal:
         """Test starting a worker with cleanup of existing real worker."""
         old_worker = RealTestWorker()
         old_worker.start()
-        qtbot.waitUntil(old_worker.isRunning, timeout=1000)
+        qtbot.waitUntil(old_worker.isRunning, timeout=signal_timeout())
 
         new_worker = RealTestWorker()
 
@@ -211,7 +212,7 @@ class TestWorkerManagerReal:
 
         # Cleanup
         new_worker.stop()
-        qtbot.waitUntil(lambda: not new_worker.isRunning(), timeout=1000)
+        qtbot.waitUntil(lambda: not new_worker.isRunning(), timeout=signal_timeout())
 
     def test_worker_interruption_handling_real(self, qtbot):
         """Test that workers properly handle interruption requests."""
@@ -225,7 +226,7 @@ class TestWorkerManagerReal:
         worker.requestInterruption()
 
         # Worker should detect interruption and stop
-        qtbot.waitUntil(lambda: not worker.isRunning(), timeout=1000)
+        qtbot.waitUntil(lambda: not worker.isRunning(), timeout=signal_timeout())
 
         # Verify worker detected interruption
         assert worker._interrupted
@@ -250,7 +251,7 @@ class TestWorkerManagerReal:
         worker.start()
 
         # Wait for error signal
-        qtbot.waitUntil(lambda: error_spy.count() > 0, timeout=1000)
+        qtbot.waitUntil(lambda: error_spy.count() > 0, timeout=signal_timeout())
 
         # Verify error was emitted
         assert error_spy.count() == 1
@@ -299,10 +300,10 @@ class TestWorkerManagerReal:
         worker.start()
 
         # Wait for natural completion
-        qtbot.waitUntil(lambda: finished_spy.count() > 0, timeout=1000)
+        qtbot.waitUntil(lambda: finished_spy.count() > 0, timeout=signal_timeout())
 
         # Worker should complete and stop naturally
-        qtbot.waitUntil(lambda: not worker.isRunning(), timeout=1000)
+        qtbot.waitUntil(lambda: not worker.isRunning(), timeout=signal_timeout())
 
         assert finished_spy.count() == 1
         assert not worker.isRunning()
@@ -351,11 +352,11 @@ class TestWorkerManagerReal:
         # Start and let it run briefly
         worker.start()
         qtbot.waitUntil(worker.isRunning, timeout=TEST_TIMEOUT_MEDIUM)
-        qtbot.waitUntil(lambda: worker._work_cycles > 0, timeout=500)  # Wait for worker to do some work
+        qtbot.waitUntil(lambda: worker._work_cycles > 0, timeout=signal_timeout(SHORT))  # Wait for worker to do some work
 
         # Interrupt
         worker.stop()
-        qtbot.waitUntil(lambda: not worker.isRunning(), timeout=1000)
+        qtbot.waitUntil(lambda: not worker.isRunning(), timeout=signal_timeout())
 
         # State should be consistent
         assert not worker.isRunning()
