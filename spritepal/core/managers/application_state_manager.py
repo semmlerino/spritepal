@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import json
 import threading
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, ClassVar, TypeVar, cast, override
@@ -36,6 +37,76 @@ from core.managers.workflow_manager import ExtractionState
 
 # Re-export at module level for backward compatibility
 __all__ = ["ApplicationStateManager", "ExtractionState"]
+
+
+# ========== Lock Ordering Enforcement (Debug Mode) ==========
+# Thread-local storage for tracking held locks per thread
+_lock_stack: threading.local = threading.local()
+
+# Lock hierarchy: lower index = must acquire first
+_LOCK_ORDER: dict[str, int] = {
+    "_state_lock": 0,
+    "_workflow_lock": 1,
+    "_cache_stats_lock": 2,
+}
+
+
+def _check_lock_order(lock_name: str) -> None:
+    """
+    Check that lock acquisition follows documented order (debug mode only).
+
+    Raises:
+        RuntimeError: If lock order is violated (only in debug mode)
+    """
+    if not __debug__:
+        return  # Skip in optimized mode (-O flag)
+
+    # Get the current thread's lock stack
+    if not hasattr(_lock_stack, "held"):
+        _lock_stack.held = []
+
+    held = _lock_stack.held
+    if not held:
+        return  # No locks held, order is fine
+
+    # Check if we're acquiring a lock with lower order than any held lock
+    acquiring_order = _LOCK_ORDER.get(lock_name, -1)
+    if acquiring_order == -1:
+        return  # Unknown lock, skip check
+
+    for held_lock in held:
+        held_order = _LOCK_ORDER.get(held_lock, -1)
+        if held_order == -1:
+            continue
+        if acquiring_order < held_order:
+            raise RuntimeError(
+                f"Lock order violation: acquiring {lock_name} (order {acquiring_order}) "
+                f"while holding {held_lock} (order {held_order}). "
+                f"Lock order must be: _state_lock -> _workflow_lock -> _cache_stats_lock"
+            )
+
+
+def _push_lock(lock_name: str) -> None:
+    """Record that a lock has been acquired by the current thread."""
+    if not __debug__:
+        return
+    if not hasattr(_lock_stack, "held"):
+        _lock_stack.held = []
+    _lock_stack.held.append(lock_name)
+
+
+def _pop_lock(lock_name: str) -> None:
+    """Record that a lock has been released by the current thread."""
+    if not __debug__:
+        return
+    if hasattr(_lock_stack, "held") and _lock_stack.held:
+        # Remove the last occurrence (handles nested acquisition with RLock)
+        if lock_name in _lock_stack.held:
+            # Find and remove from the end
+            for i in range(len(_lock_stack.held) - 1, -1, -1):
+                if _lock_stack.held[i] == lock_name:
+                    _lock_stack.held.pop(i)
+                    break
 
 
 class ApplicationStateManager(BaseManager):
@@ -183,11 +254,47 @@ class ApplicationStateManager(BaseManager):
         #   2. _workflow_lock  - protects workflow transitions (_workflow_state)
         #   3. _cache_stats_lock - protects cache statistics (_cache_session_stats)
         # RULE: Never acquire a lower-numbered lock while holding a higher-numbered lock.
+        # DEBUG: Lock ordering is verified at runtime in debug mode (see module-level helpers)
         self._state_lock = threading.RLock()
         self._workflow_lock = threading.RLock()
         self._cache_stats_lock = threading.RLock()
 
         super().__init__("ApplicationStateManager", parent)
+
+    # ========== Lock Helper Methods (with ordering checks) ==========
+
+    @contextmanager
+    def _acquire_state_lock(self) -> Generator[None, None, None]:
+        """Acquire state lock with ordering check (debug mode)."""
+        _check_lock_order("_state_lock")
+        with self._state_lock:
+            _push_lock("_state_lock")
+            try:
+                yield
+            finally:
+                _pop_lock("_state_lock")
+
+    @contextmanager
+    def _acquire_workflow_lock(self) -> Generator[None, None, None]:
+        """Acquire workflow lock with ordering check (debug mode)."""
+        _check_lock_order("_workflow_lock")
+        with self._workflow_lock:
+            _push_lock("_workflow_lock")
+            try:
+                yield
+            finally:
+                _pop_lock("_workflow_lock")
+
+    @contextmanager
+    def _acquire_cache_stats_lock(self) -> Generator[None, None, None]:
+        """Acquire cache stats lock with ordering check (debug mode)."""
+        _check_lock_order("_cache_stats_lock")
+        with self._cache_stats_lock:
+            _push_lock("_cache_stats_lock")
+            try:
+                yield
+            finally:
+                _pop_lock("_cache_stats_lock")
 
     @override
     def _initialize(self) -> None:

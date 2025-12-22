@@ -37,10 +37,10 @@ from utils.file_validator import FileValidator
 
 from .base_manager import BaseManager, with_operation_handling
 
+from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMExtractorProtocol
-
-    from .application_state_manager import ApplicationStateManager
 
 
 class CoreOperationsManager(BaseManager):
@@ -242,11 +242,11 @@ class CoreOperationsManager(BaseManager):
             self._palette_manager, "Palette manager", ExtractionError
         )
 
-    def _get_session_manager(self) -> ApplicationStateManager:
+    def _get_session_manager(self) -> ApplicationStateManagerProtocol:
         """Get session manager via dependency injection container."""
         from core.di_container import inject
         from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-        return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value] - DI returns protocol, caller expects concrete
+        return inject(ApplicationStateManagerProtocol)
 
     def _raise_extraction_failed(self, message: str) -> None:
         """Helper method to raise ExtractionError (for TRY301 compliance)."""
@@ -619,13 +619,16 @@ class CoreOperationsManager(BaseManager):
             # Stop any existing worker
             cleanup_timeout = 5000 if params.get("mode") == "rom" else 2000
             if self._current_worker is not None:
-                WorkerManager.cleanup_worker(self._current_worker, timeout=cleanup_timeout)
-                if self._current_worker.isRunning():
+                cleanup_success = WorkerManager.cleanup_worker(
+                    self._current_worker, timeout=cleanup_timeout
+                )
+                if not cleanup_success:
+                    # Worker did not stop within timeout - use cleanup result to avoid race
                     self._logger.warning(
                         f"Previous worker still running after {cleanup_timeout}ms cleanup timeout. "
                         "Declining to start new injection to prevent data corruption."
                     )
-                    # FIX T1.2: Clear zombie reference even though worker is still running.
+                    # Clear zombie reference even though worker is still running.
                     # This prevents holding references to unresponsive workers.
                     self._current_worker = None
                     self._finish_operation(operation)

@@ -84,7 +84,7 @@ class WorkerManager:
     def cleanup_worker(
         worker: QThread | None,
         timeout: int = DEFAULT_CLEANUP_TIMEOUT,
-    ) -> None:
+    ) -> bool:
         """
         Safely clean up a worker thread without using dangerous terminate().
 
@@ -98,9 +98,13 @@ class WorkerManager:
             worker: The worker thread to clean up (can be None)
             timeout: Milliseconds to wait for graceful shutdown (default: 1000ms).
                     Use QUICK_CLEANUP_TIMEOUT (100ms) for shutdown scenarios.
+
+        Returns:
+            True if worker stopped successfully, False if still running after timeout.
+            Returns True if worker was None or already stopped.
         """
         if worker is None:
-            return
+            return True
 
         # Block signals FIRST to prevent race conditions with queued signals
         # This ensures no callbacks fire on deleted objects during cleanup
@@ -121,7 +125,7 @@ class WorkerManager:
             WorkerManager._worker_registry.discard(worker)
             worker.deleteLater()
             logger.debug(f"{worker_name}: Cleanup complete for stopped worker")
-            return
+            return True  # Worker was already stopped
 
         logger.debug(f"Stopping {worker_name} safely")
 
@@ -142,7 +146,8 @@ class WorkerManager:
         worker.quit()
 
         # Stage 4: Wait for clean shutdown
-        if worker.wait(timeout):
+        stopped_cleanly = worker.wait(timeout)
+        if stopped_cleanly:
             logger.debug(f"{worker_name}: Stopped gracefully")
         else:
             # Worker is unresponsive - log warning but NEVER terminate
@@ -164,6 +169,8 @@ class WorkerManager:
         # Schedule for deletion regardless of shutdown success
         worker.deleteLater()
         logger.debug(f"{worker_name}: Scheduled for deletion")
+
+        return stopped_cleanly
 
     @staticmethod
     def start_worker(

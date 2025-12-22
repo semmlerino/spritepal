@@ -29,6 +29,7 @@ class DIContainer:
         """Initialize the DI container."""
         self._singletons: dict[type, object] = {}
         self._factories: dict[type, Callable[[], object]] = {}
+        self._failed_factories: set[type] = set()  # Track factories that threw exceptions
         self._lock = RLock()
         logger.debug("DIContainer initialized")
 
@@ -68,19 +69,33 @@ class DIContainer:
 
         Raises:
             ValueError: If no registration exists for the interface
+            RuntimeError: If factory previously failed (prevents infinite retries)
         """
         with self._lock:
+            # Check for previously failed factories first
+            if interface in self._failed_factories:
+                raise RuntimeError(
+                    f"Factory for {interface.__name__} previously failed. "
+                    "Clear container or re-register to retry."
+                )
+
             # Check singletons first
             if interface in self._singletons:
                 return cast(T, self._singletons[interface])
 
             # Check factories
             if interface in self._factories:
-                # Create instance and store as singleton
-                instance = self._factories[interface]()
-                self._singletons[interface] = instance
-                logger.debug(f"Created singleton from factory: {interface.__name__}")
-                return cast(T, instance)
+                try:
+                    # Create instance and store as singleton
+                    instance = self._factories[interface]()
+                    self._singletons[interface] = instance
+                    logger.debug(f"Created singleton from factory: {interface.__name__}")
+                    return cast(T, instance)
+                except Exception as e:
+                    # Cache the failure to prevent infinite retries
+                    self._failed_factories.add(interface)
+                    logger.error(f"Factory for {interface.__name__} failed: {e}")
+                    raise
 
             raise ValueError(f"No registration for {interface.__name__}")
 
@@ -117,6 +132,7 @@ class DIContainer:
         with self._lock:
             self._singletons.clear()
             self._factories.clear()
+            self._failed_factories.clear()  # Allow retry after clear
             logger.debug("DIContainer cleared")
 
     def unregister(self, interface: type) -> None:
@@ -129,6 +145,7 @@ class DIContainer:
         with self._lock:
             self._singletons.pop(interface, None)
             self._factories.pop(interface, None)
+            self._failed_factories.discard(interface)  # Allow re-registration to retry
             logger.debug(f"Unregistered: {interface.__name__}")
 
 # Global container instance

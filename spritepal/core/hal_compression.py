@@ -630,9 +630,12 @@ class HALProcessPool:
 
             # Collect results with per-request timeout guarantee
             results: dict[str | None, HALResult] = {}
-            total_timeout = HAL_POOL_TIMEOUT_SECONDS
-            # Minimum 5 seconds per request, but don't exceed total timeout
-            per_request_timeout = max(5.0, total_timeout / len(requests))
+            # Minimum per-request timeout ensures each request gets fair chance
+            MIN_PER_REQUEST_TIMEOUT = 0.5  # 500ms minimum per request
+            base_timeout = HAL_POOL_TIMEOUT_SECONDS
+            # Scale total timeout for large batches to avoid guaranteed timeouts
+            total_timeout = max(base_timeout, len(requests) * MIN_PER_REQUEST_TIMEOUT)
+            per_request_timeout = max(MIN_PER_REQUEST_TIMEOUT, base_timeout / len(requests))
             deadline = time.time() + total_timeout
 
             received_count = 0
