@@ -624,6 +624,9 @@ class TestROMCacheCore:
         # We need to make the first mkdir fail but allow the fallback
         import tempfile
 
+        # Save reference to original mkdir before patching
+        _original_mkdir = Path.mkdir
+
         mkdir_calls = 0
         def mock_mkdir(self, *args, **kwargs) -> None:
             nonlocal mkdir_calls
@@ -633,8 +636,8 @@ class TestROMCacheCore:
                 msg = "No permission"
                 raise PermissionError(msg)
             # Second call succeeds (fallback directory)
-            # Actually create the directory
-            Path(self).mkdir(parents=True, exist_ok=True)
+            # Actually create the directory using the original method
+            _original_mkdir(self, parents=True, exist_ok=True)
 
         # Create a mock settings manager for this test
         class MockSettings:

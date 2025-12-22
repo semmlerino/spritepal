@@ -16,6 +16,7 @@ as well as the facade pattern implementation.
 """
 
 import json
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch

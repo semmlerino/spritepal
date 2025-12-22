@@ -7,6 +7,8 @@ a real Kirby ROM is available.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from core.hal_compression import HALCompressor

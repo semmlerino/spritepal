@@ -138,11 +138,12 @@ class CleanupDialog(DialogBase):
                     if not thread.wait(self._worker_timeout_ms):
                         logger.warning(
                             f"Worker {worker_name} thread did not stop within "
-                            f"{self._worker_timeout_ms}ms timeout"
+                            f"{self._worker_timeout_ms}ms timeout - "
+                            "thread will be orphaned to avoid dangerous terminate()"
                         )
-                        # Force terminate as last resort (not ideal but prevents hang)
-                        thread.terminate()
-                        thread.wait(1000)  # Brief wait after terminate
+                        # Note: We intentionally do NOT call thread.terminate() as it can
+                        # cause crashes and undefined behavior. The thread will be orphaned
+                        # and cleaned up when the process exits.
                     else:
                         logger.debug(f"Worker {worker_name} thread stopped cleanly")
 
