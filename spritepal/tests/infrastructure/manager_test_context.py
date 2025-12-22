@@ -299,7 +299,7 @@ class ManagerTestContext:
             self._app.quit()
 
         # Clean up temp settings directory
-        if hasattr(self, '_settings_dir') and self._settings_dir.exists():
+        if self._settings_dir is not None and self._settings_dir.exists():
             import shutil
             try:
                 shutil.rmtree(self._settings_dir)
