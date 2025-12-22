@@ -223,7 +223,7 @@ class TestGalleryCaching:
 
         # Load and verify cache content
         import json
-        with open(cache_file) as f:
+        with cache_file.open() as f:
             cache_data = json.load(f)
 
         assert cache_data['sprite_count'] == 17
@@ -252,7 +252,7 @@ class TestGalleryCaching:
         }
 
         cache_file = tmp_path / "test_cache.json"
-        with open(cache_file, 'w') as f:
+        with cache_file.open('w') as f:
             json.dump(cache_data, f)
 
         # Load cache

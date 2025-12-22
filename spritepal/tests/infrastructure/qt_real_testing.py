@@ -14,9 +14,6 @@ Key Features:
 """
 from __future__ import annotations
 
-# Re-export MemoryHelper from memory_helpers for backwards compatibility
-from tests.fixtures.memory_helpers import MemoryHelper as MemoryHelper
-
 import gc
 import os
 import sys
@@ -34,6 +31,11 @@ from PySide6.QtCore import (
     Signal,
 )
 from PySide6.QtWidgets import QApplication, QDialog, QWidget
+
+# Re-export MemoryHelper from memory_helpers for backwards compatibility
+from tests.fixtures.memory_helpers import MemoryHelper
+
+__all__ = ["MemoryHelper", "QtTestCase", "EventLoopHelper", "WidgetFactory", "ThreadSafetyHelper", "WidgetPool"]
 
 # Type variable for generic widget types
 W = TypeVar("W", bound=QWidget)

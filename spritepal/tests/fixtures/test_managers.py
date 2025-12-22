@@ -6,8 +6,8 @@ For extraction/injection test files, use TestDataFactory directly.
 """
 from __future__ import annotations
 
-import os
 import tempfile
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -96,7 +96,7 @@ class GridImageProcessorFixture:
 
         sprite_image.putdata(pixels)
 
-        self.sprite_path = os.path.join(self.temp_dir, "test_grid_sprite.png")
+        self.sprite_path = str(Path(self.temp_dir) / "test_grid_sprite.png")
         sprite_image.save(self.sprite_path)
 
         # Process the sprite
@@ -115,7 +115,7 @@ class GridImageProcessorFixture:
     def cleanup(self):
         """Clean up test files"""
         import shutil
-        if os.path.exists(self.temp_dir):
+        if Path(self.temp_dir).exists():
             shutil.rmtree(self.temp_dir)
 
 class PaletteColorizerFixture:

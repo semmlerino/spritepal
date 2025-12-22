@@ -155,7 +155,7 @@ class TestPaletteManager:
             assert Path(output_path).exists()
 
             # Load and validate JSON
-            with open(output_path) as f:
+            with Path(output_path).open() as f:
                 data = json.load(f)
 
             assert data["format_version"] == "1.0"
@@ -189,8 +189,8 @@ class TestPaletteManager:
             palette_manager.create_palette_json(pal_idx, f.name)
 
         try:
-            with open(f.name) as f:
-                data = json.load(f)
+            with Path(f.name).open() as file:
+                data = json.load(file)
             assert data["palette"]["name"] == expected_name
         finally:
             Path(f.name).unlink(missing_ok=True)
@@ -263,7 +263,7 @@ class TestPaletteManagerExtended:
             assert Path(metadata_path).exists()
 
             # Load and verify metadata content
-            with open(metadata_path) as f:
+            with Path(metadata_path).open() as f:
                 metadata = json.load(f)
 
             assert metadata["format_version"] == "1.0"
@@ -356,7 +356,7 @@ class TestPaletteManagerExtended:
             palette_manager.create_palette_json(8, output_path)
 
             # Load and verify JSON
-            with open(output_path) as f:
+            with Path(output_path).open() as f:
                 data = json.load(f)
 
             # Should not have source info

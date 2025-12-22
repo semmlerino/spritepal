@@ -12,7 +12,6 @@ Tests all components of the continuous monitoring system including:
 """
 
 import json
-import os
 
 # Test imports
 import sys
@@ -374,9 +373,9 @@ class TestMonitoringManager:
             
             exported_path = monitoring_manager.export_data("json", 1, output_path)
             assert exported_path.exists()
-            
+
             # Verify JSON is valid
-            with open(exported_path) as f:
+            with exported_path.open() as f:
                 data = json.load(f)
                 assert "report_id" in data
                 assert "generated_at" in data

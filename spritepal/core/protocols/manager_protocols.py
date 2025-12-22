@@ -4,7 +4,7 @@ These protocols define the interfaces that managers must implement.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -414,7 +414,7 @@ class ROMCacheProtocol(Protocol):
         ...
 
     def save_partial_scan_results(self, rom_path: str, scan_params: Mapping[str, int],
-                                 found_sprites: list[Mapping[str, object]],
+                                 found_sprites: Sequence[Mapping[str, Any]],  # pyright: ignore[reportExplicitAny] - sprite result dicts have mixed types
                                  current_offset: int, completed: bool = False) -> bool:
         """Save partial scan results for incremental progress."""
         ...

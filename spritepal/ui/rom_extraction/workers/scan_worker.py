@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 from typing import Any, override
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QMutex, QMutexLocker, Signal
 
 from core.parallel_sprite_finder import ParallelSpriteFinder
 from core.workers.base import BaseWorker, handle_worker_errors
@@ -79,6 +79,39 @@ class SpriteScanWorker(BaseWorker):
         # Assign rom_cache
         self.rom_cache = rom_cache
 
+        # Thread-safe storage for found sprites
+        self._found_sprites: dict[int, dict[str, Any]] = {}  # pyright: ignore[reportExplicitAny] - Sprite result dicts
+        self._results_mutex = QMutex()
+
+    def _add_found_sprite(self, sprite_info: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Sprite result dict
+        """Thread-safe method to add a found sprite to the results."""
+        offset = sprite_info.get("offset")
+        if offset is not None:
+            with QMutexLocker(self._results_mutex):
+                self._found_sprites[offset] = sprite_info
+
+    def _get_found_sprites_snapshot(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Sprite result dicts
+        """Thread-safe method to get a snapshot of all found sprites."""
+        with QMutexLocker(self._results_mutex):
+            return list(self._found_sprites.values())
+
+    def _get_found_sprites_count(self) -> int:
+        """Thread-safe method to get the count of found sprites."""
+        with QMutexLocker(self._results_mutex):
+            return len(self._found_sprites)
+
+    def _clear_found_sprites(self) -> None:
+        """Thread-safe method to clear the found sprites."""
+        with QMutexLocker(self._results_mutex):
+            self._found_sprites.clear()
+
+    def get_found_sprites(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Sprite result dicts
+        """Public thread-safe getter for found sprites.
+
+        Returns a copy of the found sprites list to prevent concurrent modification.
+        """
+        return self._get_found_sprites_snapshot()
+
     @handle_worker_errors("sprite scanning", handle_interruption=True)
     def run(self):
         """Scan ROM for valid sprite offsets using parallel processing"""
@@ -102,7 +135,8 @@ class SpriteScanWorker(BaseWorker):
 
             logger.info(f"Scanning entire ROM: 0x{start_offset:X} to 0x{end_offset:X} (ROM size: 0x{rom_size:X})")
 
-        found_sprites = {}  # Track unique sprites by offset
+        # Clear any previous results (thread-safe)
+        self._clear_found_sprites()
 
         # Define scan parameters for cache (must match scan_controller.compute_scan_params)
         scan_params = {
@@ -135,13 +169,11 @@ class SpriteScanWorker(BaseWorker):
                 self.cache_status.emit(f"Resuming from {progress_pct}% (found {found_count} sprites)")
                 logger.info(f"Resuming scan from offset 0x{last_offset:X}")
 
-                # Load already-found sprites
+                # Load already-found sprites (thread-safe)
                 for sprite_info in cached_sprites:
-                    offset = sprite_info.get("offset")
-                    if offset:
-                        found_sprites[offset] = sprite_info
-                        # Emit the cached sprites immediately so they appear in the dialog
-                        self.sprite_found.emit(sprite_info)
+                    self._add_found_sprite(sprite_info)
+                    # Emit the cached sprites immediately so they appear in the dialog
+                    self.sprite_found.emit(sprite_info)
 
                 # Update start position to continue from where we left off
                 # Use the step_size from the parallel finder configuration instead of hardcoded 0x100
@@ -184,7 +216,8 @@ class SpriteScanWorker(BaseWorker):
                 self._last_save_progress = current_progress
                 self.cache_status.emit(f"Saving progress ({current_progress}%)...")
 
-                found_sprites_list = list(found_sprites.values())
+                # Thread-safe snapshot of found sprites
+                found_sprites_list = self._get_found_sprites_snapshot()
                 current_offset = original_start_offset + int(current_range)
 
                 if rom_cache.save_partial_scan_results(
@@ -218,7 +251,8 @@ class SpriteScanWorker(BaseWorker):
                 "quality": result.confidence
             }
 
-            found_sprites[result.offset] = sprite_info
+            # Thread-safe add
+            self._add_found_sprite(sprite_info)
             self.sprite_found.emit(sprite_info)
 
             logger.info(
@@ -226,11 +260,12 @@ class SpriteScanWorker(BaseWorker):
                 f"tiles={result.tile_count}"
             )
 
-        # Save final results after scan completes
-        logger.debug(f"Parallel scan completed. Found {len(found_sprites)} sprites total")
+        # Save final results after scan completes (thread-safe)
+        total_found = self._get_found_sprites_count()
+        logger.debug(f"Parallel scan completed. Found {total_found} sprites total")
         if rom_cache:
             self.cache_status.emit("Saving final results...")
-            found_sprites_list = list(found_sprites.values())
+            found_sprites_list = self._get_found_sprites_snapshot()
             logger.debug(f"Saving {len(found_sprites_list)} sprites to cache as completed")
 
             if rom_cache.save_partial_scan_results(
@@ -244,31 +279,32 @@ class SpriteScanWorker(BaseWorker):
                 self.cache_progress.emit(100)
                 logger.info("Saved final scan results to cache")
 
-        # Log summary statistics
+        # Log summary statistics (thread-safe snapshot for statistics)
         logger.debug("Preparing summary statistics")
-        if found_sprites:
+        final_sprites = self._get_found_sprites_snapshot()
+        if final_sprites:
             # Filter out sprites that don't have quality (e.g., from cache)
-            sprites_with_quality = [s for s in found_sprites.values() if "quality" in s]
+            sprites_with_quality = [s for s in final_sprites if "quality" in s]
             if sprites_with_quality:
                 qualities = [s["quality"] for s in sprites_with_quality]
                 avg_quality = sum(qualities) / len(qualities)
                 high_quality_count = sum(1 for q in qualities if q >= 0.7)
 
-                logger.info(f"Parallel scan complete. Found {len(found_sprites)} sprites:")
+                logger.info(f"Parallel scan complete. Found {len(final_sprites)} sprites:")
                 logger.info(f"  - Average quality: {avg_quality:.2f}")
                 logger.info(f"  - High quality (≥0.7): {high_quality_count}")
                 logger.info(f"  - Quality range: {min(qualities):.2f} - {max(qualities):.2f}")
             else:
                 # No quality data available (e.g., all sprites from cache)
-                logger.info(f"Parallel scan complete. Found {len(found_sprites)} sprites (from cache)")
+                logger.info(f"Parallel scan complete. Found {len(final_sprites)} sprites (from cache)")
         else:
             logger.info("Parallel scan complete. No valid sprites found.")
 
         # Emit compatibility signal with all found sprites
-        self.sprites_found.emit(list(found_sprites.values()))
+        self.sprites_found.emit(final_sprites)
 
         self.finished.emit()
-        self.operation_finished.emit(True, f"Scan complete. Found {len(found_sprites)} sprites.")
+        self.operation_finished.emit(True, f"Scan complete. Found {len(final_sprites)} sprites.")
 
         # Cleanup parallel finder resources
         if hasattr(self, "_parallel_finder"):

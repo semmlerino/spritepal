@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import tempfile
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -51,9 +52,8 @@ class TestComprehensiveDialogMigrations:
 
         yield temp_file.name
 
-        import os
         with contextlib.suppress(Exception):
-            os.unlink(temp_file.name)
+            Path(temp_file.name).unlink()
 
     def test_all_dialogs_inherit_from_correct_base_classes(
         self,
@@ -417,9 +417,8 @@ class TestManagerContextIntegration:
 
         yield temp_file.name
 
-        import os
         with contextlib.suppress(Exception):
-            os.unlink(temp_file.name)
+            Path(temp_file.name).unlink()
 
     def test_injection_dialog_manager_access(self, qtbot, manager_context_factory):
         """Test that InjectionDialog can access managers through context."""

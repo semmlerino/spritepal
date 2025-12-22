@@ -244,7 +244,7 @@ class TestSettingsIntegration:
         """Test recovery from corrupted settings file"""
         # Create corrupted settings file
         settings_file = Path(temp_settings_dir) / ".spritepal_settings.json"
-        with open(settings_file, "w") as f:
+        with settings_file.open("w") as f:
             f.write("{ corrupted json }")
 
         # Create an ApplicationStateManager with our temp settings file
@@ -263,7 +263,7 @@ class TestSettingsIntegration:
         settings.save_settings()
 
         # Verify file is now valid JSON
-        with open(settings_file) as f:
+        with settings_file.open() as f:
             data = json.load(f)
             assert data["session"]["vram_path"] == "/new/path.dmp"
 

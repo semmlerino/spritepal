@@ -342,7 +342,7 @@ def hal_golden_data() -> dict[str, dict]:
     if not checksums_file.exists():
         return {}
 
-    with open(checksums_file) as f:
+    with checksums_file.open() as f:
         checksums = json.load(f)
 
     if not checksums.get("entries"):

@@ -126,7 +126,7 @@ class ImportAnalyzer(ast.NodeVisitor):
 def analyze_file(filepath: Path) -> tuple[list[dict], list[dict]]:
     """Analyze a single Python file for imports."""
     try:
-        with open(filepath, encoding="utf-8") as f:
+        with filepath.open(encoding="utf-8") as f:
             content = f.read()
 
         tree = ast.parse(content, filename=str(filepath))
@@ -249,7 +249,7 @@ def main():
 
     # Save detailed report
     report_path = project_root / "import_analysis_report.json"
-    with open(report_path, "w") as f:
+    with report_path.open("w") as f:
         json.dump({
             "dependencies": {k: list(v) for k, v in dependencies.items()},
             "conditional_imports": conditional_imports,

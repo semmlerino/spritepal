@@ -4,8 +4,8 @@ Ensures sprites survive the extract -> edit -> inject cycle without corruption
 """
 from __future__ import annotations
 
-import os
 import tempfile
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -52,8 +52,8 @@ class TestPNGRoundTrip:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Step 1: Convert 4bpp to grayscale PNG (simulating ROM extraction)
-            png_path = os.path.join(tmpdir, "test_sprite.png")
-            self.extractor._convert_4bpp_to_png(original_data, png_path)
+            png_path = Path(tmpdir) / "test_sprite.png"
+            self.extractor._convert_4bpp_to_png(original_data, str(png_path))
 
             # Verify grayscale image properties
             img = Image.open(png_path)
@@ -79,7 +79,7 @@ class TestPNGRoundTrip:
             img = img.convert("L")
             img.save(png_path)
 
-            converted_data = self.injector.convert_png_to_4bpp(png_path)
+            converted_data = self.injector.convert_png_to_4bpp(str(png_path))
 
             # Extract just the first tile for comparison
             first_tile_converted = converted_data[:32]  # 32 bytes per tile
@@ -97,7 +97,7 @@ class TestPNGRoundTrip:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create indexed PNG directly (simulating pixel editor save)
-            png_path = os.path.join(tmpdir, "test_indexed.png")
+            png_path = Path(tmpdir) / "test_indexed.png"
             img = Image.new("P", (8, 8))
 
             # Set pixels with palette indices
@@ -116,7 +116,7 @@ class TestPNGRoundTrip:
             img.save(png_path)
 
             # Convert back to 4bpp
-            converted_data = self.injector.convert_png_to_4bpp(png_path)
+            converted_data = self.injector.convert_png_to_4bpp(str(png_path))
 
             # Verify data matches original
             assert len(converted_data) == len(original_data)
@@ -145,26 +145,26 @@ class TestPNGRoundTrip:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Test all black (index 0)
             black_tile = encode_4bpp_tile([0] * 64)
-            png_path = os.path.join(tmpdir, "black.png")
-            self.extractor._convert_4bpp_to_png(black_tile, png_path)
+            png_path = Path(tmpdir) / "black.png"
+            self.extractor._convert_4bpp_to_png(black_tile, str(png_path))
 
             # Convert to grayscale and back
             img = Image.open(png_path).convert("L")
             img.save(png_path)
-            converted = self.injector.convert_png_to_4bpp(png_path)
+            converted = self.injector.convert_png_to_4bpp(str(png_path))
             # Extract first tile only
             first_tile = converted[:32]
             assert first_tile == black_tile
 
             # Test all white (index 15)
             white_tile = encode_4bpp_tile([15] * 64)
-            png_path = os.path.join(tmpdir, "white.png")
-            self.extractor._convert_4bpp_to_png(white_tile, png_path)
+            png_path = Path(tmpdir) / "white.png"
+            self.extractor._convert_4bpp_to_png(white_tile, str(png_path))
 
             # Convert to grayscale and back
             img = Image.open(png_path).convert("L")
             img.save(png_path)
-            converted = self.injector.convert_png_to_4bpp(png_path)
+            converted = self.injector.convert_png_to_4bpp(str(png_path))
             # Extract first tile only
             first_tile = converted[:32]
             assert first_tile == white_tile
@@ -180,8 +180,8 @@ class TestPNGRoundTrip:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Convert to PNG
-            png_path = os.path.join(tmpdir, "sprite_sheet.png")
-            self.extractor._convert_4bpp_to_png(bytes(tiles_data), png_path)
+            png_path = Path(tmpdir) / "sprite_sheet.png"
+            self.extractor._convert_4bpp_to_png(bytes(tiles_data), str(png_path))
 
             # Verify dimensions
             img = Image.open(png_path)
@@ -190,7 +190,7 @@ class TestPNGRoundTrip:
             # Convert to grayscale and back
             img = img.convert("L")
             img.save(png_path)
-            converted_data = self.injector.convert_png_to_4bpp(png_path)
+            converted_data = self.injector.convert_png_to_4bpp(str(png_path))
 
             # Verify all tiles preserved
             assert len(converted_data) == len(tiles_data)
@@ -200,25 +200,25 @@ class TestPNGRoundTrip:
         """Test sprite validation accepts both grayscale and indexed modes"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Test grayscale mode
-            gray_path = os.path.join(tmpdir, "gray.png")
+            gray_path = Path(tmpdir) / "gray.png"
             img = Image.new("L", (16, 16), 128)
             img.save(gray_path)
-            valid, msg = self.injector.validate_sprite(gray_path)
+            valid, msg = self.injector.validate_sprite(str(gray_path))
             assert valid, f"Grayscale validation failed: {msg}"
 
             # Test indexed mode
-            indexed_path = os.path.join(tmpdir, "indexed.png")
+            indexed_path = Path(tmpdir) / "indexed.png"
             img = Image.new("P", (16, 16))
             img.putpalette([i % 256 for i in range(768)])  # Dummy palette
             img.save(indexed_path)
-            valid, msg = self.injector.validate_sprite(indexed_path)
+            valid, msg = self.injector.validate_sprite(str(indexed_path))
             assert valid, f"Indexed validation failed: {msg}"
 
             # Test RGB mode (should fail)
-            rgb_path = os.path.join(tmpdir, "rgb.png")
+            rgb_path = Path(tmpdir) / "rgb.png"
             img = Image.new("RGB", (16, 16))
             img.save(rgb_path)
-            valid, msg = self.injector.validate_sprite(rgb_path)
+            valid, msg = self.injector.validate_sprite(str(rgb_path))
             assert not valid
             assert "must be in indexed (P) or grayscale (L) mode" in msg
 

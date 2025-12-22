@@ -26,7 +26,7 @@ class TestSpriteValidator:
         """Test validation of a valid indexed sprite"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create valid indexed sprite
-            sprite_path = os.path.join(tmpdir, "valid_sprite.png")
+            sprite_path = str(Path(tmpdir) / "valid_sprite.png")
             img = Image.new("P", (16, 16))
 
             # Set palette with 16 colors
@@ -58,7 +58,7 @@ class TestSpriteValidator:
         """Test validation catches invalid dimensions"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create sprite with invalid dimensions
-            sprite_path = os.path.join(tmpdir, "bad_dims.png")
+            sprite_path = str(Path(tmpdir) / "bad_dims.png")
             img = Image.new("P", (15, 17))  # Not multiples of 8
             img.save(sprite_path)
 
@@ -75,7 +75,7 @@ class TestSpriteValidator:
         """Test validation catches too many colors"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create sprite with too many colors
-            sprite_path = os.path.join(tmpdir, "many_colors.png")
+            sprite_path = str(Path(tmpdir) / "many_colors.png")
             img = Image.new("P", (16, 16))
 
             # Set up palette first
@@ -103,7 +103,7 @@ class TestSpriteValidator:
     def test_validate_grayscale_sprite(self):
         """Test validation of grayscale sprite"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            sprite_path = os.path.join(tmpdir, "gray_sprite.png")
+            sprite_path = str(Path(tmpdir) / "gray_sprite.png")
             img = Image.new("L", (16, 16))
 
             # Fill with standard grayscale values (multiples of 17)
@@ -124,7 +124,7 @@ class TestSpriteValidator:
     def test_validate_non_standard_grayscale(self):
         """Test validation warns about non-standard grayscale values"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            sprite_path = os.path.join(tmpdir, "nonstandard_gray.png")
+            sprite_path = str(Path(tmpdir) / "nonstandard_gray.png")
             img = Image.new("L", (16, 16))
 
             # Fill with non-standard values
@@ -145,7 +145,7 @@ class TestSpriteValidator:
     def test_validate_large_sprite_warning(self):
         """Test validation warns about large sprites"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            sprite_path = os.path.join(tmpdir, "large_sprite.png")
+            sprite_path = str(Path(tmpdir) / "large_sprite.png")
             img = Image.new("P", (512, 512))  # Very large
             img.save(sprite_path)
 
@@ -162,7 +162,7 @@ class TestSpriteValidator:
         """Test compressed size estimation"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create sprite with few colors (should compress well)
-            sprite_path = os.path.join(tmpdir, "simple_sprite.png")
+            sprite_path = str(Path(tmpdir) / "simple_sprite.png")
             img = Image.new("P", (128, 128))
 
             # Fill with only 2 colors
@@ -187,8 +187,8 @@ class TestSpriteValidator:
         """Test sprite compatibility checking"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create two compatible sprites
-            sprite1_path = os.path.join(tmpdir, "sprite1.png")
-            sprite2_path = os.path.join(tmpdir, "sprite2.png")
+            sprite1_path = str(Path(tmpdir) / "sprite1.png")
+            sprite2_path = str(Path(tmpdir) / "sprite2.png")
 
             img1 = Image.new("P", (16, 16))
             img1.save(sprite1_path)
@@ -204,7 +204,7 @@ class TestSpriteValidator:
             assert len(reasons) == 0
 
             # Create incompatible sprite
-            sprite3_path = os.path.join(tmpdir, "sprite3.png")
+            sprite3_path = str(Path(tmpdir) / "sprite3.png")
             img3 = Image.new("P", (32, 32))  # Different size
             img3.save(sprite3_path)
 
@@ -218,14 +218,14 @@ class TestSpriteValidator:
         """Test validation against metadata"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create sprite
-            sprite_path = os.path.join(tmpdir, "sprite.png")
+            sprite_path = str(Path(tmpdir) / "sprite.png")
             img = Image.new("P", (128, 128))  # 256 tiles
             img.save(sprite_path)
 
             # Create metadata
-            metadata_path = os.path.join(tmpdir, "sprite.metadata.json")
+            metadata_path = str(Path(tmpdir) / "sprite.metadata.json")
             metadata = {"extraction": {"tile_count": 300}}  # Mismatch
-            with open(metadata_path, "w") as f:
+            with Path(metadata_path).open("w") as f:
                 json.dump(metadata, f)
 
             # Validate

@@ -43,8 +43,7 @@ class TestSpriteFinder:
         finder = SpriteFinder()
 
         # Read ROM data
-        with open(rom_path, 'rb') as f:
-            rom_data = f.read()
+        rom_data = Path(rom_path).read_bytes()
 
         # Find sprites at known locations
         sprites_found = []
@@ -84,8 +83,7 @@ class TestSpriteFinder:
         finder = SpriteFinder()
 
         # Read ROM
-        with open(rom_path, 'rb') as f:
-            rom_data = f.read()
+        rom_data = Path(rom_path).read_bytes()
 
         # Scan for sprites at known locations
         found_sprites = []
@@ -105,8 +103,7 @@ class TestSpriteFinder:
         finder = SpriteFinder()
 
         # Read ROM
-        with open(real_kirby_rom, 'rb') as f:
-            rom_data = f.read()
+        rom_data = Path(real_kirby_rom).read_bytes()
 
         # Known sprite locations in Kirby Super Star
         known_locations = [
@@ -186,8 +183,7 @@ class TestHALCompression:
         rom_info = test_rom_with_sprites
         rom_path = str(rom_info['path'])
 
-        with open(rom_path, 'rb') as f:
-            rom_data = f.read()
+        rom_data = Path(rom_path).read_bytes()
 
         compressor = HALCompressor()
 
@@ -262,8 +258,7 @@ class TestROMExtractor:
         output_path = tmp_path / "decompressed_sprite.bin"
 
         # Extract with decompression
-        with open(rom_path, 'rb') as f:
-            rom_data = f.read()
+        rom_data = Path(rom_path).read_bytes()
 
         # Use the injector to find and decompress
         compressed_size, decompressed_data = extractor.rom_injector.find_compressed_sprite(

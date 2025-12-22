@@ -234,7 +234,7 @@ class TestROMLoadingSafety:
                            )
 
             finally:
-                os.unlink(tmp_file.name)
+                Path(tmp_file.name).unlink()
 
     def test_clear_rom_ui_state(self, injection_dialog):
         """Test that ROM UI state is properly cleared"""
@@ -331,7 +331,7 @@ class TestPreviewWorkerSafety:
                 assert "beyond ROM size" in error_messages[0]
 
             finally:
-                os.unlink(tmp_file.name)
+                Path(tmp_file.name).unlink()
 
 class TestInputValidation:
     """Test input validation improvements"""

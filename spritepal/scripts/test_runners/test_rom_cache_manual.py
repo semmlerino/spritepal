@@ -4,15 +4,15 @@ from __future__ import annotations
 """Manual test runner for ROM cache functionality"""
 
 import inspect
-import os
 import sys
 import tempfile
 import traceback
+from pathlib import Path
 
 import core.services.rom_cache
 
 # Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # Direct imports with full module resolution
 import importlib
@@ -39,8 +39,8 @@ def test_basic_cache_operations():
         print(f"✓ Created cache at: {cache.cache_dir}")
 
         # Test ROM file
-        test_rom = os.path.join(tmpdir, "test.sfc")
-        with open(test_rom, "wb") as f:
+        test_rom = Path(tmpdir) / "test.sfc"
+        with test_rom.open("wb") as f:
             f.write(b"TEST_ROM_DATA" * 1000)
         print(f"✓ Created test ROM: {test_rom}")
 

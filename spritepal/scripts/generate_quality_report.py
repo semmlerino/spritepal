@@ -10,7 +10,6 @@ Designed for CI/CD integration and trend analysis.
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -29,7 +28,7 @@ class QualityReportGenerator:
     def load_json_report(self, file_path: str) -> dict[str, Any]:
         """Load a JSON report file safely."""
         try:
-            if os.path.exists(file_path):
+            if Path(file_path).exists():
                 with Path(file_path).open() as f:
                     return json.load(f)
             return {}

@@ -488,7 +488,7 @@ class HealthMonitor:
             "quick_wins_available": metrics.quick_wins_available,
         }
 
-        with open(filepath, 'w') as f:
+        with filepath.open('w') as f:
             json.dump(data, f, indent=2)
 
         return filepath
@@ -500,7 +500,7 @@ class HealthMonitor:
 
         for filepath in self.history_dir.glob("test_health_*.json"):
             try:
-                with open(filepath) as f:
+                with filepath.open() as f:
                     data = json.load(f)
 
                 timestamp = datetime.fromisoformat(data["timestamp"])

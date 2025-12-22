@@ -26,7 +26,7 @@ class SpriteClipboardHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith("sprite_clipboard.txt"):
             try:
-                with open(event.src_path) as f:
+                with Path(event.src_path).open() as f:
                     offset_str = f.read().strip()
 
                 # Parse offset (handles both 0x and $ prefix)
@@ -54,7 +54,7 @@ class SpriteSessionLoader:
     def load_session(filepath: Path) -> dict | None:
         """Load a sprite session JSON file."""
         try:
-            with open(filepath) as f:
+            with filepath.open() as f:
                 data = json.load(f)
                 logger.info(f"Loaded session with {len(data['sprites_found'])} sprites")
                 return data

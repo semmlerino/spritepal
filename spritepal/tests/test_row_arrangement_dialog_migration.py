@@ -44,7 +44,7 @@ class TestRowArrangementDialogMigration:
 
         # Cleanup
         with contextlib.suppress(Exception):
-            os.unlink(temp_file.name)
+            Path(temp_file.name).unlink()
 
     def test_row_arrangement_dialog_inherits_from_splitter_dialog(self, test_sprite_image, qtbot):
         """Test that RowArrangementDialog properly inherits from SplitterDialog"""

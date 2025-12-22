@@ -6,9 +6,10 @@ from __future__ import annotations
 import os
 import sys
 import unittest
+from pathlib import Path
 
 # Add spritepal to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # Disable Qt if not available
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'

@@ -92,7 +92,7 @@ class TestROMInjector(unittest.TestCase):
             assert header.rom_type_offset == 0x7FC0  # Should detect LoROM offset
 
         finally:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink()
 
     def test_checksum_calculation(self):
         """Test ROM checksum calculation"""
@@ -116,16 +116,13 @@ class TestROMInjector(unittest.TestCase):
     def test_sprite_location_finding(self):
         """Test finding sprite locations using real Kirby Super Star ROM"""
         # Use real ROM file for testing
-        rom_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "Kirby Super Star (USA).sfc"
-        )
+        rom_path = Path(__file__).parent.parent / "Kirby Super Star (USA).sfc"
 
         # Skip test if ROM file doesn't exist
-        if not os.path.exists(rom_path):
+        if not rom_path.exists():
             self.skipTest(f"ROM file not found: {rom_path}")
 
-        locations = self.injector.find_sprite_locations(rom_path)
+        locations = self.injector.find_sprite_locations(str(rom_path))
 
         # Should return known locations with new naming scheme
         assert "High_Quality_Sprite_1" in locations

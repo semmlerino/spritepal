@@ -77,7 +77,7 @@ def get_main_thread():
     app = QApplication.instance()
     return app.thread() if app else None
 
-from ui.components import DialogBase
+from ui.components.base.cleanup_dialog import CleanupDialog
 from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.dialogs.services import ViewStateManager
@@ -100,7 +100,7 @@ from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmart
 
 # SimpleBrowseTab, SimpleSmartTab, SimpleHistoryTab removed - now imported from ui.tabs.manual_offset
 
-class UnifiedManualOffsetDialog(DialogBase):
+class UnifiedManualOffsetDialog(CleanupDialog):
     """
     Unified Manual Offset Dialog combining simplified architecture with tab-based navigation.
 
@@ -722,7 +722,8 @@ class UnifiedManualOffsetDialog(DialogBase):
         """Check if ROM data is available."""
         return bool(self.rom_path and self.rom_size > 0)
 
-    def _cleanup_workers(self):
+    @override
+    def _cleanup_workers(self) -> None:
         """Clean up worker threads."""
         WorkerManager.cleanup_worker(self.preview_worker, timeout=2000)
         self.preview_worker = None

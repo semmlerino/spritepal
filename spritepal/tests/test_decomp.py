@@ -14,7 +14,7 @@ pytestmark = [
 Test decompression at a known sprite offset.
 """
 
-import os
+from pathlib import Path
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 from core.di_container import inject
@@ -29,11 +29,11 @@ def test_decompression():
     rom_extractor = extraction_manager.get_rom_extractor()
 
     test_rom = "Kirby Super Star (USA).sfc"
-    if not os.path.exists(test_rom):
+    if not Path(test_rom).exists():
         pytest.skip("Test ROM not found - skipping decompression test")
 
     # Read ROM data
-    with open(test_rom, "rb") as f:
+    with Path(test_rom).open("rb") as f:
         rom_data = f.read()
 
     # Test at a known sprite offset (Kirby main sprite)

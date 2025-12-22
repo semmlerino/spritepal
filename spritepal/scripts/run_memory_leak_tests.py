@@ -49,7 +49,7 @@ def run_baseline_measurements(profiler: MemoryLeakProfiler, output_dir: Path):
 
     # Save baseline metrics
     baseline_file = output_dir / "baseline_metrics.txt"
-    with open(baseline_file, "w") as f:
+    with baseline_file.open("w") as f:
         f.write("SpritePal Baseline Memory Metrics\n")
         f.write("=" * 40 + "\n")
         f.write(f"Timestamp: {baseline.timestamp}\n")
@@ -102,7 +102,7 @@ def run_dialog_leak_tests(profiler: MemoryLeakProfiler, cycles: int, output_dir:
 
             # Save individual results
             result_file = output_dir / f"{dialog_name}_leak_test.txt"
-            with open(result_file, "w") as f:
+            with result_file.open("w") as f:
                 f.write(f"{dialog_name} Memory Leak Test Results\n")
                 f.write("=" * 50 + "\n")
                 f.write(f"Cycles: {result.cycles_completed}\n")
@@ -149,9 +149,9 @@ def run_worker_leak_tests(profiler: MemoryLeakProfiler, operations: int, output_
             module = __import__(module_path, fromlist=[class_name])
             worker_class = getattr(module, class_name)
 
-            # Create worker factory
-            def worker_factory():
-                return worker_class()
+            # Create worker factory - bind worker_class to avoid late binding issue
+            def worker_factory(cls=worker_class):
+                return cls()
 
             # Run leak test
             result = profiler.profile_worker_operations(
@@ -161,7 +161,7 @@ def run_worker_leak_tests(profiler: MemoryLeakProfiler, operations: int, output_
 
             # Save individual results
             result_file = output_dir / f"{worker_name}_leak_test.txt"
-            with open(result_file, "w") as f:
+            with result_file.open("w") as f:
                 f.write(f"{worker_name} Memory Leak Test Results\n")
                 f.write("=" * 50 + "\n")
                 f.write(f"Operations: {result.cycles_completed}\n")
@@ -192,7 +192,7 @@ def generate_summary_report(profiler: MemoryLeakProfiler, output_dir: Path):
     """Generate summary report with key metrics."""
     summary_file = output_dir / "memory_leak_summary.txt"
 
-    with open(summary_file, "w") as f:
+    with summary_file.open("w") as f:
         f.write("SpritePal Memory Leak Test Summary\n")
         f.write("=" * 50 + "\n")
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
@@ -314,7 +314,7 @@ def main():
     run_worker_leak_tests(profiler, args.operations, args.output_dir)
 
     # Run extraction tests if ROM provided
-    if args.rom and os.path.exists(args.rom):
+    if args.rom and Path(args.rom).exists():
         print(f"\nRunning extraction leak tests with ROM: {args.rom}")
         try:
             profiler.profile_extraction_operations(args.rom, operations=10)
@@ -326,7 +326,7 @@ def main():
     full_report = profiler.generate_leak_report()
 
     report_file = args.output_dir / "comprehensive_leak_report.txt"
-    with open(report_file, "w") as f:
+    with report_file.open("w") as f:
         f.write(full_report)
 
     print(f"Comprehensive report saved to: {report_file}")

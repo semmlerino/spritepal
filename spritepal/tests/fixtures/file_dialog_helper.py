@@ -6,9 +6,9 @@ predetermined responses for testing without user interaction.
 """
 from __future__ import annotations
 
-import os
 import tempfile
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -174,14 +174,14 @@ class FileHelper:
         """Clean up all temporary files and directories"""
         for temp_file in self.temp_files:
             try:
-                if os.path.exists(temp_file):
-                    os.unlink(temp_file)
+                if Path(temp_file).exists():
+                    Path(temp_file).unlink()
             except Exception:
                 pass  # Ignore cleanup errors
 
         for temp_dir in self.temp_dirs:
             try:
-                if os.path.exists(temp_dir):
+                if Path(temp_dir).exists():
                     import shutil
                     shutil.rmtree(temp_dir)
             except Exception:

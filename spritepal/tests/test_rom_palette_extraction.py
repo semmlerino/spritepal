@@ -26,7 +26,7 @@ class TestROMPaletteExtraction:
 
     def create_test_rom_with_palettes(self, tmpdir):
         """Create a test ROM file with palette data"""
-        rom_path = os.path.join(tmpdir, "test.sfc")
+        rom_path = Path(tmpdir) / "test.sfc"
 
         # Create test ROM data
         rom_data = bytearray(0x300000)  # 3MB ROM
@@ -51,16 +51,16 @@ class TestROMPaletteExtraction:
                 rom_data[offset + 1] = (bgr555 >> 8) & 0xFF
 
         # Write ROM file
-        with open(rom_path, "wb") as f:
+        with rom_path.open("wb") as f:
             f.write(rom_data)
 
-        return rom_path, palette_offset
+        return str(rom_path), palette_offset
 
     def test_extract_single_palette(self):
         """Test extracting a single palette from ROM"""
         with tempfile.TemporaryDirectory() as tmpdir:
             rom_path, palette_offset = self.create_test_rom_with_palettes(tmpdir)
-            output_base = os.path.join(tmpdir, "test_sprite")
+            output_base = str(Path(tmpdir) / "test_sprite")
 
             # Extract palette 8
             files = self.extractor.extract_palettes_from_rom(
@@ -68,11 +68,11 @@ class TestROMPaletteExtraction:
             )
 
             assert len(files) == 1
-            assert os.path.exists(files[0])
+            assert Path(files[0]).exists()
             assert files[0].endswith("_pal8.pal.json")
 
             # Load and verify palette
-            with open(files[0]) as f:
+            with Path(files[0]).open() as f:
                 palette_data = json.load(f)
 
             assert "colors" in palette_data
@@ -87,7 +87,7 @@ class TestROMPaletteExtraction:
         """Test extracting multiple palettes from ROM"""
         with tempfile.TemporaryDirectory() as tmpdir:
             rom_path, palette_offset = self.create_test_rom_with_palettes(tmpdir)
-            output_base = os.path.join(tmpdir, "test_sprite")
+            output_base = str(Path(tmpdir) / "test_sprite")
 
             # Extract palettes 8-11 (typical Kirby palettes)
             files = self.extractor.extract_palettes_from_rom(
@@ -98,14 +98,14 @@ class TestROMPaletteExtraction:
 
             # Verify all files exist and have correct names
             for idx, pal_file in enumerate(files):
-                assert os.path.exists(pal_file)
+                assert Path(pal_file).exists()
                 assert f"_pal{8+idx}.pal.json" in pal_file
 
     def test_palette_bgr555_conversion(self):
         """Test BGR555 to RGB888 conversion"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create ROM with known palette values
-            rom_path = os.path.join(tmpdir, "test.sfc")
+            rom_path = Path(tmpdir) / "test.sfc"
             rom_data = bytearray(0x300000)
 
             # Set specific test colors at palette 0
@@ -122,17 +122,17 @@ class TestROMPaletteExtraction:
                 rom_data[palette_offset + i * 2] = bgr555 & 0xFF
                 rom_data[palette_offset + i * 2 + 1] = (bgr555 >> 8) & 0xFF
 
-            with open(rom_path, "wb") as f:
+            with rom_path.open("wb") as f:
                 f.write(rom_data)
 
             # Extract palette
-            output_base = os.path.join(tmpdir, "test")
+            output_base = str(Path(tmpdir) / "test")
             files = self.extractor.extract_palettes_from_rom(
-                rom_path, palette_offset, [0], output_base
+                str(rom_path), palette_offset, [0], output_base
             )
 
             # Load and verify colors
-            with open(files[0]) as f:
+            with Path(files[0]).open() as f:
                 palette_data = json.load(f)
 
             colors = palette_data["colors"]

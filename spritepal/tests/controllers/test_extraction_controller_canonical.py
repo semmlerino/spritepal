@@ -15,7 +15,6 @@ Key improvements:
 from __future__ import annotations
 
 import importlib
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -396,7 +395,7 @@ class TestExtractionControllerUnit:
         launch_command = mock_popen.call_args[0][0]
         assert launch_command[0] == sys.executable
         assert launch_command[1].endswith("launch_pixel_editor.py")
-        assert launch_command[2] == os.path.abspath(str(sprite_file))
+        assert launch_command[2] == str(Path(sprite_file).resolve())
         main_window.status_bar.showMessage.assert_called_once()
         assert "Opened" in main_window.status_bar.showMessage.call_args[0][0]
 

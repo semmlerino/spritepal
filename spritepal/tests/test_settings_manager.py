@@ -97,7 +97,7 @@ class TestSettingsManager:
             "ui": {"window_width": 1000},
         }
         settings_file = Path(temp_dir) / ".testapp_settings.json"
-        with open(settings_file, "w") as f:
+        with settings_file.open("w") as f:
             json.dump(settings_data, f)
 
         # Load settings - pass session_manager directly
@@ -113,7 +113,7 @@ class TestSettingsManager:
 
         # Create corrupted settings file
         settings_file = Path(temp_dir) / ".testapp_settings.json"
-        with open(settings_file, "w") as f:
+        with settings_file.open("w") as f:
             f.write("{ invalid json }")
 
         # Should return default settings - pass session_manager directly
@@ -133,7 +133,7 @@ class TestSettingsManager:
         settings_manager.save_settings()
 
         # Verify file contents
-        with open(settings_manager._test_settings_file) as f:
+        with settings_manager._test_settings_file.open() as f:
             saved_data = json.load(f)
 
         assert saved_data["session"]["vram_path"] == "/test/path.dmp"

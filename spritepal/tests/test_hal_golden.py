@@ -218,7 +218,7 @@ class TestRegenerateGolden:
 
         # Write checksums file
         checksums_file = golden_dir / "checksums.json"
-        with open(checksums_file, "w") as f:
+        with checksums_file.open("w") as f:
             json.dump(checksums, f, indent=2)
 
         print(f"\nGolden data regenerated at: {golden_dir}")

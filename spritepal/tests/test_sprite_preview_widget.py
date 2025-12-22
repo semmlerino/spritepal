@@ -56,7 +56,7 @@ class TestSpritePreviewWidget:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a test grayscale image
-            img_path = os.path.join(tmpdir, "test_gray.png")
+            img_path = str(Path(tmpdir) / "test_gray.png")
             img = Image.new("L", (16, 16), 128)
             img.save(img_path)
 
@@ -74,7 +74,7 @@ class TestSpritePreviewWidget:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a test indexed image
-            img_path = os.path.join(tmpdir, "test_indexed.png")
+            img_path = str(Path(tmpdir) / "test_indexed.png")
             img = Image.new("P", (16, 16))
             # Set a simple palette
             palette = []
@@ -97,7 +97,7 @@ class TestSpritePreviewWidget:
 
         # Load something first
         with tempfile.TemporaryDirectory() as tmpdir:
-            img_path = os.path.join(tmpdir, "test.png")
+            img_path = str(Path(tmpdir) / "test.png")
             img = Image.new("L", (16, 16))
             img.save(img_path)
             widget.load_sprite_from_png(img_path)

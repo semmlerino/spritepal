@@ -86,7 +86,7 @@ class TestLoggingIntegration:
             module_logger.info("Test message from module")
 
             log_file = log_dir / "spritepal.log"
-            with open(log_file) as f:
+            with log_file.open() as f:
                 content = f.read()
                 assert "Test message from module" in content
                 assert "spritepal.extractor" in content

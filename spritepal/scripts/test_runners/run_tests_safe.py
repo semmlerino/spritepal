@@ -11,6 +11,7 @@ See CLAUDE.md for details on the testing strategy.
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 
 class TestEnvironment:
@@ -27,7 +28,7 @@ class TestEnvironment:
         if sys.platform != "linux":
             return False
         try:
-            with open("/proc/version") as f:
+            with Path("/proc/version").open() as f:
                 return "microsoft" in f.read().lower()
         except OSError:
             return False

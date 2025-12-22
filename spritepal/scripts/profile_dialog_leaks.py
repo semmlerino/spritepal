@@ -332,7 +332,7 @@ def main():
 
         # Save results if output file specified
         if args.output and results:
-            with open(args.output, "w") as f:
+            with Path(args.output).open("w") as f:
                 f.write(f"Dialog Memory Leak Analysis: {args.dialog}\n")
                 f.write("=" * 50 + "\n")
                 f.write(f"Cycles: {results['cycles_completed']}\n")

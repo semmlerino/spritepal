@@ -11,9 +11,9 @@ and ROMExtractionPanel, ensuring proper:
 """
 from __future__ import annotations
 
-import os
 import tempfile
 import time
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -38,7 +38,7 @@ def temp_rom_file():
 
     # Cleanup
     try:
-        os.unlink(temp_path)
+        Path(temp_path).unlink()
     except Exception:
         # Caught exception during operation
         pass

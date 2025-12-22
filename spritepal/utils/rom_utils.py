@@ -7,13 +7,10 @@ from __future__ import annotations
 
 import logging
 import mmap
+from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

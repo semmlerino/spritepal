@@ -306,7 +306,7 @@ def main():
     # Get type checking data
     if args.input and Path(args.input).exists():
         # Load from existing JSON file
-        with open(args.input) as f:
+        with Path(args.input).open() as f:
             json_data = json.load(f)
     else:
         # Run basedpyright
@@ -326,7 +326,7 @@ def main():
 
     # Save report if requested
     if args.output:
-        with open(args.output, 'w') as f:
+        with Path(args.output).open('w') as f:
             json.dump(report, f, indent=2)
         print(f"\n💾 Report saved to: {args.output}")
 

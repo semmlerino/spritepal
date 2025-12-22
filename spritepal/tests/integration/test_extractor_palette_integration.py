@@ -99,7 +99,7 @@ class TestEndToEndWorkflow:
         assert pal_path.exists()
 
         # Verify palette file references the sprite
-        with open(pal_path) as f:
+        with pal_path.open() as f:
             pal_data = json.load(f)
 
         assert pal_data["source"]["companion_image"] == str(sprite_path)
@@ -134,7 +134,7 @@ class TestEndToEndWorkflow:
         # Check each has unique palette data
         palettes_data = []
         for pal_file in palette_files:
-            with open(pal_file) as f:
+            with Path(pal_file).open() as f:
                 palettes_data.append(json.load(f))
 
         # Each should have different palette index
@@ -211,7 +211,7 @@ class TestRealFilePatterns:
 
         # Verify palette files are valid JSON
         for pal_file in palette_files.values():
-            with open(pal_file) as f:
+            with Path(pal_file).open() as f:
                 data = json.load(f)
                 assert "palette" in data
                 assert "colors" in data["palette"]

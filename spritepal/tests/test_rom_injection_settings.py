@@ -47,8 +47,8 @@ class TestROMInjectionSettingsPersistence:
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
+        if Path(temp_path).exists():
+            Path(temp_path).unlink()
 
     @pytest.fixture
     def settings_manager(self, temp_settings_file):
@@ -67,7 +67,7 @@ class TestROMInjectionSettingsPersistence:
         def get_settings():
             # Load settings from the temp file for test verification
             try:
-                with open(temp_settings_file) as f:
+                with Path(temp_settings_file).open() as f:
                     return json.load(f)
             except Exception:
                 return {}

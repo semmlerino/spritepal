@@ -59,7 +59,7 @@ class InfrastructureAnalyzer:
     def _analyze_test_file(self, test_file: Path, results: dict):
         """Analyze a single test file for issues."""
         try:
-            with open(test_file, encoding="utf-8") as f:
+            with test_file.open(encoding="utf-8") as f:
                 content = f.read()
 
             # Parse AST
@@ -176,7 +176,7 @@ class InfrastructureAnalyzer:
 
         for conftest_file in conftest_files:
             try:
-                with open(conftest_file, encoding="utf-8") as f:
+                with conftest_file.open(encoding="utf-8") as f:
                     content = f.read()
 
                 tree = ast.parse(content)
@@ -304,7 +304,7 @@ if __name__ == "__main__":
 
     # Save report to file
     report_file = test_dir / "infrastructure_cleanup_report.txt"
-    with open(report_file, "w", encoding="utf-8") as f:
+    with report_file.open("w", encoding="utf-8") as f:
         f.write(report)
 
     print(f"\nReport saved to: {report_file}")

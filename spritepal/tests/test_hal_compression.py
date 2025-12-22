@@ -80,7 +80,7 @@ def save_restore_cwd() -> Generator[None, None, None]:
     Used for tests that need to change cwd to test tool detection from
     various directories.
     """
-    original_cwd = os.getcwd()
+    original_cwd = Path.cwd()
     yield
     os.chdir(original_cwd)
 
@@ -744,8 +744,8 @@ class TestHALToolDetection:
         # Create dummy executable files
         dummy_exhal.write_text("")
         dummy_inhal.write_text("")
-        os.chmod(dummy_exhal, 0o755)
-        os.chmod(dummy_inhal, 0o755)
+        dummy_exhal.chmod(0o755)
+        dummy_inhal.chmod(0o755)
 
         compressor = HALCompressor(
             exhal_path=str(dummy_exhal), inhal_path=str(dummy_inhal)

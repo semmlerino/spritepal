@@ -351,7 +351,7 @@ class TestROMCacheCore:
         rom_hash = rom_cache._get_rom_hash(test_rom_file)
         cache_file = rom_cache._get_cache_file_path(rom_hash, "sprite_locations")
 
-        with open(cache_file) as f:
+        with Path(cache_file).open() as f:
             cache_data = json.load(f)
 
         assert "rom_header" in cache_data
@@ -391,10 +391,10 @@ class TestROMCacheCore:
 
         # Modify ROM file and explicitly set mtime to future
         # (avoids brittle time.sleep on low-resolution filesystems)
-        with open(test_rom_file, "ab") as f:
+        with Path(test_rom_file).open("ab") as f:
             f.write(b"MODIFIED")
         # Force mtime change - add 2 seconds to ensure detection on any filesystem
-        current_stat = os.stat(test_rom_file)
+        current_stat = Path(test_rom_file).stat()
         os.utime(test_rom_file, (current_stat.st_atime, current_stat.st_mtime + 2))
 
         # Cache should be invalidated
@@ -634,8 +634,7 @@ class TestROMCacheCore:
                 raise PermissionError(msg)
             # Second call succeeds (fallback directory)
             # Actually create the directory
-            import os
-            os.makedirs(str(self), exist_ok=True)
+            Path(self).mkdir(parents=True, exist_ok=True)
 
         # Create a mock settings manager for this test
         class MockSettings:
@@ -828,7 +827,7 @@ class TestROMCacheErrorHandling:
         rom_hash = rom_cache._get_rom_hash(test_rom_file)
         cache_file = rom_cache._get_cache_file_path(rom_hash, "sprite_locations")
 
-        with open(cache_file, "w") as f:
+        with Path(cache_file).open("w") as f:
             f.write("{ corrupted json !!!")
 
         # Should return None instead of crashing
@@ -859,7 +858,7 @@ class TestROMCacheErrorHandling:
             "sprite_locations": {"test": {"offset": 0x1000}},
         }
 
-        with open(cache_file, "w") as f:
+        with Path(cache_file).open("w") as f:
             json.dump(cache_data, f)
 
         # Should return None for incompatible version

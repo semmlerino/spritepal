@@ -16,7 +16,6 @@ as well as the facade pattern implementation.
 """
 
 import json
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -73,7 +72,7 @@ class TestBasicFileValidator:
             assert result.file_info.exists
             assert result.file_info.is_readable
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_existence_with_permission_error(self):
         """Test validation fails with permission error."""
@@ -87,7 +86,7 @@ class TestBasicFileValidator:
             assert not result.is_valid
             assert "Permission denied" in result.error_message
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_properties_with_extension_check(self):
         """Test validation with extension requirements."""
@@ -108,7 +107,7 @@ class TestBasicFileValidator:
             assert not result.is_valid
             assert "Invalid file extension" in result.error_message
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_properties_with_size_constraints(self):
         """Test validation with size constraints."""
@@ -136,7 +135,7 @@ class TestBasicFileValidator:
             assert not result.is_valid
             assert "File too large" in result.error_message
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_get_file_info(self):
         """Test file info retrieval."""
@@ -152,7 +151,7 @@ class TestBasicFileValidator:
             assert info.path == tmp.name
             assert Path(info.resolved_path).is_absolute()
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_get_file_info_with_invalid_path(self):
         """Test file info retrieval with invalid path."""
@@ -355,7 +354,7 @@ class TestContentValidator:
             assert not result.is_valid
             assert "Invalid JSON format" in result.error_message
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_json_content_read_error(self):
         """Test JSON content validation with read error."""
@@ -372,7 +371,7 @@ class TestContentValidator:
             result = ContentValidator.validate_vram_header(tmp.name)
             assert result.is_valid
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_vram_header_truncated(self):
         """Test VRAM header validation with truncated file."""
@@ -384,7 +383,7 @@ class TestContentValidator:
             assert not result.is_valid
             assert "corrupted or truncated" in result.error_message
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_vram_header_read_error(self):
         """Test VRAM header validation with read error."""
@@ -412,7 +411,7 @@ class TestFileValidatorFacade:
             assert result.is_valid
             assert result.file_info is not None
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_json_file_complete(self):
         """Test complete JSON file validation through facade."""
@@ -423,7 +422,7 @@ class TestFileValidatorFacade:
             result = FileValidator.validate_json_file(tmp.name)
             assert result.is_valid
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_backward_compatibility_methods(self):
         """Test backward compatibility wrapper methods."""
@@ -445,7 +444,7 @@ class TestFileValidatorFacade:
             size_str = FileValidator._format_file_size(1024)
             assert size_str == "1KB"
 
-        os.unlink(tmp.name)
+        Path(tmp.name).unlink()
 
     def test_validate_file_existence_facade(self):
         """Test file existence validation through facade."""

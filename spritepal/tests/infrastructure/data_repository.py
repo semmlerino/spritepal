@@ -7,7 +7,6 @@ reliability and ensures tests use realistic data patterns.
 """
 from __future__ import annotations
 
-import os
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -297,8 +296,7 @@ class DataRepository:
             # Create 4bpp sprite data pattern
             vram_data[sprite_offset + i] = self._generate_sprite_byte(i)
 
-        with open(filepath, "wb") as f:
-            f.write(vram_data)
+        Path(filepath).write_bytes(vram_data)
 
         self._temp_files.append(filepath)
         return filepath
@@ -329,8 +327,7 @@ class DataRepository:
                     cgram_data[base_offset + color_idx * 2] = color & 0xFF
                     cgram_data[base_offset + color_idx * 2 + 1] = (color >> 8) & 0xFF
 
-        with open(filepath, "wb") as f:
-            f.write(cgram_data)
+        Path(filepath).write_bytes(cgram_data)
 
         self._temp_files.append(filepath)
         return filepath
@@ -350,8 +347,7 @@ class DataRepository:
             oam_data[base + 2] = i % 256        # Tile number
             oam_data[base + 3] = 0x20 | (i % 8) # Attributes (palette, etc.)
 
-        with open(filepath, "wb") as f:
-            f.write(oam_data)
+        Path(filepath).write_bytes(oam_data)
 
         self._temp_files.append(filepath)
         return filepath
@@ -377,8 +373,7 @@ class DataRepository:
                 for i in range(0x800):  # 2KB of sprite data
                     rom_data[offset + i] = self._generate_sprite_byte(i)
 
-        with open(filepath, "wb") as f:
-            f.write(rom_data)
+        Path(filepath).write_bytes(rom_data)
 
         self._temp_files.append(filepath)
         return filepath
@@ -433,13 +428,13 @@ class DataRepository:
         """Get path for a temporary file."""
         temp_dir = tempfile.mkdtemp(prefix="spritepal_test_")
         self._temp_dirs.append(temp_dir)
-        return os.path.join(temp_dir, filename)
+        return str(Path(temp_dir) / filename)
 
     def _get_temp_output_path(self, name: str) -> str:
         """Get path for temporary output."""
         temp_dir = tempfile.mkdtemp(prefix="spritepal_output_")
         self._temp_dirs.append(temp_dir)
-        return os.path.join(temp_dir, name)
+        return str(Path(temp_dir) / name)
 
     def list_available_data_sets(self) -> list[str]:
         """List all available data set names."""
@@ -462,13 +457,13 @@ class DataRepository:
         issues = []
 
         # Check file existence
-        if data_set.vram_path and not os.path.exists(data_set.vram_path):
+        if data_set.vram_path and not Path(data_set.vram_path).exists():
             issues.append(f"VRAM file missing: {data_set.vram_path}")
 
-        if data_set.cgram_path and not os.path.exists(data_set.cgram_path):
+        if data_set.cgram_path and not Path(data_set.cgram_path).exists():
             issues.append(f"CGRAM file missing: {data_set.cgram_path}")
 
-        if data_set.rom_path and not os.path.exists(data_set.rom_path):
+        if data_set.rom_path and not Path(data_set.rom_path).exists():
             issues.append(f"ROM file missing: {data_set.rom_path}")
 
         return {
@@ -488,15 +483,15 @@ class DataRepository:
         # Remove temporary files
         for filepath in self._temp_files:
             try:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
+                if Path(filepath).exists():
+                    Path(filepath).unlink()
             except Exception:
                 pass  # Ignore cleanup errors
 
         # Remove temporary directories
         for dirpath in self._temp_dirs:
             try:
-                if os.path.exists(dirpath):
+                if Path(dirpath).exists():
                     shutil.rmtree(dirpath)
             except Exception:
                 pass  # Ignore cleanup errors

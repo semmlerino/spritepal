@@ -12,6 +12,8 @@ These tests focus on memory-related bugs that were fixed:
 from __future__ import annotations
 
 import gc
+
+# Skip tests that use complex Qt widgets + event processing in offscreen mode
 import os
 import weakref
 from pathlib import Path
@@ -27,7 +29,6 @@ from tests.infrastructure.qt_real_testing import (
 )
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
-# Skip tests that use complex Qt widgets + event processing in offscreen mode
 _offscreen_mode = os.environ.get('QT_QPA_PLATFORM') == 'offscreen'
 skip_in_offscreen = pytest.mark.skipif(
     _offscreen_mode,
@@ -86,8 +87,7 @@ class MockROMCache:
 
         # Load ROM data
         try:
-            with open(rom_path, 'rb') as f:
-                data = f.read()
+            data = Path(rom_path).read_bytes()
 
             # Check if adding this would exceed cache limit
             if self._get_cache_size() + len(data) > self.max_cache_size:

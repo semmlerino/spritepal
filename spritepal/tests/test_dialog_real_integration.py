@@ -24,8 +24,8 @@ the dialog expectations to match headless behavior.
 """
 from __future__ import annotations
 
-import os
 import tempfile
+from pathlib import Path
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -384,8 +384,9 @@ class TestRealDialogIntegration:
         finally:
             dialog.close()
             # Clean up test file
-            if os.path.exists(test_file):
-                os.unlink(test_file)
+            test_file_path = Path(test_file)
+            if test_file_path.exists():
+                test_file_path.unlink()
 
     def test_real_grid_arrangement_dialog_vs_mocked_tile_extraction(self):
         """
@@ -439,8 +440,9 @@ class TestRealDialogIntegration:
 
         finally:
             dialog.close()
-            if os.path.exists(test_file):
-                os.unlink(test_file)
+            test_file_path = Path(test_file)
+            if test_file_path.exists():
+                test_file_path.unlink()
 
     def test_real_user_error_dialog_vs_mocked_error_display(self):
         """

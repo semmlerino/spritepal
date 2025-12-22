@@ -153,7 +153,7 @@ class TestCacheWorker:
         old_metadata = {"timestamp": time.time() - 90000}  # 25 hours ago
         cache_file = self.temp_dir / f"{cache_key}.cache"
 
-        with open(cache_file, "wb") as f:
+        with cache_file.open("wb") as f:
             meta_json = json.dumps(old_metadata).encode()
             f.write(len(meta_json).to_bytes(4, "little"))
             f.write(meta_json)

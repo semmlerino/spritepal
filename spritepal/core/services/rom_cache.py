@@ -8,9 +8,9 @@ import threading
 import time
 import uuid
 import zlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 try:
     from utils.logging_config import get_logger
@@ -311,7 +311,7 @@ class ROMCache:
         self,
         rom_path: str,
         scan_params: dict[str, int],
-        found_sprites: list[dict[str, object]],
+        found_sprites: Sequence[Mapping[str, Any]],  # pyright: ignore[reportExplicitAny] - sprite dicts have mixed types
         current_offset: int,
         completed: bool = False,
     ) -> bool:
