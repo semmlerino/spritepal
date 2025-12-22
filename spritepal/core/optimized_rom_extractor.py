@@ -13,7 +13,6 @@ import concurrent.futures
 import logging
 import time
 from collections.abc import Mapping
-from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, override
@@ -512,51 +511,3 @@ class OptimizedROMExtractor(ROMExtractor):
         self._rom_readers.clear()
 
         logger.info("Cleared all extractor caches")
-
-
-def benchmark_extraction(rom_path: str, offsets: list[int]) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - benchmark results contain mixed types
-    """
-    Benchmark extraction performance comparing original vs optimized.
-
-    Args:
-        rom_path: Path to ROM file
-        offsets: List of sprite offsets to test
-
-    Returns:
-        Performance comparison metrics
-    """
-    from core.di_container import inject
-    from core.protocols.manager_protocols import ROMExtractorProtocol
-
-    results = {}
-
-    # Test original extractor (via DI to get rom_cache dependency)
-    original = inject(ROMExtractorProtocol)
-    start = time.perf_counter()
-
-    for offset in offsets:
-        with suppress(Exception):
-            original.extract_sprite_data(rom_path, offset)
-
-    original_time = time.perf_counter() - start
-    results["original_time_ms"] = original_time * 1000
-
-    # Test optimized extractor
-    optimized = OptimizedROMExtractor(enable_parallel=True)
-    start = time.perf_counter()
-
-    optimized.extract_multiple_sprites(rom_path, offsets)
-
-    optimized_time = time.perf_counter() - start
-    results["optimized_time_ms"] = optimized_time * 1000
-
-    # Calculate improvement
-    results["speedup"] = original_time / max(optimized_time, 0.001)
-    results["cache_stats"] = optimized.get_cache_stats()
-
-    logger.info(
-        f"Benchmark results: {results['speedup']:.2f}x speedup "
-        f"({results['original_time_ms']:.1f}ms -> {results['optimized_time_ms']:.1f}ms)"
-    )
-
-    return results

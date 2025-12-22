@@ -1573,30 +1573,3 @@ class CoreOperationsManager(BaseManager):
         removed_count = rom_cache.clear_scan_progress_cache(rom_path, scan_params)
         self._logger.info(f"Scan progress cache cleared: {removed_count} files removed")
         return removed_count
-
-    # ========== Palette Operations ==========
-
-    def load_palette(self, cgram_path: str) -> dict[int, list[list[int]]]:
-        """Load palette from CGRAM dump."""
-        if not self._palette_manager:
-            raise ExtractionError("Palette manager not initialized")
-
-        self._palette_manager.load_cgram(cgram_path)
-        return self._palette_manager.get_sprite_palettes()
-
-    def get_palette(self, palette_index: int) -> list[list[int]]:
-        """Get a specific palette."""
-        if not self._palette_manager:
-            raise ExtractionError("Palette manager not initialized")
-
-        return self._palette_manager.get_palette(palette_index)
-
-    def create_palette_json(self, palette_index: int, output_path: str,
-                           companion_image: str | None = None) -> str:
-        """Create palette JSON file."""
-        if not self._palette_manager:
-            raise ExtractionError("Palette manager not initialized")
-
-        return self._palette_manager.create_palette_json(
-            palette_index, output_path, companion_image
-        )
