@@ -344,21 +344,23 @@ class ROMExtractor:
         """
         Find game configuration matching the ROM header.
 
+        Uses the unified game matching logic from SpriteConfigLoader which
+        prioritizes checksum matching (most reliable) and falls back to
+        flexible title matching with regional variant support.
+
         Args:
             header: ROM header information
 
         Returns:
             Game configuration dict or None if not found
         """
-        game_configs = self.sprite_config_loader.config_data.get("games", {})
-
-        # Find matching game config by title
-        for game_name, config in game_configs.items():
-            if game_name.upper() in header.title.upper():
-                logger.debug(f"Found game configuration: {game_name}")
-                return config
-
-        return None
+        # Use unified game matching (checksum + flexible title) from sprite_config_loader
+        game_name, config = self.sprite_config_loader.find_game_config(
+            header.title, header.checksum
+        )
+        if game_name:
+            logger.debug(f"Found game configuration: {game_name}")
+        return config
 
     def _load_default_palettes(
         self, sprite_name: str, output_base: str, rom_title: str = ""

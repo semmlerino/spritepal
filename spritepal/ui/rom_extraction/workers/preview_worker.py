@@ -153,13 +153,12 @@ class SpritePreviewWorker(BaseWorker):
                     if expected_size:
                         logger.debug(f"[PREVIEW_WORKER] Using expected size from config: {expected_size} bytes")
 
-                # Use smaller expected size for manual browsing to avoid oversized decompression
+                # Don't use hardcoded fallback sizes - let decompression return full data
+                # The rom_injector has a 64KB safety limit and will return actual decompressed size
+                # Using the actual decompressed size prevents truncation of valid sprites
                 if not expected_size:
-                    if self.sprite_name.startswith("manual_"):
-                        expected_size = 4096  # 4KB for manual browsing
-                    else:
-                        expected_size = 8192  # 8KB for known sprites
-                    logger.debug(f"Using default expected size: {expected_size} bytes")
+                    # Pass None - rom_injector will use 64KB max and return actual size
+                    logger.debug("[PREVIEW_WORKER] No config size - using full decompression")
 
                 # Try to decompress
                 from typing import cast

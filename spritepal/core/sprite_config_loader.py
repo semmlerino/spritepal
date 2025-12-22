@@ -5,6 +5,7 @@ Loads sprite locations from external configuration files
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -79,6 +80,82 @@ class SpriteConfigLoader:
         if "expected_size" in sprite_data:
             return int(sprite_data["expected_size"])
         return default
+
+    def find_game_config(
+        self, rom_title: str, rom_checksum: int
+    ) -> tuple[str | None, Mapping[str, object] | None]:
+        """
+        Find game configuration by checksum (preferred) or flexible title matching.
+
+        This method provides consistent game matching for both sprite extraction
+        and palette extraction, using checksum matching first (most reliable),
+        then falling back to flexible title matching with regional variant support.
+
+        Args:
+            rom_title: ROM title from header
+            rom_checksum: ROM checksum
+
+        Returns:
+            Tuple of (game_name, game_config) or (None, None) if not found
+        """
+        if "games" not in self.config_data:
+            return None, None
+
+        checksum_hex = f"0x{rom_checksum:04X}"
+
+        # Try to find matching game by checksum first (most reliable)
+        checksum_matched_game = None
+
+        for game_name, game_data in self.config_data["games"].items():
+            checksums = game_data.get("checksums", {})
+            for version, expected_checksum in checksums.items():
+                # Parse checksum
+                if isinstance(expected_checksum, str):
+                    expected = (
+                        int(expected_checksum, 16)
+                        if expected_checksum.startswith("0x")
+                        else int(expected_checksum)
+                    )
+                else:
+                    expected = expected_checksum
+
+                if rom_checksum == expected:
+                    checksum_matched_game = game_name
+                    logger.info(f"Found checksum match: {game_name} ({version}) = {checksum_hex}")
+                    break
+
+            if checksum_matched_game:
+                break
+
+        # Then try title matching with flexible patterns
+        title_matched_games = []
+        for game_name in self.config_data["games"]:
+            if self._title_matches(game_name, rom_title):
+                title_matched_games.append(game_name)
+                logger.debug(f"Title pattern match: '{game_name}' matches '{rom_title}'")
+
+        # Decide which game config to use
+        selected_game = None
+
+        if checksum_matched_game:
+            selected_game = checksum_matched_game
+            if selected_game not in title_matched_games:
+                logger.warning(
+                    f"ROM checksum {checksum_hex} matches '{selected_game}' but "
+                    f"title '{rom_title}' doesn't match expected pattern"
+                )
+        elif title_matched_games:
+            selected_game = title_matched_games[0]
+            logger.warning(
+                f"No checksum match for {checksum_hex}, using title match: '{selected_game}'"
+            )
+        else:
+            logger.debug(
+                f"No game configuration found for ROM: title='{rom_title}', checksum={checksum_hex}"
+            )
+            return None, None
+
+        return selected_game, self.config_data["games"][selected_game]
 
     def get_game_sprites(
         self, rom_title: str, rom_checksum: int

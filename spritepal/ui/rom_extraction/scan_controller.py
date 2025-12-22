@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
+from pathlib import Path
 from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
 
@@ -48,6 +49,46 @@ if TYPE_CHECKING:
     )
 
 logger = get_logger(__name__)
+
+
+# ROM scan default parameters
+_ROM_SCAN_START_DEFAULT = 0x40000  # Skip headers and early data
+_ROM_SCAN_END_MAX = 0x400000  # Cap at 4MB for SNES ROMs
+
+
+def compute_scan_params(
+    rom_path: str,
+    start_offset: int | None = None,
+    end_offset: int | None = None,
+    step: int | None = None,
+) -> dict[str, int]:
+    """Compute scan parameters from ROM size.
+
+    This function ensures consistency between cache key generation and
+    actual scan execution by centralizing parameter computation.
+
+    Args:
+        rom_path: Path to the ROM file
+        start_offset: Optional custom start offset (defaults to 0x40000)
+        end_offset: Optional custom end offset (defaults to min(rom_size, 0x400000))
+        step: Optional step size (defaults to 0x100 for alignment)
+
+    Returns:
+        Dict with keys: start_offset, end_offset, alignment
+    """
+    if start_offset is not None and end_offset is not None:
+        return {
+            "start_offset": start_offset,
+            "end_offset": end_offset,
+            "alignment": step if step is not None else 0x100,
+        }
+
+    rom_size = Path(rom_path).stat().st_size
+    return {
+        "start_offset": _ROM_SCAN_START_DEFAULT,
+        "end_offset": min(rom_size, _ROM_SCAN_END_MAX),
+        "alignment": step if step is not None else 0x100,
+    }
 
 
 class ScanDialog(QDialog):
@@ -345,12 +386,8 @@ class ScanController(QObject):
 
         rom_cache = inject(ROMCacheProtocol)
 
-        # Define scan parameters (must match SpriteScanWorker)
-        scan_params = {
-            "start_offset": 0xC0000,
-            "end_offset": 0xF0000,
-            "alignment": 0x100
-        }
+        # Compute scan parameters from ROM size (matches SpriteScanWorker)
+        scan_params = compute_scan_params(rom_path)
 
         partial_cache = rom_cache.get_partial_scan_results(rom_path, scan_params)
 

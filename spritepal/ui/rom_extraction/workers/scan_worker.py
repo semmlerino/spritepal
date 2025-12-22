@@ -49,6 +49,11 @@ class SpriteScanWorker(BaseWorker):
     progress_detailed = Signal(int, int)
     """Emitted with detailed progress. Args: current_offset, total_offsets."""
 
+    # Default scan parameters (consistent with scan_controller.py)
+    _ROM_SCAN_START_DEFAULT = 0x40000  # Skip headers and early data
+    _ROM_SCAN_END_MAX = 0x400000  # Cap at 4MB for SNES ROMs
+    _DEFAULT_STEP = 0x100  # Default step/alignment
+
     def __init__(self, rom_path: str, extractor: ROMExtractorProtocol | None = None, use_cache: bool = True,
                  start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None, *,
                  rom_cache: ROMCacheProtocol,
@@ -62,10 +67,13 @@ class SpriteScanWorker(BaseWorker):
         self.custom_end_offset = end_offset      # Custom scan range
         self._last_save_progress = 0
         self._cancellation_token = threading.Event()
+
+        # Store step and wire it to ParallelSpriteFinder
+        self._step = step if step is not None else self._DEFAULT_STEP
         self._parallel_finder = parallel_finder or ParallelSpriteFinder(
             num_workers=4,
             chunk_size=0x40000,  # 256KB chunks
-            step_size=0x100      # 256-byte alignment
+            step_size=self._step  # Use configured step (was hardcoded 0x100)
         )
 
         # Assign rom_cache
@@ -88,20 +96,19 @@ class SpriteScanWorker(BaseWorker):
             rom_size = Path(self.rom_path).stat().st_size
 
             # Default to scanning the entire ROM with reasonable limits
-            # Start from 0x40000 to skip headers and early data
-            # End at ROM size or reasonable max (4MB for SNES ROMs)
-            start_offset = 0x40000  # Skip headers and early data
-            end_offset = min(rom_size, 0x400000)  # Cap at 4MB for safety
+            # Use class constants to stay consistent with scan_controller
+            start_offset = self._ROM_SCAN_START_DEFAULT
+            end_offset = min(rom_size, self._ROM_SCAN_END_MAX)
 
             logger.info(f"Scanning entire ROM: 0x{start_offset:X} to 0x{end_offset:X} (ROM size: 0x{rom_size:X})")
 
         found_sprites = {}  # Track unique sprites by offset
 
-        # Define scan parameters for cache
+        # Define scan parameters for cache (must match scan_controller.compute_scan_params)
         scan_params = {
             "start_offset": start_offset,
             "end_offset": end_offset,
-            "alignment": 0x100
+            "alignment": self._step,  # Use configured step for cache key consistency
         }
 
         # Initialize cache if enabled

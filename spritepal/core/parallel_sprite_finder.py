@@ -259,7 +259,18 @@ class ParallelSpriteFinder:
                 results.append(result)
 
                 # Skip ahead past this sprite
-                skip_distance = max(scan_result.compressed_size, self.step_size)
+                # Use confidence-based skip distance to avoid missing sprites
+                # when compressed_size estimation is unreliable
+                if scan_result.confidence >= 0.8:
+                    # High confidence - trust compressed_size
+                    skip_distance = max(scan_result.compressed_size, self.step_size)
+                else:
+                    # Low confidence - cap skip distance to avoid missing sprites
+                    # when HAL parsing might have overestimated compressed_size
+                    skip_distance = min(
+                        max(scan_result.compressed_size, self.step_size),
+                        self.step_size * 2
+                    )
                 offset += skip_distance
             else:
                 # Move to next offset

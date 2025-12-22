@@ -283,6 +283,7 @@ class TestROMExtractorMainExtraction:
 
         # Mock sprite config loader to return empty dict (no sprite config found)
         mock_extractor.sprite_config_loader.get_game_sprites.return_value = {}
+        mock_extractor.sprite_config_loader.find_game_config.return_value = (None, None)
 
         # Mock palette extraction (no palettes found)
         mock_extractor.sprite_config_loader.config_data = {"games": {}}
@@ -340,6 +341,9 @@ class TestROMExtractorMainExtraction:
         mock_extractor.sprite_config_loader.config_data = {
             "games": {"KIRBY SUPER STAR": mock_game_config}
         }
+        mock_extractor.sprite_config_loader.find_game_config.return_value = (
+            "KIRBY SUPER STAR", mock_game_config
+        )
 
         # Mock palette extraction
         mock_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (
@@ -380,6 +384,7 @@ class TestROMExtractorMainExtraction:
 
         # Mock sprite config loader to return empty dict (no sprite config found)
         mock_extractor.sprite_config_loader.get_game_sprites.return_value = {}
+        mock_extractor.sprite_config_loader.find_game_config.return_value = (None, None)
 
         # Mock no ROM palettes available
         mock_extractor.sprite_config_loader.config_data = {"games": {}}
