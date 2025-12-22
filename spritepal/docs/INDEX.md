@@ -1,79 +1,73 @@
 # SpritePal Documentation Index
 
-This is the central entry point for all SpritePal documentation. Start here to find what you need.
+This is the central entry point for all SpritePal documentation.
 
 ## Getting Started
 
 | Document | Purpose |
 |----------|---------|
-| [README.md](../README.md) | Project overview, installation, and quick start |
-| [CLAUDE.md](../CLAUDE.md) | Development workflow and tooling |
+| [README.md](../README.md) | Project overview, installation, quick start |
+| [CLAUDE.md](../CLAUDE.md) | Development workflow, tooling, testing quick reference |
 
-## Architecture
-
-| Document | Purpose |
-|----------|---------|
-| [architecture.md](architecture.md) | Layer structure, import rules, **DI patterns**, **singletons & cleanup** |
-
-## UI Development
+## Core Documentation
 
 | Document | Purpose |
 |----------|---------|
-| [dialog_development_guide.md](dialog_development_guide.md) | Dialog patterns, singleton dialogs, lifecycle management |
-| [main_window_flows.md](main_window_flows.md) | Key user action flows through MainWindow |
+| [architecture.md](architecture.md) | Layer structure, import rules, DI, dialogs, singletons |
+| [application_flows.md](application_flows.md) | Initialization, extraction, injection, error flows |
+| [qt_patterns.md](qt_patterns.md) | Signals, workers, Qt testing best practices |
+| [testing_guide.md](testing_guide.md) | Comprehensive testing patterns |
+| [configuration_guide.md](configuration_guide.md) | Settings and configuration system |
 
-## Testing
+## Test Documentation
 
 | Document | Purpose |
 |----------|---------|
-| [tests/README.md](../tests/README.md) | Test suite overview, **fixture quick reference** |
-| [testing_guide.md](testing_guide.md) | Comprehensive testing patterns (Qt, threading, mocking) |
-| [QT_TESTING_BEST_PRACTICES.md](QT_TESTING_BEST_PRACTICES.md) | pytest-qt specific patterns |
-| [WORKER_PATTERNS.md](WORKER_PATTERNS.md) | Background worker patterns and lifecycle |
+| [tests/README.md](../tests/README.md) | Test suite overview, fixtures, headless testing |
 
 ## Domain Knowledge
 
 | Document | Purpose |
 |----------|---------|
-| [SPRITE_LEARNINGS_DO_NOT_DELETE.md](../SPRITE_LEARNINGS_DO_NOT_DELETE.md) | Sprite extraction knowledge, SNES formats |
-| [DEV_NOTES.md](../DEV_NOTES.md) | Mesen2 integration notes, historical context |
+| [SPRITE_LEARNINGS_DO_NOT_DELETE.md](../SPRITE_LEARNINGS_DO_NOT_DELETE.md) | Sprite extraction, SNES formats, ROM structure |
 
 ## Quick Reference
 
 ### Common Tasks
 
-- **Add a new feature**: Start with [architecture.md](architecture.md) for import rules
-- **Write tests**: See [tests/README.md](../tests/README.md) § Fixture Quick Reference
-- **Create a dialog**: Follow [dialog_development_guide.md](dialog_development_guide.md)
-- **Understand DI**: Read [architecture.md](architecture.md) § Dependency Injection
-- **Debug singleton issues**: Check [architecture.md](architecture.md) § Singletons and Cleanup
-- **Trace MainWindow flows**: See [main_window_flows.md](main_window_flows.md)
+| Task | Document |
+|------|----------|
+| Add a new feature | [architecture.md](architecture.md) → Import Rules |
+| Write tests | [tests/README.md](../tests/README.md) → Fixture Quick Reference |
+| Create a dialog | [architecture.md](architecture.md) → Dialog Patterns |
+| Understand DI | [architecture.md](architecture.md) → Dependency Injection |
+| Debug singletons | [architecture.md](architecture.md) → Singletons and Cleanup |
+| Trace data flows | [application_flows.md](application_flows.md) |
+| Qt signals/workers | [qt_patterns.md](qt_patterns.md) |
 
 ### Key Commands
 
 ```bash
-# From spritepal/ directory
-
 # Lint
 uv run ruff check .
-uv run ruff check . --fix  # Auto-fix
+uv run ruff check . --fix
 
 # Type check
 uv run basedpyright core ui utils
 
-# Run tests (QT_QPA_PLATFORM=offscreen is set automatically by conftest.py)
+# Run tests
 uv run pytest
 
-# Quick triage for large test suite
+# Quick triage
 uv run pytest --tb=no -q
 
-# Re-run failures with details
+# Re-run failures
 uv run pytest --lf -vv --tb=short
 
-# Run specific test (serial, verbose)
+# Specific test (serial, verbose)
 uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 ```
 
 ---
 
-*Last updated: December 21, 2025*
+*Last updated: December 23, 2025*

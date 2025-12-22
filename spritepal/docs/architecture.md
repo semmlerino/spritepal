@@ -20,7 +20,7 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
 └─────────────────────────────────────┘
 ```
 
-**For detailed data flow diagrams**, see [data_flow_guide.md](./data_flow_guide.md).
+**For detailed data flow diagrams**, see [application_flows.md](./application_flows.md).
 
 ### Import Rules
 
@@ -216,16 +216,16 @@ Test files have more flexibility but should follow these guidelines:
 2. **Code Review**: Check imports follow these rules
 3. **CI/CD**: Automated checks for import violations
 
-### Dialog Initialization Pattern
+### Dialog Patterns
+
+#### Initialization Pattern
 
 All dialogs should follow the initialization pattern enforced by `DialogBase`:
 
 ```python
-from spritepal.ui.components.base import DialogBase
-
 class MyDialog(DialogBase):
     def __init__(self, parent: QWidget | None = None):
-        # Step 1: Declare ALL instance variables
+        # Step 1: Declare ALL instance variables BEFORE super()
         self.my_widget: QWidget | None = None
         self.my_data: list[str] = []
 
@@ -237,7 +237,44 @@ class MyDialog(DialogBase):
         self.my_widget = QPushButton("Click me")
 ```
 
-This prevents the common bug where instance variables declared after `_setup_ui()` overwrite already-created widgets.
+#### Dialog Lifecycle Types
+
+| Type | Parent | WA_DeleteOnClose | closeEvent | Use For |
+|------|--------|------------------|------------|---------|
+| One-time | Required | True (default) | Default | File dialogs, message boxes |
+| Singleton | **None** | False | Hide, ignore | Persistent tool windows |
+| Reusable | Optional | False | Hide, ignore | Frequently used dialogs |
+
+#### Singleton Dialog Pattern
+
+**Critical**: Singleton dialogs must be parentless to survive parent deletion.
+
+```python
+class SingletonDialog(BaseDialog):
+    _instance: ClassVar["SingletonDialog | None"] = None
+
+    @classmethod
+    def get_instance(cls, parent: QWidget | None = None) -> "SingletonDialog":
+        if cls._instance is None:
+            cls._instance = cls(parent=None)  # ALWAYS None
+        return cls._instance
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent=None, title="Singleton")  # ALWAYS None
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+
+    def closeEvent(self, event: QCloseEvent):
+        event.ignore()
+        self.hide()  # Hide instead of close
+```
+
+#### Red Flags in Code Review
+
+- Singleton with parent parameter used
+- No WA_DeleteOnClose=False for singletons/reusables
+- No closeEvent override for singletons
+- Only mock-based dialog tests (no real Qt lifecycle tests)
 
 ---
 
@@ -521,4 +558,4 @@ The adapter pattern allows:
 
 ---
 
-*Last updated: December 22, 2025*
+*Last updated: December 23, 2025*

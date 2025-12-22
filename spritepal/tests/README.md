@@ -365,10 +365,36 @@ All timeouts scale with `PYTEST_TIMEOUT_MULTIPLIER` environment variable.
 - **Comprehensive Data**: Full workflow tests (10KB+ test files)
 - **Consistent Paths**: Use `DataRepository` for reliable test data
 
-## Documentation
+## Headless Testing
 
-- **[Real Component Testing Guide](infrastructure/REAL_COMPONENT_TESTING_GUIDE.md)**: Comprehensive patterns and migration guide
-- **[Environment Detection](infrastructure/ENVIRONMENT_DETECTION_SUMMARY.md)**: Test environment detection and skip decorators
+Tests run in headless mode via Qt's offscreen platform:
+- `tests/conftest.py` sets `QT_QPA_PLATFORM=offscreen` automatically
+- Tests marked `@pytest.mark.gui` run with offscreen backend (not skipped)
+- Tests marked `@pytest.mark.requires_display` are skipped when offscreen
+
+```bash
+# All tests work in headless mode
+uv run pytest tests/ -v
+
+# Force offscreen explicitly (rarely needed)
+QT_QPA_PLATFORM=offscreen uv run pytest tests/ -v
+```
+
+## Environment Detection
+
+The `tests/infrastructure/environment_detection.py` module provides:
+
+| Function | Description |
+|----------|-------------|
+| `is_headless_environment()` | True if offscreen, WSL, or no DISPLAY |
+| `is_ci_environment()` | True if `CI` env var is set |
+| `is_wsl_environment()` | True if running in WSL/WSL2 |
+
+| Decorator | Effect |
+|-----------|--------|
+| `@skip_if_wsl` | Skip in WSL environments |
+| `@skip_if_no_display` | Skip if no display available |
+| `@requires_display` | Alias for `@skip_if_no_display` |
 
 ## Recent Test Suite Improvements
 
@@ -447,4 +473,4 @@ The real component testing migration is **ongoing** (128 test files, ~2000+ test
 
 ---
 
-*Last updated: December 21, 2025*
+*Last updated: December 23, 2025*
