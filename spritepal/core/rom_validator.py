@@ -196,19 +196,23 @@ class ROMValidator:
         return checksum, complement
 
     @classmethod
-    def verify_rom_checksum(cls, rom_path: str, header: ROMHeader) -> bool:
+    def verify_rom_checksum(
+        cls, rom_path: str, header: ROMHeader, lenient: bool = False
+    ) -> bool:
         """
         Verify ROM checksum matches header.
 
         Args:
             rom_path: Path to ROM file
             header: ROMHeader from validate_rom_header()
+            lenient: If True, log warning on mismatch instead of raising exception.
+                     Useful for patched/modified ROMs with intentionally invalid checksums.
 
         Returns:
-            True if checksum is valid
+            True if checksum is valid, False if mismatch in lenient mode
 
         Raises:
-            ROMChecksumError: If checksum validation fails
+            ROMChecksumError: If checksum validation fails (only when lenient=False)
         """
         with Path(rom_path).open("rb") as f:
             rom_data = f.read()
@@ -216,10 +220,14 @@ class ROMValidator:
         calculated_checksum, _ = cls.calculate_checksum(rom_data, header.header_offset)
 
         if calculated_checksum != header.checksum:
-            raise ROMChecksumError(
+            msg = (
                 f"ROM checksum mismatch: expected 0x{header.checksum:04X}, "
                 f"got 0x{calculated_checksum:04X}"
             )
+            if lenient:
+                logger.warning(f"{msg} (continuing in lenient mode)")
+                return False
+            raise ROMChecksumError(msg)
 
         logger.info("ROM checksum verified successfully")
         return True
@@ -272,10 +280,16 @@ class ROMValidator:
 
     @classmethod
     def validate_rom_for_injection(
-        cls, rom_path: str, sprite_offset: int
+        cls, rom_path: str, sprite_offset: int, lenient_checksum: bool = False
     ) -> tuple[ROMHeader, int]:
         """
         Complete ROM validation for injection.
+
+        Args:
+            rom_path: Path to ROM file
+            sprite_offset: Offset in ROM where sprite is located
+            lenient_checksum: If True, warn on checksum mismatch instead of failing.
+                              Useful for patched/modified ROMs.
 
         Returns:
             Tuple of (ROMHeader, smc_header_offset)
@@ -292,7 +306,7 @@ class ROMValidator:
         header, smc_header_offset = cls.validate_rom_header(rom_path)
 
         # Checksum validation
-        cls.verify_rom_checksum(rom_path, header)
+        cls.verify_rom_checksum(rom_path, header, lenient=lenient_checksum)
 
         # Validate sprite offset
         file_size = Path(rom_path).stat().st_size

@@ -287,6 +287,7 @@ class TestROMExtractorMainExtraction:
         # Mock palette extraction (no palettes found)
         mock_extractor.sprite_config_loader.config_data = {"games": {}}
         mock_extractor.default_palette_loader.has_default_palettes.return_value = False
+        mock_extractor.default_palette_loader.has_palettes_for_rom_title.return_value = False
 
         output_path, extraction_info = mock_extractor.extract_sprite_from_rom(
             str(rom_path), 0x8000, str(output_base), "test_sprite"

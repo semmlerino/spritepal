@@ -58,6 +58,28 @@ class SpriteConfigLoader:
         except (OSError, json.JSONDecodeError):
             logger.exception("Failed to load sprite config")
 
+    @staticmethod
+    def _get_size_field(
+        sprite_data: dict[str, Any], default: int = 8192  # pyright: ignore[reportExplicitAny]
+    ) -> int:
+        """
+        Get sprite size from config, supporting both field name conventions.
+
+        Args:
+            sprite_data: Sprite configuration dictionary
+            default: Default size if neither field is present
+
+        Returns:
+            Sprite size in bytes
+        """
+        # Prefer 'estimated_size' for backward compatibility with existing code
+        if "estimated_size" in sprite_data:
+            return int(sprite_data["estimated_size"])
+        # Fall back to 'expected_size' (used in newer JSON configs from scanner)
+        if "expected_size" in sprite_data:
+            return int(sprite_data["expected_size"])
+        return default
+
     def get_game_sprites(
         self, rom_title: str, rom_checksum: int
     ) -> dict[str, SpriteConfig]:
@@ -153,6 +175,9 @@ class SpriteConfigLoader:
         game_data = self.config_data["games"][selected_game]
         logger.info(f"Loading sprite configurations from: {selected_game}")
 
+        # Get game-level offset_variants for fallback (some configs store variants at game level)
+        game_level_variants = game_data.get("offset_variants", {})
+
         for sprite_name, sprite_data in game_data.get("sprites", {}).items():
             # Skip metadata entries like "_note"
             if sprite_name.startswith("_"):
@@ -165,10 +190,18 @@ class SpriteConfigLoader:
                 else int(offset_str)
             )
 
-            # Get offset variants if available
+            # Get offset variants if available (sprite-level first, then game-level fallback)
             offset_variants = None
-            if selected_version and "offset_variants" in sprite_data:
-                version_variants = sprite_data["offset_variants"].get(selected_version, [])
+            if selected_version:
+                # Check sprite-level offset_variants first
+                if "offset_variants" in sprite_data:
+                    version_variants = sprite_data["offset_variants"].get(selected_version, [])
+                # Fall back to game-level offset_variants
+                elif game_level_variants:
+                    version_variants = game_level_variants.get(selected_version, [])
+                else:
+                    version_variants = []
+
                 if version_variants:
                     # Convert hex strings to integers
                     offset_variants = []
@@ -192,7 +225,7 @@ class SpriteConfigLoader:
                 offset=offset,
                 description=sprite_data.get("description", ""),
                 compressed=sprite_data.get("compressed", True),
-                estimated_size=sprite_data.get("estimated_size", 8192),
+                estimated_size=self._get_size_field(sprite_data),
                 palette_indices=sprite_data.get("palette_indices", None),
                 offset_variants=offset_variants,
             )
@@ -262,7 +295,7 @@ class SpriteConfigLoader:
                     offset=offset,
                     description=sprite_data.get("description", ""),
                     compressed=sprite_data.get("compressed", True),
-                    estimated_size=sprite_data.get("estimated_size", 8192),
+                    estimated_size=self._get_size_field(sprite_data),
                     palette_indices=sprite_data.get("palette_indices", None),
                 )
 

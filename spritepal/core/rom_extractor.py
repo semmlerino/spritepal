@@ -56,9 +56,8 @@ from utils.constants import (
     TYPICAL_SPRITE_MIN,
 )
 from utils.logging_config import get_logger
-
-# from utils.rom_cache import get_rom_cache # Removed due to DI
 from utils.rom_exceptions import ROMCompressionError
+from utils.rom_utils import detect_smc_offset
 
 logger: logging.Logger = get_logger(__name__)
 
@@ -170,7 +169,9 @@ class ROMExtractor:
 
             # Stage 6: Fall back to default palettes if needed
             if not palette_files and sprite_name:
-                palette_files = self._load_default_palettes(sprite_name, output_base)
+                palette_files = self._load_default_palettes(
+                    sprite_name, output_base, header.title
+                )
 
             if not palette_files:
                 logger.info("No palettes available - sprite will be grayscale in editor")
@@ -359,17 +360,21 @@ class ROMExtractor:
 
         return None
 
-    def _load_default_palettes(self, sprite_name: str, output_base: str) -> list[str]:
+    def _load_default_palettes(
+        self, sprite_name: str, output_base: str, rom_title: str = ""
+    ) -> list[str]:
         """
         Load default palettes as fallback.
 
         Args:
             sprite_name: Name of the sprite
             output_base: Base path for output files
+            rom_title: ROM title for fallback lookup when sprite name doesn't match
 
         Returns:
             List of palette file paths
         """
+        # Try sprite name first
         if self.default_palette_loader.has_default_palettes(sprite_name):
             logger.info(f"Falling back to default palettes for {sprite_name}")
             palette_files = self.default_palette_loader.create_palette_files(
@@ -379,6 +384,24 @@ class ROMExtractor:
             for pf in palette_files:
                 logger.debug(f"  - {Path(pf).name}")
             return palette_files
+
+        # Fall back to ROM title lookup (for generic sprite names like "High_Quality_Sprite_1")
+        if rom_title and self.default_palette_loader.has_palettes_for_rom_title(rom_title):
+            palette_key = self.default_palette_loader.get_palette_key_for_rom_title(rom_title)
+            if palette_key:
+                logger.info(
+                    f"Falling back to default palettes for ROM title: "
+                    f"{rom_title} -> {palette_key}"
+                )
+                palette_files = self.default_palette_loader.create_palette_files(
+                    palette_key, output_base
+                )
+                logger.info(
+                    f"Created {len(palette_files)} default palette files via ROM title"
+                )
+                for pf in palette_files:
+                    logger.debug(f"  - {Path(pf).name}")
+                return palette_files
 
         return []
 
@@ -671,9 +694,8 @@ class ROMExtractor:
         with Path(rom_path).open("rb") as rom_file:
             rom_data = rom_file.read()
 
-        # Detect and strip SMC header (512 bytes present when file_size % 1024 == 512)
-        file_size = len(rom_data)
-        smc_offset = 512 if file_size % 1024 == 512 else 0
+        # Detect and strip SMC header
+        smc_offset = detect_smc_offset(rom_data)
         if smc_offset > 0:
             logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
             rom_data = rom_data[smc_offset:]
