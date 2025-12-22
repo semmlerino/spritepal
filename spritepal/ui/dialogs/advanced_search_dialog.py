@@ -39,6 +39,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from PIL import Image
+
 from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
 from core.services.preview_generator import PreviewGenerator, PreviewRequest
 from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngine
@@ -183,9 +185,12 @@ class SearchWorker(BaseWorker):
         """Run visual similarity search."""
         try:
             rom_path = str(self.params["rom_path"])
-            ref_offset = int(self.params["reference_offset"])
             similarity_threshold = float(self.params["similarity_threshold"])
             self.params["search_scope"]
+
+            # Determine search mode: offset or image file
+            ref_offset = self.params.get("reference_offset")
+            image_path = self.params.get("image_path")
 
             # Initialize similarity engine
             similarity_engine = VisualSimilarityEngine()
@@ -207,15 +212,32 @@ class SearchWorker(BaseWorker):
             # Search for similar sprites
             max_results = int(self.params.get("max_results", 50))
 
-            if ref_offset not in similarity_engine.sprite_database:
-                self.error.emit(f"Reference sprite at 0x{ref_offset:X} not found in index")
-                return
+            # Determine the search target (offset or image)
+            target: Image.Image | int
+            if image_path is not None:
+                # Load the uploaded image
+                try:
+                    target = Image.open(image_path)
+                    # Convert to RGBA for consistent processing
+                    if target.mode != "RGBA":
+                        target = target.convert("RGBA")
+                    logger.info(f"Using uploaded image as reference: {image_path}")
+                except Exception as e:
+                    self.error.emit(f"Failed to load image: {e}")
+                    return
+            else:
+                # Use offset-based search
+                ref_offset = int(ref_offset)  # type: ignore[arg-type]
+                if ref_offset not in similarity_engine.sprite_database:
+                    self.error.emit(f"Reference sprite at 0x{ref_offset:X} not found in index")
+                    return
+                target = ref_offset
 
             # Perform similarity search
             self.progress.emit(0, 1)  # Indeterminate progress
 
             matches = similarity_engine.find_similar(
-                ref_offset,
+                target,
                 max_results=max_results,
                 similarity_threshold=similarity_threshold / 100.0  # Convert percentage to decimal
             )
@@ -1024,26 +1046,61 @@ class AdvancedSearchDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        # Reference sprite
-        ref_group = QGroupBox("Reference Sprite")
+        # Reference source selection
+        ref_group = QGroupBox("Reference Selection")
         ref_layout = QVBoxLayout()
 
-        # Reference selection
-        ref_select_layout = QHBoxLayout()
+        # Mode selection radio buttons
+        self.ref_mode_offset_radio = QRadioButton("Use ROM Sprite Offset")
+        self.ref_mode_offset_radio.setChecked(True)
+        self.ref_mode_offset_radio.toggled.connect(self._on_ref_mode_changed)
+        ref_layout.addWidget(self.ref_mode_offset_radio)
+
+        # ROM offset selection row
+        offset_layout = QHBoxLayout()
+        offset_layout.setContentsMargins(20, 0, 0, 0)  # Indent under radio
         self.ref_offset_edit = QLineEdit()
         self.ref_offset_edit.setPlaceholderText("Sprite offset (e.g. 0x12345)")
         self.ref_offset_edit.setToolTip(TOOLTIPS["offset"])
         self.ref_offset_edit.textChanged.connect(self._on_reference_offset_changed)
-        ref_select_layout.addWidget(self.ref_offset_edit)
+        offset_layout.addWidget(self.ref_offset_edit)
 
-        self.ref_browse_button = QPushButton("Browse...")
+        self.ref_browse_button = QPushButton("Browse ROM...")
         self.ref_browse_button.clicked.connect(self._browse_reference_sprite)
-        ref_select_layout.addWidget(self.ref_browse_button)
+        offset_layout.addWidget(self.ref_browse_button)
+        ref_layout.addLayout(offset_layout)
 
-        ref_layout.addLayout(ref_select_layout)
+        # Image file mode
+        self.ref_mode_image_radio = QRadioButton("Use Image File")
+        self.ref_mode_image_radio.toggled.connect(self._on_ref_mode_changed)
+        ref_layout.addWidget(self.ref_mode_image_radio)
+
+        # Image file selection row
+        image_layout = QHBoxLayout()
+        image_layout.setContentsMargins(20, 0, 0, 0)  # Indent under radio
+        self.image_path_edit = QLineEdit()
+        self.image_path_edit.setPlaceholderText("Image file path (PNG, BMP, GIF)")
+        self.image_path_edit.setToolTip(
+            "Upload an image to search for similar sprites.\n"
+            "Supported formats: PNG, BMP, GIF, JPEG\n"
+            "Recommended size: 8x8 to 256x256 pixels"
+        )
+        self.image_path_edit.setEnabled(False)  # Disabled until image mode selected
+        self.image_path_edit.textChanged.connect(self._on_image_path_changed)
+        image_layout.addWidget(self.image_path_edit)
+
+        self.image_browse_button = QPushButton("Browse...")
+        self.image_browse_button.setEnabled(False)
+        self.image_browse_button.clicked.connect(self._browse_image_file)
+        image_layout.addWidget(self.image_browse_button)
+        ref_layout.addLayout(image_layout)
 
         # Reference preview
-        self.ref_preview_label = QLabel("No reference sprite selected")
+        preview_label = QLabel("Preview:")
+        preview_label.setStyleSheet("margin-top: 8px;")
+        ref_layout.addWidget(preview_label)
+
+        self.ref_preview_label = QLabel("No reference selected")
         self.ref_preview_label.setMinimumHeight(128)
         self.ref_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.ref_preview_label.setStyleSheet(
@@ -1083,6 +1140,9 @@ class AdvancedSearchDialog(QDialog):
 
         sim_group.setLayout(sim_layout)
         layout.addWidget(sim_group)
+
+        # Store uploaded image
+        self._uploaded_image: Image.Image | None = None
 
         layout.addStretch()
         return widget
@@ -1319,19 +1379,37 @@ class AdvancedSearchDialog(QDialog):
             self._offer_to_build_similarity_index()
             return
 
-        # Get reference sprite offset
-        ref_text = self.ref_offset_edit.text().strip()
-        if not ref_text:
-            if self.results_label:
-                self.results_label.setText("Please specify a reference sprite offset")
-            return
+        # Determine mode: offset or image file
+        use_offset_mode = self.ref_mode_offset_radio.isChecked()
+        ref_offset: int | None = None
+        image_path: str | None = None
+        query_description: str
 
-        try:
-            ref_offset = int(ref_text, 16) if ref_text.startswith("0x") else int(ref_text, 16)
-        except ValueError:
-            if self.results_label:
-                self.results_label.setText("Invalid offset format. Use hex format like 0x12345")
-            return
+        if use_offset_mode:
+            # Get reference sprite offset
+            ref_text = self.ref_offset_edit.text().strip()
+            if not ref_text:
+                if self.results_label:
+                    self.results_label.setText("Please specify a reference sprite offset")
+                return
+
+            try:
+                ref_offset = int(ref_text, 16) if ref_text.startswith("0x") else int(ref_text, 16)
+            except ValueError:
+                if self.results_label:
+                    self.results_label.setText("Invalid offset format. Use hex format like 0x12345")
+                return
+
+            query_description = f"Similar to 0x{ref_offset:X}"
+        else:
+            # Get image file
+            image_path = self.image_path_edit.text().strip()
+            if not image_path or self._uploaded_image is None:
+                if self.results_label:
+                    self.results_label.setText("Please select an image file")
+                return
+
+            query_description = f"Similar to image: {Path(image_path).name}"
 
         # Get similarity threshold
         similarity_threshold = self.similarity_slider.value()  # Get percentage value
@@ -1340,13 +1418,17 @@ class AdvancedSearchDialog(QDialog):
         search_scope = self.visual_scope_combo.currentText()
 
         # Create worker parameters
-        params = {
+        params: dict[str, Any] = {  # pyright: ignore[reportExplicitAny] - Dynamic params
             "rom_path": self.rom_path,
-            "reference_offset": ref_offset,
             "similarity_threshold": similarity_threshold,
             "search_scope": search_scope,
             "max_results": 50
         }
+
+        if use_offset_mode:
+            params["reference_offset"] = ref_offset
+        else:
+            params["image_path"] = image_path
 
         self.search_worker = SearchWorker("visual", params)
         self._connect_worker_signals()
@@ -1367,7 +1449,7 @@ class AdvancedSearchDialog(QDialog):
         entry = SearchHistoryEntry(
             timestamp=datetime.now(UTC),
             search_type="Visual",
-            query=f"Similar to 0x{ref_offset:X} (threshold: {similarity_threshold}%)",
+            query=f"{query_description} (threshold: {similarity_threshold}%)",
             filters=SearchFilter(
                 min_size=0, max_size=MAX_SPRITE_SIZE,
                 min_tiles=0, max_tiles=1024,
@@ -1736,6 +1818,140 @@ class AdvancedSearchDialog(QDialog):
             logger.exception(f"Error in _browse_reference_sprite: {e}")
             if self.results_label:
                 self.results_label.setText(f"Error: {e}")
+
+    def _on_ref_mode_changed(self, checked: bool) -> None:
+        """Handle reference mode radio button changes."""
+        if not checked:
+            return  # Only handle when a button is being selected
+
+        use_offset = self.ref_mode_offset_radio.isChecked()
+
+        # Toggle enabled state of inputs
+        self.ref_offset_edit.setEnabled(use_offset)
+        self.ref_browse_button.setEnabled(use_offset)
+        self.image_path_edit.setEnabled(not use_offset)
+        self.image_browse_button.setEnabled(not use_offset)
+
+        # Clear preview when switching modes
+        if self.ref_preview_label:
+            self.ref_preview_label.setText("No reference selected")
+            self.ref_preview_label.setPixmap(QPixmap())
+
+        # Clear stored image when switching to offset mode
+        if use_offset:
+            self._uploaded_image = None
+
+    def _browse_image_file(self) -> None:
+        """Browse for an image file to use as reference."""
+        from PySide6.QtWidgets import QFileDialog
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Reference Image",
+            "",
+            "Image Files (*.png *.bmp *.gif *.jpg *.jpeg);;All Files (*.*)"
+        )
+
+        if filename:
+            self.image_path_edit.setText(filename)
+
+    def _on_image_path_changed(self) -> None:
+        """Handle changes to the image path."""
+        image_path = self.image_path_edit.text().strip()
+        if not image_path:
+            if self.ref_preview_label:
+                self.ref_preview_label.setText("No image selected")
+                self.ref_preview_label.setPixmap(QPixmap())
+            self._uploaded_image = None
+            return
+
+        self._load_and_validate_image(image_path)
+
+    def _load_and_validate_image(self, path: str) -> bool:
+        """Load and validate an image file.
+
+        Args:
+            path: Path to the image file
+
+        Returns:
+            True if image was loaded successfully
+        """
+        try:
+            # Check if file exists
+            image_path = Path(path)
+            if not image_path.exists():
+                if self.ref_preview_label:
+                    self.ref_preview_label.setText("File not found")
+                self._uploaded_image = None
+                return False
+
+            # Load the image
+            image = Image.open(path)
+
+            # Validate dimensions
+            width, height = image.size
+            if width < 8 or height < 8:
+                if self.ref_preview_label:
+                    self.ref_preview_label.setText(
+                        f"Image too small ({width}x{height}). Minimum: 8x8"
+                    )
+                self._uploaded_image = None
+                return False
+
+            # Resize if too large
+            max_size = 256
+            if width > max_size or height > max_size:
+                # Maintain aspect ratio
+                if width > height:
+                    new_width = max_size
+                    new_height = int(height * max_size / width)
+                else:
+                    new_height = max_size
+                    new_width = int(width * max_size / height)
+                image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                logger.info(f"Resized image from {width}x{height} to {new_width}x{new_height}")
+
+            # Convert to RGBA for consistent processing
+            if image.mode != "RGBA":
+                image = image.convert("RGBA")
+
+            # Store the image
+            self._uploaded_image = image
+
+            # Show preview
+            # Convert PIL image to QPixmap
+            from io import BytesIO
+            buffer = BytesIO()
+            image.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            pixmap = QPixmap()
+            pixmap.loadFromData(buffer.getvalue())
+
+            # Scale for display (max 128 pixels)
+            if pixmap.width() > 128 or pixmap.height() > 128:
+                pixmap = pixmap.scaled(
+                    128, 128,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+
+            if self.ref_preview_label:
+                self.ref_preview_label.setPixmap(pixmap)
+                self.ref_preview_label.setToolTip(
+                    f"Image: {image_path.name}\n"
+                    f"Size: {image.size[0]}x{image.size[1]}"
+                )
+
+            logger.info(f"Loaded reference image: {path} ({image.size[0]}x{image.size[1]})")
+            return True
+
+        except Exception as e:
+            logger.exception(f"Error loading image: {e}")
+            if self.ref_preview_label:
+                self.ref_preview_label.setText(f"Error loading image: {e}")
+            self._uploaded_image = None
+            return False
 
     def _on_reference_offset_changed(self):
         """Handle changes to reference offset text."""

@@ -20,6 +20,10 @@ class MenuBarActionsProtocol(Protocol):
         """Show settings dialog"""
         ...
 
+    def show_presets(self) -> None:
+        """Show sprite presets dialog"""
+        ...
+
     def show_cache_manager(self) -> None:
         """Show cache manager dialog"""
         ...
@@ -80,6 +84,13 @@ class MenuBarManager:
         settings_action.triggered.connect(self.actions_handler.show_settings)
         if tools_menu:
             tools_menu.addAction(settings_action)
+
+        # Manage Presets
+        presets_action = QAction("Manage Presets...", self.window)
+        presets_action.setShortcut("Ctrl+P")
+        presets_action.triggered.connect(self.actions_handler.show_presets)
+        if tools_menu:
+            tools_menu.addAction(presets_action)
             tools_menu.addSeparator()
 
         # Cache Manager

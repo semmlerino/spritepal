@@ -872,3 +872,93 @@ class ApplicationStateManagerProtocol(Protocol):
         """Get the current ROM offset."""
         ...
 
+
+class SpritePresetManagerProtocol(Protocol):
+    """Protocol for sprite preset management.
+
+    Manages user-defined sprite presets with persistence, ROM matching,
+    and import/export functionality for community sharing.
+    """
+
+    # Signals
+    preset_added: Signal  # Signal(str) - preset name
+    preset_removed: Signal  # Signal(str) - preset name
+    preset_updated: Signal  # Signal(str) - preset name
+    presets_loaded: Signal  # Signal()
+    presets_imported: Signal  # Signal(int) - number imported
+
+    # CRUD operations
+    def add_preset(self, preset: object) -> bool:
+        """Add a new preset. Returns True if added."""
+        ...
+
+    def update_preset(self, preset: object) -> bool:
+        """Update an existing preset. Returns True if updated."""
+        ...
+
+    def remove_preset(self, name: str) -> bool:
+        """Remove a preset by name. Returns True if removed."""
+        ...
+
+    def get_preset(self, name: str) -> object | None:
+        """Get a preset by name."""
+        ...
+
+    def get_all_presets(self) -> list[object]:
+        """Get all user presets."""
+        ...
+
+    def get_presets_for_game(self, game_title: str) -> list[object]:
+        """Get all presets for a specific game."""
+        ...
+
+    def get_presets_for_checksum(self, checksum: int) -> list[object]:
+        """Get all presets that match a ROM checksum."""
+        ...
+
+    def get_presets_by_tag(self, tag: str) -> list[object]:
+        """Get all presets with a specific tag."""
+        ...
+
+    # Import/Export
+    def export_presets(
+        self,
+        path: Path,
+        preset_names: list[str] | None = None,
+    ) -> int:
+        """Export presets to a file. Returns number exported."""
+        ...
+
+    def import_presets(
+        self,
+        path: Path,
+        overwrite_existing: bool = False,
+    ) -> int:
+        """Import presets from a file. Returns number imported."""
+        ...
+
+    # Utility methods
+    def has_preset(self, name: str) -> bool:
+        """Check if a preset with the given name exists."""
+        ...
+
+    def get_preset_count(self) -> int:
+        """Get the total number of presets."""
+        ...
+
+    def get_all_game_titles(self) -> list[str]:
+        """Get list of unique game titles in presets."""
+        ...
+
+    def get_all_tags(self) -> list[str]:
+        """Get list of all unique tags."""
+        ...
+
+    def clear_all(self) -> None:
+        """Remove all presets."""
+        ...
+
+    def reload(self) -> None:
+        """Reload presets from disk."""
+        ...
+

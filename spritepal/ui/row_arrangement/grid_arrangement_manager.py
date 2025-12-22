@@ -370,3 +370,299 @@ class GridArrangementManager(QObject):
         return (
             0 <= position.row < self.total_rows and 0 <= position.col < self.total_cols
         )
+
+    # =========================================================================
+    # Internal methods for undo/redo commands
+    # These methods modify state without triggering undo history.
+    # They emit signals for UI updates but are called by command instances,
+    # not directly by user actions.
+    # =========================================================================
+
+    def _add_tile_no_history(self, tile: TilePosition) -> bool:
+        """Add a tile without triggering undo history.
+
+        Called by command execution, not directly by user actions.
+
+        Args:
+            tile: The tile position to add
+
+        Returns:
+            True if tile was added, False if already present or invalid
+        """
+        if not self._is_valid_position(tile):
+            return False
+
+        if tile in self._tile_set or tile in self._tile_to_group:
+            return False
+
+        self._arranged_tiles.append(tile)
+        self._tile_set.add(tile)
+        self._arrangement_order.append(
+            (ArrangementType.TILE, f"{tile.row},{tile.col}")
+        )
+
+        self.tile_added.emit(tile)
+        self.arrangement_changed.emit()
+        return True
+
+    def _remove_tile_no_history(self, tile: TilePosition) -> bool:
+        """Remove a tile without triggering undo history.
+
+        Called by command execution, not directly by user actions.
+        Note: Does NOT handle group membership - caller must handle that.
+
+        Args:
+            tile: The tile position to remove
+
+        Returns:
+            True if tile was removed, False if not present
+        """
+        if tile not in self._tile_set:
+            return False
+
+        self._arranged_tiles.remove(tile)
+        self._tile_set.remove(tile)
+
+        # Remove from arrangement order
+        tile_key = f"{tile.row},{tile.col}"
+        self._arrangement_order = [
+            (t, k)
+            for t, k in self._arrangement_order
+            if not (t == ArrangementType.TILE and k == tile_key)
+        ]
+
+        self.tile_removed.emit(tile)
+        self.arrangement_changed.emit()
+        return True
+
+    def _insert_tile_no_history(self, tile: TilePosition, position: int) -> bool:
+        """Insert a tile at a specific position without triggering undo history.
+
+        Called by command undo to restore a tile at its original position.
+
+        Args:
+            tile: The tile position to insert
+            position: Position in the _arranged_tiles list to insert at
+
+        Returns:
+            True if tile was inserted, False if already present or invalid
+        """
+        if not self._is_valid_position(tile):
+            return False
+
+        if tile in self._tile_set or tile in self._tile_to_group:
+            return False
+
+        # Clamp position to valid range
+        position = max(0, min(position, len(self._arranged_tiles)))
+        self._arranged_tiles.insert(position, tile)
+        self._tile_set.add(tile)
+
+        # Insert in arrangement order at corresponding position
+        tile_key = f"{tile.row},{tile.col}"
+        order_position = max(0, min(position, len(self._arrangement_order)))
+        self._arrangement_order.insert(order_position, (ArrangementType.TILE, tile_key))
+
+        self.tile_added.emit(tile)
+        self.arrangement_changed.emit()
+        return True
+
+    def _add_group_no_history(self, group: TileGroup) -> bool:
+        """Add a group without triggering undo history.
+
+        Called by command execution, not directly by user actions.
+
+        Args:
+            group: The tile group to add
+
+        Returns:
+            True if group was added, False if any tile conflicts
+        """
+        # Check if any tile in the group is already arranged
+        for tile in group.tiles:
+            if tile in self._tile_set or tile in self._tile_to_group:
+                return False
+
+        # Add group
+        self._groups[group.id] = group
+
+        # Add tiles to arrangement
+        for tile in group.tiles:
+            self._arranged_tiles.append(tile)
+            self._tile_set.add(tile)
+            self._tile_to_group[tile] = group.id
+
+        self._arrangement_order.append((ArrangementType.GROUP, group.id))
+        self.group_added.emit(group.id)
+        self.arrangement_changed.emit()
+        return True
+
+    def _remove_group_no_history(self, group_id: str) -> bool:
+        """Remove a group without triggering undo history.
+
+        Called by command execution, not directly by user actions.
+
+        Args:
+            group_id: ID of the group to remove
+
+        Returns:
+            True if group was removed, False if not found
+        """
+        if group_id not in self._groups:
+            return False
+
+        group = self._groups[group_id]
+
+        # Remove all tiles in the group
+        for tile in group.tiles:
+            self._arranged_tiles.remove(tile)
+            self._tile_set.remove(tile)
+            del self._tile_to_group[tile]
+
+        # Remove group
+        del self._groups[group_id]
+
+        # Remove from arrangement order
+        self._arrangement_order = [
+            (t, k)
+            for t, k in self._arrangement_order
+            if not (t == ArrangementType.GROUP and k == group_id)
+        ]
+
+        self.group_removed.emit(group_id)
+        self.arrangement_changed.emit()
+        return True
+
+    def _add_group_at_position_no_history(self, group: TileGroup, order_position: int) -> bool:
+        """Add a group at a specific arrangement order position without triggering undo history.
+
+        Called by command undo to restore a group at its original position.
+
+        Args:
+            group: The tile group to add
+            order_position: Position in _arrangement_order to insert at
+
+        Returns:
+            True if group was added, False if any tile conflicts
+        """
+        # Check if any tile in the group is already arranged
+        for tile in group.tiles:
+            if tile in self._tile_set or tile in self._tile_to_group:
+                return False
+
+        # Add group
+        self._groups[group.id] = group
+
+        # Add tiles to arrangement
+        for tile in group.tiles:
+            self._arranged_tiles.append(tile)
+            self._tile_set.add(tile)
+            self._tile_to_group[tile] = group.id
+
+        # Insert at specific position in arrangement order
+        order_position = max(0, min(order_position, len(self._arrangement_order)))
+        self._arrangement_order.insert(order_position, (ArrangementType.GROUP, group.id))
+
+        self.group_added.emit(group.id)
+        self.arrangement_changed.emit()
+        return True
+
+    def _set_arrangement_order_no_history(
+        self, new_order: list[tuple[ArrangementType, str]]
+    ) -> None:
+        """Set the arrangement order without triggering undo history.
+
+        Called by command execution for reorder operations.
+
+        Args:
+            new_order: New arrangement order
+        """
+        self._arrangement_order = list(new_order)
+        self.arrangement_changed.emit()
+
+    def _clear_no_history(self) -> None:
+        """Clear all arrangements without triggering undo history.
+
+        Called by command execution, not directly by user actions.
+        """
+        self._arranged_tiles.clear()
+        self._tile_set.clear()
+        self._groups.clear()
+        self._tile_to_group.clear()
+        self._arrangement_order.clear()
+
+        self.arrangement_cleared.emit()
+        self.arrangement_changed.emit()
+
+    def _restore_state_no_history(
+        self,
+        tiles: list[TilePosition],
+        groups: dict[str, TileGroup],
+        tile_to_group: dict[TilePosition, str],
+        order: list[tuple[ArrangementType, str]],
+    ) -> None:
+        """Restore full state without triggering undo history.
+
+        Called by ClearGridCommand.undo() to restore previous state.
+
+        Args:
+            tiles: List of tile positions to restore
+            groups: Dict of groups to restore
+            tile_to_group: Tile-to-group mapping to restore
+            order: Arrangement order to restore
+        """
+        self._arranged_tiles = list(tiles)
+        self._tile_set = set(tiles)
+        self._groups = dict(groups)
+        self._tile_to_group = dict(tile_to_group)
+        self._arrangement_order = list(order)
+
+        self.arrangement_changed.emit()
+
+    def get_tile_position(self, tile: TilePosition) -> int:
+        """Get the position of a tile in the arrangement.
+
+        Args:
+            tile: The tile position to find
+
+        Returns:
+            Position in the arrangement, or -1 if not found
+        """
+        try:
+            return self._arranged_tiles.index(tile)
+        except ValueError:
+            return -1
+
+    def get_group_order_position(self, group_id: str) -> int:
+        """Get the position of a group in the arrangement order.
+
+        Args:
+            group_id: ID of the group to find
+
+        Returns:
+            Position in the arrangement order, or -1 if not found
+        """
+        for i, (arr_type, key) in enumerate(self._arrangement_order):
+            if arr_type == ArrangementType.GROUP and key == group_id:
+                return i
+        return -1
+
+    def get_state_snapshot(
+        self,
+    ) -> tuple[
+        list[TilePosition],
+        dict[str, TileGroup],
+        dict[TilePosition, str],
+        list[tuple[ArrangementType, str]],
+    ]:
+        """Get a snapshot of the current state for undo/redo.
+
+        Returns:
+            Tuple of (tiles, groups, tile_to_group, arrangement_order) copies
+        """
+        return (
+            list(self._arranged_tiles),
+            dict(self._groups),
+            dict(self._tile_to_group),
+            list(self._arrangement_order),
+        )

@@ -11,7 +11,8 @@ Moved from utils/type_aliases.py to fix layer boundary violations
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import NotRequired, TypeAlias, TypedDict
+from dataclasses import dataclass, field
+from typing import Literal, NotRequired, TypeAlias, TypedDict
 
 from PIL import Image
 from PySide6.QtGui import QPixmap
@@ -109,6 +110,62 @@ NavigationHint: TypeAlias = dict[str, object]
 SpriteLocation: TypeAlias = dict[str, object]
 RegionMap: TypeAlias = dict[str, object]
 
+
+# Preset source type
+PresetSource = Literal["builtin", "user", "imported"]
+
+
+@dataclass
+class SpritePreset:
+    """A user-managed sprite preset for quick access to known sprite locations.
+
+    This dataclass represents a sprite offset that has been saved for reuse,
+    with metadata to help match it to the correct ROM and provide context.
+    """
+
+    name: str
+    offset: int
+    game_title: str
+    game_checksums: list[int] = field(default_factory=list)
+    description: str = ""
+    compressed: bool = True
+    estimated_size: int = 8192
+    tags: list[str] = field(default_factory=list)
+    source: PresetSource = "user"
+    verified: bool = False
+
+    def to_dict(self) -> dict[str, object]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "name": self.name,
+            "offset": self.offset,
+            "game_title": self.game_title,
+            "game_checksums": self.game_checksums,
+            "description": self.description,
+            "compressed": self.compressed,
+            "estimated_size": self.estimated_size,
+            "tags": self.tags,
+            "source": self.source,
+            "verified": self.verified,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> "SpritePreset":
+        """Create a SpritePreset from a dictionary."""
+        return cls(
+            name=str(data.get("name", "")),
+            offset=int(data.get("offset", 0)),  # type: ignore[arg-type]
+            game_title=str(data.get("game_title", "")),
+            game_checksums=list(data.get("game_checksums", [])),  # type: ignore[arg-type]
+            description=str(data.get("description", "")),
+            compressed=bool(data.get("compressed", True)),
+            estimated_size=int(data.get("estimated_size", 8192)),  # type: ignore[arg-type]
+            tags=list(data.get("tags", [])),  # type: ignore[arg-type]
+            source=data.get("source", "user"),  # type: ignore[arg-type]
+            verified=bool(data.get("verified", False)),
+        )
+
+
 # Re-export for backward compatibility
 __all__ = [
     "BoolSignal",
@@ -132,6 +189,7 @@ __all__ = [
     "OutputPath",
     "PILImage",
     "PaletteData",
+    "PresetSource",
     "PreviewPixmap",
     "PreviewSize",
     "ProgressCallback",
@@ -146,6 +204,7 @@ __all__ = [
     "SpriteData",
     "SpriteLocation",
     "SpriteOffset",
+    "SpritePreset",
     "StringSignal",
     "TileCount",
     "TileData",

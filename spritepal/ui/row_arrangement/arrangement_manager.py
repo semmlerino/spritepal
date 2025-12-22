@@ -133,3 +133,110 @@ class ArrangementManager(QObject):
             True if row is arranged, False otherwise
         """
         return row_index in self._arranged_rows
+
+    # =========================================================================
+    # Internal methods for undo/redo commands
+    # These methods modify state and emit signals but are not called directly
+    # by user actions - they are called by ArrangementCommand instances.
+    # =========================================================================
+
+    def _add_row_no_history(self, row_index: int) -> bool:
+        """Add a row without triggering undo history tracking.
+
+        Called by command execution, not directly by user actions.
+
+        Args:
+            row_index: Index of the row to add
+
+        Returns:
+            True if row was added, False if already present
+        """
+        if row_index not in self._arranged_rows:
+            self._arranged_rows.append(row_index)
+            self.row_added.emit(row_index)
+            self.arrangement_changed.emit()
+            return True
+        return False
+
+    def _remove_row_no_history(self, row_index: int) -> bool:
+        """Remove a row without triggering undo history tracking.
+
+        Called by command execution, not directly by user actions.
+
+        Args:
+            row_index: Index of the row to remove
+
+        Returns:
+            True if row was removed, False if not present
+        """
+        if row_index in self._arranged_rows:
+            self._arranged_rows.remove(row_index)
+            self.row_removed.emit(row_index)
+            self.arrangement_changed.emit()
+            return True
+        return False
+
+    def _insert_row_no_history(self, row_index: int, position: int) -> bool:
+        """Insert a row at a specific position without triggering undo history.
+
+        Called by command undo to restore a row at its original position.
+
+        Args:
+            row_index: Index of the row to insert
+            position: Position in the arrangement list to insert at
+
+        Returns:
+            True if row was inserted, False if already present
+        """
+        if row_index not in self._arranged_rows:
+            # Clamp position to valid range
+            position = max(0, min(position, len(self._arranged_rows)))
+            self._arranged_rows.insert(position, row_index)
+            self.row_added.emit(row_index)
+            self.arrangement_changed.emit()
+            return True
+        return False
+
+    def _set_arrangement_no_history(self, rows: list[int]) -> None:
+        """Set the entire arrangement without triggering undo history.
+
+        Called by command execution for reorder and clear-undo operations.
+
+        Args:
+            rows: New list of row indices
+        """
+        self._arranged_rows = list(rows)
+        self.arrangement_changed.emit()
+
+    def _clear_no_history(self) -> None:
+        """Clear all rows without triggering undo history.
+
+        Called by command execution, not directly by user actions.
+        """
+        self._arranged_rows.clear()
+        self.arrangement_cleared.emit()
+        self.arrangement_changed.emit()
+
+    def get_row_position(self, row_index: int) -> int:
+        """Get the position of a row in the arrangement.
+
+        Args:
+            row_index: Index of the row to find
+
+        Returns:
+            Position in the arrangement, or -1 if not found
+        """
+        try:
+            return self._arranged_rows.index(row_index)
+        except ValueError:
+            return -1
+
+    def get_state_copy(self) -> list[int]:
+        """Get a copy of the current arrangement state.
+
+        Used by commands to capture state before modifications.
+
+        Returns:
+            Copy of the arranged rows list
+        """
+        return list(self._arranged_rows)

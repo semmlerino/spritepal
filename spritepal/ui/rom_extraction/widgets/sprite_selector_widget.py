@@ -24,6 +24,8 @@ class SpriteSelectorWidget(BaseExtractionWidget):
     # Signals
     sprite_changed = Signal(int)  # Emitted when sprite selection changes
     find_sprites_clicked = Signal()  # Emitted when find sprites button clicked
+    manage_presets_clicked = Signal()  # Emitted when manage presets button clicked
+    preset_applied = Signal(object)  # Emitted when a preset is applied (SpritePreset)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -70,8 +72,11 @@ class SpriteSelectorWidget(BaseExtractionWidget):
 
         sprite_layout.addLayout(offset_row)
 
-        # Find Sprites button - on its own row for prominence
-        # This is the primary discovery action, so it deserves visual prominence
+        # Button row with Find Sprites (prominent) and Presets (secondary)
+        button_row = QHBoxLayout()
+        button_row.setSpacing(SPACING_MEDIUM)
+
+        # Find Sprites button - primary discovery action
         self.find_sprites_btn = QPushButton("🔍 Find Sprites in ROM (Ctrl+F)")
         self.find_sprites_btn.setMinimumHeight(BUTTON_MIN_HEIGHT + 4)  # Slightly taller
         self.find_sprites_btn.setShortcut(QKeySequence("Ctrl+F"))
@@ -79,7 +84,20 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.find_sprites_btn.setStyleSheet(get_prominent_action_button_style())
         _ = self.find_sprites_btn.clicked.connect(self.find_sprites_clicked.emit)
         self.find_sprites_btn.setEnabled(False)
-        sprite_layout.addWidget(self.find_sprites_btn)
+        button_row.addWidget(self.find_sprites_btn, 1)  # Stretch to take more space
+
+        # Presets button - manage saved sprite presets
+        self.presets_btn = QPushButton("📁 Presets")
+        self.presets_btn.setMinimumHeight(BUTTON_MIN_HEIGHT + 4)
+        self.presets_btn.setToolTip(
+            "Manage saved sprite presets\n\n"
+            "Save and load known sprite offsets for quick access.\n"
+            "Import/export presets to share with the community."
+        )
+        _ = self.presets_btn.clicked.connect(self.manage_presets_clicked.emit)
+        button_row.addWidget(self.presets_btn)
+
+        sprite_layout.addLayout(button_row)
 
         self._setup_widget_with_group("Sprite Selection", sprite_layout)
 

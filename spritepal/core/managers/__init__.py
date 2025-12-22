@@ -37,6 +37,7 @@ from .base_manager import BaseManager
 
 # Consolidated managers (NEW - these hold the actual logic)
 from .core_operations_manager import CoreOperationsManager
+from .sprite_preset_manager import SpritePresetManager
 
 # NOTE: ExtractionManager and InjectionManager have been removed.
 # Use CoreOperationsManager via dependency injection:
@@ -65,6 +66,7 @@ __all__ = [
     "NavigationError",
     "PreviewError",
     "SessionError",
+    "SpritePresetManager",
     "ValidationError",
     "cleanup_managers",
     "initialize_managers",

@@ -27,6 +27,7 @@ from .application_state_manager import ApplicationStateManager
 # Import consolidated managers
 from .core_operations_manager import CoreOperationsManager
 from .monitoring_manager import MonitoringManager
+from .sprite_preset_manager import SpritePresetManager
 
 # NavigationManager import deferred to avoid circular imports
 
@@ -281,10 +282,22 @@ class ManagerRegistry:
                     ApplicationStateManagerProtocol,
                     ExtractionManagerProtocol,
                     InjectionManagerProtocol,
+                    SpritePresetManagerProtocol,
                 )
                 register_singleton(ApplicationStateManagerProtocol, state_manager)
                 self._lifecycle_order.append(ApplicationStateManagerProtocol)
                 self._logger.debug("ApplicationStateManagerProtocol registered for downstream dependencies")
+
+                # SpritePresetManager handles user-defined sprite presets
+                self._logger.debug("Creating SpritePresetManager...")
+                preset_manager = SpritePresetManager(
+                    config_service=configuration_service,
+                    parent=qt_parent,
+                )
+                created_managers.append("preset")
+                register_singleton(SpritePresetManagerProtocol, preset_manager)
+                self._lifecycle_order.append(SpritePresetManagerProtocol)
+                self._logger.debug("SpritePresetManager created and registered")
 
                 # CoreOperationsManager handles extraction and injection operations
                 self._logger.debug("Creating CoreOperationsManager...")

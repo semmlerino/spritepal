@@ -22,6 +22,7 @@ from .manager_protocols import (
     ROMExtractorProtocol,
     ROMServiceProtocol,
     SettingsManagerProtocol,
+    SpritePresetManagerProtocol,
     VRAMServiceProtocol,
 )
 from .preview_protocols import (
@@ -47,5 +48,6 @@ __all__ = [
     "ROMExtractorProtocol",
     "ROMServiceProtocol",
     "SettingsManagerProtocol",
+    "SpritePresetManagerProtocol",
     "VRAMServiceProtocol",
 ]

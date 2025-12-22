@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
     from core.rom_validator import ROMHeader
+    from core.types import SpritePreset
 
 # ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
 from core.managers.workflow_manager import ExtractionState
@@ -93,6 +94,7 @@ class ROMExtractionPanel(QWidget):
         self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()  # type: ignore[assignment]
         self.rom_size = 0  # Track ROM size for slider limits
         self._manual_offset_mode = False  # Default to preset mode (sprite picker visible)
+        self._current_header: ROMHeader | None = None  # Stored header for preset matching
 
         # State manager for coordinating operations (ApplicationStateManager)
         from core.di_container import inject
@@ -227,6 +229,7 @@ class ROMExtractionPanel(QWidget):
         self.sprite_selector_widget = SpriteSelectorWidget()
         self.sprite_selector_widget.sprite_changed.connect(self._on_sprite_changed)
         self.sprite_selector_widget.find_sprites_clicked.connect(self._find_sprites)
+        self.sprite_selector_widget.manage_presets_clicked.connect(self._open_presets_dialog)
         layout.addWidget(self.sprite_selector_widget)
 
     def _add_manual_offset_controls(self, layout: QVBoxLayout):
@@ -414,6 +417,9 @@ class ROMExtractionPanel(QWidget):
         header = cast("ROMHeader | None", result.get("header"))
         sprite_configs = result.get("sprite_configs")
 
+        # Store header for preset matching
+        self._current_header = header
+
         if header is None:
             self.rom_file_widget.set_info_text('<span style="color: red;">Error reading ROM header</span>')
         else:
@@ -484,6 +490,52 @@ class ROMExtractionPanel(QWidget):
         offset = cast(int, sprite_data.get("offset", 0))
         self._manual_offset = offset
         self._manual_offset_mode = True  # User chose manual offset mode via dialog
+        # Check extraction readiness
+        self._check_extraction_ready()
+
+    def _open_presets_dialog(self) -> None:
+        """Open the sprite presets management dialog."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SpritePresetManagerProtocol
+        from ui.dialogs.sprite_preset_dialog import SpritePresetDialog
+
+        # Get the preset manager from DI
+        preset_manager = inject(SpritePresetManagerProtocol)
+
+        # Get current ROM info for auto-filtering
+        game_title: str | None = None
+        checksum: int | None = None
+        if self._current_header is not None:
+            game_title = self._current_header.title
+            checksum = self._current_header.checksum
+
+        dialog = SpritePresetDialog(
+            preset_manager=preset_manager,  # type: ignore[arg-type] - Protocol to concrete
+            current_game_title=game_title,
+            current_checksum=checksum,
+            parent=self,
+        )
+
+        # Connect preset_selected signal to handle the selection
+        dialog.preset_selected.connect(self._on_preset_applied)
+        dialog.exec()
+
+    def _on_preset_applied(self, preset: SpritePreset) -> None:
+        """Handle applying a preset from the dialog.
+
+        Args:
+            preset: The SpritePreset to apply
+        """
+        logger.info(f"Applying preset '{preset.name}' at offset 0x{preset.offset:06X}")
+
+        # Set the manual offset from the preset
+        self._manual_offset = preset.offset
+        self._manual_offset_mode = True
+
+        # Update the offset display
+        if self.sprite_selector_widget:
+            self.sprite_selector_widget.set_offset_text(f"0x{preset.offset:06X}")
+
         # Check extraction readiness
         self._check_extraction_ready()
 

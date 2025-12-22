@@ -37,6 +37,15 @@ from .row_arrangement import (
     PreviewGenerator,
     RowImageProcessor,
 )
+from .row_arrangement.undo_redo import (
+    AddMultipleRowsCommand,
+    AddRowCommand,
+    ClearRowsCommand,
+    RemoveMultipleRowsCommand,
+    RemoveRowCommand,
+    ReorderRowsCommand,
+    UndoRedoStack,
+)
 from .widgets.row_widgets import DragDropListWidget, RowPreviewWidget
 
 if TYPE_CHECKING:
@@ -60,6 +69,9 @@ class RowArrangementDialog(SplitterDialog):
         self.arrangement_manager: ArrangementManager = ArrangementManager()
         self.colorizer: PaletteColorizer = PaletteColorizer()
         self.preview_generator: PreviewGenerator = PreviewGenerator(self.colorizer)
+
+        # Initialize undo/redo stack
+        self.undo_stack: UndoRedoStack = UndoRedoStack()
 
         # Initialize UI components that will be created in _setup_ui
         self.available_list: DragDropListWidget | None = None
@@ -316,7 +328,7 @@ class RowArrangementDialog(SplitterDialog):
                 widget.set_selected(is_selected)
 
     def _add_row_to_arrangement(self, row_index: int | QListWidgetItem) -> None:
-        """Add a row to the arrangement"""
+        """Add a row to the arrangement via undo-able command"""
         actual_row_index: int
         if isinstance(row_index, QListWidgetItem):
             # Handle double-click from available list
@@ -324,77 +336,160 @@ class RowArrangementDialog(SplitterDialog):
         else:
             actual_row_index = row_index
 
-        if self.arrangement_manager.add_row(actual_row_index):
-            self._refresh_ui()
-            self._update_status(
-                f"Added row {actual_row_index} to arrangement ({self.arrangement_manager.get_arranged_count()} total)"
-            )
+        # Skip if already arranged
+        if self.arrangement_manager.is_row_arranged(actual_row_index):
+            return
+
+        # Create and execute command
+        cmd = AddRowCommand(manager=self.arrangement_manager, row_index=actual_row_index)
+        self.undo_stack.push(cmd)
+        self._refresh_ui()
+        self._update_status(
+            f"Added row {actual_row_index} to arrangement ({self.arrangement_manager.get_arranged_count()} total)"
+        )
 
     def _remove_row_from_arrangement(self, item: QListWidgetItem) -> None:
-        """Remove a row from the arrangement"""
+        """Remove a row from the arrangement via undo-able command"""
         row_index = item.data(Qt.ItemDataRole.UserRole)
-        if self.arrangement_manager.remove_row(row_index):
-            self._refresh_ui()
-            self._update_status(
-                f"Removed row {row_index} from arrangement ({self.arrangement_manager.get_arranged_count()} remaining)"
-            )
 
-    def _add_all_rows(self):
-        """Add all rows to arrangement"""
-        row_indices = [row_data["index"] for row_data in self.tile_rows]
-        self.arrangement_manager.add_multiple_rows(row_indices)
+        # Skip if not arranged
+        if not self.arrangement_manager.is_row_arranged(row_index):
+            return
+
+        # Capture position before removal for undo
+        position = self.arrangement_manager.get_row_position(row_index)
+
+        # Create and execute command
+        cmd = RemoveRowCommand(
+            manager=self.arrangement_manager, row_index=row_index, position=position
+        )
+        self.undo_stack.push(cmd)
+        self._refresh_ui()
+        self._update_status(
+            f"Removed row {row_index} from arrangement ({self.arrangement_manager.get_arranged_count()} remaining)"
+        )
+
+    def _add_all_rows(self) -> None:
+        """Add all rows to arrangement via undo-able command"""
+        # Only add rows that aren't already arranged
+        row_indices = [
+            row_data["index"]
+            for row_data in self.tile_rows
+            if not self.arrangement_manager.is_row_arranged(row_data["index"])
+        ]
+
+        if not row_indices:
+            self._update_status("All rows are already arranged")
+            return
+
+        # Create and execute command
+        cmd = AddMultipleRowsCommand(
+            manager=self.arrangement_manager, row_indices=row_indices
+        )
+        self.undo_stack.push(cmd)
         self._refresh_ui()
         self._update_status(
             f"Added all rows to arrangement ({self.arrangement_manager.get_arranged_count()} total)"
         )
 
-    def _add_selected_rows(self):
-        """Add selected rows to arrangement"""
+    def _add_selected_rows(self) -> None:
+        """Add selected rows to arrangement via undo-able command"""
         if self.available_list is None:
             return
         selected_items = self.available_list.selectedItems()
-        row_indices = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
 
-        added_count = self.arrangement_manager.add_multiple_rows(row_indices)
+        # Only add rows that aren't already arranged
+        row_indices = [
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in selected_items
+            if not self.arrangement_manager.is_row_arranged(
+                item.data(Qt.ItemDataRole.UserRole)
+            )
+        ]
 
-        if added_count > 0:
-            self._refresh_ui()
-            self._update_status(f"Added {added_count} selected rows to arrangement")
+        if not row_indices:
+            self._update_status("No new rows to add")
+            return
 
-    def _remove_selected_rows(self):
-        """Remove selected rows from arrangement"""
+        # Create and execute command
+        cmd = AddMultipleRowsCommand(
+            manager=self.arrangement_manager, row_indices=row_indices
+        )
+        self.undo_stack.push(cmd)
+        self._refresh_ui()
+        self._update_status(f"Added {len(row_indices)} selected rows to arrangement")
+
+    def _remove_selected_rows(self) -> None:
+        """Remove selected rows from arrangement via undo-able command"""
         if self.arranged_list is None:
             return
         selected_items = self.arranged_list.selectedItems()
-        row_indices = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
 
-        removed_count = self.arrangement_manager.remove_multiple_rows(row_indices)
+        if not selected_items:
+            return
 
-        if removed_count > 0:
-            self._refresh_ui()
-            self._update_status(
-                f"Removed {removed_count} selected rows from arrangement"
-            )
+        # Capture row indices and their positions before removal
+        rows_with_positions: list[tuple[int, int]] = []
+        for item in selected_items:
+            row_index = item.data(Qt.ItemDataRole.UserRole)
+            if self.arrangement_manager.is_row_arranged(row_index):
+                position = self.arrangement_manager.get_row_position(row_index)
+                rows_with_positions.append((row_index, position))
 
-    def _clear_arrangement(self):
-        """Clear all arranged rows"""
-        if self.arrangement_manager:
-            self.arrangement_manager.clear()
+        if not rows_with_positions:
+            return
+
+        # Create and execute command
+        cmd = RemoveMultipleRowsCommand(
+            manager=self.arrangement_manager, rows_with_positions=rows_with_positions
+        )
+        self.undo_stack.push(cmd)
+        self._refresh_ui()
+        self._update_status(
+            f"Removed {len(rows_with_positions)} selected rows from arrangement"
+        )
+
+    def _clear_arrangement(self) -> None:
+        """Clear all arranged rows via undo-able command"""
+        if self.arrangement_manager.get_arranged_count() == 0:
+            self._update_status("No rows to clear")
+            return
+
+        # Capture state before clearing
+        previous_state = self.arrangement_manager.get_state_copy()
+
+        # Create and execute command
+        cmd = ClearRowsCommand(
+            manager=self.arrangement_manager, previous_state=previous_state
+        )
+        self.undo_stack.push(cmd)
         self._refresh_ui()
         self._update_status("Cleared all arranged rows")
 
-    def _refresh_arrangement(self):
-        """Refresh arrangement after internal reordering"""
+    def _refresh_arrangement(self) -> None:
+        """Refresh arrangement after internal reordering via undo-able command"""
         if self.arranged_list is None:
             return
-        # Get current order from the list widget
-        new_order = []
+
+        # Get current (old) order from manager
+        old_order = self.arrangement_manager.get_state_copy()
+
+        # Get new order from the list widget
+        new_order: list[int] = []
         for i in range(self.arranged_list.count()):
             item = self.arranged_list.item(i)
             row_index = item.data(Qt.ItemDataRole.UserRole)
             new_order.append(row_index)
 
-        self.arrangement_manager.reorder_rows(new_order)
+        # Skip if order hasn't changed
+        if old_order == new_order:
+            return
+
+        # Create and execute command
+        cmd = ReorderRowsCommand(
+            manager=self.arrangement_manager, old_order=old_order, new_order=new_order
+        )
+        self.undo_stack.push(cmd)
         self._update_preview()
         self._update_status("Reordered rows")
 
@@ -671,6 +766,25 @@ class RowArrangementDialog(SplitterDialog):
             # Delete selected rows from arrangement
             self._remove_selected_rows()
         elif a0 and (
+            a0.key() == Qt.Key.Key_Z
+            and a0.modifiers() == Qt.KeyboardModifier.ControlModifier
+        ):
+            # Ctrl+Z: Undo
+            self._on_undo()
+        elif a0 and (
+            a0.key() == Qt.Key.Key_Y
+            and a0.modifiers() == Qt.KeyboardModifier.ControlModifier
+        ):
+            # Ctrl+Y: Redo
+            self._on_redo()
+        elif a0 and (
+            a0.key() == Qt.Key.Key_Z
+            and a0.modifiers()
+            == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+        ):
+            # Ctrl+Shift+Z: Redo (alternative)
+            self._on_redo()
+        elif a0 and (
             a0.key() == Qt.Key.Key_A
             and a0.modifiers() == Qt.KeyboardModifier.ControlModifier
         ):
@@ -687,6 +801,24 @@ class RowArrangementDialog(SplitterDialog):
             self._cycle_palette()
         elif a0:
             super().keyPressEvent(a0)
+
+    def _on_undo(self) -> None:
+        """Handle undo action"""
+        description = self.undo_stack.undo()
+        if description:
+            self._refresh_ui()
+            self._update_status(f"Undo: {description}")
+        else:
+            self._update_status("Nothing to undo")
+
+    def _on_redo(self) -> None:
+        """Handle redo action"""
+        description = self.undo_stack.redo()
+        if description:
+            self._refresh_ui()
+            self._update_status(f"Redo: {description}")
+        else:
+            self._update_status("Nothing to redo")
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:

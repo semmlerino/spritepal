@@ -361,6 +361,19 @@ class MainWindow(QMainWindow):
         dialog.cache_cleared.connect(self._on_cache_cleared)
         dialog.exec()
 
+    def show_presets(self) -> None:
+        """Show the sprite presets management dialog"""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import SpritePresetManagerProtocol
+        from ui.dialogs.sprite_preset_dialog import SpritePresetDialog
+
+        preset_manager = inject(SpritePresetManagerProtocol)
+        dialog = SpritePresetDialog(
+            preset_manager=preset_manager,  # type: ignore[arg-type] - Protocol to concrete
+            parent=self,
+        )
+        dialog.exec()
+
     def clear_all_caches(self) -> None:
         """Clear all ROM caches with confirmation"""
         rom_cache = self.rom_cache

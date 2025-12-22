@@ -47,10 +47,20 @@ from .row_arrangement import PaletteColorizer
 from .row_arrangement.grid_arrangement_manager import (
     ArrangementType,
     GridArrangementManager,
+    TileGroup,
     TilePosition,
 )
 from .row_arrangement.grid_image_processor import GridImageProcessor
 from .row_arrangement.grid_preview_generator import GridPreviewGenerator
+from .row_arrangement.undo_redo import (
+    AddGroupCommand,
+    AddMultipleTilesCommand,
+    AddRowTilesCommand,
+    AddColumnTilesCommand,
+    ClearGridCommand,
+    RemoveMultipleTilesCommand,
+    UndoRedoStack,
+)
 from .utils.accessibility import AccessibilityHelper
 
 
@@ -717,6 +727,9 @@ class GridArrangementDialog(SplitterDialog):
             self.processor.grid_rows, self.processor.grid_cols
         )
 
+        # Create undo/redo stack
+        self.undo_stack = UndoRedoStack()
+
         # Step 2: Call parent init (this will call _setup_ui)
         super().__init__(
             parent=parent,
@@ -1059,14 +1072,18 @@ class GridArrangementDialog(SplitterDialog):
         return preview_group
 
     def _on_undo(self) -> None:
-        """Handle undo shortcut (placeholder)."""
-        # TODO: Implement undo functionality
-        pass
+        """Handle undo shortcut."""
+        description = self.undo_stack.undo()
+        if description:
+            self._update_displays()
+            self._update_status(f"Undo: {description}")
 
     def _on_redo(self) -> None:
-        """Handle redo shortcut (placeholder)."""
-        # TODO: Implement redo functionality
-        pass
+        """Handle redo shortcut."""
+        description = self.undo_stack.redo()
+        if description:
+            self._update_displays()
+            self._update_status(f"Redo: {description}")
 
     def _on_delete_selection(self) -> None:
         """Handle delete shortcut to clear selection."""
@@ -1100,17 +1117,49 @@ class GridArrangementDialog(SplitterDialog):
             return
 
         if self.grid_view.selection_mode == SelectionMode.ROW:
-            # Add as row
+            # Add as row - find tiles that aren't already arranged
             row = selection[0].row
-            self.arrangement_manager.add_row(row)
+            tiles_to_add = [
+                TilePosition(row, col)
+                for col in range(self.arrangement_manager.total_cols)
+                if not self.arrangement_manager.is_tile_arranged(TilePosition(row, col))
+            ]
+            if tiles_to_add:
+                command = AddRowTilesCommand(
+                    manager=self.arrangement_manager,
+                    row=row,
+                    tiles_added=tiles_to_add,
+                )
+                self.undo_stack.push(command)
+
         elif self.grid_view.selection_mode == SelectionMode.COLUMN:
-            # Add as column
+            # Add as column - find tiles that aren't already arranged
             col = selection[0].col
-            self.arrangement_manager.add_column(col)
+            tiles_to_add = [
+                TilePosition(row, col)
+                for row in range(self.arrangement_manager.total_rows)
+                if not self.arrangement_manager.is_tile_arranged(TilePosition(row, col))
+            ]
+            if tiles_to_add:
+                command = AddColumnTilesCommand(
+                    manager=self.arrangement_manager,
+                    col=col,
+                    tiles_added=tiles_to_add,
+                )
+                self.undo_stack.push(command)
+
         else:
-            # Add individual tiles
-            for tile_pos in selection:
-                self.arrangement_manager.add_tile(tile_pos)
+            # Add individual tiles - filter out already arranged ones
+            tiles_to_add = [
+                tile for tile in selection
+                if not self.arrangement_manager.is_tile_arranged(tile)
+            ]
+            if tiles_to_add:
+                command = AddMultipleTilesCommand(
+                    manager=self.arrangement_manager,
+                    tiles=tiles_to_add,
+                )
+                self.undo_stack.push(command)
 
         self.grid_view.clear_selection()
 
@@ -1118,8 +1167,24 @@ class GridArrangementDialog(SplitterDialog):
         """Remove current selection from arrangement"""
         selection = list(self.grid_view.current_selection)
 
-        for tile_pos in selection:
-            self.arrangement_manager.remove_tile(tile_pos)
+        if not selection:
+            return
+
+        # Filter to only tiles that are arranged and not part of groups
+        tiles_to_remove: list[tuple[TilePosition, int]] = []
+        for tile in selection:
+            if self.arrangement_manager.is_tile_arranged(tile):
+                # Skip tiles that are part of groups (those need group removal)
+                if self.arrangement_manager.get_tile_group(tile) is None:
+                    position = self.arrangement_manager.get_tile_position(tile)
+                    tiles_to_remove.append((tile, position))
+
+        if tiles_to_remove:
+            command = RemoveMultipleTilesCommand(
+                manager=self.arrangement_manager,
+                tiles_with_positions=tiles_to_remove,
+            )
+            self.undo_stack.push(command)
 
         self.grid_view.clear_selection()
 
@@ -1131,26 +1196,65 @@ class GridArrangementDialog(SplitterDialog):
             self._update_status("Select at least 2 tiles to create a group")
             return
 
+        # Check if any tile is already arranged
+        for tile in selection:
+            if self.arrangement_manager.is_tile_arranged(tile):
+                self._update_status("Some tiles are already arranged")
+                return
+
         # Generate group ID
         group_id = f"group_{len(self.arrangement_manager.get_groups())}"
+        group_name = f"Custom Group {len(self.arrangement_manager.get_groups()) + 1}"
+
+        # Calculate bounding box
+        min_row = min(t.row for t in selection)
+        max_row = max(t.row for t in selection)
+        min_col = min(t.col for t in selection)
+        max_col = max(t.col for t in selection)
+
+        width = max_col - min_col + 1
+        height = max_row - min_row + 1
 
         # Create group
-        group = self.arrangement_manager.create_group_from_selection(
-            selection,
-            group_id,
-            f"Custom Group {len(self.arrangement_manager.get_groups()) + 1}",
+        group = TileGroup(
+            id=group_id,
+            tiles=selection,
+            width=width,
+            height=height,
+            name=group_name,
         )
 
-        if group:
-            self._update_status(f"Created group with {len(selection)} tiles")
-            self.grid_view.clear_selection()
-        else:
-            self._update_status("Some tiles are already arranged")
+        command = AddGroupCommand(
+            manager=self.arrangement_manager,
+            group=group,
+        )
+        self.undo_stack.push(command)
+
+        self._update_status(f"Created group with {len(selection)} tiles")
+        self.grid_view.clear_selection()
 
     def _clear_arrangement(self):
         """Clear all arrangements"""
-        if self.arrangement_manager:
-            self.arrangement_manager.clear()
+        if not self.arrangement_manager:
+            return
+
+        # Check if there's anything to clear
+        if not self.arrangement_manager.get_arranged_tiles():
+            self._update_status("Nothing to clear")
+            return
+
+        # Capture current state for undo
+        tiles, groups, tile_to_group, order = self.arrangement_manager.get_state_snapshot()
+
+        command = ClearGridCommand(
+            manager=self.arrangement_manager,
+            previous_tiles=tiles,
+            previous_groups=groups,
+            previous_tile_to_group=tile_to_group,
+            previous_order=order,
+        )
+        self.undo_stack.push(command)
+
         self.grid_view.clear_selection()
         self._update_status("Cleared all arrangements")
 
@@ -1326,22 +1430,42 @@ class GridArrangementDialog(SplitterDialog):
     @override
     def keyPressEvent(self, a0: QKeyEvent | None):
         """Handle keyboard shortcuts"""
-        if a0 and a0.key() == Qt.Key.Key_G:
+        if not a0:
+            return
+
+        modifiers = a0.modifiers()
+        key = a0.key()
+
+        # Undo/Redo shortcuts
+        if modifiers == Qt.KeyboardModifier.ControlModifier:
+            if key == Qt.Key.Key_Z:
+                self._on_undo()
+                return
+            elif key == Qt.Key.Key_Y:
+                self._on_redo()
+                return
+        elif modifiers == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
+            if key == Qt.Key.Key_Z:
+                self._on_redo()
+                return
+
+        # Other shortcuts
+        if key == Qt.Key.Key_G:
             # Toggle grid (already handled by view)
             pass
-        elif a0 and a0.key() == Qt.Key.Key_C:
+        elif key == Qt.Key.Key_C:
             # Toggle palette
             self.colorizer.toggle_palette_mode()
-        elif a0 and a0.key() == Qt.Key.Key_P and self.colorizer.is_palette_mode():
+        elif key == Qt.Key.Key_P and self.colorizer.is_palette_mode():
             # Cycle palette
             self.colorizer.cycle_palette()
-        elif a0 and a0.key() == Qt.Key.Key_Delete:
+        elif key == Qt.Key.Key_Delete:
             # Remove selection
             self._remove_selection()
-        elif a0 and a0.key() == Qt.Key.Key_Escape:
+        elif key == Qt.Key.Key_Escape:
             # Clear selection
             self.grid_view.clear_selection()
-        elif a0:
+        else:
             # Let the grid view handle zoom shortcuts
             self.grid_view.keyPressEvent(a0)
             self._update_zoom_level_display()
