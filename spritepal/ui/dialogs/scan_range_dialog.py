@@ -19,8 +19,6 @@ from PySide6.QtWidgets import (
 from ui.common.spacing_constants import TAB_MIN_WIDTH
 from ui.styles.theme import COLORS
 
-# from typing_extensions import override
-
 
 class ScanRangeDialog(QDialog):
     """Dialog for specifying custom scan range."""

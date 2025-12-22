@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     import logging
@@ -19,6 +19,7 @@ else:
 from PIL import Image
 
 from core.default_palette_loader import DefaultPaletteLoader
+from core.types import SpriteInfo
 from core.hal_compression import HALCompressionError, HALCompressor
 from core.rom_injector import ROMInjector, SpritePointer
 from core.rom_palette_extractor import ROMPaletteExtractor
@@ -62,18 +63,6 @@ from utils.rom_exceptions import ROMCompressionError
 from utils.rom_utils import detect_smc_offset
 
 logger: logging.Logger = get_logger(__name__)
-
-
-class SpriteInfo(TypedDict):
-    """Information about a sprite found during ROM scanning."""
-
-    offset: int
-    offset_hex: str
-    compressed_size: int
-    decompressed_size: int
-    tile_count: int
-    alignment: str
-    quality: float
 
 
 class ROMExtractor:

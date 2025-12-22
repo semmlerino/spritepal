@@ -340,26 +340,3 @@ class LayoutManager:
         """
         LayoutManager.set_size_policies(widget, QSizePolicy.Policy.Fixed,
                                        QSizePolicy.Policy.Expanding)
-
-# Module-level convenience functions for common operations
-def apply_compact_layout(widget: QWidget) -> None:
-    """Convenience function for LayoutManager.apply_compact_layout()."""
-    LayoutManager.apply_compact_layout(widget)
-
-def apply_standard_layout(widget: QWidget) -> None:
-    """Convenience function for LayoutManager.apply_standard_layout()."""
-    LayoutManager.apply_standard_layout(widget)
-
-def configure_splitter(splitter: QSplitter, sizes: list[int]) -> None:
-    """Convenience function for LayoutManager.configure_splitter()."""
-    LayoutManager.configure_splitter(splitter, sizes)
-
-def remove_all_stretches(layout: QLayout) -> None:
-    """Convenience function for LayoutManager.remove_all_stretches()."""
-    LayoutManager.remove_all_stretches(layout)
-
-def set_size_policies(widget: QWidget,
-                     h_policy: QSizePolicy.Policy,
-                     v_policy: QSizePolicy.Policy) -> None:
-    """Convenience function for LayoutManager.set_size_policies()."""
-    LayoutManager.set_size_policies(widget, h_policy, v_policy)

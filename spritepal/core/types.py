@@ -83,6 +83,26 @@ class ROMExtractionParams(TypedDict):
     cgram_path: NotRequired[str | None]
 
 
+class SpriteInfo(TypedDict):
+    """Information about a sprite found during ROM scanning.
+
+    Consolidates duplicate definitions from rom_extractor.py, sprite_finder.py,
+    and scan_controller.py (SpriteInfoDict).
+    """
+
+    offset: int
+    offset_hex: str
+    compressed_size: int
+    decompressed_size: int
+    tile_count: int
+    alignment: str
+    quality: float
+    # Optional fields (from SpriteInfoDict)
+    size_limit_used: NotRequired[int]
+    size: NotRequired[int]
+    name: NotRequired[str]
+
+
 # Configuration and settings types
 ConfigDict: TypeAlias = dict[str, object]
 SettingsValue: TypeAlias = object
@@ -202,6 +222,7 @@ __all__ = [
     "SimilarityResult",
     "SimilarityScore",
     "SpriteData",
+    "SpriteInfo",
     "SpriteLocation",
     "SpriteOffset",
     "SpritePreset",

@@ -96,20 +96,3 @@ class ControllerDialogFactory:
             parent, sprite_path, metadata_path, input_vram,
             injection_manager=injection_manager
         )
-
-
-# Global accessor for the factory (for non-DI contexts)
-_controller_dialog_factory: ControllerDialogFactory | None = None
-
-
-def get_controller_dialog_factory() -> ControllerDialogFactory:
-    """
-    Get a global instance of the ControllerDialogFactory.
-
-    This should primarily be used in legacy code or if injection is not feasible.
-    For new code, prefer injecting the factory via the DI container.
-    """
-    global _controller_dialog_factory
-    if _controller_dialog_factory is None:
-        _controller_dialog_factory = ControllerDialogFactory()
-    return _controller_dialog_factory

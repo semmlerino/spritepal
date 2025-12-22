@@ -43,16 +43,3 @@ class ManualOffsetDialogFactory:
             extraction_manager=self._extraction_manager,
             rom_extractor=self._rom_extractor
         )
-
-# Optional: A global accessor for the factory, if needed in some non-DI contexts
-_manual_offset_dialog_factory: ManualOffsetDialogFactoryProtocol | None = None
-
-def get_manual_offset_dialog_factory() -> ManualOffsetDialogFactoryProtocol:
-    """
-    Provides a global accessor for the ManualOffsetDialogFactory.
-    This should primarily be used in legacy code or if injection is not feasible.
-    """
-    global _manual_offset_dialog_factory
-    if _manual_offset_dialog_factory is None:
-        _manual_offset_dialog_factory = inject(ManualOffsetDialogFactoryProtocol)
-    return _manual_offset_dialog_factory

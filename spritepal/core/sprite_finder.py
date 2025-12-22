@@ -7,7 +7,7 @@ import json
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, cast
 
 from PIL import Image
 
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from core.rom_injector import ROMInjector
 
 from core.region_analyzer import EmptyRegionConfig, EmptyRegionDetector
+from core.types import SpriteInfo
 from core.sprite_visual_validator import SpriteVisualValidator
 from core.tile_renderer import TileRenderer
 from utils.constants import (
@@ -34,17 +35,6 @@ from utils.logging_config import get_logger
 from utils.rom_utils import detect_smc_offset, detect_smc_offset_from_size
 
 logger = get_logger(__name__)
-
-
-class SpriteInfo(TypedDict):
-    """Metadata for a sprite found at a specific ROM offset."""
-    offset: int
-    offset_hex: str
-    compressed_size: int
-    decompressed_size: int
-    tile_count: int
-    quality: float
-    alignment: str
 
 
 @dataclass
@@ -405,6 +395,16 @@ class SpriteFinder:
         total_offsets = len(scan_offsets)
         processed = 0
         found_count = 0
+        skipped_duplicates = 0
+
+        # Track found sprite ranges to avoid duplicates (LOC-2.2c fix)
+        # When we find a sprite at offset X with compressed size Y,
+        # offsets in [X, X+Y) are part of the same compressed block
+        found_ranges: list[tuple[int, int]] = []
+
+        def is_in_found_range(check_offset: int) -> bool:
+            """Check if offset falls within any previously found sprite."""
+            return any(start <= check_offset < end for start, end in found_ranges)
 
         logger.info(f"Scanning {total_offsets} offsets...")
 
@@ -412,10 +412,15 @@ class SpriteFinder:
         for offset in scan_offsets:
             processed += 1
 
+            # Skip offsets within already-found sprites to avoid duplicates
+            if is_in_found_range(offset):
+                skipped_duplicates += 1
+                continue
+
             # Progress update every 1000 offsets
             if processed % 1000 == 0:
                 progress = (processed / total_offsets) * 100
-                logger.info(f"Progress: {progress:.1f}% ({processed}/{total_offsets}), found {found_count} candidates")
+                logger.info(f"Progress: {progress:.1f}% ({processed}/{total_offsets}), found {found_count} candidates, skipped {skipped_duplicates} duplicates")
 
             # Try to decompress at this offset
             compressed_size = 0
@@ -484,6 +489,15 @@ class SpriteFinder:
 
                         candidates.append(candidate)
                         found_count += 1
+
+                        # Track this sprite's range to prevent duplicate detection
+                        # at nearby offsets within the same compressed block
+                        if compressed_size > 0:
+                            found_ranges.append((offset, offset + compressed_size))
+                            logger.debug(
+                                f"Marking range 0x{offset:06X}-0x{offset + compressed_size:06X} "
+                                "as found to prevent duplicates"
+                            )
 
                         # Stop if we have enough candidates
                         if len(candidates) >= max_candidates:

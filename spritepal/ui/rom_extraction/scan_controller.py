@@ -9,22 +9,9 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, cast
 
-
-class SpriteInfoDict(TypedDict):
-    """Sprite scan result data structure."""
-    offset: int
-    offset_hex: str
-    compressed_size: int
-    decompressed_size: int
-    tile_count: int
-    alignment: str
-    quality: float
-    size_limit_used: NotRequired[int]
-    size: NotRequired[int]
-    name: NotRequired[str]
-
+from core.types import SpriteInfo
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
     QDialog,
@@ -110,7 +97,7 @@ class ScanContext:
     """Context object for sharing data between scan event handlers."""
 
     def __init__(self) -> None:
-        self.found_offsets: list[SpriteInfoDict] = []
+        self.found_offsets: list[SpriteInfo] = []
         self.selected_offset: int | None = None
 
 
@@ -471,7 +458,7 @@ class ScanController(QObject):
         dialog.progress_bar.setFormat(f"Scanning... {current}/{total}")
         self.scan_progress.emit(current, total)
 
-    def _on_sprite_found(self, dialog: ScanDialog, sprite_info: SpriteInfoDict) -> None:
+    def _on_sprite_found(self, dialog: ScanDialog, sprite_info: SpriteInfo) -> None:
         """Handle sprite found during scan."""
         if self._scan_context is None:
             return
@@ -652,13 +639,13 @@ class ScanController(QObject):
             self.cache_status_changed.emit("Save failed", "cache-error")
             return False
 
-    def _save_scan_results_to_cache(self, dialog: ScanDialog, found_offsets: list[SpriteInfoDict]) -> None:
+    def _save_scan_results_to_cache(self, dialog: ScanDialog, found_offsets: list[SpriteInfo]) -> None:
         """Save scan results to cache."""
         self._update_cache_status(dialog, "saving", "\U0001F4BE Saving results to cache...")
         # Defer actual save to next event loop iteration to allow UI update
         QTimer.singleShot(0, lambda: self._do_cache_save(dialog, found_offsets))
 
-    def _do_cache_save(self, dialog: ScanDialog, found_offsets: list[SpriteInfoDict]) -> None:
+    def _do_cache_save(self, dialog: ScanDialog, found_offsets: list[SpriteInfo]) -> None:
         """Perform the actual cache save operation."""
         if self._current_rom_path is None:
             return
@@ -726,7 +713,7 @@ class ScanController(QObject):
 
         return f"{name} @ {offset_str} ({size_str})"
 
-    def _format_sprite_info_detailed(self, sprite_info: SpriteInfoDict) -> str:
+    def _format_sprite_info_detailed(self, sprite_info: SpriteInfo) -> str:
         """Format sprite info for display (detailed format for scan results)."""
         text = f"Found sprite at {sprite_info['offset_hex']}:\n"
         text += f"  - Tiles: {sprite_info['tile_count']}\n"
@@ -778,7 +765,7 @@ class ScanController(QObject):
 
         return "\n".join(lines)
 
-    def _format_scan_summary_detailed(self, found_offsets: list[SpriteInfoDict]) -> str:
+    def _format_scan_summary_detailed(self, found_offsets: list[SpriteInfo]) -> str:
         """Format scan completion summary (detailed format for scan results)."""
         from operator import itemgetter
         
