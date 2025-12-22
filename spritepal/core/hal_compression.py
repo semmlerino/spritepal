@@ -123,8 +123,9 @@ def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queu
     try:
         from utils.logging_config import get_logger
         worker_logger = get_logger(f"hal_worker_{os.getpid()}")
-    except Exception:
-        # If logging fails, create basic logger to avoid failures
+    except (ImportError, ModuleNotFoundError, FileNotFoundError):
+        # If custom logging unavailable (import error or missing config file),
+        # fall back to basic stdlib logger
         import logging
         worker_logger = logging.getLogger(f"hal_worker_{os.getpid()}")
         worker_logger.setLevel(logging.DEBUG)
@@ -417,13 +418,15 @@ class HALProcessPool:
                 self._request_queue = self._manager.Queue()  # type: ignore[assignment] - Manager.Queue() returns untyped proxy
                 self._result_queue = self._manager.Queue()  # type: ignore[assignment] - Manager.Queue() returns untyped proxy
 
-                # Start worker processes (daemon=False to prevent zombie processes)
+                # Start worker processes (daemon=False to allow graceful shutdown)
+                # Non-daemon processes complete their current work before termination,
+                # preventing data corruption. Requires explicit cleanup via shutdown().
                 logger.info(f"Starting HAL process pool with {pool_size} workers")
                 for i in range(pool_size):
                     p = mp.Process(
                         target=_hal_worker_process,
                         args=(exhal_path, inhal_path, self._request_queue, self._result_queue),
-                        daemon=False  # Changed from True to prevent zombie processes
+                        daemon=False  # Non-daemon: allows graceful shutdown, requires explicit cleanup
                     )
                     p.start()
                     self._processes.append(p)

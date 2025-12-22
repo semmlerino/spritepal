@@ -77,8 +77,8 @@ class ROMPaletteExtractor:
                     f"Extracted palette {palette_idx} to {Path(palette_path).name}"
                 )
 
-        except Exception:
-            logger.exception("Failed to extract palettes from ROM")
+        except OSError as e:
+            logger.warning(f"Failed to extract palettes from ROM: {e}")
 
         return created_files
 
@@ -186,7 +186,7 @@ class ROMPaletteExtractor:
                 if 0 <= idx <= 15:
                     palettes[idx] = self._extract_palette_colors(palette_data, idx)
 
-        except Exception:
-            logger.exception("Failed to extract palette range")
+        except OSError as e:
+            logger.warning(f"Failed to extract palette range: {e}")
 
         return palettes

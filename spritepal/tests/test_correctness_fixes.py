@@ -214,7 +214,7 @@ class TestWorkerCleanup:
     """
 
     def test_worker_cleared_on_exception(
-        self, isolated_managers: Any, qtbot: Any
+        self, isolated_managers: Any, qtbot: Any, tmp_path: Path
     ) -> None:
         """_current_worker should be None after exception in start_injection."""
         manager = get_extraction_manager()
@@ -228,7 +228,7 @@ class TestWorkerCleanup:
             "mode": "rom",
             "sprite_path": "/nonexistent/sprite.png",
             "input_rom": "/nonexistent/rom.smc",
-            "output_rom": "/tmp/output.smc",
+            "output_rom": str(tmp_path / "output.smc"),
             "offset": 0x1000,
         }
 

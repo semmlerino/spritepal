@@ -53,8 +53,8 @@ class DefaultPaletteLoader:
             with palette_path_obj.open() as f:
                 self.palette_data = json.load(f)
             logger.info(f"Loaded default palettes: {self.palette_path}")
-        except Exception:
-            logger.exception("Failed to load default palettes")
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning(f"Failed to load default palettes: {e}")
 
     def get_sprite_palettes(self, sprite_name: str) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny]
         """
@@ -112,8 +112,8 @@ class DefaultPaletteLoader:
                 logger.info(
                     f"Created default palette: {palette_name} -> {Path(palette_path).name}"
                 )
-            except Exception:
-                logger.exception("Failed to create palette file")
+            except OSError as e:
+                logger.warning(f"Failed to create palette file {palette_name}: {e}")
 
         return created_files
 
