@@ -9,7 +9,6 @@ InjectionManagerProtocol without using adapters.
 from __future__ import annotations
 
 import json
-import os
 import threading
 import time
 from collections.abc import Mapping
@@ -623,31 +622,33 @@ class CoreOperationsManager(BaseManager):
     ) -> dict[str, object] | None:  # Error dict with error and error_type keys
         """Validate ROM file exists, is readable, and has reasonable size.
 
+        Uses FileValidator for comprehensive validation, converts result to dict format.
+
         Returns:
             Error dict if validation fails, None if valid
         """
-        # Check file exists and is readable
-        if not Path(rom_path).exists():
-            return {"error": f"ROM file not found: {rom_path}", "error_type": "FileNotFoundError"}
+        result = FileValidator.validate_rom_file(rom_path)
+        if result.is_valid:
+            return None
 
-        if not os.access(rom_path, os.R_OK):
-            return {"error": f"Cannot read ROM file: {rom_path}", "error_type": "PermissionError"}
+        # Convert ValidationResult to legacy dict format for backward compatibility
+        error_msg = result.error_message or f"Invalid ROM file: {rom_path}"
 
-        # Check file size is reasonable for a SNES ROM
-        file_size = Path(rom_path).stat().st_size
-        if file_size < 0x8000:  # Minimum reasonable SNES ROM size (32KB)
-            return {"error": f"File too small to be a valid SNES ROM: {file_size} bytes", "error_type": "ValueError"}
+        # Determine error_type from error message
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
+            error_type = "FileNotFoundError"
+        elif "permission" in error_msg.lower() or "cannot read" in error_msg.lower():
+            error_type = "PermissionError"
+        else:
+            error_type = "ValueError"
 
-        if file_size > 0x600000:  # Maximum reasonable size (6MB)
-            return {"error": f"File too large to be a valid SNES ROM: {file_size} bytes", "error_type": "ValueError"}
-
-        return None
+        return {"error": error_msg, "error_type": error_type}
 
     def _validate_extraction_rom_file(self, rom_path: str) -> None:
         """Validate ROM file for extraction and raise if invalid."""
-        rom_result = FileValidator.validate_rom_file(rom_path)
-        if not rom_result.is_valid:
-            raise ValidationError(f"ROM file validation failed: {rom_result.error_message}")
+        error_result = self._validate_rom_file(rom_path)
+        if error_result:
+            raise ValidationError(f"ROM file validation failed: {error_result['error']}")
 
     # ========== Injection Operations ==========
 
@@ -907,9 +908,142 @@ class CoreOperationsManager(BaseManager):
 
     # ========== VRAM Suggestion Strategies ==========
 
+    def _validate_vram_path(self, path: str | None) -> str:
+        """Validate and return VRAM path if it exists, empty string otherwise."""
+        if path and Path(path).exists():
+            return str(path)
+        return ""
+
+    def _find_vram_path_internal(
+        self,
+        sprite_path: str,
+        metadata_path: str = "",
+        metadata: dict[str, object] | None = None,
+        pre_suggested: str = "",
+        strip_editor_suffixes: bool = False,
+    ) -> str:
+        """
+        Unified internal method for finding VRAM path with all strategies.
+
+        Tries multiple sources in priority order:
+        1. Pre-suggested path (if exists)
+        2. Session manager current vram_path
+        3. Metadata file (source_vram or extraction.vram_source)
+        4. Basename pattern matching
+        5. Session settings
+        6. Last injection settings
+
+        Args:
+            sprite_path: Path to sprite file
+            metadata_path: Optional metadata file path (loads and parses)
+            metadata: Pre-loaded metadata dict (from load_metadata)
+            pre_suggested: Pre-suggested VRAM path to check first
+            strip_editor_suffixes: Strip editor suffixes from sprite name
+
+        Returns:
+            Suggested VRAM path or empty string if none found
+        """
+        # Strategy 0: Pre-suggested path
+        if result := self._validate_vram_path(pre_suggested):
+            return result
+
+        # Strategy 1: Session manager current vram_path
+        try:
+            session_manager = self._get_session_manager()
+            if result := self._validate_vram_path(
+                cast(str, session_manager.get("session", "vram_path", ""))
+            ):
+                return result
+        except (OSError, ValueError, TypeError):
+            pass
+
+        # Strategy 2a: Load metadata from file if path provided
+        loaded_metadata = metadata
+        if not loaded_metadata and metadata_path and Path(metadata_path).exists():
+            try:
+                with Path(metadata_path).open() as f:
+                    loaded_metadata = cast(dict[str, object], json.load(f))
+            except (OSError, ValueError, json.JSONDecodeError):
+                pass
+
+        # Strategy 2b: Check metadata for VRAM source
+        if loaded_metadata:
+            # Check top-level source_vram (absolute path)
+            if result := self._validate_vram_path(cast(str, loaded_metadata.get("source_vram", ""))):
+                return result
+            # Check extraction.vram_source (relative path)
+            extraction = loaded_metadata.get("extraction")
+            if isinstance(extraction, dict):
+                vram_source = cast(str, extraction.get("vram_source", ""))
+                if vram_source and sprite_path:
+                    sprite_dir = Path(sprite_path).parent
+                    if result := self._validate_vram_path(str(sprite_dir / vram_source)):
+                        return result
+
+        # Strategy 3: Basename pattern matching
+        if sprite_path:
+            sprite_path_obj = Path(sprite_path)
+            sprite_dir = sprite_path_obj.parent
+            base_name = sprite_path_obj.stem
+
+            # Strip editor suffixes if requested
+            if strip_editor_suffixes:
+                for suffix in ["_sprites_editor", "_sprites", "_editor", "Edited"]:
+                    if base_name.endswith(suffix):
+                        base_name = base_name[: -len(suffix)]
+                        break
+
+            # Combined patterns from both methods (order by specificity)
+            vram_patterns = [
+                f"{base_name}.dmp",
+                f"{base_name}_VRAM.dmp",
+                f"{base_name}.VRAM.dmp",
+                f"{base_name}.vram",
+                f"{base_name}.SnesVideoRam.dmp",
+                f"{base_name}.VideoRam.dmp",
+                "VRAM.dmp",
+                "vram.dmp",
+            ]
+
+            for pattern in vram_patterns:
+                if result := self._validate_vram_path(str(sprite_dir / pattern)):
+                    return result
+
+        # Strategy 4: Session settings
+        try:
+            session_manager = self._get_session_manager()
+            # Try get_setting variant
+            if result := self._validate_vram_path(
+                cast(str, session_manager.get_setting("session", "vram_path", ""))
+            ):
+                return result
+            # Try session_data variant
+            session_data = session_manager.get_session_data()
+            if SETTINGS_KEY_VRAM_PATH in session_data:
+                if result := self._validate_vram_path(cast(str, session_data[SETTINGS_KEY_VRAM_PATH])):
+                    return result
+        except (OSError, ValueError, TypeError):
+            pass
+
+        # Strategy 5: Last injection settings
+        try:
+            session_manager = self._get_session_manager()
+            if result := self._validate_vram_path(
+                cast(str, session_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, ""))
+            ):
+                return result
+        except (OSError, ValueError, TypeError):
+            pass
+
+        self._logger.debug("No VRAM suggestion found")
+        return ""
+
     def get_smart_vram_suggestion(self, sprite_path: str, metadata_path: str = "") -> str:
         """
         Get smart suggestion for input VRAM path using multiple strategies.
+
+        Tries multiple sources in priority order: extraction panel, metadata,
+        basename patterns, session data, and last injection settings.
 
         Args:
             sprite_path: Path to sprite file
@@ -918,99 +1052,11 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested VRAM path or empty string if none found
         """
-        strategies = [
-            lambda: self._try_extraction_panel_vram(),
-            lambda: self._try_metadata_vram(metadata_path, sprite_path),
-            lambda: self._try_basename_vram_patterns(sprite_path),
-            lambda: self._try_session_vram(),
-            lambda: self._try_last_injection_vram(),
-        ]
-
-        for strategy in strategies:
-            try:
-                vram_path = strategy()
-                if vram_path:
-                    self._logger.debug(f"Smart VRAM suggestion found: {vram_path}")
-                    return vram_path
-            except (OSError, ValueError) as e:
-                self._logger.debug(f"VRAM suggestion strategy failed: {e}")
-                continue
-            except Exception as e:
-                self._logger.debug(f"Unexpected error in VRAM suggestion strategy: {e}")
-                continue
-
-        self._logger.debug("No VRAM suggestion found")
-        return ""
-
-    def _try_extraction_panel_vram(self) -> str:
-        """Try to get VRAM path from extraction panel's current session."""
-        try:
-            session_manager = self._get_session_manager()
-            vram_path = cast(str, session_manager.get("session", "vram_path", ""))
-            if vram_path and Path(vram_path).exists():
-                return str(vram_path)
-        except (OSError, ValueError):
-            pass
-        return ""
-
-    def _try_metadata_vram(self, metadata_path: str, sprite_path: str) -> str:
-        """Try to get VRAM path from metadata file."""
-        if not metadata_path or not Path(metadata_path).exists():
-            return ""
-
-        try:
-            with Path(metadata_path).open() as f:
-                metadata = cast(dict[str, object], json.load(f))
-            vram_path = cast(str, metadata.get("source_vram", ""))
-            if vram_path and Path(vram_path).exists():
-                return str(vram_path)
-        except (OSError, ValueError, json.JSONDecodeError):
-            pass
-        return ""
-
-    def _try_basename_vram_patterns(self, sprite_path: str) -> str:
-        """Try to find VRAM file using basename patterns."""
-        sprite_path_obj = Path(sprite_path)
-        sprite_dir = sprite_path_obj.parent
-        base_name = sprite_path_obj.stem
-
-        patterns = [
-            f"{base_name}.dmp",
-            f"{base_name}_VRAM.dmp",
-            f"{base_name}.vram",
-            "VRAM.dmp",
-            "vram.dmp",
-        ]
-
-        for pattern in patterns:
-            vram_path = sprite_dir / pattern
-            if vram_path.exists():
-                return str(vram_path)
-        return ""
-
-    def _try_session_vram(self) -> str:
-        """Try to get VRAM path from session data."""
-        try:
-            session_manager = self._get_session_manager()
-            vram_path = cast(str, session_manager.get_setting("session", "vram_path", ""))
-            if vram_path and Path(vram_path).exists():
-                return str(vram_path)
-        except (OSError, ValueError, TypeError):
-            pass
-        return ""
-
-    def _try_last_injection_vram(self) -> str:
-        """Try to get VRAM path from last injection settings."""
-        try:
-            session_manager = self._get_session_manager()
-            last_injection_vram = cast(str, session_manager.get(
-                SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, ""
-            ))
-            if last_injection_vram and Path(last_injection_vram).exists():
-                return str(last_injection_vram)
-        except (OSError, ValueError, TypeError):
-            pass
-        return ""
+        return self._find_vram_path_internal(
+            sprite_path=sprite_path,
+            metadata_path=metadata_path,
+            strip_editor_suffixes=False,
+        )
 
     # ========== Metadata and ROM Info ==========
 
@@ -1182,59 +1228,12 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested VRAM path or empty string if none found
         """
-        if suggested_vram and Path(suggested_vram).exists():
-            return suggested_vram
-
-        # Try metadata first
-        if metadata and metadata.get("extraction"):
-            extraction = metadata["extraction"]
-            if isinstance(extraction, dict):
-                vram_source = cast(str, extraction.get("vram_source", ""))
-                if vram_source and sprite_path:
-                    sprite_dir = Path(sprite_path).parent
-                    possible_path = Path(sprite_dir) / vram_source
-                    if possible_path.exists():
-                        return str(possible_path)
-
-        # Try to find VRAM file with same base name
-        if sprite_path:
-            sprite_dir = Path(sprite_path).parent
-            sprite_base = Path(sprite_path).stem
-
-            for suffix in ["_sprites_editor", "_sprites", "_editor", "Edited"]:
-                if sprite_base.endswith(suffix):
-                    sprite_base = sprite_base[: -len(suffix)]
-                    break
-
-            vram_patterns = [
-                f"{sprite_base}.dmp",
-                f"{sprite_base}.SnesVideoRam.dmp",
-                f"{sprite_base}_VRAM.dmp",
-                f"{sprite_base}.VideoRam.dmp",
-                f"{sprite_base}.VRAM.dmp",
-            ]
-
-            for pattern in vram_patterns:
-                possible_path = Path(sprite_dir) / pattern
-                if possible_path.exists():
-                    return str(possible_path)
-
-        # Check session data
-        session_manager = self._get_session_manager()
-        session_data = session_manager.get_session_data()
-        if SETTINGS_KEY_VRAM_PATH in session_data:
-            vram_path = cast(str, session_data[SETTINGS_KEY_VRAM_PATH])
-            if vram_path and Path(vram_path).exists():
-                return str(vram_path)
-
-        # Check last used injection VRAM
-        last_injection_vram = cast(str, session_manager.get(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, ""
-        ))
-        if last_injection_vram and Path(last_injection_vram).exists():
-            return str(last_injection_vram)
-
-        return ""
+        return self._find_vram_path_internal(
+            sprite_path=sprite_path,
+            metadata=metadata,
+            pre_suggested=suggested_vram,
+            strip_editor_suffixes=True,
+        )
 
     def _suggest_output_path(
         self,

@@ -13,9 +13,7 @@ Base Classes:
 - ScanWorkerBase: Specialized for scanning operations
 - PreviewWorkerBase: Specialized for preview generation operations
 
-Architecture Patterns:
-- Legacy: Workers use global singleton managers (for backward compatibility)
-- Modern: Workers own their managers via factory pattern (recommended for new code)
+Workers receive their manager via constructor (dependency injection pattern).
 """
 from __future__ import annotations
 
@@ -23,16 +21,12 @@ from .base import BaseWorker, ManagedWorker
 from .extraction import (
     ROMExtractionWorker,
     VRAMExtractionWorker,
-    WorkerOwnedROMExtractionWorker,
-    WorkerOwnedVRAMExtractionWorker,
 )
 from .injection import (
     ROMInjectionParams,
     ROMInjectionWorker,
     VRAMInjectionParams,
     VRAMInjectionWorker,
-    WorkerOwnedROMInjectionWorker,
-    WorkerOwnedVRAMInjectionWorker,
 )
 from .injection_worker import InjectionWorker
 from .specialized import (
@@ -56,8 +50,4 @@ __all__ = [
     "VRAMExtractionWorker",
     "VRAMInjectionParams",
     "VRAMInjectionWorker",
-    "WorkerOwnedROMExtractionWorker",
-    "WorkerOwnedROMInjectionWorker",
-    "WorkerOwnedVRAMExtractionWorker",
-    "WorkerOwnedVRAMInjectionWorker",
 ]

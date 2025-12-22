@@ -8,7 +8,7 @@ signals and behavior for extraction, injection, and scanning operations.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -23,11 +23,6 @@ from utils.logging_config import get_logger
 from .base import BaseWorker, ManagedWorker
 
 logger = get_logger(__name__)
-
-class QObjectMixin(Protocol):
-    """Protocol to ensure mixin is used with QObject-derived classes."""
-    def setParent(self, parent: QObject | None) -> None: ...
-    _operation_name: str
 
 class SignalConnectionHelper:
     """
@@ -187,58 +182,6 @@ class SignalConnectionHelper:
         self._connections.append(connection)
         logger.debug("Connected injection completion signals")
 
-class WorkerOwnedManagerMixin:
-    """
-    Mixin for standardizing the worker-owned manager pattern.
-
-    This mixin assumes it will be used with QObject subclasses (like BaseWorker).
-    The type checker understands this through the setup_worker_owned_manager method
-    which requires self to have setParent capability.
-
-    Provides common initialization logic for workers that own their
-    own manager instances for perfect thread isolation.
-
-    Note: This mixin should only be used with QObject-derived classes.
-    """
-
-    @staticmethod
-    def create_worker_owned_manager(
-        manager_factory: object | None,
-        manager_creator_func: Callable[[object, QObject | None], BaseManager],
-        parent: QObject | None = None
-    ) -> BaseManager:
-        """
-        Create a manager using DI injection.
-
-        Note: The factory pattern is deprecated. This now uses DI to get
-        the singleton CoreOperationsManager instance.
-
-        Args:
-            manager_factory: Deprecated, ignored if provided
-            manager_creator_func: Deprecated, ignored
-            parent: Ignored (singleton manager has its own parent)
-
-        Returns:
-            CoreOperationsManager instance from DI
-        """
-        # Use DI to get the singleton manager
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ExtractionManagerProtocol
-        return inject(ExtractionManagerProtocol)  # type: ignore[return-value] - DI returns protocol, caller expects concrete
-
-    def setup_worker_owned_manager(self, manager: BaseManager) -> None:
-        """
-        Complete worker-owned manager setup after worker initialization.
-
-        Args:
-            manager: The manager to set up proper parent relationship
-        """
-        # Fix the manager's parent to be this worker for proper ownership
-        # Type checker: self is expected to be a QObject (mixed with BaseWorker)
-        if isinstance(self, QObject):
-            manager.setParent(self)
-        operation_name = getattr(self, '_operation_name', 'Worker')
-        logger.info(f"{operation_name}: Created with worker-owned manager")
 
 class ExtractionWorkerBase(ManagedWorker):
     """

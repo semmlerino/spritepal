@@ -15,6 +15,7 @@ from PySide6.QtCore import Signal
 from core.workers.base import BaseWorker, handle_worker_errors
 from utils.constants import MAX_ROM_SIZE
 from utils.logging_config import get_logger
+from utils.rom_utils import detect_smc_offset
 
 # from utils.rom_cache import get_rom_cache # Removed due to DI
 
@@ -99,9 +100,8 @@ class RangeScanWorker(BaseWorker):
             with Path(self.rom_path).open("rb") as f:
                 rom_data = f.read()
 
-            # Strip SMC header if present (512 bytes when file_size % 1024 == 512)
-            file_size = len(rom_data)
-            smc_offset = 512 if file_size % 1024 == 512 else 0
+            # Strip SMC header if present
+            smc_offset = detect_smc_offset(rom_data)
             if smc_offset > 0:
                 logger.debug(f"Stripping {smc_offset}-byte SMC header from ROM data")
                 rom_data = rom_data[smc_offset:]

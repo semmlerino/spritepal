@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Callable, Mapping
-from pathlib import Path
 from typing import TypeVar
 
 # Type variable for generic _ensure_component method
@@ -285,20 +284,6 @@ class BaseManager(QObject):
                 f"Invalid type for '{name}': expected {expected_type.__name__}, "
                 f"got {type(value).__name__}"
             )
-
-    def _validate_file_exists(self, path: str, name: str) -> None:
-        """
-        Validate that a file exists
-
-        Args:
-            path: File path to check
-            name: Parameter name for error messages
-
-        Raises:
-            ValidationError: If file doesn't exist
-        """
-        if not Path(path).exists():
-            raise ValidationError(f"{name} does not exist: {path}")
 
     def _validate_range(self, value: int | float, name: str,
                        min_val: int | float | None = None,

@@ -476,9 +476,9 @@ class BatchThumbnailWorker(QObject):
                 # Store handles for persistent use (cleanup via _clear_rom_data)
                 self._rom_file = rom_file
                 self._rom_mmap = rom_mmap
-                # Detect SMC header (512 bytes present when file_size % 1024 == 512)
+                # Detect SMC header using utility
                 file_size = len(self._rom_mmap)
-                self._smc_offset = 512 if file_size % 1024 == 512 else 0
+                self._smc_offset = detect_smc_offset(self._rom_mmap)
                 if self._smc_offset > 0:
                     logger.info(f"Detected {self._smc_offset}-byte SMC header in ROM")
                 logger.info(f"ROM data mapped: {file_size} bytes (SMC offset: {self._smc_offset})")
@@ -489,13 +489,13 @@ class BatchThumbnailWorker(QObject):
                 rom_file.close()
                 rom_file = None
 
-                # Detect SMC header (512 bytes present when file_size % 1024 == 512)
+                # Detect SMC header using utility
                 file_size = len(rom_data)
-                self._smc_offset = 512 if file_size % 1024 == 512 else 0
+                self._smc_offset = detect_smc_offset(rom_data)
                 if self._smc_offset > 0:
                     logger.info(f"Detected {self._smc_offset}-byte SMC header in ROM")
 
-                # Use module-level BytesMMAPWrapper for mmap-compatible interface
+                # Use BytesMMAPWrapper from rom_utils for mmap-compatible interface
                 self._rom_mmap = BytesMMAPWrapper(rom_data)
                 self._rom_file = None
                 logger.info(f"ROM data loaded (fallback): {file_size} bytes (SMC offset: {self._smc_offset})")

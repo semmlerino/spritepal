@@ -104,21 +104,6 @@ class TestBaseManager:
         with pytest.raises(ValidationError, match="Invalid type for 'param'"):
             manager._validate_type("test", "param", int)
 
-    def test_validation_file_exists(self, tmp_path):
-        """Test file existence validation"""
-        manager = ConcreteManager()
-
-        # Create test file
-        test_file = tmp_path / "test.txt"
-        test_file.write_text("test")
-
-        # Existing file
-        manager._validate_file_exists(str(test_file), "test file")
-
-        # Non-existing file
-        with pytest.raises(ValidationError, match="test file does not exist"):
-            manager._validate_file_exists(str(tmp_path / "missing.txt"), "test file")
-
     def test_validation_range(self):
         """Test range validation"""
         manager = ConcreteManager()

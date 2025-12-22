@@ -23,6 +23,7 @@ from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 from core.services.worker_lifecycle import WorkerManager
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 from utils.logging_config import get_logger
+from utils.rom_utils import detect_smc_offset
 
 if TYPE_CHECKING:
     from weakref import ReferenceType
@@ -145,9 +146,8 @@ class PooledPreviewWorker(SpritePreviewWorker):
             with Path(self.rom_path).open("rb") as f:
                 rom_data = f.read()
 
-            # Strip SMC header if present (512 bytes when file_size % 1024 == 512)
-            file_size = len(rom_data)
-            smc_offset = 512 if file_size % 1024 == 512 else 0
+            # Strip SMC header if present
+            smc_offset = detect_smc_offset(rom_data)
             if smc_offset > 0:
                 logger.debug(f"Stripping {smc_offset}-byte SMC header from ROM data")
                 rom_data = rom_data[smc_offset:]

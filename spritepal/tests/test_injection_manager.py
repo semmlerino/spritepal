@@ -681,15 +681,15 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == str(vram_file)
 
-    def test_try_metadata_vram_valid_file(self, tmp_path):
-        """Test metadata VRAM strategy with valid metadata file"""
+    def test_get_smart_vram_suggestion_metadata_strategy(self, tmp_path):
+        """Test VRAM suggestion using metadata strategy"""
         manager = CoreOperationsManager()
 
         # Create VRAM file
         vram_file = tmp_path / "metadata_vram.dmp"
         vram_file.write_text("fake vram data")
 
-        # Create metadata file
+        # Create metadata file pointing to VRAM
         metadata_file = tmp_path / "metadata.json"
         metadata_data = {"source_vram": str(vram_file)}
         metadata_file.write_text(json.dumps(metadata_data))
@@ -697,22 +697,13 @@ class TestInjectionManagerVRAMSuggestion:
         sprite_file = tmp_path / "sprite.png"
         sprite_file.write_text("fake sprite data")
 
-        result = manager._try_metadata_vram(str(metadata_file), str(sprite_file))
+        result = manager.get_smart_vram_suggestion(
+            str(sprite_file), metadata_path=str(metadata_file)
+        )
         assert result == str(vram_file)
 
-    def test_try_metadata_vram_invalid_file(self, tmp_path):
-        """Test metadata VRAM strategy with invalid metadata file"""
-        manager = CoreOperationsManager()
-
-        sprite_file = tmp_path / "sprite.png"
-        sprite_file.write_text("fake sprite data")
-
-        # Nonexistent metadata file
-        result = manager._try_metadata_vram("/nonexistent/metadata.json", str(sprite_file))
-        assert result == ""
-
-    def test_try_basename_vram_patterns_multiple_patterns(self, tmp_path):
-        """Test basename VRAM patterns with multiple pattern matching"""
+    def test_get_smart_vram_suggestion_vram_suffix_pattern(self, tmp_path):
+        """Test VRAM suggestion using _VRAM.dmp suffix pattern"""
         manager = CoreOperationsManager()
 
         sprite_file = tmp_path / "test_sprite.png"
@@ -722,42 +713,9 @@ class TestInjectionManagerVRAMSuggestion:
         vram_file = tmp_path / "test_sprite_VRAM.dmp"
         vram_file.write_text("fake vram data")
 
-        result = manager._try_basename_vram_patterns(str(sprite_file))
+        result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == str(vram_file)
 
-    @patch.object(CoreOperationsManager, "_get_session_manager")
-    def test_try_session_vram_recent_files(self, mock_get_session, tmp_path):
-        """Test session VRAM strategy with session vram_path setting"""
-        manager = CoreOperationsManager()
-
-        # Create VRAM file
-        vram_file = tmp_path / "recent_vram.dmp"
-        vram_file.write_text("fake vram data")
-
-        # Mock session manager - get_setting is what _try_session_vram actually calls
-        mock_session = Mock()
-        mock_session.get_setting.return_value = str(vram_file)
-        mock_get_session.return_value = mock_session
-
-        result = manager._try_session_vram()
-        assert result == str(vram_file)
-
-    @patch.object(CoreOperationsManager, "_get_session_manager")
-    def test_try_last_injection_vram_settings(self, mock_get_session, tmp_path):
-        """Test last injection VRAM strategy"""
-        manager = CoreOperationsManager()
-
-        # Create VRAM file
-        vram_file = tmp_path / "last_injection_vram.dmp"
-        vram_file.write_text("fake vram data")
-
-        # Mock session manager
-        mock_session = Mock()
-        mock_session.get.return_value = str(vram_file)
-        mock_get_session.return_value = mock_session
-
-        result = manager._try_last_injection_vram()
-        assert result == str(vram_file)
 
 # Integration test demonstrating TDD methodology with real components
 

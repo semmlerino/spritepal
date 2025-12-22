@@ -4,6 +4,11 @@ Registry for accessing manager instances
 from __future__ import annotations
 
 import threading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.protocols.manager_protocols import ConfigurationServiceProtocol
+
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
@@ -203,7 +208,7 @@ class ManagerRegistry:
         self,
         app_name: str = "SpritePal",
         settings_path: Path | None = None,
-        configuration_service: object = None,
+        configuration_service: ConfigurationServiceProtocol | None = None,
     ) -> None:
         """
         Initialize all managers with proper error handling and cleanup.
@@ -559,7 +564,7 @@ def _ensure_registry() -> ManagerRegistry:
 def initialize_managers(
     app_name: str = "SpritePal",
     settings_path: Path | None = None,
-    configuration_service: object = None,
+    configuration_service: ConfigurationServiceProtocol | None = None,
 ) -> None:
     """
     Initialize all managers with consolidated architecture.
