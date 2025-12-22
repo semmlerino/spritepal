@@ -21,7 +21,7 @@ User selects VRAM/CGRAM files
          │
          ▼
 ┌────────────────────────────┐
-│ ExtractionManager          │  core/managers/extraction_manager.py
+│ CoreOperationsManager      │  core/managers/core_operations_manager.py
 │ extract_from_vram()        │  Coordinates extraction, owns state
 └────────────────────────────┘
          │
@@ -52,7 +52,7 @@ User selects VRAM/CGRAM files
 
 **Key files:**
 - `ui/rom_extraction_panel.py` - UI entry point
-- `core/managers/extraction_manager.py:extract_from_vram()` - Manager coordination
+- `core/managers/core_operations_manager.py:extract_from_vram()` - Manager coordination
 - `core/services/vram_service.py:extract_from_vram()` - Service delegation
 - `core/extractor.py:SpriteExtractor` - Core tile decoding logic
 
@@ -71,7 +71,7 @@ User selects ROM file
          │
          ▼
 ┌────────────────────────────┐
-│ ExtractionManager          │  core/managers/extraction_manager.py
+│ CoreOperationsManager      │  core/managers/core_operations_manager.py
 │ extract_from_rom()         │  Coordinates ROM extraction
 │ get_rom_extractor()        │  Creates/returns ROMExtractor
 └────────────────────────────┘
@@ -354,12 +354,11 @@ ManagerRegistry.initialize_managers()
          │
          ├── 3. CoreOperationsManager     (depends on StateManager)
          │
-         ├── 4. ExtractionManager         (depends on services)
-         │
-         ├── 5. InjectionManager          (depends on services)
-         │
-         └── 6. MonitoringManager         (depends on all above)
+         └── 4. register_managers()         (registers ExtractionManagerProtocol,
+                                             InjectionManagerProtocol as adapters)
 ```
+
+**Note**: `ExtractionManagerProtocol` and `InjectionManagerProtocol` are implemented via adapters that delegate to `CoreOperationsManager`. See `docs/architecture.md` for the adapter pattern details.
 
 **WARNING**: The order is implicit in `core/managers/registry.py:initialize_managers()`. Adding new managers requires careful consideration of dependencies.
 
@@ -379,4 +378,4 @@ ManagerRegistry.initialize_managers()
 
 ---
 
-*Last updated: December 21, 2025*
+*Last updated: December 22, 2025*

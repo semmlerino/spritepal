@@ -82,7 +82,7 @@ tests/
 │   ├── real_component_factory.py    # Factory for real components
 │   ├── manager_test_context.py      # Integration test contexts
 │   ├── data_repository.py           # Consistent test data
-│   └── mock_dialogs.py              # Dialog test doubles
+│   └── qt_mocks.py                  # Qt test doubles
 ├── fixtures/               # Pytest fixtures
 │   ├── core_fixtures.py    # Manager fixtures
 │   ├── qt_fixtures.py      # Qt-specific fixtures

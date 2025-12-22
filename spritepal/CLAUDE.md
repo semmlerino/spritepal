@@ -7,7 +7,7 @@ These rules prevent crashes and test failures. Each has a solution.
 | Rule | Solution |
 |------|----------|
 | **Never `QPixmap` in worker threads** | Use `ThreadSafeTestImage` from `tests/infrastructure/` |
-| **Never inherit `QDialog` in mocks** | Use `QObject` with signals (see `tests/infrastructure/mock_dialogs.py`) |
+| **Never inherit `QDialog` in mocks** | Use `QObject` with signals (see `tests/infrastructure/qt_mocks.py`) |
 | **Use `isolated_managers` by default** | Only use `session_managers` with `@pytest.mark.shared_state_safe` |
 | **Use `tmp_path` for file operations** | Never hardcode paths like `/tmp/test_output` |
 | **Use `with qtbot.waitSignal():`** | Context manager catches fast signals; non-context form races |
@@ -238,7 +238,7 @@ Scale all with `PYTEST_TIMEOUT_MULTIPLIER` env var for slow CI.
 ```python
 from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout, LONG
 from tests.fixtures.qt_waits import wait_for_condition  # Function (requires qtbot arg)
-from tests.infrastructure.mock_dialogs import MockDialog
+from tests.infrastructure.qt_mocks import MockMainWindow
 from tests.infrastructure.real_component_factory import RealComponentFactory
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
@@ -381,7 +381,7 @@ spritepal/
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
 | DI container, `inject()` | `core/di_container.py` |
 | Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
-| MockDialog, Qt mocks | `tests/infrastructure/mock_dialogs.py`, `tests/infrastructure/qt_mocks.py` |
+| Qt mocks | `tests/infrastructure/qt_mocks.py` |
 | ThreadSafeTestImage | `tests/infrastructure/thread_safe_test_image.py` |
 | RealComponentFactory | `tests/infrastructure/real_component_factory.py` |
 | Test data repository | `tests/infrastructure/data_repository.py` |

@@ -46,7 +46,6 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
      - `rom_cache.py` - ROM file caching with async support
      - `vram_service.py` - VRAM extraction operations
      - `settings_manager.py` - Settings persistence
-     - `signal_registry.py` - Signal management for cross-component communication
      - `worker_lifecycle.py` - Background worker management
 
 4. **Core Layer (`core/`)**
@@ -393,8 +392,6 @@ ManagerRegistry.initialize_managers()
 4. register_managers()             → Registers ExtractionManagerProtocol,
    │                                  InjectionManagerProtocol
    ↓
-5. Create MonitoringManager
-       ↓
 Application Code: inject(ExtractionManagerProtocol)
        ↓
 DIContainer returns the registered implementation
@@ -524,4 +521,4 @@ The adapter pattern allows:
 
 ---
 
-*Last updated: December 21, 2025*
+*Last updated: December 22, 2025*
