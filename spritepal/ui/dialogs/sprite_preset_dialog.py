@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class AddEditPresetDialog(QDialog):
+class AddEditPresetDialog(DialogBase):
     """Dialog for adding or editing a sprite preset."""
 
     def __init__(
@@ -49,19 +49,36 @@ class AddEditPresetDialog(QDialog):
         preset: SpritePreset | None = None,
         game_title: str = "",
     ) -> None:
-        super().__init__(parent)
+        # Instance variables BEFORE super().__init__() - DialogBase pattern
         self._preset = preset
         self._game_title = game_title
-        self._setup_ui()
+
+        # Widget references (set in _setup_ui)
+        self.name_edit: QLineEdit | None = None
+        self.game_title_edit: QLineEdit | None = None
+        self.offset_spin: QSpinBox | None = None
+        self.size_spin: QSpinBox | None = None
+        self.compressed_check: QCheckBox | None = None
+        self.description_edit: QTextEdit | None = None
+        self.tags_edit: QLineEdit | None = None
+        self.checksums_edit: QLineEdit | None = None
+
+        super().__init__(
+            parent=parent,
+            title="Add Preset" if not preset else "Edit Preset",
+            modal=True,
+            min_size=(400, None),
+            with_button_box=True,
+        )
+
+        # Load preset data after UI is set up
         if preset:
             self._load_preset(preset)
 
+    @override
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""
-        self.setWindowTitle("Add Preset" if not self._preset else "Edit Preset")
-        self.setMinimumWidth(400)
-
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout()
 
         # Form layout for fields
         form = QFormLayout()
@@ -107,23 +124,28 @@ class AddEditPresetDialog(QDialog):
 
         layout.addLayout(form)
 
-        # Buttons
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
+        # Set content layout (DialogBase provides button_box automatically)
+        self.set_content_layout(layout)
 
-        self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.clicked.connect(self.reject)
-        button_layout.addWidget(self.cancel_btn)
-
-        self.save_btn = QPushButton("Save")
-        self.save_btn.setDefault(True)
-        self.save_btn.clicked.connect(self._on_save)
-        button_layout.addWidget(self.save_btn)
-
-        layout.addLayout(button_layout)
+        # Rename Ok button to "Save"
+        if self.button_box:
+            from PySide6.QtWidgets import QDialogButtonBox
+            ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
+            if ok_button:
+                ok_button.setText("Save")
 
     def _load_preset(self, preset: SpritePreset) -> None:
         """Load preset data into form fields."""
+        # Widgets are guaranteed to be initialized after _setup_ui
+        assert self.name_edit is not None
+        assert self.game_title_edit is not None
+        assert self.offset_spin is not None
+        assert self.size_spin is not None
+        assert self.compressed_check is not None
+        assert self.description_edit is not None
+        assert self.tags_edit is not None
+        assert self.checksums_edit is not None
+
         self.name_edit.setText(preset.name)
         self.game_title_edit.setText(preset.game_title)
         self.offset_spin.setValue(preset.offset)
@@ -134,8 +156,13 @@ class AddEditPresetDialog(QDialog):
         checksums_str = ", ".join(f"0x{c:04X}" for c in preset.game_checksums)
         self.checksums_edit.setText(checksums_str)
 
-    def _on_save(self) -> None:
-        """Validate and save preset."""
+    @override
+    def accept(self) -> None:
+        """Validate inputs and accept dialog."""
+        if self.name_edit is None or self.game_title_edit is None:
+            super().accept()
+            return
+
         name = self.name_edit.text().strip()
         if not name:
             QMessageBox.warning(self, "Validation Error", "Name is required.")
@@ -146,10 +173,20 @@ class AddEditPresetDialog(QDialog):
             QMessageBox.warning(self, "Validation Error", "Game title is required.")
             return
 
-        self.accept()
+        super().accept()
 
     def get_preset(self) -> SpritePreset:
         """Get the preset data from the form."""
+        # Widgets are guaranteed to be initialized after _setup_ui
+        assert self.name_edit is not None
+        assert self.game_title_edit is not None
+        assert self.offset_spin is not None
+        assert self.size_spin is not None
+        assert self.compressed_check is not None
+        assert self.description_edit is not None
+        assert self.tags_edit is not None
+        assert self.checksums_edit is not None
+
         name = self.name_edit.text().strip()
         game_title = self.game_title_edit.text().strip()
         offset = self.offset_spin.value()

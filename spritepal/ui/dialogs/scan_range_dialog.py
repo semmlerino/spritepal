@@ -4,23 +4,25 @@ Allows users to define specific start and end offsets for sprite scanning.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from typing import override
+
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from ui.common.spacing_constants import TAB_MIN_WIDTH
+from ui.components.base.dialog_base import DialogBase
 from ui.styles.theme import COLORS
 
 
-class ScanRangeDialog(QDialog):
+class ScanRangeDialog(DialogBase):
     """Dialog for specifying custom scan range."""
 
     def __init__(self, rom_size: int = 0, parent: QWidget | None = None):
@@ -31,23 +33,29 @@ class ScanRangeDialog(QDialog):
             rom_size: Size of the ROM file in bytes
             parent: Parent widget
         """
-        super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        # Instance variables BEFORE super().__init__() - DialogBase pattern
         self.rom_size = rom_size
         # Default to full ROM scan (matching scan_worker.py defaults)
         # Skip headers/early data, cap at reasonable max
         self.start_offset = 0x40000  # Skip headers and early data
         self.end_offset = min(rom_size, 0x400000) if rom_size > 0 else 0x200000  # Cap at 4MB for SNES
 
-        self.setWindowTitle("Custom Scan Range")
-        self.setModal(True)
-        self.setMinimumWidth(TAB_MIN_WIDTH)  # 400px minimum, but can grow
+        # Widget references (set in _setup_ui)
+        self.start_input: QLineEdit | None = None
+        self.end_input: QLineEdit | None = None
 
-        self._setup_ui()
+        super().__init__(
+            parent=parent,
+            title="Custom Scan Range",
+            modal=True,
+            min_size=(TAB_MIN_WIDTH, None),
+            with_button_box=True,
+        )
 
-    def _setup_ui(self):
+    @override
+    def _setup_ui(self) -> None:
         """Setup the dialog UI."""
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout()
 
         # Info label
         info_label = QLabel(
@@ -63,15 +71,13 @@ class ScanRangeDialog(QDialog):
         # Start offset input
         self.start_input = QLineEdit()
         self.start_input.setPlaceholderText("e.g., 0xC0000 or 786432")
-        if self.start_input:
-            self.start_input.setText(f"0x{self.start_offset:X}")
+        self.start_input.setText(f"0x{self.start_offset:X}")
         form_layout.addRow("Start Offset:", self.start_input)
 
         # End offset input
         self.end_input = QLineEdit()
         self.end_input.setPlaceholderText("e.g., 0xF0000 or 983040")
-        if self.end_input:
-            self.end_input.setText(f"0x{self.end_offset:X}")
+        self.end_input.setText(f"0x{self.end_offset:X}")
         form_layout.addRow("End Offset:", self.end_input)
 
         # ROM size info
@@ -94,18 +100,8 @@ class ScanRangeDialog(QDialog):
         ranges_label.setStyleSheet(f"background-color: {COLORS['panel_background']}; color: {COLORS['text_primary']}; padding: 10px; margin-top: 10px;")
         layout.addWidget(ranges_label)
 
-        # Buttons
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        button_box.accepted.connect(self._validate_and_accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
-
         # Add quick presets
         layout.addWidget(QLabel("<b>Quick Presets:</b>"))
-
-        from PySide6.QtWidgets import QHBoxLayout, QPushButton
 
         preset_layout = QHBoxLayout()
 
@@ -124,7 +120,10 @@ class ScanRangeDialog(QDialog):
 
         layout.addLayout(preset_layout)
 
-    def _apply_preset(self, start: int, end: int):
+        # Set the content layout (DialogBase provides button_box automatically)
+        self.set_content_layout(layout)
+
+    def _apply_preset(self, start: int, end: int) -> None:
         """Apply a preset range."""
         if self.start_input:
             self.start_input.setText(f"0x{start:X}")
@@ -159,8 +158,13 @@ class ScanRangeDialog(QDialog):
         # Otherwise treat as decimal
         return int(text)
 
-    def _validate_and_accept(self):
+    @override
+    def accept(self) -> None:
         """Validate inputs and accept dialog."""
+        if self.start_input is None or self.end_input is None:
+            super().accept()
+            return
+
         try:
             # Parse offsets
             start = self._parse_offset(self.start_input.text())
@@ -179,8 +183,7 @@ class ScanRangeDialog(QDialog):
                 if end > self.rom_size:
                     # Clamp to ROM size
                     end = self.rom_size
-                    if self.end_input:
-                        self.end_input.setText(f"0x{end:X}")
+                    self.end_input.setText(f"0x{end:X}")
 
             # Ensure alignment (optional but recommended)
             if start % 0x100 != 0:
@@ -197,7 +200,7 @@ class ScanRangeDialog(QDialog):
 
             self.start_offset = start
             self.end_offset = end
-            self.accept()
+            super().accept()
 
         except ValueError as e:
             QMessageBox.critical(
