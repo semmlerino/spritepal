@@ -57,25 +57,13 @@ class CoreOperationsManager(BaseManager):
     """
 
     # ========== Signal Architecture ==========
-    #
-    # CANONICAL SIGNALS (use these in new code):
-    #   operation_progress - Unified progress for all operations
-    #   operation_completed - Unified completion for all operations
-    #
-    # DOMAIN-SPECIFIC SIGNALS (simplified signatures for specific use cases):
-    #   extraction_progress, injection_progress - Message-only progress
-    #   preview_generated, palettes_extracted - Data delivery signals
-    #   cache_hit, cache_miss, cache_saved - Cache monitoring
-    #
-    # Signal Registry: Use utils.signal_registry.SignalRegistry for debugging
-    # connection flow across the application.
+    # Extraction: extraction_progress, extraction_warning, preview_generated,
+    #             palettes_extracted, active_palettes_found, files_created
+    # Injection: injection_progress, injection_finished, compression_info, progress_percent
+    # Cache: cache_operation_started, cache_hit, cache_miss, cache_saved
     # =========================================
 
-    # Unified signals (canonical - use in new code)
-    operation_progress = Signal(str, str, int)  # op_type, message, percent
-    operation_completed = Signal(str, bool, str)  # op_type, success, message
-
-    # Extraction signals (domain-specific)
+    # Extraction signals
     extraction_progress = Signal(str)  # message only (simpler for UI consumers)
     extraction_warning = Signal(str)  # Warning message (partial success)
     preview_generated = Signal(object, int)  # pixmap, offset
@@ -83,7 +71,7 @@ class CoreOperationsManager(BaseManager):
     active_palettes_found = Signal(list)  # list of active palette indices
     files_created = Signal(list)  # list of created file paths
 
-    # Injection signals (domain-specific)
+    # Injection signals
     injection_progress = Signal(str)  # message only
     injection_finished = Signal(bool, str)  # success, message
     compression_info = Signal(dict)  # compression statistics
