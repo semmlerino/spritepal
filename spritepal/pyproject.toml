@@ -448,8 +448,9 @@ markers = [
     "shared_state_safe: REQUIRED when using session_managers fixture",
     "allows_registry_state: Allow registry state without manager fixtures",
     "skip_thread_cleanup: Skip thread cleanup verification (requires reason argument)",
-    "no_hal: Skip HAL-related fixtures for this test",
     "real_hal: Use real HAL components (requires exhal binary)",
+    "golden_hal: Verify HAL output against recorded golden checksums",
+    "no_qt: Skip Qt app/thread cleanup for tests that do not use Qt",
 
     # Execution control
     "parallel_unsafe: Force test to run serially (has hidden shared state)",

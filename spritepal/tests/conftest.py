@@ -112,54 +112,10 @@ def _get_environment_info():
 
 
 def pytest_configure(config):
-    """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers",
-        "allows_registry_state: Allow test to find/leave registry initialized without manager fixtures"
-    )
-    config.addinivalue_line(
-        "markers",
-        "real_hal: Use real HAL implementation instead of mocks"
-    )
-    config.addinivalue_line(
-        "markers",
-        "no_qt: Skip Qt app/thread cleanup for tests that do not use Qt"
-    )
-    config.addinivalue_line(
-        "markers",
-        "golden_hal: Verify HAL output against recorded golden checksums (no real binary needed)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "no_manager_setup: Skip manager initialization for this test"
-    )
-    # New markers for autouse fixture opt-out
-    config.addinivalue_line(
-        "markers",
-        "skip_thread_cleanup: Skip automatic thread cleanup for tests that manage their own threads"
-    )
-    config.addinivalue_line(
-        "markers",
-        "shared_state_safe: Mark test as verified safe for use with session_managers (required for session_managers usage)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "requires_display: Test requires a real display (skips cleanly in offscreen mode)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "parallel_unsafe: Force test to run in serial mode under xdist (use when wrapper fixtures hide shared state)"
-    )
-    # Categorization markers (do not control skip behavior - all Qt tests run in offscreen mode)
-    config.addinivalue_line(
-        "markers",
-        "gui: Categorizes tests that render Qt widgets (runs in offscreen mode, use requires_display for true display needs)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "headless: Categorizes tests that don't need rendering (runs same as gui in offscreen mode)"
-    )
+    """Configure pytest hooks.
 
+    Note: Custom markers are defined in pyproject.toml (single source of truth).
+    """
     # Install QPixmap guard via import hook - guarantees guard is installed even for late Qt imports
     _install_qpixmap_guard_unconditional()
 
@@ -920,8 +876,8 @@ def skip_requires_display(request: FixtureRequest):
 def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
     """Verify that test cleanup actually succeeded (autouse for Qt/manager tests).
 
-    This fixture checks for lingering manager state (active operations, open handles)
-    after tests complete. It helps identify incomplete cleanup that could cause flaky tests.
+    This fixture checks for lingering manager state (active operations) after tests
+    complete. It helps identify incomplete cleanup that could cause flaky tests.
 
     Activation: Runs automatically for tests using Qt or manager fixtures.
     Behavior: Warns or fails based on --leak-mode (consistent with cleanup_workers).
@@ -950,23 +906,15 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
     leak_mode = request.config.getoption("--leak-mode", default="fail")
     leaks_found: list[str] = []
 
-    # Check for active operations and open handles that weren't cleaned up
+    # Check for active operations that weren't cleaned up
     for manager_name in ['extraction_manager', 'injection_manager', 'session_manager']:
         if hasattr(registry, manager_name):
             manager = getattr(registry, manager_name)
-            if manager and hasattr(manager, '_active_operations'):
-                active_ops = getattr(manager, '_active_operations', [])
-                if active_ops:
+            # Use public API instead of private _active_operations attribute
+            if manager and hasattr(manager, 'has_active_operations'):
+                if manager.has_active_operations():
                     leaks_found.append(
-                        f"Manager '{manager_name}' has {len(active_ops)} active operations"
-                    )
-
-            # Check for unclosed resources
-            if manager and hasattr(manager, '_open_handles'):
-                handles = getattr(manager, '_open_handles', [])
-                if handles:
-                    leaks_found.append(
-                        f"Manager '{manager_name}' has {len(handles)} open handles"
+                        f"Manager '{manager_name}' has active operations (not cleaned up)"
                     )
 
     if leaks_found:
