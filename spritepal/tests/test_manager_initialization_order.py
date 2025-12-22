@@ -104,19 +104,17 @@ class TestValidateManagerOrder:
         """Passing a valid explicit list does not raise."""
         from core.managers.application_state_manager import ApplicationStateManager
         from core.managers.core_operations_manager import CoreOperationsManager
-        from core.managers.monitoring_manager import MonitoringManager
 
         # Same as MANAGED_CLASSES - should pass
-        valid_order = [ApplicationStateManager, CoreOperationsManager, MonitoringManager]
+        valid_order = [ApplicationStateManager, CoreOperationsManager]
         validate_manager_order(valid_order)
 
     def test_invalid_order_core_before_state_raises(self) -> None:
         """Putting CoreOperationsManager before ApplicationStateManager raises."""
         from core.managers.application_state_manager import ApplicationStateManager
         from core.managers.core_operations_manager import CoreOperationsManager
-        from core.managers.monitoring_manager import MonitoringManager
 
-        invalid_order = [CoreOperationsManager, ApplicationStateManager, MonitoringManager]
+        invalid_order = [CoreOperationsManager, ApplicationStateManager]
 
         with pytest.raises(InitializationError) as exc_info:
             validate_manager_order(invalid_order)

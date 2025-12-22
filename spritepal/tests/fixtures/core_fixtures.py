@@ -134,7 +134,6 @@ def reset_all_singletons() -> None:
         - MockHALProcessPool (mock HAL compression)
         - DataRepository (test data cleanup)
         - PreviewGenerator (preview caching)
-        - SignalRegistry (signal tracking)
         - WorkerManager (thread registry)
 
     Note: Failures are logged but don't stop the reset process.
@@ -181,27 +180,12 @@ def reset_all_singletons() -> None:
         cleanup_preview_generator()
     _try_reset("PreviewGenerator", reset_preview_gen)
 
-    # Reset SignalRegistry singleton
-    def reset_signal_registry() -> None:
-        from core.services.signal_registry import SignalRegistry
-        SignalRegistry.reset_instance()
-    _try_reset("SignalRegistry", reset_signal_registry)
-
     # Cleanup all workers and clear registry (waits for thread termination)
     def cleanup_worker_registry() -> None:
         from core.services.worker_lifecycle import WorkerManager
         WorkerManager.cleanup_all(timeout=500)  # Wait up to 500ms for each worker
     _try_reset("WorkerManager", cleanup_worker_registry)
 
-    # Reset MonitoringManager (has daemon health timer that needs explicit cleanup)
-    def reset_monitoring() -> None:
-        from core.managers.monitoring_manager import MonitoringManager
-        if hasattr(MonitoringManager, '_instance') and MonitoringManager._instance:
-            # Shutdown the health timer if it exists
-            if hasattr(MonitoringManager._instance, 'shutdown'):
-                MonitoringManager._instance.shutdown()
-            MonitoringManager._instance = None
-    _try_reset("MonitoringManager", reset_monitoring)
 
 
 def reset_hal_singletons_only() -> None:

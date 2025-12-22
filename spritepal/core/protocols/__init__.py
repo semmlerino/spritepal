@@ -20,10 +20,8 @@ from .manager_protocols import (
     InjectionManagerProtocol,
     ROMCacheProtocol,
     ROMExtractorProtocol,
-    ROMServiceProtocol,
     SettingsManagerProtocol,
     SpritePresetManagerProtocol,
-    VRAMServiceProtocol,
 )
 from .worker_protocols import (
     PreviewWorkerPoolProtocol,
@@ -42,8 +40,6 @@ __all__ = [
     "PreviewWorkerPoolProtocol",
     "ROMCacheProtocol",
     "ROMExtractorProtocol",
-    "ROMServiceProtocol",
     "SettingsManagerProtocol",
     "SpritePresetManagerProtocol",
-    "VRAMServiceProtocol",
 ]

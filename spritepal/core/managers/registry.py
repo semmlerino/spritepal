@@ -26,7 +26,6 @@ from .application_state_manager import ApplicationStateManager
 
 # Import consolidated managers
 from .core_operations_manager import CoreOperationsManager
-from .monitoring_manager import MonitoringManager
 from .sprite_preset_manager import SpritePresetManager
 
 # NavigationManager import deferred to avoid circular imports
@@ -67,18 +66,15 @@ def _ensure_dependency_maps() -> None:
 
     from .application_state_manager import ApplicationStateManager
     from .core_operations_manager import CoreOperationsManager
-    from .monitoring_manager import MonitoringManager
 
     MANAGER_DEPENDENCIES.update({
         ApplicationStateManager: [],  # No dependencies - always first
         CoreOperationsManager: [ApplicationStateManagerProtocol],  # Needs state manager via DI chain
-        MonitoringManager: [],  # No DI dependencies (uses direct references passed in)
     })
 
     MANAGER_TO_PROTOCOLS.update({
         ApplicationStateManager: [ApplicationStateManagerProtocol],
         CoreOperationsManager: [ExtractionManagerProtocol, InjectionManagerProtocol],
-        MonitoringManager: [],  # Not registered with a protocol
     })
 
     _DEPENDENCY_MAPS_INITIALIZED = True
@@ -148,11 +144,10 @@ class ManagerRegistry:
     _cleanup_registered: bool = False
 
     # List of manager classes in initialization order.
-    # Order: ApplicationStateManager → CoreOperationsManager → MonitoringManager
+    # Order: ApplicationStateManager → CoreOperationsManager
     MANAGED_CLASSES: list[type] = [
         ApplicationStateManager,
         CoreOperationsManager,
-        MonitoringManager,
     ]
 
     def __new__(cls) -> ManagerRegistry:
@@ -204,7 +199,7 @@ class ManagerRegistry:
     # 2. Add entry to MANAGER_DEPENDENCIES with required protocol dependencies
     # 3. Add entry to MANAGER_TO_PROTOCOLS with protocols this manager registers
     # 4. Add initialization code in initialize_managers() following the pattern
-    # Current order: ApplicationStateManager → CoreOperationsManager → MonitoringManager
+    # Current order: ApplicationStateManager → CoreOperationsManager
     def initialize_managers(
         self,
         app_name: str = "SpritePal",
@@ -305,16 +300,6 @@ class ManagerRegistry:
                 created_managers.append("core_operations")
                 self._logger.debug("CoreOperationsManager created successfully")
 
-                # MonitoringManager for performance and health monitoring
-                self._logger.debug("Creating MonitoringManager...")
-                monitoring_manager = MonitoringManager(parent=qt_parent)
-                created_managers.append("monitoring")
-                self._logger.debug("MonitoringManager created successfully")
-
-                # Register managers for automatic monitoring
-                monitoring_manager.register_manager_monitoring(core_manager)
-                monitoring_manager.register_manager_monitoring(state_manager)
-
                 # Register CoreOperationsManager with DI container
                 # Registered under both ExtractionManagerProtocol and InjectionManagerProtocol
                 from core.di_container import register_managers
@@ -405,21 +390,6 @@ class ManagerRegistry:
         """
         from core.protocols.manager_protocols import ApplicationStateManagerProtocol
         return self._get_manager_by_protocol(ApplicationStateManagerProtocol, ApplicationStateManager)
-
-    def get_monitoring_manager(self):
-        """
-        Get the monitoring manager instance.
-
-        Note: MonitoringManager is not registered with a protocol in DI container,
-        so this method is not supported. Use inject() for protocol-based access.
-
-        Raises:
-            ManagerError: Always - MonitoringManager has no protocol registration
-        """
-        raise ManagerError(
-            "MonitoringManager is not accessible via protocol. "
-            "It is only used internally for manager monitoring."
-        )
 
     def _get_manager_by_protocol(self, protocol: type, expected_type: type) -> object:
         """
