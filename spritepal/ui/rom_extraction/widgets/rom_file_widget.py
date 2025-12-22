@@ -9,7 +9,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPus
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
-# from utils.rom_cache import get_rom_cache # Removed due to DI
 from .base_widget import BaseExtractionWidget
 
 if TYPE_CHECKING:

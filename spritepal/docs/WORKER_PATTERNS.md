@@ -227,16 +227,15 @@ If you have workers using the old `QThread` inheritance pattern:
 
 ## Worker Audit (December 2025)
 
-The following production workers still use the deprecated `QThread` inheritance pattern and should be migrated:
+All production workers have been migrated to the `BaseWorker` pattern:
 
-| File | Class | Priority | Notes |
-|------|-------|----------|-------|
-| `ui/rom_extraction/workers/search_worker.py` | `SpriteSearchWorker` | Low | Used by ROMExtractionPanel |
-| `ui/dialogs/advanced_search_dialog.py` | `SearchWorker` | Low | Dialog-local worker |
-| `ui/common/simple_preview_coordinator.py` | `SimplePreviewWorker` | Low | Preview generation |
+| File | Class | Status | Notes |
+|------|-------|--------|-------|
+| `ui/rom_extraction/workers/search_worker.py` | `SpriteSearchWorker` | Migrated | Uses custom offset-based progress signal |
+| `ui/dialogs/advanced_search_dialog.py` | `SearchWorker` | Migrated | Uses custom error signal (str only) |
 
 **Note**: Test files using `QThread` directly are acceptable (test doubles don't need the full pattern).
 
 ---
 
-*Last updated: December 21, 2025*
+*Last updated: December 22, 2025*

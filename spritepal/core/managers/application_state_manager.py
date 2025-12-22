@@ -368,10 +368,6 @@ class ApplicationStateManager(BaseManager):
                 with self._settings_file.open() as f:
                     data = json.load(f)
                     if isinstance(data, dict):
-                        # Check if this is old flat format (has old keys, missing categories)
-                        if self._is_old_format(data):
-                            self._logger.info("Detected old settings format, migrating...")
-                            return self._migrate_old_settings(data)
                         self._logger.info("Settings loaded successfully")
                         # Cast to expected structure after validation
                         return self._merge_with_defaults(cast(dict[str, dict[str, object]], data))
@@ -447,62 +443,6 @@ class ApplicationStateManager(BaseManager):
                         data[category][key] = default_value
 
         return data
-
-    def _is_old_format(self, data: dict[str, object]) -> bool:
-        """Check if settings data is in old flat format.
-
-        Old format has flat keys like 'vram_path', 'window_width'.
-        New format has categories like 'session', 'ui', 'paths'.
-        """
-        old_keys = {"vram_path", "cgram_path", "oam_path", "output_name",
-                    "window_width", "window_height", "window_x", "window_y",
-                    "theme", "last_export_dir"}
-
-        # If any old-style flat keys exist at top level, it's old format
-        if old_keys & data.keys():
-            return True
-
-        # If no categories exist, it might be old format or empty
-        new_categories = {"session", "ui", "paths"}
-        if not (new_categories & data.keys()):
-            # Only consider it old if it has any keys at all
-            return bool(data)
-
-        return False
-
-    def _migrate_old_settings(
-        self, old_data: dict[str, object]
-    ) -> dict[str, dict[str, object]]:
-        """Migrate old flat settings format to new categorized format."""
-        # Start with defaults
-        new_settings = self._get_default_settings()
-
-        # Map old keys to new structure
-        if "vram_path" in old_data:
-            new_settings["session"]["vram_path"] = old_data["vram_path"]
-        if "cgram_path" in old_data:
-            new_settings["session"]["cgram_path"] = old_data["cgram_path"]
-        if "oam_path" in old_data:
-            new_settings["session"]["oam_path"] = old_data["oam_path"]
-        if "output_name" in old_data:
-            new_settings["session"]["output_name"] = old_data["output_name"]
-
-        if "window_width" in old_data:
-            new_settings["ui"]["window_width"] = old_data["window_width"]
-        if "window_height" in old_data:
-            new_settings["ui"]["window_height"] = old_data["window_height"]
-        if "window_x" in old_data:
-            new_settings["ui"]["window_x"] = old_data["window_x"]
-        if "window_y" in old_data:
-            new_settings["ui"]["window_y"] = old_data["window_y"]
-        if "theme" in old_data:
-            new_settings["ui"]["theme"] = old_data["theme"]
-
-        if "last_export_dir" in old_data:
-            new_settings["paths"]["last_used_dir"] = old_data["last_export_dir"]
-
-        self._logger.info("Settings migration completed")
-        return new_settings
 
     # ========== SessionManagerProtocol Methods ==========
 

@@ -11,9 +11,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QStatusBar, QWidget
 from ui.styles import get_muted_text_style
 from ui.styles.theme import COLORS
 
-# from utils.rom_cache import get_rom_cache # Removed due to DI
-# from utils.settings_manager import get_settings_manager # Removed due to DI
-
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 

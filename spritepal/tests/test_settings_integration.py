@@ -228,30 +228,6 @@ class TestSettingsIntegration:
         loaded_scheme = settings.get("appearance", "color_scheme", {})
         assert loaded_scheme == color_scheme
 
-    def test_settings_migration(self, temp_settings_dir):
-        """Test settings migration from old format"""
-        # Create old format settings
-        old_settings = {
-            "vram_path": "/old/path.dmp",
-            "window_width": 800,
-            "window_height": 600,
-        }
-
-        settings_file = Path(temp_settings_dir) / ".spritepal_settings.json"
-        with open(settings_file, "w") as f:
-            json.dump(old_settings, f)
-
-        # Create an ApplicationStateManager with our temp settings file
-        from core.managers.application_state_manager import ApplicationStateManager
-
-        session_manager = ApplicationStateManager(settings_path=settings_file)
-        settings = SettingsManager("SpritePal", session_manager=session_manager)
-
-        # Verify migration worked through the public API
-        assert settings.get("session", "vram_path") == "/old/path.dmp"
-        assert settings.get("ui", "window_width") == 800
-        assert settings.get("ui", "window_height") == 600
-
     def test_concurrent_settings_access(self, temp_settings_dir, isolated_managers):
         """Test concurrent access to settings"""
         settings1 = get_settings_manager()

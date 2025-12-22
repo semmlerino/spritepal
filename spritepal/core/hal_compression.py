@@ -1060,9 +1060,6 @@ class HALCompressor:
             spritepal_dir / "tools" / tool_with_suffix,
             # Alternative tools locations relative to spritepal
             spritepal_dir.parent / "tools" / tool_with_suffix,  # exhal-master/tools/
-            # Archive directory (from codebase structure)
-            spritepal_dir.parent / "archive" / "obsolete_test_images" / "ultrathink" / tool_name,
-            spritepal_dir.parent / "archive" / "obsolete_test_images" / "ultrathink" / tool_with_suffix,
             # Working directory relative paths (for backward compatibility)
             Path.cwd() / "tools" / tool_with_suffix,
             Path.cwd() / tool_with_suffix,

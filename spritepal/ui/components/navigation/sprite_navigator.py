@@ -40,8 +40,6 @@ from ui.rom_extraction.workers import SpritePreviewWorker
 from ui.styles.theme import COLORS
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 from utils.logging_config import get_logger
-
-# from utils.rom_cache import get_rom_cache # Removed due to DI
 from utils.sprite_regions import SpriteRegion, SpriteRegionDetector
 
 logger = get_logger(__name__)

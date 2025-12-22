@@ -3,32 +3,34 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMExtractorProtocol
 
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QObject, Signal
 
 from core.parallel_sprite_finder import ParallelSpriteFinder
-from core.workers.base import handle_worker_errors
+from core.workers.base import BaseWorker, handle_worker_errors
 from utils.constants import MAX_ROM_SIZE
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-class SpriteSearchWorker(QThread):
-    """Worker thread for searching next/previous valid sprite"""
+class SpriteSearchWorker(BaseWorker):
+    """Worker thread for searching next/previous valid sprite.
 
+    Inherits from BaseWorker for standard worker lifecycle management.
+    """
+
+    # Custom signals specific to sprite search
     sprite_found = Signal(int, float)
     """Emitted when a sprite is found. Args: offset (int), quality_score (float 0.0-1.0)."""
 
     search_complete = Signal(bool)
     """Emitted when search completes. Args: found (True if sprite found)."""
 
-    error = Signal(str, Exception)
-    """Emitted on error. Args: error_message, exception_object."""
-
+    # Override progress signal with offset-based signature (differs from BaseWorker's percent-based)
     progress = Signal(int, int)
     """Emitted with search progress. Args: current_offset, total_offsets."""
 
@@ -40,7 +42,6 @@ class SpriteSearchWorker(QThread):
         self.end_offset = end_offset
         self.direction = direction  # 1 for forward, -1 for backward
         self.extractor = extractor
-        self._cancelled = False
         self._cancellation_token = threading.Event()
 
         # Default step size
@@ -52,10 +53,7 @@ class SpriteSearchWorker(QThread):
             chunk_size=0x20000,  # 128KB chunks for smaller search areas
             step_size=self.step
         )
-
-        # Auto-register with WorkerManager for cleanup_all()
-        from core.services.worker_lifecycle import WorkerManager
-        WorkerManager._register_worker(self)
+        # Note: BaseWorker handles WorkerManager registration automatically
 
     @handle_worker_errors("sprite searching")
     def run(self):
@@ -154,9 +152,9 @@ class SpriteSearchWorker(QThread):
                 except Exception as cleanup_error:
                     logger.warning(f"Error during parallel finder cleanup: {cleanup_error}")
 
-    def cancel(self):
-        """Cancel the search"""
-        self._cancelled = True
+    @override
+    def cancel(self) -> None:
+        """Cancel the search."""
+        super().cancel()  # Sets _cancellation_requested and calls requestInterruption()
         if hasattr(self, "_cancellation_token"):
             self._cancellation_token.set()
-            logger.debug("Sprite search cancellation requested")

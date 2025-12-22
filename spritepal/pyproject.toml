@@ -105,6 +105,7 @@ select = [
     "FIX",    # flake8-fixme (track FIXMEs)
     "Q",      # flake8-quotes (quote consistency)
     "COM",    # flake8-commas (trailing commas)
+    "PTH",    # flake8-use-pathlib (modern path handling)
 ]
 
 ignore = [
@@ -145,7 +146,7 @@ ignore = [
     "ARG004",   # unused-static-method-argument
     "ARG005",   # unused-lambda-argument
     "B007",     # unused-loop-control-variable
-    "B023",     # function-uses-loop-variable
+    # B023 (function-uses-loop-variable) intentionally NOT ignored - catches real closure bugs
 
     # Security (desktop app, user controls input)
     "S101",     # assert-used
@@ -235,6 +236,10 @@ ignore = [
     "FA100",    # future-rewritable-type-annotation (gradual migration)
     "DTZ005",   # datetime.now() without tz (local timestamps are fine)
     "DTZ007",   # strptime without %z (local parsing is fine)
+
+    # Pathlib (PTH) - gradual adoption
+    "PTH123",   # builtin-open (open() is fine, Path.read_text() not always better)
+    "PTH118",   # os-path-join (too many to fix now, gradual migration)
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -27,8 +27,6 @@ from PySide6.QtWidgets import (
 
 from ui.common.file_dialogs import FileDialogHelper
 
-# from utils.settings_manager import get_settings_manager # Removed due to DI
-
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import SettingsManagerProtocol
 

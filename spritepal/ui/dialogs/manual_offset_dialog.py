@@ -87,8 +87,6 @@ from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 from utils.logging_config import get_logger
 
-# from utils.rom_cache import get_rom_cache # Removed due to DI
-
 logger = get_logger(__name__)
 
 

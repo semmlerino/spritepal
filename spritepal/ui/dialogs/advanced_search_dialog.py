@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, override
 
-from PySide6.QtCore import QMutex, Qt, QThread, QWaitCondition, Signal
+from PySide6.QtCore import QMutex, Qt, QWaitCondition, Signal
 from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
 from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
 from core.services.preview_generator import PreviewGenerator, PreviewRequest
 from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngine
-from core.workers.base import handle_worker_errors
+from core.workers.base import BaseWorker, handle_worker_errors
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.components.filters import SearchFiltersWidget
@@ -71,14 +71,24 @@ class SearchHistoryEntry:
         time_str = self.timestamp.strftime("%H:%M:%S")
         return f"[{time_str}] {self.search_type}: {self.query} ({self.results_count} results)"
 
-class SearchWorker(QThread):
-    """Worker thread for background searching."""
+class SearchWorker(BaseWorker):
+    """Worker thread for background searching.
 
-    progress = Signal(int, int)  # current, total
+    Inherits from BaseWorker for standard worker lifecycle management.
+    """
+
+    # Custom signals specific to search
+    progress = Signal(int, int)
+    """Search progress. Args: current, total."""
+
     result_found = Signal(SearchResult)
+    """Emitted when a result is found."""
+
     search_complete = Signal(list)  # all results
+    """Emitted when search completes. Args: all results list."""
+
     error = Signal(str)
-    operation_finished = Signal(bool, str)  # success, message - for decorator compatibility
+    """Emitted on error. Args: error_message."""
 
     # Thread-safe user interaction signals
     input_requested = Signal(str, str)  # title, prompt
@@ -90,17 +100,13 @@ class SearchWorker(QThread):
         self.search_type = search_type
         self.params = params
         self.finder = None
-        self._cancelled = False
-        self._operation_name = f"SearchWorker-{search_type}"  # For decorator compatibility
+        self._operation_name = f"SearchWorker-{search_type}"  # Override BaseWorker's default
 
         # Thread-safe user interaction support
         self._user_response_mutex = QMutex()
         self._user_response_condition = QWaitCondition()
-        self._user_response = None
-
-        # Auto-register with WorkerManager for cleanup_all()
-        from core.services.worker_lifecycle import WorkerManager
-        WorkerManager._register_worker(self)
+        self._user_response: tuple[str, bool] | bool | None = None
+        # Note: BaseWorker handles WorkerManager registration automatically
 
     @handle_worker_errors("search operation")
     @override
@@ -300,7 +306,7 @@ class SearchWorker(QThread):
             # Search through ROM data
             for start_offset in range(0, rom_size - pattern_len + 1, chunk_size):
                 # Check cancellation
-                if self._cancelled:
+                if self.is_cancelled:
                     break
 
                 # Update progress
@@ -353,7 +359,7 @@ class SearchWorker(QThread):
                         offset += 1
 
                 # Early termination check
-                if self._cancelled:
+                if self.is_cancelled:
                     break
 
             self.progress.emit(100, 100)
@@ -380,7 +386,7 @@ class SearchWorker(QThread):
             # Search through ROM data in chunks
             for start_offset in range(0, rom_size, chunk_size - overlap_size):
                 # Check cancellation
-                if self._cancelled:
+                if self.is_cancelled:
                     break
 
                 # Update progress
@@ -434,7 +440,7 @@ class SearchWorker(QThread):
                         return
 
                 # Early termination check
-                if self._cancelled:
+                if self.is_cancelled:
                     break
 
             self.progress.emit(100, 100)
@@ -534,7 +540,7 @@ class SearchWorker(QThread):
             if operation.startswith("OR"):
                 # OR operation - find matches for any pattern
                 for start_offset in range(0, rom_size, chunk_size):
-                    if self._cancelled or results_count >= max_results:
+                    if self.is_cancelled or results_count >= max_results:
                         break
 
                     progress = int((start_offset / rom_size) * 100)
@@ -563,7 +569,7 @@ class SearchWorker(QThread):
             elif operation.startswith("AND"):
                 # AND operation - find locations where all patterns exist nearby
                 for start_offset in range(0, rom_size - and_window_size, chunk_size):
-                    if self._cancelled or results_count >= max_results:
+                    if self.is_cancelled or results_count >= max_results:
                         break
 
                     progress = int((start_offset / rom_size) * 100)
@@ -638,7 +644,7 @@ class SearchWorker(QThread):
             if operation.startswith("OR"):
                 # OR operation - find matches for any pattern
                 for start_offset in range(0, rom_size, chunk_size - overlap_size):
-                    if self._cancelled or results_count >= max_results:
+                    if self.is_cancelled or results_count >= max_results:
                         break
 
                     progress = int((start_offset / rom_size) * 100)
@@ -671,7 +677,7 @@ class SearchWorker(QThread):
             elif operation.startswith("AND"):
                 # AND operation - find locations where all patterns exist nearby
                 for start_offset in range(0, rom_size - and_window_size, chunk_size):
-                    if self._cancelled or results_count >= max_results:
+                    if self.is_cancelled or results_count >= max_results:
                         break
 
                     progress = int((start_offset / rom_size) * 100)
@@ -763,9 +769,10 @@ class SearchWorker(QThread):
         # Confidence filter
         return not result.confidence < filters.confidence_threshold
 
-    def cancel(self):
+    @override
+    def cancel(self) -> None:
         """Cancel the search."""
-        self._cancelled = True
+        super().cancel()  # Sets _cancellation_requested and calls requestInterruption()
         # Wake up any waiting user interaction to allow clean shutdown
         self._user_response_mutex.lock()
         try:
@@ -775,9 +782,9 @@ class SearchWorker(QThread):
             self._user_response_mutex.unlock()
         self._cleanup_finder()
 
-    def is_set(self):
+    def is_set(self) -> bool:
         """Check if cancelled (for cancellation token interface)."""
-        return self._cancelled
+        return self.is_cancelled  # Use BaseWorker's property
 
     def _cleanup_finder(self):
         """Cleanup finder resources."""
@@ -792,7 +799,7 @@ class SearchWorker(QThread):
 
     def _request_user_input(self, title: str, prompt: str) -> tuple[str, bool]:
         """Thread-safe method to request user input from main thread."""
-        if self._cancelled:
+        if self.is_cancelled:
             return ("", False)
 
         self._user_response_mutex.lock()
@@ -802,7 +809,7 @@ class SearchWorker(QThread):
 
             # Wait for response from main thread (with timeout)
             if self._user_response_condition.wait(self._user_response_mutex, 30000):  # 30 second timeout
-                if self._cancelled:
+                if self.is_cancelled:
                     return ("", False)
                 # _user_response is set by another thread via _set_user_response()
                 # Note: isinstance check needed because basedpyright doesn't track cross-thread mutations
@@ -817,7 +824,7 @@ class SearchWorker(QThread):
 
     def _request_user_question(self, title: str, question: str) -> bool:
         """Thread-safe method to ask user a yes/no question from main thread."""
-        if self._cancelled:
+        if self.is_cancelled:
             return False
 
         self._user_response_mutex.lock()
@@ -827,7 +834,7 @@ class SearchWorker(QThread):
 
             # Wait for response from main thread (with timeout)
             if self._user_response_condition.wait(self._user_response_mutex, 30000):  # 30 second timeout
-                if self._cancelled:
+                if self.is_cancelled:
                     return False
                 # _user_response is set by another thread via _set_user_response()
                 # Note: isinstance check needed because basedpyright doesn't track cross-thread mutations
@@ -844,7 +851,7 @@ class SearchWorker(QThread):
         """Thread-safe method to show info message to user from main thread."""
         self.info_requested.emit(title, message)
 
-    def _set_user_response(self, response: object) -> None:
+    def _set_user_response(self, response: tuple[str, bool] | bool | None) -> None:
         """Called from main thread to provide user response."""
         self._user_response_mutex.lock()
         try:
@@ -857,6 +864,7 @@ class SearchWorker(QThread):
         """Emit progress signal - avoids lambda closure."""
         self.progress.emit(current, total)
 
+    @override
     def emit_error(self, message: str, exception: Exception | None = None) -> None:
         """Emit error signal - compatibility method for decorator."""
         self.error.emit(message)

@@ -10,7 +10,6 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
-import pickle
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -76,8 +75,6 @@ class SimilarityIndexingWorker(BaseWorker):
         # Cache directory for similarity indices
         self.cache_dir = self._get_cache_directory()
         self.index_file = self.cache_dir / f"{self.rom_hash}.json"
-        # Legacy pickle file path for auto-conversion
-        self._legacy_pickle_file = self.cache_dir / f"{self.rom_hash}.idx"
 
         # Indexing state
         self._indexed_count = 0
@@ -124,15 +121,10 @@ class SimilarityIndexingWorker(BaseWorker):
         return cache_dir
 
     def _load_existing_index(self) -> None:
-        """Load existing similarity index if available.
+        """Load existing similarity index if available."""
+        # Use Any since json.load returns Any - isinstance narrows it
+        index_data: Any = None  # pyright: ignore[reportExplicitAny] - json.load returns Any
 
-        Tries JSON format first (new), then falls back to pickle (legacy)
-        with automatic conversion to JSON.
-        """
-        # Use Any since json.load/pickle.load return Any - isinstance narrows it
-        index_data: Any = None  # pyright: ignore[reportExplicitAny] - json.load/pickle.load return Any
-
-        # Try JSON first (new format)
         if self.index_file.exists():
             try:
                 with self.index_file.open("r", encoding="utf-8") as f:
@@ -140,28 +132,6 @@ class SimilarityIndexingWorker(BaseWorker):
                 logger.debug("Loaded index from JSON format")
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning(f"Could not load JSON index: {e}")
-                index_data = None
-
-        # Fall back to pickle (legacy format) and auto-convert
-        if index_data is None and self._legacy_pickle_file.exists():
-            try:
-                with self._legacy_pickle_file.open("rb") as f:
-                    index_data = pickle.load(f)
-
-                if index_data is not None:
-                    logger.info("Migrating legacy pickle index to JSON format")
-                    # Save as JSON immediately
-                    self._save_index_json(index_data)
-                    # Delete old pickle file
-                    with contextlib.suppress(OSError):
-                        self._legacy_pickle_file.unlink()
-                    logger.info(f"Successfully migrated index to JSON: {self.index_file}")
-
-            except Exception as e:
-                logger.warning(f"Could not load legacy pickle index: {e}")
-                # Remove corrupt pickle file
-                with contextlib.suppress(OSError):
-                    self._legacy_pickle_file.unlink()
                 index_data = None
 
         if index_data is None:

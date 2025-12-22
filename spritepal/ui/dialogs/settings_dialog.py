@@ -28,9 +28,6 @@ from ui.common.file_dialogs import browse_for_directory
 from ui.components.base import DialogBase
 from ui.styles import get_button_style, get_muted_text_style
 
-# from utils.rom_cache import get_rom_cache # Removed due to DI
-# from utils.settings_manager import get_settings_manager # Removed due to DI
-
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
 
