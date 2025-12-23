@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from core.protocols.manager_protocols import (
         ApplicationStateManagerProtocol,
         ROMCacheProtocol,
-        SettingsManagerProtocol,
     )
 
 from typing import override
@@ -84,7 +83,7 @@ class MainWindow(QMainWindow):
 
     def __init__(
         self,
-        settings_manager: SettingsManagerProtocol,
+        settings_manager: ApplicationStateManagerProtocol,
         rom_cache: ROMCacheProtocol,
         session_manager: ApplicationStateManagerProtocol,
     ) -> None:
@@ -269,7 +268,6 @@ class MainWindow(QMainWindow):
 
         self.session_coordinator = SessionCoordinator(
             self, self.extraction_panel, self.output_settings_manager,
-            settings_manager=self.settings_manager,
             session_manager=self.session_manager
         )
 

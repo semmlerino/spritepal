@@ -8,10 +8,10 @@ from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
-        SettingsManagerProtocol,
     )
 
 
@@ -22,7 +22,7 @@ class ManualOffsetDialogFactory:
 
     def __init__(self,
                  rom_cache: ROMCacheProtocol,
-                 settings_manager: SettingsManagerProtocol,
+                 settings_manager: ApplicationStateManagerProtocol,
                  extraction_manager: ExtractionManagerProtocol,
                  rom_extractor: ROMExtractorProtocol):
         self._rom_cache = rom_cache

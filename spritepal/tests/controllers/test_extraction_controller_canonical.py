@@ -29,7 +29,6 @@ from core.controller import ExtractionController
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-from core.services.settings_manager import SettingsManager
 from core.workers import VRAMExtractionWorker
 
 # Unified pytest markers for this consolidated module
@@ -130,7 +129,7 @@ def standard_mock_managers() -> tuple[Mock, Mock, Mock, Mock, Mock]:
     extraction_manager = Mock(spec=CoreOperationsManager)
     injection_manager = Mock(spec=CoreOperationsManager)
     session_manager = Mock(spec=ApplicationStateManagerProtocol)
-    settings_manager = Mock(spec=SettingsManager)
+    settings_manager = Mock(spec=ApplicationStateManagerProtocol)
     dialog_factory = Mock(spec=DialogFactoryProtocol)
     return extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory
 

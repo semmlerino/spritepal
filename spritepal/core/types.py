@@ -97,6 +97,59 @@ class SpriteInfo(TypedDict):
     name: NotRequired[str]
 
 
+class ROMHeaderInfo(TypedDict):
+    """ROM header information from read_rom_header()."""
+
+    title: str
+    rom_type: str
+    checksum: str
+
+
+class ScanParams(TypedDict):
+    """Parameters for ROM scanning operations."""
+
+    start_offset: int
+    end_offset: int
+    step: int
+
+
+class WindowGeometry(TypedDict):
+    """Window position and size settings."""
+
+    window_width: int
+    window_height: int
+    window_x: int
+    window_y: int
+    restore_position: bool
+    theme: NotRequired[str]
+
+
+class CacheMetadata(TypedDict):
+    """Cache entry metadata."""
+
+    created_at: float
+    expires_at: float
+    size_bytes: int
+    source: str
+
+
+class SpriteSearchResult(TypedDict):
+    """Result from sprite search operations."""
+
+    offset: int
+    quality: float
+    size: int
+    metadata: NotRequired[dict[str, object]]
+
+
+class ParsedMetadataInfo(TypedDict):
+    """Result from load_metadata()."""
+
+    metadata: dict[str, object]
+    source_type: str
+    extraction: dict[str, object] | None
+
+
 # Configuration and settings types
 ConfigDict: TypeAlias = dict[str, object]
 SettingsValue: TypeAlias = object
@@ -118,8 +171,11 @@ SpriteLocation: TypeAlias = dict[str, object]
 RegionMap: TypeAlias = dict[str, object]
 
 
-# Preset source type
+# Literal types for mode values and status
 PresetSource = Literal["builtin", "user", "imported"]
+InjectionMode = Literal["rom", "vram"]
+SourceType = Literal["rom", "vram"]
+OperationStatus = Literal["success", "failed", "pending", "cancelled"]
 
 
 @dataclass
@@ -177,19 +233,23 @@ class SpritePreset:
 __all__ = [
     "CacheData",
     "CacheKey",
+    "CacheMetadata",
     "CachePath",
     "CacheStats",
     "ConfigDict",
     "DialogResult",
     "ErrorCallback",
     "FilePath",
+    "InjectionMode",
     "NavigationHint",
     "OperationName",
     "OperationProgress",
     "OperationResult",
+    "OperationStatus",
     "OutputPath",
     "PILImage",
     "PaletteData",
+    "ParsedMetadataInfo",
     "PresetSource",
     "PreviewPixmap",
     "PreviewSize",
@@ -197,19 +257,24 @@ __all__ = [
     "RGBColor",
     "ROMData",
     "ROMExtractionParams",
+    "ROMHeaderInfo",
     "RegionMap",
+    "ScanParams",
     "SearchResults",
     "SettingsValue",
     "SimilarityResult",
     "SimilarityScore",
+    "SourceType",
     "SpriteInfo",
     "SpriteLocation",
     "SpriteOffset",
     "SpritePreset",
+    "SpriteSearchResult",
     "TileCount",
     "TileData",
     "VRAMExtractionParams",
     "ValidationResult",
     "WidgetParent",
+    "WindowGeometry",
     "WorkerCallback",
 ]

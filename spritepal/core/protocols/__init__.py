@@ -18,9 +18,9 @@ from .manager_protocols import (
     ConfigurationServiceProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
+    PathSuggestionServiceProtocol,
     ROMCacheProtocol,
     ROMExtractorProtocol,
-    SettingsManagerProtocol,
     SpritePresetManagerProtocol,
 )
 from .worker_protocols import (
@@ -37,9 +37,9 @@ __all__ = [
     "InjectionManagerProtocol",
     "ManualOffsetDialogFactoryProtocol",
     "ManualOffsetDialogProtocol",
+    "PathSuggestionServiceProtocol",
     "PreviewWorkerPoolProtocol",
     "ROMCacheProtocol",
     "ROMExtractorProtocol",
-    "SettingsManagerProtocol",
     "SpritePresetManagerProtocol",
 ]

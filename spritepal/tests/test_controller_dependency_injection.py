@@ -16,7 +16,6 @@ from core.controller import ExtractionController
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-from core.services.settings_manager import SettingsManager
 
 # Systematic pytest markers applied based on test content analysis
 # NOTE: parallel_safe removed - tests use isolated_managers fixture and mocks
@@ -33,7 +32,7 @@ class TestControllerDependencyInjection:
         mock_extraction_manager = Mock(spec=CoreOperationsManager)
         mock_session_manager = Mock(spec=ApplicationStateManagerProtocol)
         mock_injection_manager = Mock(spec=CoreOperationsManager)
-        mock_settings_manager = Mock(spec=SettingsManager)
+        mock_settings_manager = Mock(spec=ApplicationStateManagerProtocol)
         mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
         # Create controller with injected managers
@@ -59,7 +58,7 @@ class TestControllerDependencyInjection:
         mock_extraction_manager = Mock(spec=CoreOperationsManager)
         mock_injection_manager = Mock(spec=CoreOperationsManager)
         mock_session_manager = Mock(spec=ApplicationStateManagerProtocol)
-        mock_settings_manager = Mock(spec=SettingsManager)
+        mock_settings_manager = Mock(spec=ApplicationStateManagerProtocol)
         mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
         # Set up signals as Mock objects

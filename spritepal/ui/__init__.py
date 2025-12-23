@@ -23,10 +23,10 @@ def register_ui_factories() -> None:
         ManualOffsetDialogFactoryProtocol,
     )
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
-        SettingsManagerProtocol,
     )
 
     def _create_manual_offset_dialog_factory():
@@ -34,7 +34,7 @@ def register_ui_factories() -> None:
 
         return ManualOffsetDialogFactory(
             rom_cache=inject(ROMCacheProtocol),
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             extraction_manager=inject(ExtractionManagerProtocol),
             rom_extractor=inject(ROMExtractorProtocol),
         )

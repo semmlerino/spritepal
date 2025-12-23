@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import SettingsManagerProtocol
+    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ class ConfigurationService:
     def __init__(
         self,
         app_root: Path | None = None,
-        settings_manager: SettingsManagerProtocol | None = None,
+        settings_manager: ApplicationStateManagerProtocol | None = None,
     ) -> None:
         """
         Initialize configuration service.
@@ -71,7 +71,7 @@ class ConfigurationService:
         Args:
             app_root: Application root directory. If None, determined from
                      this module's location (core/configuration_service.py).
-            settings_manager: Optional settings manager for user overrides.
+            settings_manager: Optional ApplicationStateManager for user overrides.
                              Can be set later via set_settings_manager().
         """
         # Resolve app root
@@ -81,7 +81,7 @@ class ConfigurationService:
             # Default: this file is in core/, so parent is app root (spritepal/)
             self._app_root = Path(__file__).parent.parent.resolve()
 
-        self._settings_manager: SettingsManagerProtocol | None = settings_manager
+        self._settings_manager: ApplicationStateManagerProtocol | None = settings_manager
 
         # Compute base paths (immutable)
         self._base_paths = self._compute_base_paths()
@@ -114,14 +114,14 @@ class ConfigurationService:
             default_dumps_directory=Path.home() / self.DEFAULT_DUMPS_SUBPATH,
         )
 
-    def set_settings_manager(self, settings_manager: SettingsManagerProtocol) -> None:
+    def set_settings_manager(self, settings_manager: ApplicationStateManagerProtocol) -> None:
         """
         Set settings manager for user override resolution.
 
         This allows cache directory to be overridden by user settings.
 
         Args:
-            settings_manager: The settings manager instance
+            settings_manager: The ApplicationStateManager instance
         """
         self._settings_manager = settings_manager
 

@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 from ui.common.file_dialogs import FileDialogHelper
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import SettingsManagerProtocol
+    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
 
 class FileSelector(QWidget):
@@ -64,7 +64,7 @@ class FileSelector(QWidget):
         selection_callback: Callable[[str], None] | None = None,
         settings_key: str | None = None,
         settings_namespace: str | None = None,
-        settings_manager: SettingsManagerProtocol | None = None
+        settings_manager: ApplicationStateManagerProtocol | None = None
     ):
         super().__init__(parent)
 
@@ -78,8 +78,8 @@ class FileSelector(QWidget):
         # Inject settings manager or use fallback
         if settings_manager is None:
             from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            self.settings_manager = inject(SettingsManagerProtocol)
+            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+            self.settings_manager = inject(ApplicationStateManagerProtocol)
         else:
             self.settings_manager = settings_manager
 

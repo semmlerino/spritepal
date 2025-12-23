@@ -21,7 +21,7 @@ except ImportError:
         return logging.getLogger(module_name)
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import SettingsManagerProtocol
+    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
 logger = get_logger(__name__)
 
@@ -31,17 +31,17 @@ class ROMCache:
     CACHE_VERSION = "1.0"
     CACHE_DIR_NAME = ".spritepal_rom_cache"
 
-    def __init__(self, settings_manager: SettingsManagerProtocol, cache_dir: str | None = None) -> None:
+    def __init__(self, state_manager: ApplicationStateManagerProtocol, cache_dir: str | None = None) -> None:
         """Initialize ROM cache with robust error handling.
 
         Args:
-            settings_manager: Required SettingsManagerProtocol instance for cache settings.
+            state_manager: Required ApplicationStateManagerProtocol instance for cache settings.
             cache_dir: Optional custom cache directory. If None, uses settings or default.
         """
         self._hash_cache: dict[str, str] = {}
         self._hash_cache_lock = threading.Lock()
 
-        self.settings_manager = settings_manager
+        self.settings_manager = state_manager  # Keep attribute name for minimal changes
 
         # Check if caching is enabled in settings
         self._cache_enabled = self.settings_manager.get_cache_enabled()

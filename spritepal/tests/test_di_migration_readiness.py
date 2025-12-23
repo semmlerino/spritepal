@@ -20,14 +20,12 @@ from core.protocols.manager_protocols import (
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
     ROMCacheProtocol,
-    SettingsManagerProtocol,
 )
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.services.rom_cache import ROMCache
-    from core.services.settings_manager import SettingsManager
 
 
 pytestmark = [
@@ -43,12 +41,12 @@ class TestProtocolInjection:
     def test_container_is_configured(self, isolated_managers):
         """Verify DI container is properly configured."""
         container = get_container()
-        # Container should have at least SettingsManagerProtocol registered
-        assert container.has(SettingsManagerProtocol), "DI container should be configured after manager init"
+        # Container should have at least ApplicationStateManagerProtocol registered
+        assert container.has(ApplicationStateManagerProtocol), "DI container should be configured after manager init"
 
     def test_inject_settings_manager_protocol(self, isolated_managers):
-        """Test SettingsManagerProtocol injection."""
-        settings = inject(SettingsManagerProtocol)
+        """Test ApplicationStateManagerProtocol injection."""
+        settings = inject(ApplicationStateManagerProtocol)
         assert settings is not None
         assert hasattr(settings, "get")
         assert hasattr(settings, "set")
@@ -91,7 +89,7 @@ class TestPureDIComponentInitialization:
         extraction_mgr = inject(ExtractionManagerProtocol)
         session_mgr = inject(ApplicationStateManagerProtocol)
         injection_mgr = inject(InjectionManagerProtocol)
-        settings_mgr = inject(SettingsManagerProtocol)
+        settings_mgr = inject(ApplicationStateManagerProtocol)
 
         # Create mock main window
         mock_window = Mock()
@@ -133,7 +131,7 @@ class TestPureDIComponentInitialization:
         """
         from ui.main_window import MainWindow
 
-        settings_mgr = inject(SettingsManagerProtocol)
+        settings_mgr = inject(ApplicationStateManagerProtocol)
         rom_cache = inject(ROMCacheProtocol)
         session_mgr = inject(ApplicationStateManagerProtocol)
 
@@ -202,7 +200,7 @@ class TestNoFallbackScenario:
 
             # Try to inject - should raise ValueError
             with pytest.raises(ValueError, match="No registration"):
-                inject(SettingsManagerProtocol)
+                inject(ApplicationStateManagerProtocol)
         finally:
             # Restore
             container._singletons.update(original_singletons)

@@ -11,7 +11,6 @@ from core.di_container import inject
 from core.protocols.manager_protocols import (
     ApplicationStateManagerProtocol,
     ROMCacheProtocol,
-    SettingsManagerProtocol,
 )
 from ui.main_window import MainWindow
 
@@ -34,7 +33,7 @@ class TestCircularDependencyFix:
     def main_window_deps(self, isolated_managers):
         """Get MainWindow dependencies from DI container."""
         return {
-            "settings_manager": inject(SettingsManagerProtocol),
+            "settings_manager": inject(ApplicationStateManagerProtocol),
             "rom_cache": inject(ROMCacheProtocol),
             "session_manager": inject(ApplicationStateManagerProtocol),
         }

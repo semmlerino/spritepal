@@ -43,11 +43,11 @@ class TestRealDialogInitialization:
         Requires isolated_managers because SettingsDialog uses DI.
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
         from ui.dialogs.settings_dialog import SettingsDialog
 
         dialog = SettingsDialog(
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             rom_cache=inject(ROMCacheProtocol)
         )
         qtbot.addWidget(dialog)
@@ -170,11 +170,11 @@ class TestRealDialogLifecycle:
         Requires isolated_managers because SettingsDialog uses DI.
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
         from ui.dialogs.settings_dialog import SettingsDialog
 
         dialog = SettingsDialog(
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             rom_cache=inject(ROMCacheProtocol)
         )
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail

@@ -57,7 +57,7 @@ class PreviewRequest:
     sprite_name: str = ""  # Optional sprite name
     palette: PaletteData | None = None  # Optional palette data
     size: tuple[int, int] = (128, 128)  # Preview size (width, height)
-    sprite_config: object = None  # Optional sprite configuration
+    sprite_config: object | None = None  # Optional sprite configuration
 
     def cache_key(self) -> str:
         """Generate a cache key for this request."""

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import threading
-import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
@@ -25,12 +24,11 @@ from core.exceptions import (
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-from core.services import ROMService, VRAMService
+from core.services import PathSuggestionService, ROMService, VRAMService
 from utils.constants import (
     SETTINGS_KEY_FAST_COMPRESSION,
     SETTINGS_KEY_LAST_CUSTOM_OFFSET,
     SETTINGS_KEY_LAST_INPUT_ROM,
-    SETTINGS_KEY_LAST_INPUT_VRAM,
     SETTINGS_KEY_LAST_SPRITE_LOCATION,
     SETTINGS_NS_ROM_INJECTION,
 )
@@ -92,6 +90,7 @@ class CoreOperationsManager(BaseManager):
         # Services (owned by this manager)
         self._rom_service: ROMService | None = None
         self._vram_service: VRAMService | None = None
+        self._path_suggestion_service: PathSuggestionService | None = None
 
         # Thread safety for inherited methods
         self._lock = threading.RLock()
@@ -121,6 +120,9 @@ class CoreOperationsManager(BaseManager):
                 sprite_extractor=self._sprite_extractor,
                 palette_manager=self._palette_manager,
                 parent=self,
+            )
+            self._path_suggestion_service = PathSuggestionService(
+                session_manager_getter=self._get_session_manager
             )
 
             # Connect service signals for backward compatibility
@@ -299,10 +301,7 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If extraction fails
             ValidationError: If parameters are invalid
         """
-        if self._vram_service is None:
-            raise ExtractionError("VRAMService not initialized")
-
-        return self._vram_service.extract_from_vram(
+        return self.vram_service.extract_from_vram(
             vram_path=vram_path,
             output_base=output_base,
             cgram_path=cgram_path,
@@ -336,10 +335,7 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If extraction fails
             ValidationError: If parameters are invalid
         """
-        if self._rom_service is None:
-            raise ExtractionError("ROMService not initialized")
-
-        return self._rom_service.extract_from_rom(
+        return self.rom_service.extract_from_rom(
             rom_path=rom_path,
             offset=offset,
             output_base=output_base,
@@ -366,10 +362,7 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ExtractionError: If preview generation fails
         """
-        if self._rom_service is None:
-            raise ExtractionError("ROMService not initialized")
-
-        return self._rom_service.get_sprite_preview(rom_path, offset, sprite_name)
+        return self.rom_service.get_sprite_preview(rom_path, offset, sprite_name)
 
     def validate_extraction_params(
         self, params: Mapping[str, object]
@@ -435,11 +428,8 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ExtractionError: If preview generation fails
         """
-        if self._vram_service is None:
-            raise ExtractionError("VRAMService not initialized")
-
         try:
-            return self._vram_service.generate_preview(vram_path, offset)
+            return self.vram_service.generate_preview(vram_path, offset)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "preview_generation", "generating preview")
             raise
@@ -453,9 +443,7 @@ class CoreOperationsManager(BaseManager):
 
     def get_rom_extractor(self) -> ROMExtractorProtocol:
         """Get the ROM extractor instance for advanced operations."""
-        if self._rom_service is None:
-            raise ExtractionError("ROMService not initialized")
-        return self._rom_service.get_rom_extractor()
+        return self.rom_service.get_rom_extractor()
 
     def extract_sprite_to_png(self, rom_path: str, sprite_offset: int,
                              output_path: str, cgram_path: str | None = None) -> bool:
@@ -474,9 +462,7 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ExtractionError: If operation fails (service not initialized, etc.)
         """
-        if self._rom_service is None:
-            raise ExtractionError("ROMService not initialized")
-        return self._rom_service.extract_sprite_to_png(
+        return self.rom_service.extract_sprite_to_png(
             rom_path, sprite_offset, output_path, cgram_path
         )
 
@@ -495,11 +481,8 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ExtractionError: If operation fails
         """
-        if self._rom_service is None:
-            raise ExtractionError("ROMService not initialized")
-
         try:
-            return self._rom_service.get_known_sprite_locations(rom_path)
+            return self.rom_service.get_known_sprite_locations(rom_path)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "get_known_sprite_locations", "getting sprite locations")
             raise
@@ -526,11 +509,8 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ExtractionError: If operation fails
         """
-        if self._rom_service is None:
-            raise ExtractionError("ROMService not initialized")
-
         try:
-            return self._rom_service.read_rom_header(rom_path)
+            return self.rom_service.read_rom_header(rom_path)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "read_rom_header", "reading ROM header")
             raise
@@ -840,6 +820,8 @@ class CoreOperationsManager(BaseManager):
 
     def _validate_vram_path(self, path: str | None) -> str:
         """Validate and return VRAM path if it exists, empty string otherwise."""
+        if self._path_suggestion_service:
+            return self._path_suggestion_service.validate_path(path)
         if path and Path(path).exists():
             return str(path)
         return ""
@@ -855,12 +837,7 @@ class CoreOperationsManager(BaseManager):
         """
         Find VRAM path using multiple strategies in priority order.
 
-        Strategies (in order):
-        1. Pre-suggested path
-        2. Session manager vram_path
-        3. Metadata file (source_vram or extraction.vram_source)
-        4. Basename pattern matching
-        5. Last injection settings
+        Delegates to PathSuggestionService for the actual logic.
 
         Args:
             sprite_path: Path to sprite file
@@ -872,88 +849,22 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested VRAM path or empty string if none found
         """
-        # Strategy 1: Pre-suggested path
-        if result := self._validate_vram_path(pre_suggested):
-            return result
-
-        # Strategy 2: Session manager vram_path
-        try:
-            session_manager = self._get_session_manager()
-            if result := self._validate_vram_path(
-                cast(str, session_manager.get("session", "vram_path", ""))
-            ):
-                return result
-        except (OSError, ValueError, TypeError):
-            pass
-
-        # Strategy 3: Metadata file
-        loaded_metadata = metadata
-        if not loaded_metadata and metadata_path and Path(metadata_path).exists():
-            try:
-                with Path(metadata_path).open() as f:
-                    loaded_metadata = cast(dict[str, object], json.load(f))
-            except (OSError, ValueError, json.JSONDecodeError):
-                pass
-
-        if loaded_metadata:
-            # Check top-level source_vram (absolute path)
-            if result := self._validate_vram_path(cast(str, loaded_metadata.get("source_vram", ""))):
-                return result
-            # Check extraction.vram_source (relative path)
-            extraction = loaded_metadata.get("extraction")
-            if isinstance(extraction, dict):
-                vram_source = cast(str, extraction.get("vram_source", ""))
-                if vram_source and sprite_path:
-                    sprite_dir = Path(sprite_path).parent
-                    if result := self._validate_vram_path(str(sprite_dir / vram_source)):
-                        return result
-
-        # Strategy 4: Basename pattern matching
-        if sprite_path:
-            sprite_path_obj = Path(sprite_path)
-            sprite_dir = sprite_path_obj.parent
-            base_name = sprite_path_obj.stem
-
-            if strip_editor_suffixes:
-                for suffix in ["_sprites_editor", "_sprites", "_editor", "Edited"]:
-                    if base_name.endswith(suffix):
-                        base_name = base_name[: -len(suffix)]
-                        break
-
-            vram_patterns = [
-                f"{base_name}.dmp",
-                f"{base_name}_VRAM.dmp",
-                f"{base_name}.VRAM.dmp",
-                f"{base_name}.vram",
-                f"{base_name}.SnesVideoRam.dmp",
-                f"{base_name}.VideoRam.dmp",
-                "VRAM.dmp",
-                "vram.dmp",
-            ]
-
-            for pattern in vram_patterns:
-                if result := self._validate_vram_path(str(sprite_dir / pattern)):
-                    return result
-
-        # Strategy 5: Last injection settings
-        try:
-            session_manager = self._get_session_manager()
-            if result := self._validate_vram_path(
-                cast(str, session_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, ""))
-            ):
-                return result
-        except (OSError, ValueError, TypeError):
-            pass
-
-        self._logger.debug("No VRAM suggestion found")
+        if self._path_suggestion_service:
+            return self._path_suggestion_service.find_vram_path(
+                sprite_path=sprite_path,
+                metadata_path=metadata_path,
+                metadata=metadata,
+                pre_suggested=pre_suggested,
+                strip_editor_suffixes=strip_editor_suffixes,
+            )
+        self._logger.debug("No path suggestion service available")
         return ""
 
     def get_smart_vram_suggestion(self, sprite_path: str, metadata_path: str = "") -> str:
         """
         Get smart suggestion for input VRAM path using multiple strategies.
 
-        Tries multiple sources in priority order: extraction panel, metadata,
-        basename patterns, session data, and last injection settings.
+        Delegates to PathSuggestionService for the actual logic.
 
         Args:
             sprite_path: Path to sprite file
@@ -962,11 +873,12 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested VRAM path or empty string if none found
         """
-        return self._find_vram_path_internal(
-            sprite_path=sprite_path,
-            metadata_path=metadata_path,
-            strip_editor_suffixes=False,
-        )
+        if self._path_suggestion_service:
+            return self._path_suggestion_service.get_smart_vram_suggestion(
+                sprite_path=sprite_path,
+                metadata_path=metadata_path,
+            )
+        return ""
 
     # ========== Metadata and ROM Info ==========
 
@@ -1130,6 +1042,8 @@ class CoreOperationsManager(BaseManager):
         """
         Find the best suggestion for input VRAM path.
 
+        Delegates to PathSuggestionService for the actual logic.
+
         Args:
             sprite_path: Path to sprite file
             metadata: Loaded metadata dict (from load_metadata)
@@ -1138,12 +1052,13 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested VRAM path or empty string if none found
         """
-        return self._find_vram_path_internal(
-            sprite_path=sprite_path,
-            metadata=metadata,
-            pre_suggested=suggested_vram,
-            strip_editor_suffixes=True,
-        )
+        if self._path_suggestion_service:
+            return self._path_suggestion_service.find_suggested_input_vram(
+                sprite_path=sprite_path,
+                metadata=metadata,
+                suggested_vram=suggested_vram,
+            )
+        return ""
 
     def _suggest_output_path(
         self,
@@ -1155,6 +1070,8 @@ class CoreOperationsManager(BaseManager):
         """
         Generic output path suggestion with smart numbering.
 
+        Delegates to PathSuggestionService for the actual logic.
+
         Args:
             input_path: Input file path
             suffix: Suffix to add (e.g., "_injected", "_modified")
@@ -1164,29 +1081,25 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested non-existent output path
         """
+        if self._path_suggestion_service:
+            return self._path_suggestion_service.suggest_output_path(
+                input_path=input_path,
+                suffix=suffix,
+                extension=extension,
+                preserve_parent=preserve_parent,
+            )
+        # Fallback if service unavailable
         path = Path(input_path)
         base = path.stem.removesuffix(suffix)
         ext = extension if extension else path.suffix
         parent = path.parent if preserve_parent else Path()
-
-        # Try base name with suffix
-        suggested = parent / f"{base}{suffix}{ext}"
-        if not suggested.exists():
-            return str(suggested)
-
-        # Try numbered variations
-        for counter in range(2, 11):
-            suggested = parent / f"{base}{suffix}{counter}{ext}"
-            if not suggested.exists():
-                return str(suggested)
-
-        # Fall back to timestamp
-        timestamp = int(time.time())
-        return str(parent / f"{base}{suffix}_{timestamp}{ext}")
+        return str(parent / f"{base}{suffix}{ext}")
 
     def suggest_output_vram_path(self, input_vram_path: str) -> str:
         """
         Suggest output VRAM path based on input path with smart numbering.
+
+        Delegates to PathSuggestionService for the actual logic.
 
         Args:
             input_vram_path: Input VRAM file path
@@ -1194,11 +1107,15 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested output path
         """
+        if self._path_suggestion_service:
+            return self._path_suggestion_service.suggest_output_vram_path(input_vram_path)
         return self._suggest_output_path(input_vram_path, "_injected", ".dmp")
 
     def suggest_output_rom_path(self, input_rom_path: str) -> str:
         """
         Suggest output ROM path based on input path with smart numbering.
+
+        Delegates to PathSuggestionService for the actual logic.
 
         Args:
             input_rom_path: Input ROM file path
@@ -1206,6 +1123,8 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Suggested output path (in same directory as input)
         """
+        if self._path_suggestion_service:
+            return self._path_suggestion_service.suggest_output_rom_path(input_rom_path)
         return self._suggest_output_path(
             input_rom_path, "_modified", None, preserve_parent=True
         )

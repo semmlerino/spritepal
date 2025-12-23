@@ -233,11 +233,10 @@ class RealComponentFactory:
         from core.protocols.manager_protocols import (
             ApplicationStateManagerProtocol,
             ROMCacheProtocol,
-            SettingsManagerProtocol,
         )
 
         window = MainWindow(
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             rom_cache=inject(ROMCacheProtocol),
             session_manager=inject(ApplicationStateManagerProtocol),  # type: ignore[arg-type]  # Protocol vs concrete type mismatch
         )
@@ -316,7 +315,7 @@ class RealComponentFactory:
         mock_settings.get_cache_enabled.return_value = True
         mock_settings.get_cache_location.return_value = str(cache_dir)
 
-        cache = ROMCache(settings_manager=mock_settings, cache_dir=str(cache_dir))
+        cache = ROMCache(state_manager=mock_settings, cache_dir=str(cache_dir))
 
         return cache
 

@@ -13,7 +13,6 @@ from PySide6.QtCore import QObject
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import (
         ApplicationStateManagerProtocol,
-        SettingsManagerProtocol,
     )
     from ui.extraction_panel import ExtractionPanel
     from ui.main_window import MainWindow
@@ -27,7 +26,6 @@ class SessionCoordinator(QObject):
         main_window: MainWindow,
         extraction_panel: ExtractionPanel,
         output_settings_manager: OutputSettingsManager,
-        settings_manager: SettingsManagerProtocol,
         session_manager: ApplicationStateManagerProtocol,
     ) -> None:
         """Initialize session coordinator
@@ -36,7 +34,6 @@ class SessionCoordinator(QObject):
             main_window: Main window for geometry save/restore
             extraction_panel: Extraction panel for file path save/restore
             output_settings_manager: Output settings for save/restore
-            settings_manager: Injected SettingsManagerProtocol instance
             session_manager: Injected ApplicationStateManagerProtocol instance
         """
         super().__init__()
@@ -44,7 +41,6 @@ class SessionCoordinator(QObject):
         self.main_window = main_window
         self.extraction_panel = extraction_panel
         self.output_settings_manager = output_settings_manager
-        self.settings_manager = settings_manager
         self.session_manager = session_manager
 
     def restore_session(self) -> bool:
@@ -82,8 +78,8 @@ class SessionCoordinator(QObject):
     def _restore_window_geometry(self) -> None:
         """Restore window geometry if enabled in settings"""
 
-        settings_manager = self.settings_manager
-        if settings_manager.get("ui", "restore_position", False):
+        session_manager = self.session_manager
+        if session_manager.get("ui", "restore_position", False):
             window_geometry: dict[str, Any] = dict(self.session_manager.get_window_geometry())  # pyright: ignore[reportExplicitAny] - window state
 
             # Extract scalar values with type narrowing

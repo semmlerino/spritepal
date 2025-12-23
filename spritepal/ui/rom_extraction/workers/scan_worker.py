@@ -16,6 +16,7 @@ from PySide6.QtCore import QMutex, QMutexLocker, Signal
 
 from core.parallel_sprite_finder import ParallelSpriteFinder
 from core.workers.base import BaseWorker, handle_worker_errors
+from utils.constants import ROM_SCAN_START_DEFAULT, ROM_SIZE_4MB
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -49,10 +50,8 @@ class SpriteScanWorker(BaseWorker):
     progress_detailed = Signal(int, int)
     """Emitted with detailed progress. Args: current_offset, total_offsets."""
 
-    # Default scan parameters (consistent with scan_controller.py)
-    _ROM_SCAN_START_DEFAULT = 0x40000  # Skip headers and early data
-    _ROM_SCAN_END_MAX = 0x400000  # Cap at 4MB for SNES ROMs
-    _DEFAULT_STEP = 0x100  # Default step/alignment
+    # Default step/alignment for scanning
+    _DEFAULT_STEP = 0x100
 
     def __init__(self, rom_path: str, extractor: ROMExtractorProtocol | None = None, use_cache: bool = True,
                  start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None, *,
@@ -129,9 +128,9 @@ class SpriteScanWorker(BaseWorker):
             rom_size = Path(self.rom_path).stat().st_size
 
             # Default to scanning the entire ROM with reasonable limits
-            # Use class constants to stay consistent with scan_controller
-            start_offset = self._ROM_SCAN_START_DEFAULT
-            end_offset = min(rom_size, self._ROM_SCAN_END_MAX)
+            # Use shared constants from utils.constants for consistency
+            start_offset = ROM_SCAN_START_DEFAULT
+            end_offset = min(rom_size, ROM_SIZE_4MB)
 
             logger.info(f"Scanning entire ROM: 0x{start_offset:X} to 0x{end_offset:X} (ROM size: 0x{rom_size:X})")
 

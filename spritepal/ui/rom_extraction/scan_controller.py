@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from core.types import SpriteInfo
 from ui.rom_extraction.workers import SpriteScanWorker
 from ui.styles.components import get_cache_status_style
+from utils.constants import ROM_SCAN_START_DEFAULT, ROM_SIZE_4MB
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -36,11 +37,6 @@ if TYPE_CHECKING:
     )
 
 logger = get_logger(__name__)
-
-
-# ROM scan default parameters
-_ROM_SCAN_START_DEFAULT = 0x40000  # Skip headers and early data
-_ROM_SCAN_END_MAX = 0x400000  # Cap at 4MB for SNES ROMs
 
 
 def compute_scan_params(
@@ -72,8 +68,8 @@ def compute_scan_params(
 
     rom_size = Path(rom_path).stat().st_size
     return {
-        "start_offset": _ROM_SCAN_START_DEFAULT,
-        "end_offset": min(rom_size, _ROM_SCAN_END_MAX),
+        "start_offset": ROM_SCAN_START_DEFAULT,
+        "end_offset": min(rom_size, ROM_SIZE_4MB),
         "alignment": step if step is not None else 0x100,
     }
 

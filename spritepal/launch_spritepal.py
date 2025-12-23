@@ -22,7 +22,6 @@ from core.managers import (
 from core.protocols.manager_protocols import (
     ApplicationStateManagerProtocol,
     ROMCacheProtocol,
-    SettingsManagerProtocol,
 )
 from ui.main_window import MainWindow
 from ui.styles.accessibility import initialize_accessibility
@@ -78,7 +77,7 @@ class SpritePalApp(QApplication):
         # B.6: Create main window with explicit DI dependencies
         # This eliminates deprecation warnings and makes dependencies explicit
         self.main_window = MainWindow(
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             rom_cache=inject(ROMCacheProtocol),
             session_manager=inject(ApplicationStateManagerProtocol),
         )

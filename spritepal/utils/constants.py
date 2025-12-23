@@ -150,6 +150,7 @@ MAX_SPRITE_DIMENSION = 256         # Maximum sprite width/height in pixels
 PREVIEW_SCALE_FACTOR = 2           # Preview image scale factor
 
 # ROM scanning parameters
+ROM_SCAN_START_DEFAULT = 0x40000   # Default scan start (skip headers/early data, 256KB)
 ROM_SCAN_STEP_DEFAULT = 0x10       # Default ROM scan step (16 bytes = thorough)
 ROM_SCAN_STEP_FAST = 0x80          # Fast scan step (128 bytes = 4 tiles, legacy default)
 ROM_SCAN_STEP_QUICK = 0x1000       # Quick scan step (4KB)

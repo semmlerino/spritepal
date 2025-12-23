@@ -234,12 +234,12 @@ class TestRealDialogIntegration:
         - Settings file I/O integration issues
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+        from core.protocols.manager_protocols import ROMCacheProtocol
 
         # Managers already initialized by setup_test_infrastructure fixture
 
         dialog = SettingsDialog(
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             rom_cache=inject(ROMCacheProtocol)
         )
 
@@ -512,7 +512,7 @@ class TestRealDialogManagerIntegration:
         - Manager initialization dependencies for dialogs
         - Dialog-manager communication protocol issues
         """
-        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+        from core.protocols.manager_protocols import ROMCacheProtocol
 
         # Managers already initialized by setup_test_infrastructure fixture
 
@@ -520,7 +520,7 @@ class TestRealDialogManagerIntegration:
         extraction_manager = inject(ExtractionManagerProtocol)
         injection_manager = inject(InjectionManagerProtocol)
         session_manager = inject(ApplicationStateManagerProtocol)
-        settings_manager = inject(SettingsManagerProtocol)
+        settings_manager = inject(ApplicationStateManagerProtocol)
         rom_cache = inject(ROMCacheProtocol)
 
         # Test multiple dialogs using same managers (could expose resource conflicts)

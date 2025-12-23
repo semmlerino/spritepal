@@ -29,7 +29,7 @@ from ui.components.base import DialogBase
 from ui.styles import get_button_style, get_muted_text_style
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+    from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
 
 
 class SettingsDialog(DialogBase):
@@ -40,7 +40,7 @@ class SettingsDialog(DialogBase):
     cache_cleared = Signal()
 
     def __init__(self, parent: WidgetParent = None, *,
-                 settings_manager: SettingsManagerProtocol,
+                 settings_manager: ApplicationStateManagerProtocol,
                  rom_cache: ROMCacheProtocol):
         # Store original settings to detect changes
         self._original_settings: dict[str, object] = {}

@@ -25,7 +25,7 @@ from PySide6.QtTest import QSignalSpy
 from core.controller import ExtractionController
 from core.di_container import inject
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.protocols.manager_protocols import SettingsManagerProtocol
+from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: Real Qt components
@@ -172,7 +172,7 @@ class TestExtractionControllerReal:
             injection_manager = factory.create_injection_manager()
             session_manager = factory.create_session_manager("TestControllerApp")
             # Get settings_manager and dialog_factory from DI container
-            settings_manager = inject(SettingsManagerProtocol)
+            settings_manager = inject(ApplicationStateManagerProtocol)
             dialog_factory = Mock(spec=DialogFactoryProtocol)
 
             yield {

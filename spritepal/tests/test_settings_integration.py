@@ -13,19 +13,18 @@ import pytest
 
 from core.controller import ExtractionController
 from core.di_container import inject
+from core.managers.application_state_manager import ApplicationStateManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
     ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
-    SettingsManagerProtocol,
 )
-from core.services.settings_manager import SettingsManager
 
 
 def get_settings_manager():
-    """Get settings manager from DI container (replaces deprecated function)."""
-    return inject(SettingsManagerProtocol)
+    """Get settings manager from DI container."""
+    return inject(ApplicationStateManagerProtocol)
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -64,11 +63,12 @@ class TestSettingsIntegration:
 
     def test_settings_persistence_across_sessions(self, temp_settings_dir, isolated_managers):
         """Test that settings persist across application restarts"""
-        # Session 1: Save settings - need to provide session_manager via DI
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-        session_mgr = inject(ApplicationStateManagerProtocol)
-        settings1 = SettingsManager("TestApp", session_manager=session_mgr)
+        # Use ApplicationStateManager directly for isolated testing
+        temp_file = Path(temp_settings_dir) / "test_settings.json"
+        settings1 = ApplicationStateManager(
+            app_name="TestApp",
+            settings_path=temp_file
+        )
 
         # Set various settings
         settings1.set("session", "vram_path", "/test/vram.dmp")
@@ -81,7 +81,10 @@ class TestSettingsIntegration:
         settings1.save_settings()
 
         # Session 2: Load settings in new instance
-        settings2 = SettingsManager("TestApp", session_manager=session_mgr)
+        settings2 = ApplicationStateManager(
+            app_name="TestApp",
+            settings_path=temp_file
+        )
 
         # Verify settings persisted
         assert settings2.get("session", "vram_path") == "/test/vram.dmp"
@@ -93,11 +96,6 @@ class TestSettingsIntegration:
 
     def test_controller_settings_integration(self, temp_settings_dir, mock_main_window, isolated_managers):
         """Test controller interaction with settings manager"""
-        # Reset global instance to ensure it uses temp directory
-        import core.services.settings_manager
-
-        core.services.settings_manager._settings_instance = None
-
         settings = get_settings_manager()
 
         # Pre-populate settings
@@ -122,11 +120,12 @@ class TestSettingsIntegration:
 
     def test_window_geometry_persistence(self, temp_settings_dir, isolated_managers):
         """Test UI geometry settings persistence"""
-        # Create fresh settings instance with required session_manager
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-        session_mgr = inject(ApplicationStateManagerProtocol)
-        settings = SettingsManager("SpritePal", session_manager=session_mgr)
+        # Create ApplicationStateManager with temporary file
+        temp_file = Path(temp_settings_dir) / "geometry_settings.json"
+        settings = ApplicationStateManager(
+            app_name="SpritePal",
+            settings_path=temp_file
+        )
 
         # Simulate saving window state
         window_state = {
@@ -144,7 +143,10 @@ class TestSettingsIntegration:
         settings.save_settings()
 
         # Load in new instance
-        new_settings = SettingsManager("SpritePal", session_manager=session_mgr)
+        new_settings = ApplicationStateManager(
+            app_name="SpritePal",
+            settings_path=temp_file
+        )
 
         # Verify all geometry saved
         assert new_settings.get("ui", "window_x") == 100
@@ -248,10 +250,10 @@ class TestSettingsIntegration:
             f.write("{ corrupted json }")
 
         # Create an ApplicationStateManager with our temp settings file
-        from core.managers.application_state_manager import ApplicationStateManager
-
-        session_manager = ApplicationStateManager(settings_path=settings_file)
-        settings = SettingsManager("SpritePal", session_manager=session_manager)
+        settings = ApplicationStateManager(
+            app_name="SpritePal",
+            settings_path=settings_file
+        )
 
         # Should load defaults without crashing
         # Verify defaults loaded (since file was corrupted)
@@ -309,7 +311,7 @@ class TestSettingsIntegration:
 
         # Import back - use the public API to restore settings
         # Session data has its own method
-        settings.save_session_data(export_data["session"])
+        settings.update_session_data(export_data["session"])
         # Other settings use set method
         settings.set("extraction", "tile_width", export_data["extraction"]["tile_width"])
         settings.set("appearance", "theme", export_data["appearance"]["theme"])

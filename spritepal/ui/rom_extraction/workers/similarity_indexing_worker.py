@@ -3,7 +3,7 @@ Background indexing worker for visual similarity search.
 
 Automatically indexes sprites as they're found during ROM scanning,
 building a searchable index for visual similarity queries.
-Now accepts `SettingsManagerProtocol` via dependency injection.
+Now accepts `ApplicationStateManagerProtocol` via dependency injection.
 """
 from __future__ import annotations
 
@@ -23,8 +23,8 @@ from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
-        SettingsManagerProtocol,
     )
 
 logger = get_logger(__name__)
@@ -48,14 +48,14 @@ class SimilarityIndexingWorker(BaseWorker):
     """Emitted when index is loaded from cache. Args: sprite_count (int)."""
 
     def __init__(self, rom_path: str, parent: QObject | None = None,
-                 settings_manager: SettingsManagerProtocol | None = None):
+                 settings_manager: ApplicationStateManagerProtocol | None = None):
         """
         Initialize similarity indexing worker.
 
         Args:
             rom_path: Path to the ROM file being scanned
             parent: Parent QObject
-            settings_manager: Injected SettingsManagerProtocol instance.
+            settings_manager: Injected ApplicationStateManagerProtocol instance.
         """
         super().__init__(parent)
         self.rom_path = rom_path
@@ -64,8 +64,8 @@ class SimilarityIndexingWorker(BaseWorker):
         # Inject settings manager or use fallback
         if settings_manager is None:
             from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            self.settings_manager = inject(SettingsManagerProtocol)
+            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+            self.settings_manager = inject(ApplicationStateManagerProtocol)
         else:
             self.settings_manager = settings_manager
 

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
-    from core.protocols.manager_protocols import SettingsManagerProtocol
+    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 else:
     from PySide6.QtWidgets import QWidget
 
@@ -40,7 +40,7 @@ class ViewStateManager(QObject):
     title_changed = Signal(str)  # new_title
 
     def __init__(self, dialog_widget: QWidget, parent: QObject | None = None,
-                 settings_manager: SettingsManagerProtocol | None = None) -> None:
+                 settings_manager: ApplicationStateManagerProtocol | None = None) -> None:
         super().__init__(parent)
 
         self.dialog_widget = dialog_widget
@@ -48,8 +48,8 @@ class ViewStateManager(QObject):
         # Inject settings manager or use fallback
         if settings_manager is None:
             from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            self.settings_manager = inject(SettingsManagerProtocol)
+            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+            self.settings_manager = inject(ApplicationStateManagerProtocol)
         else:
             self.settings_manager = settings_manager
 

@@ -49,8 +49,8 @@ class TestROMCacheCore:
     @pytest.fixture
     def rom_cache(self, temp_cache_dir, mock_settings_manager):
         """Create a ROMCache instance with temp directory."""
-        # Create cache with explicit directory and required settings_manager
-        return ROMCache(settings_manager=mock_settings_manager, cache_dir=temp_cache_dir)
+        # Create cache with explicit directory and required state_manager
+        return ROMCache(state_manager=mock_settings_manager, cache_dir=temp_cache_dir)
 
     @pytest.fixture
     def mock_settings_manager(self, temp_cache_dir):
@@ -69,14 +69,14 @@ class TestROMCacheCore:
 
     def test_initialization_with_custom_dir(self, temp_cache_dir, mock_settings_manager) -> None:
         """Test cache initialization with custom directory."""
-        cache = ROMCache(settings_manager=mock_settings_manager, cache_dir=temp_cache_dir)
+        cache = ROMCache(state_manager=mock_settings_manager, cache_dir=temp_cache_dir)
         assert cache.cache_dir == Path(temp_cache_dir)
         assert cache.cache_enabled is True
 
-    def test_initialization_with_settings_manager(self, temp_cache_dir, mock_settings_manager) -> None:
-        """Test cache initialization using settings manager."""
-        # Pass settings_manager directly via constructor (DI pattern)
-        cache = ROMCache(settings_manager=mock_settings_manager)
+    def test_initialization_with_state_manager(self, temp_cache_dir, mock_settings_manager) -> None:
+        """Test cache initialization using state manager."""
+        # Pass state_manager directly via constructor (DI pattern)
+        cache = ROMCache(state_manager=mock_settings_manager)
         assert cache.cache_dir == Path(temp_cache_dir)
         assert cache.cache_enabled is True
 
@@ -87,7 +87,7 @@ class TestROMCacheCore:
                 return False
 
         # Pass disabled settings directly via constructor (DI pattern)
-        cache = ROMCache(settings_manager=MockDisabledSettings(), cache_dir=temp_cache_dir)
+        cache = ROMCache(state_manager=MockDisabledSettings(), cache_dir=temp_cache_dir)
         assert cache.cache_enabled is False
 
     def test_rom_hash_generation(self, rom_cache, test_rom_file) -> None:
@@ -577,7 +577,7 @@ class TestROMCacheCore:
             def get_cache_enabled(self) -> bool:
                 return False
 
-        cache = ROMCache(settings_manager=MockDisabledSettings(), cache_dir=temp_cache_dir)
+        cache = ROMCache(state_manager=MockDisabledSettings(), cache_dir=temp_cache_dir)
 
         # All operations should return False/None
         assert cache.save_sprite_locations("/test.rom", {}) is False
@@ -649,7 +649,7 @@ class TestROMCacheCore:
                 return 30
 
         with patch("pathlib.Path.mkdir", mock_mkdir):
-            cache = ROMCache(settings_manager=MockSettings(), cache_dir="/root/no_permission")
+            cache = ROMCache(state_manager=MockSettings(), cache_dir="/root/no_permission")
             # Should fallback to temp directory
             assert "spritepal_rom_cache" in str(cache.cache_dir)
             assert str(cache.cache_dir).startswith(tempfile.gettempdir())
@@ -812,7 +812,7 @@ class TestROMCacheErrorHandling:
     @pytest.fixture
     def rom_cache(self, tmp_path, mock_settings_manager):
         """Create a ROMCache instance."""
-        return ROMCache(settings_manager=mock_settings_manager, cache_dir=str(tmp_path))
+        return ROMCache(state_manager=mock_settings_manager, cache_dir=str(tmp_path))
 
     @pytest.fixture
     def test_rom_file(self, tmp_path):

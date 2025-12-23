@@ -27,7 +27,6 @@ from core.protocols.manager_protocols import (
     ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
-    SettingsManagerProtocol,
 )
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
@@ -124,7 +123,7 @@ class TestQtSignalArchitecture:
             extraction_manager=extraction_mgr,
             session_manager=inject(ApplicationStateManagerProtocol),
             injection_manager=injection_mgr,
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             dialog_factory=inject(DialogFactoryProtocol),
         )
 
@@ -356,7 +355,7 @@ class TestQtSignalArchitecture:
             extraction_manager=extraction_mgr,
             session_manager=inject(ApplicationStateManagerProtocol),
             injection_manager=injection_mgr,
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             dialog_factory=inject(DialogFactoryProtocol),
         )
 

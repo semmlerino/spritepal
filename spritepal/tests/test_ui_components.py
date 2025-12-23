@@ -237,7 +237,7 @@ class TestStatusPanel:
         from PySide6.QtWidgets import QWidget
 
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
         from ui.components.panels.status_panel import StatusPanel
 
         parent_widget = QWidget()
@@ -245,7 +245,7 @@ class TestStatusPanel:
 
         panel = StatusPanel(
             parent_widget,
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             rom_cache=inject(ROMCacheProtocol)
         )
         qtbot.addWidget(panel)
@@ -260,7 +260,7 @@ class TestStatusPanel:
         from PySide6.QtWidgets import QWidget
 
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
         from ui.components.panels.status_panel import StatusPanel
 
         parent_widget = QWidget()
@@ -268,7 +268,7 @@ class TestStatusPanel:
 
         panel = StatusPanel(
             parent_widget,
-            settings_manager=inject(SettingsManagerProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
             rom_cache=inject(ROMCacheProtocol)
         )
         qtbot.addWidget(panel)

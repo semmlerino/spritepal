@@ -25,10 +25,10 @@ with contextlib.suppress(ImportError):
 
 if TYPE_CHECKING:
     from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
-        SettingsManagerProtocol,
     )
 
 from PySide6.QtCore import (
@@ -115,7 +115,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def __init__(self, parent: QWidget | None = None,
                  rom_cache: ROMCacheProtocol | None = None,
-                 settings_manager: SettingsManagerProtocol | None = None,
+                 settings_manager: ApplicationStateManagerProtocol | None = None,
                  extraction_manager: ExtractionManagerProtocol | None = None,
                  rom_extractor: ROMExtractorProtocol | None = None) -> None:
         # Debug logging for singleton tracking
@@ -166,8 +166,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         if settings_manager is None:
             from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            self.settings_manager = inject(SettingsManagerProtocol)
+            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+            self.settings_manager = inject(ApplicationStateManagerProtocol)
         else:
             self.settings_manager = settings_manager
 

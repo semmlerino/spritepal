@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from core.types import SpritePreset
 
 
+@runtime_checkable
 class ExtractionManagerProtocol(Protocol):
     """Protocol for extraction manager."""
 
@@ -134,6 +135,7 @@ class ExtractionManagerProtocol(Protocol):
         ...
 
 
+@runtime_checkable
 class InjectionManagerProtocol(Protocol):
     """Protocol for injection manager."""
 
@@ -291,98 +293,9 @@ class InjectionManagerProtocol(Protocol):
         ...
 
 
-# SessionManagerProtocol has been consolidated into ApplicationStateManagerProtocol.
-# Use inject(ApplicationStateManagerProtocol) for session management functionality.
-
-
-class SettingsManagerProtocol(Protocol):
-    """Protocol for the Settings Manager."""
-
-    app_name: str
-
-    def save_settings(self) -> None:
-        """Save settings to file."""
-        ...
-
-    def get(self, category: str, key: str, default: object = None) -> object:
-        """Get a setting value."""
-        ...
-
-    def set(self, category: str, key: str, value: object) -> None:
-        """Set a setting value."""
-        ...
-
-    def get_session_data(self) -> Mapping[str, object]:
-        """Get all session data."""
-        ...
-
-    def save_session_data(self, session_data: Mapping[str, object]) -> None:
-        """Save session data."""
-        ...
-
-    def get_ui_data(self) -> Mapping[str, object]:
-        """Get UI settings."""
-        ...
-
-    def save_ui_data(self, ui_data: Mapping[str, object]) -> None:
-        """Save UI settings."""
-        ...
-
-    def validate_file_paths(self) -> Mapping[str, str]:
-        """Validate and return existing file paths from session."""
-        ...
-
-    def has_valid_session(self) -> bool:
-        """Check if there's a valid session to restore."""
-        ...
-
-    def clear_session(self) -> None:
-        """Clear session data."""
-        ...
-
-    def get_default_directory(self) -> str:
-        """Get the default directory for file operations."""
-        ...
-
-    def set_last_used_directory(self, directory: str) -> None:
-        """Set the last used directory."""
-        ...
-
-    def get_cache_settings(self) -> Mapping[str, object]:
-        """Get all cache settings."""
-        ...
-
-    def set_cache_enabled(self, enabled: bool) -> None:
-        """Enable or disable caching."""
-        ...
-
-    def get_cache_enabled(self) -> bool:
-        """Check if caching is enabled."""
-        ...
-
-    def set_cache_location(self, location: str) -> None:
-        """Set custom cache location."""
-        ...
-
-    def get_cache_location(self) -> str:
-        """Get custom cache location (empty string means default)."""
-        ...
-
-    def get_cache_max_size_mb(self) -> int:
-        """Get maximum cache size in MB."""
-        ...
-
-    def set_cache_max_size_mb(self, size_mb: int) -> None:
-        """Set maximum cache size in MB."""
-        ...
-
-    def get_cache_expiration_days(self) -> int:
-        """Get cache expiration in days."""
-        ...
-
-    def set_cache_expiration_days(self, days: int) -> None:
-        """Set cache expiration in days."""
-        ...
+# SessionManagerProtocol and SettingsManagerProtocol have been consolidated into
+# ApplicationStateManagerProtocol. Use inject(ApplicationStateManagerProtocol) for
+# session, settings, and state management functionality.
 
 
 class ROMExtractorProtocol(Protocol):
@@ -407,6 +320,7 @@ class ROMExtractorProtocol(Protocol):
         ...
 
 
+@runtime_checkable
 class ROMCacheProtocol(Protocol):
     """Protocol for the ROM cache."""
 
@@ -545,7 +459,7 @@ class ConfigurationServiceProtocol(Protocol):
         """Create required directories if they don't exist."""
         ...
 
-    def set_settings_manager(self, settings_manager: SettingsManagerProtocol) -> None:
+    def set_settings_manager(self, settings_manager: ApplicationStateManagerProtocol) -> None:
         """Set settings manager for user override resolution."""
         ...
 
@@ -775,6 +689,73 @@ class ApplicationStateManagerProtocol(Protocol):
 
     def get_current_offset(self) -> int | None:
         """Get the current ROM offset."""
+        ...
+
+    # ----- Settings Convenience Methods (from SettingsManager) -----
+
+    @property
+    def app_name(self) -> str:
+        """Get the application name."""
+        ...
+
+    def get_ui_data(self) -> Mapping[str, object]:
+        """Get UI settings."""
+        ...
+
+    def save_ui_data(self, ui_data: Mapping[str, object]) -> None:
+        """Save UI settings."""
+        ...
+
+    def validate_file_paths(self) -> Mapping[str, str]:
+        """Validate and return existing file paths from session."""
+        ...
+
+    def has_valid_session(self) -> bool:
+        """Check if there's a valid session to restore."""
+        ...
+
+    def get_default_directory(self) -> str:
+        """Get the default directory for file operations."""
+        ...
+
+    def set_last_used_directory(self, directory: str) -> None:
+        """Set the last used directory."""
+        ...
+
+    def get_cache_settings(self) -> Mapping[str, object]:
+        """Get all cache settings."""
+        ...
+
+    def set_cache_enabled(self, enabled: bool) -> None:
+        """Enable or disable caching."""
+        ...
+
+    def get_cache_enabled(self) -> bool:
+        """Check if caching is enabled."""
+        ...
+
+    def set_cache_location(self, location: str) -> None:
+        """Set custom cache location."""
+        ...
+
+    def get_cache_location(self) -> str:
+        """Get custom cache location (empty string means default)."""
+        ...
+
+    def get_cache_max_size_mb(self) -> int:
+        """Get maximum cache size in MB."""
+        ...
+
+    def set_cache_max_size_mb(self, size_mb: int) -> None:
+        """Set maximum cache size in MB."""
+        ...
+
+    def get_cache_expiration_days(self) -> int:
+        """Get cache expiration in days."""
+        ...
+
+    def set_cache_expiration_days(self, days: int) -> None:
+        """Set cache expiration in days."""
         ...
 
 

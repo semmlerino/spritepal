@@ -239,9 +239,7 @@ def configure_container(
     from core.protocols.manager_protocols import (
         ApplicationStateManagerProtocol,
         ConfigurationServiceProtocol,
-        SettingsManagerProtocol,
     )
-    from core.services.settings_manager import SettingsManager
 
     if configuration_service is not None:
         register_singleton(ConfigurationServiceProtocol, configuration_service)
@@ -253,23 +251,14 @@ def configure_container(
     # are registered by register_managers() AFTER managers are created.
     # This avoids circular dependency between DI container and ManagerRegistry.
 
-    # Register SettingsManager (depends on ApplicationStateManagerProtocol, so use factory)
-    register_factory(
-        SettingsManagerProtocol,
-        lambda: SettingsManager(
-            app_name="SpritePal",
-            session_manager=inject(ApplicationStateManagerProtocol)
-        )
-    )
-
     # Import ROMCache and its Protocol
     from core.protocols.manager_protocols import ROMCacheProtocol
     from core.services.rom_cache import ROMCache
 
-    # Register ROMCache
+    # Register ROMCache (uses ApplicationStateManager for cache settings)
     register_factory(
         ROMCacheProtocol,
-        lambda: ROMCache(settings_manager=inject(SettingsManagerProtocol))
+        lambda: ROMCache(state_manager=inject(ApplicationStateManagerProtocol))
     )
 
     # Import ROMExtractor and its Protocol

@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QFileDialog, QWidget
 
 from core.di_container import inject
-from core.protocols.manager_protocols import SettingsManagerProtocol
+from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
 
 class FileDialogHelper:
@@ -37,7 +37,7 @@ class FileDialogHelper:
         Returns:
             Selected directory path, or empty string if cancelled
         """
-        settings = inject(SettingsManagerProtocol)
+        settings = inject(ApplicationStateManagerProtocol)
 
         # Determine initial directory
         if initial_dir and Path(initial_dir).exists():
@@ -78,7 +78,7 @@ class FileDialogHelper:
         Returns:
             Selected file path, or empty string if cancelled
         """
-        settings = inject(SettingsManagerProtocol)
+        settings = inject(ApplicationStateManagerProtocol)
 
         # Determine initial directory
         if initial_path and Path(initial_path).exists():
@@ -132,7 +132,7 @@ class FileDialogHelper:
         Returns:
             Selected file path, or empty string if cancelled
         """
-        settings = inject(SettingsManagerProtocol)
+        settings = inject(ApplicationStateManagerProtocol)
 
         # Determine initial path
         if initial_path:
@@ -180,7 +180,7 @@ class FileDialogHelper:
         Returns:
             Best initial directory to use
         """
-        settings = inject(SettingsManagerProtocol)
+        settings = inject(ApplicationStateManagerProtocol)
 
         # Check current path first
         if current_path:

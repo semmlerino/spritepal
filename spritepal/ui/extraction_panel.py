@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         QPen,
     )
 
-    from core.protocols.manager_protocols import SettingsManagerProtocol
+    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 else:
     from PySide6.QtGui import (
         QColor,
@@ -86,7 +86,7 @@ class DropZone(QWidget):
         self,
         file_type: str,
         parent: QWidget | None = None,
-        settings_manager: SettingsManagerProtocol | None = None,
+        settings_manager: ApplicationStateManagerProtocol | None = None,
         required: bool = True,
     ) -> None:
         super().__init__(parent)
@@ -102,8 +102,8 @@ class DropZone(QWidget):
         if settings_manager is None:
             # Fallback for environments where DI might not be fully configured
             from core.di_container import inject
-            from core.protocols.manager_protocols import SettingsManagerProtocol
-            self.settings_manager = inject(SettingsManagerProtocol)
+            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+            self.settings_manager = inject(ApplicationStateManagerProtocol)
         else:
             self.settings_manager = settings_manager
 
@@ -319,7 +319,7 @@ class DropZone(QWidget):
 class ExtractionPanel(QGroupBox):
     """
     Panel for managing VRAM extraction inputs.
-    Now accepts `SettingsManagerProtocol` via dependency injection.
+    Now accepts `ApplicationStateManagerProtocol` via dependency injection.
     """
 
     files_changed = Signal()
@@ -327,7 +327,7 @@ class ExtractionPanel(QGroupBox):
     offset_changed = Signal(int)  # Emitted when VRAM offset changes
     mode_changed = Signal(int)  # Emitted when extraction mode changes
 
-    def __init__(self, settings_manager: SettingsManagerProtocol, parent: QWidget | None = None) -> None:
+    def __init__(self, settings_manager: ApplicationStateManagerProtocol, parent: QWidget | None = None) -> None:
         super().__init__("Input Files", parent)
         # Timer for debouncing offset changes
         self._offset_timer = QTimer(self)  # Parent this timer to prevent crashes

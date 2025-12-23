@@ -46,6 +46,13 @@ def handle_worker_errors(
 
     All handled exceptions emit both error and operation_finished signals for consistent error handling.
 
+    Note on return type:
+        The declared return type is ``Callable[P, R]`` but error paths return ``None``.
+        This is intentional for Qt worker patterns where signal emission (not return value)
+        is the primary error communication mechanism. The ``# type: ignore[return-value]``
+        comments in the implementation are deliberate - callers should not rely on return
+        values for error detection; instead connect to the ``operation_finished`` signal.
+
     Args:
         operation_context: Context string for error messages (e.g., "VRAM extraction")
         handle_interruption: If True, handles InterruptedError instead of re-raising

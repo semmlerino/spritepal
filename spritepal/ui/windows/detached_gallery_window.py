@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.di_container import inject
-from core.protocols.manager_protocols import ROMCacheProtocol, SettingsManagerProtocol
+from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
 from ui.common import WorkerManager
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 
@@ -85,7 +85,7 @@ class DetachedGalleryWindow(QMainWindow):
         # Core managers (B.3: Using injected manager)
         self.extraction_manager = extraction_manager
         self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()
-        self.settings_manager: SettingsManagerProtocol = inject(SettingsManagerProtocol)
+        self.settings_manager: ApplicationStateManagerProtocol = inject(ApplicationStateManagerProtocol)
         self.rom_cache: ROMCacheProtocol = inject(ROMCacheProtocol)
 
         # UI Components (initialized in _setup_ui)

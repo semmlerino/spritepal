@@ -22,7 +22,6 @@ if TYPE_CHECKING:
         ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
-        SettingsManagerProtocol,
     )
 
 from core.console_error_handler import ConsoleErrorHandler
@@ -82,7 +81,7 @@ class ExtractionController(QObject):
         extraction_manager: ExtractionManagerProtocol,
         session_manager: ApplicationStateManagerProtocol,
         injection_manager: InjectionManagerProtocol,
-        settings_manager: SettingsManagerProtocol,
+        settings_manager: ApplicationStateManagerProtocol,
         dialog_factory: DialogFactoryProtocol,
     ) -> None:
         super().__init__()

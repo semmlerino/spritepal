@@ -306,20 +306,20 @@ class TestRealWorldScenarios:
 
 
 @pytest.mark.usefixtures("isolated_managers")
-class TestSettingsManagerSingletonIntegration:
-    """Integration tests for the fixed SettingsManagerSingleton."""
+class TestApplicationStateManagerSingletonIntegration:
+    """Integration tests for ApplicationStateManager thread safety via DI."""
 
     @pytest.mark.integration
-    def test_settings_manager_thread_safety(self):
-        """Test that SettingsManagerSingleton is thread-safe."""
+    def test_application_state_manager_thread_safety(self):
+        """Test that ApplicationStateManager via DI injection is thread-safe."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import SettingsManagerProtocol
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
         instances = []
 
         def worker_thread(thread_id: int):
             # Use DI injection (replaces deprecated get_settings_manager)
-            manager = inject(SettingsManagerProtocol)
+            manager = inject(ApplicationStateManagerProtocol)
             instances.append((thread_id, manager))
             return manager
 
