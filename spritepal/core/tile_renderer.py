@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 from core.default_palette_loader import DefaultPaletteLoader
+from core.tile_utils import decode_4bpp_tile
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -96,7 +97,7 @@ class TileRenderer:
                         continue
 
                     # Decode the tile
-                    tile_pixels = self._decode_4bpp_tile(
+                    tile_pixels = decode_4bpp_tile(
                         tile_data[tile_offset:tile_offset + bytes_per_tile]
                     )
 
@@ -125,64 +126,6 @@ class TileRenderer:
         except Exception as e:
             logger.error(f"Failed to render tiles: {e}", exc_info=True)
             return None
-
-    def _decode_4bpp_tile(self, tile_bytes: bytes) -> list[list[int]]:
-        """
-        Decode a single 4bpp SNES tile.
-
-        Args:
-            tile_bytes: 32 bytes of tile data
-
-        Returns:
-            8x8 array of color indices (0-15)
-        """
-        if len(tile_bytes) < 32:
-            # Pad if needed
-            tile_bytes = tile_bytes + b'\x00' * (32 - len(tile_bytes))
-
-        # Initialize 8x8 pixel array
-        pixels = [[0 for _ in range(8)] for _ in range(8)]
-
-        # SNES 4bpp format:
-        # 2 bytes for plane 0-1 of row 0
-        # 2 bytes for plane 0-1 of row 1
-        # ... (8 rows)
-        # 2 bytes for plane 2-3 of row 0
-        # 2 bytes for plane 2-3 of row 1
-        # ... (8 rows)
-
-        for row in range(8):
-            # Get the 4 plane bytes for this row
-            plane_01_offset = row * 2
-            plane_23_offset = 16 + row * 2
-
-            if plane_01_offset + 1 < len(tile_bytes):
-                plane0 = tile_bytes[plane_01_offset]
-                plane1 = tile_bytes[plane_01_offset + 1]
-            else:
-                plane0 = plane1 = 0
-
-            if plane_23_offset + 1 < len(tile_bytes):
-                plane2 = tile_bytes[plane_23_offset]
-                plane3 = tile_bytes[plane_23_offset + 1]
-            else:
-                plane2 = plane3 = 0
-
-            # Decode each pixel in the row
-            for col in range(8):
-                bit_mask = 1 << (7 - col)
-
-                # Extract bit from each plane
-                bit0 = 1 if (plane0 & bit_mask) else 0
-                bit1 = 2 if (plane1 & bit_mask) else 0
-                bit2 = 4 if (plane2 & bit_mask) else 0
-                bit3 = 8 if (plane3 & bit_mask) else 0
-
-                # Combine to get color index (0-15)
-                color_index = bit0 | bit1 | bit2 | bit3
-                pixels[row][col] = color_index
-
-        return pixels
 
     def render_sprite_preview(
         self,

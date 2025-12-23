@@ -16,6 +16,7 @@ pytestmark = [
 ]
 
 from core.extractor import SpriteExtractor
+from core.tile_utils import decode_4bpp_tile
 
 
 class TestSpriteExtractor:
@@ -72,7 +73,7 @@ class TestSpriteExtractor:
         tile_data[16] = 0x00  # Plane 2, bit 7 = 0
         tile_data[17] = 0x80  # Plane 3, bit 7 = 1
 
-        pixels = extractor._decode_4bpp_tile(tile_data)
+        pixels = decode_4bpp_tile(tile_data)
 
         assert len(pixels) == 8  # 8 rows
         assert len(pixels[0]) == 8  # 8 pixels per row

@@ -182,6 +182,7 @@ class BatchThumbnailWorker(QObject):
         self._pause_requested = False
         self._mutex = QMutex()
         self._cache_mutex = QMutex()  # Separate mutex for cache
+        self._counter_mutex = QMutex()  # Mutex for progress counters (thread-safe access)
 
         # Request queue
         self._request_queue: PriorityQueue[Any] = PriorityQueue()  # pyright: ignore[reportExplicitAny] - Generic queue type
@@ -332,7 +333,7 @@ class BatchThumbnailWorker(QObject):
                             cached_image = self._get_cached_image(cache_key)
                             if cached_image:
                                 self.thumbnail_ready.emit(request.offset, cached_image)
-                                self._completed_count += 1
+                                self._increment_completed_count()
                                 self._emit_progress()
                             else:
                                 batch_requests.append(request)
@@ -387,7 +388,7 @@ class BatchThumbnailWorker(QObject):
 
                 if cached_image:
                     self.thumbnail_ready.emit(request.offset, cached_image)
-                    self._completed_count += 1
+                    self._increment_completed_count()
                     self._emit_progress()
                     continue
 
@@ -405,7 +406,7 @@ class BatchThumbnailWorker(QObject):
                 else:
                     logger.warning(f"Failed to generate thumbnail for 0x{request.offset:06X} - image is null or None")
 
-                self._completed_count += 1
+                self._increment_completed_count()
                 self._emit_progress()
 
         except Exception as e:
@@ -591,13 +592,13 @@ class BatchThumbnailWorker(QObject):
 
                     # Emit result (thread-safe)
                     self.thumbnail_ready.emit(request.offset, qimage)
-                    self._completed_count += 1
+                    self._increment_completed_count()
                     self._emit_progress()
 
                     logger.debug(f"Generated thumbnail for offset 0x{request.offset:06X} (parallel)")
             except Exception as e:
                 logger.warning(f"Parallel thumbnail generation failed for 0x{request.offset:06X}: {e}")
-                self._completed_count += 1
+                self._increment_completed_count()
                 self._emit_progress()
 
     def _generate_thumbnail_thread_safe(self, request: ThumbnailRequest) -> QImage | None:
@@ -750,11 +751,18 @@ class BatchThumbnailWorker(QObject):
         """Add an image to the cache (thread-safe with LRU eviction)."""
         self._cache.put(key, qimage)
 
+    def _increment_completed_count(self) -> None:
+        """Thread-safe increment of completed count."""
+        with QMutexLocker(self._counter_mutex):
+            self._completed_count += 1
+
     def _emit_progress(self) -> None:
-        """Emit progress signal."""
-        total = self._pending_count + self._completed_count
+        """Emit progress signal (thread-safe)."""
+        with QMutexLocker(self._counter_mutex):
+            total = self._pending_count + self._completed_count
+            completed = self._completed_count
         if total > 0:
-            self.progress.emit(self._completed_count, total)
+            self.progress.emit(completed, total)
 
     def get_cache_size(self) -> int:
         """Get the current cache size (thread-safe)."""

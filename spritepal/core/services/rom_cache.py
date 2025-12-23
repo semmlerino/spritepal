@@ -258,6 +258,10 @@ class ROMCache:
         if not self._cache_enabled:
             return False
 
+        # Initialize temp_file at function scope to ensure cleanup works even if
+        # exception occurs before assignment (fixes fragile locals().get() pattern)
+        temp_file: Path | None = None
+
         try:
             # Ensure cache directory exists before saving (thread-safe)
             cache_file.parent.mkdir(parents=True, exist_ok=True)
@@ -274,8 +278,8 @@ class ROMCache:
                 os.fsync(f.fileno())
             temp_file.replace(cache_file)
         except Exception as e:
-            # Clean up temp file if it exists
-            self._cleanup_temp_file(locals().get("temp_file"))
+            # Clean up temp file if it exists (temp_file initialized before try block)
+            self._cleanup_temp_file(temp_file)
             logger.warning(f"Failed to save cache file {cache_file}: {e}")
             return False
 
@@ -503,8 +507,10 @@ class ROMCache:
             sprite_locations = cache_data["sprite_locations"]
             restored_locations = {}
 
-            # Type assertion: sprite_locations is a dict from JSON
-            assert isinstance(sprite_locations, dict)
+            # Validate type (asserts are disabled with -O, use explicit check)
+            if not isinstance(sprite_locations, dict):
+                logger.warning(f"Invalid sprite_locations type in cache: {type(sprite_locations).__name__}")
+                return None
             for name, location_data in sprite_locations.items():
                 if isinstance(location_data, dict) and "offset" in location_data:
                     # Import SpritePointer only when needed to avoid circular imports.
@@ -868,8 +874,10 @@ class ROMCache:
                 return None
 
             preview_data = cache_data["preview_data"]
-            # Type assertion: preview_data is a dict from JSON
-            assert isinstance(preview_data, dict)
+            # Validate type (asserts are disabled with -O, use explicit check)
+            if not isinstance(preview_data, dict):
+                logger.warning(f"Invalid preview_data type in cache: {type(preview_data).__name__}")
+                return None
 
             # Decompress tile data
             try:
@@ -1061,8 +1069,10 @@ class ROMCache:
             offset_sources: Dictionary to update with found offsets
         """
         scan_progress = cache_data.get("scan_progress", {})
-        # Type assertion: scan_progress is a dict from JSON
-        assert isinstance(scan_progress, dict)
+        # Validate type (asserts are disabled with -O, use explicit check)
+        if not isinstance(scan_progress, dict):
+            logger.debug(f"Invalid scan_progress type in cache: {type(scan_progress).__name__}")
+            return
         found_sprites = scan_progress.get("found_sprites", [])
 
         for sprite in found_sprites:
@@ -1117,8 +1127,10 @@ class ROMCache:
         if not preview_data:
             return
 
-        # Type assertion: preview_data is a dict from JSON
-        assert isinstance(preview_data, dict)
+        # Validate type (asserts are disabled with -O, use explicit check)
+        if not isinstance(preview_data, dict):
+            logger.debug(f"Invalid preview_data type in cache: {type(preview_data).__name__}")
+            return
         offset = preview_data.get("offset")
         if offset is None or offset == current_offset:
             return
@@ -1153,15 +1165,18 @@ class ROMCache:
                 return
 
             batch_preview_data = cache_data["batch_preview_data"]
-            # Type assertion: batch_preview_data is a dict from JSON
-            assert isinstance(batch_preview_data, dict)
+            # Validate type (asserts are disabled with -O, use explicit check)
+            if not isinstance(batch_preview_data, dict):
+                logger.debug(f"Invalid batch_preview_data type: {type(batch_preview_data).__name__}")
+                return
             for offset_str, data in batch_preview_data.items():
                 offset = int(offset_str)
                 if offset == current_offset:
                     continue
 
-                # Type assertion: data is a dict from JSON
-                assert isinstance(data, dict)
+                # Validate type (asserts are disabled with -O, use explicit check)
+                if not isinstance(data, dict):
+                    continue  # Skip invalid entries
                 self._add_offset_source(offset_sources, offset,
                                       confidence=0.5,
                                       source="batch_preview",
@@ -1193,18 +1208,24 @@ class ROMCache:
                 "metadata": {}
             }
 
-        # Type assertions for dict value access (validated by initialization above)
-        confidence_val = offset_sources[offset]["confidence"]
-        assert isinstance(confidence_val, (int, float))
+        # Validate types (asserts are disabled with -O, use explicit checks)
+        # Handle pre-existing entries with potentially wrong types
+        confidence_val = offset_sources[offset].get("confidence", 0.0)
+        if not isinstance(confidence_val, (int, float)):
+            confidence_val = 0.0
         offset_sources[offset]["confidence"] = confidence_val + confidence
 
-        sources_list = offset_sources[offset]["sources"]
-        assert isinstance(sources_list, list)
+        sources_list = offset_sources[offset].get("sources")
+        if not isinstance(sources_list, list):
+            sources_list = []
+            offset_sources[offset]["sources"] = sources_list
         sources_list.append(source)
 
         if metadata:
-            metadata_dict = offset_sources[offset]["metadata"]
-            assert isinstance(metadata_dict, dict)
+            metadata_dict = offset_sources[offset].get("metadata")
+            if not isinstance(metadata_dict, dict):
+                metadata_dict = {}
+                offset_sources[offset]["metadata"] = metadata_dict
             metadata_dict.update(metadata)
 
     def _build_suggestions(
@@ -1246,14 +1267,16 @@ class ROMCache:
         Returns:
             Normalized confidence score (0.0 to 1.0)
         """
-        # Cap confidence at 1.0
-        base_confidence = source_data["confidence"]
-        assert isinstance(base_confidence, (int, float))
+        # Cap confidence at 1.0 (validate types - asserts disabled with -O)
+        base_confidence = source_data.get("confidence", 0.0)
+        if not isinstance(base_confidence, (int, float)):
+            base_confidence = 0.0
         confidence = min(base_confidence, 1.0)
 
         # Boost confidence for multiple unique sources
-        sources = source_data["sources"]
-        assert isinstance(sources, list)
+        sources = source_data.get("sources", [])
+        if not isinstance(sources, list):
+            sources = []
         source_count = len(set(sources))
         if source_count > 1:
             confidence = min(confidence * 1.2, 1.0)

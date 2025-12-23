@@ -879,19 +879,3 @@ def test_session_manager():
         yield ctx.get_session_manager()
 
 
-@pytest.fixture
-def complete_test_context():
-    """Provide a complete test context with all managers configured."""
-    from tests.infrastructure.manager_test_context import manager_context
-
-    with manager_context("extraction", "injection", "session") as ctx:
-        yield ctx
-
-
-@pytest.fixture
-def minimal_injection_context():
-    """Provide a minimal context with just injection manager for dialog tests."""
-    from tests.infrastructure.manager_test_context import manager_context
-
-    with manager_context("injection") as ctx:
-        yield ctx

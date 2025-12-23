@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from PIL import Image
     from PySide6.QtCore import Signal
 
 
@@ -103,6 +104,21 @@ class ExtractionManagerProtocol(Protocol):
 
         Raises:
             ExtractionError: If operation fails (service not initialized, etc.)
+        """
+        ...
+
+    def generate_preview(self, vram_path: str, offset: int) -> tuple[Image.Image, int]:
+        """Generate a preview image from VRAM at the specified offset.
+
+        Args:
+            vram_path: Path to VRAM dump file
+            offset: Offset in VRAM to start extracting from
+
+        Returns:
+            Tuple of (PIL image, tile count)
+
+        Raises:
+            ExtractionError: If preview generation fails
         """
         ...
 
@@ -231,6 +247,17 @@ class InjectionManagerProtocol(Protocol):
         """
         ...
 
+    def load_rom_info(self, rom_path: str) -> dict[str, object] | None:
+        """Load ROM information and sprite locations with caching.
+
+        Args:
+            rom_path: Path to ROM file
+
+        Returns:
+            Dict containing header, sprite_locations, cached flag, or error info
+        """
+        ...
+
 
 # SessionManagerProtocol and SettingsManagerProtocol have been consolidated into
 # ApplicationStateManager. Use inject(ApplicationStateManager) for
@@ -316,5 +343,28 @@ class ROMCacheProtocol(Protocol):
 
     def refresh_settings(self) -> None:
         """Refresh cache settings from settings manager."""
+        ...
+
+    def get_rom_info(self, rom_path: str) -> dict[str, object] | None:
+        """Get cached ROM information (header, etc.).
+
+        Args:
+            rom_path: Path to ROM file
+
+        Returns:
+            Dictionary of ROM info or None if not cached
+        """
+        ...
+
+    def save_rom_info(self, rom_path: str, rom_info: Mapping[str, object]) -> bool:
+        """Save ROM information to cache.
+
+        Args:
+            rom_path: Path to ROM file
+            rom_info: Dictionary of ROM information to cache
+
+        Returns:
+            True if saved successfully, False otherwise
+        """
         ...
 

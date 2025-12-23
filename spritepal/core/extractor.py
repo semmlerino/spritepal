@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 else:
     pass
 
+from core.tile_utils import decode_4bpp_tile
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_TILES_PER_ROW,
@@ -101,7 +102,7 @@ class SpriteExtractor:
             tile_data = sprite_data[tile_offset : tile_offset + BYTES_PER_TILE]
 
             # Decode 4bpp tile
-            pixels = self._decode_4bpp_tile(tile_data)
+            pixels = decode_4bpp_tile(tile_data)
             tiles.append(pixels)
 
             # Log progress at intervals
@@ -110,39 +111,6 @@ class SpriteExtractor:
 
         logger.info(f"Successfully extracted {num_tiles} tiles")
         return tiles, num_tiles
-
-    def _decode_4bpp_tile(self, tile_data: bytes) -> list[list[int]]:
-        """Decode a 4bpp SNES tile to pixel indices"""
-        if len(tile_data) < BYTES_PER_TILE:
-            logger.warning(f"Tile data is incomplete: {len(tile_data)} bytes (expected {BYTES_PER_TILE})")
-
-        pixels: list[list[int]] = []
-
-        # 4bpp SNES format: 32 bytes per 8x8 tile
-        for y in range(8):
-            row: list[int] = []
-            # Get the 4 bytes for this row
-            b0 = tile_data[y * 2] if y * 2 < len(tile_data) else 0
-            b1 = tile_data[y * 2 + 1] if y * 2 + 1 < len(tile_data) else 0
-            b2 = tile_data[y * 2 + 16] if y * 2 + 16 < len(tile_data) else 0
-            b3 = tile_data[y * 2 + 17] if y * 2 + 17 < len(tile_data) else 0
-
-            # Decode each pixel in the row
-            for x in range(8):
-                bit = 7 - x
-                pixel = 0
-                if b0 & (1 << bit):
-                    pixel |= 1
-                if b1 & (1 << bit):
-                    pixel |= 2
-                if b2 & (1 << bit):
-                    pixel |= 4
-                if b3 & (1 << bit):
-                    pixel |= 8
-                row.append(pixel)
-            pixels.append(row)
-
-        return pixels
 
     def create_grayscale_image(
         self, tiles: list[list[list[int]]], tiles_per_row: int | None = None

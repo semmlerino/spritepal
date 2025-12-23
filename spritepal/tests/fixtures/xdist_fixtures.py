@@ -62,39 +62,9 @@ def is_xdist_worker() -> bool:
     return get_xdist_worker_id() is not None
 
 
-def is_xdist_controller() -> bool:
-    """Check if running as the xdist controller or single-process pytest.
-
-    The controller orchestrates test distribution but doesn't run tests itself.
-    In single-process mode (no -n flag), this also returns True.
-    """
-    return os.environ.get("PYTEST_XDIST_WORKER") is None
-
-
-def get_worker_count() -> int:
-    """Get the total number of xdist workers.
-
-    Returns 0 if not running under xdist.
-    """
-    worker_count = os.environ.get("PYTEST_XDIST_WORKER_COUNT")
-    if worker_count:
-        return int(worker_count)
-    return 0
-
-
 # ============================================================================
 # Fixtures for Worker Isolation
 # ============================================================================
-
-
-@pytest.fixture(scope="session")
-def xdist_worker_id() -> str | None:
-    """Provide the xdist worker ID as a fixture.
-
-    Useful for tests that need to know which worker they're running on,
-    e.g., for debugging parallel test issues.
-    """
-    return get_xdist_worker_id()
 
 
 @pytest.fixture(scope="session")

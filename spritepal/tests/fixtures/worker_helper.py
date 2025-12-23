@@ -1,5 +1,5 @@
 """
-Test worker helpers for synchronous execution in tests
+Test worker helpers for injection tests.
 """
 from __future__ import annotations
 
@@ -8,40 +8,9 @@ from typing import Any
 
 import pytest
 
-from core.workers import ROMExtractionWorker, VRAMExtractionWorker
-
 # Test characteristics: Thread safety concerns
 pytestmark = [pytest.mark.headless]
 
-class SyncWorkerMixin:
-    """Mixin for test workers that run synchronously instead of in a thread.
-
-    Provides common overrides for QThread methods to enable synchronous
-    execution in tests. Classes using this mixin must have a run() method.
-    """
-
-    def start(self) -> None:
-        """Override start to run synchronously for tests."""
-        self.run()  # type: ignore[attr-defined]
-
-    def isRunning(self) -> bool:
-        """Override for test compatibility - always returns False."""
-        return False
-
-    def quit(self) -> None:
-        """Override for test compatibility - no-op."""
-
-    def wait(self, timeout: int = 0) -> bool:
-        """Override for test compatibility - always returns True."""
-        return True
-
-
-class SyncExtractionWorker(SyncWorkerMixin, VRAMExtractionWorker):
-    """Test-specific ExtractionWorker that runs synchronously."""
-
-
-class SyncROMExtractionWorker(SyncWorkerMixin, ROMExtractionWorker):
-    """Test-specific ROMExtractionWorker that runs synchronously."""
 
 class WorkerHelper:
     """Helper for creating test injection workers and scenarios"""

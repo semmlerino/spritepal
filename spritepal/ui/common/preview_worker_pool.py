@@ -117,10 +117,15 @@ class PooledPreviewWorker(SpritePreviewWorker):
                 self.preview_error.emit(request_id, str(e))
         finally:
             self._set_processing(False)
-            # Return worker to pool
+            # Return worker to pool (protect against pool being deleted by another thread
+            # between weak ref check and method call - race condition during cleanup)
             pool = self._pool_ref()
             if pool:
-                pool._return_worker(self)
+                try:
+                    pool._return_worker(self)
+                except RuntimeError:
+                    # Pool C++ object was deleted - expected during shutdown
+                    logger.debug("Pool already deleted, cannot return worker")
 
     def _run_with_cancellation_checks(self) -> None:
         """Run preview generation with periodic cancellation checks."""
