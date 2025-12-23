@@ -39,19 +39,17 @@ class ViewStateManager(QObject):
     fullscreen_toggled = Signal(bool)  # is_fullscreen
     title_changed = Signal(str)  # new_title
 
-    def __init__(self, dialog_widget: QWidget, parent: QObject | None = None,
-                 settings_manager: ApplicationStateManagerProtocol | None = None) -> None:
+    def __init__(
+        self,
+        dialog_widget: QWidget,
+        parent: QObject | None = None,
+        *,
+        settings_manager: ApplicationStateManagerProtocol,
+    ) -> None:
         super().__init__(parent)
 
         self.dialog_widget = dialog_widget
-
-        # Inject settings manager or use fallback
-        if settings_manager is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-            self.settings_manager = inject(ApplicationStateManagerProtocol)
-        else:
-            self.settings_manager = settings_manager
+        self.settings_manager = settings_manager
 
         # Fullscreen state
         self._is_fullscreen = False

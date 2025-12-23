@@ -152,12 +152,17 @@ class TestPureDIComponentInitialization:
 
     def test_injection_dialog_pure_di(self, isolated_managers, qtbot):
         """Test InjectionDialog works with injection_manager passed explicitly."""
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
         from ui.injection_dialog import InjectionDialog
 
         injection_mgr = inject(InjectionManagerProtocol)
+        settings_mgr = inject(ApplicationStateManagerProtocol)
 
-        # Create with explicit dep
-        dialog = InjectionDialog(injection_manager=injection_mgr)
+        # Create with explicit deps
+        dialog = InjectionDialog(
+            injection_manager=injection_mgr,
+            settings_manager=settings_mgr,
+        )
 
         try:
             assert dialog.injection_manager is injection_mgr

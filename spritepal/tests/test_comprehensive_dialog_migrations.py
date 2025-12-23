@@ -19,12 +19,21 @@ import pytest
 from PIL import Image
 
 from core.di_container import inject
-from core.protocols.manager_protocols import InjectionManagerProtocol
+from core.protocols.manager_protocols import ApplicationStateManagerProtocol, InjectionManagerProtocol
 from ui.components import DialogBase, SplitterDialog, TabbedDialog
 from ui.dialogs.user_error_dialog import UserErrorDialog
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
 from ui.row_arrangement_dialog import RowArrangementDialog
+
+
+def _create_injection_dialog(**kwargs) -> InjectionDialog:
+    """Create InjectionDialog with injected dependencies."""
+    return InjectionDialog(
+        injection_manager=inject(InjectionManagerProtocol),
+        settings_manager=inject(ApplicationStateManagerProtocol),
+        **kwargs,
+    )
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -69,7 +78,7 @@ class TestComprehensiveDialogMigrations:
             assert isinstance(error_dialog, DialogBase)
 
             # Test InjectionDialog inherits from TabbedDialog
-            injection_dialog = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            injection_dialog = _create_injection_dialog()
             qtbot.addWidget(injection_dialog)
             assert isinstance(injection_dialog, TabbedDialog)
             assert isinstance(injection_dialog, DialogBase)  # TabbedDialog inherits from DialogBase
@@ -104,7 +113,7 @@ class TestComprehensiveDialogMigrations:
         with manager_context_factory():
             dialogs = [
                 UserErrorDialog("Test error"),
-                InjectionDialog(injection_manager=inject(InjectionManagerProtocol)),
+                _create_injection_dialog(),
                 RowArrangementDialog(test_sprite_image),
             ]
 
@@ -143,7 +152,7 @@ class TestComprehensiveDialogMigrations:
             assert error_dialog.button_box is None  # BaseDialog was created with with_button_box=False
 
             # InjectionDialog has custom buttons
-            injection_dialog = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            injection_dialog = _create_injection_dialog()
             qtbot.addWidget(injection_dialog)
             assert injection_dialog.button_box is not None
 
@@ -199,7 +208,7 @@ class TestComprehensiveDialogMigrations:
         """Test that component APIs are consistent across dialogs"""
         with manager_context_factory():
             # Test InjectionDialog component usage
-            injection_dialog = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            injection_dialog = _create_injection_dialog()
             qtbot.addWidget(injection_dialog)
 
             # Should have HexOffsetInput components
@@ -223,7 +232,7 @@ class TestComprehensiveDialogMigrations:
         """Test that layout architecture is consistent after migrations"""
         with manager_context_factory():
             # Test TabbedDialog structure
-            injection_dialog = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            injection_dialog = _create_injection_dialog()
             qtbot.addWidget(injection_dialog)
             assert hasattr(injection_dialog, "tab_widget")
             assert injection_dialog.tab_widget.count() == 2  # VRAM and ROM tabs
@@ -350,7 +359,7 @@ class TestComprehensiveDialogMigrations:
             assert hasattr(arrangement_dialog, "export_btn")
 
             # 2. Simulate injection workflow
-            injection_dialog = InjectionDialog(sprite_path=test_sprite_image, injection_manager=inject(InjectionManagerProtocol))
+            injection_dialog = _create_injection_dialog(sprite_path=test_sprite_image)
             qtbot.addWidget(injection_dialog)
 
             # Should receive sprite path correctly
@@ -374,7 +383,7 @@ class TestComprehensiveDialogMigrations:
         """Test that component changes don't affect other dialogs"""
         with manager_context_factory():
             # Create multiple dialogs
-            injection_dialog = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            injection_dialog = _create_injection_dialog()
             row_dialog = RowArrangementDialog(test_sprite_image)
 
             with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
@@ -423,7 +432,7 @@ class TestManagerContextIntegration:
     def test_injection_dialog_manager_access(self, qtbot, manager_context_factory):
         """Test that InjectionDialog can access managers through context."""
         with manager_context_factory() as context:
-            injection_dialog = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            injection_dialog = _create_injection_dialog()
             qtbot.addWidget(injection_dialog)
 
             # Verify dialog can access required managers
@@ -445,7 +454,7 @@ class TestManagerContextIntegration:
         """
         # First context
         with manager_context_factory(name="context1") as ctx1:
-            dialog1 = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            dialog1 = _create_injection_dialog()
             qtbot.addWidget(dialog1)
 
             # Verify context1 managers
@@ -458,7 +467,7 @@ class TestManagerContextIntegration:
         # Second context - ManagerRegistry is a singleton, so same instance
         # but context manages lifecycle (init/cleanup) properly
         with manager_context_factory(name="context2") as ctx2:
-            dialog2 = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            dialog2 = _create_injection_dialog()
             qtbot.addWidget(dialog2)
 
             # Verify context2 managers are available (same singleton)
@@ -474,7 +483,7 @@ class TestManagerContextIntegration:
         """Test that manager state persists within a context."""
         with manager_context_factory() as context:
             # Create first dialog and modify manager state
-            dialog1 = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            dialog1 = _create_injection_dialog()
             qtbot.addWidget(dialog1)
 
             injection_manager = context.get_manager("injection")
@@ -483,7 +492,7 @@ class TestManagerContextIntegration:
             dialog1.close()
 
             # Create second dialog in same context
-            dialog2 = InjectionDialog(injection_manager=inject(InjectionManagerProtocol))
+            dialog2 = _create_injection_dialog()
             qtbot.addWidget(dialog2)
 
             # Manager state should persist

@@ -20,12 +20,20 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 from core.di_container import inject
-from core.protocols.manager_protocols import InjectionManagerProtocol
+from core.protocols.manager_protocols import (
+    ApplicationStateManagerProtocol,
+    InjectionManagerProtocol,
+)
 
 
 def get_injection_manager():
     """Get injection manager via DI."""
     return inject(InjectionManagerProtocol)
+
+
+def get_settings_manager():
+    """Get settings manager via DI."""
+    return inject(ApplicationStateManagerProtocol)
 
 
 if TYPE_CHECKING:
@@ -238,7 +246,10 @@ class TestRealDialogWithManagers:
 
         from ui.injection_dialog import InjectionDialog
 
-        dialog = InjectionDialog(injection_manager=get_injection_manager())
+        dialog = InjectionDialog(
+            injection_manager=get_injection_manager(),
+            settings_manager=get_settings_manager(),
+        )
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         qtbot.addWidget(dialog)

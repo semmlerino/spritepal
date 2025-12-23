@@ -17,7 +17,11 @@ from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoad
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
+    from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
+        ROMCacheProtocol,
+        ROMExtractorProtocol,
+    )
 
 logger = get_logger(__name__)
 
@@ -58,17 +62,20 @@ class ROMWorkerOrchestrator(QObject):
         parent: QObject | None = None,
         *,
         rom_cache: ROMCacheProtocol,
+        settings_manager: ApplicationStateManagerProtocol,
     ) -> None:
         """Initialize the worker orchestrator.
 
         Args:
             parent: Parent QObject
             rom_cache: ROM cache for scan operations
+            settings_manager: Settings manager for worker operations
         """
         super().__init__(parent)
 
         # Injected dependencies
         self._rom_cache = rom_cache
+        self._settings_manager = settings_manager
 
         # Worker tracking
         self._header_worker: ROMHeaderLoaderWorker | None = None
@@ -251,7 +258,10 @@ class ROMWorkerOrchestrator(QObject):
         """
         self._cleanup_similarity_worker()
 
-        self._similarity_worker = SimilarityIndexingWorker(rom_path=rom_path)
+        self._similarity_worker = SimilarityIndexingWorker(
+            rom_path=rom_path,
+            settings_manager=self._settings_manager,
+        )
 
         # Feed sprites to the worker before starting
         for sprite_info in sprites:

@@ -129,6 +129,8 @@ class TestDivisionByZeroFixes:
 
     def test_similarity_indexing_no_sprites(self):
         """Test SimilarityIndexingWorker with no sprites to index."""
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
         from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
@@ -136,7 +138,8 @@ class TestDivisionByZeroFixes:
             tmp.flush()
 
             worker = SimilarityIndexingWorker(
-                rom_path=tmp.name
+                rom_path=tmp.name,
+                settings_manager=inject(ApplicationStateManagerProtocol),
             )
 
             # Don't add any sprites - should handle empty list gracefully
@@ -241,12 +244,16 @@ class TestDivisionByZeroFixes:
     def test_all_workers_with_realistic_edge_cases(self):
         """Integration test with realistic edge cases that could cause division by zero."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.protocols.manager_protocols import (
+            ApplicationStateManagerProtocol,
+            ROMCacheProtocol,
+        )
         from ui.rom_extraction.workers.range_scan_worker import RangeScanWorker
         from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
         from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
 
         rom_cache = inject(ROMCacheProtocol)
+        settings_manager = inject(ApplicationStateManagerProtocol)
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
             # Small file that might not have sprites
@@ -276,7 +283,8 @@ class TestDivisionByZeroFixes:
 
             # Test 2: Similarity indexing with no sprites
             sim_worker = SimilarityIndexingWorker(
-                rom_path=tmp.name
+                rom_path=tmp.name,
+                settings_manager=settings_manager,
             )
             # Worker starts with no pending sprites
             sim_worker.run()

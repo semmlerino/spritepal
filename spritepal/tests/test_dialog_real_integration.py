@@ -59,6 +59,15 @@ def _create_manual_offset_dialog(parent=None) -> ManualOffsetDialog:
         settings_manager=inject(ApplicationStateManagerProtocol),
         extraction_manager=inject(ExtractionManagerProtocol),
     )
+
+
+def _create_injection_dialog(**kwargs) -> InjectionDialog:
+    """Create InjectionDialog with injected dependencies."""
+    return InjectionDialog(
+        injection_manager=inject(InjectionManagerProtocol),
+        settings_manager=inject(ApplicationStateManagerProtocol),
+        **kwargs,
+    )
 from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
@@ -182,12 +191,10 @@ class TestRealDialogIntegration:
 
         try:
             # Test real dialog creation with real file paths (vs mocked paths)
-            injection_manager = inject(InjectionManagerProtocol)
-            dialog = InjectionDialog(
+            dialog = _create_injection_dialog(
                 sprite_path=test_sprite_path,
                 metadata_path=test_metadata_path,
                 input_vram=extraction_data["vram_path"],
-                injection_manager=injection_manager,
             )
 
             # CRITICAL: Test that all UI components are properly initialized
@@ -204,7 +211,8 @@ class TestRealDialogIntegration:
                 assert widget is not None, f"REAL BUG DISCOVERED: UI component {component} is None"
 
             # Test real manager integration (vs mocked manager returns)
-            assert dialog.injection_manager is injection_manager, "Dialog should use real injection manager"
+            expected_manager = inject(InjectionManagerProtocol)
+            assert dialog.injection_manager is expected_manager, "Dialog should use real injection manager"
 
             # Test tab switching functionality (could expose widget initialization bugs)
             # DISCOVERED BUG #20: Real API uses set_current_tab(), not set_current_tab_index()
@@ -661,9 +669,9 @@ class TestBugDiscoveryRealVsMockedDialogs:
             extraction_data = self.test_data.get_vram_extraction_data("medium")
 
             # Dialog creation with managers already initialized
-            dialog = InjectionDialog(
+            dialog = _create_injection_dialog(
                 sprite_path=extraction_data["output_base"] + ".png",
-                metadata_path=extraction_data["output_base"] + ".metadata.json"
+                metadata_path=extraction_data["output_base"] + ".metadata.json",
             )
 
             # Test that dialog can recover or handle manager initialization timing
@@ -698,9 +706,9 @@ class TestBugDiscoveryRealVsMockedDialogs:
         invalid_metadata_path = "/nonexistent/metadata.json"
 
         try:
-            dialog = InjectionDialog(
+            dialog = _create_injection_dialog(
                 sprite_path=invalid_sprite_path,
-                metadata_path=invalid_metadata_path
+                metadata_path=invalid_metadata_path,
             )
 
             # Test that dialog handles invalid files properly

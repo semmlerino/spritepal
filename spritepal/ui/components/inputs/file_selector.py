@@ -64,7 +64,8 @@ class FileSelector(QWidget):
         selection_callback: Callable[[str], None] | None = None,
         settings_key: str | None = None,
         settings_namespace: str | None = None,
-        settings_manager: ApplicationStateManagerProtocol | None = None
+        *,
+        settings_manager: ApplicationStateManagerProtocol,
     ):
         super().__init__(parent)
 
@@ -74,14 +75,7 @@ class FileSelector(QWidget):
         self._selection_callback = selection_callback
         self._settings_key = settings_key
         self._settings_namespace = settings_namespace
-
-        # Inject settings manager or use fallback
-        if settings_manager is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-            self.settings_manager = inject(ApplicationStateManagerProtocol)
-        else:
-            self.settings_manager = settings_manager
+        self.settings_manager = settings_manager
 
         # Create UI components
         self._layout = QHBoxLayout(self)

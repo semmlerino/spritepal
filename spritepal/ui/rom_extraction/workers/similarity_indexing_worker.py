@@ -47,27 +47,25 @@ class SimilarityIndexingWorker(BaseWorker):
     index_loaded = Signal(int)
     """Emitted when index is loaded from cache. Args: sprite_count (int)."""
 
-    def __init__(self, rom_path: str, parent: QObject | None = None,
-                 settings_manager: ApplicationStateManagerProtocol | None = None):
+    def __init__(
+        self,
+        rom_path: str,
+        parent: QObject | None = None,
+        *,
+        settings_manager: ApplicationStateManagerProtocol,
+    ):
         """
         Initialize similarity indexing worker.
 
         Args:
             rom_path: Path to the ROM file being scanned
             parent: Parent QObject
-            settings_manager: Injected ApplicationStateManagerProtocol instance.
+            settings_manager: ApplicationStateManagerProtocol instance (required).
         """
         super().__init__(parent)
         self.rom_path = rom_path
         self.rom_hash = self._calculate_rom_hash(rom_path)
-
-        # Inject settings manager or use fallback
-        if settings_manager is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-            self.settings_manager = inject(ApplicationStateManagerProtocol)
-        else:
-            self.settings_manager = settings_manager
+        self.settings_manager = settings_manager
 
         # Initialize similarity engine
         self.similarity_engine = VisualSimilarityEngine()

@@ -103,7 +103,11 @@ class ROMExtractionPanel(QWidget):
         self.state_manager.workflow_state_changed.connect(self._on_state_changed)
 
         # Initialize extracted components
-        self._worker_orchestrator = ROMWorkerOrchestrator(self, rom_cache=inject(ROMCacheProtocol))
+        self._worker_orchestrator = ROMWorkerOrchestrator(
+            self,
+            rom_cache=inject(ROMCacheProtocol),
+            settings_manager=self.state_manager,
+        )
         self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
         self._scan_controller = ScanController(
             state_manager=self.state_manager, parent=self

@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import InjectionManagerProtocol
+    from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
+        InjectionManagerProtocol,
+    )
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
@@ -57,6 +60,7 @@ class InjectionDialog(TabbedDialog):
         input_vram: str = "",
         *,
         injection_manager: InjectionManagerProtocol,
+        settings_manager: ApplicationStateManagerProtocol,
     ):
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path = sprite_path
@@ -66,6 +70,7 @@ class InjectionDialog(TabbedDialog):
         self.extraction_vram_offset: str | None = None
         self.rom_extraction_info: Mapping[str, object] | None = None
         self.injection_manager = injection_manager
+        self.settings_manager = settings_manager
 
         # Initialize UI components that will be created in setup methods
         self.extraction_group: QGroupBox | None = None
@@ -129,7 +134,8 @@ class InjectionDialog(TabbedDialog):
             browse_text="Browse...",
             mode="open",
             file_filter="PNG Files (*.png);;All Files (*.*)",
-            read_only=False
+            read_only=False,
+            settings_manager=self.settings_manager,
         )
         self.sprite_file_selector.set_path(self.sprite_path)
         self.sprite_file_selector.path_changed.connect(self._on_sprite_path_changed)
@@ -347,7 +353,8 @@ class InjectionDialog(TabbedDialog):
             placeholder="Select VRAM file to modify...",
             browse_text="Browse...",
             mode="open",
-            file_filter="VRAM Files (*.dmp *.bin);;All Files (*.*)"
+            file_filter="VRAM Files (*.dmp *.bin);;All Files (*.*)",
+            settings_manager=self.settings_manager,
         )
         self.input_vram_selector.path_changed.connect(self._on_input_vram_changed)
         self.input_vram_selector.setToolTip("Select the VRAM dump file to inject the sprite into")
@@ -360,7 +367,8 @@ class InjectionDialog(TabbedDialog):
             placeholder="Save modified VRAM as...",
             browse_text="Browse...",
             mode="save",
-            file_filter="VRAM Files (*.dmp);;All Files (*.*)"
+            file_filter="VRAM Files (*.dmp);;All Files (*.*)",
+            settings_manager=self.settings_manager,
         )
         self.output_vram_selector.path_changed.connect(self._on_output_vram_changed)
         self.output_vram_selector.setToolTip("Specify where to save the modified VRAM with the injected sprite")
@@ -405,7 +413,8 @@ class InjectionDialog(TabbedDialog):
             placeholder="Select ROM file to modify...",
             browse_text="Browse...",
             mode="open",
-            file_filter="SNES ROM Files (*.sfc *.smc);;All Files (*.*)"
+            file_filter="SNES ROM Files (*.sfc *.smc);;All Files (*.*)",
+            settings_manager=self.settings_manager,
         )
         self.input_rom_selector.path_changed.connect(self._on_input_rom_changed)
         self.input_rom_selector.setToolTip("Select the ROM file to inject the sprite into")
@@ -423,7 +432,8 @@ class InjectionDialog(TabbedDialog):
             placeholder="Save modified ROM as...",
             browse_text="Browse...",
             mode="save",
-            file_filter="SNES ROM Files (*.sfc *.smc);;All Files (*.*)"
+            file_filter="SNES ROM Files (*.sfc *.smc);;All Files (*.*)",
+            settings_manager=self.settings_manager,
         )
         self.output_rom_selector.path_changed.connect(self._on_output_rom_changed)
         self.output_rom_selector.setToolTip("Specify where to save the modified ROM with the injected sprite")
