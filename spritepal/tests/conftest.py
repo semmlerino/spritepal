@@ -160,7 +160,7 @@ def _patch_qpixmap_init() -> None:
             original_init(self, *args, **kwargs)
 
         QPixmap.__init__ = guarded_init
-        QPixmap._test_guard_installed = True  # pyright: ignore[reportAttributeAccessIssue]
+        QPixmap._test_guard_installed = True  # pyright: ignore[reportAttributeAccessIssue] - dynamic attr for test guard
     except ImportError:
         pass  # Qt not available, skip guard
 

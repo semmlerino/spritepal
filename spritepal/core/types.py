@@ -10,9 +10,9 @@ Moved from utils/type_aliases.py to fix layer boundary violations
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Literal, NotRequired, TypeAlias, TypedDict
+from typing import Literal, NotRequired, TypeAlias, TypedDict, cast
 
 from PIL import Image
 from PySide6.QtGui import QPixmap
@@ -161,14 +161,14 @@ class SpritePreset:
         """Create a SpritePreset from a dictionary."""
         return cls(
             name=str(data.get("name", "")),
-            offset=int(data.get("offset", 0)),  # type: ignore[arg-type]
+            offset=cast(int, data.get("offset", 0)),
             game_title=str(data.get("game_title", "")),
-            game_checksums=list(data.get("game_checksums", [])),  # type: ignore[arg-type]
+            game_checksums=list(cast(Iterable[int], data.get("game_checksums", []))),
             description=str(data.get("description", "")),
             compressed=bool(data.get("compressed", True)),
-            estimated_size=int(data.get("estimated_size", 8192)),  # type: ignore[arg-type]
-            tags=list(data.get("tags", [])),  # type: ignore[arg-type]
-            source=data.get("source", "user"),  # type: ignore[arg-type]
+            estimated_size=cast(int, data.get("estimated_size", 8192)),
+            tags=list(cast(Iterable[str], data.get("tags", []))),
+            source=cast(PresetSource, data.get("source", "user")),
             verified=bool(data.get("verified", False)),
         )
 

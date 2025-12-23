@@ -280,12 +280,12 @@ def create_simple_singleton(
         manager = MyManagerSingleton.get()
     """
 
-    class SimpleSingleton(ThreadSafeSingleton[TFactory]):  # type: ignore[misc]
+    class SimpleSingleton(ThreadSafeSingleton[TFactory]):  # type: ignore[misc] - dynamic generic class creation
         _instance: TFactory | None = None
         _lock = threading.Lock()
 
         @classmethod
-        def _create_instance(cls, *args, **kwargs) -> TFactory:  # type: ignore[misc]
+        def _create_instance(cls, *args, **kwargs) -> TFactory:  # type: ignore[misc] - captures factory from closure
             return instance_type(*args, **kwargs)
 
     SimpleSingleton.__name__ = f"{instance_type.__name__}Singleton"

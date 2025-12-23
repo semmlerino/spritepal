@@ -655,7 +655,7 @@ class SpritePreviewWidget(QWidget):
                 for y in range(8):
                     for x in range(8):
                         if decode_method == "rom_extractor":
-                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y) if extractor else 0  # type: ignore[attr-defined]
+                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y) if extractor else 0  # type: ignore[attr-defined] - private method from ROMExtractor
                         else:
                             # Fallback 4bpp decoding method
                             pixel = self._decode_4bpp_pixel_fallback(tile_bytes, x, y)

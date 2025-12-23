@@ -39,7 +39,7 @@ class DefaultPaletteLoader:
         """
         self.palette_path: str = palette_path or self.DEFAULT_PALETTE_PATH
         # JSON data is inherently untyped; structure validated at runtime
-        self.palette_data: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny]
+        self.palette_data: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny] - JSON data
         self.load_palettes()
 
     def load_palettes(self) -> None:
@@ -56,7 +56,7 @@ class DefaultPaletteLoader:
         except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Failed to load default palettes: {e}")
 
-    def get_sprite_palettes(self, sprite_name: str) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny]
+    def get_sprite_palettes(self, sprite_name: str) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - palette data from JSON
         """
         Get default palettes for a specific sprite.
 
@@ -151,7 +151,7 @@ class DefaultPaletteLoader:
 
     def get_palettes_by_rom_title(
         self, rom_title: str
-    ) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny]
+    ) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - palette data from JSON
         """
         Get default palettes based on ROM title.
 

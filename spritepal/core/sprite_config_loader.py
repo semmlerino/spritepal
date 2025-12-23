@@ -42,7 +42,7 @@ class SpriteConfigLoader:
         """
         self.config_path: str = config_path or self.DEFAULT_CONFIG_PATH
         # JSON data is inherently untyped; structure validated at runtime
-        self.config_data: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny]
+        self.config_data: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny] - JSON config
         self.load_config()
 
     def load_config(self) -> None:
@@ -61,7 +61,8 @@ class SpriteConfigLoader:
 
     @staticmethod
     def _get_size_field(
-        sprite_data: dict[str, Any], default: int = 8192  # pyright: ignore[reportExplicitAny]
+        sprite_data: dict[str, Any],  # pyright: ignore[reportExplicitAny] - JSON config
+        default: int = 8192,
     ) -> int:
         """
         Get sprite size from config, supporting both field name conventions.

@@ -202,14 +202,14 @@ def skip_if_wsl(func_or_reason: F | str | None = None) -> F | Callable[[F], F]:
             return pytest.mark.skipif(
                 is_wsl_environment(),
                 reason=default_reason
-            )(func)  # type: ignore[return-value]
-        return decorator  # type: ignore[return-value]
+            )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+        return decorator  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
     elif callable(func_or_reason):
         # Called as @skip_if_wsl (no parentheses)
         return pytest.mark.skipif(
             is_wsl_environment(),
             reason=default_reason
-        )(func_or_reason)  # type: ignore[return-value]
+        )(func_or_reason)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
     else:
         # Called as @skip_if_wsl("reason")
         reason = func_or_reason
@@ -217,8 +217,8 @@ def skip_if_wsl(func_or_reason: F | str | None = None) -> F | Callable[[F], F]:
             return pytest.mark.skipif(
                 is_wsl_environment(),
                 reason=reason
-            )(func)  # type: ignore[return-value]
-        return decorator  # type: ignore[return-value]
+            )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+        return decorator  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
 
 
 def skip_if_no_display(func: F) -> F:
@@ -226,7 +226,7 @@ def skip_if_no_display(func: F) -> F:
     return pytest.mark.skipif(
         not has_display_available(),
         reason="Test requires display"
-    )(func)  # type: ignore[return-value]
+    )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
 
 
 def skip_in_ci(func: F) -> F:
@@ -234,7 +234,7 @@ def skip_in_ci(func: F) -> F:
     return pytest.mark.skipif(
         is_ci_environment(),
         reason="Test skipped in CI"
-    )(func)  # type: ignore[return-value]
+    )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
 
 
 def requires_display(func: F) -> F:
@@ -249,7 +249,7 @@ def requires_real_qt(func: F) -> F:
     return pytest.mark.skipif(
         should_skip,
         reason="Test requires real Qt (PySide6)"
-    )(func)  # type: ignore[return-value]
+    )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
 
 
 def headless_safe(func: Callable[P, R]) -> Callable[P, R]:

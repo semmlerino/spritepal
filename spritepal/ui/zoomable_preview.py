@@ -601,9 +601,9 @@ class PreviewPanel(QWidget):
         """Set the grayscale PIL image for palette application"""
         self._grayscale_image = pil_image
 
-    def set_palettes(self, palettes_dict: object) -> None:
+    def set_palettes(self, palettes_dict: dict[int, list[tuple[int, int, int]]]) -> None:
         """Set the available palettes"""
-        self.colorizer.set_palettes(palettes_dict)  # type: ignore[arg-type]
+        self.colorizer.set_palettes(palettes_dict)
 
         # Enable palette controls if we have both image and palettes
         has_data = self._grayscale_image is not None and self.colorizer.has_palettes()
@@ -613,9 +613,9 @@ class PreviewPanel(QWidget):
         if self.palette_toggle.isChecked() and has_data:
             self._apply_current_palette()
 
-    def _pil_to_pixmap(self, pil_image: object) -> QPixmap | None:
+    def _pil_to_pixmap(self, pil_image: PILImage | None) -> QPixmap | None:
         """Convert PIL image to QPixmap using enhanced utility function"""
-        return pil_to_qpixmap(pil_image)  # type: ignore[return-value]
+        return pil_to_qpixmap(pil_image)
 
     @override
     def keyPressEvent(self, event: QKeyEvent | None) -> None:
@@ -646,10 +646,11 @@ class PreviewPanel(QWidget):
                 break
 
     @override
-    def mousePressEvent(self, a0: object) -> None:
+    def mousePressEvent(self, event: QMouseEvent | None) -> None:
         """Handle mouse press to ensure focus"""
         self.setFocus()
-        super().mousePressEvent(a0)  # type: ignore[arg-type]
+        if event is not None:
+            super().mousePressEvent(event)
 
     def get_palettes(self) -> dict[int, list[tuple[int, int, int]]]:
         """Get the current palette data
