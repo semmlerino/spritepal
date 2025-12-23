@@ -66,6 +66,23 @@ except ImportError as e:
     print("Please run from the spritepal root directory")
     sys.exit(1)
 
+def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
+    """Create UnifiedManualOffsetDialog with injected dependencies."""
+    from core.di_container import inject
+    from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
+        ExtractionManagerProtocol,
+        ROMCacheProtocol,
+    )
+
+    return UnifiedManualOffsetDialog(
+        parent,
+        rom_cache=inject(ROMCacheProtocol),
+        settings_manager=inject(ApplicationStateManagerProtocol),
+        extraction_manager=inject(ExtractionManagerProtocol),
+    )
+
+
 class PerformanceValidationRunner:
     """Standalone performance validation runner."""
 
@@ -74,6 +91,7 @@ class PerformanceValidationRunner:
         self.profile = profile
         self.app = None
         self.results = {}
+        self._managers_initialized = False
 
     def setup_qt(self):
         """Setup Qt application for testing."""
@@ -98,8 +116,15 @@ class PerformanceValidationRunner:
                 mock_prev.return_value = Mock()
                 mock_err.return_value = Mock()
 
+                # Initialize managers if not done
+                if not self._managers_initialized:
+                    from core.managers import initialize_managers
+                    initialize_managers()
+                    self._managers_initialized = True
+
                 def setup_dialog(dialog_class, parent):
-                    dialog = dialog_class(parent)
+                    # Use _create_dialog to inject dependencies
+                    dialog = _create_dialog(parent)
                     dialog.setup_ui()
                     return dialog
 
@@ -145,9 +170,15 @@ class PerformanceValidationRunner:
                 mock_prev.return_value = Mock()
                 mock_err.return_value = Mock()
 
+                # Initialize managers if not done
+                if not self._managers_initialized:
+                    from core.managers import initialize_managers
+                    initialize_managers()
+                    self._managers_initialized = True
+
                 # Create and use dialog
                 parent = QWidget()
-                dialog = UnifiedManualOffsetDialog(parent)
+                dialog = _create_dialog(parent)
                 dialog.setup_ui()
                 dialog.set_rom_data("test.smc", 0x400000)
 
@@ -198,9 +229,15 @@ class PerformanceValidationRunner:
                 mock_prev.return_value = Mock()
                 mock_err.return_value = Mock()
 
+                # Initialize managers if not done
+                if not self._managers_initialized:
+                    from core.managers import initialize_managers
+                    initialize_managers()
+                    self._managers_initialized = True
+
                 # Create dialog
                 parent = QWidget()
-                dialog = UnifiedManualOffsetDialog(parent)
+                dialog = _create_dialog(parent)
                 dialog.setup_ui()
                 dialog.set_rom_data("test.smc", 0x400000)
 

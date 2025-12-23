@@ -17,7 +17,7 @@ from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoad
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
 
 logger = get_logger(__name__)
 
@@ -53,9 +53,22 @@ class ROMWorkerOrchestrator(QObject):
     similarity_finished = Signal()
     similarity_error = Signal(str)
 
-    def __init__(self, parent: QObject | None = None) -> None:
-        """Initialize the worker orchestrator."""
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        *,
+        rom_cache: ROMCacheProtocol,
+    ) -> None:
+        """Initialize the worker orchestrator.
+
+        Args:
+            parent: Parent QObject
+            rom_cache: ROM cache for scan operations
+        """
         super().__init__(parent)
+
+        # Injected dependencies
+        self._rom_cache = rom_cache
 
         # Worker tracking
         self._header_worker: ROMHeaderLoaderWorker | None = None
@@ -165,9 +178,6 @@ class ROMWorkerOrchestrator(QObject):
 
     def start_scan(self, rom_path: str, step: int = 0x1000) -> None:
         """Start sprite scanning on the ROM."""
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-
         if self._is_scanning:
             logger.warning("Scan already in progress")
             return
@@ -176,7 +186,7 @@ class ROMWorkerOrchestrator(QObject):
         self._found_sprites = []
         self._is_scanning = True
 
-        self._scan_worker = SpriteScanWorker(rom_path, step=step, rom_cache=inject(ROMCacheProtocol))
+        self._scan_worker = SpriteScanWorker(rom_path, step=step, rom_cache=self._rom_cache)
         self._scan_thread = QThread()
         self._scan_worker.moveToThread(self._scan_thread)
 

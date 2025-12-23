@@ -98,12 +98,12 @@ class ROMExtractionPanel(QWidget):
 
         # State manager for coordinating operations (ApplicationStateManager)
         from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
         self.state_manager: ApplicationStateManager = inject(ApplicationStateManagerProtocol)  # type: ignore[assignment] - DI returns protocol, runtime is concrete
         self.state_manager.workflow_state_changed.connect(self._on_state_changed)
 
         # Initialize extracted components
-        self._worker_orchestrator = ROMWorkerOrchestrator(self)
+        self._worker_orchestrator = ROMWorkerOrchestrator(self, rom_cache=inject(ROMCacheProtocol))
         self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
         self._scan_controller = ScanController(
             state_manager=self.state_manager, parent=self

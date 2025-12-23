@@ -86,7 +86,8 @@ class DropZone(QWidget):
         self,
         file_type: str,
         parent: QWidget | None = None,
-        settings_manager: ApplicationStateManagerProtocol | None = None,
+        *,
+        settings_manager: ApplicationStateManagerProtocol,
         required: bool = True,
     ) -> None:
         super().__init__(parent)
@@ -99,13 +100,8 @@ class DropZone(QWidget):
         # Apply initial styling based on required state
         self._update_style()
 
-        if settings_manager is None:
-            # Fallback for environments where DI might not be fully configured
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-            self.settings_manager = inject(ApplicationStateManagerProtocol)
-        else:
-            self.settings_manager = settings_manager
+        # Store injected dependency
+        self.settings_manager = settings_manager
 
         # Layout
         layout = QVBoxLayout(self)

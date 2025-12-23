@@ -596,12 +596,21 @@ class SpriteGalleryTab(QWidget):
         if not self.detached_window:
             # Local import to avoid circular dependency
             from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            from core.protocols.manager_protocols import (
+                ApplicationStateManagerProtocol,
+                ExtractionManagerProtocol,
+                ROMCacheProtocol,
+            )
             from ui.windows.detached_gallery_window import DetachedGalleryWindow
+            # inject() at app boundary - passes dependencies to constructor
             extraction_manager = inject(ExtractionManagerProtocol)
+            settings_manager = inject(ApplicationStateManagerProtocol)
+            rom_cache = inject(ROMCacheProtocol)
             self.detached_window = DetachedGalleryWindow(
                 self,
-                extraction_manager=extraction_manager
+                extraction_manager=extraction_manager,
+                settings_manager=settings_manager,
+                rom_cache=rom_cache,
             )
 
             # Connect signals

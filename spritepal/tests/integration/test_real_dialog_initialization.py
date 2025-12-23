@@ -131,9 +131,19 @@ class TestRealDialogInitialization:
 
         This dialog requires managers to be initialized.
         """
+        from core.di_container import inject
+        from core.protocols.manager_protocols import (
+            ApplicationStateManagerProtocol,
+            ExtractionManagerProtocol,
+            ROMCacheProtocol,
+        )
         from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
-        dialog = UnifiedManualOffsetDialog()
+        dialog = UnifiedManualOffsetDialog(
+            rom_cache=inject(ROMCacheProtocol),
+            settings_manager=inject(ApplicationStateManagerProtocol),
+            extraction_manager=inject(ExtractionManagerProtocol),
+        )
         qtbot.addWidget(dialog)
 
         # Verify real Qt widgets exist

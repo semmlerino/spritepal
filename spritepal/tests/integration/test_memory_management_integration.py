@@ -69,6 +69,26 @@ def massive_sprite_dataset() -> list[dict[str, Any]]:
         for i in range(5000)  # 5000 sprites
     ]
 
+
+@pytest.fixture
+def mock_settings_manager():
+    """Create mock settings manager for DetachedGalleryWindow."""
+    manager = Mock()
+    manager.get.return_value = ""
+    manager.set.return_value = None
+    manager.set_last_used_directory.return_value = None
+    return manager
+
+
+@pytest.fixture
+def mock_rom_cache():
+    """Create mock ROM cache for DetachedGalleryWindow."""
+    cache = Mock()
+    cache.get_cached_sprite.return_value = None
+    cache.cache_sprite.return_value = None
+    return cache
+
+
 class MockROMCache:
     """Mock ROM cache for testing memory behavior."""
 
@@ -275,7 +295,12 @@ class TestMemoryManagementIntegration(QtTestCase):
         assert strong_count == 1000  # All strong refs alive
 
     @skip_in_offscreen
-    def test_component_cleanup_releases_memory(self, massive_sprite_dataset):
+    def test_component_cleanup_releases_memory(
+        self,
+        massive_sprite_dataset,
+        mock_settings_manager,
+        mock_rom_cache,
+    ):
         """Test that component cleanup releases memory."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
@@ -286,7 +311,11 @@ class TestMemoryManagementIntegration(QtTestCase):
         mock_manager.get_known_sprite_locations.return_value = {}
 
         with MemoryHelper.assert_no_leak(DetachedGalleryWindow, max_increase=1):
-            window = DetachedGalleryWindow(extraction_manager=mock_manager)
+            window = DetachedGalleryWindow(
+                extraction_manager=mock_manager,
+                settings_manager=mock_settings_manager,
+                rom_cache=mock_rom_cache,
+            )
 
             # Load massive sprite dataset
             window.set_sprites(massive_sprite_dataset)
@@ -379,7 +408,13 @@ class TestMemoryManagementIntegration(QtTestCase):
 
     @skip_in_offscreen
     @pytest.mark.slow
-    def test_memory_stress_with_repeated_operations(self, large_rom_data, massive_sprite_dataset):
+    def test_memory_stress_with_repeated_operations(
+        self,
+        large_rom_data,
+        massive_sprite_dataset,
+        mock_settings_manager,
+        mock_rom_cache,
+    ):
         """Stress test memory management with repeated operations."""
         import os
 
@@ -398,7 +433,11 @@ class TestMemoryManagementIntegration(QtTestCase):
         # Perform many operations that could leak memory
         for cycle in range(10):
             # Create window
-            window = DetachedGalleryWindow(extraction_manager=mock_manager)
+            window = DetachedGalleryWindow(
+                extraction_manager=mock_manager,
+                settings_manager=mock_settings_manager,
+                rom_cache=mock_rom_cache,
+            )
             window._set_rom_file(large_rom_data)
 
             # Load large sprite set

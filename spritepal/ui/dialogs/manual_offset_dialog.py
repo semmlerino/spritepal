@@ -113,11 +113,15 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     offset_changed = Signal(int)  # Emitted when offset changes
     sprite_found = Signal(int, str)  # Emitted when sprite is found (offset, name)
 
-    def __init__(self, parent: QWidget | None = None,
-                 rom_cache: ROMCacheProtocol | None = None,
-                 settings_manager: ApplicationStateManagerProtocol | None = None,
-                 extraction_manager: ExtractionManagerProtocol | None = None,
-                 rom_extractor: ROMExtractorProtocol | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        rom_cache: ROMCacheProtocol,
+        settings_manager: ApplicationStateManagerProtocol,
+        extraction_manager: ExtractionManagerProtocol,
+        rom_extractor: ROMExtractorProtocol | None = None,
+    ) -> None:
         # Debug logging for singleton tracking
         logger.debug(f"Creating UnifiedManualOffsetDialog instance (parent: {parent.__class__.__name__ if parent else 'None'})")
 
@@ -143,33 +147,16 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._manager_mutex = QMutex()
         self._preview_update_mutex = QMutex()  # Mutex for serializing preview widget updates
 
-        # Inject dependencies or use fallbacks
-        if extraction_manager is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
-            self.extraction_manager = inject(ExtractionManagerProtocol)
-        else:
-            self.extraction_manager = extraction_manager
+        # Store injected dependencies
+        self.extraction_manager = extraction_manager
+        self.rom_cache = rom_cache
+        self.settings_manager = settings_manager
 
-        # rom_extractor can be obtained from extraction_manager
+        # rom_extractor can be obtained from extraction_manager if not provided
         if rom_extractor is None:
             self.rom_extractor: ROMExtractorProtocol | None = cast('ROMExtractorProtocol | None', self.extraction_manager.get_rom_extractor())
         else:
             self.rom_extractor = rom_extractor
-
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            self.rom_cache = inject(ROMCacheProtocol)
-        else:
-            self.rom_cache = rom_cache
-
-        if settings_manager is None:
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-            self.settings_manager = inject(ApplicationStateManagerProtocol)
-        else:
-            self.settings_manager = settings_manager
 
         self._cache_stats = {"hits": 0, "misses": 0, "total_requests": 0}
         self._adjacent_offsets_cache = set()  # Track preloaded offsets

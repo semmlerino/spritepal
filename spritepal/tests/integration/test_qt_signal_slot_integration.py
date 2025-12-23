@@ -27,6 +27,26 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
+    """Create UnifiedManualOffsetDialog with injected dependencies.
+
+    Used by tests that have managers_initialized fixture.
+    """
+    from core.di_container import inject
+    from core.protocols.manager_protocols import (
+        ApplicationStateManagerProtocol,
+        ExtractionManagerProtocol,
+        ROMCacheProtocol,
+    )
+
+    return UnifiedManualOffsetDialog(
+        parent,
+        rom_cache=inject(ROMCacheProtocol),
+        settings_manager=inject(ApplicationStateManagerProtocol),
+        extraction_manager=inject(ExtractionManagerProtocol),
+    )
+
+
 @pytest.fixture
 def temp_rom_file():
     """Create a temporary ROM file for testing."""
@@ -104,7 +124,7 @@ class TestDialogSignalConnections:
 
     def test_dialog_signals_exist(self, qtbot, managers_initialized):
         """Test that dialog has required signals."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         # Check signals exist
@@ -117,7 +137,7 @@ class TestDialogSignalConnections:
 
     def test_offset_changed_emission(self, qtbot, managers_initialized):
         """Test offset_changed signal is emitted with correct value."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         # Create signal spy
@@ -130,7 +150,7 @@ class TestDialogSignalConnections:
 
     def test_sprite_found_emission(self, qtbot, managers_initialized):
         """Test sprite_found signal is emitted with correct parameters."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         # Create signal spy
@@ -145,7 +165,7 @@ class TestDialogSignalConnections:
 
     def test_multiple_rapid_emissions(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test handling of multiple rapid signal emissions."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         recorder = SignalRecorder()
@@ -166,7 +186,7 @@ class TestDialogSignalConnections:
 
     def test_signal_connection_types(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test different Qt connection types for cross-thread safety."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         recorder = SignalRecorder()
@@ -199,7 +219,7 @@ class TestThreadSafetyAndTiming:
 
     def test_signal_thread_affinity(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test that signals are emitted and received in correct threads."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         main_thread = QThread.currentThread()
@@ -224,7 +244,7 @@ class TestThreadSafetyAndTiming:
 
     def test_worker_thread_signal_emission(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test signal emission from worker thread to main thread."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         main_thread = QThread.currentThread()
@@ -274,7 +294,7 @@ class TestThreadSafetyAndTiming:
 
     def test_signal_emission_timing(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test timing and order of signal emissions."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         recorder = SignalRecorder()
@@ -308,7 +328,7 @@ class TestThreadSafetyAndTiming:
 
     def test_high_frequency_emissions(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test handling of high-frequency signal emissions."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         received_count = 0
@@ -339,7 +359,7 @@ class TestSignalBlockingAndError:
 
     def test_blocked_signals(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test that blocked signals are not emitted."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         recorder = SignalRecorder()
@@ -365,7 +385,7 @@ class TestSignalBlockingAndError:
 
     def test_exception_in_slot(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test that exceptions in slots don't break signal system."""
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         faulty_calls: list[int] = []
@@ -410,7 +430,7 @@ class TestSignalBlockingAndError:
         import gc
         import weakref
 
-        dialog = UnifiedManualOffsetDialog(None)
+        dialog = _create_dialog(None)
         qtbot.addWidget(dialog)
 
         # Track receptions with a list (avoids class attribute pollution)

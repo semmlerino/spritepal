@@ -221,7 +221,21 @@ def run_tests():
 
         try:
             print("\n📝 Testing detached window scrolling...")
-            window = DetachedGalleryWindow()
+            # Inject dependencies at test boundary
+            from core.di_container import inject
+            from core.protocols.manager_protocols import (
+                ApplicationStateManagerProtocol,
+                ExtractionManagerProtocol,
+                ROMCacheProtocol,
+            )
+            extraction_manager = inject(ExtractionManagerProtocol)
+            settings_manager = inject(ApplicationStateManagerProtocol)
+            rom_cache = inject(ROMCacheProtocol)
+            window = DetachedGalleryWindow(
+                extraction_manager=extraction_manager,
+                settings_manager=settings_manager,
+                rom_cache=rom_cache,
+            )
 
             sprites = []
             for i in range(5):

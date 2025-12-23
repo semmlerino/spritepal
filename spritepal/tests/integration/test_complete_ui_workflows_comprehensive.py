@@ -62,6 +62,25 @@ def complete_test_rom(tmp_path) -> str:
     return str(rom_path)
 
 @pytest.fixture
+def mock_settings_manager():
+    """Create mock settings manager for integration tests."""
+    manager = Mock()
+    manager.get.return_value = ""
+    manager.set.return_value = None
+    manager.set_last_used_directory.return_value = None
+    return manager
+
+
+@pytest.fixture
+def mock_rom_cache():
+    """Create mock ROM cache for integration tests."""
+    cache = Mock()
+    cache.get_cached_sprite.return_value = None
+    cache.cache_sprite.return_value = None
+    return cache
+
+
+@pytest.fixture
 def realistic_sprite_data() -> list[dict[str, Any]]:
     """Create realistic sprite data matching what a ROM scan would find."""
     return [
@@ -139,6 +158,8 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_scan_worker_class,
         complete_test_rom,
         realistic_sprite_data,
+        mock_settings_manager,
+        mock_rom_cache,
     ):
         # DI setup provided by session_managers via pytestmark at module level
         """Test complete workflow: ROM load -> scan -> thumbnails -> fullscreen view."""
@@ -178,7 +199,11 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         workflow_steps = []
 
         # Step 1: Create gallery window
-        self.gallery_window = DetachedGalleryWindow(extraction_manager=mock_manager)
+        self.gallery_window = DetachedGalleryWindow(
+            extraction_manager=mock_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         workflow_steps.append("gallery_created")
 
         assert self.gallery_window.windowTitle() == "Sprite Gallery"
@@ -258,7 +283,9 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
     def test_gallery_window_lifecycle_memory_safety(
         self,
         complete_test_rom,
-        realistic_sprite_data
+        realistic_sprite_data,
+        mock_settings_manager,
+        mock_rom_cache,
     ):
         """Test gallery window lifecycle with memory safety checks."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
@@ -269,7 +296,11 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
 
         with MemoryHelper.assert_no_leak(DetachedGalleryWindow, max_increase=1):
             # Create window
-            self.gallery_window = DetachedGalleryWindow(extraction_manager=mock_manager)
+            self.gallery_window = DetachedGalleryWindow(
+                extraction_manager=mock_manager,
+                settings_manager=mock_settings_manager,
+                rom_cache=mock_rom_cache,
+            )
 
             # Load ROM and sprites
             self.gallery_window._set_rom_file(complete_test_rom)
@@ -360,7 +391,9 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
     def test_large_rom_performance_workflow(
         self,
         mock_thumbnail_worker_class,
-        tmp_path
+        tmp_path,
+        mock_settings_manager,
+        mock_rom_cache,
     ):
         """Test performance with large ROM and many sprites."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
@@ -405,7 +438,11 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         start_time = time.time()
 
         # Create and setup window
-        self.gallery_window = DetachedGalleryWindow(extraction_manager=mock_manager)
+        self.gallery_window = DetachedGalleryWindow(
+            extraction_manager=mock_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         self.gallery_window._set_rom_file(str(large_rom))
 
         setup_time = time.time() - start_time
@@ -431,7 +468,9 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
     def test_concurrent_operations_workflow(
         self,
         complete_test_rom,
-        realistic_sprite_data
+        realistic_sprite_data,
+        mock_settings_manager,
+        mock_rom_cache,
     ):
         """Test handling of concurrent operations."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
@@ -440,7 +479,11 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_manager.get_rom_extractor.return_value = Mock()
         mock_manager.get_known_sprite_locations.return_value = {}
 
-        self.gallery_window = DetachedGalleryWindow(extraction_manager=mock_manager)
+        self.gallery_window = DetachedGalleryWindow(
+            extraction_manager=mock_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         self.gallery_window._set_rom_file(complete_test_rom)
 
         # Create mock workers to simulate concurrent operations
@@ -480,6 +523,8 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_critical,
         complete_test_rom,
         realistic_sprite_data,
+        mock_settings_manager,
+        mock_rom_cache,
     ):
         """Test error recovery in workflows."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
@@ -488,7 +533,11 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_manager.get_rom_extractor.return_value = Mock()
         mock_manager.get_known_sprite_locations.return_value = {}
 
-        self.gallery_window = DetachedGalleryWindow(extraction_manager=mock_manager)
+        self.gallery_window = DetachedGalleryWindow(
+            extraction_manager=mock_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
 
         # Test invalid ROM file
         invalid_rom = "/nonexistent/path/invalid.sfc"
@@ -519,7 +568,12 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
 class TestUIWorkflowPerformanceIntegration(QtTestCase):
     """Performance-focused UI workflow tests."""
 
-    def test_rapid_rom_switching_performance(self, tmp_path):
+    def test_rapid_rom_switching_performance(
+        self,
+        tmp_path,
+        mock_settings_manager,
+        mock_rom_cache,
+    ):
         """Test performance when rapidly switching between ROMs."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
@@ -540,7 +594,11 @@ class TestUIWorkflowPerformanceIntegration(QtTestCase):
         mock_manager.get_rom_extractor.return_value = Mock()
         mock_manager.get_known_sprite_locations.return_value = {}
 
-        window = DetachedGalleryWindow(extraction_manager=mock_manager)
+        window = DetachedGalleryWindow(
+            extraction_manager=mock_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
 
         start_time = time.time()
 

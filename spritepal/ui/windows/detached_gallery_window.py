@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.di_container import inject
 from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
 from ui.common import WorkerManager
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
@@ -58,13 +57,17 @@ class DetachedGalleryWindow(QMainWindow):
         parent: QWidget | None = None,
         *,
         extraction_manager: ExtractionManagerProtocol,
+        settings_manager: ApplicationStateManagerProtocol,
+        rom_cache: ROMCacheProtocol,
     ):
         """
         Initialize the detached gallery window.
 
         Args:
             parent: Parent widget (usually the main window)
-            extraction_manager: Injected ExtractionManager instance
+            extraction_manager: ExtractionManager instance for sprite operations
+            settings_manager: ApplicationStateManager instance for settings/state
+            rom_cache: ROMCache instance for caching ROM data
         """
         super().__init__(parent)
 
@@ -82,11 +85,11 @@ class DetachedGalleryWindow(QMainWindow):
         self.scan_timeout_timer: QTimer | None = None
         self._thumbnail_generation_timer: QTimer | None = None  # Timer for delayed thumbnail generation
 
-        # Core managers (B.3: Using injected manager)
+        # Core managers (passed via constructor - no DI in __init__)
         self.extraction_manager = extraction_manager
         self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()
-        self.settings_manager: ApplicationStateManagerProtocol = inject(ApplicationStateManagerProtocol)
-        self.rom_cache: ROMCacheProtocol = inject(ROMCacheProtocol)
+        self.settings_manager = settings_manager
+        self.rom_cache = rom_cache
 
         # UI Components (initialized in _setup_ui)
         self.gallery_widget: SpriteGalleryWidget | None = None

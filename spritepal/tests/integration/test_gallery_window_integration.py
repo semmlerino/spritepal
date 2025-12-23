@@ -63,6 +63,25 @@ def mock_extraction_manager():
     }
     return manager
 
+
+@pytest.fixture
+def mock_settings_manager():
+    """Create mock settings manager for integration tests."""
+    manager = Mock()
+    manager.get.return_value = ""
+    manager.set.return_value = None
+    manager.set_last_used_directory.return_value = None
+    return manager
+
+
+@pytest.fixture
+def mock_rom_cache():
+    """Create mock ROM cache for integration tests."""
+    cache = Mock()
+    cache.get_cached_sprite.return_value = None
+    cache.cache_sprite.return_value = None
+    return cache
+
 @pytest.fixture
 def mock_scan_worker():
     """Create mock scan worker."""
@@ -158,10 +177,14 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
 
         super().teardown_method()
 
-    def test_window_initialization_and_cleanup(self, mock_extraction_manager):
+    def test_window_initialization_and_cleanup(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache):
         """Test basic window initialization and cleanup."""
         with MemoryHelper.assert_no_leak(DetachedGalleryWindow, max_increase=1):
-            self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+            self.window = DetachedGalleryWindow(
+                extraction_manager=mock_extraction_manager,
+                settings_manager=mock_settings_manager,
+                rom_cache=mock_rom_cache,
+            )
 
             # Window should initialize properly
             assert self.window.windowTitle() == "Sprite Gallery"
@@ -174,9 +197,13 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             self.window.close()
             self.window = None
 
-    def test_rom_loading_workflow(self, mock_extraction_manager, test_rom_file):
+    def test_rom_loading_workflow(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache, test_rom_file):
         """Test complete ROM loading workflow."""
-        self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        self.window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
 
         # Load ROM file
         self.window._set_rom_file(test_rom_file)
@@ -195,13 +222,19 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         self,
         mock_scan_worker_class,
         mock_extraction_manager,
+        mock_settings_manager,
+        mock_rom_cache,
         mock_scan_worker,
         test_rom_file
     ):
         """Test ROM scanning with proper worker cleanup."""
         mock_scan_worker_class.return_value = mock_scan_worker
 
-        self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        self.window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         self.window._set_rom_file(test_rom_file)
 
         # Capture initial sprite count (may have cached sprites from prior ROM cache)
@@ -244,6 +277,8 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         self,
         mock_thumbnail_controller_class,
         mock_extraction_manager,
+        mock_settings_manager,
+        mock_rom_cache,
         test_rom_file
     ):
         """Test thumbnail generation worker lifecycle.
@@ -260,7 +295,11 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         mock_controller.start_worker = Mock()
         mock_thumbnail_controller_class.return_value = mock_controller
 
-        self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        self.window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         self.window._set_rom_file(test_rom_file)
 
         # Set some sprite data
@@ -287,7 +326,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         # Verify controller is stored on the window
         assert self.window.thumbnail_controller is not None
 
-    def test_memory_management_with_large_sprite_set(self, mock_extraction_manager):
+    def test_memory_management_with_large_sprite_set(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache):
         """Test memory management with large number of sprites."""
         # Create large sprite data set
         large_sprite_set = [
@@ -301,7 +340,11 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         ]
 
         with MemoryHelper.assert_no_leak(DetachedGalleryWindow, max_increase=1):
-            self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+            self.window = DetachedGalleryWindow(
+                extraction_manager=mock_extraction_manager,
+                settings_manager=mock_settings_manager,
+                rom_cache=mock_rom_cache,
+            )
 
             # Set large sprite set
             self.window.set_sprites(large_sprite_set)
@@ -316,13 +359,17 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             self.window.close()
             self.window = None
 
-    def test_worker_cleanup_prevents_thread_leaks(self, mock_extraction_manager):
+    def test_worker_cleanup_prevents_thread_leaks(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache):
         """Test that proper worker cleanup prevents thread leaks."""
         initial_thread_count = len([t for t in gc.get_objects() if isinstance(t, type(QTimer()))])
 
         # Create and destroy multiple windows with workers
         for _ in range(5):
-            window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+            window = DetachedGalleryWindow(
+                extraction_manager=mock_extraction_manager,
+                settings_manager=mock_settings_manager,
+                rom_cache=mock_rom_cache,
+            )
 
             # Simulate having active workers
             window.scan_worker = Mock()
@@ -346,13 +393,17 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         # Should not have excessive thread growth
         assert final_thread_count - initial_thread_count <= 2  # Allow some variance
 
-    def test_fullscreen_viewer_integration(self, mock_extraction_manager):
+    def test_fullscreen_viewer_integration(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache):
         """Test integration with fullscreen sprite viewer.
 
         Note: FullscreenSpriteViewer is created without a parent (None) to avoid
         fullscreen constraints that can occur with parent widgets.
         """
-        self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        self.window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
 
         # Set sprite data
         self.window.sprites_data = [
@@ -377,9 +428,13 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             mock_viewer.show.assert_called_once()
 
     @patch('ui.windows.detached_gallery_window.QMessageBox')
-    def test_sprite_extraction_workflow(self, mock_msgbox, mock_extraction_manager, tmp_path):
+    def test_sprite_extraction_workflow(self, mock_msgbox, mock_extraction_manager, mock_settings_manager, mock_rom_cache, tmp_path):
         """Test sprite extraction workflow."""
-        self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        self.window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         self.window.rom_path = "test_rom.sfc"
 
         # Mock gallery selection
@@ -405,13 +460,19 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         mock_scan_worker_class,
         mock_msgbox,
         mock_extraction_manager,
+        mock_settings_manager,
+        mock_rom_cache,
         mock_scan_worker_running,
         test_rom_file
     ):
         """Test scan timeout handling prevents infinite scanning."""
         mock_scan_worker_class.return_value = mock_scan_worker_running
 
-        self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        self.window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         self.window._set_rom_file(test_rom_file)
 
         # Start scan
@@ -425,7 +486,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         assert self.window.scan_worker is None
         mock_scan_worker_running.requestInterruption.assert_called()
 
-    def test_virtual_scrolling_performance(self, mock_extraction_manager):
+    def test_virtual_scrolling_performance(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache):
         """Test virtual scrolling performance with many sprites."""
         # Create massive sprite set to test virtual scrolling
         massive_sprite_set = [
@@ -441,7 +502,11 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         import time
         start_time = time.time()
 
-        self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        self.window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         self.window.set_sprites(massive_sprite_set)
 
         # Process UI updates
@@ -459,12 +524,18 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
     def test_concurrent_worker_management(
         self,
         mock_extraction_manager,
+        mock_settings_manager,
+        mock_rom_cache,
         mock_scan_worker_running,
         mock_thumbnail_worker,
         test_rom_file
     ):
         """Test management of concurrent workers prevents issues."""
-        self.window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        self.window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         self.window._set_rom_file(test_rom_file)
 
         # Set initial workers
@@ -492,6 +563,8 @@ class TestGalleryWindowPerformance(QtTestCase):
         self,
         mock_controller_class,
         mock_extraction_manager,
+        mock_settings_manager,
+        mock_rom_cache,
         mock_thumbnail_worker_for_queueing
     ):
         """Test thumbnail generation performance with realistic sprite counts."""
@@ -511,7 +584,11 @@ class TestGalleryWindowPerformance(QtTestCase):
 
         import time
 
-        window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         window.rom_path = "test_rom.sfc"
 
         # Measure thumbnail request processing time
@@ -528,11 +605,15 @@ class TestGalleryWindowPerformance(QtTestCase):
         # Verify all sprites were queued
         assert mock_thumbnail_worker_for_queueing.queue_thumbnail.call_count == typical_sprite_count
 
-    def test_window_resize_performance(self, mock_extraction_manager):
+    def test_window_resize_performance(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache):
         """Test window resize performance with many sprites."""
         sprites_data = [{'offset': 0x10000 + i * 0x100, 'name': f'S{i}'} for i in range(1000)]
 
-        window = DetachedGalleryWindow(extraction_manager=mock_extraction_manager)
+        window = DetachedGalleryWindow(
+            extraction_manager=mock_extraction_manager,
+            settings_manager=mock_settings_manager,
+            rom_cache=mock_rom_cache,
+        )
         window.set_sprites(sprites_data)
         window.show()
 

@@ -47,7 +47,18 @@ from core.protocols.manager_protocols import (
     ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
+    ROMCacheProtocol,
 )
+
+
+def _create_manual_offset_dialog(parent=None) -> ManualOffsetDialog:
+    """Create ManualOffsetDialog with injected dependencies."""
+    return ManualOffsetDialog(
+        parent,
+        rom_cache=inject(ROMCacheProtocol),
+        settings_manager=inject(ApplicationStateManagerProtocol),
+        extraction_manager=inject(ExtractionManagerProtocol),
+    )
 from tests.infrastructure import (
     ApplicationFactory,
     DataRepository,
@@ -106,7 +117,7 @@ class TestRealDialogIntegration:
         # Managers already initialized by setup_test_infrastructure fixture
 
         # Test real dialog creation (vs mocked widget creation)
-        dialog = ManualOffsetDialog(None)  # Create with no parent
+        dialog = _create_manual_offset_dialog(None)  # Create with no parent
 
         try:
             # CRITICAL: Test that all widget components are properly initialized
@@ -524,7 +535,7 @@ class TestRealDialogManagerIntegration:
         rom_cache = inject(ROMCacheProtocol)
 
         # Test multiple dialogs using same managers (could expose resource conflicts)
-        manual_dialog = ManualOffsetDialog()
+        manual_dialog = _create_manual_offset_dialog()
         settings_dialog = SettingsDialog(
             settings_manager=settings_manager,
             rom_cache=rom_cache
@@ -601,7 +612,7 @@ class TestBugDiscoveryRealVsMockedDialogs:
         """
         # Managers already initialized by setup_test_infrastructure fixture
 
-        dialog = ManualOffsetDialog()
+        dialog = _create_manual_offset_dialog()
 
         try:
             # Test the specific initialization order bug pattern

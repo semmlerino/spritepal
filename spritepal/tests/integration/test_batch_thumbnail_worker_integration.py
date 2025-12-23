@@ -83,11 +83,19 @@ class WorkerThreadWrapper:
 
     def cleanup(self):
         """Clean up worker and thread."""
-        if hasattr(self.worker, 'cleanup'):
-            self.worker.cleanup()
+        # IMPORTANT: Stop the thread FIRST and wait for it to finish
+        # before cleaning up resources. Cleaning up while the thread
+        # is still running causes Qt assertion failures / crashes.
         if self.thread.isRunning():
             self.worker.stop()
-            self.thread.wait(1000)
+            if not self.thread.wait(3000):  # 3 second timeout
+                # Thread didn't stop gracefully, force terminate
+                self.thread.terminate()
+                self.thread.wait(1000)
+
+        # Now safe to clean up resources after thread has stopped
+        if hasattr(self.worker, 'cleanup'):
+            self.worker.cleanup()
 
     def queue_thumbnail(self, *args, **kwargs):
         """Forward queue_thumbnail calls to worker."""

@@ -50,11 +50,30 @@ class _ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDia
             *args: First argument should be OffsetDialogManager if provided
             **kwargs: Ignored
         """
+        from core.di_container import inject
+        from core.protocols.manager_protocols import (
+            ApplicationStateManagerProtocol,
+            ExtractionManagerProtocol,
+            ROMCacheProtocol,
+        )
         from ui.dialogs import UnifiedManualOffsetDialog
 
         manager = args[0] if args and isinstance(args[0], OffsetDialogManager) else None
         parent = manager._parent_widget if manager else None
-        dialog = UnifiedManualOffsetDialog(parent=parent)
+
+        # Inject dependencies at singleton boundary
+        rom_cache = inject(ROMCacheProtocol)
+        settings_manager = inject(ApplicationStateManagerProtocol)
+        extraction_manager = inject(ExtractionManagerProtocol)
+        rom_extractor = extraction_manager.get_rom_extractor()
+
+        dialog = UnifiedManualOffsetDialog(
+            parent=parent,
+            rom_cache=rom_cache,
+            settings_manager=settings_manager,
+            extraction_manager=extraction_manager,
+            rom_extractor=rom_extractor,
+        )
         cls._creator_manager = manager
         cls._destroyed = False
         return dialog

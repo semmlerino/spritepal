@@ -193,8 +193,23 @@ class StandaloneGalleryLauncher:
         """Create and setup the gallery window."""
         print("🗖 Creating detached gallery window...")
 
-        # Create the detached gallery window
-        self.gallery_window = DetachedGalleryWindow()
+        # Inject dependencies at app boundary
+        from core.di_container import inject
+        from core.protocols.manager_protocols import (
+            ApplicationStateManagerProtocol,
+            ExtractionManagerProtocol,
+            ROMCacheProtocol,
+        )
+        extraction_manager = inject(ExtractionManagerProtocol)
+        settings_manager = inject(ApplicationStateManagerProtocol)
+        rom_cache = inject(ROMCacheProtocol)
+
+        # Create the detached gallery window with dependencies
+        self.gallery_window = DetachedGalleryWindow(
+            extraction_manager=extraction_manager,
+            settings_manager=settings_manager,
+            rom_cache=rom_cache,
+        )
         self.gallery_window.setWindowTitle("SpritePal - Sprite Gallery (Standalone)")
 
         # Create sample sprites
