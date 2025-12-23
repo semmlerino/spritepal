@@ -6,16 +6,20 @@ following the principle of progressive disclosure to reduce UI complexity.
 """
 from __future__ import annotations
 
+import os
+import sys
 from collections.abc import Callable
+from typing import cast
 
 try:
     from typing import override
 except ImportError:
     from typing import override
 
-from PySide6.QtCore import QEasingCurve, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -27,7 +31,6 @@ from PySide6.QtWidgets import (
 )
 
 from ui.styles.theme import COLORS
-from ui.utils.safe_animation import SafeAnimation, is_headless_environment
 
 from .spacing_constants import (
     COLLAPSIBLE_ANIMATION_DURATION,
@@ -35,6 +38,26 @@ from .spacing_constants import (
     GROUP_PADDING,
     SPACING_SMALL,
 )
+
+
+def _is_headless_environment() -> bool:
+    """Detect if we're running in a headless environment (CI, offscreen, no display)."""
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        return True
+    if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+        return True
+    if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
+        return True
+    try:
+        app = QApplication.instance()
+        if app:
+            qapp = cast(QApplication, app)
+            screen = qapp.primaryScreen()
+            if not screen or screen.geometry().width() == 0:
+                return True
+    except Exception:
+        return True
+    return False
 
 
 class CollapsibleGroupBox(QFrame):
@@ -65,11 +88,11 @@ class CollapsibleGroupBox(QFrame):
         self._animation_duration: int = COLLAPSIBLE_ANIMATION_DURATION
         self._content_widget: QWidget | None = None
         self._content_layout: QVBoxLayout | None = None
-        self._animation: SafeAnimation | None = None
+        self._animation: QPropertyAnimation | None = None
         self._title_label: QLabel
         self._toggle_button: QPushButton
         self._animation_connections: list[Callable[[], None]] = []  # Track our connections
-        self._is_headless = is_headless_environment()
+        self._is_headless = _is_headless_environment()
 
         # Setup UI components first
         self._setup_ui(title)
@@ -156,17 +179,14 @@ class CollapsibleGroupBox(QFrame):
         self._content_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
 
     def _setup_animation(self) -> None:
-        """Set up the collapse/expand animation (safe for headless mode)."""
-        if self._content_widget is None:
+        """Set up the collapse/expand animation (skipped in headless mode)."""
+        if self._content_widget is None or self._is_headless:
             return
 
-        # Use SafeAnimation which handles headless environments
-        self._animation = SafeAnimation(self._content_widget, b"maximumHeight")
+        # Create real QPropertyAnimation only in non-headless mode
+        self._animation = QPropertyAnimation(self._content_widget, b"maximumHeight")
         self._animation.setDuration(self._animation_duration)
-
-        # Only set easing curve if not in headless mode
-        if not self._is_headless:
-            self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
 
     def _update_button_text(self) -> None:
         """Update the toggle button text based on collapsed state."""
@@ -190,110 +210,99 @@ class CollapsibleGroupBox(QFrame):
         self._is_collapsed = collapsed
         self._update_button_text()
 
-        if self._animation is not None and self._content_widget is not None:
-            self._animation.stop()
+        if self._content_widget is None:
+            self.collapsed.emit(collapsed)
+            return
 
-            # Disconnect our previous connections
-            for connection in self._animation_connections:
-                try:
-                    connection()
-                except RuntimeError as e:
-                    # Only ignore the specific Qt object deletion error (exact match)
-                    if str(e) != "wrapped C/C++ object has been deleted":
-                        raise
-                except TypeError:
-                    # Connection might have incompatible signature
-                    pass
-            if self._animation_connections:
-                self._animation_connections.clear()
-
+        # Headless mode: instant changes without animation
+        if self._animation is None:
             if collapsed:
-                # Collapse: animate to height 0
-                start_height = self._content_widget.height()
-                self._animation.setStartValue(start_height)
-                self._animation.setEndValue(0)
-
-                # Update widget height during animation
-                def on_collapse_value_changed(value: int) -> None:
-                    if self._content_widget is not None:
-                        self._content_widget.setFixedHeight(value)
-
-                # Store connections so we can disconnect them later
-                self._animation.valueChanged.connect(on_collapse_value_changed)
-
-                # Hide content after animation finishes
-                def on_collapse_finished() -> None:
-                    if self._is_collapsed and self._content_widget is not None:
-                        self._content_widget.setVisible(False)
-                        self._content_widget.setMaximumHeight(0)
-
-                self._animation.finished.connect(on_collapse_finished)
-
-                # Track connections
-                def disconnect_collapse_value() -> None:
-                    if self._animation:
-                        self._animation.valueChanged.disconnect(on_collapse_value_changed)
-
-                def disconnect_collapse_finished() -> None:
-                    if self._animation:
-                        self._animation.finished.disconnect(on_collapse_finished)
-
-                self._animation_connections = [
-                    disconnect_collapse_value,
-                    disconnect_collapse_finished
-                ]
-            else:
-                # Expand: animate to natural height
-                # Show content widget at start of expansion
-                self._content_widget.setVisible(True)
-
-                # Calculate natural height without forcing layout updates (prevent conflicts)
-                natural_height = self._calculate_natural_height()
-                if natural_height <= 0:
-                    natural_height = 80  # Reasonable fallback
-
-                # Reset constraint to start animation from collapsed state
+                self._content_widget.setVisible(False)
                 self._content_widget.setMaximumHeight(0)
+            else:
+                self._content_widget.setVisible(True)
+                self._content_widget.setMinimumHeight(0)
+                self._content_widget.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX
+            self.collapsed.emit(collapsed)
+            return
 
-                # Animate from 0 to natural height
-                self._animation.setStartValue(0)
-                self._animation.setEndValue(natural_height)
+        # Animated mode: use QPropertyAnimation
+        self._animation.stop()
 
-                # Update widget height during animation
-                def on_value_changed(value: int) -> None:
-                    if self._content_widget is not None:
-                        self._content_widget.setFixedHeight(value)
+        # Disconnect our previous connections
+        for connection in self._animation_connections:
+            try:
+                connection()
+            except RuntimeError as e:
+                if str(e) != "wrapped C/C++ object has been deleted":
+                    raise
+            except TypeError:
+                pass
+        self._animation_connections.clear()
 
-                # Store connections so we can disconnect them later
-                self._animation.valueChanged.connect(on_value_changed)
+        if collapsed:
+            # Collapse: animate to height 0
+            start_height = self._content_widget.height()
+            self._animation.setStartValue(start_height)
+            self._animation.setEndValue(0)
 
-                # Remove height constraint after animation finishes
-                def on_finished() -> None:
-                    if not self._is_collapsed and self._content_widget is not None:
-                        # Remove all height constraints by setting different min/max values
-                        self._content_widget.setMinimumHeight(0)
-                        self._content_widget.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX
-                        # This effectively removes the fixed height constraint
+            def on_collapse_value_changed(value: int) -> None:
+                if self._content_widget is not None:
+                    self._content_widget.setFixedHeight(value)
 
-                self._animation.finished.connect(on_finished)
+            self._animation.valueChanged.connect(on_collapse_value_changed)
 
-                # Track connections
-                def disconnect_expand_value() -> None:
-                    if self._animation:
-                        self._animation.valueChanged.disconnect(on_value_changed)
+            def on_collapse_finished() -> None:
+                if self._is_collapsed and self._content_widget is not None:
+                    self._content_widget.setVisible(False)
+                    self._content_widget.setMaximumHeight(0)
 
-                def disconnect_expand_finished() -> None:
-                    if self._animation:
-                        self._animation.finished.disconnect(on_finished)
+            self._animation.finished.connect(on_collapse_finished)
 
-                self._animation_connections = [
-                    disconnect_expand_value,
-                    disconnect_expand_finished
-                ]
+            def disconnect_collapse_value() -> None:
+                if self._animation:
+                    self._animation.valueChanged.disconnect(on_collapse_value_changed)
 
-            self._animation.start()
+            def disconnect_collapse_finished() -> None:
+                if self._animation:
+                    self._animation.finished.disconnect(on_collapse_finished)
 
-        # Emit signal
+            self._animation_connections = [disconnect_collapse_value, disconnect_collapse_finished]
+        else:
+            # Expand: animate to natural height
+            self._content_widget.setVisible(True)
+            natural_height = self._calculate_natural_height()
+            if natural_height <= 0:
+                natural_height = 80
+
+            self._content_widget.setMaximumHeight(0)
+            self._animation.setStartValue(0)
+            self._animation.setEndValue(natural_height)
+
+            def on_value_changed(value: int) -> None:
+                if self._content_widget is not None:
+                    self._content_widget.setFixedHeight(value)
+
+            self._animation.valueChanged.connect(on_value_changed)
+
+            def on_finished() -> None:
+                if not self._is_collapsed and self._content_widget is not None:
+                    self._content_widget.setMinimumHeight(0)
+                    self._content_widget.setMaximumHeight(16777215)
+
+            self._animation.finished.connect(on_finished)
+
+            def disconnect_expand_value() -> None:
+                if self._animation:
+                    self._animation.valueChanged.disconnect(on_value_changed)
+
+            def disconnect_expand_finished() -> None:
+                if self._animation:
+                    self._animation.finished.disconnect(on_finished)
+
+            self._animation_connections = [disconnect_expand_value, disconnect_expand_finished]
+
+        self._animation.start()
         self.collapsed.emit(collapsed)
 
     def is_collapsed(self) -> bool:

@@ -105,8 +105,6 @@ class ApplicationStateManager(BaseManager):
     # DOMAIN-SPECIFIC SIGNALS (simplified for specific use cases):
     #   session_changed, settings_saved - Persistence events
     #   preview_ready, current_offset_changed - UI updates
-    #
-    # Signal Registry: Use utils.signal_registry.SignalRegistry for debugging
     # =========================================
 
     # Unified signals (canonical)

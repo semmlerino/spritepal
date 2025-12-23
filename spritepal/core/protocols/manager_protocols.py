@@ -4,7 +4,7 @@ These protocols define the interfaces that managers must implement.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -550,24 +550,119 @@ class ConfigurationServiceProtocol(Protocol):
         ...
 
 
-# ========== Application State Manager Protocols (A.4) ==========
+class PathSuggestionServiceProtocol(Protocol):
+    """
+    Protocol for path suggestion service.
 
-
-# ========== Internal Base Protocols (A.4.1) ==========
-# These protocols are internal base classes for ApplicationStateManagerProtocol.
-# They are NOT registered in DI and should NOT be imported directly.
-# Use ApplicationStateManagerProtocol for all DI injection.
-
-
-class WorkflowStateProtocol(Protocol):
-    """Protocol for workflow state management.
-
-    Controls the extraction workflow state machine, tracking whether operations
-    are in progress and what transitions are valid.
+    Provides smart file path suggestions for injection workflows using
+    multiple strategies: metadata, session data, basename patterns, etc.
     """
 
-    # Signal
+    def set_session_manager_getter(
+        self, getter: Callable[[], ApplicationStateManagerProtocol | None]
+    ) -> None:
+        """Set the session manager getter for session-based strategies."""
+        ...
+
+    def validate_path(self, path: str | None) -> str:
+        """Validate and return path if it exists, empty string otherwise."""
+        ...
+
+    def find_vram_path(
+        self,
+        sprite_path: str,
+        metadata_path: str = "",
+        metadata: Mapping[str, object] | None = None,
+        pre_suggested: str = "",
+        strip_editor_suffixes: bool = False,
+    ) -> str:
+        """
+        Find VRAM path using multiple strategies in priority order.
+
+        Args:
+            sprite_path: Path to sprite file
+            metadata_path: Optional metadata file path
+            metadata: Pre-loaded metadata dict
+            pre_suggested: Pre-suggested VRAM path to check first
+            strip_editor_suffixes: Strip editor suffixes from sprite name
+
+        Returns:
+            Suggested VRAM path or empty string if none found
+        """
+        ...
+
+    def get_smart_vram_suggestion(
+        self, sprite_path: str, metadata_path: str = ""
+    ) -> str:
+        """Get smart VRAM file suggestion for injection."""
+        ...
+
+    def find_suggested_input_vram(
+        self,
+        sprite_path: str,
+        metadata: Mapping[str, object] | None = None,
+        suggested_vram: str = "",
+    ) -> str:
+        """Find the best suggestion for input VRAM path."""
+        ...
+
+    def suggest_output_path(
+        self,
+        input_path: str,
+        suffix: str,
+        extension: str | None = None,
+        preserve_parent: bool = False,
+    ) -> str:
+        """Generic output path suggestion with smart numbering."""
+        ...
+
+    def suggest_output_vram_path(self, input_vram_path: str) -> str:
+        """Suggest output VRAM path based on input path."""
+        ...
+
+    def suggest_output_rom_path(self, input_rom_path: str) -> str:
+        """Suggest output ROM path based on input path."""
+        ...
+
+
+# ========== Application State Manager Protocol ==========
+
+
+class ApplicationStateManagerProtocol(Protocol):
+    """Protocol for the consolidated application state manager.
+
+    Manages workflow state, session persistence, settings access, cache statistics,
+    runtime state, and current offset coordination. This is the primary protocol
+    for application state - inject this for all state management needs.
+    """
+
+    # Workflow signals
     workflow_state_changed: Signal  # Signal(object, object) - old_state, new_state
+
+    # Session signals
+    session_changed: Signal  # Signal() - session data modified
+    files_updated: Signal  # Signal(dict) - file paths changed
+    session_restored: Signal  # Signal(dict) - session loaded from disk
+
+    # Settings signals
+    settings_saved: Signal  # Signal() - settings persisted to disk
+
+    # Cache signals
+    cache_stats_updated: Signal  # Signal(dict) - updated cache metrics
+
+    # State signals
+    state_changed: Signal  # Signal(str, dict) - category, data
+
+    # Offset signals
+    current_offset_changed: Signal  # Signal(int) - ROM offset changed
+    preview_ready: Signal  # Signal(int, QImage) - offset, preview_image
+
+    # Additional signals
+    application_state_snapshot: Signal  # Signal(dict) - full state for debugging
+    history_updated: Signal  # Signal(list) - list of sprite offsets
+    sprite_added: Signal  # Signal(int, float) - offset, quality_score
+
+    # ----- Workflow State Methods -----
 
     @property
     def workflow_state(self) -> object:
@@ -590,18 +685,7 @@ class WorkflowStateProtocol(Protocol):
         """Attempt to transition to a new workflow state."""
         ...
 
-
-class SessionPersistenceProtocol(Protocol):
-    """Protocol for session persistence operations.
-
-    Handles saving and loading session state (current files, offsets, etc.)
-    to enable resuming work across application restarts.
-    """
-
-    # Signals
-    session_changed: Signal  # Signal() - session data modified
-    files_updated: Signal  # Signal(dict) - file paths changed
-    session_restored: Signal  # Signal(dict) - session loaded from disk
+    # ----- Session Persistence Methods -----
 
     def save_session(self, path: Path | None = None) -> bool:
         """Save current session state."""
@@ -623,16 +707,7 @@ class SessionPersistenceProtocol(Protocol):
         """Update multiple session values at once."""
         ...
 
-
-class SettingsAccessProtocol(Protocol):
-    """Protocol for settings access (get/set operations).
-
-    Provides access to persistent user settings including window geometry,
-    application preferences, and other configuration values.
-    """
-
-    # Signal
-    settings_saved: Signal  # Signal() - settings persisted to disk
+    # ----- Settings Access Methods -----
 
     def get_setting(self, category: str, key: str, default: object = None) -> object:
         """Get a persistent setting value."""
@@ -662,16 +737,7 @@ class SettingsAccessProtocol(Protocol):
         """Update window geometry in settings including splitter sizes."""
         ...
 
-
-class CacheStatsProtocol(Protocol):
-    """Protocol for cache session statistics.
-
-    Tracks cache hit/miss rates during the current session for
-    performance monitoring and optimization.
-    """
-
-    # Signal
-    cache_stats_updated: Signal  # Signal(dict) - updated cache metrics
+    # ----- Cache Stats Methods -----
 
     def record_cache_hit(self) -> None:
         """Record a cache hit in session statistics."""
@@ -685,16 +751,7 @@ class CacheStatsProtocol(Protocol):
         """Get current cache session statistics."""
         ...
 
-
-class RuntimeStateProtocol(Protocol):
-    """Protocol for runtime (non-persisted) state management.
-
-    Manages ephemeral state that exists only during the current session,
-    such as temporary UI state or computed values with optional TTL.
-    """
-
-    # Signal
-    state_changed: Signal  # Signal(str, dict) - category, data
+    # ----- Runtime State Methods -----
 
     def get_state(self, namespace: str, key: str, default: object = None) -> object:
         """Get runtime state value (not persisted)."""
@@ -710,17 +767,7 @@ class RuntimeStateProtocol(Protocol):
         """Clear runtime state."""
         ...
 
-
-class CurrentOffsetProtocol(Protocol):
-    """Protocol for current ROM offset coordination.
-
-    Manages the currently selected ROM offset and coordinates preview
-    generation across UI components.
-    """
-
-    # Signals
-    current_offset_changed: Signal  # Signal(int) - ROM offset changed
-    preview_ready: Signal  # Signal(int, QImage) - offset, preview_image
+    # ----- Current Offset Methods -----
 
     def set_current_offset(self, offset: int) -> None:
         """Set the current ROM offset and emit signal."""
@@ -729,42 +776,6 @@ class CurrentOffsetProtocol(Protocol):
     def get_current_offset(self) -> int | None:
         """Get the current ROM offset."""
         ...
-
-
-# ========== Composite Protocol (A.4.2) ==========
-
-
-class ApplicationStateManagerProtocol(
-    WorkflowStateProtocol,
-    SessionPersistenceProtocol,
-    SettingsAccessProtocol,
-    CacheStatsProtocol,
-    RuntimeStateProtocol,
-    CurrentOffsetProtocol,
-    Protocol,
-):
-    """Composite protocol for the consolidated application state manager.
-
-    This protocol composes all focused state management protocols for backward
-    compatibility. Existing code can continue to depend on this protocol.
-
-    New code should prefer depending on specific focused protocols when only
-    a subset of functionality is needed:
-    - WorkflowStateProtocol: workflow state machine
-    - SessionPersistenceProtocol: save/load session
-    - SettingsAccessProtocol: get/set settings
-    - CacheStatsProtocol: cache hit/miss tracking
-    - RuntimeStateProtocol: ephemeral runtime state
-    - CurrentOffsetProtocol: current ROM offset coordination
-
-    All methods and signals are inherited from the focused protocols above.
-    Only additional signals not covered by focused protocols are defined here.
-    """
-
-    # Additional signals not in focused protocols
-    application_state_snapshot: Signal  # Signal(dict) - full state for debugging
-    history_updated: Signal  # Signal(list) - list of sprite offsets
-    sprite_added: Signal  # Signal(int, float) - offset, quality_score
 
 
 class SpritePresetManagerProtocol(Protocol):
