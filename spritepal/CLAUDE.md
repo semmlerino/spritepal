@@ -192,7 +192,6 @@ For integration tests and real component testing:
 | Fixture | Scope | Purpose |
 |---------|-------|---------|
 | `real_factory` | function | RealComponentFactory wrapper with cleanup |
-| `complete_test_context` | function | All managers together (injection, extraction, session) |
 | `manager_context_factory` | function | Factory for creating test contexts |
 | `test_injection_manager` | function | Context-based injection manager |
 | `test_extraction_manager` | function | Context-based extraction manager |
@@ -372,11 +371,9 @@ spritepal/
 
 | Looking for... | Location |
 |----------------|----------|
-| Manager protocols | `core/protocols/manager_protocols.py` |
-| Dialog protocols | `core/protocols/dialog_protocols.py` |
-| Preview protocols | `core/protocols/preview_protocols.py` |
-| Worker protocols | `core/protocols/worker_protocols.py` |
-| All protocols (exports) | `core/protocols/__init__.py` |
+| Manager protocols | `core/protocols/manager_protocols.py` (ExtractionManager, InjectionManager, ROMCache, ROMExtractor) |
+| Dialog protocols | `core/protocols/dialog_protocols.py` (ArrangementDialog, DialogFactory, ManualOffsetDialogFactory) |
+| All protocols (7 total) | `core/protocols/__init__.py` |
 | ExtractionManager, InjectionManager | `core/managers/` |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
 | DI container, `inject()` | `core/di_container.py` |
@@ -428,4 +425,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: December 21, 2025*
+*Last updated: December 23, 2025*

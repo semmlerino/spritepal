@@ -450,17 +450,28 @@ ApplicationStateManager isn't registered before CoreOperationsManager is created
 
 ### Available Protocols
 
-All protocols are defined in `core/protocols/manager_protocols.py`:
+SpritePal uses 7 protocols across two files:
+
+**Manager protocols** (`core/protocols/manager_protocols.py`):
 
 | Protocol | Purpose |
 |----------|---------|
-| `ApplicationStateManagerProtocol` | Consolidated session, state, settings |
-| `ExtractionManagerProtocol` | Sprite extraction |
-| `InjectionManagerProtocol` | Sprite injection |
-| `SettingsManagerProtocol` | Persistent settings |
-| `ConfigurationServiceProtocol` | App configuration |
+| `ExtractionManagerProtocol` | Sprite extraction from ROM/VRAM |
+| `InjectionManagerProtocol` | Sprite injection into ROM |
 | `ROMCacheProtocol` | ROM file caching |
 | `ROMExtractorProtocol` | Low-level ROM extraction |
+
+**Dialog protocols** (`core/protocols/dialog_protocols.py`):
+
+| Protocol | Purpose |
+|----------|---------|
+| `DialogFactoryProtocol` | Create dialog instances |
+| `ArrangementDialogProtocol` | Grid arrangement dialog |
+| `ManualOffsetDialogFactoryProtocol` | Manual offset entry dialog |
+
+**Consolidated managers** (no longer protocols - use concrete classes):
+- `ApplicationStateManager` - Session, state, settings (use directly, not via protocol)
+- `ConfigurationService` - App configuration (use directly, not via protocol)
 
 ### What NOT to Do
 
@@ -558,4 +569,4 @@ The adapter pattern allows:
 
 ---
 
-*Last updated: December 23, 2025*
+*Last updated: December 23, 2025 (Protocol simplification: 14 → 7 protocols)*

@@ -257,12 +257,15 @@ Application Launch
 ### 4.3 Settings Access Pattern
 
 ```python
+from core.managers.application_state_manager import ApplicationStateManager
 from core.di_container import inject
-from core.protocols.manager_protocols import SettingsManagerProtocol
 
-settings_manager = inject(SettingsManagerProtocol)
-value = settings_manager.get("some_setting", default_value)
+# Settings are now part of ApplicationStateManager
+app_state = inject(ApplicationStateManager)
+value = app_state.settings.get("some_setting", default_value)
 ```
+
+**Note:** `SettingsManagerProtocol` has been consolidated into `ApplicationStateManager`. Use the concrete class directly.
 
 ---
 
@@ -389,4 +392,4 @@ User modifies sprite
 
 ---
 
-*Last updated: December 23, 2025*
+*Last updated: December 23, 2025 (Updated for consolidated ApplicationStateManager)*

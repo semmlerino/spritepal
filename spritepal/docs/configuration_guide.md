@@ -89,24 +89,26 @@ config.default_dumps_directory  # ~/Documents/Mesen2/Debugger/
 
 ## 4. Accessing Settings at Runtime
 
-Use dependency injection to access settings:
+Settings are now managed through `ApplicationStateManager`:
 
 ```python
+from core.managers.application_state_manager import ApplicationStateManager
 from core.di_container import inject
-from core.protocols.manager_protocols import SettingsManagerProtocol
 
-settings_manager = inject(SettingsManagerProtocol)
+app_state = inject(ApplicationStateManager)
 
 # Read a setting
-value = settings_manager.get("some_key", default_value)
+value = app_state.settings.get("some_key", default_value)
 
 # Read a nested setting
-last_rom = settings_manager.get("rom_injection.last_input_rom", "")
+last_rom = app_state.settings.get("rom_injection.last_input_rom", "")
 
 # Write a setting
-settings_manager.set("some_key", new_value)
-settings_manager.save()  # Persist to disk
+app_state.settings.set("some_key", new_value)
+app_state.settings.save()  # Persist to disk
 ```
+
+**Note:** `SettingsManagerProtocol` has been consolidated into `ApplicationStateManager`. Use the concrete class directly.
 
 ---
 
@@ -155,7 +157,8 @@ Feature flags for experimental functionality are in the `experimental` namespace
 
 **Checking feature flags**:
 ```python
-use_feature = settings_manager.get("experimental.use_feature_x", False)
+app_state = inject(ApplicationStateManager)
+use_feature = app_state.settings.get("experimental.use_feature_x", False)
 if use_feature:
     # Use new implementation
 else:
@@ -177,8 +180,8 @@ Tests use isolated settings to prevent polluting production config:
 # In tests, use isolated_managers fixture
 def test_something(isolated_managers):
     # Settings are isolated - changes don't affect production
-    settings = inject(SettingsManagerProtocol)
-    settings.set("test_key", "test_value")
+    app_state = inject(ApplicationStateManager)
+    app_state.settings.set("test_key", "test_value")
     # ... test code ...
     # Settings reset automatically after test
 ```
@@ -217,4 +220,4 @@ def test_something(isolated_managers):
 
 ---
 
-*Last updated: December 21, 2025*
+*Last updated: December 23, 2025 (Updated for consolidated ApplicationStateManager)*
