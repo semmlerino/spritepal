@@ -196,12 +196,12 @@ class StandaloneGalleryLauncher:
         # Inject dependencies at app boundary
         from core.di_container import inject
         from core.protocols.manager_protocols import (
-            ApplicationStateManagerProtocol,
+            ApplicationStateManager,
             ExtractionManagerProtocol,
             ROMCacheProtocol,
         )
         extraction_manager = inject(ExtractionManagerProtocol)
-        settings_manager = inject(ApplicationStateManagerProtocol)
+        settings_manager = inject(ApplicationStateManager)
         rom_cache = inject(ROMCacheProtocol)
 
         # Create the detached gallery window with dependencies

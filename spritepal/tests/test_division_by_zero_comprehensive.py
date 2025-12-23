@@ -130,7 +130,7 @@ class TestDivisionByZeroFixes:
     def test_similarity_indexing_no_sprites(self):
         """Test SimilarityIndexingWorker with no sprites to index."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        from core.managers.application_state_manager import ApplicationStateManager
         from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
@@ -139,7 +139,7 @@ class TestDivisionByZeroFixes:
 
             worker = SimilarityIndexingWorker(
                 rom_path=tmp.name,
-                settings_manager=inject(ApplicationStateManagerProtocol),
+                settings_manager=inject(ApplicationStateManager),
             )
 
             # Don't add any sprites - should handle empty list gracefully
@@ -244,16 +244,14 @@ class TestDivisionByZeroFixes:
     def test_all_workers_with_realistic_edge_cases(self):
         """Integration test with realistic edge cases that could cause division by zero."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import (
-            ApplicationStateManagerProtocol,
-            ROMCacheProtocol,
-        )
+        from core.managers.application_state_manager import ApplicationStateManager
+        from core.protocols.manager_protocols import ROMCacheProtocol
         from ui.rom_extraction.workers.range_scan_worker import RangeScanWorker
         from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
         from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
 
         rom_cache = inject(ROMCacheProtocol)
-        settings_manager = inject(ApplicationStateManagerProtocol)
+        settings_manager = inject(ApplicationStateManager)
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
             # Small file that might not have sprites

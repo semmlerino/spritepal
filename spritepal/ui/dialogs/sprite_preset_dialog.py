@@ -35,7 +35,7 @@ from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 from ui.components.base import DialogBase
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ConfigurationServiceProtocol
+    from core.configuration_service import ConfigurationService
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +240,7 @@ class SpritePresetDialog(DialogBase):
         self,
         parent: WidgetParent = None,
         *,
-        config_service: ConfigurationServiceProtocol | None = None,
+        config_service: ConfigurationService | None = None,
         current_game_title: str = "",
         current_checksum: int | None = None,
     ) -> None:

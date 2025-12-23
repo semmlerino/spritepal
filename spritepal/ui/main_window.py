@@ -9,10 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from core.controller import ExtractionController
-    from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
-        ROMCacheProtocol,
-    )
+    from core.managers.application_state_manager import ApplicationStateManager
+    from core.protocols.manager_protocols import ROMCacheProtocol
 
 from typing import override
 
@@ -36,7 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# Session manager accessed via DI: inject(ApplicationStateManagerProtocol)
+# Session manager accessed via DI: inject(ApplicationStateManager)
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
 from core.types import VRAMExtractionParams
 from ui.common.spacing_constants import (
@@ -45,8 +43,6 @@ from ui.common.spacing_constants import (
 )
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
-    KeyboardShortcutHandler,
-    MenuBarManager,
     OutputSettingsManager,
     PreviewCoordinator,
     SessionCoordinator,
@@ -83,9 +79,9 @@ class MainWindow(QMainWindow):
 
     def __init__(
         self,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
         rom_cache: ROMCacheProtocol,
-        session_manager: ApplicationStateManagerProtocol,
+        session_manager: ApplicationStateManager,
     ) -> None:
         super().__init__()
         # Declare instance variables with type hints
@@ -105,13 +101,11 @@ class MainWindow(QMainWindow):
         self.session_manager = session_manager
 
         # Manager instances
-        self.menu_bar_manager: MenuBarManager
         self.toolbar_manager: ToolbarManager
         self.status_bar_manager: StatusBarManager
         self.output_settings_manager: OutputSettingsManager
         self.tab_coordinator: TabCoordinator
         self.preview_coordinator: PreviewCoordinator
-        self.keyboard_handler: KeyboardShortcutHandler
         self.session_coordinator: SessionCoordinator
 
         self._output_path = ""
@@ -247,7 +241,6 @@ class MainWindow(QMainWindow):
     def _setup_managers(self) -> None:
         """Set up all UI managers"""
         # Create managers in dependency order
-        self.menu_bar_manager = MenuBarManager(self, self)
         self.status_bar_manager = StatusBarManager(self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         self.output_settings_manager = OutputSettingsManager(self, self)
 
@@ -281,16 +274,8 @@ class MainWindow(QMainWindow):
             self
         )
 
-        # Keyboard handler needs several managers
-        self.keyboard_handler = KeyboardShortcutHandler(
-            self.tab_coordinator,
-            self.output_settings_manager,
-            self.toolbar_manager,
-            self
-        )
-
         # Initialize manager UIs
-        self.menu_bar_manager.create_menus()
+        self._create_menus()
         self.status_bar_manager.setup_status_bar_indicators()
 
         # Add action buttons to the pinned action zone
@@ -573,7 +558,120 @@ class MainWindow(QMainWindow):
         """Hide cache operation badge"""
         self.status_bar_manager.hide_cache_operation_badge()
 
-    # Menu creation now handled by MenuBarManager in _setup_managers()
+    # Menu creation inlined from MenuBarManager
+
+    def _create_menus(self) -> None:
+        """Create application menus"""
+        from PySide6.QtGui import QAction
+
+        menubar = self.menuBar()
+        if not menubar:
+            return
+
+        # File menu
+        file_menu = menubar.addMenu("File")
+        if file_menu:
+            new_action = QAction("New Extraction", self)
+            new_action.setShortcut("Ctrl+N")
+            new_action.triggered.connect(self.new_extraction)
+            file_menu.addAction(new_action)
+            file_menu.addSeparator()
+
+            exit_action = QAction("Exit", self)
+            exit_action.setShortcut("Ctrl+Q")
+            exit_action.triggered.connect(self.close)
+            file_menu.addAction(exit_action)
+
+        # Tools menu
+        tools_menu = menubar.addMenu("Tools")
+        if tools_menu:
+            settings_action = QAction("Settings...", self)
+            settings_action.setShortcut("Ctrl+,")
+            settings_action.triggered.connect(self.show_settings)
+            tools_menu.addAction(settings_action)
+
+            presets_action = QAction("Manage Presets...", self)
+            presets_action.setShortcut("Ctrl+P")
+            presets_action.triggered.connect(self.show_presets)
+            tools_menu.addAction(presets_action)
+            tools_menu.addSeparator()
+
+            cache_manager_action = QAction("Cache Manager...", self)
+            cache_manager_action.triggered.connect(self.show_cache_manager)
+            tools_menu.addAction(cache_manager_action)
+            tools_menu.addSeparator()
+
+            clear_cache_action = QAction("Clear All Caches", self)
+            clear_cache_action.triggered.connect(self.clear_all_caches)
+            tools_menu.addAction(clear_cache_action)
+
+        # Help menu
+        help_menu = menubar.addMenu("Help")
+        if help_menu:
+            shortcuts_action = QAction("Keyboard Shortcuts", self)
+            shortcuts_action.setShortcut("F1")
+            shortcuts_action.triggered.connect(self._show_keyboard_shortcuts)
+            help_menu.addAction(shortcuts_action)
+            help_menu.addSeparator()
+
+            about_action = QAction("About SpritePal", self)
+            about_action.triggered.connect(self._show_about)
+            help_menu.addAction(about_action)
+
+    def _show_about(self) -> None:
+        """Show about dialog"""
+        QMessageBox.about(
+            self,
+            "About SpritePal",
+            "<h2>SpritePal</h2>"
+            "<p>Version 1.0.0</p>"
+            "<p>A modern sprite extraction tool for SNES games.</p>"
+            "<p>Simplifies sprite extraction with automatic palette association.</p>"
+            "<br>"
+            "<p>Part of the Kirby Super Star sprite editing toolkit.</p>"
+        )
+
+    def _show_keyboard_shortcuts(self) -> None:
+        """Show keyboard shortcuts dialog"""
+        shortcuts_text = """
+        <h3>Main Actions</h3>
+        <table>
+        <tr><td><b>Ctrl+E / F5</b></td><td>Extract sprites</td></tr>
+        <tr><td><b>Ctrl+O</b></td><td>Open in editor</td></tr>
+        <tr><td><b>Ctrl+R</b></td><td>Arrange rows</td></tr>
+        <tr><td><b>Ctrl+G</b></td><td>Grid arrange</td></tr>
+        <tr><td><b>Ctrl+I</b></td><td>Inject sprites</td></tr>
+        <tr><td><b>Ctrl+N</b></td><td>New extraction</td></tr>
+        <tr><td><b>Ctrl+Q</b></td><td>Exit application</td></tr>
+        </table>
+
+        <h3>Navigation</h3>
+        <table>
+        <tr><td><b>Ctrl+Tab</b></td><td>Next tab</td></tr>
+        <tr><td><b>Ctrl+Shift+Tab</b></td><td>Previous tab</td></tr>
+        <tr><td><b>Alt+N</b></td><td>Focus output name field</td></tr>
+        <tr><td><b>F1</b></td><td>Show this help</td></tr>
+        </table>
+
+        <h3>ROM Manual Offset Mode</h3>
+        <table>
+        <tr><td><b>Ctrl+M</b></td><td>Open Manual Offset Control window</td></tr>
+        <tr><td><b>Alt+Left</b></td><td>Find previous sprite (in dialog)</td></tr>
+        <tr><td><b>Alt+Right</b></td><td>Find next sprite (in dialog)</td></tr>
+        <tr><td><b>Page Up</b></td><td>Jump backward 64KB (in dialog)</td></tr>
+        <tr><td><b>Page Down</b></td><td>Jump forward 64KB (in dialog)</td></tr>
+        </table>
+
+        <h3>Preview Window</h3>
+        <table>
+        <tr><td><b>G</b></td><td>Toggle grid</td></tr>
+        <tr><td><b>F</b></td><td>Zoom to fit</td></tr>
+        <tr><td><b>Ctrl+0</b></td><td>Reset zoom to 4x</td></tr>
+        <tr><td><b>C</b></td><td>Toggle palette</td></tr>
+        <tr><td><b>Mouse Wheel</b></td><td>Zoom in/out</td></tr>
+        </table>
+        """
+        QMessageBox.information(self, "Keyboard Shortcuts", shortcuts_text)
 
     def _connect_signals(self) -> None:
         """Connect internal signals"""
@@ -777,14 +875,12 @@ class MainWindow(QMainWindow):
         """
         # Clean up managers (not all have cleanup methods yet)
         managers: list[object] = [
-            self.menu_bar_manager,
             self.status_bar_manager,
             self.output_settings_manager,
             self.toolbar_manager,
             self.preview_coordinator,
             self.session_coordinator,
             self.tab_coordinator,
-            self.keyboard_handler,
         ]
         for manager in managers:
             cleanup_fn = getattr(manager, "cleanup", None)
@@ -802,16 +898,62 @@ class MainWindow(QMainWindow):
                 cleanup_fn()
 
     @override
-    def keyPressEvent(self, a0: QKeyEvent | None) -> None:
-        """Handle keyboard shortcuts"""
-        if not a0:
+    def keyPressEvent(self, event: QKeyEvent | None) -> None:
+        """Handle keyboard shortcuts (inlined from KeyboardShortcutHandler)"""
+        if not event:
             return
 
-        # Delegate to keyboard handler
-        if self.keyboard_handler.handle_key_press_event(a0):
+        # Tab navigation: Ctrl+Tab / Ctrl+Shift+Tab
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            if event.key() == Qt.Key.Key_Tab:
+                self._navigate_to_next_tab()
+                event.accept()
+                return
+        elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
+            if event.key() == Qt.Key.Key_Backtab:
+                self._navigate_to_previous_tab()
+                event.accept()
+                return
+
+        # F5 as alternative to Extract
+        if event.key() == Qt.Key.Key_F5 and self.toolbar_manager.extract_button.isEnabled():
+            self.on_extract_clicked()
+            event.accept()
             return
 
-        super().keyPressEvent(a0)
+        # Ctrl+M: Open Manual Offset Control (if in ROM extraction mode)
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            if event.key() == Qt.Key.Key_M:
+                if self.can_open_manual_offset_dialog():
+                    self.open_manual_offset_dialog()
+                    event.accept()
+                    return
+
+        # Alt+N: Focus output name field
+        if event.modifiers() == Qt.KeyboardModifier.AltModifier:
+            if event.key() == Qt.Key.Key_N:
+                output_edit = getattr(self.output_settings_manager, "output_name_edit", None)
+                if output_edit is not None:
+                    output_edit.setFocus()
+                    output_edit.selectAll()
+                    event.accept()
+                    return
+
+        super().keyPressEvent(event)
+
+    def _navigate_to_next_tab(self) -> None:
+        """Navigate to next tab"""
+        current = self.tab_coordinator.get_current_tab_index()
+        tab_count = self.extraction_tabs.count()
+        next_tab = (current + 1) % tab_count
+        self.extraction_tabs.setCurrentIndex(next_tab)
+
+    def _navigate_to_previous_tab(self) -> None:
+        """Navigate to previous tab"""
+        current = self.tab_coordinator.get_current_tab_index()
+        tab_count = self.extraction_tabs.count()
+        prev_tab = (current - 1) % tab_count
+        self.extraction_tabs.setCurrentIndex(prev_tab)
 
     # Property delegation to managers for test compatibility
     @property
@@ -874,9 +1016,9 @@ class MainWindow(QMainWindow):
             # Import here to avoid circular dependency at module level
             from core.controller import ExtractionController
             from core.di_container import inject
+            from core.managers.application_state_manager import ApplicationStateManager
             from core.protocols.dialog_protocols import DialogFactoryProtocol
             from core.protocols.manager_protocols import (
-                ApplicationStateManagerProtocol,
                 ExtractionManagerProtocol,
                 InjectionManagerProtocol,
             )
@@ -884,7 +1026,7 @@ class MainWindow(QMainWindow):
             self._controller = ExtractionController(
                 self,
                 extraction_manager=inject(ExtractionManagerProtocol),
-                session_manager=inject(ApplicationStateManagerProtocol),
+                session_manager=inject(ApplicationStateManager),
                 injection_manager=inject(InjectionManagerProtocol),
                 settings_manager=self.settings_manager,
                 dialog_factory=inject(DialogFactoryProtocol),

@@ -22,8 +22,8 @@ from core.exceptions import (
     ValidationError,
 )
 from core.extractor import SpriteExtractor
+from core.managers.application_state_manager import ApplicationStateManager
 from core.palette_manager import PaletteManager
-from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 from core.services import PathSuggestionService, ROMService, VRAMService
 from utils.constants import (
     SETTINGS_KEY_FAST_COMPRESSION,
@@ -243,11 +243,11 @@ class CoreOperationsManager(BaseManager):
             self._palette_manager, "Palette manager", ExtractionError
         )
 
-    def _get_session_manager(self) -> ApplicationStateManagerProtocol:
+    def _get_session_manager(self) -> ApplicationStateManager:
         """Get session manager via dependency injection container."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-        return inject(ApplicationStateManagerProtocol)
+        from core.managers.application_state_manager import ApplicationStateManager
+        return inject(ApplicationStateManager)
 
     def _raise_extraction_failed(self, message: str) -> None:
         """Helper method to raise ExtractionError (for TRY301 compliance)."""

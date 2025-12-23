@@ -26,9 +26,9 @@ from PySide6.QtTest import QSignalSpy
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 import core.controller
 from core.controller import ExtractionController
+from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 from core.workers import VRAMExtractionWorker
 
 # Unified pytest markers for this consolidated module
@@ -128,8 +128,8 @@ def standard_mock_managers() -> tuple[Mock, Mock, Mock, Mock, Mock]:
     """
     extraction_manager = Mock(spec=CoreOperationsManager)
     injection_manager = Mock(spec=CoreOperationsManager)
-    session_manager = Mock(spec=ApplicationStateManagerProtocol)
-    settings_manager = Mock(spec=ApplicationStateManagerProtocol)
+    session_manager = Mock(spec=ApplicationStateManager)
+    settings_manager = Mock(spec=ApplicationStateManager)
     dialog_factory = Mock(spec=DialogFactoryProtocol)
     return extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory
 

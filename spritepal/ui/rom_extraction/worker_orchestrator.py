@@ -17,8 +17,8 @@ from ui.workers.rom_info_loader_worker import ROMHeaderLoaderWorker, ROMInfoLoad
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
     )
@@ -62,7 +62,7 @@ class ROMWorkerOrchestrator(QObject):
         parent: QObject | None = None,
         *,
         rom_cache: ROMCacheProtocol,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
     ) -> None:
         """Initialize the worker orchestrator.
 

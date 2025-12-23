@@ -51,8 +51,8 @@ class _ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDia
             **kwargs: Ignored
         """
         from core.di_container import inject
+        from core.managers.application_state_manager import ApplicationStateManager
         from core.protocols.manager_protocols import (
-            ApplicationStateManagerProtocol,
             ExtractionManagerProtocol,
             ROMCacheProtocol,
         )
@@ -63,7 +63,7 @@ class _ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDia
 
         # Inject dependencies at singleton boundary
         rom_cache = inject(ROMCacheProtocol)
-        settings_manager = inject(ApplicationStateManagerProtocol)
+        settings_manager = inject(ApplicationStateManager)
         extraction_manager = inject(ExtractionManagerProtocol)
         rom_extractor = extraction_manager.get_rom_extractor()
 

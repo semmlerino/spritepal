@@ -10,11 +10,17 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from PySide6.QtWidgets import QWidget
+    from PySide6.QtWidgets import QDialog, QWidget
+
+    from ui.injection_dialog import InjectionDialog
 
 
 class ArrangementDialogProtocol(Protocol):
-    """Protocol for arrangement dialogs (row and grid)."""
+    """Protocol for arrangement dialogs (row and grid).
+
+    This protocol has true polymorphism - RowArrangementDialog and
+    GridArrangementDialog both implement it.
+    """
 
     def set_palettes(
         self, palettes_dict: Mapping[int, object]
@@ -31,30 +37,6 @@ class ArrangementDialogProtocol(Protocol):
         ...
 
 
-class InjectionDialogProtocol(Protocol):
-    """Protocol for the injection dialog."""
-
-    def exec(self) -> int:
-        """Execute the dialog modally and return result code."""
-        ...
-
-    def get_parameters(self) -> Mapping[str, object] | None:
-        """Get injection parameters, or None if validation failed."""
-        ...
-
-    def save_rom_injection_parameters(self) -> None:
-        """Save the ROM injection parameters to session."""
-        ...
-
-
-class ManualOffsetDialogProtocol(Protocol):
-    """Protocol for the manual offset browser dialog."""
-
-    def exec(self) -> int:
-        """Execute the dialog modally and return result code."""
-        ...
-
-
 class ManualOffsetDialogFactoryProtocol(Protocol):
     """
     Protocol for creating ManualOffsetDialog instances.
@@ -63,7 +45,7 @@ class ManualOffsetDialogFactoryProtocol(Protocol):
     importing the concrete UI class, maintaining layer separation.
     """
 
-    def create(self, parent: QWidget | None = None) -> ManualOffsetDialogProtocol:
+    def create(self, parent: QWidget | None = None) -> QDialog:
         """
         Create a manual offset dialog.
 
@@ -71,7 +53,7 @@ class ManualOffsetDialogFactoryProtocol(Protocol):
             parent: Parent widget
 
         Returns:
-            A dialog implementing ManualOffsetDialogProtocol
+            A QDialog instance (UnifiedManualOffsetDialog)
         """
         ...
 
@@ -128,7 +110,7 @@ class DialogFactoryProtocol(Protocol):
         sprite_path: str = "",
         metadata_path: str = "",
         input_vram: str = "",
-    ) -> InjectionDialogProtocol:
+    ) -> InjectionDialog:
         """
         Create an injection dialog.
 
@@ -139,6 +121,6 @@ class DialogFactoryProtocol(Protocol):
             input_vram: Path to input VRAM file
 
         Returns:
-            A dialog implementing InjectionDialogProtocol
+            An InjectionDialog instance
         """
         ...

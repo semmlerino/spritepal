@@ -13,9 +13,9 @@ from unittest.mock import Mock
 import pytest
 
 from core.controller import ExtractionController
+from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
 # Systematic pytest markers applied based on test content analysis
 # NOTE: parallel_safe removed - tests use isolated_managers fixture and mocks
@@ -30,9 +30,9 @@ class TestControllerDependencyInjection:
 
         # Create mock managers that satisfy the protocol
         mock_extraction_manager = Mock(spec=CoreOperationsManager)
-        mock_session_manager = Mock(spec=ApplicationStateManagerProtocol)
+        mock_session_manager = Mock(spec=ApplicationStateManager)
         mock_injection_manager = Mock(spec=CoreOperationsManager)
-        mock_settings_manager = Mock(spec=ApplicationStateManagerProtocol)
+        mock_settings_manager = Mock(spec=ApplicationStateManager)
         mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
         # Create controller with injected managers
@@ -57,8 +57,8 @@ class TestControllerDependencyInjection:
         # Create mock managers with signal attributes
         mock_extraction_manager = Mock(spec=CoreOperationsManager)
         mock_injection_manager = Mock(spec=CoreOperationsManager)
-        mock_session_manager = Mock(spec=ApplicationStateManagerProtocol)
-        mock_settings_manager = Mock(spec=ApplicationStateManagerProtocol)
+        mock_session_manager = Mock(spec=ApplicationStateManager)
+        mock_settings_manager = Mock(spec=ApplicationStateManager)
         mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
         # Set up signals as Mock objects

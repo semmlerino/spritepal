@@ -43,8 +43,8 @@ pytestmark = [
 # Import real testing infrastructure
 # Import real dialogs and managers (not mocked!)
 from core.di_container import inject
+from core.managers.application_state_manager import ApplicationStateManager
 from core.protocols.manager_protocols import (
-    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
     ROMCacheProtocol,
@@ -56,7 +56,7 @@ def _create_manual_offset_dialog(parent=None) -> ManualOffsetDialog:
     return ManualOffsetDialog(
         parent,
         rom_cache=inject(ROMCacheProtocol),
-        settings_manager=inject(ApplicationStateManagerProtocol),
+        settings_manager=inject(ApplicationStateManager),
         extraction_manager=inject(ExtractionManagerProtocol),
     )
 
@@ -65,7 +65,7 @@ def _create_injection_dialog(**kwargs) -> InjectionDialog:
     """Create InjectionDialog with injected dependencies."""
     return InjectionDialog(
         injection_manager=inject(InjectionManagerProtocol),
-        settings_manager=inject(ApplicationStateManagerProtocol),
+        settings_manager=inject(ApplicationStateManager),
         **kwargs,
     )
 from tests.infrastructure import (
@@ -258,7 +258,7 @@ class TestRealDialogIntegration:
         # Managers already initialized by setup_test_infrastructure fixture
 
         dialog = SettingsDialog(
-            settings_manager=inject(ApplicationStateManagerProtocol),
+            settings_manager=inject(ApplicationStateManager),
             rom_cache=inject(ROMCacheProtocol)
         )
 
@@ -538,8 +538,8 @@ class TestRealDialogManagerIntegration:
         # Get real managers for coordination testing
         extraction_manager = inject(ExtractionManagerProtocol)
         injection_manager = inject(InjectionManagerProtocol)
-        session_manager = inject(ApplicationStateManagerProtocol)
-        settings_manager = inject(ApplicationStateManagerProtocol)
+        session_manager = inject(ApplicationStateManager)
+        settings_manager = inject(ApplicationStateManager)
         rom_cache = inject(ROMCacheProtocol)
 
         # Test multiple dialogs using same managers (could expose resource conflicts)

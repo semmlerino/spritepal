@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ class ConfigurationService:
 
         # Or inject via DI container
         from core.di_container import inject
-        config = inject(ConfigurationServiceProtocol)
+        config = inject(ConfigurationService)
     """
 
     # Default subdirectory/file names
@@ -63,7 +63,7 @@ class ConfigurationService:
     def __init__(
         self,
         app_root: Path | None = None,
-        settings_manager: ApplicationStateManagerProtocol | None = None,
+        settings_manager: ApplicationStateManager | None = None,
     ) -> None:
         """
         Initialize configuration service.
@@ -81,7 +81,7 @@ class ConfigurationService:
             # Default: this file is in core/, so parent is app root (spritepal/)
             self._app_root = Path(__file__).parent.parent.resolve()
 
-        self._settings_manager: ApplicationStateManagerProtocol | None = settings_manager
+        self._settings_manager: ApplicationStateManager | None = settings_manager
 
         # Compute base paths (immutable)
         self._base_paths = self._compute_base_paths()
@@ -114,7 +114,7 @@ class ConfigurationService:
             default_dumps_directory=Path.home() / self.DEFAULT_DUMPS_SUBPATH,
         )
 
-    def set_settings_manager(self, settings_manager: ApplicationStateManagerProtocol) -> None:
+    def set_settings_manager(self, settings_manager: ApplicationStateManager) -> None:
         """
         Set settings manager for user override resolution.
 

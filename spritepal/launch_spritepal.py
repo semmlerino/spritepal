@@ -19,10 +19,8 @@ from core.managers import (
     initialize_managers,
     validate_manager_dependencies,
 )
-from core.protocols.manager_protocols import (
-    ApplicationStateManagerProtocol,
-    ROMCacheProtocol,
-)
+from core.managers.application_state_manager import ApplicationStateManager
+from core.protocols.manager_protocols import ROMCacheProtocol
 from ui.main_window import MainWindow
 from ui.styles.accessibility import initialize_accessibility
 from utils.logging_config import get_logger, setup_logging
@@ -77,9 +75,9 @@ class SpritePalApp(QApplication):
         # B.6: Create main window with explicit DI dependencies
         # This eliminates deprecation warnings and makes dependencies explicit
         self.main_window = MainWindow(
-            settings_manager=inject(ApplicationStateManagerProtocol),
+            settings_manager=inject(ApplicationStateManager),
             rom_cache=inject(ROMCacheProtocol),
-            session_manager=inject(ApplicationStateManagerProtocol),
+            session_manager=inject(ApplicationStateManager),
         )
 
     def _apply_dark_theme(self):

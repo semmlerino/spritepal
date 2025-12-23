@@ -6,8 +6,6 @@ following the Single Responsibility Principle.
 """
 from __future__ import annotations
 
-from .keyboard_handler import KeyboardActionsProtocol, KeyboardShortcutHandler
-from .menu_bar_manager import MenuBarActionsProtocol, MenuBarManager
 from .output_settings_manager import (
     OutputSettingsActionsProtocol,
     OutputSettingsManager,
@@ -19,10 +17,6 @@ from .tab_coordinator import TabCoordinator, TabCoordinatorActionsProtocol
 from .toolbar_manager import ToolbarActionsProtocol, ToolbarManager
 
 __all__ = [
-    "KeyboardActionsProtocol",
-    "KeyboardShortcutHandler",
-    "MenuBarActionsProtocol",
-    "MenuBarManager",
     "OutputSettingsActionsProtocol",
     "OutputSettingsManager",
     "PreviewCoordinator",

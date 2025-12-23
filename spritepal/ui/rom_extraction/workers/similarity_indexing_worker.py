@@ -3,7 +3,7 @@ Background indexing worker for visual similarity search.
 
 Automatically indexes sprites as they're found during ROM scanning,
 building a searchable index for visual similarity queries.
-Now accepts `ApplicationStateManagerProtocol` via dependency injection.
+Now accepts `ApplicationStateManager` via dependency injection.
 """
 from __future__ import annotations
 
@@ -22,10 +22,8 @@ from core.workers.base import BaseWorker, handle_worker_errors
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
-        ExtractionManagerProtocol,
-    )
+    from core.managers.application_state_manager import ApplicationStateManager
+    from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 logger = get_logger(__name__)
 
@@ -52,7 +50,7 @@ class SimilarityIndexingWorker(BaseWorker):
         rom_path: str,
         parent: QObject | None = None,
         *,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
     ):
         """
         Initialize similarity indexing worker.
@@ -60,7 +58,7 @@ class SimilarityIndexingWorker(BaseWorker):
         Args:
             rom_path: Path to the ROM file being scanned
             parent: Parent QObject
-            settings_manager: ApplicationStateManagerProtocol instance (required).
+            settings_manager: ApplicationStateManager instance (required).
         """
         super().__init__(parent)
         self.rom_path = rom_path

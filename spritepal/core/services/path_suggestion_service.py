@@ -22,7 +22,7 @@ from utils.constants import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class PathSuggestionService:
 
     def __init__(
         self,
-        session_manager_getter: Callable[[], ApplicationStateManagerProtocol | None] | None = None,
+        session_manager_getter: Callable[[], ApplicationStateManager | None] | None = None,
     ) -> None:
         """
         Initialize the path suggestion service.
@@ -68,12 +68,12 @@ class PathSuggestionService:
         self._logger = logging.getLogger(__name__)
 
     def set_session_manager_getter(
-        self, getter: Callable[[], ApplicationStateManagerProtocol | None]
+        self, getter: Callable[[], ApplicationStateManager | None]
     ) -> None:
         """Set the session manager getter for session-based strategies."""
         self._session_manager_getter = getter
 
-    def _get_session_manager(self) -> ApplicationStateManagerProtocol | None:
+    def _get_session_manager(self) -> ApplicationStateManager | None:
         """Get the session manager lazily via the getter."""
         if self._session_manager_getter:
             return self._session_manager_getter()

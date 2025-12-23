@@ -19,7 +19,8 @@ import pytest
 from PIL import Image
 
 from core.di_container import inject
-from core.protocols.manager_protocols import ApplicationStateManagerProtocol, InjectionManagerProtocol
+from core.managers.application_state_manager import ApplicationStateManager
+from core.protocols.manager_protocols import InjectionManagerProtocol
 from ui.components import DialogBase, SplitterDialog, TabbedDialog
 from ui.dialogs.user_error_dialog import UserErrorDialog
 from ui.grid_arrangement_dialog import GridArrangementDialog
@@ -31,7 +32,7 @@ def _create_injection_dialog(**kwargs) -> InjectionDialog:
     """Create InjectionDialog with injected dependencies."""
     return InjectionDialog(
         injection_manager=inject(InjectionManagerProtocol),
-        settings_manager=inject(ApplicationStateManagerProtocol),
+        settings_manager=inject(ApplicationStateManager),
         **kwargs,
     )
 

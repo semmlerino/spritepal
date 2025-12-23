@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast, override
 
 if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
     from core.rom_injector import SpritePointer
 
@@ -29,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
+from core.protocols.manager_protocols import ROMCacheProtocol
 from ui.common import WorkerManager
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 
@@ -57,7 +58,7 @@ class DetachedGalleryWindow(QMainWindow):
         parent: QWidget | None = None,
         *,
         extraction_manager: ExtractionManagerProtocol,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
         rom_cache: ROMCacheProtocol,
     ):
         """

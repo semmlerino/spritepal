@@ -236,18 +236,15 @@ def configure_container(
     # Import protocols
     # Register ConfigurationService FIRST - it's needed by other managers
     from core.configuration_service import ConfigurationService
-    from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
-        ConfigurationServiceProtocol,
-    )
+    from core.managers.application_state_manager import ApplicationStateManager
 
     if configuration_service is not None:
-        register_singleton(ConfigurationServiceProtocol, configuration_service)
+        register_singleton(ConfigurationService, configuration_service)
     else:
         # Create default ConfigurationService
-        register_singleton(ConfigurationServiceProtocol, ConfigurationService())
+        register_singleton(ConfigurationService, ConfigurationService())
 
-    # NOTE: Manager protocols (ApplicationStateManagerProtocol, ExtractionManagerProtocol, etc.)
+    # NOTE: Manager types (ApplicationStateManager, ExtractionManagerProtocol, etc.)
     # are registered by register_managers() AFTER managers are created.
     # This avoids circular dependency between DI container and ManagerRegistry.
 
@@ -258,7 +255,7 @@ def configure_container(
     # Register ROMCache (uses ApplicationStateManager for cache settings)
     register_factory(
         ROMCacheProtocol,
-        lambda: ROMCache(state_manager=inject(ApplicationStateManagerProtocol))
+        lambda: ROMCache(state_manager=inject(ApplicationStateManager))
     )
 
     # Import ROMExtractor and its Protocol
@@ -290,7 +287,7 @@ def register_managers(
     ExtractionManagerProtocol and InjectionManagerProtocol for backward
     compatibility with code that injects these protocols.
 
-    NOTE: SessionManagerProtocol and ApplicationStateManagerProtocol are registered
+    NOTE: SessionManagerProtocol and ApplicationStateManager are registered
     earlier in initialize_managers() because other services depend on them during
     CoreOperationsManager initialization.
 

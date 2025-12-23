@@ -9,10 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
-        InjectionManagerProtocol,
-    )
+    from core.managers.application_state_manager import ApplicationStateManager
+    from core.protocols.manager_protocols import InjectionManagerProtocol
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
@@ -60,7 +58,7 @@ class InjectionDialog(TabbedDialog):
         input_vram: str = "",
         *,
         injection_manager: InjectionManagerProtocol,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
     ):
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path = sprite_path

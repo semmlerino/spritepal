@@ -16,7 +16,7 @@ from PySide6.QtCore import QObject, Signal
 from core.types import SpritePreset
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ConfigurationServiceProtocol
+    from core.configuration_service import ConfigurationService
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class SpritePresetManager(QObject):
 
     def __init__(
         self,
-        config_service: ConfigurationServiceProtocol | None = None,
+        config_service: ConfigurationService | None = None,
         parent: QObject | None = None,
     ) -> None:
         """Initialize the preset manager.

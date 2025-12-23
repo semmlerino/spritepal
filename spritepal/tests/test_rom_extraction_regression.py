@@ -101,10 +101,10 @@ class TestROMServicePathHandling:
 @pytest.fixture
 def injection_dialog(qtbot, isolated_managers):
     """Create injection dialog for testing."""
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
 
     injection_manager = inject(InjectionManagerProtocol)
-    settings_manager = inject(ApplicationStateManagerProtocol)
+    settings_manager = inject(ApplicationStateManager)
     dialog = InjectionDialog(
         injection_manager=injection_manager,
         settings_manager=settings_manager,

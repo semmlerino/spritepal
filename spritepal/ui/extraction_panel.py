@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         QPen,
     )
 
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
 else:
     from PySide6.QtGui import (
         QColor,
@@ -87,7 +87,7 @@ class DropZone(QWidget):
         file_type: str,
         parent: QWidget | None = None,
         *,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
         required: bool = True,
     ) -> None:
         super().__init__(parent)
@@ -315,7 +315,7 @@ class DropZone(QWidget):
 class ExtractionPanel(QGroupBox):
     """
     Panel for managing VRAM extraction inputs.
-    Now accepts `ApplicationStateManagerProtocol` via dependency injection.
+    Now accepts `ApplicationStateManager` via dependency injection.
     """
 
     files_changed = Signal()
@@ -323,7 +323,7 @@ class ExtractionPanel(QGroupBox):
     offset_changed = Signal(int)  # Emitted when VRAM offset changes
     mode_changed = Signal(int)  # Emitted when extraction mode changes
 
-    def __init__(self, settings_manager: ApplicationStateManagerProtocol, parent: QWidget | None = None) -> None:
+    def __init__(self, settings_manager: ApplicationStateManager, parent: QWidget | None = None) -> None:
         super().__init__("Input Files", parent)
         # Timer for debouncing offset changes
         self._offset_timer = QTimer(self)  # Parent this timer to prevent crashes

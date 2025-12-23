@@ -33,8 +33,8 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
     Used by tests that have managers_initialized fixture.
     """
     from core.di_container import inject
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
     )
@@ -42,7 +42,7 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
     return UnifiedManualOffsetDialog(
         parent,
         rom_cache=inject(ROMCacheProtocol),
-        settings_manager=inject(ApplicationStateManagerProtocol),
+        settings_manager=inject(ApplicationStateManager),
         extraction_manager=inject(ExtractionManagerProtocol),
     )
 

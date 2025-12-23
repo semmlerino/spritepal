@@ -45,9 +45,9 @@ def get_session_manager():
     that expect the old API's error semantics.
     """
     from core.di_container import inject
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
     try:
-        return inject(ApplicationStateManagerProtocol)
+        return inject(ApplicationStateManager)
     except ValueError as e:
         raise ManagerError("SessionManager not initialized") from e
 
@@ -131,10 +131,10 @@ class TestManagerRegistry:
         all_managers = registry.get_all_managers()
 
         # Keys are now protocol names (DI container is single source of truth)
-        assert "ApplicationStateManagerProtocol" in all_managers
+        assert "ApplicationStateManager" in all_managers
         assert "ExtractionManagerProtocol" in all_managers
         # Consolidated architecture: state returns ApplicationStateManager
-        assert isinstance(all_managers["ApplicationStateManagerProtocol"], ApplicationStateManager)
+        assert isinstance(all_managers["ApplicationStateManager"], ApplicationStateManager)
         # Consolidated architecture: extraction returns CoreOperationsManager
         assert isinstance(all_managers["ExtractionManagerProtocol"], CoreOperationsManager)
 

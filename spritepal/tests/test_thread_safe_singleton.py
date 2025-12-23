@@ -313,13 +313,13 @@ class TestApplicationStateManagerSingletonIntegration:
     def test_application_state_manager_thread_safety(self):
         """Test that ApplicationStateManager via DI injection is thread-safe."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        from core.managers.application_state_manager import ApplicationStateManager
 
         instances = []
 
         def worker_thread(thread_id: int):
             # Use DI injection (replaces deprecated get_settings_manager)
-            manager = inject(ApplicationStateManagerProtocol)
+            manager = inject(ApplicationStateManager)
             instances.append((thread_id, manager))
             return manager
 

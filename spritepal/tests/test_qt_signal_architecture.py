@@ -21,10 +21,10 @@ from PySide6.QtWidgets import QApplication
 
 from core.controller import ExtractionController
 from core.di_container import inject
+from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
-    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
 )
@@ -121,9 +121,9 @@ class TestQtSignalArchitecture:
         controller = ExtractionController(
             main_window=main_window,
             extraction_manager=extraction_mgr,
-            session_manager=inject(ApplicationStateManagerProtocol),
+            session_manager=inject(ApplicationStateManager),
             injection_manager=injection_mgr,
-            settings_manager=inject(ApplicationStateManagerProtocol),
+            settings_manager=inject(ApplicationStateManager),
             dialog_factory=inject(DialogFactoryProtocol),
         )
 
@@ -353,9 +353,9 @@ class TestQtSignalArchitecture:
         controller = ExtractionController(
             main_window=main_window,
             extraction_manager=extraction_mgr,
-            session_manager=inject(ApplicationStateManagerProtocol),
+            session_manager=inject(ApplicationStateManager),
             injection_manager=injection_mgr,
-            settings_manager=inject(ApplicationStateManagerProtocol),
+            settings_manager=inject(ApplicationStateManager),
             dialog_factory=inject(DialogFactoryProtocol),
         )
 

@@ -27,7 +27,7 @@ from utils.constants import (
 )
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ConfigurationServiceProtocol
+    from core.configuration_service import ConfigurationService
 from utils.file_validator import atomic_write
 from utils.state_manager import StateEntry
 
@@ -132,7 +132,7 @@ class ApplicationStateManager(BaseManager):
 
     def __init__(self, app_name: str = "SpritePal", settings_path: Path | None = None,
                  parent: QObject | None = None,
-                 configuration_service: ConfigurationServiceProtocol | None = None) -> None:
+                 configuration_service: ConfigurationService | None = None) -> None:
         """
         Initialize application state manager.
 
@@ -153,9 +153,9 @@ class ApplicationStateManager(BaseManager):
             if config is None:
                 # Try DI injection first (preferred method)
                 try:
+                    from core.configuration_service import ConfigurationService
                     from core.di_container import get_container
-                    from core.protocols.manager_protocols import ConfigurationServiceProtocol
-                    config = get_container().get_optional(ConfigurationServiceProtocol)
+                    config = get_container().get_optional(ConfigurationService)
                 except (ImportError, ValueError):
                     config = None
 

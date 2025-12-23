@@ -61,9 +61,9 @@ def sample_files(tmp_path):
 def vram_drop_zone(qtbot, isolated_managers):
     """Create a real DropZone widget for VRAM files."""
     from core.di_container import inject
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
 
-    drop_zone = DropZone(file_type="VRAM", settings_manager=inject(ApplicationStateManagerProtocol))
+    drop_zone = DropZone(file_type="VRAM", settings_manager=inject(ApplicationStateManager))
     qtbot.addWidget(drop_zone)
     return drop_zone
 
@@ -72,9 +72,9 @@ def vram_drop_zone(qtbot, isolated_managers):
 def cgram_drop_zone(qtbot, isolated_managers):
     """Create a real DropZone widget for CGRAM files."""
     from core.di_container import inject
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
 
-    drop_zone = DropZone(file_type="CGRAM", settings_manager=inject(ApplicationStateManagerProtocol))
+    drop_zone = DropZone(file_type="CGRAM", settings_manager=inject(ApplicationStateManager))
     qtbot.addWidget(drop_zone)
     return drop_zone
 
@@ -83,9 +83,9 @@ def cgram_drop_zone(qtbot, isolated_managers):
 def oam_drop_zone(qtbot, isolated_managers):
     """Create a real DropZone widget for OAM files."""
     from core.di_container import inject
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
 
-    drop_zone = DropZone(file_type="OAM", settings_manager=inject(ApplicationStateManagerProtocol))
+    drop_zone = DropZone(file_type="OAM", settings_manager=inject(ApplicationStateManager))
     qtbot.addWidget(drop_zone)
     return drop_zone
 

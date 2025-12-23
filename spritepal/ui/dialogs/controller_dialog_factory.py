@@ -11,10 +11,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
-    from core.protocols.dialog_protocols import (
-        ArrangementDialogProtocol,
-        InjectionDialogProtocol,
-    )
+    from core.protocols.dialog_protocols import ArrangementDialogProtocol
+    from ui.injection_dialog import InjectionDialog
 
 
 class ControllerDialogFactory:
@@ -74,7 +72,7 @@ class ControllerDialogFactory:
         sprite_path: str = "",
         metadata_path: str = "",
         input_vram: str = "",
-    ) -> InjectionDialogProtocol:
+    ) -> InjectionDialog:
         """
         Create an injection dialog.
 
@@ -88,14 +86,12 @@ class ControllerDialogFactory:
             An InjectionDialog instance
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import (
-            ApplicationStateManagerProtocol,
-            InjectionManagerProtocol,
-        )
+        from core.managers.application_state_manager import ApplicationStateManager
+        from core.protocols.manager_protocols import InjectionManagerProtocol
         from ui.injection_dialog import InjectionDialog
 
         injection_manager = inject(InjectionManagerProtocol)
-        settings_manager = inject(ApplicationStateManagerProtocol)
+        settings_manager = inject(ApplicationStateManager)
         return InjectionDialog(
             parent, sprite_path, metadata_path, input_vram,
             injection_manager=injection_manager,

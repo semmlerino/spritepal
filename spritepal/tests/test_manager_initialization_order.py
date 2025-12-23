@@ -47,28 +47,27 @@ class TestDependencyMapsInitialization:
         )
 
     def test_core_operations_manager_depends_on_state_protocol(self) -> None:
-        """CoreOperationsManager depends on ApplicationStateManagerProtocol."""
+        """CoreOperationsManager depends on ApplicationStateManager."""
         _ensure_dependency_maps()
 
+        from core.managers.application_state_manager import ApplicationStateManager
         from core.managers.core_operations_manager import CoreOperationsManager
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
         deps = MANAGER_DEPENDENCIES.get(CoreOperationsManager, [])
-        assert ApplicationStateManagerProtocol in deps, (
-            "CoreOperationsManager should depend on ApplicationStateManagerProtocol"
+        assert ApplicationStateManager in deps, (
+            "CoreOperationsManager should depend on ApplicationStateManager"
         )
 
 
 class TestGetProtocolsForManager:
     """Tests for _get_protocols_for_manager helper."""
 
-    def test_application_state_manager_provides_its_protocol(self) -> None:
-        """ApplicationStateManager registers ApplicationStateManagerProtocol."""
+    def test_application_state_manager_provides_its_type(self) -> None:
+        """ApplicationStateManager registers itself as ApplicationStateManager."""
         from core.managers.application_state_manager import ApplicationStateManager
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
 
         protocols = _get_protocols_for_manager(ApplicationStateManager)
-        assert ApplicationStateManagerProtocol in protocols
+        assert ApplicationStateManager in protocols
 
     def test_core_operations_manager_provides_extraction_and_injection(self) -> None:
         """CoreOperationsManager registers both extraction and injection protocols."""
@@ -121,7 +120,7 @@ class TestValidateManagerOrder:
 
         # Error message should mention the missing dependency
         assert "CoreOperationsManager" in str(exc_info.value)
-        assert "ApplicationStateManagerProtocol" in str(exc_info.value)
+        assert "ApplicationStateManager" in str(exc_info.value)
 
     def test_missing_dependency_declaration_raises(self) -> None:
         """Manager not in MANAGER_DEPENDENCIES raises InitializationError."""

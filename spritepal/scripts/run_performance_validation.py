@@ -70,7 +70,7 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
     """Create UnifiedManualOffsetDialog with injected dependencies."""
     from core.di_container import inject
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
+        ApplicationStateManager,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
     )
@@ -78,7 +78,7 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
     return UnifiedManualOffsetDialog(
         parent,
         rom_cache=inject(ROMCacheProtocol),
-        settings_manager=inject(ApplicationStateManagerProtocol),
+        settings_manager=inject(ApplicationStateManager),
         extraction_manager=inject(ExtractionManagerProtocol),
     )
 

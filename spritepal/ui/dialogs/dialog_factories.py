@@ -7,8 +7,8 @@ from PySide6.QtWidgets import QWidget
 from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
 if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
@@ -22,7 +22,7 @@ class ManualOffsetDialogFactory:
 
     def __init__(self,
                  rom_cache: ROMCacheProtocol,
-                 settings_manager: ApplicationStateManagerProtocol,
+                 settings_manager: ApplicationStateManager,
                  extraction_manager: ExtractionManagerProtocol,
                  rom_extractor: ROMExtractorProtocol):
         self._rom_cache = rom_cache

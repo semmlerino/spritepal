@@ -123,36 +123,7 @@ def handle_worker_errors(
         return wrapper
     return decorator
 
-class WorkerMeta(type(QThread)):
-    """Metaclass that properly combines QThread and ABC functionality."""
-
-    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, object], **kwargs: object) -> type:
-        # First create the class with QThread metaclass
-        cls = super().__new__(mcs, name, bases, namespace, **kwargs)
-
-        # Add ABC functionality manually for abstract methods
-        if any(hasattr(base, '__abstractmethods__') for base in bases):
-            # Collect abstract methods from all bases
-            abstracts = set()
-            for base in bases:
-                if hasattr(base, '__abstractmethods__'):
-                    abstracts.update(base.__abstractmethods__)
-
-            # Add abstract methods from current class
-            for name, value in namespace.items():
-                if getattr(value, '__isabstractmethod__', False):
-                    abstracts.add(name)
-
-            # Remove implemented methods
-            for method in list(abstracts):
-                if method in namespace and not getattr(namespace[method], '__isabstractmethod__', False):
-                    abstracts.discard(method)
-
-            cls.__abstractmethods__ = frozenset(abstracts)  # type: ignore[attr-defined]  # Metaclass magic for ABCs
-
-        return cls
-
-class BaseWorker(QThread, metaclass=WorkerMeta):
+class BaseWorker(QThread):
     """
     Base class for all worker threads with standard signals and behavior.
 

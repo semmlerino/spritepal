@@ -229,8 +229,8 @@ def manual_offset_dialog(qtbot, managers_initialized):
     import shiboken6
 
     from core.di_container import inject
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
     )
@@ -238,7 +238,7 @@ def manual_offset_dialog(qtbot, managers_initialized):
 
     dialog = UnifiedManualOffsetDialog(
         rom_cache=inject(ROMCacheProtocol),
-        settings_manager=inject(ApplicationStateManagerProtocol),
+        settings_manager=inject(ApplicationStateManager),
         extraction_manager=inject(ExtractionManagerProtocol),
     )
     # Don't use qtbot.addWidget() - we manage cleanup ourselves to avoid

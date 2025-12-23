@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
 else:
     from PySide6.QtWidgets import QWidget
 
@@ -44,7 +44,7 @@ class ViewStateManager(QObject):
         dialog_widget: QWidget,
         parent: QObject | None = None,
         *,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
     ) -> None:
         super().__init__(parent)
 

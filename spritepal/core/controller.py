@@ -14,15 +14,13 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
-    from core.protocols.dialog_protocols import (
-        DialogFactoryProtocol,
-        InjectionDialogProtocol,
-    )
+    from core.managers.application_state_manager import ApplicationStateManager
+    from core.protocols.dialog_protocols import DialogFactoryProtocol
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
     )
+    from ui.injection_dialog import InjectionDialog
 
 from core.console_error_handler import ConsoleErrorHandler
 from core.managers.core_operations_manager import CoreOperationsManager
@@ -79,9 +77,9 @@ class ExtractionController(QObject):
         self,
         main_window: Any,  # pyright: ignore[reportExplicitAny] - MainWindow has no protocol
         extraction_manager: ExtractionManagerProtocol,
-        session_manager: ApplicationStateManagerProtocol,
+        session_manager: ApplicationStateManager,
         injection_manager: InjectionManagerProtocol,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
         dialog_factory: DialogFactoryProtocol,
     ) -> None:
         super().__init__()
@@ -97,7 +95,7 @@ class ExtractionController(QObject):
         self.rom_worker: ROMExtractionWorker | None = None
 
         # Store current injection dialog reference (not in session - not serializable)
-        self._current_injection_dialog: InjectionDialogProtocol | None = None
+        self._current_injection_dialog: InjectionDialog | None = None
 
         # Initialize error handler - always use console error handler for core layer
         # This removes the UI dependency while still properly logging errors

@@ -7,7 +7,7 @@ import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ConfigurationServiceProtocol
+    from core.configuration_service import ConfigurationService
 
 from pathlib import Path
 
@@ -59,7 +59,6 @@ def _ensure_dependency_maps() -> None:
 
     # Import protocols here to avoid circular imports at module load time
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         InjectionManagerProtocol,
     )
@@ -69,11 +68,11 @@ def _ensure_dependency_maps() -> None:
 
     MANAGER_DEPENDENCIES.update({
         ApplicationStateManager: [],  # No dependencies - always first
-        CoreOperationsManager: [ApplicationStateManagerProtocol],  # Needs state manager via DI chain
+        CoreOperationsManager: [ApplicationStateManager],  # Needs state manager via DI chain
     })
 
     MANAGER_TO_PROTOCOLS.update({
-        ApplicationStateManager: [ApplicationStateManagerProtocol],
+        ApplicationStateManager: [ApplicationStateManager],  # Now uses concrete type
         CoreOperationsManager: [ExtractionManagerProtocol, InjectionManagerProtocol],
     })
 
@@ -204,7 +203,7 @@ class ManagerRegistry:
         self,
         app_name: str = "SpritePal",
         settings_path: Path | None = None,
-        configuration_service: ConfigurationServiceProtocol | None = None,
+        configuration_service: ConfigurationService | None = None,
     ) -> None:
         """
         Initialize all managers with proper error handling and cleanup.
@@ -270,18 +269,16 @@ class ManagerRegistry:
                 created_managers.append("state")
                 self._logger.debug("ApplicationStateManager created successfully")
 
-                # Register ApplicationStateManagerProtocol immediately - other managers depend on it via DI
+                # Register ApplicationStateManager immediately - other managers depend on it via DI
                 # (e.g., ROMCache → SettingsManager → ApplicationStateManager)
                 from core.di_container import register_singleton
                 from core.protocols.manager_protocols import (
-                    ApplicationStateManagerProtocol,
                     ExtractionManagerProtocol,
                     InjectionManagerProtocol,
-                    SpritePresetManagerProtocol,
                 )
-                register_singleton(ApplicationStateManagerProtocol, state_manager)
-                self._lifecycle_order.append(ApplicationStateManagerProtocol)
-                self._logger.debug("ApplicationStateManagerProtocol registered")
+                register_singleton(ApplicationStateManager, state_manager)
+                self._lifecycle_order.append(ApplicationStateManager)
+                self._logger.debug("ApplicationStateManager registered")
 
                 # SpritePresetManager handles user-defined sprite presets
                 self._logger.debug("Creating SpritePresetManager...")
@@ -290,8 +287,8 @@ class ManagerRegistry:
                     parent=qt_parent,
                 )
                 created_managers.append("preset")
-                register_singleton(SpritePresetManagerProtocol, preset_manager)
-                self._lifecycle_order.append(SpritePresetManagerProtocol)
+                register_singleton(SpritePresetManager, preset_manager)
+                self._lifecycle_order.append(SpritePresetManager)
                 self._logger.debug("SpritePresetManager created and registered")
 
                 # CoreOperationsManager handles extraction and injection operations
@@ -388,8 +385,7 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-        return self._get_manager_by_protocol(ApplicationStateManagerProtocol, ApplicationStateManager)
+        return self._get_manager_by_protocol(ApplicationStateManager, ApplicationStateManager)
 
     def _get_manager_by_protocol(self, protocol: type, expected_type: type) -> object:
         """
@@ -547,7 +543,7 @@ def _ensure_registry() -> ManagerRegistry:
 def initialize_managers(
     app_name: str = "SpritePal",
     settings_path: Path | None = None,
-    configuration_service: ConfigurationServiceProtocol | None = None,
+    configuration_service: ConfigurationService | None = None,
 ) -> None:
     """
     Initialize all managers with consolidated architecture.

@@ -224,12 +224,12 @@ def run_tests():
             # Inject dependencies at test boundary
             from core.di_container import inject
             from core.protocols.manager_protocols import (
-                ApplicationStateManagerProtocol,
+                ApplicationStateManager,
                 ExtractionManagerProtocol,
                 ROMCacheProtocol,
             )
             extraction_manager = inject(ExtractionManagerProtocol)
-            settings_manager = inject(ApplicationStateManagerProtocol)
+            settings_manager = inject(ApplicationStateManager)
             rom_cache = inject(ROMCacheProtocol)
             window = DetachedGalleryWindow(
                 extraction_manager=extraction_manager,

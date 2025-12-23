@@ -12,7 +12,8 @@ from ui.styles import get_muted_text_style
 from ui.styles.theme import COLORS
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
+    from core.protocols.manager_protocols import ROMCacheProtocol
 
 
 logger = logging.getLogger(__name__)
@@ -21,13 +22,13 @@ class StatusBarManager:
     """Manages status bar and cache indicators for MainWindow"""
 
     def __init__(self, status_bar: QStatusBar,
-                 settings_manager: ApplicationStateManagerProtocol,
+                 settings_manager: ApplicationStateManager,
                  rom_cache: ROMCacheProtocol) -> None:
         """Initialize status bar manager
 
         Args:
             status_bar: The status bar widget to manage
-            settings_manager: Injected ApplicationStateManagerProtocol instance
+            settings_manager: Injected ApplicationStateManager instance
             rom_cache: Injected ROMCacheProtocol instance
         """
         self.status_bar = status_bar

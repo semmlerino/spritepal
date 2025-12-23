@@ -55,10 +55,8 @@ if TYPE_CHECKING:
 
 # Runtime imports for inject() - needed to avoid deprecated ManagerRegistry methods
 from core.di_container import inject
-from core.protocols.manager_protocols import (
-    ApplicationStateManagerProtocol,
-    ExtractionManagerProtocol,
-)
+from core.managers.application_state_manager import ApplicationStateManager
+from core.protocols.manager_protocols import ExtractionManagerProtocol
 
 # Import Qt fixtures for IS_HEADLESS constant
 try:
@@ -664,7 +662,7 @@ def real_session_manager(
     """
     # Use inject() to avoid deprecated ManagerRegistry.get_session_manager()
     _ = isolated_managers  # Ensures fixture runs first to initialize managers
-    return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value]
+    return inject(ApplicationStateManager)  # type: ignore[return-value]
 
 
 @pytest.fixture

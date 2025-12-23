@@ -8,10 +8,8 @@ from PySide6.QtWidgets import QApplication
 
 from core.controller import ExtractionController
 from core.di_container import inject
-from core.protocols.manager_protocols import (
-    ApplicationStateManagerProtocol,
-    ROMCacheProtocol,
-)
+from core.managers.application_state_manager import ApplicationStateManager
+from core.protocols.manager_protocols import ROMCacheProtocol
 from ui.main_window import MainWindow
 
 
@@ -33,9 +31,9 @@ class TestCircularDependencyFix:
     def main_window_deps(self, isolated_managers):
         """Get MainWindow dependencies from DI container."""
         return {
-            "settings_manager": inject(ApplicationStateManagerProtocol),
+            "settings_manager": inject(ApplicationStateManager),
             "rom_cache": inject(ROMCacheProtocol),
-            "session_manager": inject(ApplicationStateManagerProtocol),
+            "session_manager": inject(ApplicationStateManager),
         }
 
     def test_main_window_creates_without_controller(self, qtbot, app, main_window_deps):

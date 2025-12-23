@@ -24,8 +24,8 @@ with contextlib.suppress(ImportError):
     pass
 
 if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.protocols.manager_protocols import (
-        ApplicationStateManagerProtocol,
         ExtractionManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
@@ -118,7 +118,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         parent: QWidget | None = None,
         *,
         rom_cache: ROMCacheProtocol,
-        settings_manager: ApplicationStateManagerProtocol,
+        settings_manager: ApplicationStateManager,
         extraction_manager: ExtractionManagerProtocol,
         rom_extractor: ROMExtractorProtocol | None = None,
     ) -> None:
@@ -1685,7 +1685,3 @@ Cache Misses: {session_stats['misses']}"""
 
         except Exception as e:
             logger.warning(f"Failed to load sprites for mini map: {e}")
-
-def create_manual_offset_dialog(parent: QWidget | None = None) -> UnifiedManualOffsetDialog:
-    """Factory function for creating manual offset dialog."""
-    return UnifiedManualOffsetDialog(parent)

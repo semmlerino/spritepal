@@ -98,8 +98,9 @@ class ROMExtractionPanel(QWidget):
 
         # State manager for coordinating operations (ApplicationStateManager)
         from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
-        self.state_manager: ApplicationStateManager = inject(ApplicationStateManagerProtocol)  # type: ignore[assignment] - DI returns protocol, runtime is concrete
+        from core.managers.application_state_manager import ApplicationStateManager
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        self.state_manager: ApplicationStateManager = inject(ApplicationStateManager)
         self.state_manager.workflow_state_changed.connect(self._on_state_changed)
 
         # Initialize extracted components
@@ -339,8 +340,8 @@ class ROMExtractionPanel(QWidget):
         """Load the last used ROM file from settings"""
         try:
             from core.di_container import inject
-            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-            settings = inject(ApplicationStateManagerProtocol)
+            from core.managers.application_state_manager import ApplicationStateManager
+            settings = inject(ApplicationStateManager)
             last_rom = settings.get(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, ""
             )
@@ -381,8 +382,8 @@ class ROMExtractionPanel(QWidget):
 
             # Save to settings
             from core.di_container import inject
-            from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-            settings = inject(ApplicationStateManagerProtocol)
+            from core.managers.application_state_manager import ApplicationStateManager
+            settings = inject(ApplicationStateManager)
             settings.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
             settings.set_last_used_directory(str(Path(filename).parent))
             logger.debug(f"Saved ROM to settings: {filename}")

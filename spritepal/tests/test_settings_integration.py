@@ -16,7 +16,6 @@ from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
-    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
 )
@@ -24,7 +23,7 @@ from core.protocols.manager_protocols import (
 
 def get_settings_manager():
     """Get settings manager from DI container."""
-    return inject(ApplicationStateManagerProtocol)
+    return inject(ApplicationStateManager)
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -107,7 +106,7 @@ class TestSettingsIntegration:
         ExtractionController(
             main_window=mock_main_window,
             extraction_manager=inject(ExtractionManagerProtocol),
-            session_manager=inject(ApplicationStateManagerProtocol),
+            session_manager=inject(ApplicationStateManager),
             injection_manager=inject(InjectionManagerProtocol),
             settings_manager=settings,
             dialog_factory=inject(DialogFactoryProtocol),

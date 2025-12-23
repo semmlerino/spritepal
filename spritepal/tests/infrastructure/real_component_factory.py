@@ -157,8 +157,8 @@ class RealComponentFactory:
     def _get_session_manager_from_registry(self) -> ApplicationStateManager:
         """Get session manager (ApplicationStateManager) via DI."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
-        return inject(ApplicationStateManagerProtocol)  # type: ignore[return-value]
+        from core.managers.application_state_manager import ApplicationStateManager
+        return inject(ApplicationStateManager)  # type: ignore[return-value]
 
     def create_extraction_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """
@@ -230,15 +230,13 @@ class RealComponentFactory:
 
         # B.7: Create MainWindow with explicit DI dependencies (matching B.6 pattern)
         from core.di_container import inject
-        from core.protocols.manager_protocols import (
-            ApplicationStateManagerProtocol,
-            ROMCacheProtocol,
-        )
+        from core.managers.application_state_manager import ApplicationStateManager
+        from core.protocols.manager_protocols import ROMCacheProtocol
 
         window = MainWindow(
-            settings_manager=inject(ApplicationStateManagerProtocol),
+            settings_manager=inject(ApplicationStateManager),
             rom_cache=inject(ROMCacheProtocol),
-            session_manager=inject(ApplicationStateManagerProtocol),  # type: ignore[arg-type]  # Protocol vs concrete type mismatch
+            session_manager=inject(ApplicationStateManager),  # type: ignore[arg-type]  # Protocol vs concrete type mismatch
         )
         self._created_components.append(window)
 

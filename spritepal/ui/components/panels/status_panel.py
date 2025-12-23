@@ -14,14 +14,15 @@ from ui.styles import get_muted_text_style, get_panel_style
 from ui.styles.theme import COLORS
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ApplicationStateManagerProtocol, ROMCacheProtocol
+    from core.managers.application_state_manager import ApplicationStateManager
+    from core.protocols.manager_protocols import ROMCacheProtocol
 
 
 class StatusPanel(QWidget):
     """Panel for displaying status information and progress"""
 
     def __init__(self, parent: QWidget | None = None, *,
-                 settings_manager: ApplicationStateManagerProtocol,
+                 settings_manager: ApplicationStateManager,
                  rom_cache: ROMCacheProtocol):
         super().__init__(parent)
         self.setStyleSheet(get_panel_style())

@@ -14,16 +14,15 @@ from unittest.mock import Mock, patch
 import pytest
 
 from core.di_container import get_container, inject
+from core.managers.application_state_manager import ApplicationStateManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.protocols.manager_protocols import (
-    ApplicationStateManagerProtocol,
     ExtractionManagerProtocol,
     InjectionManagerProtocol,
     ROMCacheProtocol,
 )
 
 if TYPE_CHECKING:
-    from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.services.rom_cache import ROMCache
 
@@ -41,19 +40,19 @@ class TestProtocolInjection:
     def test_container_is_configured(self, isolated_managers):
         """Verify DI container is properly configured."""
         container = get_container()
-        # Container should have at least ApplicationStateManagerProtocol registered
-        assert container.has(ApplicationStateManagerProtocol), "DI container should be configured after manager init"
+        # Container should have at least ApplicationStateManager registered
+        assert container.has(ApplicationStateManager), "DI container should be configured after manager init"
 
     def test_inject_settings_manager_protocol(self, isolated_managers):
-        """Test ApplicationStateManagerProtocol injection."""
-        settings = inject(ApplicationStateManagerProtocol)
+        """Test ApplicationStateManager injection."""
+        settings = inject(ApplicationStateManager)
         assert settings is not None
         assert hasattr(settings, "get")
         assert hasattr(settings, "set")
 
     def test_inject_session_manager_protocol(self, isolated_managers):
-        """Test ApplicationStateManagerProtocol injection (for session)."""
-        session = inject(ApplicationStateManagerProtocol)
+        """Test ApplicationStateManager injection (for session)."""
+        session = inject(ApplicationStateManager)
         assert session is not None
         # SessionAdapter provides get_session_data
         assert hasattr(session, "get_session_data")
@@ -87,9 +86,9 @@ class TestPureDIComponentInitialization:
 
         # Get all dependencies via DI
         extraction_mgr = inject(ExtractionManagerProtocol)
-        session_mgr = inject(ApplicationStateManagerProtocol)
+        session_mgr = inject(ApplicationStateManager)
         injection_mgr = inject(InjectionManagerProtocol)
-        settings_mgr = inject(ApplicationStateManagerProtocol)
+        settings_mgr = inject(ApplicationStateManager)
 
         # Create mock main window
         mock_window = Mock()
@@ -131,9 +130,9 @@ class TestPureDIComponentInitialization:
         """
         from ui.main_window import MainWindow
 
-        settings_mgr = inject(ApplicationStateManagerProtocol)
+        settings_mgr = inject(ApplicationStateManager)
         rom_cache = inject(ROMCacheProtocol)
-        session_mgr = inject(ApplicationStateManagerProtocol)
+        session_mgr = inject(ApplicationStateManager)
 
         # Create window with explicit deps
         window = MainWindow(
@@ -152,11 +151,11 @@ class TestPureDIComponentInitialization:
 
     def test_injection_dialog_pure_di(self, isolated_managers, qtbot):
         """Test InjectionDialog works with injection_manager passed explicitly."""
-        from core.protocols.manager_protocols import ApplicationStateManagerProtocol
+        from core.managers.application_state_manager import ApplicationStateManager
         from ui.injection_dialog import InjectionDialog
 
         injection_mgr = inject(InjectionManagerProtocol)
-        settings_mgr = inject(ApplicationStateManagerProtocol)
+        settings_mgr = inject(ApplicationStateManager)
 
         # Create with explicit deps
         dialog = InjectionDialog(
@@ -205,7 +204,7 @@ class TestNoFallbackScenario:
 
             # Try to inject - should raise ValueError
             with pytest.raises(ValueError, match="No registration"):
-                inject(ApplicationStateManagerProtocol)
+                inject(ApplicationStateManager)
         finally:
             # Restore
             container._singletons.update(original_singletons)

@@ -13,10 +13,8 @@ import pytest
 
 from core.di_container import inject
 from core.hal_compression import HALCompressionError, HALCompressor
-from core.protocols.manager_protocols import (
-    ApplicationStateManagerProtocol,
-    InjectionManagerProtocol,
-)
+from core.managers.application_state_manager import ApplicationStateManager
+from core.protocols.manager_protocols import InjectionManagerProtocol
 from core.rom_injector import ROMHeader, ROMInjector
 
 # Systematic pytest markers applied based on test content analysis
@@ -154,7 +152,7 @@ class TestROMInjectionDialog(unittest.TestCase):
         from ui.injection_dialog import InjectionDialog
 
         injection_manager = inject(InjectionManagerProtocol)
-        settings_manager = inject(ApplicationStateManagerProtocol)
+        settings_manager = inject(ApplicationStateManager)
         dialog = InjectionDialog(
             injection_manager=injection_manager,
             settings_manager=settings_manager,
