@@ -553,9 +553,10 @@ class ConfigurationServiceProtocol(Protocol):
 # ========== Application State Manager Protocols (A.4) ==========
 
 
-# ========== Focused Protocols (A.4.1) ==========
-# These protocols provide fine-grained interfaces for specific concerns.
-# ApplicationStateManagerProtocol composes all of them for backward compatibility.
+# ========== Internal Base Protocols (A.4.1) ==========
+# These protocols are internal base classes for ApplicationStateManagerProtocol.
+# They are NOT registered in DI and should NOT be imported directly.
+# Use ApplicationStateManagerProtocol for all DI injection.
 
 
 class WorkflowStateProtocol(Protocol):

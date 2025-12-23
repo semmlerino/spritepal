@@ -11,7 +11,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from core.types import SpriteInfo
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import (
     QDialog,
@@ -24,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.types import SpriteInfo
 from ui.rom_extraction.workers import SpriteScanWorker
 from ui.styles.components import get_cache_status_style
 from utils.logging_config import get_logger

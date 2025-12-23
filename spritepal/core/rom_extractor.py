@@ -19,12 +19,12 @@ else:
 from PIL import Image
 
 from core.default_palette_loader import DefaultPaletteLoader
-from core.types import SpriteInfo
 from core.hal_compression import HALCompressionError, HALCompressor
 from core.rom_injector import ROMInjector, SpritePointer
 from core.rom_palette_extractor import ROMPaletteExtractor
 from core.rom_validator import ROMHeader
 from core.sprite_config_loader import SpriteConfigLoader
+from core.types import SpriteInfo
 from utils.constants import (
     BUFFER_SIZE_1KB,
     BUFFER_SIZE_2KB,

@@ -15,9 +15,9 @@ if TYPE_CHECKING:
     from core.rom_injector import ROMInjector
 
 from core.region_analyzer import EmptyRegionConfig, EmptyRegionDetector
-from core.types import SpriteInfo
 from core.sprite_visual_validator import SpriteVisualValidator
 from core.tile_renderer import TileRenderer
+from core.types import SpriteInfo
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_TILES_PER_ROW,

@@ -1166,7 +1166,7 @@ class HALCompressor:
                 raise HALCompressionError(
                     f"Decompression timed out at offset 0x{offset:X} - "
                     "data may be malformed or not HAL-compressed"
-                )
+                ) from None
 
             logger.debug(f"Command completed with return code: {result.returncode}")
 

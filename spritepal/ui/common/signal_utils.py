@@ -74,5 +74,8 @@ def is_valid_pixmap(pixmap: object) -> bool:
     """
     if pixmap is None:
         return False
-    # QPixmap has isNull() method
-    return hasattr(pixmap, "isNull") and not pixmap.isNull()
+    # QPixmap has isNull() method - use getattr to satisfy type checker
+    is_null_method = getattr(pixmap, "isNull", None)
+    if is_null_method is None:
+        return False
+    return not is_null_method()

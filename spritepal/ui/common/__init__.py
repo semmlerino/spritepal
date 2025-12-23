@@ -66,7 +66,6 @@ from .spacing_constants import (
     TILE_GRID_THICKNESS,
     WIDE_WIDTH,
 )
-from .widget_factory import WidgetFactory
 
 __all__ = [
     # Spacing and sizing constants
@@ -120,7 +119,6 @@ __all__ = [
     "CollapsibleGroupBox",
     "ErrorHandler",
     "FileDialogHelper",
-    "WidgetFactory",
     "WorkerManager",
     # File dialog functions
     "browse_for_directory",

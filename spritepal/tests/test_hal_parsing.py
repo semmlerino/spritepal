@@ -27,11 +27,12 @@ HAL Compression Format Reference (from exhal compress.c):
 
 from __future__ import annotations
 
-import pytest
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import pytest
 
 from core.rom_injector import ROMInjector
 
@@ -71,7 +72,7 @@ class HALStreamBuilder:
         self._data: bytearray = bytearray()
         self._terminated: bool = False
 
-    def raw_bytes(self, data: bytes, long_form: bool = False) -> "HALStreamBuilder":
+    def raw_bytes(self, data: bytes, long_form: bool = False) -> HALStreamBuilder:
         """Add raw bytes command (command 0).
 
         Args:
@@ -97,7 +98,7 @@ class HALStreamBuilder:
         self._data.extend(data)
         return self
 
-    def rle_8bit(self, byte_val: int, count: int, long_form: bool = False) -> "HALStreamBuilder":
+    def rle_8bit(self, byte_val: int, count: int, long_form: bool = False) -> HALStreamBuilder:
         """Add 8-bit RLE command (command 1).
 
         Args:
@@ -121,7 +122,7 @@ class HALStreamBuilder:
         self._data.append(byte_val & 0xFF)
         return self
 
-    def rle_16bit(self, word_val: int, count: int, long_form: bool = False) -> "HALStreamBuilder":
+    def rle_16bit(self, word_val: int, count: int, long_form: bool = False) -> HALStreamBuilder:
         """Add 16-bit RLE command (command 2).
 
         Args:
@@ -145,7 +146,7 @@ class HALStreamBuilder:
         self._data.append((word_val >> 8) & 0xFF)
         return self
 
-    def sequence_rle(self, start_byte: int, count: int, long_form: bool = False) -> "HALStreamBuilder":
+    def sequence_rle(self, start_byte: int, count: int, long_form: bool = False) -> HALStreamBuilder:
         """Add sequence RLE command (command 3).
 
         Outputs: start_byte, start_byte+1, start_byte+2, ...
@@ -171,7 +172,7 @@ class HALStreamBuilder:
 
     def backref(
         self, offset: int, count: int, command: int = 4, long_form: bool = False
-    ) -> "HALStreamBuilder":
+    ) -> HALStreamBuilder:
         """Add backref command (commands 4-7).
 
         Args:
@@ -203,7 +204,7 @@ class HALStreamBuilder:
         self._data.append((offset >> 8) & 0xFF)
         return self
 
-    def terminate(self) -> "HALStreamBuilder":
+    def terminate(self) -> HALStreamBuilder:
         """Add stream terminator (0xFF)."""
         self._data.append(0xFF)
         self._terminated = True

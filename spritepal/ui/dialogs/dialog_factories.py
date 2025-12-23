@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QWidget
 
-from core.di_container import inject
-from core.protocols.dialog_protocols import ManualOffsetDialogFactoryProtocol
 from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
 if TYPE_CHECKING:

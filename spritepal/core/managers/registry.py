@@ -275,29 +275,13 @@ class ManagerRegistry:
                 from core.di_container import register_singleton
                 from core.protocols.manager_protocols import (
                     ApplicationStateManagerProtocol,
-                    CacheStatsProtocol,
-                    CurrentOffsetProtocol,
                     ExtractionManagerProtocol,
                     InjectionManagerProtocol,
-                    RuntimeStateProtocol,
-                    SessionPersistenceProtocol,
-                    SettingsAccessProtocol,
                     SpritePresetManagerProtocol,
-                    WorkflowStateProtocol,
                 )
                 register_singleton(ApplicationStateManagerProtocol, state_manager)
                 self._lifecycle_order.append(ApplicationStateManagerProtocol)
-                self._logger.debug("ApplicationStateManagerProtocol registered for downstream dependencies")
-
-                # Register focused protocols - all point to the same ApplicationStateManager singleton
-                # This allows callers to depend on specific interfaces (Interface Segregation Principle)
-                register_singleton(WorkflowStateProtocol, state_manager)
-                register_singleton(SessionPersistenceProtocol, state_manager)
-                register_singleton(SettingsAccessProtocol, state_manager)
-                register_singleton(CacheStatsProtocol, state_manager)
-                register_singleton(RuntimeStateProtocol, state_manager)
-                register_singleton(CurrentOffsetProtocol, state_manager)
-                self._logger.debug("Focused state protocols registered (6 protocols -> same singleton)")
+                self._logger.debug("ApplicationStateManagerProtocol registered")
 
                 # SpritePresetManager handles user-defined sprite presets
                 self._logger.debug("Creating SpritePresetManager...")
