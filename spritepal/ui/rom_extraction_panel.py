@@ -945,37 +945,43 @@ class ROMExtractionPanel(QWidget):
 
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent stale handler calls after close."""
-        # Orchestrator signals (most critical - these come from background workers)
-        orchestrator_signals = [
-            "header_loaded",
-            "header_error",
-            "sprite_locations_loaded",
-            "sprite_locations_error",
-            "similarity_progress",
-            "sprite_indexed",
-            "index_saved",
-            "index_loaded",
-            "similarity_finished",
-            "similarity_error",
-        ]
-        for signal_name in orchestrator_signals:
+        import warnings
+
+        # Suppress PySide6 disconnect warnings (emitted before exception is raised)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", "Failed to disconnect", RuntimeWarning)
+
+            # Orchestrator signals (most critical - these come from background workers)
+            orchestrator_signals = [
+                "header_loaded",
+                "header_error",
+                "sprite_locations_loaded",
+                "sprite_locations_error",
+                "similarity_progress",
+                "sprite_indexed",
+                "index_saved",
+                "index_loaded",
+                "similarity_finished",
+                "similarity_error",
+            ]
+            for signal_name in orchestrator_signals:
+                try:
+                    getattr(self._worker_orchestrator, signal_name).disconnect()
+                except (RuntimeError, AttributeError):
+                    pass  # Already disconnected or destroyed
+
+            # State manager signals
             try:
-                getattr(self._worker_orchestrator, signal_name).disconnect()
+                self.state_manager.workflow_state_changed.disconnect(self._on_state_changed)
             except (RuntimeError, AttributeError):
-                pass  # Already disconnected or destroyed
+                pass
 
-        # State manager signals
-        try:
-            self.state_manager.workflow_state_changed.disconnect(self._on_state_changed)
-        except (RuntimeError, AttributeError):
-            pass
-
-        # Dialog manager signals
-        try:
-            self._offset_dialog_manager.offset_changed.disconnect()
-            self._offset_dialog_manager.sprite_found.disconnect()
-        except (RuntimeError, AttributeError):
-            pass
+            # Dialog manager signals
+            try:
+                self._offset_dialog_manager.offset_changed.disconnect()
+                self._offset_dialog_manager.sprite_found.disconnect()
+            except (RuntimeError, AttributeError):
+                pass
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:
@@ -992,3 +998,13 @@ class ROMExtractionPanel(QWidget):
         # Call parent implementation
         if a0 is not None:
             super().closeEvent(a0)
+
+    def cleanup(self) -> None:
+        """Clean up resources when panel is closed.
+
+        This must be called explicitly from MainWindow._cleanup_managers()
+        because child widget closeEvent is NOT called when parent window closes.
+        """
+        self._disconnect_signals()
+        self._cleanup_workers()
+        self._offset_dialog_manager.close()

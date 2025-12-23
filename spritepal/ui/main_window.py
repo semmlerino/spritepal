@@ -770,10 +770,44 @@ class MainWindow(QMainWindow):
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:
-        """Handle window close event"""
+        """Handle window close event."""
         self.session_coordinator.save_session()
+        self._cleanup_managers()
         if a0:
             super().closeEvent(a0)
+
+    def _cleanup_managers(self) -> None:
+        """Clean up signal connections in all UI managers and panels.
+
+        Prevents memory leaks from orphaned signal handlers when the window closes.
+        Child widget closeEvent is NOT called when parent closes, so we must
+        explicitly clean up panels here.
+        """
+        # Clean up managers (not all have cleanup methods yet)
+        managers: list[object] = [
+            self.menu_bar_manager,
+            self.status_bar_manager,
+            self.output_settings_manager,
+            self.toolbar_manager,
+            self.preview_coordinator,
+            self.session_coordinator,
+            self.tab_coordinator,
+            self.keyboard_handler,
+        ]
+        for manager in managers:
+            cleanup_fn = getattr(manager, "cleanup", None)
+            if callable(cleanup_fn):
+                cleanup_fn()
+
+        # Clean up panels (their closeEvent won't be called automatically)
+        panels: list[object] = [
+            self.rom_extraction_panel,
+            self.extraction_panel,
+        ]
+        for panel in panels:
+            cleanup_fn = getattr(panel, "cleanup", None)
+            if callable(cleanup_fn):
+                cleanup_fn()
 
     @override
     def keyPressEvent(self, a0: QKeyEvent | None) -> None:
