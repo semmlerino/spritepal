@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, override
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt
 from PySide6.QtGui import (
     QColor,
+    QKeyEvent,
     QMouseEvent,
     QPainter,
     QPen,
@@ -291,27 +292,29 @@ class ZoomablePreviewWidget(QWidget):
             self.update()
 
     @override
-    def keyPressEvent(self, a0: object) -> None:
+    def keyPressEvent(self, event: QKeyEvent | None) -> None:
         """Handle keyboard input"""
-        if a0.key() == Qt.Key.Key_G:  # type: ignore[attr-defined]
+        if event is None:
+            return
+        if event.key() == Qt.Key.Key_G:
             self._grid_visible = not self._grid_visible
             self.update()
-        elif a0.key() == Qt.Key.Key_F:  # type: ignore[attr-defined]
+        elif event.key() == Qt.Key.Key_F:
             # F: Zoom to fit
             self.zoom_to_fit()
-        elif a0.key() == Qt.Key.Key_0:  # type: ignore[attr-defined]
-            if a0.modifiers() == Qt.KeyboardModifier.ControlModifier:  # type: ignore[attr-defined]
+        elif event.key() == Qt.Key.Key_0:
+            if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                 # Ctrl+0: Reset zoom to default (4x zoom for pixel art)
                 self._zoom = 4.0
                 self._pan_offset = QPointF(0, 0)
                 self.update()
-            elif a0.modifiers() == (  # type: ignore[attr-defined]
+            elif event.modifiers() == (
                 Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
             ):
                 # Ctrl+Shift+0: Zoom to fit
                 self.zoom_to_fit()
         else:
-            super().keyPressEvent(a0)  # type: ignore[arg-type]
+            super().keyPressEvent(event)
 
     def set_preview(
         self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0
@@ -615,14 +618,16 @@ class PreviewPanel(QWidget):
         return pil_to_qpixmap(pil_image)  # type: ignore[return-value]
 
     @override
-    def keyPressEvent(self, a0: object) -> None:
+    def keyPressEvent(self, event: QKeyEvent | None) -> None:
         """Handle keyboard input"""
-        if a0.key() == Qt.Key.Key_C:  # type: ignore[attr-defined]
+        if event is None:
+            return
+        if event.key() == Qt.Key.Key_C:
             # Toggle palette application
             if self.palette_toggle:
                 self.palette_toggle.setChecked(not self.palette_toggle.isChecked())
         else:
-            super().keyPressEvent(a0)  # type: ignore[arg-type]
+            super().keyPressEvent(event)
 
     def _on_colorizer_palette_mode_changed(self, enabled: bool) -> None:
         """Handle palette mode change from colorizer"""

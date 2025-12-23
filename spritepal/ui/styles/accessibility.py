@@ -288,28 +288,23 @@ def configure_accessibility_settings() -> None:
     if not app:
         return
 
+    # Cast to QApplication for type checker
+    app = cast(QApplication, app)
+
     # Set default font size for better readability
-    font = app.font()  # type: ignore[attr-defined]
+    font = app.font()
     if font.pointSize() < 10:
         font.setPointSize(10)
-        app.setFont(font)  # type: ignore[attr-defined]
+        app.setFont(font)
 
     # Note: setNavigationMode is not available in Qt6/PySide6
     # Keyboard navigation is enabled by default in modern Qt
 
     # Set double-click interval for users with motor impairments
     try:
-        app.setDoubleClickInterval(600)  # type: ignore[attr-defined]  # 600ms instead of default 400ms
+        app.setDoubleClickInterval(600)  # 600ms instead of default 400ms
     except AttributeError:
         # This method might not be available in all Qt versions
-        pass
-
-    # Set additional accessibility attributes if available
-    try:
-        # Disable context help button which can be confusing
-        app.setAttribute(Qt.AA_DisableWindowContextHelpButton, False)  # type: ignore[attr-defined]
-    except (AttributeError, TypeError):
-        # Attribute may not be available in this Qt version
         pass
 
 def initialize_accessibility() -> None:

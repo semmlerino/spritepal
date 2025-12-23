@@ -252,11 +252,6 @@ class AccessibilityHelper:
         # Connect callback
         action.triggered.connect(callback)
 
-        # Set accessible name
-        clean_text = text.replace('&', '')
-        action.setAccessibleName(clean_text)  # type: ignore[attr-defined]
-        action.setAccessibleDescription(description or clean_text)  # type: ignore[attr-defined]
-
         return action
 
     @staticmethod

@@ -495,12 +495,7 @@ class ROMExtractionPanel(QWidget):
 
     def _open_presets_dialog(self) -> None:
         """Open the sprite presets management dialog."""
-        from core.di_container import inject
-        from core.protocols.manager_protocols import SpritePresetManagerProtocol
         from ui.dialogs.sprite_preset_dialog import SpritePresetDialog
-
-        # Get the preset manager from DI
-        preset_manager = inject(SpritePresetManagerProtocol)
 
         # Get current ROM info for auto-filtering
         game_title: str | None = None
@@ -510,8 +505,7 @@ class ROMExtractionPanel(QWidget):
             checksum = self._current_header.checksum
 
         dialog = SpritePresetDialog(
-            preset_manager=preset_manager,  # type: ignore[arg-type] - Protocol to concrete
-            current_game_title=game_title,
+            current_game_title=game_title or "",
             current_checksum=checksum,
             parent=self,
         )

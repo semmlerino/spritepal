@@ -12,11 +12,13 @@ import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 import pytest
 
 F = TypeVar('F', bound=Callable[..., Any])
+P = ParamSpec('P')
+R = TypeVar('R')
 
 
 class EnvironmentInfo:
@@ -250,17 +252,17 @@ def requires_real_qt(func: F) -> F:
     )(func)  # type: ignore[return-value]
 
 
-def headless_safe(func: F) -> F:
+def headless_safe(func: Callable[P, R]) -> Callable[P, R]:
     """Mark test as safe to run in headless environments (no-op decorator)."""
     @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(*args, **kwargs)
-    return wrapper  # type: ignore[return-value]
+    return wrapper
 
 
-def ci_safe(func: F) -> F:
+def ci_safe(func: Callable[P, R]) -> Callable[P, R]:
     """Mark test as safe to run in CI environments (no-op decorator)."""
     @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(*args, **kwargs)
-    return wrapper  # type: ignore[return-value]
+    return wrapper

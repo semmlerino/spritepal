@@ -12,7 +12,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import TYPE_CHECKING, ParamSpec, TypeVar, override
 
-from PySide6.QtCore import QMetaObject, QThread, Signal
+from PySide6.QtCore import QMetaObject, QThread, Signal, SignalInstance
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
@@ -196,9 +196,9 @@ class BaseWorker(QThread, metaclass=WorkerMeta):
         self._signal_connections.clear()
         logger.debug(f"{self._operation_name}: Cleaned up {connection_count} signal connections")
 
-    def connect_signal_with_tracking(self, signal: Signal, slot: Callable[..., object]) -> QMetaObject.Connection:
+    def connect_signal_with_tracking(self, signal: SignalInstance, slot: Callable[..., object]) -> QMetaObject.Connection:
         """Connect a signal and track the connection for cleanup"""
-        connection = signal.connect(slot)  # type: ignore[attr-defined]  # Signal.connect exists at runtime
+        connection = signal.connect(slot)
         self._signal_connections.append(connection)
         return connection
 
