@@ -13,27 +13,8 @@ from typing import Any
 
 
 def is_logging_available() -> bool:
-    """
-    Check if the logging system is still active and functional.
-
-    Returns:
-        True if logging is available, False if shutdown
-    """
-    try:
-        # Check if we're in the process of shutting down
-        if sys.is_finalizing():
-            return False
-
-        # Check if logging handlers are still available
-        if not hasattr(logging, '_handlers') or not logging._handlers:  # type: ignore[attr-defined]
-            return False
-
-        # Try to get a logger and check if it has handlers
-        test_logger = logging.getLogger("safe_logging_test")
-        return not (not test_logger.handlers and not logging.getLogger().handlers)
-    except (AttributeError, ValueError, RuntimeError):
-        # Logging system is in an invalid state
-        return False
+    """Check if logging system is still functional (not shutting down)."""
+    return not sys.is_finalizing()
 
 def safe_log(logger: logging.Logger, level: int, message: str, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny] - Logging args
     """
@@ -66,10 +47,6 @@ def safe_info(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -
 def safe_warning(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny] - Logging args
     """Safely log a warning message."""
     safe_log(logger, logging.WARNING, message, *args, **kwargs)
-
-def safe_error(logger: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny] - Logging args
-    """Safely log an error message."""
-    safe_log(logger, logging.ERROR, message, *args, **kwargs)
 
 def suppress_logging_errors(func: Callable[..., Any]) -> Callable[..., Any]:  # pyright: ignore[reportExplicitAny] - Decorator pattern
     """

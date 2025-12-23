@@ -6,8 +6,6 @@ This module provides reusable building blocks for state management:
 """
 from __future__ import annotations
 
-import pickle
-import sys
 import time
 from typing import Any
 
@@ -18,6 +16,8 @@ class StateEntry:
 
     Tracks creation time, access patterns, and optional TTL for automatic expiry.
     """
+
+    __slots__ = ("access_count", "accessed_at", "created_at", "ttl_seconds", "value")
 
     def __init__(self, value: Any, ttl_seconds: float | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Generic state value
         """
@@ -32,14 +32,6 @@ class StateEntry:
         self.accessed_at = time.time()
         self.ttl_seconds = ttl_seconds
         self.access_count = 0
-
-        # Track size for memory management
-        try:
-            # Use pickle to get accurate size for complex objects
-            self.size_bytes = len(pickle.dumps(value))
-        except (TypeError, pickle.PicklingError):
-            # Fall back to sys.getsizeof for unpickleable objects
-            self.size_bytes = sys.getsizeof(value)
 
     def is_expired(self) -> bool:
         """

@@ -6,7 +6,6 @@ import logging.handlers
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, override
 
 
 def setup_logging(
@@ -56,7 +55,7 @@ def setup_logging(
         # If we can't clear it, that's okay, just continue
         pass
 
-    # Create a custom rotating file handler that's more resilient to directory cleanup
+    # File handler with rotating logs
     try:
         file_handler = logging.handlers.RotatingFileHandler(
             log_file, maxBytes=5_000_000, backupCount=3  # 5MB
@@ -66,73 +65,12 @@ def setup_logging(
             "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
         )
         file_handler.setFormatter(file_formatter)
-
-        # Create a permanent null stream to avoid file handle closure issues
-        class PermanentNullStream:
-            """A null stream that can never be closed"""
-            def write(self, data: str) -> None:
-                pass
-            def flush(self) -> None:
-                pass
-            def close(self) -> None:
-                pass
-            def seek(self, *args: Any) -> int:  # pyright: ignore[reportExplicitAny] - Stream seek args
-                return 0
-            def tell(self) -> int:
-                return 0
-            def __enter__(self) -> PermanentNullStream:
-                return self
-            def __exit__(self, *args: Any) -> None:  # pyright: ignore[reportExplicitAny] - Context manager args
-                pass
-
-        _null_stream = PermanentNullStream()
-
-        # Create a safe wrapper handler instead of modifying methods
-        class SafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
-            """A safer rotating file handler that handles directory cleanup gracefully."""
-
-            @override
-            def emit(self, record: logging.LogRecord) -> None:
-                try:
-                    super().emit(record)
-                except (FileNotFoundError, OSError):
-                    # If log directory was cleaned up (e.g., in tests), silently ignore
-                    # This prevents cascade failures in threaded operations
-                    pass
-
-            @override
-            def shouldRollover(self, record: logging.LogRecord) -> bool:
-                try:
-                    return bool(super().shouldRollover(record))
-                except (FileNotFoundError, OSError):
-                    # If log directory was cleaned up, don't rollover
-                    return False
-
-            @override
-            def _open(self) -> Any:  # pyright: ignore[reportExplicitAny] - File stream object
-                try:
-                    # Check if log directory still exists before opening
-                    log_dir = Path(self.baseFilename).parent
-                    if not log_dir.exists():
-                        # Log directory was cleaned up, return permanent null stream
-                        return _null_stream
-                    return super()._open()
-                except (FileNotFoundError, OSError):
-                    # If anything fails, return permanent null stream
-                    return _null_stream
-
-        # Replace the file handler with our safe version
-        file_handler = SafeRotatingFileHandler(
-            log_file, maxBytes=5_000_000, backupCount=3  # 5MB
-        )
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(file_formatter)
-
-        logger.addHandler(console_handler)
         logger.addHandler(file_handler)
-    except Exception:
-        # If file handler creation fails completely, just use console handler
-        logger.addHandler(console_handler)
+    except (FileNotFoundError, OSError):
+        # If file handler creation fails, continue with console only
+        pass
+
+    logger.addHandler(console_handler)
 
     # Log startup banner
     logger.info("=" * 80)
