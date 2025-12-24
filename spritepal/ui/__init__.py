@@ -9,22 +9,12 @@ logger = logging.getLogger(__name__)
 
 def register_ui_factories() -> None:
     """
-    Register UI factories with the DI container.
+    Legacy no-op function, kept for backwards compatibility.
 
-    This function must be called AFTER configure_container() but BEFORE
-    any code tries to inject UI factory protocols. It keeps UI dependencies
-    out of core/ by having the UI layer register its own factories.
+    Previously registered DialogFactoryProtocol with the DI container,
+    but this is no longer needed since ExtractionController now directly
+    imports and instantiates dialogs.
 
-    Called from: core/managers/registry.py after configure_container()
+    This function can be safely removed once all call sites are updated.
     """
-    from core.di_container import register_factory
-    from core.protocols.dialog_protocols import DialogFactoryProtocol
-
-    def _create_controller_dialog_factory():
-        from ui.dialogs.controller_dialog_factory import ControllerDialogFactory
-
-        return ControllerDialogFactory()
-
-    register_factory(DialogFactoryProtocol, _create_controller_dialog_factory)
-
-    logger.debug("UI factories registered with DI container")
+    logger.debug("register_ui_factories() is now a no-op (dialog factory removed)")

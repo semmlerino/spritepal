@@ -22,11 +22,10 @@ import pytest
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtTest import QSignalSpy
 
-from core.controller import ExtractionController
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
-from core.protocols.dialog_protocols import DialogFactoryProtocol
 from tests.infrastructure.real_component_factory import RealComponentFactory
+from ui.extraction_controller import ExtractionController
 
 # Serial execution required: Real Qt components
 pytestmark = [
@@ -171,16 +170,14 @@ class TestExtractionControllerReal:
             extraction_manager = factory.create_extraction_manager()
             injection_manager = factory.create_injection_manager()
             session_manager = factory.create_session_manager("TestControllerApp")
-            # Get settings_manager and dialog_factory from DI container
+            # Get settings_manager from DI container
             settings_manager = inject(ApplicationStateManager)
-            dialog_factory = Mock(spec=DialogFactoryProtocol)
 
             yield {
                 "extraction_manager": extraction_manager,
                 "injection_manager": injection_manager,
                 "session_manager": session_manager,
                 "settings_manager": settings_manager,
-                "dialog_factory": dialog_factory,
             }
 
     @pytest.fixture
@@ -192,7 +189,6 @@ class TestExtractionControllerReal:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
-            dialog_factory=real_managers["dialog_factory"],
         )
         yield ctrl
         # Cleanup any running workers

@@ -11,11 +11,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.controller import ExtractionController
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.dialog_protocols import DialogFactoryProtocol
+from ui.extraction_controller import ExtractionController
 
 
 def get_settings_manager():
@@ -106,7 +105,6 @@ class TestSettingsIntegration:
             session_manager=inject(ApplicationStateManager),
             injection_manager=inject(CoreOperationsManager),
             settings_manager=settings,
-            dialog_factory=inject(DialogFactoryProtocol),
         )
 
         # Controller should be able to access settings

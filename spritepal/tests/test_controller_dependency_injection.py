@@ -12,10 +12,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from core.controller import ExtractionController
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.dialog_protocols import DialogFactoryProtocol
+from ui.extraction_controller import ExtractionController
 
 # Systematic pytest markers applied based on test content analysis
 # NOTE: parallel_safe removed - tests use isolated_managers fixture and mocks
@@ -33,7 +32,6 @@ class TestControllerDependencyInjection:
         mock_session_manager = Mock(spec=ApplicationStateManager)
         mock_injection_manager = Mock(spec=CoreOperationsManager)
         mock_settings_manager = Mock(spec=ApplicationStateManager)
-        mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
         # Create controller with injected managers
         controller = ExtractionController(
@@ -42,7 +40,6 @@ class TestControllerDependencyInjection:
             session_manager=mock_session_manager,
             injection_manager=mock_injection_manager,
             settings_manager=mock_settings_manager,
-            dialog_factory=mock_dialog_factory,
         )
 
         # Verify the exact same objects are used
@@ -59,7 +56,6 @@ class TestControllerDependencyInjection:
         mock_injection_manager = Mock(spec=CoreOperationsManager)
         mock_session_manager = Mock(spec=ApplicationStateManager)
         mock_settings_manager = Mock(spec=ApplicationStateManager)
-        mock_dialog_factory = Mock(spec=DialogFactoryProtocol)
 
         # Set up signals as Mock objects
         mock_extraction_manager.cache_operation_started = Mock()
@@ -78,7 +74,6 @@ class TestControllerDependencyInjection:
             session_manager=mock_session_manager,
             injection_manager=mock_injection_manager,
             settings_manager=mock_settings_manager,
-            dialog_factory=mock_dialog_factory,
         )
 
         # Verify signals were connected

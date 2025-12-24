@@ -11,12 +11,4 @@ NOTE: Use concrete classes directly via DI:
 """
 from __future__ import annotations
 
-from .dialog_protocols import (
-    ArrangementDialogProtocol,
-    DialogFactoryProtocol,
-)
-
-__all__ = [
-    "ArrangementDialogProtocol",
-    "DialogFactoryProtocol",
-]
+__all__: list[str] = []

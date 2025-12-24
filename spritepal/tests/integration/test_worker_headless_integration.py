@@ -143,10 +143,8 @@ class TestVRAMExtractionWorkerHeadless:
         worker.extraction_finished = finished_mock
         worker.error = error_mock
 
-        # Mock pixmap creation to avoid Qt dependency
-        with patch("core.controller.pil_to_qpixmap") as mock_pil_to_qpixmap, \
-             patch.object(worker, "disconnect_manager_signals") as mock_disconnect:
-            mock_pil_to_qpixmap.return_value = Mock()
+        # Mock disconnect to avoid signal cleanup issues
+        with patch.object(worker, "disconnect_manager_signals") as mock_disconnect:
             mock_disconnect.return_value = None
 
             # Run the worker logic directly (not as thread)
@@ -244,7 +242,7 @@ class TestWorkerBusinessLogic:
             mock_pixmap_class.return_value = mock_pixmap
 
             # Import and test the pil_to_qpixmap function
-            from core.controller import pil_to_qpixmap
+            from core.services.image_utils import pil_to_qpixmap
 
             # Test pixmap creation
             result = pil_to_qpixmap(test_img)

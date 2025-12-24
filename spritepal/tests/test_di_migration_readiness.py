@@ -16,7 +16,6 @@ import pytest
 from core.di_container import get_container, inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.services.rom_cache import ROMCache
 
 pytestmark = [
@@ -74,7 +73,7 @@ class TestPureDIComponentInitialization:
 
     def test_extraction_controller_pure_di(self, isolated_managers):
         """Test ExtractionController works with all deps passed explicitly."""
-        from core.controller import ExtractionController
+        from ui.extraction_controller import ExtractionController
 
         # Get all dependencies via DI
         extraction_mgr = inject(CoreOperationsManager)
@@ -98,14 +97,12 @@ class TestPureDIComponentInitialization:
             warnings.filterwarnings("ignore", category=DeprecationWarning)
 
             # Create with explicit deps
-            dialog_factory = Mock(spec=DialogFactoryProtocol)
             controller = ExtractionController(
                 mock_window,
                 extraction_manager=extraction_mgr,
                 session_manager=session_mgr,
                 injection_manager=injection_mgr,
                 settings_manager=settings_mgr,
-                dialog_factory=dialog_factory,
             )
 
         # Verify managers are the injected ones

@@ -12,9 +12,9 @@ from unittest.mock import Mock, patch
 import pytest
 
 # Import business logic components - no more manual path setup needed
-from core.controller import ExtractionController
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
+from ui.extraction_controller import ExtractionController
 
 # Test categorization
 pytestmark = [
@@ -40,7 +40,7 @@ class TestVRAMExtractionWorkerMocked:
         mock_qpixmap.return_value = mock_pixmap_instance
 
         # Import and test the pil_to_qpixmap function
-        from core.controller import pil_to_qpixmap
+        from core.services.image_utils import pil_to_qpixmap
 
         # Test pixmap creation
         result = pil_to_qpixmap(test_image)

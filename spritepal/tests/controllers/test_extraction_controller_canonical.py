@@ -24,12 +24,11 @@ import pytest
 from PySide6.QtTest import QSignalSpy
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-import core.controller
-from core.controller import ExtractionController
+import ui.extraction_controller
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.workers import VRAMExtractionWorker
+from ui.extraction_controller import ExtractionController
 
 # Unified pytest markers for this consolidated module
 pytestmark = [pytest.mark.headless]
@@ -120,18 +119,17 @@ def standard_mock_main_window() -> Any:
 
 
 @pytest.fixture
-def standard_mock_managers() -> tuple[Mock, Mock, Mock, Mock, Mock]:
+def standard_mock_managers() -> tuple[Mock, Mock, Mock, Mock]:
     """Create standard mock managers for dependency injection.
 
-    Returns (extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory).
+    Returns (extraction_manager, injection_manager, session_manager, settings_manager).
     This consolidates repeated manager mock creation pattern.
     """
     extraction_manager = Mock(spec=CoreOperationsManager)
     injection_manager = Mock(spec=CoreOperationsManager)
     session_manager = Mock(spec=ApplicationStateManager)
     settings_manager = Mock(spec=ApplicationStateManager)
-    dialog_factory = Mock(spec=DialogFactoryProtocol)
-    return extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory
+    return extraction_manager, injection_manager, session_manager, settings_manager
 
 
 @pytest.mark.no_manager_setup
@@ -139,21 +137,21 @@ class TestControllerImports:
     """Test that controller module imports work correctly"""
 
     def test_controller_imports(self) -> None:
-        """Test that all imports in controller module work without errors"""
+        """Test that all imports in extraction_controller module work without errors"""
         try:
-            importlib.reload(core.controller)
+            importlib.reload(ui.extraction_controller)
         except ImportError as e:
-            pytest.fail(f"Import error in controller module: {e}")
+            pytest.fail(f"Import error in extraction_controller module: {e}")
         except NameError as e:
-            pytest.fail(f"Name error in controller module: {e}")
+            pytest.fail(f"Name error in extraction_controller module: {e}")
         except Exception as e:
-            pytest.fail(f"Unexpected error importing controller module: {e}")
+            pytest.fail(f"Unexpected error importing extraction_controller module: {e}")
 
     def test_pil_to_qpixmap_import(self) -> None:
-        """Test that pil_to_qpixmap function is available in controller module"""
-        from core import controller
-        assert hasattr(controller, "pil_to_qpixmap")
-        assert callable(controller.pil_to_qpixmap)
+        """Test that pil_to_qpixmap function is available in extraction_controller module"""
+        from ui import extraction_controller
+        assert hasattr(extraction_controller, "pil_to_qpixmap")
+        assert callable(extraction_controller.pil_to_qpixmap)
 
 
 @pytest.mark.no_manager_setup
@@ -166,9 +164,9 @@ class TestExtractionControllerUnit:
         return standard_mock_main_window
 
     @pytest.fixture
-    def controller(self, main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock, Mock]) -> ExtractionController:
+    def controller(self, main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock]) -> ExtractionController:
         """Create REAL controller instance with mock managers."""
-        extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory = standard_mock_managers
+        extraction_manager, injection_manager, session_manager, settings_manager = standard_mock_managers
 
         # Controller now uses ConsoleErrorHandler directly (no UI import)
         controller = ExtractionController(
@@ -177,7 +175,6 @@ class TestExtractionControllerUnit:
             injection_manager=injection_manager,
             session_manager=session_manager,
             settings_manager=settings_manager,
-            dialog_factory=dialog_factory,
         )
 
         return controller
@@ -278,9 +275,9 @@ class TestExtractionControllerUnit:
         mock_validation_result.error_message = None
         mock_validation_result.warnings = []
 
-        with patch('core.controller.VRAMExtractionWorker') as mock_worker_class, \
-             patch('core.controller.FileValidator.validate_vram_file', return_value=mock_validation_result), \
-             patch('core.controller.FileValidator.validate_cgram_file', return_value=mock_validation_result):
+        with patch('ui.extraction_controller.VRAMExtractionWorker') as mock_worker_class, \
+             patch('ui.extraction_controller.FileValidator.validate_vram_file', return_value=mock_validation_result), \
+             patch('ui.extraction_controller.FileValidator.validate_cgram_file', return_value=mock_validation_result):
             mock_worker = Mock(spec=VRAMExtractionWorker)
             mock_worker_class.return_value = mock_worker
 
@@ -313,7 +310,7 @@ class TestExtractionControllerUnit:
         controller.preview_ready.connect(lambda px, tc: preview_signals.append((px, tc)))
         controller.preview_info_changed.connect(lambda info: info_signals.append(info))
         # Patch pil_to_qpixmap to avoid Qt context requirement
-        with patch('core.controller.pil_to_qpixmap') as mock_pil_to_qpixmap:
+        with patch('ui.extraction_controller.pil_to_qpixmap') as mock_pil_to_qpixmap:
             mock_pil_to_qpixmap.return_value = Mock()  # Return mock QPixmap
             controller._on_preview_ready(test_image, tile_count)
         assert len(preview_signals) == 1
@@ -376,7 +373,7 @@ class TestExtractionControllerUnit:
         assert signals_received[0] == error_message
         assert controller.worker is None
 
-    @patch("core.controller.subprocess.Popen")
+    @patch("ui.extraction_controller.subprocess.Popen")
     def test_open_in_editor_launcher_found(self, mock_popen, controller: ExtractionController, main_window: Any, tmp_path: Path):
         """Test opening in editor when launcher is found."""
         launcher_dir = tmp_path / "pixel_editor"
@@ -387,7 +384,7 @@ class TestExtractionControllerUnit:
         sprite_file.write_text("fake png data")
 
         mock_controller_file = tmp_path / "core" / "controller.py"
-        with patch("core.controller.__file__", str(mock_controller_file)):
+        with patch("ui.extraction_controller.__file__", str(mock_controller_file)):
             controller.open_in_editor(str(sprite_file))
 
         mock_popen.assert_called_once()
@@ -398,7 +395,7 @@ class TestExtractionControllerUnit:
         main_window.status_bar.showMessage.assert_called_once()
         assert "Opened" in main_window.status_bar.showMessage.call_args[0][0]
 
-    @patch("core.controller.subprocess.Popen")
+    @patch("ui.extraction_controller.subprocess.Popen")
     def test_open_in_editor_launcher_not_found(self, mock_popen, controller: ExtractionController, main_window: Any, tmp_path: Path):
         """Test opening in editor when launcher is not found."""
         sprite_file = tmp_path / "sprite.png"
@@ -407,13 +404,13 @@ class TestExtractionControllerUnit:
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
         mock_controller_file = empty_dir / "core" / "controller.py"
-        with patch("core.controller.__file__", str(mock_controller_file)):
+        with patch("ui.extraction_controller.__file__", str(mock_controller_file)):
             controller.open_in_editor(str(sprite_file))
 
         mock_popen.assert_not_called()
         main_window.status_bar.showMessage.assert_called_once_with("Pixel editor not found")
 
-    @patch("core.controller.subprocess.Popen")
+    @patch("ui.extraction_controller.subprocess.Popen")
     def test_open_in_editor_subprocess_error(self, mock_popen, controller: ExtractionController, main_window: Any, tmp_path: Path):
         """Test opening in editor when subprocess fails."""
         launcher_file = tmp_path / "launch_pixel_editor.py"
@@ -423,7 +420,7 @@ class TestExtractionControllerUnit:
         mock_popen.side_effect = Exception("Subprocess failed")
 
         mock_controller_file = tmp_path / "core" / "controller.py"
-        with patch("core.controller.__file__", str(mock_controller_file)):
+        with patch("ui.extraction_controller.__file__", str(mock_controller_file)):
             controller.open_in_editor(str(sprite_file))
 
         main_window.status_bar.showMessage.assert_called_once()
@@ -439,9 +436,9 @@ class TestControllerManagerContextIntegration:
     initialization and signal connections without requiring full DI setup.
     """
 
-    def test_controller_manager_access(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock, Mock]):
+    def test_controller_manager_access(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock]):
         """Test that controller can access injected managers."""
-        extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory = standard_mock_managers
+        extraction_manager, injection_manager, session_manager, settings_manager = standard_mock_managers
 
         # Controller now uses ConsoleErrorHandler directly (no UI import)
         controller = ExtractionController(
@@ -450,16 +447,15 @@ class TestControllerManagerContextIntegration:
             injection_manager=injection_manager,
             session_manager=session_manager,
             settings_manager=settings_manager,
-            dialog_factory=dialog_factory,
         )
         # Verify the exact managers passed are used (not fetched from DI)
         assert controller.extraction_manager is extraction_manager
         assert controller.injection_manager is injection_manager
         assert controller.session_manager is session_manager
 
-    def test_controller_manager_state_persistence(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock, Mock]):
+    def test_controller_manager_state_persistence(self, standard_mock_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock]):
         """Test that managers maintain their state independently."""
-        extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory = standard_mock_managers
+        extraction_manager, injection_manager, session_manager, settings_manager = standard_mock_managers
 
         # Controller now uses ConsoleErrorHandler directly (no UI import)
         controller1 = ExtractionController(
@@ -468,7 +464,6 @@ class TestControllerManagerContextIntegration:
             injection_manager=injection_manager,
             session_manager=session_manager,
             settings_manager=settings_manager,
-            dialog_factory=dialog_factory,
         )
         # Set state on the extraction manager
         extraction_manager.test_state = "persistent_value"
@@ -490,7 +485,6 @@ class TestControllerManagerContextIntegration:
             injection_manager=injection_manager,
             session_manager=session_manager,
             settings_manager=settings_manager,
-            dialog_factory=dialog_factory,
         )
 
         assert controller2.extraction_manager is controller1.extraction_manager
@@ -519,9 +513,9 @@ class TestPrivateAttributeAccessFix:
         return window
 
     @pytest.fixture
-    def test_controller(self, test_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock, Mock]) -> ExtractionController:
+    def test_controller(self, test_main_window: Any, standard_mock_managers: tuple[Mock, Mock, Mock, Mock]) -> ExtractionController:
         """Create controller instance for private attribute access tests."""
-        extraction_manager, injection_manager, session_manager, settings_manager, dialog_factory = standard_mock_managers
+        extraction_manager, injection_manager, session_manager, settings_manager = standard_mock_managers
 
         # Controller now uses ConsoleErrorHandler directly (no UI import)
         controller = ExtractionController(
@@ -530,7 +524,6 @@ class TestPrivateAttributeAccessFix:
             injection_manager=injection_manager,
             session_manager=session_manager,
             settings_manager=settings_manager,
-            dialog_factory=dialog_factory,
         )
         return controller
 

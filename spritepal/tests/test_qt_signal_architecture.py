@@ -19,14 +19,13 @@ import pytest
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtWidgets import QApplication
 
-from core.controller import ExtractionController
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.dialog_protocols import DialogFactoryProtocol
 
 # ExtractionManagerProtocol and InjectionManagerProtocol removed - use CoreOperationsManager directly
 from tests.infrastructure.real_component_factory import RealComponentFactory
+from ui.extraction_controller import ExtractionController
 
 pytestmark = [
     pytest.mark.usefixtures("session_managers"),
@@ -123,7 +122,6 @@ class TestQtSignalArchitecture:
             session_manager=inject(ApplicationStateManager),
             injection_manager=injection_mgr,
             settings_manager=inject(ApplicationStateManager),
-            dialog_factory=inject(DialogFactoryProtocol),
         )
 
         # Connect signal capture to manager signals
@@ -355,7 +353,6 @@ class TestQtSignalArchitecture:
             session_manager=inject(ApplicationStateManager),
             injection_manager=injection_mgr,
             settings_manager=inject(ApplicationStateManager),
-            dialog_factory=inject(DialogFactoryProtocol),
         )
 
         # Capture controller's handling of manager signals

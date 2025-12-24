@@ -770,7 +770,7 @@ def mock_file_dialogs(real_factory: RealComponentFactory) -> dict[str, Mock]:
 
 # Import for controller fixture
 try:
-    from core.controller import ExtractionController
+    from ui.extraction_controller import ExtractionController
 except ImportError:
     ExtractionController = None  # type: ignore[misc, assignment]
 

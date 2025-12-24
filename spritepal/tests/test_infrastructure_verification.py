@@ -26,7 +26,7 @@ class TestInfrastructureVerification:
         """Verify circular import is resolved"""
         try:
             # These imports should work without hanging
-            from core.controller import ExtractionController
+            from ui.extraction_controller import ExtractionController
             from ui.main_window import MainWindow
 
             # Should be able to reference each other through protocols

@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from core.controller import ExtractionController
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.services.rom_cache import ROMCache
+from ui.extraction_controller import ExtractionController
 from ui.main_window import MainWindow
 
 
@@ -72,7 +72,7 @@ class TestCircularDependencyFix:
         This test verifies that we can import both modules without issues.
         """
         # These imports should work without circular dependency
-        from core.controller import ExtractionController
+        from ui.extraction_controller import ExtractionController
         from ui.main_window import MainWindow
 
         # Verify classes are importable

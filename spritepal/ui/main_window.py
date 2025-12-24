@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from core.controller import ExtractionController
     from core.managers.application_state_manager import ApplicationStateManager
     from core.services.rom_cache import ROMCache
+    from ui.extraction_controller import ExtractionController
 
 from typing import override
 
@@ -1003,11 +1003,10 @@ class MainWindow(QMainWindow):
         """
         if self._controller is None:
             # Import here to avoid circular dependency at module level
-            from core.controller import ExtractionController
             from core.di_container import inject
             from core.managers.application_state_manager import ApplicationStateManager
             from core.managers.core_operations_manager import CoreOperationsManager
-            from core.protocols.dialog_protocols import DialogFactoryProtocol
+            from ui.extraction_controller import ExtractionController
 
             core_ops_manager = inject(CoreOperationsManager)
             self._controller = ExtractionController(
@@ -1016,7 +1015,6 @@ class MainWindow(QMainWindow):
                 session_manager=inject(ApplicationStateManager),
                 injection_manager=core_ops_manager,
                 settings_manager=self.settings_manager,
-                dialog_factory=inject(DialogFactoryProtocol),
             )
             # Connect controller output signals for decoupled UI updates
             self._connect_controller_signals(self._controller)
