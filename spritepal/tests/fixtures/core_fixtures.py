@@ -871,32 +871,3 @@ def manager_context_factory() -> Callable[..., ContextManager[Any]]:
         return manager_context(*manager_types)
 
     return _create_context
-
-
-@pytest.fixture
-def test_injection_manager():
-    """Provide a test injection manager instance."""
-    from tests.infrastructure.manager_test_context import manager_context
-
-    with manager_context("injection") as ctx:
-        yield ctx.get_injection_manager()
-
-
-@pytest.fixture
-def test_extraction_manager():
-    """Provide a test extraction manager instance."""
-    from tests.infrastructure.manager_test_context import manager_context
-
-    with manager_context("extraction") as ctx:
-        yield ctx.get_extraction_manager()
-
-
-@pytest.fixture
-def test_session_manager():
-    """Provide a test session manager instance."""
-    from tests.infrastructure.manager_test_context import manager_context
-
-    with manager_context("session") as ctx:
-        yield ctx.get_session_manager()
-
-

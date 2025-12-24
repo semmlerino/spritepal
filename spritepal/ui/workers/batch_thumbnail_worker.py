@@ -16,8 +16,7 @@ from typing import TYPE_CHECKING, Any, override
 from PIL import Image
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMExtractorProtocol
-    from core.rom_injector import ROMInjector
+    from core.rom_extractor import ROMExtractor
 from PySide6.QtCore import (
     QMutex,
     QMutexLocker,
@@ -156,7 +155,7 @@ class BatchThumbnailWorker(QObject):
     def __init__(
         self,
         rom_path: str,
-        rom_extractor: ROMExtractorProtocol | None = None,
+        rom_extractor: ROMExtractor | None = None,
         parent: QObject | None = None
     ):
         """
@@ -172,8 +171,8 @@ class BatchThumbnailWorker(QObject):
         self.rom_path = rom_path
         if rom_extractor is None:
             from core.di_container import inject
-            from core.protocols.manager_protocols import ROMExtractorProtocol
-            rom_extractor = inject(ROMExtractorProtocol)
+            from core.rom_extractor import ROMExtractor
+            rom_extractor = inject(ROMExtractor)
         self.rom_extractor = rom_extractor
         self.tile_renderer = TileRenderer()
 
@@ -637,11 +636,10 @@ class BatchThumbnailWorker(QObject):
             if self.rom_extractor and hasattr(self.rom_extractor, 'rom_injector'):
                 # Try HAL decompression
                 try:
-                    from typing import cast
                     # Read chunk for decompression
                     chunk = self._read_rom_chunk(request.offset, 0x10000)  # Read up to 64KB
                     if chunk:
-                        rom_injector = cast("ROMInjector", self.rom_extractor.rom_injector)
+                        rom_injector = self.rom_extractor.rom_injector
                         _, decompressed_data = rom_injector.find_compressed_sprite(
                             chunk,
                             0,  # Offset within chunk
@@ -868,7 +866,7 @@ class ThumbnailWorkerController(QObject):
         self._thread: QThread | None = None
         self._cleanup_called = False
 
-    def start_worker(self, rom_path: str, rom_extractor: ROMExtractorProtocol | None = None) -> None:
+    def start_worker(self, rom_path: str, rom_extractor: ROMExtractor | None = None) -> None:
         """Start worker with proper thread management."""
         if self._thread and self._thread.isRunning():
             logger.warning("Worker already running, stopping first")

@@ -101,11 +101,11 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_scan_range_dialog_real(self, qtbot: MockQtBotProtocol) -> None:
-        """Test ScanRangeDialog can be created with real Qt widgets."""
-        from ui.dialogs.scan_range_dialog import ScanRangeDialog
+    def test_range_scan_dialog_real(self, qtbot: MockQtBotProtocol) -> None:
+        """Test RangeScanDialog can be created with real Qt widgets."""
+        from ui.components.dialogs.range_scan_dialog import RangeScanDialog
 
-        dialog = ScanRangeDialog(
+        dialog = RangeScanDialog(
             rom_size=0x400000,
         )
         qtbot.addWidget(dialog)

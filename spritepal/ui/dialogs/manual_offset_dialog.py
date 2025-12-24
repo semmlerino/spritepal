@@ -25,10 +25,8 @@ with contextlib.suppress(ImportError):
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import (
-        ROMCacheProtocol,
-        ROMExtractorProtocol,
-    )
+    from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
 from PySide6.QtCore import (
     QMutex,
@@ -108,10 +106,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self,
         parent: QWidget | None = None,
         *,
-        rom_cache: ROMCacheProtocol,
+        rom_cache: ROMCache,
         settings_manager: ApplicationStateManager,
         extraction_manager: CoreOperationsManager,
-        rom_extractor: ROMExtractorProtocol | None = None,
+        rom_extractor: ROMExtractor | None = None,
     ) -> None:
         # Debug logging for singleton tracking
         logger.debug(f"Creating UnifiedManualOffsetDialog instance (parent: {parent.__class__.__name__ if parent else 'None'})")
@@ -146,7 +144,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # rom_extractor can be obtained from extraction_manager if not provided
         if rom_extractor is None:
-            self.rom_extractor: ROMExtractorProtocol | None = cast('ROMExtractorProtocol | None', self.extraction_manager.get_rom_extractor())
+            self.rom_extractor: ROMExtractor | None = cast('ROMExtractor | None', self.extraction_manager.get_rom_extractor())
         else:
             self.rom_extractor = rom_extractor
 
@@ -360,9 +358,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def _setup_smart_preview_coordinator(self):
         """Set up SmartPreviewCoordinator for efficient preview generation."""
-        from core.services.rom_cache import ROMCache
-        # SmartPreviewCoordinator expects concrete ROMCache type, not protocol
-        coordinator = SmartPreviewCoordinator(self, rom_cache=cast(ROMCache | None, self.rom_cache))
+        # SmartPreviewCoordinator expects concrete ROMCache type
+        coordinator = SmartPreviewCoordinator(self, rom_cache=self.rom_cache)
         self._smart_preview_coordinator = coordinator
         assert self._smart_preview_coordinator is not None  # Just assigned
 
@@ -714,7 +711,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             self.rom_path = rom_path
             self.rom_size = rom_size
             self.extraction_manager = extraction_manager
-            self.rom_extractor = cast('ROMExtractorProtocol | None', extraction_manager.get_rom_extractor())
+            self.rom_extractor = cast('ROMExtractor | None', extraction_manager.get_rom_extractor())
 
         # Update tabs with new ROM data
         if self.browse_tab is not None:
@@ -723,9 +720,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Update gallery tab with ROM data
         if self.gallery_tab is not None and self.rom_extractor is not None:
-            from core.rom_extractor import ROMExtractor
-            # Gallery tab expects concrete ROMExtractor type, not protocol
-            self.gallery_tab.set_rom_data(rom_path, rom_size, cast(ROMExtractor, self.rom_extractor))
+            self.gallery_tab.set_rom_data(rom_path, rom_size, self.rom_extractor)
 
         # Update mini ROM map
         if self.mini_rom_map is not None:

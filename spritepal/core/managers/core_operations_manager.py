@@ -37,7 +37,7 @@ from utils.file_validator import FileValidator
 from .base_manager import BaseManager, with_operation_handling
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
 
 
 class CoreOperationsManager(BaseManager):
@@ -83,7 +83,7 @@ class CoreOperationsManager(BaseManager):
         """Initialize the core operations manager."""
         # Initialize components
         self._sprite_extractor: SpriteExtractor | None = None
-        self._rom_extractor: ROMExtractorProtocol | None = None
+        self._rom_extractor: ROMExtractor | None = None
         self._palette_manager: PaletteManager | None = None
         self._current_worker: QThread | None = None
 
@@ -107,8 +107,8 @@ class CoreOperationsManager(BaseManager):
 
             # ROMExtractor via DI
             from core.di_container import inject
-            from core.protocols.manager_protocols import ROMExtractorProtocol
-            self._rom_extractor = inject(ROMExtractorProtocol)
+            from core.rom_extractor import ROMExtractor
+            self._rom_extractor = inject(ROMExtractor)
 
             # Get signal mappings for services to emit directly to manager signals
             rom_signals = self._get_rom_service_signals()
@@ -236,7 +236,7 @@ class CoreOperationsManager(BaseManager):
             self._sprite_extractor, "Sprite extractor", ExtractionError
         )
 
-    def _ensure_rom_extractor(self) -> ROMExtractorProtocol:
+    def _ensure_rom_extractor(self) -> ROMExtractor:
         """Ensure ROM extractor is initialized."""
         return self._ensure_component(
             self._rom_extractor, "ROM extractor", ExtractionError
@@ -446,7 +446,7 @@ class CoreOperationsManager(BaseManager):
                 self._handle_operation_error(e, "preview_generation", ExtractionError, "generating preview")
             raise
 
-    def get_rom_extractor(self) -> ROMExtractorProtocol:
+    def get_rom_extractor(self) -> ROMExtractor:
         """Get the ROM extractor instance for advanced operations."""
         return self.rom_service.get_rom_extractor()
 
@@ -832,9 +832,9 @@ class CoreOperationsManager(BaseManager):
 
         try:
             from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
+            from core.services.rom_cache import ROMCache
 
-            rom_cache = inject(ROMCacheProtocol)
+            rom_cache = inject(ROMCache)
             removed = rom_cache.invalidate_rom_cache(str(output_rom))
             self._logger.debug(f"Cache invalidation removed {removed} entries for {output_rom}")
 
@@ -1018,8 +1018,8 @@ class CoreOperationsManager(BaseManager):
 
             # Try cache first
             from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            rom_cache = inject(ROMCacheProtocol)
+            from core.services.rom_cache import ROMCache
+            rom_cache = inject(ROMCache)
             cached_info = rom_cache.get_rom_info(rom_path)
 
             if cached_info:
@@ -1361,8 +1361,8 @@ class CoreOperationsManager(BaseManager):
     def get_cache_stats(self) -> dict[str, object]:  # Cache stats with mixed types
         """Get ROM cache statistics."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-        rom_cache = inject(ROMCacheProtocol)
+        from core.services.rom_cache import ROMCache
+        rom_cache = inject(ROMCache)
         return dict(rom_cache.get_cache_stats())  # Convert Mapping to dict
 
     def clear_rom_cache(self, older_than_days: int | None = None) -> int:
@@ -1376,8 +1376,8 @@ class CoreOperationsManager(BaseManager):
             Number of cache files removed
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-        rom_cache = inject(ROMCacheProtocol)
+        from core.services.rom_cache import ROMCache
+        rom_cache = inject(ROMCache)
         removed_count = rom_cache.clear_cache(older_than_days)
         self._logger.info(f"ROM cache cleared: {removed_count} files removed")
         return removed_count
@@ -1396,8 +1396,8 @@ class CoreOperationsManager(BaseManager):
             Dictionary with scan progress or None if not cached
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-        rom_cache = inject(ROMCacheProtocol)
+        from core.services.rom_cache import ROMCache
+        rom_cache = inject(ROMCache)
         result = rom_cache.get_partial_scan_results(rom_path, scan_params)
         return dict(result) if result else None  # Convert Mapping to dict
 
@@ -1421,8 +1421,8 @@ class CoreOperationsManager(BaseManager):
             True if saved successfully, False otherwise
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-        rom_cache = inject(ROMCacheProtocol)
+        from core.services.rom_cache import ROMCache
+        rom_cache = inject(ROMCache)
         return rom_cache.save_partial_scan_results(
             rom_path, scan_params, found_sprites, current_offset, completed
         )
@@ -1442,8 +1442,8 @@ class CoreOperationsManager(BaseManager):
             Number of files removed
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-        rom_cache = inject(ROMCacheProtocol)
+        from core.services.rom_cache import ROMCache
+        rom_cache = inject(ROMCache)
         removed_count = rom_cache.clear_scan_progress_cache(rom_path, scan_params)
         self._logger.info(f"Scan progress cache cleared: {removed_count} files removed")
         return removed_count

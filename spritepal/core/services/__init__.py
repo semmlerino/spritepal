@@ -9,7 +9,7 @@ used by both core and UI layers. Services in this package:
 - rom_service.py: ROMService for ROM-based sprite extraction operations
 - vram_service.py: VRAMService for VRAM-based sprite extraction operations
 - rom_cache.py: ROMCache for ROM scan result caching
-- path_suggestion_service.py: PathSuggestionService for intelligent path suggestions
+- path_suggestion_service.py: Path suggestion functions (validate_path, find_vram_path, etc.)
 
 Settings management is now consolidated in ApplicationStateManager (core/managers/).
 
@@ -19,7 +19,18 @@ with only stdlib dependencies.
 """
 from __future__ import annotations
 
-from core.services.path_suggestion_service import PathSuggestionService
+from core.services.path_suggestion_service import (
+    # Functions (preferred)
+    find_suggested_input_vram,
+    find_vram_path,
+    get_smart_vram_suggestion,
+    suggest_output_path,
+    suggest_output_rom_path,
+    suggest_output_vram_path,
+    validate_path,
+    # DEPRECATED: Class wrapper for backward compatibility
+    PathSuggestionService,
+)
 from core.services.preview_generator import (
     LRUCache,
     PaletteData,
@@ -39,7 +50,15 @@ from core.services.worker_lifecycle import WorkerManager
 __all__ = [
     "LRUCache",
     "PaletteData",
-    # Path suggestion
+    # Path suggestion functions (preferred)
+    "find_suggested_input_vram",
+    "find_vram_path",
+    "get_smart_vram_suggestion",
+    "suggest_output_path",
+    "suggest_output_rom_path",
+    "suggest_output_vram_path",
+    "validate_path",
+    # DEPRECATED: PathSuggestionService class wrapper
     "PathSuggestionService",
     # Preview generator
     "PreviewGenerator",

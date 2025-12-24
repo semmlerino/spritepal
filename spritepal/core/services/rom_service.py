@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from core.palette_manager import PaletteManager
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
 
 from core.exceptions import ExtractionError, ValidationError
 from core.palette_manager import PaletteManager
@@ -33,8 +33,6 @@ from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_PREVIEW_HEIGHT,
     DEFAULT_PREVIEW_WIDTH,
-    SPRITE_PALETTE_END,
-    SPRITE_PALETTE_START,
 )
 from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
@@ -69,13 +67,13 @@ class ROMService(QObject):
     error_occurred = Signal(str)  # Error message
 
     # Instance attributes (set in __init__, never None after initialization)
-    _rom_extractor: ROMExtractorProtocol
+    _rom_extractor: ROMExtractor
     _palette_manager: PaletteManager
     _parent_signals: Mapping[str, SignalInstance] | None
 
     def __init__(
         self,
-        rom_extractor: ROMExtractorProtocol | None = None,
+        rom_extractor: ROMExtractor | None = None,
         palette_manager: PaletteManager | None = None,
         parent_signals: Mapping[str, SignalInstance] | None = None,
         parent: QObject | None = None,
@@ -94,8 +92,8 @@ class ROMService(QObject):
         self._logger = get_logger(f"services.{self.__class__.__name__}")
         if rom_extractor is None:
             from core.di_container import inject
-            from core.protocols.manager_protocols import ROMExtractorProtocol
-            rom_extractor = inject(ROMExtractorProtocol)
+            from core.rom_extractor import ROMExtractor
+            rom_extractor = inject(ROMExtractor)
         self._rom_extractor = rom_extractor
         self._palette_manager = palette_manager or PaletteManager()
         self._parent_signals = parent_signals
@@ -121,12 +119,12 @@ class ROMService(QObject):
         """
         pass
 
-    def get_rom_extractor(self) -> ROMExtractorProtocol:
+    def get_rom_extractor(self) -> ROMExtractor:
         """
         Get the ROM extractor instance for advanced operations.
 
         Returns:
-            ROMExtractorProtocol instance
+            ROMExtractor instance
 
         Note:
             This method provides access to the underlying ROM extractor
@@ -347,8 +345,8 @@ class ROMService(QObject):
         # Try to load from cache first
         start_time = time.time()
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-        rom_cache = inject(ROMCacheProtocol)
+        from core.services.rom_cache import ROMCache
+        rom_cache = inject(ROMCache)
 
         # Signal that cache loading operation is starting
         self._emit("cache_operation_started", "Loading", "sprite_locations")
@@ -396,8 +394,8 @@ class ROMService(QObject):
         # Validate ROM file exists
         FileValidator.validate_rom_file_exists_or_raise(rom_path)
 
-        # Protocol defines rom_injector as object, runtime has read_rom_header method
-        header = self._rom_extractor.rom_injector.read_rom_header(rom_path)  # pyright: ignore[reportAttributeAccessIssue] - runtime type is ROMInjector
+        # ROMExtractor has rom_injector with read_rom_header method
+        header = self._rom_extractor.rom_injector.read_rom_header(rom_path)
         return asdict(header)
 
     # Private helper methods
@@ -417,59 +415,26 @@ class ROMService(QObject):
         """
         Extract palettes and create palette/metadata files.
 
+        Delegates to shared palette_utils.extract_palettes_and_create_files.
+
         Returns:
             List of created file paths
         """
-        created_files: list[str] = []
+        from core.services.palette_utils import extract_palettes_and_create_files
 
-        self._emit("extraction_progress", "Extracting palettes...")
-        self._palette_manager.load_cgram(cgram_path)
-
-        # Get sprite palettes
-        sprite_palettes = self._palette_manager.get_sprite_palettes()
-        self._emit("palettes_extracted", sprite_palettes)
-
-        # Create palette files
-        if create_grayscale:
-            self._emit("extraction_progress", "Creating palette files...")
-
-            # Create main palette file (default to palette 8)
-            main_pal_file = f"{output_base}.pal.json"
-            self._palette_manager.create_palette_json(8, main_pal_file, png_file)
-            created_files.append(main_pal_file)
-
-            # Create individual palette files
-            palette_files = {}
-            for pal_idx in range(SPRITE_PALETTE_START, SPRITE_PALETTE_END):
-                pal_file = f"{output_base}_pal{pal_idx}.pal.json"
-                self._palette_manager.create_palette_json(pal_idx, pal_file, png_file)
-                created_files.append(pal_file)
-                palette_files[pal_idx] = pal_file
-
-            # Create metadata file
-            if create_metadata:
-                self._emit("extraction_progress", "Creating metadata file...")
-
-                # Prepare extraction parameters
-                extraction_params = {
-                    "source": Path(source_path).name,
-                    "offset": source_offset if source_offset is not None else 0xC000,
-                    "tile_count": num_tiles,
-                    "extraction_size": num_tiles * BYTES_PER_TILE,
-                }
-
-                metadata_file = self._palette_manager.create_metadata_json(
-                    output_base, palette_files, extraction_params
-                )
-                created_files.append(metadata_file)
-
-        # Analyze OAM if available
-        if oam_path:
-            self._emit("extraction_progress", "Analyzing sprite palette usage...")
-            active_palettes = self._palette_manager.analyze_oam_palettes(oam_path)
-            self._emit("active_palettes_found", active_palettes)
-
-        return created_files
+        return extract_palettes_and_create_files(
+            palette_manager=self._palette_manager,
+            cgram_path=cgram_path,
+            output_base=output_base,
+            png_file=png_file,
+            oam_path=oam_path,
+            source_path=source_path,
+            source_offset=source_offset,
+            num_tiles=num_tiles,
+            create_grayscale=create_grayscale,
+            create_metadata=create_metadata,
+            emit=self._emit,
+        )
 
     def _validate_rom_file(self, rom_path: str) -> None:
         """Validate ROM file exists and has correct extension."""

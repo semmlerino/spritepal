@@ -11,7 +11,6 @@ better separation of concerns between ROM and VRAM operations.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
@@ -26,11 +25,6 @@ if TYPE_CHECKING:
 from core.exceptions import ValidationError
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
-from utils.constants import (
-    BYTES_PER_TILE,
-    SPRITE_PALETTE_END,
-    SPRITE_PALETTE_START,
-)
 from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
 
@@ -234,56 +228,23 @@ class VRAMService(QObject):
         """
         Extract palettes and create palette/metadata files.
 
+        Delegates to shared palette_utils.extract_palettes_and_create_files.
+
         Returns:
             List of created file paths
         """
-        created_files: list[str] = []
+        from core.services.palette_utils import extract_palettes_and_create_files
 
-        self._emit("extraction_progress", "Extracting palettes...")
-        self._palette_manager.load_cgram(cgram_path)
-
-        # Get sprite palettes
-        sprite_palettes = self._palette_manager.get_sprite_palettes()
-        self._emit("palettes_extracted", sprite_palettes)
-
-        # Create palette files
-        if create_grayscale:
-            self._emit("extraction_progress", "Creating palette files...")
-
-            # Create main palette file (default to palette 8)
-            main_pal_file = f"{output_base}.pal.json"
-            self._palette_manager.create_palette_json(8, main_pal_file, png_file)
-            created_files.append(main_pal_file)
-
-            # Create individual palette files
-            palette_files: dict[int, str] = {}
-            for pal_idx in range(SPRITE_PALETTE_START, SPRITE_PALETTE_END):
-                pal_file = f"{output_base}_pal{pal_idx}.pal.json"
-                self._palette_manager.create_palette_json(pal_idx, pal_file, png_file)
-                created_files.append(pal_file)
-                palette_files[pal_idx] = pal_file
-
-            # Create metadata file
-            if create_metadata:
-                self._emit("extraction_progress", "Creating metadata file...")
-
-                # Prepare extraction parameters
-                extraction_params = {
-                    "source": Path(source_path).name,
-                    "offset": source_offset if source_offset is not None else 0xC000,
-                    "tile_count": num_tiles,
-                    "extraction_size": num_tiles * BYTES_PER_TILE,
-                }
-
-                metadata_file = self._palette_manager.create_metadata_json(
-                    output_base, palette_files, extraction_params
-                )
-                created_files.append(metadata_file)
-
-        # Analyze OAM if available
-        if oam_path:
-            self._emit("extraction_progress", "Analyzing sprite palette usage...")
-            active_palettes = self._palette_manager.analyze_oam_palettes(oam_path)
-            self._emit("active_palettes_found", active_palettes)
-
-        return created_files
+        return extract_palettes_and_create_files(
+            palette_manager=self._palette_manager,
+            cgram_path=cgram_path,
+            output_base=output_base,
+            png_file=png_file,
+            oam_path=oam_path,
+            source_path=source_path,
+            source_offset=source_offset,
+            num_tiles=num_tiles,
+            create_grayscale=create_grayscale,
+            create_metadata=create_metadata,
+            emit=self._emit,
+        )

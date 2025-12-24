@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
-    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
 from typing import Any, override
 
@@ -53,9 +54,9 @@ class SpriteScanWorker(BaseWorker):
     # Default step/alignment for scanning
     _DEFAULT_STEP = 0x100
 
-    def __init__(self, rom_path: str, extractor: ROMExtractorProtocol | None = None, use_cache: bool = True,
+    def __init__(self, rom_path: str, extractor: ROMExtractor | None = None, use_cache: bool = True,
                  start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None, *,
-                 rom_cache: ROMCacheProtocol,
+                 rom_cache: ROMCache,
                  parallel_finder: ParallelSpriteFinder | None = None,
                  step: int | None = None):
         super().__init__(parent)

@@ -274,10 +274,10 @@ class SpriteGalleryTab(QWidget):
             return
 
         # Import the dialog
-        from ui.dialogs.scan_range_dialog import ScanRangeDialog
+        from ui.components.dialogs.range_scan_dialog import RangeScanDialog
 
         # Show range dialog
-        dialog = ScanRangeDialog(self.rom_size, self)
+        dialog = RangeScanDialog(self.rom_size, parent=self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -453,12 +453,9 @@ class SpriteGalleryTab(QWidget):
         # Create controller if needed
         if not self.thumbnail_controller:
             logger.info("Creating ThumbnailWorkerController for on-demand requests")
-            from typing import cast
-
-            from core.protocols.manager_protocols import ROMExtractorProtocol
             self.thumbnail_controller = ThumbnailWorkerController(self)
             self.thumbnail_controller.thumbnail_ready.connect(self._on_thumbnail_ready)
-            self.thumbnail_controller.start_worker(self.rom_path, cast(ROMExtractorProtocol, self.rom_extractor))
+            self.thumbnail_controller.start_worker(self.rom_path, self.rom_extractor)
 
         # Queue thumbnail with priority
         self.thumbnail_controller.queue_thumbnail(offset, 128, priority)
@@ -594,12 +591,12 @@ class SpriteGalleryTab(QWidget):
             from core.di_container import inject
             from core.managers.application_state_manager import ApplicationStateManager
             from core.managers.core_operations_manager import CoreOperationsManager
-            from core.protocols.manager_protocols import ROMCacheProtocol
+            from core.services.rom_cache import ROMCache
             from ui.windows.detached_gallery_window import DetachedGalleryWindow
             # inject() at app boundary - passes dependencies to constructor
             extraction_manager = inject(CoreOperationsManager)
             settings_manager = inject(ApplicationStateManager)
-            rom_cache = inject(ROMCacheProtocol)
+            rom_cache = inject(ROMCache)
             self.detached_window = DetachedGalleryWindow(
                 self,
                 extraction_manager=extraction_manager,

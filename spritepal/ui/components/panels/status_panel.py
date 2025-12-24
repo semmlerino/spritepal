@@ -15,7 +15,7 @@ from ui.styles.theme import COLORS
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.services.rom_cache import ROMCache
 
 
 class StatusPanel(QWidget):
@@ -23,7 +23,7 @@ class StatusPanel(QWidget):
 
     def __init__(self, parent: QWidget | None = None, *,
                  settings_manager: ApplicationStateManager,
-                 rom_cache: ROMCacheProtocol):
+                 rom_cache: ROMCache):
         super().__init__(parent)
         self.setStyleSheet(get_panel_style())
 

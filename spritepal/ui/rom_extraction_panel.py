@@ -30,7 +30,7 @@ from ui.common.file_dialogs import browse_for_open_file
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
     from core.rom_validator import ROMHeader
     from core.types import SpritePreset
 
@@ -92,7 +92,7 @@ class ROMExtractionPanel(QWidget):
         self.sprite_locations: dict[str, Mapping[str, object]] = {}
         # Use injected extraction manager
         self.extraction_manager = extraction_manager
-        self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()
+        self.rom_extractor: ROMExtractor = self.extraction_manager.get_rom_extractor()
         self.rom_size = 0  # Track ROM size for slider limits
         self._manual_offset_mode = False  # Default to preset mode (sprite picker visible)
         self._current_header: ROMHeader | None = None  # Stored header for preset matching
@@ -100,14 +100,14 @@ class ROMExtractionPanel(QWidget):
         # State manager for coordinating operations (ApplicationStateManager)
         from core.di_container import inject
         from core.managers.application_state_manager import ApplicationStateManager
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
         self.state_manager: ApplicationStateManager = inject(ApplicationStateManager)
         self.state_manager.workflow_state_changed.connect(self._on_state_changed)
 
         # Initialize extracted components
         self._worker_orchestrator = ROMWorkerOrchestrator(
             self,
-            rom_cache=inject(ROMCacheProtocol),
+            rom_cache=inject(ROMCache),
             settings_manager=self.state_manager,
         )
         self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
@@ -212,9 +212,9 @@ class ROMExtractionPanel(QWidget):
             layout: Layout to add controls to
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
 
-        self.rom_file_widget = ROMFileWidget(rom_cache=inject(ROMCacheProtocol))
+        self.rom_file_widget = ROMFileWidget(rom_cache=inject(ROMCache))
         self.rom_file_widget.browse_clicked.connect(self._browse_rom)
         self.rom_file_widget.partial_scan_detected.connect(self._on_partial_scan_detected)
         layout.addWidget(self.rom_file_widget)
@@ -570,8 +570,8 @@ class ROMExtractionPanel(QWidget):
         # Check cache status first (fast operation)
         try:
             from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            rom_cache = inject(ROMCacheProtocol)
+            from core.services.rom_cache import ROMCache
+            rom_cache = inject(ROMCache)
             cached_locations = rom_cache.get_sprite_locations(self.rom_path)
             self._is_sprites_from_cache = bool(cached_locations)
         except Exception:

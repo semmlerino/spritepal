@@ -12,7 +12,6 @@ from __future__ import annotations
 from .dialog_protocols import (
     ArrangementDialogProtocol,
     DialogFactoryProtocol,
-    ManualOffsetDialogFactoryProtocol,
 )
 from .manager_protocols import (
     ROMCacheProtocol,
@@ -22,7 +21,7 @@ from .manager_protocols import (
 __all__ = [
     "ArrangementDialogProtocol",
     "DialogFactoryProtocol",
-    "ManualOffsetDialogFactoryProtocol",
+    # DEPRECATED: ROMCacheProtocol, ROMExtractorProtocol kept for backward compat
     "ROMCacheProtocol",
     "ROMExtractorProtocol",
 ]

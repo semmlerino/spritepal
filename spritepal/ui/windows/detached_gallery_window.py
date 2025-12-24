@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, cast, override
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
     from core.rom_injector import SpritePointer
 
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.protocols.manager_protocols import ROMCacheProtocol
+from core.services.rom_cache import ROMCache
 from ui.common import WorkerManager
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 
@@ -60,7 +60,7 @@ class DetachedGalleryWindow(QMainWindow):
         *,
         extraction_manager: CoreOperationsManager,
         settings_manager: ApplicationStateManager,
-        rom_cache: ROMCacheProtocol,
+        rom_cache: ROMCache,
     ):
         """
         Initialize the detached gallery window.
@@ -89,7 +89,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         # Core managers (passed via constructor - no DI in __init__)
         self.extraction_manager = extraction_manager
-        self.rom_extractor: ROMExtractorProtocol = self.extraction_manager.get_rom_extractor()
+        self.rom_extractor: ROMExtractor = self.extraction_manager.get_rom_extractor()
         self.settings_manager = settings_manager
         self.rom_cache = rom_cache
 
@@ -442,7 +442,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         logger.info(f"Copied {copied_count} thumbnails to detached gallery")
 
-    def set_rom_info(self, rom_path: str, rom_extractor: ROMExtractorProtocol) -> None:
+    def set_rom_info(self, rom_path: str, rom_extractor: ROMExtractor) -> None:
         """
         Set ROM information for thumbnail generation.
 
@@ -757,7 +757,7 @@ class DetachedGalleryWindow(QMainWindow):
             return
 
         # Import and show the range dialog
-        from ui.dialogs.scan_range_dialog import ScanRangeDialog
+        from ui.components.dialogs.range_scan_dialog import RangeScanDialog
 
         # Get ROM size
         try:
@@ -766,7 +766,7 @@ class DetachedGalleryWindow(QMainWindow):
             logger.error(f"Error getting ROM size: {e}")
             rom_size = 0
 
-        dialog = ScanRangeDialog(rom_size, self)
+        dialog = RangeScanDialog(rom_size, parent=self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 

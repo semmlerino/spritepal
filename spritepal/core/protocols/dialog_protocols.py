@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from PySide6.QtWidgets import QDialog, QWidget
+    from PySide6.QtWidgets import QWidget
 
     from ui.injection_dialog import InjectionDialog
 
@@ -34,27 +34,6 @@ class ArrangementDialogProtocol(Protocol):
 
     def get_arranged_path(self) -> str | None:
         """Get the path to the arranged output file, or None if cancelled."""
-        ...
-
-
-class ManualOffsetDialogFactoryProtocol(Protocol):
-    """
-    Protocol for creating ManualOffsetDialog instances.
-
-    This factory allows retrieval of the dialog factory without
-    importing the concrete UI class, maintaining layer separation.
-    """
-
-    def create(self, parent: QWidget | None = None) -> QDialog:
-        """
-        Create a manual offset dialog.
-
-        Args:
-            parent: Parent widget
-
-        Returns:
-            A QDialog instance (UnifiedManualOffsetDialog)
-        """
         ...
 
 

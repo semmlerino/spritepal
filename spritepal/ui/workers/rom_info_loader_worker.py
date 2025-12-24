@@ -16,7 +16,7 @@ from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
     from core.rom_injector import ROMInjector
 
 logger = get_logger(__name__)
@@ -47,7 +47,7 @@ class ROMInfoLoaderWorker(BaseWorker):
         self,
         rom_path: str,
         injection_manager: CoreOperationsManager | None = None,
-        extraction_manager: CoreOperationsManager | ROMExtractorProtocol | None = None,
+        extraction_manager: CoreOperationsManager | ROMExtractor | None = None,
         load_header: bool = True,
         load_sprite_locations: bool = True,
     ) -> None:

@@ -11,11 +11,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from core.protocols.manager_protocols import ROMExtractorProtocol
+from core.rom_extractor import ROMExtractor
 
 if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.services.rom_cache import ROMCache
 
 from PySide6.QtCore import QMutex, QMutexLocker, Signal
 from PySide6.QtWidgets import (
@@ -50,7 +50,7 @@ class ScanControlsPanel(QWidget):
     partial_scan_detected = Signal(object)  # cache info for resume dialog (use object to avoid PySide6 copy warning)
     sprites_detected = Signal(list)  # List of (offset, quality) tuples for region detection
 
-    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCacheProtocol):
+    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCache):
         # Step 1: Declare all instance variables with type hints
         # State
         self.rom_path: str = ""
@@ -61,7 +61,7 @@ class ScanControlsPanel(QWidget):
 
         # Manager references (set by parent)
         self.extraction_manager: CoreOperationsManager | None = None
-        self.rom_extractor: ROMExtractorProtocol | None = None
+        self.rom_extractor: ROMExtractor | None = None
         self._manager_mutex = QMutex()  # Thread safety for manager access
 
         # Worker reference
@@ -153,7 +153,7 @@ class ScanControlsPanel(QWidget):
         # Check for cached partial scan results
         self._check_for_cached_scans()
 
-    def _get_managers_safely(self) -> tuple[CoreOperationsManager | None, ROMExtractorProtocol | None]:
+    def _get_managers_safely(self) -> tuple[CoreOperationsManager | None, ROMExtractor | None]:
         """Get manager references safely with thread protection.
 
         WARNING: The returned references are only safe to use within the calling
@@ -163,7 +163,7 @@ class ScanControlsPanel(QWidget):
         with QMutexLocker(self._manager_mutex):
             return self.extraction_manager, self.rom_extractor
 
-    def _with_managers_safely(self, operation: Callable[[CoreOperationsManager | None, ROMExtractorProtocol | None], object]) -> Any:  # pyright: ignore[reportExplicitAny] - Generic operation return type
+    def _with_managers_safely(self, operation: Callable[[CoreOperationsManager | None, ROMExtractor | None], object]) -> Any:  # pyright: ignore[reportExplicitAny] - Generic operation return type
         """Execute an operation with manager references under mutex protection.
 
         This prevents TOCTOU race conditions by holding the lock during the entire
@@ -201,7 +201,7 @@ class ScanControlsPanel(QWidget):
             return
 
         # Show range selection dialog
-        dialog = RangeScanDialog(self.current_offset, self.rom_size, self)
+        dialog = RangeScanDialog(self.rom_size, current_offset=self.current_offset, parent=self)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
 

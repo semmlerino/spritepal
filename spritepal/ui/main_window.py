@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from core.controller import ExtractionController
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.services.rom_cache import ROMCache
 
 from typing import override
 
@@ -78,7 +78,7 @@ class MainWindow(QMainWindow):
     def __init__(
         self,
         settings_manager: ApplicationStateManager,
-        rom_cache: ROMCacheProtocol,
+        rom_cache: ROMCache,
         session_manager: ApplicationStateManager,
     ) -> None:
         super().__init__()

@@ -80,9 +80,6 @@ class SearchWorker(BaseWorker):
     """
 
     # Custom signals specific to search
-    progress = Signal(int, int)
-    """Search progress. Args: current, total."""
-
     result_found = Signal(SearchResult)
     """Emitted when a result is found."""
 
@@ -91,11 +88,6 @@ class SearchWorker(BaseWorker):
 
     error = Signal(str)
     """Emitted on error. Args: error_message."""
-
-    # Thread-safe user interaction signals
-    input_requested = Signal(str, str)  # title, prompt
-    question_requested = Signal(str, str)  # title, question
-    info_requested = Signal(str, str)  # title, message
 
     def __init__(self, search_type: str, params: dict[str, Any]):  # pyright: ignore[reportExplicitAny] - search parameters can be varied types
         super().__init__()

@@ -60,8 +60,6 @@ class DataRepository:
             current_dir = Path(__file__).parent.parent.parent
             potential_dirs = [
                 current_dir / "test_data",
-                current_dir / "archive" / "obsolete_legacy",
-                current_dir.parent / "archive" / "obsolete_test_images",
             ]
 
             self.base_dir = None

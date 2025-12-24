@@ -31,10 +31,8 @@ from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import (
-        ROMCacheProtocol,
-        ROMExtractorProtocol,
-    )
+    from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
 logger = get_logger(__name__)
 
@@ -86,7 +84,7 @@ class ScanDialog(QDialog):
         self.button_box: QDialogButtonBox
         self.apply_btn: QPushButton | None
         # Cache reference set at runtime during scan initialization
-        self.rom_cache: ROMCacheProtocol | None = None
+        self.rom_cache: ROMCache | None = None
 
 
 class ScanContext:
@@ -119,7 +117,7 @@ class ScanController(QObject):
 
     def __init__(
         self,
-        cache: ROMCacheProtocol | None = None,
+        cache: ROMCache | None = None,
         state_manager: ApplicationStateManager | None = None,
         parent: QObject | None = None,
     ) -> None:
@@ -144,7 +142,7 @@ class ScanController(QObject):
 
         logger.debug("ScanController initialized")
 
-    def set_cache(self, cache: ROMCacheProtocol) -> None:
+    def set_cache(self, cache: ROMCache) -> None:
         """Set the ROM cache for scan result storage."""
         self._cache = cache
 
@@ -162,7 +160,7 @@ class ScanController(QObject):
     def start_scan(
         self,
         rom_path: str,
-        extractor: ROMExtractorProtocol,
+        extractor: ROMExtractor,
         parent_widget: QWidget,
     ) -> None:
         """
@@ -309,7 +307,7 @@ class ScanController(QObject):
         self,
         dialog: ScanDialog,
         rom_path: str,
-        extractor: ROMExtractorProtocol,
+        extractor: ROMExtractor,
     ) -> None:
         """Set up the scan worker and connect signals.
 
@@ -319,7 +317,7 @@ class ScanController(QObject):
             extractor: ROM extractor for decompression
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
         from ui.common import WorkerManager
 
         # Clean up any existing scan worker
@@ -333,7 +331,7 @@ class ScanController(QObject):
             return
 
         # Get rom_cache from self._cache or inject
-        rom_cache = self._cache if self._cache is not None else inject(ROMCacheProtocol)
+        rom_cache = self._cache if self._cache is not None else inject(ROMCache)
 
         # Create scan worker
         self._scan_worker = SpriteScanWorker(
@@ -364,10 +362,10 @@ class ScanController(QObject):
             True to use cache, False to start fresh, None if cancelled
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
         from ui.dialogs import ResumeScanDialog
 
-        rom_cache = inject(ROMCacheProtocol)
+        rom_cache = inject(ROMCache)
 
         # Compute scan parameters from ROM size (matches SpriteScanWorker)
         scan_params = compute_scan_params(rom_path)
@@ -561,7 +559,7 @@ class ScanController(QObject):
     def check_cache(
         self,
         rom_path: str,
-        scan_params: Mapping[str, int] | None = None,
+        scan_params: dict[str, int] | None = None,
     ) -> tuple[bool, list[Mapping[str, object]]]:
         """
         Check if scan results exist in cache.
@@ -598,7 +596,7 @@ class ScanController(QObject):
         self,
         rom_path: str,
         sprites: list[Mapping[str, object]],
-        scan_params: Mapping[str, int] | None = None,
+        scan_params: dict[str, int] | None = None,
         current_offset: int = 0,
         completed: bool = True,
     ) -> bool:

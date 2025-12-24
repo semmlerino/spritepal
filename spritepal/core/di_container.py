@@ -248,29 +248,31 @@ def configure_container(
     # are registered by register_managers() AFTER managers are created.
     # This avoids circular dependency between DI container and ManagerRegistry.
 
-    # Import ROMCache and its Protocol
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    # Import ROMCache and ROMExtractor
     from core.services.rom_cache import ROMCache
-
-    # Register ROMCache (uses ApplicationStateManager for cache settings)
-    register_factory(
-        ROMCacheProtocol,
-        lambda: ROMCache(state_manager=inject(ApplicationStateManager))
-    )
-
-    # Import ROMExtractor and its Protocol
-    from core.protocols.manager_protocols import ROMExtractorProtocol
     from core.rom_extractor import ROMExtractor
 
-    # Register ROMExtractor
-    register_factory(
-        ROMExtractorProtocol,
-        lambda: ROMExtractor(rom_cache=inject(ROMCacheProtocol))
-    )
+    # Register ROMCache - use concrete class directly (no protocol indirection)
+    def _create_rom_cache() -> ROMCache:
+        return ROMCache(state_manager=inject(ApplicationStateManager))
 
-    # NOTE: UI factory registrations (ManualOffsetDialogFactoryProtocol, DialogFactoryProtocol)
-    # are handled by ui.register_ui_factories() called by application entry points
-    # AFTER initialize_managers() completes. This keeps UI dependencies out of core/ layer.
+    register_factory(ROMCache, _create_rom_cache)
+
+    # Register ROMExtractor - use concrete class directly
+    def _create_rom_extractor() -> ROMExtractor:
+        return ROMExtractor(rom_cache=inject(ROMCache))
+
+    register_factory(ROMExtractor, _create_rom_extractor)
+
+    # DEPRECATED: Legacy protocol registrations for backward compatibility
+    # TODO: Remove after all callers migrate to inject(ROMCache) / inject(ROMExtractor)
+    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
+    register_factory(ROMCacheProtocol, _create_rom_cache)
+    register_factory(ROMExtractorProtocol, _create_rom_extractor)
+
+    # NOTE: UI factory registration (DialogFactoryProtocol) is handled by
+    # ui.register_ui_factories() called by application entry points AFTER
+    # initialize_managers() completes. This keeps UI dependencies out of core/ layer.
     # See: launch_spritepal.py, tests/fixtures/core_fixtures.py
 
     logger.info("DI container configured (services registered, managers pending)")

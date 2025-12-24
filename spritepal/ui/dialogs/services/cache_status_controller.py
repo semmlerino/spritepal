@@ -13,7 +13,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenu, QMessageBox, QWidget
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.services.rom_cache import ROMCache
     from ui.common.collapsible_group_box import CollapsibleGroupBox
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class CacheStatusController(QObject):
 
     def __init__(
         self,
-        rom_cache: ROMCacheProtocol,
+        rom_cache: ROMCache,
         parent_widget: QWidget,
         parent: QObject | None = None,
     ) -> None:

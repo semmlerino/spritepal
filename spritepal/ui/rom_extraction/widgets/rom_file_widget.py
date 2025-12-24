@@ -12,7 +12,7 @@ from utils.logging_config import get_logger
 from .base_widget import BaseExtractionWidget
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.services.rom_cache import ROMCache
 
 logger = get_logger(__name__)
 
@@ -33,7 +33,7 @@ class ROMFileWidget(BaseExtractionWidget):
     cache_status_changed = Signal(object)  # Emitted when cache status changes (use object to avoid PySide6 copy warning)
     partial_scan_detected = Signal(object)  # Emitted when partial scan cache found (use object to avoid PySide6 copy warning)
 
-    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCacheProtocol) -> None:
+    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCache) -> None:
         super().__init__(parent)
         self._rom_path = ""
         self._cache_status = {"has_cache": False, "cache_type": None}

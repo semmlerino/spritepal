@@ -26,7 +26,8 @@ from ui.rom_extraction.workers import SpriteSearchWorker
 from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ class SpriteSearchCoordinator(QObject):
     def __init__(
         self,
         parent_widget: QWidget,
-        rom_cache: ROMCacheProtocol,
+        rom_cache: ROMCache,
         parent: QObject | None = None,
     ) -> None:
         """Initialize the sprite search coordinator.
@@ -85,20 +86,20 @@ class SpriteSearchCoordinator(QObject):
         # ROM data (set via set_rom_data)
         self._rom_path: str = ""
         self._rom_size: int = 0
-        self._rom_extractor: ROMExtractorProtocol | None = None
+        self._rom_extractor: ROMExtractor | None = None
 
     def set_rom_data(
         self,
         rom_path: str,
         rom_size: int,
-        rom_extractor: ROMExtractorProtocol | None,
+        rom_extractor: ROMExtractor | None,
     ) -> None:
         """Set ROM data for search operations.
 
         Args:
             rom_path: Path to the ROM file.
             rom_size: Size of the ROM in bytes.
-            rom_extractor: ROM extractor protocol instance.
+            rom_extractor: ROM extractor instance.
         """
         self._rom_path = rom_path
         self._rom_size = rom_size

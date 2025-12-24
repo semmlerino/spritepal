@@ -13,7 +13,7 @@ from ui.styles.theme import COLORS
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.services.rom_cache import ROMCache
 
 
 logger = logging.getLogger(__name__)
@@ -23,13 +23,13 @@ class StatusBarManager:
 
     def __init__(self, status_bar: QStatusBar,
                  settings_manager: ApplicationStateManager,
-                 rom_cache: ROMCacheProtocol) -> None:
+                 rom_cache: ROMCache) -> None:
         """Initialize status bar manager
 
         Args:
             status_bar: The status bar widget to manage
             settings_manager: Injected ApplicationStateManager instance
-            rom_cache: Injected ROMCacheProtocol instance
+            rom_cache: Injected ROMCache instance
         """
         self.status_bar = status_bar
         self.settings_manager = settings_manager

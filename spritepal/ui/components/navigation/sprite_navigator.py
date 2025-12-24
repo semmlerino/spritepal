@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.services.rom_cache import ROMCache
 
 from typing import override
 
@@ -174,7 +174,7 @@ class SpriteNavigator(QWidget):
     region_changed = Signal(int)  # Emitted when region selection changes
     navigation_mode_changed = Signal(str)  # "manual" or "smart"
 
-    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCacheProtocol):
+    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCache):
         super().__init__(parent)
 
         # State

@@ -465,7 +465,6 @@ SpritePal uses 5 protocols across two files:
 |----------|---------|
 | `DialogFactoryProtocol` | Create dialog instances |
 | `ArrangementDialogProtocol` | Grid arrangement dialog |
-| `ManualOffsetDialogFactoryProtocol` | Manual offset entry dialog |
 
 **Consolidated managers** (use concrete classes directly, not protocols):
 - `CoreOperationsManager` - Extraction and injection operations

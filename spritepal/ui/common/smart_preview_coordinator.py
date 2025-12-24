@@ -30,6 +30,7 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
+    from core.rom_extractor import ROMExtractor
     from core.services.rom_cache import ROMCache
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
@@ -638,10 +639,9 @@ class SmartPreviewCoordinator(QObject):
                 logger.warning("[DEBUG] ROM data provider returned None!")
                 return
             rom_path, extractor_obj, rom_cache_obj = provider_result
-            # Cast from object to proper protocol types
-            from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
-            extractor: ROMExtractorProtocol = cast(ROMExtractorProtocol, extractor_obj)
-            rom_cache: ROMCacheProtocol | None = cast(ROMCacheProtocol, rom_cache_obj) if rom_cache_obj else None
+            # Cast from object to proper types (keep None possibility for defensive checks)
+            extractor: ROMExtractor | None = cast("ROMExtractor | None", extractor_obj)
+            rom_cache: ROMCache | None = cast("ROMCache | None", rom_cache_obj)
             logger.debug(f"[DEBUG] Got ROM data: path={bool(rom_path)}, extractor={bool(extractor)}, cache={bool(rom_cache)}")
 
             # Check if ROM data is actually valid before proceeding

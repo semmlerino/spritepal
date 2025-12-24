@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
     from ui.dialogs import UnifiedManualOffsetDialog
 
 logger = get_logger(__name__)
@@ -54,14 +54,14 @@ class _ManualOffsetDialogSingleton(QtThreadSafeSingleton["UnifiedManualOffsetDia
         from core.di_container import inject
         from core.managers.application_state_manager import ApplicationStateManager
         from core.managers.core_operations_manager import CoreOperationsManager
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
         from ui.dialogs import UnifiedManualOffsetDialog
 
         manager = args[0] if args and isinstance(args[0], OffsetDialogManager) else None
         parent = manager._parent_widget if manager else None
 
         # Inject dependencies at singleton boundary
-        rom_cache = inject(ROMCacheProtocol)
+        rom_cache = inject(ROMCache)
         settings_manager = inject(ApplicationStateManager)
         extraction_manager = inject(CoreOperationsManager)
         rom_extractor = extraction_manager.get_rom_extractor()
@@ -168,14 +168,14 @@ class OffsetDialogManager(QObject):
         self._parent_widget = parent_widget
         self._signals_connected = False
         self._rom_path: str | None = None
-        self._extractor: ROMExtractorProtocol | None = None
+        self._extractor: ROMExtractor | None = None
 
         logger.debug("OffsetDialogManager initialized")
 
     def open_dialog(
         self,
         rom_path: str,
-        extractor: ROMExtractorProtocol,
+        extractor: ROMExtractor,
         rom_size: int,
         extraction_manager: CoreOperationsManager,
         initial_offset: int | None = None,

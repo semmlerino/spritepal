@@ -18,10 +18,8 @@ from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import (
-        ROMCacheProtocol,
-        ROMExtractorProtocol,
-    )
+    from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
 logger = get_logger(__name__)
 
@@ -61,7 +59,7 @@ class ROMWorkerOrchestrator(QObject):
         self,
         parent: QObject | None = None,
         *,
-        rom_cache: ROMCacheProtocol,
+        rom_cache: ROMCache,
         settings_manager: ApplicationStateManager,
     ) -> None:
         """Initialize the worker orchestrator.
@@ -98,14 +96,11 @@ class ROMWorkerOrchestrator(QObject):
 
     # ========== Header Loading ==========
 
-    def load_header(self, rom_path: str, extractor: ROMExtractorProtocol) -> None:
+    def load_header(self, rom_path: str, extractor: ROMExtractor) -> None:
         """Load ROM header information asynchronously."""
-        from typing import cast
-
-        from core.rom_injector import ROMInjector
         self._cleanup_header_worker()
 
-        self._header_worker = ROMHeaderLoaderWorker(rom_path, cast(ROMInjector, extractor.rom_injector))
+        self._header_worker = ROMHeaderLoaderWorker(rom_path, extractor.rom_injector)
         self._header_thread = QThread()
         self._header_worker.moveToThread(self._header_thread)
 
@@ -137,7 +132,7 @@ class ROMWorkerOrchestrator(QObject):
     # ========== Sprite Location Loading ==========
 
     def load_sprite_locations(
-        self, rom_path: str, extraction_manager: ROMExtractorProtocol
+        self, rom_path: str, extraction_manager: ROMExtractor
     ) -> None:
         """Load known sprite locations from ROM asynchronously.
 

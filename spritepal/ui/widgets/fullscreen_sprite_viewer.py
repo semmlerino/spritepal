@@ -42,7 +42,7 @@ import weakref
 from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
 
 from PySide6.QtCore import QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QCloseEvent, QFont, QGuiApplication, QKeyEvent, QMouseEvent, QPixmap, QScreen, QShowEvent
@@ -80,7 +80,7 @@ class FullscreenSpriteViewer(QWidget):
         self.sprites_data: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite metadata
         self.current_index: int = 0
         self.rom_path: str | None = None
-        self.rom_extractor: ROMExtractorProtocol | None = None
+        self.rom_extractor: ROMExtractor | None = None
 
         # UI Components
         self.sprite_label: QLabel | None = None
@@ -221,7 +221,7 @@ class FullscreenSpriteViewer(QWidget):
         self.cursor_timer.start(3000)
 
     def set_sprite_data(self, sprites_data: list[dict[str, Any]], current_offset: int,  # pyright: ignore[reportExplicitAny] - sprite metadata
-                       rom_path: str, rom_extractor: ROMExtractorProtocol | None) -> bool:
+                       rom_path: str, rom_extractor: ROMExtractor | None) -> bool:
         """
         Set the sprite data for the viewer.
 

@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
-    from core.protocols.manager_protocols import ROMCacheProtocol
     from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
 from PySide6.QtCore import Signal
 
@@ -49,7 +49,7 @@ class RangeScanWorker(BaseWorker):
 
     def __init__(self, rom_path: str, start_offset: int, end_offset: int,
                  step_size: int, extractor: ROMExtractor, parent: QObject | None = None, *,
-                 rom_cache: ROMCacheProtocol):
+                 rom_cache: ROMCache):
         """
         Initialize range scan worker
 
@@ -59,7 +59,7 @@ class RangeScanWorker(BaseWorker):
             end_offset: Ending offset for scan (inclusive)
             step_size: Step size between offsets to check
             extractor: ROM extractor instance
-            rom_cache: Injected ROMCacheProtocol instance
+            rom_cache: Injected ROMCache instance
         """
         super().__init__(parent)
         self.rom_path = rom_path

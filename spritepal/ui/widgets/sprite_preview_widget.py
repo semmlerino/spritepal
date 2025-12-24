@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, override
 if TYPE_CHECKING:
     from PySide6.QtCore import QPoint
 
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
     from core.visual_similarity_search import SimilarityMatch
 
 from PIL import Image
@@ -597,7 +597,7 @@ class SpritePreviewWidget(QWidget):
                 return
 
             # Try to get ROM extractor - handle case where it's not available
-            extractor: ROMExtractorProtocol | None
+            extractor: ROMExtractor | None
             try:
                 from core.di_container import inject
                 from core.managers.core_operations_manager import CoreOperationsManager
@@ -655,7 +655,7 @@ class SpritePreviewWidget(QWidget):
                 for y in range(8):
                     for x in range(8):
                         if decode_method == "rom_extractor":
-                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y) if extractor else 0  # type: ignore[attr-defined] - private method from ROMExtractor
+                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y) if extractor else 0
                         else:
                             # Fallback 4bpp decoding method
                             pixel = self._decode_4bpp_pixel_fallback(tile_bytes, x, y)

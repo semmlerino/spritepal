@@ -17,29 +17,8 @@ def register_ui_factories() -> None:
 
     Called from: core/managers/registry.py after configure_container()
     """
-    from core.di_container import inject, register_factory
-    from core.managers.application_state_manager import ApplicationStateManager
-    from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.dialog_protocols import (
-        DialogFactoryProtocol,
-        ManualOffsetDialogFactoryProtocol,
-    )
-    from core.protocols.manager_protocols import (
-        ROMCacheProtocol,
-        ROMExtractorProtocol,
-    )
-
-    def _create_manual_offset_dialog_factory():
-        from ui.dialogs.dialog_factories import ManualOffsetDialogFactory
-
-        return ManualOffsetDialogFactory(
-            rom_cache=inject(ROMCacheProtocol),
-            settings_manager=inject(ApplicationStateManager),
-            extraction_manager=inject(CoreOperationsManager),
-            rom_extractor=inject(ROMExtractorProtocol),
-        )
-
-    register_factory(ManualOffsetDialogFactoryProtocol, _create_manual_offset_dialog_factory)
+    from core.di_container import register_factory
+    from core.protocols.dialog_protocols import DialogFactoryProtocol
 
     def _create_controller_dialog_factory():
         from ui.dialogs.controller_dialog_factory import ControllerDialogFactory

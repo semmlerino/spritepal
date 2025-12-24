@@ -257,56 +257,39 @@ class BaseManager(QObject):
 
     def _validate_required(self, params: Mapping[str, object], required: list[str]) -> None:
         """
-        Validate that required parameters are present
+        Validate that required parameters are present.
 
-        Args:
-            params: Parameters to validate
-            required: List of required parameter names
-
-        Raises:
-            ValidationError: If required parameters are missing
+        Delegates to utils.validation.validate_required_params.
         """
-        missing = [key for key in required if key not in params or params[key] is None]
-        if missing:
-            raise ValidationError(f"Missing required parameters: {', '.join(missing)}")
+        from utils.validation import validate_required_params
+
+        validate_required_params(params, required)
 
     def _validate_type(self, value: object, name: str, expected_type: type[object]) -> None:
         """
-        Validate parameter type
+        Validate parameter type.
 
-        Args:
-            value: Value to validate
-            name: Parameter name for error messages
-            expected_type: Expected type
-
-        Raises:
-            ValidationError: If type doesn't match
+        Delegates to utils.validation.validate_type.
         """
-        if not isinstance(value, expected_type):
-            raise ValidationError(
-                f"Invalid type for '{name}': expected {expected_type.__name__}, "
-                f"got {type(value).__name__}"
-            )
+        from utils.validation import validate_type
 
-    def _validate_range(self, value: int | float, name: str,
-                       min_val: int | float | None = None,
-                       max_val: int | float | None = None) -> None:
+        validate_type(value, name, expected_type)
+
+    def _validate_range(
+        self,
+        value: int | float,
+        name: str,
+        min_val: int | float | None = None,
+        max_val: int | float | None = None,
+    ) -> None:
         """
-        Validate that a numeric value is within range
+        Validate that a numeric value is within range.
 
-        Args:
-            value: Value to validate
-            name: Parameter name for error messages
-            min_val: Minimum allowed value (inclusive)
-            max_val: Maximum allowed value (inclusive)
-
-        Raises:
-            ValidationError: If value is out of range
+        Delegates to utils.validation.validate_range.
         """
-        if min_val is not None and value < min_val:
-            raise ValidationError(f"{name} must be >= {min_val}, got {value}")
-        if max_val is not None and value > max_val:
-            raise ValidationError(f"{name} must be <= {max_val}, got {value}")
+        from utils.validation import validate_range
+
+        validate_range(value, name, min_val, max_val)
 
     def _ensure_component(
         self,
@@ -314,32 +297,14 @@ class BaseManager(QObject):
         name: str,
         error_type: type[Exception] = RuntimeError,
     ) -> T:
-        """Ensure a component is initialized and return it.
-
-        This is a generic helper for the common pattern of checking if a
-        component is None and raising an error if so.
-
-        Args:
-            component: The component to check (may be None)
-            name: Human-readable name for error messages
-            error_type: Exception type to raise if component is None
-
-        Returns:
-            The component if it's not None
-
-        Raises:
-            error_type: If component is None
-
-        Example:
-            sprite_extractor = self._ensure_component(
-                self._sprite_extractor,
-                "Sprite extractor",
-                ExtractionError
-            )
         """
-        if component is None:
-            raise error_type(f"{name} not initialized")
-        return component
+        Ensure a component is initialized and return it.
+
+        Delegates to utils.validation.ensure_component.
+        """
+        from utils.validation import ensure_component
+
+        return ensure_component(component, name, error_type)
 
     def _handle_categorized_error(
         self,

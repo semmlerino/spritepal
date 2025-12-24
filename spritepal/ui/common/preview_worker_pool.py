@@ -16,7 +16,7 @@ import threading
 import time
 import weakref
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast, override
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 
@@ -28,7 +28,8 @@ from utils.rom_utils import detect_smc_offset
 if TYPE_CHECKING:
     from weakref import ReferenceType
 
-    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
 logger = get_logger(__name__)
 
@@ -57,7 +58,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
         self._signals_connected = False
         self._being_destroyed = False  # Flag to prevent signal processing during cleanup
 
-    def setup_request(self, request: Any, extractor: ROMExtractorProtocol, rom_cache: ROMCacheProtocol | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Request object
+    def setup_request(self, request: Any, extractor: ROMExtractor, rom_cache: ROMCache | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Request object
         """Setup worker for new request with optional ROM cache."""
         self.rom_path = request.rom_path
         self.offset = request.offset
@@ -208,8 +209,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
                     logger.debug(f"[TRACE] Attempting HAL decompression at offset 0x{try_offset:X}")
 
                 # Try to extract as compressed sprite
-                from core.rom_injector import ROMInjector
-                rom_injector = cast(ROMInjector, self.extractor.rom_injector)
+                rom_injector = self.extractor.rom_injector
                 compressed_size, tile_data = rom_injector.find_compressed_sprite(
                     rom_data, try_offset, expected_size
                 )
@@ -354,7 +354,7 @@ class PreviewWorkerPool(QObject):
 
         logger.debug(f"PreviewWorkerPool initialized with max_workers={max_workers}")
 
-    def submit_request(self, request: Any, extractor: ROMExtractorProtocol, rom_cache: ROMCacheProtocol | None = None) -> None:  # pyright: ignore[reportExplicitAny] - PreviewRequest object
+    def submit_request(self, request: Any, extractor: ROMExtractor, rom_cache: ROMCache | None = None) -> None:  # pyright: ignore[reportExplicitAny] - PreviewRequest object
         """
         Submit a preview request to the worker pool.
 

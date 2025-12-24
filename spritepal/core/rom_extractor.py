@@ -12,9 +12,7 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     import logging
 
-    from core.protocols.manager_protocols import ROMCacheProtocol
-else:
-    pass
+    from core.services.rom_cache import ROMCache
 
 from PIL import Image
 
@@ -68,7 +66,7 @@ logger: logging.Logger = get_logger(__name__)
 class ROMExtractor:
     """Handles sprite extraction directly from ROM files"""
 
-    def __init__(self, rom_cache: ROMCacheProtocol) -> None:
+    def __init__(self, rom_cache: ROMCache) -> None:
         """Initialize ROM extractor with required components.
 
         Args:
@@ -600,7 +598,7 @@ class ROMExtractor:
             # Sort by quality and save results
             found_sprites.sort(key=lambda x: x["quality"], reverse=True)
             rom_cache.save_partial_scan_results(
-                rom_path, cast(Mapping[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), end_offset, completed=True
+                rom_path, cast(dict[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), end_offset, completed=True
             )
 
             return found_sprites
@@ -632,7 +630,7 @@ class ROMExtractor:
         }
 
     def _load_cached_scan(
-        self, rom_cache: ROMCacheProtocol, rom_path: str, scan_params: Mapping[str, object]
+        self, rom_cache: ROMCache, rom_path: str, scan_params: Mapping[str, object]
     ) -> list[SpriteInfo] | None:
         """Load completed scan from cache if available.
 
@@ -644,14 +642,14 @@ class ROMExtractor:
         Returns:
             Cached sprites list or None if not complete
         """
-        cached_progress = rom_cache.get_partial_scan_results(rom_path, cast(Mapping[str, int], scan_params))
+        cached_progress = rom_cache.get_partial_scan_results(rom_path, cast(dict[str, int], scan_params))
         if cached_progress and cached_progress.get("completed", False):
             logger.info("Found completed scan in cache, returning cached results")
             return cast(list[SpriteInfo], cached_progress.get("found_sprites", []))
         return None
 
     def _get_resume_state(
-        self, rom_cache: ROMCacheProtocol, rom_path: str, scan_params: Mapping[str, object], start_offset: int
+        self, rom_cache: ROMCache, rom_path: str, scan_params: Mapping[str, object], start_offset: int
     ) -> tuple[list[SpriteInfo], int]:
         """Get resume state from cached progress.
 
@@ -664,7 +662,7 @@ class ROMExtractor:
         Returns:
             Tuple of (found_sprites list, resume_offset)
         """
-        cached_progress = rom_cache.get_partial_scan_results(rom_path, cast(Mapping[str, int], scan_params))
+        cached_progress = rom_cache.get_partial_scan_results(rom_path, cast(dict[str, int], scan_params))
 
         if cached_progress and not cached_progress.get("completed", False):
             found_sprites = cast(list[SpriteInfo], cached_progress.get("found_sprites", []))
@@ -714,7 +712,7 @@ class ROMExtractor:
 
     def _perform_scan(
         self, rom_data: bytes, resume_offset: int, end_offset: int, step: int,
-        found_sprites: list[SpriteInfo], rom_cache: ROMCacheProtocol, rom_path: str, scan_params: Mapping[str, object]
+        found_sprites: list[SpriteInfo], rom_cache: ROMCache, rom_path: str, scan_params: Mapping[str, object]
     ) -> list[SpriteInfo]:
         """Perform the actual sprite scanning.
 
@@ -753,7 +751,7 @@ class ROMExtractor:
             # Save progress periodically
             if scan_count % save_progress_interval == 0:
                 rom_cache.save_partial_scan_results(
-                    rom_path, cast(Mapping[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), offset, completed=False
+                    rom_path, cast(dict[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), offset, completed=False
                 )
 
             # Try to find sprite at this offset
@@ -842,7 +840,7 @@ class ROMExtractor:
         }
 
     def _handle_scan_error(
-        self, error: Exception, found_sprites: list[SpriteInfo], rom_cache: ROMCacheProtocol,
+        self, error: Exception, found_sprites: list[SpriteInfo], rom_cache: ROMCache,
         rom_path: str, scan_params: Mapping[str, object], resume_offset: int
     ) -> None:
         """Handle errors during scanning and save partial results.
@@ -862,7 +860,7 @@ class ROMExtractor:
         if found_sprites:
             try:
                 rom_cache.save_partial_scan_results(
-                    rom_path, cast(Mapping[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), resume_offset, completed=False
+                    rom_path, cast(dict[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), resume_offset, completed=False
                 )
             except Exception as cache_error:
                 logger.warning(f"Failed to save partial results on scan failure: {cache_error}")

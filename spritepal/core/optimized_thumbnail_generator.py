@@ -24,7 +24,7 @@ from threading import Lock
 from typing import TYPE_CHECKING, Protocol, TypedDict
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ROMExtractorProtocol
+    from core.rom_extractor import ROMExtractor
 
 # Maximum queue size to prevent memory exhaustion during rapid scrolling
 MAX_QUEUE_SIZE = 500
@@ -540,7 +540,7 @@ class OptimizedThumbnailGenerator:
             logger.warning(f"Error during thumbnail generator shutdown: {e}")
 
 def create_optimized_generator(
-    rom_extractor: ROMExtractorProtocol,
+    rom_extractor: ROMExtractor,
     tile_renderer: SpriteRendererProtocol,
     rom_path: str | Path,
     max_workers: int = 4

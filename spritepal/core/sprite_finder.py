@@ -7,12 +7,8 @@ import json
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
 
 from PIL import Image
-
-if TYPE_CHECKING:
-    from core.rom_injector import ROMInjector
 
 from core.region_analyzer import EmptyRegionConfig, EmptyRegionDetector
 from core.sprite_visual_validator import SpriteVisualValidator
@@ -109,9 +105,9 @@ class SpriteFinder:
 
     def __init__(self, output_dir: str = "sprite_candidates", region_config: EmptyRegionConfig | None = None) -> None:
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMExtractorProtocol
+        from core.rom_extractor import ROMExtractor
 
-        self.extractor = inject(ROMExtractorProtocol)
+        self.extractor = inject(ROMExtractor)
         self.validator = SpriteVisualValidator()
         self.tile_renderer = TileRenderer()
         self.output_dir = output_dir
@@ -233,9 +229,8 @@ class SpriteFinder:
 
         # Step 2: Try decompression
         try:
-            # Access rom_injector implementation detail (typed as object in protocol)
-            rom_injector = cast("ROMInjector", self.extractor.rom_injector)
-            compressed_size, sprite_data = rom_injector.find_compressed_sprite(
+            # Use ROMExtractor's rom_injector
+            compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
                 rom_data, offset, expected_size=None
             )
             if len(sprite_data) == 0:
@@ -426,9 +421,8 @@ class SpriteFinder:
             compressed_size = 0
             sprite_data = b""
             try:
-                # Access rom_injector implementation detail (typed as object in protocol)
-                rom_injector = cast("ROMInjector", self.extractor.rom_injector)
-                compressed_size, sprite_data = rom_injector.find_compressed_sprite(
+                # Use ROMExtractor's rom_injector
+                compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
                     rom_data, offset, expected_size=None
                 )
 
@@ -641,9 +635,8 @@ class SpriteFinder:
         sprite_data = b""
         try:
             # Try to decompress sprite at this offset
-            # Access rom_injector implementation detail (typed as object in protocol)
-            rom_injector = cast("ROMInjector", self.extractor.rom_injector)
-            compressed_size, sprite_data = rom_injector.find_compressed_sprite(
+            # Use ROMExtractor's rom_injector
+            compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
                 rom_data, offset, expected_size=None
             )
 
