@@ -359,14 +359,11 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def _setup_smart_preview_coordinator(self):
         """Set up SmartPreviewCoordinator for efficient preview generation."""
-        # SmartPreviewCoordinator expects concrete ROMCache type
-        coordinator = SmartPreviewCoordinator(self, rom_cache=self.rom_cache)
+        coordinator = SmartPreviewCoordinator(self)
         self._smart_preview_coordinator = coordinator
         assert self._smart_preview_coordinator is not None  # Just assigned
 
         # Use AutoConnection (default) to let Qt choose the best connection type
-        # This will use DirectConnection when called from main thread (avoiding queue delays)
-        # and QueuedConnection when called from worker threads (for thread safety)
         coordinator.preview_ready.connect(
             self._on_smart_preview_ready
         )
@@ -377,14 +374,14 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             self._on_smart_preview_error
         )
 
-        # Setup ROM data provider with cache support
+        # Setup ROM data provider
         coordinator.set_rom_data_provider(self._get_rom_data_for_preview)
 
         # Connect cache-related signals
         coordinator.preview_ready.connect(self._on_cache_miss)
         coordinator.preview_cached.connect(self._on_cache_hit)
 
-        logger.debug("Smart preview coordinator setup complete with ROM cache integration")
+        logger.debug("Smart preview coordinator setup complete")
 
     def _setup_preview_timer(self):
         """Set up preview update timer."""
@@ -752,12 +749,12 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     # _show_sprite_scan_results, _jump_to_sprite, _jump_to_selected_sprite
     # are now handled internally by SpriteSearchCoordinator
 
-    def _get_rom_data_for_preview(self):
-        """Provide ROM data with cache support for smart preview coordinator."""
+    def _get_rom_data_for_preview(self) -> tuple[str, object] | None:
+        """Provide ROM data for smart preview coordinator."""
         with QMutexLocker(self._manager_mutex):
-            result = (self.rom_path, self.rom_extractor, self.rom_cache)
-            logger.debug(f"[DEBUG] _get_rom_data_for_preview returning: (rom_path={bool(result[0])}, extractor={bool(result[1])}, cache={bool(result[2])})")
-            return result
+            if not self.rom_path or not self.rom_extractor:
+                return None
+            return (self.rom_path, self.rom_extractor)
 
     def _on_smart_preview_ready(self, tile_data: bytes, width: int, height: int, sprite_name: str):
         """Handle preview ready from smart coordinator with guaranteed UI updates."""

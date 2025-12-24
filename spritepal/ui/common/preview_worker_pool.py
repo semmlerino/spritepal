@@ -3,8 +3,7 @@ Preview Worker Pool for efficient thread reuse during preview generation.
 
 This module provides a pool of reusable worker threads to prevent the overhead
 of creating/destroying threads for each preview request. Features:
-- Thread reuse with automatic scaling
-- Request priority queuing
+- Thread reuse (1-2 workers)
 - Cancellation support for stale requests
 - Automatic cleanup of idle workers
 """
@@ -16,7 +15,7 @@ import threading
 import time
 import weakref
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
     from weakref import ReferenceType
 
     from core.rom_extractor import ROMExtractor
-    from core.services.rom_cache import ROMCache
+    from ui.common.smart_preview_coordinator import PreviewRequest
 
 logger = get_logger(__name__)
 
@@ -47,7 +46,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
     preview_ready = Signal(int, bytes, int, int, str)  # request_id, tile_data, width, height, name
     preview_error = Signal(int, str)  # request_id, error_msg
 
-    def __init__(self, pool_ref: ReferenceType[Any]) -> None:  # pyright: ignore[reportExplicitAny] - Weak reference to pool
+    def __init__(self, pool_ref: ReferenceType[PreviewWorkerPool]) -> None:
         # Initialize with dummy values - actual values set per request
         super().__init__("", 0, "", None, None)  # type: ignore[arg-type]  # Dummy init, real values set via setup_request
         self._pool_ref = pool_ref
@@ -58,14 +57,13 @@ class PooledPreviewWorker(SpritePreviewWorker):
         self._signals_connected = False
         self._being_destroyed = False  # Flag to prevent signal processing during cleanup
 
-    def setup_request(self, request: Any, extractor: ROMExtractor, rom_cache: ROMCache | None = None) -> None:  # pyright: ignore[reportExplicitAny] - Request object
-        """Setup worker for new request with optional ROM cache."""
+    def setup_request(self, request: PreviewRequest, extractor: ROMExtractor) -> None:
+        """Setup worker for new request."""
         self.rom_path = request.rom_path
         self.offset = request.offset
         self.sprite_name = f"manual_0x{request.offset:X}"
-        logger.debug(f"[TRACE] Worker setup: offset=0x{request.offset:X}, sprite_name={self.sprite_name}, request_id={request.request_id}")
+        logger.debug(f"Worker setup: offset=0x{request.offset:X}, request_id={request.request_id}")
         self.extractor = extractor
-        self.rom_cache = rom_cache  # Store ROM cache for potential use
         self.sprite_config = None
         # Thread-safe state updates
         with QMutexLocker(self._state_mutex):
@@ -313,7 +311,6 @@ class PreviewWorkerPool(QObject):
 
     Features:
     - Maintains pool of 1-2 workers to prevent thread churn
-    - Priority queue for request handling
     - Automatic cancellation of stale requests
     - Worker cleanup after idle period
     - Thread-safe request submission
@@ -323,16 +320,16 @@ class PreviewWorkerPool(QObject):
     preview_ready = Signal(int, bytes, int, int, str)  # request_id, tile_data, width, height, name
     preview_error = Signal(int, str)  # request_id, error_msg
 
-    def __init__(self, max_workers: int = 8, idle_timeout: int = 30000):
+    def __init__(self, max_workers: int = 2, idle_timeout: int = 30000):
         super().__init__()
 
         self._max_workers = max_workers
         self._idle_timeout = idle_timeout
 
         # Thread-safe collections
-        self._available_workers = queue.Queue()
-        self._active_workers = set()
-        self._request_queue = queue.PriorityQueue()
+        self._available_workers: queue.Queue[PooledPreviewWorker] = queue.Queue()
+        self._active_workers: set[PooledPreviewWorker] = set()
+        self._request_queue: queue.Queue[tuple[float, PreviewRequest, ROMExtractor]] = queue.Queue()
 
         # Synchronization
         self._mutex = QMutex()
@@ -341,10 +338,10 @@ class PreviewWorkerPool(QObject):
         # Pool management
         self._worker_count = 0
         self._last_activity = time.time()
-        self._zombie_workers = set()  # Track stuck workers
+        self._zombie_workers: set[PooledPreviewWorker] = set()
 
         # Request throttling to prevent overwhelming the pool
-        self._last_request_time = 0
+        self._last_request_time = 0.0
         self._min_request_interval = 0.01  # 10ms minimum between requests
 
         # Cleanup timer
@@ -354,17 +351,15 @@ class PreviewWorkerPool(QObject):
 
         logger.debug(f"PreviewWorkerPool initialized with max_workers={max_workers}")
 
-    def submit_request(self, request: Any, extractor: ROMExtractor, rom_cache: ROMCache | None = None) -> None:  # pyright: ignore[reportExplicitAny] - PreviewRequest object
+    def submit_request(self, request: PreviewRequest, extractor: ROMExtractor) -> None:
         """
         Submit a preview request to the worker pool.
 
         Args:
             request: PreviewRequest object
             extractor: ROM extractor for sprite processing
-            rom_cache: Optional ROM cache for performance optimization
         """
         if self._shutdown_requested.is_set():
-            logger.warning("Cannot submit request - pool is shutting down")
             return
 
         # Throttle rapid requests to prevent overwhelming the pool
@@ -372,34 +367,29 @@ class PreviewWorkerPool(QObject):
         time_since_last = current_time - self._last_request_time
         if time_since_last < self._min_request_interval:
             # Too fast, queue for later processing instead
-            logger.debug(f"Throttling request {request.request_id}, queuing for later")
-            self._request_queue.put((request.priority, current_time, request, extractor, rom_cache))
-            # Schedule deferred processing
+            self._request_queue.put((current_time, request, extractor))
             QTimer.singleShot(int(self._min_request_interval * 1000), self._process_queued_requests)
             return
 
         self._last_request_time = current_time
 
         with QMutexLocker(self._mutex):
-            # Cancel any existing requests with lower priority
-            self._cancel_lower_priority_requests(request.priority)
+            # Cancel any active workers (new request takes priority)
+            for worker in list(self._active_workers):
+                worker.cancel_current_request()
 
             # Get or create a worker
             worker = self._get_available_worker()
             if worker is None:
                 # Queue the request instead of rejecting it
-                logger.debug(f"No workers available, queuing request {request.request_id}")
-                self._request_queue.put((request.priority, current_time, request, extractor, rom_cache))
-                # Try to process queue after a short delay
+                self._request_queue.put((current_time, request, extractor))
                 QTimer.singleShot(10, self._process_queued_requests)
                 return
 
-            # Setup worker for this request with ROM cache
-            worker.setup_request(request, extractor, rom_cache)
+            # Setup worker for this request
+            worker.setup_request(request, extractor)
 
             # Connect signals only if not already connected
-            # We keep signals connected to avoid race conditions from disconnect/reconnect
-            # Use QueuedConnection for cross-thread safety
             if not hasattr(worker, '_signals_connected') or not worker._signals_connected:
                 worker.preview_ready.connect(
                     self._on_worker_ready,
@@ -410,7 +400,6 @@ class PreviewWorkerPool(QObject):
                     Qt.ConnectionType.QueuedConnection
                 )
                 worker._signals_connected = True
-                logger.debug("Connected worker signals (QueuedConnection)")
 
             # Move to active set
             self._active_workers.add(worker)
@@ -490,12 +479,11 @@ class PreviewWorkerPool(QObject):
         # Try to process one request from the queue
         try:
             if not self._request_queue.empty():
-                priority, timestamp, request, extractor, rom_cache = self._request_queue.get_nowait()
+                timestamp, request, extractor = self._request_queue.get_nowait()
 
                 # Check if request is still recent (not stale)
                 age = time.time() - timestamp
                 if age > 2.0:  # Discard requests older than 2 seconds
-                    logger.debug(f"Discarding stale request {request.request_id} (age: {age:.2f}s)")
                     # Try next request
                     QTimer.singleShot(0, self._process_queued_requests)
                     return
@@ -505,9 +493,9 @@ class PreviewWorkerPool(QObject):
                     worker = self._get_available_worker()
                     if worker:
                         # Setup and start worker
-                        worker.setup_request(request, extractor, rom_cache)
+                        worker.setup_request(request, extractor)
 
-                        # Connect signals only if not already connected (QueuedConnection)
+                        # Connect signals only if not already connected
                         if not hasattr(worker, '_signals_connected') or not worker._signals_connected:
                             worker.preview_ready.connect(
                                 self._on_worker_ready,
@@ -521,30 +509,17 @@ class PreviewWorkerPool(QObject):
                         self._active_workers.add(worker)
                         self._last_activity = time.time()
                         worker.start()
-                        logger.debug(f"Processed queued request {request.request_id}")
 
                         # Check for more queued requests
                         if not self._request_queue.empty():
                             QTimer.singleShot(10, self._process_queued_requests)
                     else:
                         # No worker available, put request back
-                        self._request_queue.put((priority, timestamp, request, extractor, rom_cache))
+                        self._request_queue.put((timestamp, request, extractor))
         except queue.Empty:
             pass
         except Exception as e:
             logger.warning(f"Error processing queued request: {e}")
-
-    def _cancel_lower_priority_requests(self, priority: int) -> None:
-        """Cancel active requests with lower priority."""
-        cancelled_count = 0
-        for worker in list(self._active_workers):
-            # Cancel workers processing lower priority requests
-            if hasattr(worker, "_current_request_id"):
-                worker.cancel_current_request()
-                cancelled_count += 1
-
-        if cancelled_count > 0:
-            logger.debug(f"Cancelled {cancelled_count} lower priority requests")
 
     def _on_worker_ready(self, request_id: int, tile_data: bytes,
                         width: int, height: int, sprite_name: str) -> None:
