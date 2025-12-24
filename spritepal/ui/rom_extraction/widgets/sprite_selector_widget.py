@@ -59,7 +59,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.sprite_combo.setMinimumWidth(300)
         self.sprite_combo.addItem("Select ROM file first...", None)
         self.sprite_combo.setEnabled(False)
-        self.sprite_combo.currentIndexChanged.connect(self._on_sprite_changed)
+        _ = self.sprite_combo.currentIndexChanged.connect(self.sprite_changed.emit)
         sprite_row.addWidget(self.sprite_combo, 1)
 
         sprite_layout.addLayout(sprite_row)
@@ -107,10 +107,6 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         sprite_layout.addLayout(button_row)
 
         self._setup_widget_with_group("Sprite Selection", sprite_layout)
-
-    def _on_sprite_changed(self, index: int):
-        """Handle internal sprite change"""
-        self.sprite_changed.emit(index)
 
     def clear(self):
         """Clear sprite selection"""

@@ -289,11 +289,8 @@ class ScanControlsPanel(QWidget):
         range_kb = (end_offset - start_offset) // 1024
         self.scan_status_changed.emit(f"Scanning {range_kb} KB range...")
 
-        # Disable scan buttons during operation and show control buttons
-        self.scan_range_btn.setEnabled(False)
-        self.scan_all_btn.setEnabled(False)
-        self.pause_btn.setVisible(True)
-        self.stop_btn.setVisible(True)
+        # Enter scanning mode
+        self._set_scanning_mode(True)
         self.pause_btn.setText("Pause")  # Reset pause button text
 
         # Emit scan started signal
@@ -443,15 +440,21 @@ class ScanControlsPanel(QWidget):
         sprite_count = len(self.found_sprites)
         self.scan_status_changed.emit(f"Scan stopped by user: {sprite_count} sprites found")
 
+    def _set_scanning_mode(self, is_scanning: bool) -> None:
+        """Toggle button states for scanning mode.
+
+        Args:
+            is_scanning: True to enter scanning mode, False to exit.
+        """
+        self.scan_range_btn.setEnabled(not is_scanning)
+        self.scan_all_btn.setEnabled(not is_scanning)
+        self.pause_btn.setVisible(is_scanning)
+        self.stop_btn.setVisible(is_scanning)
+
     def _finish_scan(self):
         """Common scan cleanup operations"""
         self.is_scanning = False
-
-        # Re-enable scan buttons and hide control buttons
-        self.scan_range_btn.setEnabled(True)
-        self.scan_all_btn.setEnabled(True)
-        self.pause_btn.setVisible(False)
-        self.stop_btn.setVisible(False)
+        self._set_scanning_mode(False)
 
         # Emit sprites for smart mode processing if any were found
         if self.found_sprites:

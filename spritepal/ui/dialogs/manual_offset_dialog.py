@@ -50,7 +50,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFrame,
-    QHBoxLayout,
     QInputDialog,
     QLabel,
     QListWidget,
@@ -89,6 +88,17 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Layout constants (formerly in DialogLayoutManager)
+_MAX_MINI_MAP_HEIGHT = 60
+_MIN_MINI_MAP_HEIGHT = 40
+
+
+def _create_section_title(text: str) -> QLabel:
+    """Create a styled section title label."""
+    label = QLabel(text)
+    label.setStyleSheet(f"font-weight: bold; font-size: 12px; color: {COLORS['text_primary']};")
+    return label
+
 
 # Signal utilities imported from shared module
 from ui.common.signal_utils import is_valid_qt as _is_valid_qt, safe_disconnect as _safe_disconnect
@@ -96,9 +106,6 @@ from ui.common.signal_utils import is_valid_qt as _is_valid_qt, safe_disconnect 
 # Import tab widgets from the new module
 from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmartTab
 
-# SmartPreviewCoordinator used exclusively (SimplePreviewCoordinator removed for DRY)
-
-# SimpleBrowseTab, SimpleSmartTab, SimpleHistoryTab removed - now imported from ui.tabs.manual_offset
 
 class UnifiedManualOffsetDialog(CleanupDialog):
     """
@@ -177,42 +184,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._debug_id = f"dialog_{int(time.time()*1000)}"
         logger.debug(f"Dialog debug ID: {self._debug_id}")
 
-        # Inline layout manager - provides basic layout configuration
-        class DialogLayoutManager:
-            """Simple layout manager for dialog panels."""
-            MAX_MINI_MAP_HEIGHT = 60
-            MIN_MINI_MAP_HEIGHT = 40
-
-            def configure_splitter(self, *args: object) -> None:
-                pass
-
-            def fix_empty_space_issue(self) -> None:
-                pass
-
-            def apply_standard_layout(self, layout: QVBoxLayout | QHBoxLayout, spacing_type: str = 'normal') -> None:
-                layout.setSpacing(SPACING_SMALL)
-                layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
-
-            def remove_all_stretches(self, layout: object) -> None:
-                pass
-
-            def create_section_title(self, title: str, subtitle: str = "") -> QLabel:
-                from PySide6.QtWidgets import QLabel
-                label = QLabel(title)
-                label.setStyleSheet(f"font-weight: bold; font-size: 12px; color: {COLORS['text_primary']};")
-                return label
-
-            def on_dialog_show(self) -> None:
-                pass
-
-            def update_for_tab(self, index: int, width: int) -> None:
-                pass
-
-            def handle_resize(self, event: object) -> None:
-                pass
-
-        self.layout_manager = DialogLayoutManager()
-
         super().__init__(
             parent=parent,
             title="Manual Offset Control - SpritePal",
@@ -232,8 +203,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._setup_preview_timer()
         self._connect_signals()
 
-        # DialogSignalManager handles custom signals to avoid Qt metaclass issues
-
     @override
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""
@@ -243,12 +212,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             # Create left and right panels
             left_panel = self._create_left_panel()
             right_panel = self._create_right_panel()
-
-            # Use layout manager to configure splitter (if available)
-            if self.layout_manager and hasattr(self, 'main_splitter') and self.main_splitter:
-                self.layout_manager.configure_splitter(self.main_splitter, left_panel, right_panel)
-            else:
-                logger.debug("Main splitter not available during setup, panels will be added directly")
 
             # Add panels to splitter with better proportions
             # Left panel should be wider for controls, right panel narrower for preview
@@ -271,20 +234,16 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if self.tab_widget:
             self.tab_widget.currentChanged.connect(self._on_tab_changed)
 
-        # Fix empty space issue after everything is set up
-        if self.layout_manager:
-            self.layout_manager.fix_empty_space_issue()
-
     def _create_left_panel(self) -> QWidget:
         """Create the left panel with tabs and collapsible status."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
 
-        # Use layout manager to apply standard layout configuration
-        if self.layout_manager:
-            self.layout_manager.apply_standard_layout(layout, spacing_type='compact')
+        # Apply compact layout configuration
+        layout.setSpacing(SPACING_SMALL)
+        layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
-        # Tab widget - will be configured by layout manager
+        # Tab widget
         self.tab_widget = QTabWidget()
 
         # Create and add tabs
@@ -316,13 +275,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Mini ROM map for position context with flexible height
         self.mini_rom_map = ROMMapWidget()
-        self.mini_rom_map.setMaximumHeight(self.layout_manager.MAX_MINI_MAP_HEIGHT)
-        self.mini_rom_map.setMinimumHeight(self.layout_manager.MIN_MINI_MAP_HEIGHT)
+        self.mini_rom_map.setMaximumHeight(_MAX_MINI_MAP_HEIGHT)
+        self.mini_rom_map.setMinimumHeight(_MIN_MINI_MAP_HEIGHT)
         self.mini_rom_map.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.mini_rom_map, 0)  # No stretch - fixed height
-
-        # Use layout manager to ensure no unwanted stretches
-        self.layout_manager.remove_all_stretches(layout)
         # The tab widget with stretch=1 will expand to fill available space
 
         return panel
@@ -408,8 +364,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 padding: 4px 12px;
             }
         """)
-
-    # _setup_signal_coordinator removed - SmartPreviewCoordinator handles all coordination
 
     def _setup_smart_preview_coordinator(self):
         """Set up SmartPreviewCoordinator for efficient preview generation."""
@@ -1473,35 +1427,25 @@ Cache Misses: {session_stats['misses']}"""
         super().showEvent(event)
         self.view_state_manager.handle_show_event()
 
-        # Let layout manager handle all initial setup including splitter configuration
-        self.layout_manager.on_dialog_show()
-
         # Set initial splitter sizes based on current tab
         self._update_splitter_for_tab()
 
     def _on_tab_changed(self, index: int) -> None:
-        """Handle tab change - adjust splitter ratio based on tab."""
-        self.layout_manager.update_for_tab(index, self.width())
+        """Handle tab change."""
+        pass  # Tab-specific adjustments handled elsewhere
 
     def _update_splitter_for_tab(self, index: int | None = None) -> None:
-        """Update splitter sizes based on active tab - delegated to layout manager."""
-        if index is None and self.tab_widget:
-            index = self.tab_widget.currentIndex()
-        if index is not None:
-            self.layout_manager.update_for_tab(index, self.width())
+        """Update splitter sizes based on active tab."""
+        pass  # Splitter adjustment is optional - no-op for now
 
     def _create_section_title(self, text: str) -> QLabel:
-        """Create a styled section title label - delegated to layout manager."""
-        return self.layout_manager.create_section_title(text)
+        """Create a styled section title label."""
+        return _create_section_title(text)
 
     @override
     def resizeEvent(self, event: QResizeEvent) -> None:
-        """Handle resize event - adjust splitter proportionally."""
+        """Handle resize event."""
         super().resizeEvent(event)
-
-        # Delegate all resize handling to layout manager
-        if self.isVisible():
-            self.layout_manager.handle_resize(event.size().width())
 
     @override
     def moveEvent(self, event: QMoveEvent) -> None:
