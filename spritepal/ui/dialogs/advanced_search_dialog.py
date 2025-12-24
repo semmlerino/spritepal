@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, override
 
 from PIL import Image
-from PySide6.QtCore import QMutex, Qt, QWaitCondition, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -95,11 +95,6 @@ class SearchWorker(BaseWorker):
         self.params = params
         self.finder = None
         self._operation_name = f"SearchWorker-{search_type}"  # Override BaseWorker's default
-
-        # Thread-safe user interaction support
-        self._user_response_mutex = QMutex()
-        self._user_response_condition = QWaitCondition()
-        self._user_response: tuple[str, bool] | bool | None = None
         # Note: BaseWorker handles WorkerManager registration automatically
 
     @handle_worker_errors("search operation")
@@ -155,12 +150,11 @@ class SearchWorker(BaseWorker):
             step_size=int(self.params.get("step_size", 0x100))
         )
 
-        # Search with progress callback
+        # Search without progress callback (removed dead signal)
         results = self.finder.search_parallel(
             rom_path,
             start,
             end,
-            progress_callback=self._emit_progress,
             cancellation_token=self  # type: ignore[arg-type]  # Worker has is_cancelled() method
         )
 
@@ -787,13 +781,6 @@ class SearchWorker(BaseWorker):
     def cancel(self) -> None:
         """Cancel the search."""
         super().cancel()  # Sets _cancellation_requested and calls requestInterruption()
-        # Wake up any waiting user interaction to allow clean shutdown
-        self._user_response_mutex.lock()
-        try:
-            self._user_response = None
-            self._user_response_condition.wakeAll()
-        finally:
-            self._user_response_mutex.unlock()
         self._cleanup_finder()
 
     def is_set(self) -> bool:
@@ -810,73 +797,6 @@ class SearchWorker(BaseWorker):
                 logger.warning(f"Error shutting down finder: {e}")
             finally:
                 self.finder = None
-
-    def _request_user_input(self, title: str, prompt: str) -> tuple[str, bool]:
-        """Thread-safe method to request user input from main thread."""
-        if self.is_cancelled:
-            return ("", False)
-
-        self._user_response_mutex.lock()
-        try:
-            self._user_response = None
-            self.input_requested.emit(title, prompt)
-
-            # Wait for response from main thread (with timeout)
-            if self._user_response_condition.wait(self._user_response_mutex, 30000):  # 30 second timeout
-                if self.is_cancelled:
-                    return ("", False)
-                # _user_response is set by another thread via _set_user_response()
-                # Note: isinstance check needed because basedpyright doesn't track cross-thread mutations
-                if isinstance(self._user_response, tuple):  # pyright: ignore[reportUnnecessaryIsInstance]
-                    return self._user_response
-                # Fallback for unexpected response type
-                return ("", False)
-            logger.warning("User input request timed out")
-            return ("", False)
-        finally:
-            self._user_response_mutex.unlock()
-
-    def _request_user_question(self, title: str, question: str) -> bool:
-        """Thread-safe method to ask user a yes/no question from main thread."""
-        if self.is_cancelled:
-            return False
-
-        self._user_response_mutex.lock()
-        try:
-            self._user_response = None
-            self.question_requested.emit(title, question)
-
-            # Wait for response from main thread (with timeout)
-            if self._user_response_condition.wait(self._user_response_mutex, 30000):  # 30 second timeout
-                if self.is_cancelled:
-                    return False
-                # _user_response is set by another thread via _set_user_response()
-                # Note: isinstance check needed because basedpyright doesn't track cross-thread mutations
-                if isinstance(self._user_response, bool):  # pyright: ignore[reportUnnecessaryIsInstance]
-                    return self._user_response
-                # Fallback for unexpected response type
-                return False
-            logger.warning("User question request timed out")
-            return False
-        finally:
-            self._user_response_mutex.unlock()
-
-    def _show_user_info(self, title: str, message: str) -> None:
-        """Thread-safe method to show info message to user from main thread."""
-        self.info_requested.emit(title, message)
-
-    def _set_user_response(self, response: tuple[str, bool] | bool | None) -> None:
-        """Called from main thread to provide user response."""
-        self._user_response_mutex.lock()
-        try:
-            self._user_response = response
-            self._user_response_condition.wakeAll()
-        finally:
-            self._user_response_mutex.unlock()
-
-    def _emit_progress(self, current: int, total: int) -> None:
-        """Emit progress signal - avoids lambda closure."""
-        self.progress.emit(current, total)
 
     @override
     def emit_error(self, message: str, exception: Exception | None = None) -> None:
@@ -1590,33 +1510,18 @@ class AdvancedSearchDialog(QDialog):
     def _connect_worker_signals(self):
         """Connect search worker signals."""
         if self.search_worker:
-            self.search_worker.progress.connect(self._update_progress)
             self.search_worker.result_found.connect(self._add_result)
             self.search_worker.search_complete.connect(self._search_complete)
             self.search_worker.error.connect(self._search_error)
-
-            # Connect thread-safe user interaction signals
-            self.search_worker.input_requested.connect(self._handle_worker_input_request)
-            self.search_worker.question_requested.connect(self._handle_worker_question_request)
-            self.search_worker.info_requested.connect(self._handle_worker_info_request)
 
     def _disconnect_worker_signals(self) -> None:
         """Disconnect search worker signals before cleanup."""
         if self.search_worker:
             from contextlib import suppress
             with suppress(RuntimeError, TypeError):
-                self.search_worker.progress.disconnect(self._update_progress)
                 self.search_worker.result_found.disconnect(self._add_result)
                 self.search_worker.search_complete.disconnect(self._search_complete)
                 self.search_worker.error.disconnect(self._search_error)
-                self.search_worker.input_requested.disconnect(self._handle_worker_input_request)
-                self.search_worker.question_requested.disconnect(self._handle_worker_question_request)
-                self.search_worker.info_requested.disconnect(self._handle_worker_info_request)
-
-    def _update_progress(self, current: int, total: int):
-        """Update progress bar."""
-        self.progress_bar.setMaximum(total)
-        self.progress_bar.setValue(current)
 
     def _add_result(self, result: SearchResult):
         """Add result to list with enhanced pattern search support."""
@@ -1712,53 +1617,10 @@ class AdvancedSearchDialog(QDialog):
             self.results_label.setText(f"Search error: {error_msg}")
         logger.error(f"Search error: {error_msg}")
 
-    def _handle_worker_input_request(self, title: str, prompt: str):
-        """Handle input request from worker thread (runs in main thread)."""
-        from PySide6.QtWidgets import QInputDialog
-
-        try:
-            text, ok = QInputDialog.getText(self, title, prompt, text="0x")
-            if self.search_worker is not None:
-                self.search_worker._set_user_response((text, ok))
-        except Exception as e:
-            logger.exception(f"Error handling worker input request: {e}")
-            if self.search_worker is not None:
-                self.search_worker._set_user_response(("", False))
-
-    def _handle_worker_question_request(self, title: str, question: str):
-        """Handle question request from worker thread (runs in main thread)."""
-        from PySide6.QtWidgets import QMessageBox
-
-        try:
-            reply = QMessageBox.question(
-                self, title, question,
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
-            )
-            result = reply == QMessageBox.StandardButton.Yes
-            if self.search_worker is not None:
-                self.search_worker._set_user_response(result)
-        except Exception as e:
-            logger.exception(f"Error handling worker question request: {e}")
-            if self.search_worker is not None:
-                self.search_worker._set_user_response(False)
-
-    def _handle_worker_info_request(self, title: str, message: str):
-        """Handle info request from worker thread (runs in main thread)."""
-        from PySide6.QtWidgets import QMessageBox
-
-        try:
-            QMessageBox.information(self, title, message)
-        except Exception as e:
-            logger.exception(f"Error handling worker info request: {e}")
-
     def _stop_search(self):
         """Stop current search."""
         if self.search_worker is not None and self.search_worker.isRunning():
             self.search_worker.cancel()
-            # Wake up any waiting threads to allow clean shutdown
-            if hasattr(self.search_worker, "_user_response_condition"):
-                self.search_worker._user_response_condition.wakeAll()
             if self.results_label:
                 self.results_label.setText("Search cancelled")
 
