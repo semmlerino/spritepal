@@ -46,6 +46,7 @@ from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngin
 from core.workers.base import BaseWorker, handle_worker_errors
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.common.spacing_constants import INDENT_UNDER_CONTROL
 from ui.components.filters import SearchFiltersWidget
 from ui.components.filters.search_filters_widget import SearchFilter
 from ui.constants.help_text import TOOLTIPS
@@ -1057,7 +1058,7 @@ class AdvancedSearchDialog(QDialog):
 
         # ROM offset selection row
         offset_layout = QHBoxLayout()
-        offset_layout.setContentsMargins(20, 0, 0, 0)  # Indent under radio
+        offset_layout.setContentsMargins(INDENT_UNDER_CONTROL, 0, 0, 0)  # Indent under radio
         self.ref_offset_edit = QLineEdit()
         self.ref_offset_edit.setPlaceholderText("Sprite offset (e.g. 0x12345)")
         self.ref_offset_edit.setToolTip(TOOLTIPS["offset"])
@@ -1076,7 +1077,7 @@ class AdvancedSearchDialog(QDialog):
 
         # Image file selection row
         image_layout = QHBoxLayout()
-        image_layout.setContentsMargins(20, 0, 0, 0)  # Indent under radio
+        image_layout.setContentsMargins(INDENT_UNDER_CONTROL, 0, 0, 0)  # Indent under radio
         self.image_path_edit = QLineEdit()
         self.image_path_edit.setPlaceholderText("Image file path (PNG, BMP, GIF)")
         self.image_path_edit.setToolTip(

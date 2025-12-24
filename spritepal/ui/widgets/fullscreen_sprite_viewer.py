@@ -54,6 +54,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import FULLSCREEN_MARGINS
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
@@ -105,7 +106,10 @@ class FullscreenSpriteViewer(QWidget):
         """Setup the fullscreen viewer UI."""
         # Main layout - center everything
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setContentsMargins(
+            FULLSCREEN_MARGINS, FULLSCREEN_MARGINS,
+            FULLSCREEN_MARGINS, FULLSCREEN_MARGINS
+        )
         main_layout.setSpacing(0)
 
         # Sprite display area (centered)

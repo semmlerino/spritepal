@@ -82,6 +82,12 @@ CIRCLE_INDICATOR_SIZE = 25           # Size of circular status indicators
 CIRCLE_INDICATOR_MARGIN = 35         # Distance from edge for indicators
 CHECKMARK_OFFSET = 10                # Position offset for checkmark indicators
 
+# Control indentation (for sub-controls under radio buttons/checkboxes)
+INDENT_UNDER_CONTROL = 20            # Left indent for dependent controls
+
+# Fullscreen viewer margins
+FULLSCREEN_MARGINS = 20              # Uniform margins for fullscreen displays
+
 # Border and line widths
 BORDER_THIN = 1                      # Thin border (1px)
 BORDER_THICK = 2                     # Thick border (2px)

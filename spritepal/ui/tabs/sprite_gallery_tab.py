@@ -32,14 +32,10 @@ from core.sprite_finder import SpriteFinder
 from ui.common.file_dialogs import browse_for_directory, browse_for_save_file
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
+from ui.common.spacing_constants import COMPACT_BUTTON_HEIGHT, SPACING_TINY
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-
-# Layout constants
-LAYOUT_SPACING = 4
-LAYOUT_MARGINS = 4
-BUTTON_HEIGHT = 32
 
 class SpriteGalleryTab(QWidget):
     """Tab widget for sprite gallery display and management."""
@@ -78,8 +74,8 @@ class SpriteGalleryTab(QWidget):
     def _setup_ui(self):
         """Setup the tab UI."""
         layout = QVBoxLayout()
-        layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS)
-        layout.setSpacing(LAYOUT_SPACING)
+        layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
+        layout.setSpacing(SPACING_TINY)
 
         # Toolbar
         self.toolbar = self._create_toolbar()
@@ -164,14 +160,14 @@ class SpriteGalleryTab(QWidget):
         """Create the bottom action bar."""
         widget = QWidget()
         layout = QHBoxLayout()
-        layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS)
+        layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
 
         # Quick actions with responsive sizing
         self.compare_btn = QPushButton("Compare")
         if self.compare_btn:
             self.compare_btn.setEnabled(False)
         self.compare_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.compare_btn.setFixedHeight(BUTTON_HEIGHT)
+        self.compare_btn.setFixedHeight(COMPACT_BUTTON_HEIGHT)
         self.compare_btn.clicked.connect(self._compare_sprites)
         layout.addWidget(self.compare_btn)
 
@@ -179,7 +175,7 @@ class SpriteGalleryTab(QWidget):
         if self.palette_btn:
             self.palette_btn.setEnabled(False)
         self.palette_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.palette_btn.setFixedHeight(BUTTON_HEIGHT)
+        self.palette_btn.setFixedHeight(COMPACT_BUTTON_HEIGHT)
         self.palette_btn.clicked.connect(self._apply_palette)
         layout.addWidget(self.palette_btn)
 

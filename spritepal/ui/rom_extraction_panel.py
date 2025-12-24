@@ -57,8 +57,8 @@ logger = get_logger(__name__)
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
     BUTTON_HEIGHT,
-    SPACING_COMPACT_MEDIUM as SPACING_SECTION,  # 10px between sections
-    SPACING_COMPACT_SMALL as SPACING_INTERNAL,  # 6px for internal margins
+    SPACING_COMPACT_MEDIUM,
+    SPACING_COMPACT_SMALL,
 )
 
 
@@ -189,8 +189,11 @@ class ROMExtractionPanel(QWidget):
         """
         main_panel = QWidget(self)
         layout = QVBoxLayout()
-        layout.setSpacing(SPACING_SECTION)  # 10px between sections (tighter than before)
-        layout.setContentsMargins(SPACING_INTERNAL, SPACING_INTERNAL, SPACING_INTERNAL, SPACING_INTERNAL)
+        layout.setSpacing(SPACING_COMPACT_MEDIUM)  # 10px between sections
+        layout.setContentsMargins(
+            SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL,
+            SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL
+        )
 
         # Add all widget groups
         self._add_rom_controls(layout)
