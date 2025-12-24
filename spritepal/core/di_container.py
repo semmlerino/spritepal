@@ -1,7 +1,4 @@
-"""
-Dependency injection container for SpritePal.
-Breaks circular dependencies and improves testability.
-"""
+"""Minimal DI container - thread-safe singletons and lazy factories."""
 from __future__ import annotations
 
 import logging
@@ -10,283 +7,92 @@ from threading import RLock
 from typing import TypeVar, cast
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
-T = TypeVar('T')
 
 class DIContainer:
-    """
-    Simple dependency injection container for managing application dependencies.
+    """Thread-safe container for singletons and lazy factories."""
 
-    Features:
-    - Singleton instances
-    - Factory functions
-    - Thread-safe operations
-    - Lazy initialization
-    - Protocol/interface based registration
-    """
-
-    def __init__(self):
-        """Initialize the DI container."""
-        self._singletons: dict[type, object] = {}
+    def __init__(self) -> None:
+        self._instances: dict[type, object] = {}
         self._factories: dict[type, Callable[[], object]] = {}
-        self._failed_factories: set[type] = set()  # Track factories that threw exceptions
         self._lock = RLock()
-        logger.debug("DIContainer initialized")
 
-    def register_singleton(self, interface: type[T], implementation: T) -> None:
-        """
-        Register a singleton instance.
-
-        Args:
-            interface: The interface/protocol type
-            implementation: The implementation instance
-        """
+    def register_singleton(self, key: type[T], instance: T) -> None:
+        """Register a singleton instance."""
         with self._lock:
-            self._singletons[interface] = implementation
-            logger.debug(f"Registered singleton: {interface.__name__} -> {implementation.__class__.__name__}")
+            self._instances[key] = instance
+            logger.debug("Registered singleton: %s", key.__name__)
 
-    def register_factory(self, interface: type[T], factory: Callable[[], T]) -> None:
-        """
-        Register a factory function for lazy initialization.
-
-        Args:
-            interface: The interface/protocol type
-            factory: Function that creates an instance
-        """
+    def register_factory(self, key: type[T], factory: Callable[[], T]) -> None:
+        """Register a factory for lazy initialization."""
         with self._lock:
-            self._factories[interface] = factory
-            logger.debug(f"Registered factory for: {interface.__name__}")
+            self._factories[key] = factory
+            logger.debug("Registered factory: %s", key.__name__)
 
-    def get(self, interface: type[T]) -> T:
-        """
-        Get an instance of the requested type.
-
-        Args:
-            interface: The interface/protocol type to retrieve
-
-        Returns:
-            Instance of the requested type
-
-        Raises:
-            ValueError: If no registration exists for the interface
-            RuntimeError: If factory previously failed (prevents infinite retries)
-        """
+    def get(self, key: type[T]) -> T:
+        """Get an instance, creating from factory if needed."""
         with self._lock:
-            # Check for previously failed factories first
-            if interface in self._failed_factories:
-                raise RuntimeError(
-                    f"Factory for {interface.__name__} previously failed. "
-                    "Clear container or re-register to retry."
-                )
+            if key in self._instances:
+                return cast(T, self._instances[key])
+            if key in self._factories:
+                instance = self._factories[key]()
+                self._instances[key] = instance
+                logger.debug("Created from factory: %s", key.__name__)
+                return cast(T, instance)
+            raise ValueError(f"No registration for {key.__name__}")
 
-            # Check singletons first
-            if interface in self._singletons:
-                return cast(T, self._singletons[interface])
-
-            # Check factories
-            if interface in self._factories:
-                try:
-                    # Create instance and store as singleton
-                    instance = self._factories[interface]()
-                    self._singletons[interface] = instance
-                    logger.debug(f"Created singleton from factory: {interface.__name__}")
-                    return cast(T, instance)
-                except Exception as e:
-                    # Cache the failure to prevent infinite retries
-                    self._failed_factories.add(interface)
-                    logger.error(f"Factory for {interface.__name__} failed: {e}")
-                    raise
-
-            # Provide helpful error message with common fixes
-            protocol_name = interface.__name__
-            hints = []
-
-            # Check for common missing registrations
-            if "Manager" in protocol_name or "Protocol" in protocol_name:
-                hints.append("Ensure initialize_managers() was called before this code runs")
-            if "Dialog" in protocol_name or "Factory" in protocol_name:
-                hints.append("Ensure register_ui_factories() was called after initialize_managers()")
-            if "Application" in protocol_name or "State" in protocol_name:
-                hints.append("ApplicationStateManager must be created first in the init sequence")
-
-            hint_text = ""
-            if hints:
-                hint_text = "\n  Possible fixes:\n  - " + "\n  - ".join(hints)
-
-            raise ValueError(
-                f"No registration for {protocol_name}.{hint_text}\n"
-                f"  See docs/initialization_flow.md for the correct initialization order."
-            )
-
-    def get_optional(self, interface: type[T]) -> T | None:
-        """
-        Get an instance if registered, otherwise return None.
-
-        Args:
-            interface: The interface/protocol type to retrieve
-
-        Returns:
-            Instance or None if not registered
-        """
+    def get_optional(self, key: type[T]) -> T | None:
+        """Get an instance if registered, otherwise None."""
         try:
-            return self.get(interface)
+            return self.get(key)
         except ValueError:
             return None
 
-    def has(self, interface: type) -> bool:
-        """
-        Check if an interface is registered.
-
-        Args:
-            interface: The interface/protocol type to check
-
-        Returns:
-            True if registered, False otherwise
-        """
+    def has(self, key: type) -> bool:
+        """Check if a type is registered."""
         with self._lock:
-            return interface in self._singletons or interface in self._factories
+            return key in self._instances or key in self._factories
 
     def clear(self) -> None:
-        """Clear all registrations (useful for testing)."""
+        """Clear all registrations."""
         with self._lock:
-            self._singletons.clear()
+            self._instances.clear()
             self._factories.clear()
-            self._failed_factories.clear()  # Allow retry after clear
-            logger.debug("DIContainer cleared")
+            logger.debug("Container cleared")
 
-    def unregister(self, interface: type) -> None:
-        """
-        Remove a registration.
-
-        Args:
-            interface: The interface/protocol type to remove
-        """
+    def unregister(self, key: type) -> None:
+        """Remove a registration."""
         with self._lock:
-            self._singletons.pop(interface, None)
-            self._factories.pop(interface, None)
-            self._failed_factories.discard(interface)  # Allow re-registration to retry
-            logger.debug(f"Unregistered: {interface.__name__}")
+            self._instances.pop(key, None)
+            self._factories.pop(key, None)
+            logger.debug("Unregistered: %s", key.__name__)
+
 
 # Global container instance
 _container = DIContainer()
 
-def get_container() -> DIContainer:
-    """
-    Get the global DI container instance.
 
-    Returns:
-        The global DIContainer instance
-    """
+def get_container() -> DIContainer:
+    """Get the global DI container."""
     return _container
 
-def register_singleton(interface: type[T], implementation: T) -> None:
-    """
-    Convenience function to register a singleton.
-
-    Args:
-        interface: The interface/protocol type
-        implementation: The implementation instance
-    """
-    _container.register_singleton(interface, implementation)
-
-def register_factory(interface: type[T], factory: Callable[[], T]) -> None:
-    """
-    Convenience function to register a factory.
-
-    Args:
-        interface: The interface/protocol type
-        factory: Function that creates an instance
-    """
-    _container.register_factory(interface, factory)
 
 def inject(interface: type[T]) -> T:
-    """
-    Convenience function to get an injected dependency.
-
-    Args:
-        interface: The interface/protocol type
-
-    Returns:
-        Instance of the requested type
-    """
+    """Get an injected dependency."""
     return _container.get(interface)
 
+
+def register_singleton(interface: type[T], implementation: T) -> None:
+    """Register a singleton instance."""
+    _container.register_singleton(interface, implementation)
+
+
+def register_factory(interface: type[T], factory: Callable[[], T]) -> None:
+    """Register a factory for lazy initialization."""
+    _container.register_factory(interface, factory)
+
+
 def reset_container() -> None:
-    """Reset the container (mainly for testing)."""
+    """Reset the container (for testing)."""
     _container.clear()
-
-def configure_container(
-    configuration_service: object = None,
-) -> None:
-    """
-    Configure the DI container with non-manager dependencies.
-
-    This function sets up service bindings. Manager bindings are registered
-    separately by ManagerRegistry.initialize_managers() after managers are created.
-
-    INITIALIZATION ORDER (enforced by ManagerRegistry):
-    1. configure_container() - registers services and factories
-    2. ManagerRegistry creates managers
-    3. register_managers() - registers manager protocols with actual instances
-
-    Args:
-        configuration_service: Optional pre-created ConfigurationService instance.
-                              If not provided, one will be created automatically.
-    """
-    # Import protocols
-    # Register ConfigurationService FIRST - it's needed by other managers
-    from core.configuration_service import ConfigurationService
-    from core.managers.application_state_manager import ApplicationStateManager
-
-    if configuration_service is not None:
-        register_singleton(ConfigurationService, configuration_service)
-    else:
-        # Create default ConfigurationService
-        register_singleton(ConfigurationService, ConfigurationService())
-
-    # NOTE: Manager types (ApplicationStateManager, CoreOperationsManager, etc.)
-    # are registered by register_managers() AFTER managers are created.
-    # This avoids circular dependency between DI container and ManagerRegistry.
-
-    # Import ROMCache and ROMExtractor
-    from core.rom_extractor import ROMExtractor
-    from core.services.rom_cache import ROMCache
-
-    # Register ROMCache - use concrete class directly (no protocol indirection)
-    def _create_rom_cache() -> ROMCache:
-        return ROMCache(state_manager=inject(ApplicationStateManager))
-
-    register_factory(ROMCache, _create_rom_cache)
-
-    # Register ROMExtractor - use concrete class directly
-    def _create_rom_extractor() -> ROMExtractor:
-        return ROMExtractor(rom_cache=inject(ROMCache))
-
-    register_factory(ROMExtractor, _create_rom_extractor)
-
-    # NOTE: UI factory registration (DialogFactoryProtocol) is handled by
-    # ui.register_ui_factories() called by application entry points AFTER
-    # initialize_managers() completes. This keeps UI dependencies out of core/ layer.
-    # See: launch_spritepal.py, tests/fixtures/core_fixtures.py
-
-    logger.info("DI container configured (services registered, managers pending)")
-
-
-def register_managers(
-    core_operations_manager: object,
-) -> None:
-    """
-    Register CoreOperationsManager with the DI container.
-
-    CoreOperationsManager is the consolidated manager that handles both
-    extraction and injection operations.
-
-    Args:
-        core_operations_manager: CoreOperationsManager instance
-    """
-    from core.managers.core_operations_manager import CoreOperationsManager
-
-    # Register under concrete type - this is the preferred injection target
-    register_singleton(CoreOperationsManager, core_operations_manager)
-
-    logger.info("CoreOperationsManager registered with DI container")

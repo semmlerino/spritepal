@@ -187,8 +187,8 @@ class TestNoFallbackScenario:
         container = get_container()
 
         # Temporarily clear the container
-        # Store current state
-        original_singletons = container._singletons.copy()
+        # Store current state (using internal attribute names from DIContainer)
+        original_instances = container._instances.copy()
         original_factories = container._factories.copy()
 
         try:
@@ -199,7 +199,7 @@ class TestNoFallbackScenario:
                 inject(ApplicationStateManager)
         finally:
             # Restore
-            container._singletons.update(original_singletons)
+            container._instances.update(original_instances)
             container._factories.update(original_factories)
 
     def test_deprecated_functions_were_removed(self, isolated_managers):

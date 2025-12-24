@@ -218,15 +218,15 @@ class TestManagerRegistry:
 
     def test_qt_cleanup_registration_with_qapplication(self, qtbot):
         """Test that cleanup hooks are registered when QApplication is available."""
-        from unittest.mock import MagicMock, patch
-
         from PySide6.QtWidgets import QApplication
 
         # Ensure we have a QApplication (qtbot provides one)
         app = QApplication.instance()
         assert app is not None
 
-        # Reset cleanup flag to test registration
+        # Reset both module-level and class-level flags for clean test
+        import core.managers as managers_module
+        managers_module._cleanup_registered = False
         ManagerRegistry._cleanup_registered = False
 
         # Initialize managers - should register with aboutToQuit
@@ -240,17 +240,21 @@ class TestManagerRegistry:
         from unittest.mock import patch
 
         from core.managers.registry import _cleanup_global_registry
-        # Reset state
+
+        # Reset state - both module and class level
+        import core.managers as managers_module
+        managers_module._cleanup_registered = False
         ManagerRegistry._cleanup_registered = False
 
         # Mock QApplication.instance() to return None
-        with patch("core.managers.registry.QApplication") as mock_qapp:
+        # The import is from PySide6.QtWidgets inside initialize_managers
+        with patch("PySide6.QtWidgets.QApplication") as mock_qapp:
             mock_qapp.instance.return_value = None
 
             # Initialize managers without Qt
             initialize_managers()
 
-            # Verify Qt cleanup was NOT registered (no app)
+            # Verify Qt cleanup was NOT registered (no app available)
             assert not ManagerRegistry._cleanup_registered
 
         # Verify managers are initialized
