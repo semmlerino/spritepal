@@ -30,7 +30,7 @@ class SpriteScanWorker(BaseWorker):
     """
 
     # Custom signals (BaseWorker provides progress, error, warning, operation_finished)
-    sprite_found = Signal(dict)
+    sprite_found = Signal(object)  # use object to avoid PySide6 copy warning
     """Emitted when a valid sprite is found. Args: sprite_info (dict with 'offset', 'quality' keys)."""
 
     # Compatibility signal: emits all sprites at once when scan completes

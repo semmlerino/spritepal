@@ -674,6 +674,91 @@ class ROMCache:
             logger.warning(f"Failed to save ROM info to cache: {e}")
             return False
 
+    def invalidate_rom_cache(self, rom_path: str) -> int:
+        """Invalidate all cache entries for a modified ROM.
+
+        Should be called after ROM injection to clear stale cache data.
+        Clears: sprite_locations, rom_info, previews, scan progress, and
+        the in-memory hash cache entry for this ROM.
+
+        Args:
+            rom_path: Path to the modified ROM file
+
+        Returns:
+            Number of cache files removed
+        """
+        if not self._cache_enabled:
+            return 0
+
+        removed_count = 0
+        rom_name = Path(rom_path).name
+
+        try:
+            # Get the ROM hash before modification (if file still exists)
+            try:
+                rom_hash = self._get_rom_hash(rom_path)
+            except (OSError, PermissionError):
+                # File may not exist yet, or we can't read it
+                logger.debug(f"Could not get ROM hash for {rom_name}, skipping file cache clear")
+                rom_hash = None
+
+            if rom_hash:
+                # Clear sprite locations cache
+                sprite_cache = self._get_cache_file_path(rom_hash, "sprite_locations")
+                if sprite_cache.exists():
+                    try:
+                        sprite_cache.unlink()
+                        removed_count += 1
+                        logger.debug(f"Cleared sprite_locations cache for {rom_name}")
+                    except (OSError, PermissionError) as e:
+                        logger.debug(f"Could not delete sprite_locations cache: {e}")
+
+                # Clear ROM info cache
+                info_cache = self._get_cache_file_path(rom_hash, "rom_info")
+                if info_cache.exists():
+                    try:
+                        info_cache.unlink()
+                        removed_count += 1
+                        logger.debug(f"Cleared rom_info cache for {rom_name}")
+                    except (OSError, PermissionError) as e:
+                        logger.debug(f"Could not delete rom_info cache: {e}")
+
+                # Clear preview caches using existing method
+                preview_count = self.clear_preview_cache(rom_path)
+                removed_count += preview_count
+
+                # Clear scan progress caches (all scans for this ROM)
+                for cache_file in self.cache_dir.glob(f"{rom_hash}_scan_progress_*.json"):
+                    try:
+                        cache_file.unlink()
+                        removed_count += 1
+                    except (OSError, PermissionError) as e:
+                        logger.debug(f"Could not delete scan progress cache {cache_file}: {e}")
+
+            # Clear in-memory hash cache entries for this ROM path
+            # This ensures next access recomputes the hash after modification
+            with self._hash_cache_lock:
+                keys_to_remove = [
+                    key for key in self._hash_cache
+                    if key.startswith(f"{rom_path}_")
+                ]
+                for key in keys_to_remove:
+                    del self._hash_cache[key]
+                if keys_to_remove:
+                    logger.debug(
+                        f"Cleared {len(keys_to_remove)} hash cache entries for {rom_name}"
+                    )
+
+            if removed_count > 0:
+                logger.info(
+                    f"Invalidated {removed_count} cache files for ROM: {rom_name}"
+                )
+
+        except (OSError, PermissionError) as e:
+            logger.warning(f"Error during cache invalidation for {rom_name}: {e}")
+
+        return removed_count
+
     def clear_scan_progress_cache(self, rom_path: str | None = None,
                                  scan_params: dict[str, int] | None = None) -> int:
         """Clear scan progress caches."""

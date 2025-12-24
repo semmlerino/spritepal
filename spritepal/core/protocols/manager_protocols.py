@@ -120,3 +120,18 @@ class ROMCacheProtocol(Protocol):
         """
         ...
 
+    def invalidate_rom_cache(self, rom_path: str) -> int:
+        """Invalidate all cache entries for a modified ROM.
+
+        Should be called after ROM injection to clear stale cache data.
+        Clears: sprite_locations, rom_info, previews, scan progress, and
+        the in-memory hash cache entry for this ROM.
+
+        Args:
+            rom_path: Path to the modified ROM file
+
+        Returns:
+            Number of cache files removed
+        """
+        ...
+

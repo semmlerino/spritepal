@@ -32,6 +32,7 @@ pytestmark = [
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
+    pytest.mark.parallel_unsafe,  # Uses inject() - needs isolation from other DI-dependent tests
     pytest.mark.headless,
     pytest.mark.performance,
     pytest.mark.slow,

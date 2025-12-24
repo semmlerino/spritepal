@@ -47,7 +47,7 @@ class ScanControlsPanel(QWidget):
     progress_update = Signal(int, int)  # current_offset, progress_percentage
     scan_started = Signal()
     scan_finished = Signal()
-    partial_scan_detected = Signal(dict)  # cache info for resume dialog
+    partial_scan_detected = Signal(object)  # cache info for resume dialog (use object to avoid PySide6 copy warning)
     sprites_detected = Signal(list)  # List of (offset, quality) tuples for region detection
 
     def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCacheProtocol):

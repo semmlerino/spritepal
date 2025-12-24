@@ -459,3 +459,229 @@ class TestFileValidatorFacade:
 
         result = FileValidator.validate_offset(-1)
         assert not result.is_valid
+
+
+class TestAtomicWrite:
+    """Test cases for atomic_write function and Windows retry logic."""
+
+    def test_atomic_write_creates_file(self, tmp_path: Path) -> None:
+        """Test atomic_write creates a new file with correct content."""
+        from utils.file_validator import atomic_write
+
+        target = tmp_path / "test_file.bin"
+        data = b"test content for atomic write"
+
+        atomic_write(target, data)
+
+        assert target.exists()
+        assert target.read_bytes() == data
+
+    def test_atomic_write_overwrites_existing_file(self, tmp_path: Path) -> None:
+        """Test atomic_write overwrites existing file atomically."""
+        from utils.file_validator import atomic_write
+
+        target = tmp_path / "existing.bin"
+        target.write_bytes(b"original content")
+
+        new_data = b"new content"
+        atomic_write(target, new_data)
+
+        assert target.read_bytes() == new_data
+
+    def test_atomic_write_creates_parent_directories(self, tmp_path: Path) -> None:
+        """Test atomic_write creates parent directories if needed."""
+        from utils.file_validator import atomic_write
+
+        target = tmp_path / "subdir" / "nested" / "file.bin"
+        data = b"nested file content"
+
+        atomic_write(target, data)
+
+        assert target.exists()
+        assert target.read_bytes() == data
+
+    def test_atomic_write_cleans_up_temp_on_write_failure(
+        self, tmp_path: Path
+    ) -> None:
+        """Test atomic_write cleans up temp file if write fails."""
+        from utils.file_validator import atomic_write
+
+        target = tmp_path / "test.bin"
+
+        with patch("os.fdopen", side_effect=OSError("Simulated write error")):
+            with pytest.raises(OSError, match="Simulated write error"):
+                atomic_write(target, b"test")
+
+        # Verify no temp files remain
+        temp_files = list(tmp_path.glob(".*tmp"))
+        assert len(temp_files) == 0
+
+    def test_atomic_replace_posix_no_retry(self, tmp_path: Path) -> None:
+        """Test _atomic_replace on POSIX does single replace without retry."""
+        from utils.file_validator import _atomic_replace
+
+        src = tmp_path / "src.bin"
+        dst = tmp_path / "dst.bin"
+        src.write_bytes(b"source content")
+
+        with patch("utils.file_validator._IS_WINDOWS", False):
+            _atomic_replace(src, dst)
+
+        assert not src.exists()
+        assert dst.read_bytes() == b"source content"
+
+    def test_atomic_replace_windows_success_first_try(self, tmp_path: Path) -> None:
+        """Test _atomic_replace on Windows succeeds on first try."""
+        from utils.file_validator import _atomic_replace
+
+        src = tmp_path / "src.bin"
+        dst = tmp_path / "dst.bin"
+        src.write_bytes(b"source content")
+
+        with patch("utils.file_validator._IS_WINDOWS", True):
+            _atomic_replace(src, dst)
+
+        assert not src.exists()
+        assert dst.read_bytes() == b"source content"
+
+    def test_atomic_replace_windows_retry_on_sharing_violation(
+        self, tmp_path: Path
+    ) -> None:
+        """Test _atomic_replace on Windows retries on WinError 32 (sharing violation)."""
+        from utils.file_validator import _atomic_replace
+
+        src = tmp_path / "src.bin"
+        dst = tmp_path / "dst.bin"
+        src.write_bytes(b"source content")
+
+        # Create a PermissionError with winerror=32 (sharing violation)
+        win_error = PermissionError("File in use")
+        win_error.winerror = 32
+
+        call_count = 0
+        original_replace = Path.replace
+
+        def mock_replace(self: Path, target: Path) -> None:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:  # Fail first 2 attempts
+                raise win_error
+            return original_replace(self, target)
+
+        with (
+            patch("utils.file_validator._IS_WINDOWS", True),
+            patch.object(Path, "replace", mock_replace),
+            patch("time.sleep") as mock_sleep,
+        ):
+            _atomic_replace(src, dst)
+
+        # Should have retried and succeeded
+        assert call_count == 3
+        # Verify exponential backoff was used (50ms, 100ms)
+        assert mock_sleep.call_count == 2
+        mock_sleep.assert_any_call(0.05)  # 50ms
+        mock_sleep.assert_any_call(0.1)   # 100ms
+
+    def test_atomic_replace_windows_fails_after_max_retries(
+        self, tmp_path: Path
+    ) -> None:
+        """Test _atomic_replace on Windows fails after max retries exhausted."""
+        from utils.file_validator import (
+            _atomic_replace,
+            _WINDOWS_RETRY_ATTEMPTS,
+        )
+
+        src = tmp_path / "src.bin"
+        dst = tmp_path / "dst.bin"
+        src.write_bytes(b"source content")
+
+        # Create a PermissionError with winerror=32 that always fails
+        win_error = PermissionError("File permanently locked")
+        win_error.winerror = 32
+
+        def mock_replace(self: Path, target: Path) -> None:
+            raise win_error
+
+        with (
+            patch("utils.file_validator._IS_WINDOWS", True),
+            patch.object(Path, "replace", mock_replace),
+            patch("time.sleep"),
+        ):
+            with pytest.raises(PermissionError, match="File permanently locked"):
+                _atomic_replace(src, dst)
+
+        # Source file should still exist since replace failed
+        assert src.exists()
+
+    def test_atomic_replace_windows_no_retry_for_non_sharing_violation(
+        self, tmp_path: Path
+    ) -> None:
+        """Test _atomic_replace doesn't retry for non-winerror-32 PermissionErrors."""
+        from utils.file_validator import _atomic_replace
+
+        src = tmp_path / "src.bin"
+        dst = tmp_path / "dst.bin"
+        src.write_bytes(b"source content")
+
+        # Create a PermissionError with different winerror (e.g., access denied)
+        access_denied = PermissionError("Access denied")
+        access_denied.winerror = 5  # ERROR_ACCESS_DENIED
+
+        call_count = 0
+
+        def mock_replace(self: Path, target: Path) -> None:
+            nonlocal call_count
+            call_count += 1
+            raise access_denied
+
+        with (
+            patch("utils.file_validator._IS_WINDOWS", True),
+            patch.object(Path, "replace", mock_replace),
+            patch("time.sleep") as mock_sleep,
+        ):
+            with pytest.raises(PermissionError, match="Access denied"):
+                _atomic_replace(src, dst)
+
+        # Should NOT have retried
+        assert call_count == 1
+        mock_sleep.assert_not_called()
+
+    def test_atomic_replace_windows_no_retry_for_oserror(
+        self, tmp_path: Path
+    ) -> None:
+        """Test _atomic_replace doesn't retry for non-PermissionError OSErrors."""
+        from utils.file_validator import _atomic_replace
+
+        src = tmp_path / "src.bin"
+        dst = tmp_path / "dst.bin"
+        src.write_bytes(b"source content")
+
+        call_count = 0
+
+        def mock_replace(self: Path, target: Path) -> None:
+            nonlocal call_count
+            call_count += 1
+            raise OSError("Disk full")
+
+        with (
+            patch("utils.file_validator._IS_WINDOWS", True),
+            patch.object(Path, "replace", mock_replace),
+            patch("time.sleep") as mock_sleep,
+        ):
+            with pytest.raises(OSError, match="Disk full"):
+                _atomic_replace(src, dst)
+
+        # Should NOT have retried
+        assert call_count == 1
+        mock_sleep.assert_not_called()
+
+    def test_atomic_write_accepts_string_path(self, tmp_path: Path) -> None:
+        """Test atomic_write accepts string path in addition to Path object."""
+        from utils.file_validator import atomic_write
+
+        target = str(tmp_path / "string_path.bin")
+        data = b"content via string path"
+
+        atomic_write(target, data)
+
+        assert Path(target).read_bytes() == data

@@ -117,14 +117,14 @@ class ApplicationStateManager(BaseManager):
     state_changed = Signal(str, dict)  # category, data
     workflow_state_changed = Signal(object, object)  # old_state, new_state
 
-    # Session signals (persistence)
+    # Session signals (persistence) - use object to avoid PySide6 copy warning
     session_changed = Signal()  # session data modified
-    files_updated = Signal(dict)  # file paths changed (emitted by update_session_data)
+    files_updated = Signal(object)  # file paths changed (emitted by update_session_data)
     settings_saved = Signal()  # settings persisted to disk
-    session_restored = Signal(dict)  # session loaded from disk
+    session_restored = Signal(object)  # session loaded from disk
 
-    # Cache signals (monitoring)
-    cache_stats_updated = Signal(dict)  # updated cache metrics
+    # Cache signals (monitoring) - use object to avoid PySide6 copy warning
+    cache_stats_updated = Signal(object)  # updated cache metrics
 
     # UI coordination signals
     current_offset_changed = Signal(int)  # ROM offset changed

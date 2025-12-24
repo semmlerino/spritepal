@@ -112,7 +112,7 @@ class ScanController(QObject):
     cache_status_changed = Signal(str, str)  # status, style_class
     scan_started = Signal()  # Notify that scanning began
     scan_progress = Signal(int, int)  # current, total
-    sprite_found = Signal(dict)  # sprite_info dict
+    sprite_found = Signal(object)  # sprite_info dict (use object to avoid PySide6 copy warning)
     scan_complete = Signal(list)  # all found_offsets
     scan_cancelled = Signal()  # User cancelled or error
     sprite_selected = Signal(int)  # Selected offset to apply

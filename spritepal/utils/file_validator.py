@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
@@ -863,6 +865,64 @@ class FileValidator:
             )
 
 
+# Windows-specific constants for atomic file operations
+_IS_WINDOWS = sys.platform == "win32"
+_WINDOWS_RETRY_ATTEMPTS = 5
+_WINDOWS_RETRY_BASE_DELAY_MS = 50  # Exponential backoff: 50, 100, 200, 400, 800ms
+
+
+def _atomic_replace(src: Path, dst: Path) -> None:
+    """
+    Replace dst with src atomically.
+
+    On POSIX: Single os.replace() call (truly atomic).
+    On Windows: Retry with exponential backoff to handle transient file locks
+    (e.g., from antivirus, concurrent readers, or system indexer).
+
+    Args:
+        src: Source file (temp file with new content)
+        dst: Destination file (target path)
+
+    Raises:
+        PermissionError: If replacement fails after all retries (Windows)
+        OSError: If replacement fails for non-permission reasons
+    """
+    if not _IS_WINDOWS:
+        # POSIX: Simple atomic rename
+        src.replace(dst)
+        return
+
+    # Windows: Retry with exponential backoff for transient locks
+    last_error: PermissionError | None = None
+
+    for attempt in range(_WINDOWS_RETRY_ATTEMPTS):
+        try:
+            src.replace(dst)
+            return  # Success
+        except PermissionError as e:
+            # Check if this is a transient lock (WinError 32 = sharing violation)
+            if hasattr(e, 'winerror') and e.winerror == 32:
+                last_error = e
+                if attempt < _WINDOWS_RETRY_ATTEMPTS - 1:
+                    # Exponential backoff: 50ms, 100ms, 200ms, 400ms
+                    delay_ms = _WINDOWS_RETRY_BASE_DELAY_MS * (2 ** attempt)
+                    logger.debug(
+                        f"File locked, retry {attempt + 1}/{_WINDOWS_RETRY_ATTEMPTS} "
+                        f"in {delay_ms}ms: {dst}"
+                    )
+                    time.sleep(delay_ms / 1000.0)
+                    continue
+            # Non-transient permission error or final attempt - re-raise
+            raise
+        except OSError:
+            # Non-permission errors should not be retried
+            raise
+
+    # All retries exhausted - raise the last error
+    if last_error:
+        raise last_error
+
+
 def atomic_write(path: Path | str, data: bytes) -> None:
     """
     Write data atomically using temp file + rename pattern.
@@ -871,6 +931,9 @@ def atomic_write(path: Path | str, data: bytes) -> None:
     disk full), the original file is not corrupted. The rename operation
     is atomic on POSIX systems.
 
+    On Windows, implements retry logic with exponential backoff to handle
+    transient file locks (e.g., from antivirus or concurrent reads).
+
     Args:
         path: Destination file path
         data: Binary data to write
@@ -878,6 +941,7 @@ def atomic_write(path: Path | str, data: bytes) -> None:
     Raises:
         OSError: If the write fails
         IOError: If the data cannot be written completely
+        PermissionError: If the file cannot be replaced after all retries (Windows)
     """
     path = Path(path)
     parent_dir = path.parent
@@ -904,8 +968,8 @@ def atomic_write(path: Path | str, data: bytes) -> None:
             f.flush()
             os.fsync(f.fileno())
 
-        # Atomic rename (on POSIX; on Windows this may not be truly atomic)
-        temp_path.replace(path)
+        # Atomic rename with Windows retry logic
+        _atomic_replace(temp_path, path)
         logger.debug(f"Atomically wrote {len(data)} bytes to {path}")
 
     except Exception:

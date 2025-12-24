@@ -36,11 +36,11 @@ class ROMInfoLoaderWorker(BaseWorker):
         sprite_locations_loaded: Emitted when sprite locations are loaded
     """
 
-    # Custom signals for ROM info loading
-    rom_info_loaded = Signal(dict)
+    # Custom signals for ROM info loading (use object to avoid PySide6 copy warning)
+    rom_info_loaded = Signal(object)
     """Emitted when ROM info is loaded. Args: info_dict (with 'title', 'rom_type', etc.)."""
 
-    sprite_locations_loaded = Signal(dict)
+    sprite_locations_loaded = Signal(object)
     """Emitted when sprite locations loaded. Args: locations (dict[sprite_name, pointer])."""
 
     def __init__(

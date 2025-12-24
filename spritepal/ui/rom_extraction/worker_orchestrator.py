@@ -36,7 +36,7 @@ class ROMWorkerOrchestrator(QObject):
     """
 
     # ========== Header Loading Signals ==========
-    header_loaded = Signal(dict)  # ROM header data
+    header_loaded = Signal(object)  # ROM header data (use object to avoid PySide6 copy warning)
     header_error = Signal(str)  # Error message
 
     # ========== Sprite Location Signals ==========
@@ -45,13 +45,13 @@ class ROMWorkerOrchestrator(QObject):
 
     # ========== Scan Signals ==========
     scan_progress = Signal(int, int, str)  # current, total, message
-    sprite_found = Signal(dict)  # Found sprite data
+    sprite_found = Signal(object)  # Found sprite data (use object to avoid PySide6 copy warning)
     scan_complete = Signal(list, bool)  # sprites list, from_cache flag
     scan_error = Signal(str)
 
     # ========== Similarity Indexing Signals ==========
     similarity_progress = Signal(str)  # Progress message
-    sprite_indexed = Signal(dict)  # Indexed sprite data
+    sprite_indexed = Signal(object)  # Indexed sprite data (use object to avoid PySide6 copy warning)
     index_saved = Signal(str)  # Save path
     index_loaded = Signal(str)  # Load path
     similarity_finished = Signal()

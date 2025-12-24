@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import contextlib
 import time
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
@@ -79,7 +78,7 @@ def get_main_thread():
 from ui.components.base.cleanup_dialog import CleanupDialog
 from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
-from ui.dialogs.services import ViewStateManager
+from ui.dialogs.services import BookmarkManager, ViewStateManager
 from ui.rom_extraction.workers import SpritePreviewWorker, SpriteSearchWorker
 from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
@@ -136,8 +135,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self.status_collapsible: CollapsibleGroupBox | None = None
         self.apply_btn: QPushButton | None = None
         self.mini_rom_map: ROMMapWidget | None = None
-        self.bookmarks_menu: QMenu | None = None
-        self.bookmarks: list[tuple[int, str]] = []  # (offset, name) pairs
+        self._bookmark_manager: BookmarkManager | None = None
 
         # Business logic state
         self.rom_path: str = ""
@@ -190,6 +188,11 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Initialize view state manager with injected settings_manager
         self.view_state_manager = ViewStateManager(self, self, settings_manager=self.settings_manager)
+
+        # Initialize bookmark manager
+        self._bookmark_manager = BookmarkManager(self, self)
+        self._bookmark_manager.bookmark_selected.connect(self.set_offset)
+        self._bookmark_manager.status_message.connect(self._update_status)
 
         # Note: _setup_ui() is called by DialogBase.__init__() automatically
         self._setup_smart_preview_coordinator()
@@ -326,14 +329,13 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Bookmark management buttons (center)
         bookmark_btn = QPushButton("Add Bookmark")
         bookmark_btn.setToolTip("Save current offset to bookmarks (Ctrl+D)")
-        bookmark_btn.clicked.connect(self._add_bookmark)
+        bookmark_btn.clicked.connect(lambda: self._bookmark_manager.add_bookmark(self.get_current_offset()) if self._bookmark_manager else None)
         self.button_box.addButton(bookmark_btn, self.button_box.ButtonRole.ActionRole)
 
         bookmarks_menu_btn = QPushButton("Bookmarks ▼")
         bookmarks_menu_btn.setToolTip("Show saved bookmarks (Ctrl+B)")
-        self.bookmarks_menu = QMenu(self)
-        self._update_bookmarks_menu()
-        bookmarks_menu_btn.setMenu(self.bookmarks_menu)
+        if self._bookmark_manager:
+            bookmarks_menu_btn.setMenu(self._bookmark_manager.create_menu())
         self.button_box.addButton(bookmarks_menu_btn, self.button_box.ButtonRole.ActionRole)
 
         # Standard dialog buttons (right side)
@@ -704,9 +706,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if self._adjacent_offsets_cache:
             self._adjacent_offsets_cache.clear()
 
-        # Clear bookmarks to prevent reference leaks
-        if self.bookmarks:
-            self.bookmarks.clear()
+        # Clean up bookmark manager
+        if self._bookmark_manager:
+            self._bookmark_manager.cleanup()
+            self._bookmark_manager = None
 
         # Clear preview pixmaps
         if self.preview_widget is not None:
@@ -1330,12 +1333,14 @@ Cache Misses: {session_stats['misses']}"""
                 event.accept()
             elif event.key() == Qt.Key.Key_D and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
                 # Ctrl+D - Add bookmark
-                self._add_bookmark()
+                if self._bookmark_manager:
+                    self._bookmark_manager.add_bookmark(self.get_current_offset())
                 event.accept()
             elif event.key() == Qt.Key.Key_B and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
                 # Ctrl+B - Show bookmarks menu
-                if self.bookmarks_menu is not None:
-                    self.bookmarks_menu.exec(self.mapToGlobal(self.rect().center()))
+                if self._bookmark_manager:
+                    menu = self._bookmark_manager.create_menu()
+                    menu.exec(self.mapToGlobal(self.rect().center()))
                 event.accept()
 
         if event is not None:
@@ -1423,59 +1428,8 @@ Cache Misses: {session_stats['misses']}"""
         if not found:
             self._update_status("No sprites found in search direction")
 
-    def _add_bookmark(self):
-        """Add current offset to bookmarks"""
-        offset = self.get_current_offset()
-
-        # Check if already bookmarked
-        for existing_offset, _ in self.bookmarks:
-            if existing_offset == offset:
-                self._update_status("Offset already bookmarked")
-                return
-
-        # Add bookmark with descriptive name
-        name, ok = QInputDialog.getText(
-            self, "Add Bookmark",
-            f"Name for bookmark at 0x{offset:06X}:",
-            text=f"Sprite at 0x{offset:06X}"
-        )
-
-        if ok and name:
-            self.bookmarks.append((offset, name))
-            self._update_bookmarks_menu()
-            self._update_status(f"Bookmarked: {name}")
-
-    def _update_bookmarks_menu(self):
-        """Update bookmarks menu"""
-        if self.bookmarks_menu is None:
-            return
-
-        if self.bookmarks_menu:
-            self.bookmarks_menu.clear()
-
-        if not self.bookmarks:
-            action = self.bookmarks_menu.addAction("No bookmarks")
-            action.setEnabled(False)
-        else:
-            for offset, name in self.bookmarks:
-                action = self.bookmarks_menu.addAction(f"{name} (0x{offset:06X})")
-                # Use functools.partial to avoid lambda closure
-                action.triggered.connect(partial(self._go_to_bookmark, offset))
-
-            self.bookmarks_menu.addSeparator()
-            clear_action = self.bookmarks_menu.addAction("Clear All Bookmarks")
-            clear_action.triggered.connect(self._clear_bookmarks)
-
-    def _go_to_bookmark(self, offset: int):
-        """Go to a bookmarked offset."""
-        self.set_offset(offset)
-
-    def _clear_bookmarks(self):
-        """Clear all bookmarks"""
-        if self.bookmarks:
-            self.bookmarks.clear()
-        self._update_bookmarks_menu()
-        self._update_status("Bookmarks cleared")
+    # Bookmark methods have been extracted to BookmarkManager
+    # See: ui/dialogs/services/bookmark_manager.py
 
     def _on_similarity_search_requested(self, target_offset: int):
         """Handle similarity search request from preview widget."""

@@ -63,14 +63,14 @@ class CoreOperationsManager(BaseManager):
     extraction_progress = Signal(str)  # message only (simpler for UI consumers)
     extraction_warning = Signal(str)  # Warning message (partial success)
     preview_generated = Signal(object, int)  # pixmap, offset
-    palettes_extracted = Signal(dict)  # palette data
+    palettes_extracted = Signal(object)  # palette data - use object to avoid PySide6 copy warning
     active_palettes_found = Signal(list)  # list of active palette indices
     files_created = Signal(list)  # list of created file paths
 
     # Injection signals
     injection_progress = Signal(str)  # message only
     injection_finished = Signal(bool, str)  # success, message
-    compression_info = Signal(dict)  # compression statistics
+    compression_info = Signal(object)  # compression statistics - use object to avoid PySide6 copy warning
     progress_percent = Signal(int)  # percent only (for progress bars)
 
     # Cache signals (monitoring)
@@ -800,7 +800,47 @@ class CoreOperationsManager(BaseManager):
     def _on_worker_finished(self, success: bool, message: str) -> None:
         """Handle worker completion."""
         self._handle_worker_completion("injection", success, message)
+
+        # Invalidate cache for modified ROM on successful injection
+        if success:
+            self._invalidate_injection_cache()
+
         self.injection_finished.emit(success, message)
+
+    def _invalidate_injection_cache(self) -> None:
+        """Invalidate cache entries for ROM modified by injection.
+
+        Clears cache for the output ROM after successful injection to prevent
+        stale sprite data from being displayed. Only applies to ROM injection,
+        not VRAM injection.
+        """
+        if not self._current_worker:
+            return
+
+        # Get injection params from worker
+        params = getattr(self._current_worker, 'params', None)
+        if not params:
+            return
+
+        # Only ROM injection modifies ROM files
+        if params.get('mode') != 'rom':
+            return
+
+        output_rom = params.get('output_rom')
+        if not output_rom:
+            return
+
+        try:
+            from core.di_container import inject
+            from core.protocols.manager_protocols import ROMCacheProtocol
+
+            rom_cache = inject(ROMCacheProtocol)
+            removed = rom_cache.invalidate_rom_cache(str(output_rom))
+            self._logger.debug(f"Cache invalidation removed {removed} entries for {output_rom}")
+
+        except Exception as e:
+            # Cache invalidation failure should not break injection success
+            self._logger.warning(f"Failed to invalidate cache after injection: {e}")
 
     def _cleanup_current_worker(self) -> None:
         """

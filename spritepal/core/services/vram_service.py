@@ -50,7 +50,7 @@ class VRAMService(QObject):
     extraction_progress = Signal(str)  # Progress message
     extraction_warning = Signal(str)  # Warning message (partial success)
     preview_generated = Signal(object, int)  # PIL Image, tile count
-    palettes_extracted = Signal(dict)  # Palette data
+    palettes_extracted = Signal(object)  # Palette data - use object to avoid PySide6 copy warning
     active_palettes_found = Signal(list)  # Active palette indices
     files_created = Signal(list)  # List of created files
     error_occurred = Signal(str)  # Error message

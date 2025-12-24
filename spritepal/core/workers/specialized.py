@@ -194,7 +194,7 @@ class ExtractionWorkerBase(ManagedWorker):
     # Extraction-specific signals
     preview_ready = Signal(object, int)  # pixmap/image, tile_count
     preview_image_ready = Signal(object)  # PIL image for palette application
-    palettes_ready = Signal(dict)  # palette data
+    palettes_ready = Signal(object)  # palette data - use object to avoid PySide6 copy warning
     active_palettes_ready = Signal(list)  # active palette indices
     extraction_finished = Signal(list)  # list of extracted files
 
@@ -212,7 +212,7 @@ class InjectionWorkerBase(ManagedWorker):
 
     # Injection-specific signals
     progress_percent = Signal(int)  # Progress percentage (0-100)
-    compression_info = Signal(dict)  # Compression statistics
+    compression_info = Signal(object)  # Compression statistics - use object to avoid PySide6 copy warning
     injection_finished = Signal(bool, str)  # success, message
 
     def __init__(self, manager: BaseManager, parent: QObject | None = None) -> None:
@@ -229,8 +229,8 @@ class ScanWorkerBase(BaseWorker):
     """
 
     # Scan-specific signals
-    item_found = Signal(dict)  # Found item information
-    scan_stats = Signal(dict)  # Scan statistics and metadata
+    item_found = Signal(object)  # Found item information - use object to avoid PySide6 copy warning
+    scan_stats = Signal(object)  # Scan statistics and metadata - use object to avoid PySide6 copy warning
     scan_progress = Signal(int, int)  # current, total
     scan_finished = Signal(bool)  # success
 

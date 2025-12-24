@@ -30,8 +30,8 @@ class ROMFileWidget(BaseExtractionWidget):
 
     # Signals
     browse_clicked = Signal()  # Emitted when browse button clicked
-    cache_status_changed = Signal(dict)  # Emitted when cache status changes
-    partial_scan_detected = Signal(dict)  # Emitted when partial scan cache found
+    cache_status_changed = Signal(object)  # Emitted when cache status changes (use object to avoid PySide6 copy warning)
+    partial_scan_detected = Signal(object)  # Emitted when partial scan cache found (use object to avoid PySide6 copy warning)
 
     def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCacheProtocol) -> None:
         super().__init__(parent)

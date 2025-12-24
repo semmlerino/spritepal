@@ -7,7 +7,7 @@ providing a clean interface for opening, closing, and tracking the dialog state.
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QObject, Signal
 
@@ -148,7 +148,7 @@ class OffsetDialogManager(QObject):
 
     # Signals forwarded from dialog
     offset_changed = Signal(int)  # New offset value
-    sprite_found = Signal(dict)  # Sprite data at offset
+    sprite_found = Signal(object)  # Sprite data dict at offset (use object to avoid PySide6 copy warning)
     dialog_closed = Signal()  # Dialog was closed
     dialog_accepted = Signal()  # Dialog was accepted
 
@@ -239,8 +239,12 @@ class OffsetDialogManager(QObject):
         """Handle offset change from dialog."""
         self.offset_changed.emit(offset)
 
-    def _on_sprite_found(self, sprite_data: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
-        """Handle sprite found from dialog."""
+    def _on_sprite_found(self, offset: int, name: str) -> None:
+        """Handle sprite found from dialog.
+
+        Converts (offset, name) from dialog to dict for downstream consumers.
+        """
+        sprite_data: dict[str, object] = {"offset": offset, "name": name}
         self.sprite_found.emit(sprite_data)
 
     def _on_dialog_finished(self, result: int) -> None:

@@ -441,7 +441,7 @@ class RealTestROMExtractionPanel(QObject):
     # Define signals as class attributes
     files_changed = Signal()
     extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
-    rom_extraction_requested = Signal(dict)
+    rom_extraction_requested = Signal(object)  # use object to avoid PySide6 copy warning
     output_name_changed = Signal(str)
 
     def __init__(self, parent=None):
