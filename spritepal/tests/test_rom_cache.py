@@ -11,7 +11,6 @@ from unittest.mock import patch
 import pytest
 
 from core.di_container import inject
-from core.services.rom_cache import ROMCache
 from core.rom_injector import SpritePointer
 from core.services.rom_cache import ROMCache
 

@@ -77,103 +77,6 @@ def _get_real_factory(manager_registry):
     except ImportError as e:
         raise RuntimeError(f"Cannot import RealComponentFactory in headless environment: {e}") from e
 
-class _HeadlessFallbackFactory:
-    """Lightweight fallback factory for headless environments."""
-
-    def create_drag_drop_event(self):
-        """Create a mock drag drop event."""
-        return Mock(spec=["mimeData", "acceptProposedAction", "ignore"])
-
-    def create_extraction_manager(self):
-        """Create a mock extraction manager."""
-        mock = Mock()
-        mock.extract_sprites = Mock(return_value={"sprites": [], "success": True})
-        mock.validate_vram = Mock(return_value=True)
-        return mock
-
-    def create_extraction_worker(self, params=None, worker_type="vram"):
-        """Create a mock extraction worker."""
-        mock = Mock()
-        mock.finished = Mock()
-        mock.progress = Mock()
-        mock.error = Mock()
-        mock.start = Mock()
-        mock.quit = Mock()
-        mock.wait = Mock()
-        return mock
-
-    def create_file_dialogs(self):
-        """Create mock file dialog functions."""
-        import tempfile
-        from pathlib import Path
-
-        return {
-            "getOpenFileName": Mock(return_value=(str(Path(tempfile.gettempdir()) / "test.dmp"), "Memory dump (*.dmp)")),
-            "getSaveFileName": Mock(return_value=(str(Path(tempfile.gettempdir()) / "output.png"), "PNG files (*.png)")),
-            "getExistingDirectory": Mock(return_value=str(Path(tempfile.gettempdir()))),
-        }
-
-    def create_main_window(self, with_managers=True):
-        """Create a mock main window."""
-        mock = Mock()
-        mock.extraction_panel = Mock()
-        mock.extraction_panel.vram_input = Mock()
-        mock.extraction_panel.cgram_input = Mock()
-        mock.show = Mock()
-        mock.hide = Mock()
-        mock.close = Mock()
-        return mock
-
-    def create_qimage(self):
-        """Create a mock QImage."""
-        mock = Mock()
-        mock.width = Mock(return_value=16)
-        mock.height = Mock(return_value=16)
-        mock.format = Mock(return_value=4)  # QImage.Format_RGB32
-        mock.save = Mock(return_value=True)
-        return mock
-
-def _get_factory():
-    """Get the appropriate factory based on environment."""
-    if _is_headless_environment():
-        return _HeadlessFallbackFactory()
-    return _get_real_factory()
-
-# Create backward compatibility functions with lazy loading
-def create_mock_drag_drop_event():
-    """Create a mock drag drop event, using lazy loading for Qt dependencies."""
-    factory = _get_factory()
-    if hasattr(factory, 'create_drag_drop_event'):
-        return factory.create_drag_drop_event()
-    return None
-
-def create_mock_extraction_manager():
-    """Create a mock extraction manager, using lazy loading for Qt dependencies."""
-    factory = _get_factory()
-    return factory.create_extraction_manager()
-
-def create_mock_extraction_worker():
-    """Create a mock extraction worker, using lazy loading for Qt dependencies."""
-    factory = _get_factory()
-    return factory.create_extraction_worker()
-
-def create_mock_file_dialogs():
-    """Create mock file dialogs, using lazy loading for Qt dependencies."""
-    factory = _get_factory()
-    return factory.create_file_dialogs()
-
-def create_mock_main_window():
-    """Create a mock main window, using lazy loading for Qt dependencies."""
-    factory = _get_factory()
-    return factory.create_main_window()
-
-def create_mock_qimage():
-    """Create a mock QImage, using lazy loading for Qt dependencies."""
-    factory = _get_factory()
-    if hasattr(factory, 'create_qimage'):
-        return factory.create_qimage()
-    return None
-
 # Make Qt mocks available at module level for backward compatibility
 def __getattr__(name: str):
     """Provide lazy access to Qt mocks."""
@@ -188,12 +91,6 @@ __all__ = [
     "MockQThread",
     "MockQWidget",
     "MockSignal",
-    "create_mock_drag_drop_event",
-    "create_mock_extraction_manager",
-    "create_mock_extraction_worker",
-    "create_mock_file_dialogs",
-    "create_mock_main_window",
-    "create_mock_qimage",
     # Test data fixtures (from test_data_fixtures.py)
     "ROM_SIZES",
     "test_rom_data_factory",

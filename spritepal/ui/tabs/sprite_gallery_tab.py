@@ -197,15 +197,6 @@ class SpriteGalleryTab(QWidget):
             self.sprites_data = []
             self.gallery_widget.set_sprites([])
 
-            # Auto-scan if enabled and no cache was loaded
-            if self._should_auto_scan():
-                QTimer.singleShot(100, self._scan_for_sprites)
-
-    def _should_auto_scan(self) -> bool:
-        """Check if auto-scan is enabled in settings."""
-        # TODO: Read from settings
-        return False  # Disabled by default for performance
-
     def _scan_for_sprites(self):
         """Scan the ROM for all sprites."""
         if not self.rom_path:
@@ -458,47 +449,12 @@ class SpriteGalleryTab(QWidget):
 
     def _export_selected(self):
         """Export selected sprites as individual PNG files."""
-        selected = self.gallery_widget.get_selected_sprites()
-        if not selected:
-            QMessageBox.information(self, "No Selection", "Please select sprites to export")
-            return
-
-        # Get export directory
-        export_dir = browse_for_directory(
+        # Export functionality is not yet implemented
+        QMessageBox.information(
             self,
-            "Select Export Directory"
+            "Not Implemented",
+            "Sprite export is not yet implemented."
         )
-
-        if not export_dir:
-            return
-
-        # Export each sprite
-        exported = []
-        for sprite_info in selected:
-            try:
-                offset = sprite_info.get('offset', 0)
-                if isinstance(offset, str):
-                    offset = int(offset, 16) if offset.startswith('0x') else int(offset)
-
-                # Generate filename
-                filename = f"sprite_{offset:06X}.png"
-                filepath = Path(export_dir) / filename
-
-                # TODO: Actually export the sprite image
-                # For now, just track it
-                exported.append(str(filepath))
-
-            except Exception as e:
-                logger.error(f"Failed to export sprite: {e}")
-
-        # Show result
-        if exported:
-            QMessageBox.information(
-                self,
-                "Export Complete",
-                f"Exported {len(exported)} sprites to {export_dir}"
-            )
-            self.sprites_exported.emit(exported)
 
     def _open_detached_gallery(self):
         """Open the gallery in a separate window to avoid stretching issues."""

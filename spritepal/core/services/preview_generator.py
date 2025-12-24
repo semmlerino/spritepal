@@ -22,8 +22,6 @@ import struct
 import threading
 import time
 import weakref
-from collections import OrderedDict
-from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -39,6 +37,7 @@ if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
 
 from core.services.image_utils import pil_to_qpixmap
+from core.services.lru_cache import BaseLRUCache
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -104,8 +103,11 @@ class PreviewResult:
         metadata_size = 100  # Approximate overhead for strings/floats
         return pixmap_size + pil_size + metadata_size  # Whether this result came from cache
 
-class LRUCache:
-    """Thread-safe LRU cache for preview results with size-based eviction."""
+class PreviewCache(BaseLRUCache[PreviewResult]):
+    """LRU cache specialized for preview results.
+
+    Extends BaseLRUCache to mark cached results with cached=True flag.
+    """
 
     # Default limits based on typical usage
     DEFAULT_MAX_ITEMS = 50
@@ -116,134 +118,25 @@ class LRUCache:
         max_size: int = DEFAULT_MAX_ITEMS,
         max_bytes: int = DEFAULT_MAX_BYTES,
     ):
-        """Initialize LRU cache with dual eviction policy.
-
-        Args:
-            max_size: Maximum number of cached items (default 50)
-            max_bytes: Maximum cache size in bytes (default 32MB)
-        """
-        self.max_size = max_size
-        self.max_bytes = max_bytes
-        self._cache: OrderedDict[str, PreviewResult] = OrderedDict()
-        self._lock = threading.RLock()
-        self._current_bytes = 0
-        self._stats: dict[str, int] = {
-            "hits": 0,
-            "misses": 0,
-            "evictions": 0,
-            "evictions_count_limit": 0,
-            "evictions_byte_limit": 0,
-        }
-        self._last_stats_log = 0.0
-        self._stats_log_interval = 60.0  # Log stats every 60 seconds
-
-    def _maybe_log_stats(self) -> None:
-        """Log cache statistics periodically instead of on every operation."""
-        import time
-
-        current_time = time.time()
-
-        if current_time - self._last_stats_log >= self._stats_log_interval:
-            self._last_stats_log = current_time
-            stats = self.get_stats()
-            logger.debug(
-                f"Preview cache stats: {stats['cache_size']}/{stats['max_size']} items, "
-                f"{stats['current_mb']:.1f}/{stats['max_mb']:.1f} MB, "
-                f"hit_rate={stats['hit_rate']:.1%}, evictions={stats['evictions']}"
-            )
+        """Initialize preview cache with dual eviction policy."""
+        super().__init__(
+            max_size=max_size,
+            max_bytes=max_bytes,
+            size_fn=lambda r: r.byte_size(),
+            name="preview_cache",
+        )
 
     def get(self, key: str) -> PreviewResult | None:
-        """Get item from cache.
+        """Get item from cache, marking it as cached."""
+        result = super().get(key)
+        if result is not None:
+            result.cached = True
+        return result
 
-        Thread Safety:
-            - Uses reentrant lock (RLock) for thread safety
-            - Safe to call from multiple threads concurrently
 
-        Args:
-            key: Cache key
+# Backward compatibility alias
+LRUCache = PreviewCache
 
-        Returns:
-            Cached result or None if not found
-        """
-        with self._lock:
-            if key in self._cache:
-                # Move to end (most recently used)
-                result = self._cache.pop(key)
-                self._cache[key] = result
-                self._stats["hits"] += 1
-
-                # Mark as cached result
-                result.cached = True
-                return result
-
-            self._stats["misses"] += 1
-            return None
-
-    def put(self, key: str, result: PreviewResult) -> None:
-        """Put item in cache with size-aware eviction.
-
-        Thread Safety:
-            - Uses reentrant lock (RLock) for thread safety
-            - Atomic cache updates with eviction handling
-
-        Args:
-            key: Cache key
-            result: Preview result to cache
-        """
-        item_size = result.byte_size()
-
-        with self._lock:
-            # Remove if already exists (update scenario)
-            if key in self._cache:
-                old_result = self._cache.pop(key)
-                self._current_bytes -= old_result.byte_size()
-
-            # Evict oldest items until within byte limit
-            while self._current_bytes + item_size > self.max_bytes and self._cache:
-                oldest_key = next(iter(self._cache))
-                evicted = self._cache.pop(oldest_key)
-                self._current_bytes -= evicted.byte_size()
-                self._stats["evictions"] += 1
-                self._stats["evictions_byte_limit"] += 1
-
-            # Evict oldest if over item count limit
-            while len(self._cache) >= self.max_size and self._cache:
-                oldest_key = next(iter(self._cache))
-                evicted = self._cache.pop(oldest_key)
-                self._current_bytes -= evicted.byte_size()
-                self._stats["evictions"] += 1
-                self._stats["evictions_count_limit"] += 1
-
-            # Add to end (most recently used)
-            self._cache[key] = result
-            self._current_bytes += item_size
-
-            # Periodic stats logging
-            self._maybe_log_stats()
-
-    def clear(self) -> None:
-        """Clear all cached items."""
-        with self._lock:
-            self._cache.clear()
-            self._current_bytes = 0
-            logger.debug("Preview cache cleared")
-
-    def get_stats(self) -> dict[str, object]:
-        """Get cache statistics including memory usage."""
-        with self._lock:
-            total_requests = self._stats["hits"] + self._stats["misses"]
-            hit_rate = self._stats["hits"] / total_requests if total_requests > 0 else 0.0
-
-            return {
-                **self._stats,
-                "cache_size": len(self._cache),
-                "max_size": self.max_size,
-                "current_bytes": self._current_bytes,
-                "max_bytes": self.max_bytes,
-                "current_mb": self._current_bytes / (1024 * 1024),
-                "max_mb": self.max_bytes / (1024 * 1024),
-                "hit_rate": hit_rate,
-            }
 
 class PreviewGenerator(QObject):
     """Consolidated preview generation service with caching and thread safety.
@@ -269,8 +162,8 @@ class PreviewGenerator(QObject):
 
     def __init__(
         self,
-        cache_size: int = LRUCache.DEFAULT_MAX_ITEMS,
-        cache_max_bytes: int = LRUCache.DEFAULT_MAX_BYTES,
+        cache_size: int = PreviewCache.DEFAULT_MAX_ITEMS,
+        cache_max_bytes: int = PreviewCache.DEFAULT_MAX_BYTES,
         debounce_delay_ms: int = 50,
         parent: QObject | None = None,
     ):
@@ -285,7 +178,7 @@ class PreviewGenerator(QObject):
         super().__init__(parent)
 
         # Cache management with dual limits
-        self._cache = LRUCache(cache_size, cache_max_bytes)
+        self._cache = PreviewCache(cache_size, cache_max_bytes)
 
         # Debouncing
         self._debounce_delay_ms = debounce_delay_ms

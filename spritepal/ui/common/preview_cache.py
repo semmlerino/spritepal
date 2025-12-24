@@ -10,47 +10,52 @@ This module provides a memory-efficient cache for preview data:
 from __future__ import annotations
 
 import hashlib
-import threading
-from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
+from core.services.lru_cache import BaseLRUCache
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-class PreviewCache:
-    """
-    LRU cache for sprite preview data.
+# Type alias for preview data tuple: (tile_data, width, height, sprite_name)
+PreviewData = tuple[bytes, int, int, str | None]
+
+
+def _calculate_preview_size(data: PreviewData) -> int:
+    """Calculate byte size of preview data tuple."""
+    tile_data, _width, _height, sprite_name = data
+    name_len = len(sprite_name) if sprite_name else 0
+    return len(tile_data) + name_len + 16  # Rough size estimate
+
+
+class SpritePreviewCache(BaseLRUCache[PreviewData]):
+    """LRU cache for sprite preview data.
 
     Features:
-    - Thread-safe operations
+    - Thread-safe operations (inherited from BaseLRUCache)
     - Size-based eviction (both count and memory)
     - Efficient key generation
     - Memory usage tracking
     """
 
     def __init__(self, max_size: int = 20, max_memory_mb: float = 2.0):
-        """
-        Initialize preview cache.
+        """Initialize preview cache.
 
         Args:
             max_size: Maximum number of entries to cache
             max_memory_mb: Maximum memory usage in MB
         """
-        self._max_size = max_size
-        self._max_memory_bytes = int(max_memory_mb * 1024 * 1024)
+        super().__init__(
+            max_size=max_size,
+            max_bytes=int(max_memory_mb * 1024 * 1024),
+            size_fn=_calculate_preview_size,
+            name="sprite_preview_cache",
+        )
 
-        # Thread-safe collections
-        self._cache = OrderedDict()
-        self._memory_usage = 0
-        self._lock = threading.RLock()
-
-        logger.debug(f"PreviewCache initialized: max_size={max_size}, max_memory={max_memory_mb}MB")
-
-    def make_key(self, rom_path: str, offset: int, sprite_config_hash: str | None = None) -> str:
-        """
-        Generate cache key for preview data.
+    @staticmethod
+    def make_key(rom_path: str, offset: int, sprite_config_hash: str | None = None) -> str:
+        """Generate cache key for preview data.
 
         Args:
             rom_path: Path to ROM file
@@ -83,147 +88,35 @@ class PreviewCache:
         key_string = "|".join(key_parts)
         return hashlib.md5(key_string.encode()).hexdigest()[:16]
 
-    def get(self, key: str) -> tuple[bytes, int, int, str | None]:
-        """
-        Get cached preview data.
+    def get(self, key: str) -> PreviewData:
+        """Get cached preview data.
 
         Args:
             key: Cache key
 
         Returns:
-            Optional tuple of (tile_data, width, height, sprite_name) or None
+            Tuple of (tile_data, width, height, sprite_name) or empty tuple if not found
         """
-        with self._lock:
-            if key not in self._cache:
-                return (b"", 0, 0, None)
-
-            # Move to end (mark as recently used)
-            entry = self._cache.pop(key)
-            self._cache[key] = entry
-
-            logger.debug(f"Cache hit for key {key}")
-            return entry["data"]
-
-    def put(self, key: str, data: tuple[bytes, int, int, str]) -> None:
-        """
-        Store preview data in cache.
-
-        Args:
-            key: Cache key
-            data: Tuple of (tile_data, width, height, sprite_name)
-        """
-        tile_data, _width, _height, sprite_name = data
-        # Handle None sprite_name to avoid TypeError on len()
-        name_len = len(sprite_name) if sprite_name else 0
-        data_size = len(tile_data) + name_len + 16  # Rough size estimate
-
-        with self._lock:
-            # Remove existing entry if present
-            if key in self._cache:
-                old_entry = self._cache.pop(key)
-                self._memory_usage -= old_entry["size"]
-
-            # Create new entry
-            entry = {
-                "data": data,
-                "size": data_size
-            }
-
-            # Add new entry
-            self._cache[key] = entry
-            self._memory_usage += data_size
-
-            # Evict if necessary
-            self._evict_if_needed()
-
-            logger.debug(f"Cached preview for key {key} (size: {data_size} bytes)")
-
-    def _evict_if_needed(self) -> None:
-        """Evict entries if cache limits are exceeded."""
-        evicted_count = 0
-
-        # Evict by count limit
-        while len(self._cache) > self._max_size:
-            self._evict_oldest()
-            evicted_count += 1
-
-        # Evict by memory limit
-        while self._memory_usage > self._max_memory_bytes and self._cache:
-            self._evict_oldest()
-            evicted_count += 1
-
-        if evicted_count > 0:
-            logger.debug(f"Evicted {evicted_count} cache entries")
-
-    def _evict_oldest(self) -> None:
-        """Evict the oldest (least recently used) entry."""
-        if not self._cache:
-            return
-
-        # Remove oldest entry (first in OrderedDict)
-        key, entry = self._cache.popitem(last=False)
-        self._memory_usage -= entry["size"]
-
-        logger.debug(f"Evicted cache entry {key}")
-
-    def clear(self) -> None:
-        """Clear all cached entries."""
-        with self._lock:
-            entry_count = len(self._cache)
-            if self._cache:
-                self._cache.clear()
-            self._memory_usage = 0
-
-            if entry_count > 0:
-                logger.debug(f"Cleared {entry_count} cache entries")
+        result = super().get(key)
+        if result is None:
+            return (b"", 0, 0, None)
+        return result
 
     def get_stats(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Cache statistics dict
-        """
-        Get cache statistics.
+        """Get cache statistics with backward-compatible keys."""
+        base_stats = super().get_stats()
+        # Add backward-compatible keys
+        return {
+            **base_stats,
+            "entry_count": base_stats["cache_size"],
+            "memory_usage_bytes": base_stats["current_bytes"],
+            "memory_usage_mb": base_stats["current_mb"],
+            "memory_utilization": (
+                base_stats["current_bytes"] / base_stats["max_bytes"]
+                if base_stats["max_bytes"] > 0 else 0
+            ),
+        }
 
-        Returns:
-            dict: Cache statistics
-        """
-        with self._lock:
-            return {
-                "entry_count": len(self._cache),
-                "max_size": self._max_size,
-                "memory_usage_bytes": self._memory_usage,
-                "max_memory_bytes": self._max_memory_bytes,
-                "memory_usage_mb": self._memory_usage / (1024 * 1024),
-                "max_memory_mb": self._max_memory_bytes / (1024 * 1024),
-                "memory_utilization": self._memory_usage / self._max_memory_bytes if self._max_memory_bytes > 0 else 0
-            }
 
-    def contains(self, key: str) -> bool:
-        """
-        Check if key exists in cache.
-
-        Args:
-            key: Cache key
-
-        Returns:
-            bool: True if key exists in cache
-        """
-        with self._lock:
-            return key in self._cache
-
-    def remove(self, key: str) -> bool:
-        """
-        Remove specific entry from cache.
-
-        Args:
-            key: Cache key to remove
-
-        Returns:
-            bool: True if entry was removed, False if not found
-        """
-        with self._lock:
-            if key not in self._cache:
-                return False
-
-            entry = self._cache.pop(key)
-            self._memory_usage -= entry["size"]
-
-            logger.debug(f"Removed cache entry {key}")
-            return True
+# Backward compatibility alias
+PreviewCache = SpritePreviewCache

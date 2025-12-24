@@ -323,31 +323,12 @@ class SimilarityIndexingWorker(BaseWorker):
         """
         Extract sprite image for indexing.
 
-        Args:
-            offset: ROM offset of the sprite
-            extraction_manager: Manager to handle sprite extraction
-
-        Returns:
-            PIL Image of the sprite, or None if extraction failed
+        NOTE: Similarity indexing is not yet implemented. This method returns None
+        for all sprites until extract_sprite_at_offset is added to CoreOperationsManager.
         """
-        try:
-            # Use extraction manager to get sprite data
-            # TODO: Implement extract_sprite_at_offset method on ExtractionManager
-            sprite_data = extraction_manager.extract_sprite_at_offset(  # type: ignore[attr-defined]
-                rom_path=self.rom_path,
-                offset=offset,
-                output_format="RGBA"  # Get as PIL Image
-            )
-
-            if sprite_data and hasattr(sprite_data, "image"):
-                return sprite_data.image
-
-            logger.warning(f"No image data returned for sprite at 0x{offset:X}")
-            return None
-
-        except Exception as e:
-            logger.exception(f"Failed to extract sprite image at 0x{offset:X}: {e}")
-            return None
+        # Sprite image extraction for similarity indexing is not implemented
+        # This prevents the worker from crashing while the feature remains incomplete
+        return None
 
     def get_similarity_engine(self) -> VisualSimilarityEngine:
         """Get the similarity engine for external use."""
