@@ -1,18 +1,14 @@
 """
 Smart Preview Coordinator for real-time preview updates with memory caching.
 
-This module provides smooth 60 FPS preview updates by implementing a multi-tier
-strategy:
-- Tier 1: Immediate visual feedback (0-16ms) for UI elements
-- Tier 2: Fast cached previews (50ms debounce) during dragging
-- Tier 3: High-quality preview generation (200ms debounce) after release
-
-Memory Caching:
-- Fast LRU cache (~2MB) for instant access during session
+This module provides smooth 60 FPS preview updates with:
+- Immediate UI feedback during dragging (16ms updates)
+- Cached preview display with 50ms debounce during drag
+- High-quality preview generation with 200ms debounce after release
 
 Key features:
-- Worker thread reuse to prevent excessive thread creation
-- Memory LRU caching for session performance
+- Worker thread reuse via preview worker pool (2 workers)
+- Fast LRU memory cache (~2MB) for instant access
 - Different timing strategies for drag vs release states
 - Proper Qt signal handling with sliderPressed/sliderReleased
 """
@@ -37,6 +33,23 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
+def _validate_tile_data(tile_data: bytes | None, sample_size: int = 100) -> bool:
+    """Check if tile data is valid (non-empty and has non-zero bytes).
+
+    Args:
+        tile_data: The tile data bytes to validate
+        sample_size: Number of bytes to sample for non-zero check
+
+    Returns:
+        True if data is valid (has non-zero content), False otherwise
+    """
+    if not tile_data or len(tile_data) == 0:
+        return False
+    check_size = min(sample_size, len(tile_data))
+    return any(b != 0 for b in tile_data[:check_size])
+
+
 class DragState(Enum):
     """Slider drag state for different preview strategies."""
     IDLE = auto()         # Not dragging, normal operations
@@ -44,44 +57,38 @@ class DragState(Enum):
     SETTLING = auto()     # Just released, waiting for final update
 
 class PreviewRequest:
-    """Represents a preview request with priority and cancellation support."""
+    """Represents a preview request with cancellation support."""
 
-    def __init__(self, request_id: int, offset: int, rom_path: str,
-                 priority: int = 0, callback: Callable[..., object] | None = None):
+    def __init__(
+        self,
+        request_id: int,
+        offset: int,
+        rom_path: str,
+        callback: Callable[..., object] | None = None,
+    ):
         self.request_id = request_id
         self.offset = offset
         self.rom_path = rom_path
-        self.priority = priority  # Higher = more important
         self.callback = callback
         self.cancelled = False
 
-    def cancel(self):
+    def cancel(self) -> None:
         """Mark this request as cancelled."""
         self.cancelled = True
-
-    def __lt__(self, other: object) -> bool:
-        """Support priority queue ordering."""
-        if not isinstance(other, PreviewRequest):
-            return NotImplemented
-        return self.priority > other.priority  # Higher priority first
 
 class SmartPreviewCoordinator(QObject):
     """
     Coordinates real-time preview updates with intelligent timing and memory caching.
 
-    This coordinator implements a multi-tier approach:
-    1. Immediate UI updates (labels, indicators) during dragging
-    2. Cached preview display with 50ms debounce during drag
-    3. High-quality preview generation with 200ms debounce after release
-
-    Caching Strategy:
-    - Fast LRU memory cache (~2MB) for instant access
+    Timing Strategy:
+    - Immediate UI updates (16ms) during dragging for smooth feedback
+    - Cached preview display with 50ms debounce during drag
+    - High-quality preview generation with 200ms debounce after release
 
     Features:
-    - Worker thread reuse via preview worker pool
-    - Memory LRU caching for session performance
+    - Worker thread reuse via preview worker pool (2 workers)
+    - Fast LRU memory cache (~2MB) for instant access
     - Request cancellation to prevent stale updates
-    - Adaptive timing based on drag state
     """
 
     # Signals for preview updates
@@ -170,15 +177,14 @@ class SmartPreviewCoordinator(QObject):
         """
         self._rom_data_provider = provider
 
-    def request_preview(self, offset: int, priority: int = 0) -> None:
+    def request_preview(self, offset: int) -> None:
         """
         Request preview update with intelligent timing and memory caching.
 
         Args:
             offset: ROM offset for preview
-            priority: Request priority (higher = more important)
         """
-        logger.debug(f"Coordinator.request_preview: offset=0x{offset:06X}, priority={priority}")
+        logger.debug(f"Coordinator.request_preview: offset=0x{offset:06X}")
 
         with QMutexLocker(self._mutex):
             self._current_offset = offset
@@ -208,9 +214,8 @@ class SmartPreviewCoordinator(QObject):
         """
         logger.debug(f"[DEBUG] request_manual_preview called for offset 0x{offset:06X}")
 
-        # Just use high priority request for immediate response
-        # Avoid complex cache checking that could block
-        self.request_preview(offset, priority=10)
+        # Request preview for immediate response
+        self.request_preview(offset)
 
     def _on_drag_start(self) -> None:
         """Handle start of slider dragging."""
@@ -227,9 +232,9 @@ class SmartPreviewCoordinator(QObject):
     def _on_drag_move(self, value: int) -> None:
         """Handle slider movement during dragging."""
         logger.debug(f"[DEBUG] _on_drag_move: value=0x{value:06X}")
-        # Simple and fast - just request preview with drag priority
+        # Simple and fast - just request preview
         # Don't do heavy cache checking during rapid drag movements
-        self.request_preview(value, priority=1)
+        self.request_preview(value)
 
     def _on_drag_end(self) -> None:
         """Handle end of slider dragging."""
@@ -275,15 +280,15 @@ class SmartPreviewCoordinator(QObject):
         if self._try_show_cached_preview():
             return
 
-        # Request preview with medium priority
-        self._request_worker_preview(priority=5)
+        # Request preview from worker pool
+        self._request_worker_preview()
 
     def _handle_release_preview(self) -> None:
         """Handle high-quality preview update after release."""
         logger.debug("Processing release preview request")
 
-        # Request high-quality preview
-        self._request_worker_preview(priority=10)
+        # Request high-quality preview from worker pool
+        self._request_worker_preview()
 
     def _try_show_cached_preview(self) -> bool:
         """
@@ -310,31 +315,22 @@ class SmartPreviewCoordinator(QObject):
             if cached_data:
                 tile_data, width, height, sprite_name = cached_data
 
-                # Validate cached data before using it
-                if tile_data and len(tile_data) > 0:
-                    # Check if data is not all zeros (black)
-                    sample_size = min(100, len(tile_data))
-                    non_zero_count = sum(1 for b in tile_data[:sample_size] if b != 0)
+                if _validate_tile_data(tile_data):
+                    logger.debug(f"Cache hit for 0x{offset:06X}: {len(tile_data)} bytes")
+                    self.preview_cached.emit(tile_data, width, height, sprite_name)
+                    return True
 
-                    if non_zero_count > 0:  # Has some non-zero data
-                        logger.debug(f"Cache hit for 0x{offset:06X}: {len(tile_data)} bytes")
-                        self.preview_cached.emit(tile_data, width, height, sprite_name)
-                        return True
-
-                    # Remove invalid entry from cache
-                    self._cache.remove(cache_key)
-                else:
-                    # Remove invalid entry from cache
-                    self._cache.remove(cache_key)
+                # Remove invalid entry from cache
+                self._cache.remove(cache_key)
 
         except Exception as e:
             logger.warning(f"Error checking cached preview: {e}")
 
         return False
 
-    def _request_worker_preview(self, priority: int) -> None:
+    def _request_worker_preview(self) -> None:
         """Request preview from worker pool."""
-        logger.debug(f"_request_worker_preview called with priority={priority}")
+        logger.debug("_request_worker_preview called")
         if not self._rom_data_provider:
             return
 
@@ -360,7 +356,6 @@ class SmartPreviewCoordinator(QObject):
                 request_id=request_id,
                 offset=offset,
                 rom_path=rom_path,
-                priority=priority
             )
 
             # Submit to worker pool
@@ -379,24 +374,22 @@ class SmartPreviewCoordinator(QObject):
                 return
 
         # Cache the result if data is valid
-        if self._rom_data_provider and tile_data and len(tile_data) > 0:
-            # Validate data before caching to prevent caching black/empty sprites
-            non_zero_count = sum(1 for b in tile_data[:min(100, len(tile_data))] if b != 0)
+        if self._rom_data_provider and _validate_tile_data(tile_data):
+            try:
+                provider_result = self._rom_data_provider()
+                if provider_result is None:
+                    # Emit result even if caching fails
+                    self.preview_ready.emit(tile_data, width, height, sprite_name)
+                    return
+                rom_path, _ = provider_result
+                preview_data = (tile_data, width, height, sprite_name)
 
-            if non_zero_count > 0:  # Has some non-zero data - valid to cache
-                try:
-                    provider_result = self._rom_data_provider()
-                    if provider_result is None:
-                        return  # Don't cache if provider fails
-                    rom_path, _ = provider_result
-                    preview_data = (tile_data, width, height, sprite_name)
-
-                    # Save to memory cache
-                    cache_key = self._cache.make_key(rom_path, self._current_offset)
-                    self._cache.put(cache_key, preview_data)
-                    logger.debug(f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes")
-                except Exception as e:
-                    logger.warning(f"Error caching preview: {e}")
+                # Save to memory cache
+                cache_key = self._cache.make_key(rom_path, self._current_offset)
+                self._cache.put(cache_key, preview_data)
+                logger.debug(f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes")
+            except Exception as e:
+                logger.warning(f"Error caching preview: {e}")
 
         self.preview_ready.emit(tile_data, width, height, sprite_name)
 

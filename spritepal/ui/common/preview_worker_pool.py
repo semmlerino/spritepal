@@ -338,11 +338,6 @@ class PreviewWorkerPool(QObject):
         # Pool management
         self._worker_count = 0
         self._last_activity = time.time()
-        self._zombie_workers: set[PooledPreviewWorker] = set()
-
-        # Request throttling to prevent overwhelming the pool
-        self._last_request_time = 0.0
-        self._min_request_interval = 0.01  # 10ms minimum between requests
 
         # Cleanup timer
         self._cleanup_timer = QTimer(self)
@@ -362,16 +357,7 @@ class PreviewWorkerPool(QObject):
         if self._shutdown_requested.is_set():
             return
 
-        # Throttle rapid requests to prevent overwhelming the pool
         current_time = time.time()
-        time_since_last = current_time - self._last_request_time
-        if time_since_last < self._min_request_interval:
-            # Too fast, queue for later processing instead
-            self._request_queue.put((current_time, request, extractor))
-            QTimer.singleShot(int(self._min_request_interval * 1000), self._process_queued_requests)
-            return
-
-        self._last_request_time = current_time
 
         with QMutexLocker(self._mutex):
             # Cancel any active workers (new request takes priority)
@@ -416,34 +402,19 @@ class PreviewWorkerPool(QObject):
         try:
             worker = self._available_workers.get_nowait()
             logger.debug("Reusing existing worker")
+            return worker
         except queue.Empty:
             pass
-        else:
-            return worker
 
-        # Create new worker if under limit (accounting for zombies)
-        effective_count = self._worker_count - len(self._zombie_workers)
-        if effective_count < self._max_workers:
+        # Create new worker if under limit
+        if self._worker_count < self._max_workers:
             worker = PooledPreviewWorker(weakref.ref(self))
             WorkerManager._register_worker(worker)  # Register with centralized tracker
             self._worker_count += 1
-            logger.debug(f"Created new worker (count: {self._worker_count}, zombies: {len(self._zombie_workers)})")
+            logger.debug(f"Created new worker (count: {self._worker_count})")
             return worker
 
-        # Check if we have too many zombies and need to clean them
-        if len(self._zombie_workers) > 2:
-            logger.warning(f"Too many zombie workers ({len(self._zombie_workers)}), attempting cleanup")
-            self._cleanup_zombie_workers()
-            # Try again after cleanup
-            effective_count = self._worker_count - len(self._zombie_workers)
-            if effective_count < self._max_workers:
-                worker = PooledPreviewWorker(weakref.ref(self))
-                WorkerManager._register_worker(worker)  # Register with centralized tracker
-                self._worker_count += 1
-                logger.debug("Created new worker after zombie cleanup")
-                return worker
-
-        logger.debug(f"Worker pool at capacity (workers: {self._worker_count}, zombies: {len(self._zombie_workers)})")
+        logger.debug(f"Worker pool at capacity (workers: {self._worker_count})")
         return None
 
     def _return_worker(self, worker: PooledPreviewWorker) -> None:
@@ -559,18 +530,6 @@ class PreviewWorkerPool(QObject):
                 if workers_to_cleanup:
                     logger.debug(f"Cleaned up {len(workers_to_cleanup)} idle workers")
 
-    def _cleanup_zombie_workers(self) -> None:
-        """Clean up zombie workers that are no longer responsive."""
-        cleaned = 0
-        for zombie in list(self._zombie_workers):
-            if not zombie.isRunning():
-                # Zombie has finally stopped
-                self._zombie_workers.discard(zombie)
-                zombie.deleteLater()
-                cleaned += 1
-
-        if cleaned > 0:
-            logger.info(f"Cleaned up {cleaned} zombie workers")
 
     def _cleanup_worker(self, worker: PooledPreviewWorker) -> None:
         """Clean up a single worker safely using WorkerManager.
@@ -605,10 +564,10 @@ class PreviewWorkerPool(QObject):
             # This handles: requestInterruption, quit, wait, deleteLater
             WorkerManager.cleanup_worker(worker, timeout=1500)
 
-            # If worker is unresponsive, mark as zombie (WorkerManager won't terminate)
+            # If worker is still running after cleanup, force cleanup
             if worker.isRunning():
-                logger.warning("Worker still running after cleanup, marking as zombie")
-                self._zombie_workers.add(worker)
+                logger.warning("Worker still running after cleanup, forcing deleteLater")
+                worker.deleteLater()
                 # Decrement worker count so we can create a replacement
                 if self._worker_count > 0:
                     self._worker_count -= 1
