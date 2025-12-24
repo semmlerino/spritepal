@@ -57,12 +57,6 @@ def _ensure_dependency_maps() -> None:
     if _DEPENDENCY_MAPS_INITIALIZED:
         return
 
-    # Import protocols here to avoid circular imports at module load time
-    from core.protocols.manager_protocols import (
-        ExtractionManagerProtocol,
-        InjectionManagerProtocol,
-    )
-
     from .application_state_manager import ApplicationStateManager
     from .core_operations_manager import CoreOperationsManager
 
@@ -71,9 +65,10 @@ def _ensure_dependency_maps() -> None:
         CoreOperationsManager: [ApplicationStateManager],  # Needs state manager via DI chain
     })
 
+    # Maps manager class to the DI registration types it provides
     MANAGER_TO_PROTOCOLS.update({
-        ApplicationStateManager: [ApplicationStateManager],  # Now uses concrete type
-        CoreOperationsManager: [ExtractionManagerProtocol, InjectionManagerProtocol],
+        ApplicationStateManager: [ApplicationStateManager],
+        CoreOperationsManager: [CoreOperationsManager],  # Now uses concrete type directly
     })
 
     _DEPENDENCY_MAPS_INITIALIZED = True
@@ -272,10 +267,6 @@ class ManagerRegistry:
                 # Register ApplicationStateManager immediately - other managers depend on it via DI
                 # (e.g., ROMCache → SettingsManager → ApplicationStateManager)
                 from core.di_container import register_singleton
-                from core.protocols.manager_protocols import (
-                    ExtractionManagerProtocol,
-                    InjectionManagerProtocol,
-                )
                 register_singleton(ApplicationStateManager, state_manager)
                 self._lifecycle_order.append(ApplicationStateManager)
                 self._logger.debug("ApplicationStateManager registered")
@@ -298,12 +289,10 @@ class ManagerRegistry:
                 self._logger.debug("CoreOperationsManager created successfully")
 
                 # Register CoreOperationsManager with DI container
-                # Registered under both ExtractionManagerProtocol and InjectionManagerProtocol
                 from core.di_container import register_managers
                 register_managers(core_operations_manager=core_manager)
-                self._lifecycle_order.append(ExtractionManagerProtocol)
-                self._lifecycle_order.append(InjectionManagerProtocol)
-                self._logger.debug("All manager protocols registered with DI container")
+                self._lifecycle_order.append(CoreOperationsManager)
+                self._logger.debug("CoreOperationsManager registered with DI container")
 
                 # Mark as initialized
                 self._managers_initialized = True
@@ -372,8 +361,7 @@ class ManagerRegistry:
         Raises:
             ManagerError: If manager not initialized
         """
-        from core.protocols.manager_protocols import ExtractionManagerProtocol
-        return self._get_manager_by_protocol(ExtractionManagerProtocol, CoreOperationsManager)
+        return self._get_manager_by_protocol(CoreOperationsManager, CoreOperationsManager)
 
     def get_application_state_manager(self):
         """

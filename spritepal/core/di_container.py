@@ -283,31 +283,14 @@ def register_managers(
     Register CoreOperationsManager with the DI container.
 
     CoreOperationsManager is the consolidated manager that handles both
-    extraction and injection operations. It is registered under both
-    ExtractionManagerProtocol and InjectionManagerProtocol for backward
-    compatibility with code that injects these protocols.
-
-    NOTE: SessionManagerProtocol and ApplicationStateManager are registered
-    earlier in initialize_managers() because other services depend on them during
-    CoreOperationsManager initialization.
-
-    INITIALIZATION ORDER:
-    1. configure_container() - registers services and factories
-    2. ApplicationStateManager created, SessionManagerProtocol registered
-    3. CoreOperationsManager created (depends on SessionManager via DI chain)
-    4. register_managers() - registers CoreOperationsManager (THIS FUNCTION)
+    extraction and injection operations.
 
     Args:
-        core_operations_manager: CoreOperationsManager instance that handles
-            both extraction and injection operations
+        core_operations_manager: CoreOperationsManager instance
     """
-    from core.protocols.manager_protocols import (
-        ExtractionManagerProtocol,
-        InjectionManagerProtocol,
-    )
+    from core.managers.core_operations_manager import CoreOperationsManager
 
-    # Register same instance under both protocols for backward compatibility
-    register_singleton(ExtractionManagerProtocol, core_operations_manager)
-    register_singleton(InjectionManagerProtocol, core_operations_manager)
+    # Register under concrete type - this is the preferred injection target
+    register_singleton(CoreOperationsManager, core_operations_manager)
 
-    logger.info("CoreOperationsManager registered with DI container (extraction + injection)")
+    logger.info("CoreOperationsManager registered with DI container")

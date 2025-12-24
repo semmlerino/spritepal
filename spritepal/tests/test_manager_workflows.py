@@ -12,20 +12,17 @@ import pytest
 from core.di_container import inject
 from core.exceptions import ValidationError
 from core.managers.application_state_manager import ApplicationStateManager
-from core.protocols.manager_protocols import (
-    ExtractionManagerProtocol,
-    InjectionManagerProtocol,
-)
+from core.managers.core_operations_manager import CoreOperationsManager
 
 
 def get_extraction_manager():
     """Get extraction manager via DI."""
-    return inject(ExtractionManagerProtocol)
+    return inject(CoreOperationsManager)
 
 
 def get_injection_manager():
     """Get injection manager via DI."""
-    return inject(InjectionManagerProtocol)
+    return inject(CoreOperationsManager)
 
 
 def get_session_manager():

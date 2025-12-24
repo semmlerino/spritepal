@@ -29,11 +29,12 @@ from ui.common.file_dialogs import browse_for_open_file
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
+    from core.managers.core_operations_manager import CoreOperationsManager
+    from core.protocols.manager_protocols import ROMExtractorProtocol
     from core.rom_validator import ROMHeader
     from core.types import SpritePreset
 
-# ExtractionManager accessed via DI: inject(ExtractionManagerProtocol)
+# ExtractionManager accessed via DI: inject(CoreOperationsManager)
 from core.managers.workflow_manager import ExtractionState
 
 # Import extracted components
@@ -83,7 +84,7 @@ class ROMExtractionPanel(QWidget):
         self,
         parent: QWidget | None = None,
         *,
-        extraction_manager: ExtractionManagerProtocol,
+        extraction_manager: CoreOperationsManager,
     ) -> None:
         super().__init__(parent)
 

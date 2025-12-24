@@ -51,8 +51,8 @@ def injection_manager_real(isolated_managers):
     Uses CoreOperationsManager which implements InjectionManagerProtocol.
     """
     from core.di_container import inject
-    from core.protocols.manager_protocols import InjectionManagerProtocol
-    return inject(InjectionManagerProtocol)
+    from core.managers.core_operations_manager import CoreOperationsManager
+    return inject(CoreOperationsManager)
 
 @pytest.fixture
 def temp_files_with_real_content(tmp_path):
@@ -188,8 +188,8 @@ class TestInjectionManagerParameterValidation:
         REFACTOR: No mocking - tests real validation logic
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import InjectionManagerProtocol
-        manager = inject(InjectionManagerProtocol)
+        from core.managers.core_operations_manager import CoreOperationsManager
+        manager = inject(CoreOperationsManager)
 
         params = {
             "mode": "vram",
@@ -227,8 +227,8 @@ class TestInjectionManagerParameterValidation:
         and format verification that mocks cannot test.
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import InjectionManagerProtocol
-        manager = inject(InjectionManagerProtocol)
+        from core.managers.core_operations_manager import CoreOperationsManager
+        manager = inject(CoreOperationsManager)
 
         params = {
             "mode": "rom",
@@ -648,14 +648,14 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == str(vram_file)
 
-    def test_get_smart_vram_suggestion_vram_dmp_pattern(self, tmp_path):
-        """Test VRAM suggestion using VRAM.dmp pattern"""
+    def test_get_smart_vram_suggestion_base_dmp_pattern(self, tmp_path):
+        """Test VRAM suggestion using {base}.dmp pattern"""
         manager = CoreOperationsManager()
 
-        # Create sprite file and VRAM.dmp file
+        # Create sprite file and matching .dmp file (using {base}.dmp pattern)
         sprite_file = tmp_path / "sprite.png"
         sprite_file.write_text("fake sprite data")
-        vram_file = tmp_path / "VRAM.dmp"
+        vram_file = tmp_path / "sprite.dmp"  # {base}.dmp pattern
         vram_file.write_text("fake vram data")
 
         result = manager.get_smart_vram_suggestion(str(sprite_file))

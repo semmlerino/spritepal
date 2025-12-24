@@ -19,7 +19,7 @@ from PIL import Image
 from PySide6.QtWidgets import QApplication
 
 from core.di_container import inject
-from core.protocols.manager_protocols import InjectionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.services.rom_service import ROMService
 from ui.injection_dialog import InjectionDialog
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
@@ -103,7 +103,7 @@ def injection_dialog(qtbot, isolated_managers):
     """Create injection dialog for testing."""
     from core.managers.application_state_manager import ApplicationStateManager
 
-    injection_manager = inject(InjectionManagerProtocol)
+    injection_manager = inject(CoreOperationsManager)
     settings_manager = inject(ApplicationStateManager)
     dialog = InjectionDialog(
         injection_manager=injection_manager,

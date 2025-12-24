@@ -15,11 +15,8 @@ from PySide6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.protocols.dialog_protocols import DialogFactoryProtocol
-    from core.protocols.manager_protocols import (
-        ExtractionManagerProtocol,
-        InjectionManagerProtocol,
-    )
     from ui.injection_dialog import InjectionDialog
 
 from core.console_error_handler import ConsoleErrorHandler
@@ -76,9 +73,9 @@ class ExtractionController(QObject):
     def __init__(
         self,
         main_window: Any,  # pyright: ignore[reportExplicitAny] - MainWindow has no protocol
-        extraction_manager: ExtractionManagerProtocol,
+        extraction_manager: CoreOperationsManager,
         session_manager: ApplicationStateManager,
-        injection_manager: InjectionManagerProtocol,
+        injection_manager: CoreOperationsManager,
         settings_manager: ApplicationStateManager,
         dialog_factory: DialogFactoryProtocol,
     ) -> None:

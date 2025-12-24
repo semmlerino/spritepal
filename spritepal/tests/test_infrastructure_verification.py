@@ -5,12 +5,12 @@ Run this to verify all fixes are properly applied.
 import pytest
 
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
 
 def get_extraction_manager():
     """Get extraction manager via DI."""
-    return inject(ExtractionManagerProtocol)
+    return inject(CoreOperationsManager)
 
 # Serial execution required: QApplication management, HAL process pool
 pytestmark = [

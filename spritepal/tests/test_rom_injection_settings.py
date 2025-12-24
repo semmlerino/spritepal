@@ -14,13 +14,12 @@ import pytest
 
 from core.di_container import inject
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.manager_protocols import InjectionManagerProtocol
 from ui.injection_dialog import InjectionDialog
 
 
 def get_injection_manager():
     """Get injection manager via DI."""
-    return inject(InjectionManagerProtocol)
+    return inject(CoreOperationsManager)
 
 
 from utils.constants import (

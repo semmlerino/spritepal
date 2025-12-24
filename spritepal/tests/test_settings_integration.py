@@ -14,11 +14,8 @@ import pytest
 from core.controller import ExtractionController
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.protocols.manager_protocols import (
-    ExtractionManagerProtocol,
-    InjectionManagerProtocol,
-)
 
 
 def get_settings_manager():
@@ -105,9 +102,9 @@ class TestSettingsIntegration:
         # Create controller with all required dependencies
         ExtractionController(
             main_window=mock_main_window,
-            extraction_manager=inject(ExtractionManagerProtocol),
+            extraction_manager=inject(CoreOperationsManager),
             session_manager=inject(ApplicationStateManager),
-            injection_manager=inject(InjectionManagerProtocol),
+            injection_manager=inject(CoreOperationsManager),
             settings_manager=settings,
             dialog_factory=inject(DialogFactoryProtocol),
         )

@@ -34,16 +34,14 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
     """
     from core.di_container import inject
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import (
-        ExtractionManagerProtocol,
-        ROMCacheProtocol,
-    )
+    from core.managers.core_operations_manager import CoreOperationsManager
+    from core.protocols.manager_protocols import ROMCacheProtocol
 
     return UnifiedManualOffsetDialog(
         parent,
         rom_cache=inject(ROMCacheProtocol),
         settings_manager=inject(ApplicationStateManager),
-        extraction_manager=inject(ExtractionManagerProtocol),
+        extraction_manager=inject(CoreOperationsManager),
     )
 
 

@@ -69,17 +69,14 @@ class TestGetProtocolsForManager:
         protocols = _get_protocols_for_manager(ApplicationStateManager)
         assert ApplicationStateManager in protocols
 
-    def test_core_operations_manager_provides_extraction_and_injection(self) -> None:
-        """CoreOperationsManager registers both extraction and injection protocols."""
+    def test_core_operations_manager_is_registered(self) -> None:
+        """CoreOperationsManager is registered directly (not via protocols)."""
         from core.managers.core_operations_manager import CoreOperationsManager
-        from core.protocols.manager_protocols import (
-            ExtractionManagerProtocol,
-            InjectionManagerProtocol,
-        )
 
+        # CoreOperationsManager is now registered directly (protocols removed)
         protocols = _get_protocols_for_manager(CoreOperationsManager)
-        assert ExtractionManagerProtocol in protocols
-        assert InjectionManagerProtocol in protocols
+        # With protocols removed, CoreOperationsManager is registered directly
+        assert CoreOperationsManager in protocols
 
     def test_unknown_manager_returns_empty_list(self) -> None:
         """Unknown manager class returns empty protocol list."""

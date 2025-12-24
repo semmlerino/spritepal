@@ -44,11 +44,8 @@ pytestmark = [
 # Import real dialogs and managers (not mocked!)
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
-from core.protocols.manager_protocols import (
-    ExtractionManagerProtocol,
-    InjectionManagerProtocol,
-    ROMCacheProtocol,
-)
+from core.managers.core_operations_manager import CoreOperationsManager
+from core.protocols.manager_protocols import ROMCacheProtocol
 
 
 def _create_manual_offset_dialog(parent=None) -> ManualOffsetDialog:
@@ -57,14 +54,14 @@ def _create_manual_offset_dialog(parent=None) -> ManualOffsetDialog:
         parent,
         rom_cache=inject(ROMCacheProtocol),
         settings_manager=inject(ApplicationStateManager),
-        extraction_manager=inject(ExtractionManagerProtocol),
+        extraction_manager=inject(CoreOperationsManager),
     )
 
 
 def _create_injection_dialog(**kwargs) -> InjectionDialog:
     """Create InjectionDialog with injected dependencies."""
     return InjectionDialog(
-        injection_manager=inject(InjectionManagerProtocol),
+        injection_manager=inject(CoreOperationsManager),
         settings_manager=inject(ApplicationStateManager),
         **kwargs,
     )
@@ -211,7 +208,7 @@ class TestRealDialogIntegration:
                 assert widget is not None, f"REAL BUG DISCOVERED: UI component {component} is None"
 
             # Test real manager integration (vs mocked manager returns)
-            expected_manager = inject(InjectionManagerProtocol)
+            expected_manager = inject(CoreOperationsManager)
             assert dialog.injection_manager is expected_manager, "Dialog should use real injection manager"
 
             # Test tab switching functionality (could expose widget initialization bugs)
@@ -536,8 +533,8 @@ class TestRealDialogManagerIntegration:
         # Managers already initialized by setup_test_infrastructure fixture
 
         # Get real managers for coordination testing
-        extraction_manager = inject(ExtractionManagerProtocol)
-        injection_manager = inject(InjectionManagerProtocol)
+        extraction_manager = inject(CoreOperationsManager)
+        injection_manager = inject(CoreOperationsManager)
         session_manager = inject(ApplicationStateManager)
         settings_manager = inject(ApplicationStateManager)
         rom_cache = inject(ROMCacheProtocol)

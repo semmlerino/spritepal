@@ -15,15 +15,11 @@ import pytest
 
 from core.di_container import get_container, inject
 from core.managers.application_state_manager import ApplicationStateManager
+from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.protocols.manager_protocols import (
-    ExtractionManagerProtocol,
-    InjectionManagerProtocol,
-    ROMCacheProtocol,
-)
+from core.protocols.manager_protocols import ROMCacheProtocol
 
 if TYPE_CHECKING:
-    from core.managers.core_operations_manager import CoreOperationsManager
     from core.services.rom_cache import ROMCache
 
 
@@ -58,14 +54,14 @@ class TestProtocolInjection:
         assert hasattr(session, "get_session_data")
 
     def test_inject_extraction_manager_protocol(self, isolated_managers):
-        """Test ExtractionManagerProtocol injection."""
-        extraction = inject(ExtractionManagerProtocol)
+        """Test CoreOperationsManager injection (extraction)."""
+        extraction = inject(CoreOperationsManager)
         assert extraction is not None
         assert hasattr(extraction, "validate_extraction_params")
 
     def test_inject_injection_manager_protocol(self, isolated_managers):
-        """Test InjectionManagerProtocol injection."""
-        injection = inject(InjectionManagerProtocol)
+        """Test CoreOperationsManager injection (injection)."""
+        injection = inject(CoreOperationsManager)
         assert injection is not None
         assert hasattr(injection, "start_injection")
 
@@ -85,9 +81,9 @@ class TestPureDIComponentInitialization:
         from core.controller import ExtractionController
 
         # Get all dependencies via DI
-        extraction_mgr = inject(ExtractionManagerProtocol)
+        extraction_mgr = inject(CoreOperationsManager)
         session_mgr = inject(ApplicationStateManager)
-        injection_mgr = inject(InjectionManagerProtocol)
+        injection_mgr = inject(CoreOperationsManager)
         settings_mgr = inject(ApplicationStateManager)
 
         # Create mock main window
@@ -154,7 +150,7 @@ class TestPureDIComponentInitialization:
         from core.managers.application_state_manager import ApplicationStateManager
         from ui.injection_dialog import InjectionDialog
 
-        injection_mgr = inject(InjectionManagerProtocol)
+        injection_mgr = inject(CoreOperationsManager)
         settings_mgr = inject(ApplicationStateManager)
 
         # Create with explicit deps
@@ -173,7 +169,7 @@ class TestPureDIComponentInitialization:
         """Test ROMExtractionPanel works with extraction_manager passed explicitly."""
         from ui.rom_extraction_panel import ROMExtractionPanel
 
-        extraction_mgr = inject(ExtractionManagerProtocol)
+        extraction_mgr = inject(CoreOperationsManager)
 
         # Create with explicit dep
         panel = ROMExtractionPanel(extraction_manager=extraction_mgr)
@@ -241,7 +237,7 @@ class TestInjectionManagerDI:
 
     def test_injection_manager_session_access(self, isolated_managers):
         """Test InjectionManager can access session manager via DI."""
-        injection_mgr = inject(InjectionManagerProtocol)
+        injection_mgr = inject(CoreOperationsManager)
 
         # InjectionManager has _get_session_manager() - verify it works
         # This is an internal method that needs to use DI

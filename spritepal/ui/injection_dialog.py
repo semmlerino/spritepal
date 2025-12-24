@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, cast, override
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import InjectionManagerProtocol
+    from core.managers.core_operations_manager import CoreOperationsManager
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# InjectionManager accessed via DI: inject(InjectionManagerProtocol)
+# InjectionManager accessed via DI: inject(CoreOperationsManager)
 from core.sprite_validator import SpriteValidator
 from ui.common import WorkerManager
 from ui.common.spacing_constants import SPACING_SMALL
@@ -57,7 +57,7 @@ class InjectionDialog(TabbedDialog):
         metadata_path: str = "",
         input_vram: str = "",
         *,
-        injection_manager: InjectionManagerProtocol,
+        injection_manager: CoreOperationsManager,
         settings_manager: ApplicationStateManager,
     ):
         # Step 1: Declare instance variables BEFORE super().__init__()

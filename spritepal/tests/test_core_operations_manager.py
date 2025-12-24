@@ -19,7 +19,6 @@ from PIL import Image
 from core.di_container import inject
 from core.exceptions import ExtractionError, ValidationError
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.manager_protocols import ExtractionManagerProtocol
 from tests.fixtures.timeouts import signal_timeout
 
 pytestmark = [
@@ -33,8 +32,7 @@ pytestmark = [
 def manager(isolated_managers) -> CoreOperationsManager:
     """Get CoreOperationsManager via DI injection."""
     # isolated_managers sets up the DI container; we use inject() to get the manager
-    mgr = inject(ExtractionManagerProtocol)
-    # Cast to CoreOperationsManager since we know the concrete type in tests
+    mgr = inject(CoreOperationsManager)
     assert isinstance(mgr, CoreOperationsManager)
     return mgr
 

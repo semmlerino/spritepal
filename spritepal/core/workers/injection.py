@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
 from core.managers.base_manager import BaseManager
-from core.protocols.manager_protocols import InjectionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 from utils.logging_config import get_logger
 
 from .base import handle_worker_errors
@@ -73,14 +73,14 @@ class VRAMInjectionWorker(InjectionWorkerBase):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_expected_manager() -> InjectionManagerProtocol:
+        def _get_expected_manager() -> CoreOperationsManager:
             from core.di_container import inject
-            return inject(InjectionManagerProtocol)
+            return inject(CoreOperationsManager)
         if not helper.validate_manager_type(_get_expected_manager, "VRAM injection"):
             return
 
         # Type cast for better type checking
-        injection_manager = cast(InjectionManagerProtocol, self.manager)
+        injection_manager = cast(CoreOperationsManager, self.manager)
 
         # Connect all standard signals using helper
         helper.connect_progress_signals("injection_progress", 50)
@@ -94,7 +94,7 @@ class VRAMInjectionWorker(InjectionWorkerBase):
     def perform_operation(self) -> None:
         """Perform VRAM injection via manager."""
         # Type cast for better type safety
-        injection_manager = cast(InjectionManagerProtocol, self.manager)
+        injection_manager = cast(CoreOperationsManager, self.manager)
 
         # Check for cancellation before starting
         self.check_cancellation()
@@ -138,14 +138,14 @@ class ROMInjectionWorker(InjectionWorkerBase):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_expected_manager() -> InjectionManagerProtocol:
+        def _get_expected_manager() -> CoreOperationsManager:
             from core.di_container import inject
-            return inject(InjectionManagerProtocol)
+            return inject(CoreOperationsManager)
         if not helper.validate_manager_type(_get_expected_manager, "ROM injection"):
             return
 
         # Type cast for better type checking
-        injection_manager = cast(InjectionManagerProtocol, self.manager)
+        injection_manager = cast(CoreOperationsManager, self.manager)
 
         # Connect all standard signals using helper
         helper.connect_progress_signals("injection_progress", 50)
@@ -159,7 +159,7 @@ class ROMInjectionWorker(InjectionWorkerBase):
     def perform_operation(self) -> None:
         """Perform ROM injection via manager."""
         # Type cast for better type safety
-        injection_manager = cast(InjectionManagerProtocol, self.manager)
+        injection_manager = cast(CoreOperationsManager, self.manager)
 
         # Check for cancellation before starting
         self.check_cancellation()

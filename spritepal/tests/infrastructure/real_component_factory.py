@@ -145,14 +145,12 @@ class RealComponentFactory:
     def _get_extraction_manager_from_registry(self) -> CoreOperationsManager:
         """Get extraction manager (CoreOperationsManager) via DI."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import ExtractionManagerProtocol
-        return inject(ExtractionManagerProtocol)  # type: ignore[return-value]
+        return inject(CoreOperationsManager)
 
     def _get_injection_manager_from_registry(self) -> CoreOperationsManager:
         """Get injection manager (CoreOperationsManager) via DI."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import InjectionManagerProtocol
-        return inject(InjectionManagerProtocol)  # type: ignore[return-value]
+        return inject(CoreOperationsManager)
 
     def _get_session_manager_from_registry(self) -> ApplicationStateManager:
         """Get session manager (ApplicationStateManager) via DI."""
@@ -266,7 +264,6 @@ class RealComponentFactory:
             Real VRAMExtractionWorker or ROMExtractionWorker instance
         """
         from core.di_container import inject
-        from core.protocols.manager_protocols import ExtractionManagerProtocol
         from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 
         if params is None:
@@ -275,7 +272,7 @@ class RealComponentFactory:
             else:
                 params = self._data_repo.get_rom_extraction_data("small")
 
-        extraction_manager = inject(ExtractionManagerProtocol)
+        extraction_manager = inject(CoreOperationsManager)
 
         if worker_type == "vram":
             worker = VRAMExtractionWorker(params, extraction_manager=extraction_manager)

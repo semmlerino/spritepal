@@ -18,14 +18,14 @@ from pathlib import Path
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
 
 def test_decompression():
     """Test if decompression works at a known sprite offset."""
 
     # Managers initialized by session_managers fixture
-    extraction_manager = inject(ExtractionManagerProtocol)
+    extraction_manager = inject(CoreOperationsManager)
     rom_extractor = extraction_manager.get_rom_extractor()
 
     test_rom = "Kirby Super Star (USA).sfc"

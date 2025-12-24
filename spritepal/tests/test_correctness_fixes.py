@@ -18,12 +18,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
 
 def get_extraction_manager():
     """Get extraction manager via DI."""
-    return inject(ExtractionManagerProtocol)
+    return inject(CoreOperationsManager)
 
 
 # Mark all tests as headless and integration

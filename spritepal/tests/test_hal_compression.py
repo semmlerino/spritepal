@@ -834,7 +834,6 @@ class TestHALToolDetectionRegression:
         """Test that manager initialization works regardless of working directory"""
         from core.di_container import inject
         from core.managers import cleanup_managers, initialize_managers
-        from core.protocols.manager_protocols import InjectionManagerProtocol
 
         # Test from different directories
         test_dirs = [
@@ -854,7 +853,8 @@ class TestHALToolDetectionRegression:
                 initialize_managers(app_name="SpritePal_Test")
 
                 # Verify initialization succeeded by getting a manager via DI
-                manager = inject(InjectionManagerProtocol)
+                from core.managers.core_operations_manager import CoreOperationsManager
+                manager = inject(CoreOperationsManager)
                 assert manager is not None
 
             except Exception as e:

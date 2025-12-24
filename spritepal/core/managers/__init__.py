@@ -1,19 +1,14 @@
 """
 Manager classes for SpritePal business logic.
 
-This package provides the consolidated manager architecture with backward-compatible
-adapters. The recommended way to access managers is via dependency injection::
+This package provides the consolidated manager architecture. The recommended
+way to access managers is via dependency injection::
 
     from core.di_container import inject
-    from core.protocols.manager_protocols import (
-        ApplicationStateManager,
-        ExtractionManagerProtocol,
-        InjectionManagerProtocol,
-    )
+    from core.managers import ApplicationStateManager, CoreOperationsManager
 
     state_mgr = inject(ApplicationStateManager)
-    extraction_mgr = inject(ExtractionManagerProtocol)
-    injection_mgr = inject(InjectionManagerProtocol)
+    ops_mgr = inject(CoreOperationsManager)
 
 Architecture:
     - ApplicationStateManager: Consolidated manager for session, settings, state
@@ -38,11 +33,6 @@ from .base_manager import BaseManager
 # Consolidated managers (NEW - these hold the actual logic)
 from .core_operations_manager import CoreOperationsManager
 
-# NOTE: ExtractionManager and InjectionManager have been removed.
-# Use CoreOperationsManager via dependency injection:
-#   from core.di_container import inject
-#   from core.protocols.manager_protocols import ExtractionManagerProtocol, InjectionManagerProtocol
-#   manager = inject(ExtractionManagerProtocol)  # Returns CoreOperationsManager
 # Import DI-based manager functions
 # Note: We import from registry now which supports both consolidated and original modes
 # Convenience functions removed - use inject() or ManagerRegistry() directly

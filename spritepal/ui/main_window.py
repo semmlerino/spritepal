@@ -202,8 +202,8 @@ class MainWindow(QMainWindow):
 
         # ROM extraction tab (first tab, selected by default)
         from core.di_container import inject
-        from core.protocols.manager_protocols import ExtractionManagerProtocol
-        extraction_manager = inject(ExtractionManagerProtocol)
+        from core.managers.core_operations_manager import CoreOperationsManager
+        extraction_manager = inject(CoreOperationsManager)
         self.rom_extraction_panel = ROMExtractionPanel(
             parent=self,
             extraction_manager=extraction_manager
@@ -497,9 +497,9 @@ class MainWindow(QMainWindow):
             # Validate parameters using extraction manager
             # Delayed import to avoid initialization order issues
             from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
+            from core.managers.core_operations_manager import CoreOperationsManager
             try:
-                extraction_manager = inject(ExtractionManagerProtocol)
+                extraction_manager = inject(CoreOperationsManager)
                 extraction_manager.validate_extraction_params(params)
             except (ValueError, TypeError) as e:
                 QMessageBox.warning(
@@ -1017,17 +1017,15 @@ class MainWindow(QMainWindow):
             from core.controller import ExtractionController
             from core.di_container import inject
             from core.managers.application_state_manager import ApplicationStateManager
+            from core.managers.core_operations_manager import CoreOperationsManager
             from core.protocols.dialog_protocols import DialogFactoryProtocol
-            from core.protocols.manager_protocols import (
-                ExtractionManagerProtocol,
-                InjectionManagerProtocol,
-            )
 
+            core_ops_manager = inject(CoreOperationsManager)
             self._controller = ExtractionController(
                 self,
-                extraction_manager=inject(ExtractionManagerProtocol),
+                extraction_manager=core_ops_manager,
                 session_manager=inject(ApplicationStateManager),
-                injection_manager=inject(InjectionManagerProtocol),
+                injection_manager=core_ops_manager,
                 settings_manager=self.settings_manager,
                 dialog_factory=inject(DialogFactoryProtocol),
             )

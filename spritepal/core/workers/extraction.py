@@ -53,8 +53,8 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
         # Validate manager type
         def _get_extraction_manager() -> CoreOperationsManager:
             from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
-            return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))
+            from core.managers.core_operations_manager import CoreOperationsManager
+            return inject(CoreOperationsManager)
         if not helper.validate_manager_type(_get_extraction_manager, "VRAM extraction"):
             return
 
@@ -128,8 +128,8 @@ class ROMExtractionWorker(ExtractionWorkerBase):
         # Validate manager type
         def _get_extraction_manager() -> CoreOperationsManager:
             from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
-            return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))
+            from core.managers.core_operations_manager import CoreOperationsManager
+            return inject(CoreOperationsManager)
         if not helper.validate_manager_type(_get_extraction_manager, "ROM extraction"):
             return
 

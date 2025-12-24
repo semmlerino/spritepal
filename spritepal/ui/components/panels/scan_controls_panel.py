@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any, cast
 from core.protocols.manager_protocols import ROMExtractorProtocol
 
 if TYPE_CHECKING:
-    from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMCacheProtocol
+    from core.managers.core_operations_manager import CoreOperationsManager
+    from core.protocols.manager_protocols import ROMCacheProtocol
 
 from PySide6.QtCore import QMutex, QMutexLocker, Signal
 from PySide6.QtWidgets import (
@@ -59,7 +60,7 @@ class ScanControlsPanel(QWidget):
         self.found_sprites: list[tuple[int, float]] = []
 
         # Manager references (set by parent)
-        self.extraction_manager: ExtractionManagerProtocol | None = None
+        self.extraction_manager: CoreOperationsManager | None = None
         self.rom_extractor: ROMExtractorProtocol | None = None
         self._manager_mutex = QMutex()  # Thread safety for manager access
 
@@ -141,7 +142,7 @@ class ScanControlsPanel(QWidget):
         _ = self.pause_btn.clicked.connect(self._toggle_pause)
         _ = self.stop_btn.clicked.connect(self._stop_scan)
 
-    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: ExtractionManagerProtocol):
+    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: CoreOperationsManager):
         """Set ROM data for scanning operations"""
         with QMutexLocker(self._manager_mutex):
             self.rom_path = rom_path
@@ -152,7 +153,7 @@ class ScanControlsPanel(QWidget):
         # Check for cached partial scan results
         self._check_for_cached_scans()
 
-    def _get_managers_safely(self) -> tuple[ExtractionManagerProtocol | None, ROMExtractorProtocol | None]:
+    def _get_managers_safely(self) -> tuple[CoreOperationsManager | None, ROMExtractorProtocol | None]:
         """Get manager references safely with thread protection.
 
         WARNING: The returned references are only safe to use within the calling
@@ -162,7 +163,7 @@ class ScanControlsPanel(QWidget):
         with QMutexLocker(self._manager_mutex):
             return self.extraction_manager, self.rom_extractor
 
-    def _with_managers_safely(self, operation: Callable[[ExtractionManagerProtocol | None, ROMExtractorProtocol | None], object]) -> Any:  # pyright: ignore[reportExplicitAny] - Generic operation return type
+    def _with_managers_safely(self, operation: Callable[[CoreOperationsManager | None, ROMExtractorProtocol | None], object]) -> Any:  # pyright: ignore[reportExplicitAny] - Generic operation return type
         """Execute an operation with manager references under mutex protection.
 
         This prevents TOCTOU race conditions by holding the lock during the entire

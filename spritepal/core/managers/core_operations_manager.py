@@ -2,8 +2,8 @@
 Consolidated Core Operations Manager for SpritePal.
 
 This manager combines extraction, injection, palette, and navigation functionality
-into a single cohesive unit. It directly implements ExtractionManagerProtocol and
-InjectionManagerProtocol without using adapters.
+into a single cohesive unit. It provides all extraction and injection functionality
+directly without using adapters or protocols.
 """
 
 from __future__ import annotations
@@ -48,8 +48,8 @@ class CoreOperationsManager(BaseManager):
     - Palette management
     - Navigation and sprite discovery
 
-    This manager directly implements ExtractionManagerProtocol and
-    InjectionManagerProtocol without using adapter classes.
+    This manager provides all extraction and injection functionality directly
+    without using adapter classes or intermediate protocols.
     """
 
     # ========== Signal Architecture ==========

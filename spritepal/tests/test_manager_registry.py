@@ -59,9 +59,8 @@ def get_extraction_manager():
     that expect the old API's error semantics.
     """
     from core.di_container import inject
-    from core.protocols.manager_protocols import ExtractionManagerProtocol
     try:
-        return inject(ExtractionManagerProtocol)
+        return inject(CoreOperationsManager)
     except ValueError as e:
         raise ManagerError("ExtractionManager not initialized") from e
 
@@ -130,13 +129,13 @@ class TestManagerRegistry:
         initialize_managers()
         all_managers = registry.get_all_managers()
 
-        # Keys are now protocol names (DI container is single source of truth)
+        # Keys are now class names (DI container is single source of truth)
         assert "ApplicationStateManager" in all_managers
-        assert "ExtractionManagerProtocol" in all_managers
+        assert "CoreOperationsManager" in all_managers
         # Consolidated architecture: state returns ApplicationStateManager
         assert isinstance(all_managers["ApplicationStateManager"], ApplicationStateManager)
-        # Consolidated architecture: extraction returns CoreOperationsManager
-        assert isinstance(all_managers["ExtractionManagerProtocol"], CoreOperationsManager)
+        # Consolidated architecture: CoreOperationsManager handles extraction and injection
+        assert isinstance(all_managers["CoreOperationsManager"], CoreOperationsManager)
 
     def test_double_initialization(self):
         """Test that double initialization doesn't create new instances"""

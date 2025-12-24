@@ -24,10 +24,7 @@ from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.protocols.manager_protocols import (
-    ExtractionManagerProtocol,
-    InjectionManagerProtocol,
-)
+# ExtractionManagerProtocol and InjectionManagerProtocol removed - use CoreOperationsManager directly
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 pytestmark = [
@@ -157,7 +154,7 @@ class TestQtSignalArchitecture:
         # (Protocols aren't @runtime_checkable, so use hasattr checks)
         injection_mgr = CoreOperationsManager()
 
-        # Verify InjectionManagerProtocol signals exist
+        # Verify injection signals exist on CoreOperationsManager
         injection_signals = ['injection_progress', 'injection_finished', 'compression_info']
         for signal_name in injection_signals:
             assert hasattr(injection_mgr, signal_name), f"Missing {signal_name}"
@@ -167,7 +164,7 @@ class TestQtSignalArchitecture:
         # Test ExtractionManager compliance via duck typing
         extraction_mgr = CoreOperationsManager()
 
-        # Verify ExtractionManagerProtocol signals exist (actual signals on the class)
+        # Verify extraction signals exist on CoreOperationsManager
         extraction_signals = ['extraction_progress', 'cache_saved', 'preview_generated']
         for signal_name in extraction_signals:
             assert hasattr(extraction_mgr, signal_name), f"Missing {signal_name}"
@@ -245,8 +242,8 @@ class TestQtSignalArchitecture:
         # Create concrete manager
         concrete_mgr = CoreOperationsManager()
 
-        # Cast to protocol
-        protocol_mgr: InjectionManagerProtocol = concrete_mgr
+        # Reference as same type (protocols removed - CoreOperationsManager used directly)
+        protocol_mgr: CoreOperationsManager = concrete_mgr
 
         # Cast back to concrete type (as done in controller)
         casted_mgr = cast(CoreOperationsManager, protocol_mgr)  # cast-ok: testing cast behavior

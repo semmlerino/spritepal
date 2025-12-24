@@ -209,12 +209,11 @@ class ManagerTestContext:
         elif manager_type == "injection":
             # Create injection worker inline (factory method removed for simplification)
             from core.di_container import inject
-            from core.protocols.manager_protocols import InjectionManagerProtocol
             from core.workers import VRAMInjectionWorker
 
             if params is None:
                 params = self._data_repo.get_injection_data("small")
-            injection_manager = inject(InjectionManagerProtocol)
+            injection_manager = inject(CoreOperationsManager)
             worker = VRAMInjectionWorker(params, injection_manager=injection_manager)
         else:
             raise ValueError(f"No worker type for manager: {manager_type}")

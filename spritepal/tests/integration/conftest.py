@@ -199,11 +199,11 @@ def rom_extraction_panel(qtbot, managers_initialized):
     test pollution when multiple tests open the manual offset dialog.
     """
     from core.di_container import inject
-    from core.protocols.manager_protocols import ExtractionManagerProtocol
+    from core.managers.core_operations_manager import CoreOperationsManager
     from ui.rom_extraction.offset_dialog_manager import _ManualOffsetDialogSingleton
     from ui.rom_extraction_panel import ROMExtractionPanel
 
-    extraction_manager = inject(ExtractionManagerProtocol)
+    extraction_manager = inject(CoreOperationsManager)
     panel = ROMExtractionPanel(extraction_manager=extraction_manager)
     qtbot.addWidget(panel)
     panel.show()
@@ -230,16 +230,14 @@ def manual_offset_dialog(qtbot, managers_initialized):
 
     from core.di_container import inject
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import (
-        ExtractionManagerProtocol,
-        ROMCacheProtocol,
-    )
+    from core.managers.core_operations_manager import CoreOperationsManager
+    from core.protocols.manager_protocols import ROMCacheProtocol
     from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
     dialog = UnifiedManualOffsetDialog(
         rom_cache=inject(ROMCacheProtocol),
         settings_manager=inject(ApplicationStateManager),
-        extraction_manager=inject(ExtractionManagerProtocol),
+        extraction_manager=inject(CoreOperationsManager),
     )
     # Don't use qtbot.addWidget() - we manage cleanup ourselves to avoid
     # double-delete when managers_initialized cleanup runs first

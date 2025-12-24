@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from PIL import Image
 
-    from core.protocols.manager_protocols import ExtractionManagerProtocol
+    from core.managers.core_operations_manager import CoreOperationsManager
 
 from PySide6.QtCore import QObject, Signal
 
@@ -94,7 +94,7 @@ class SignalConnectionHelper:
         else:
             logger.warning(f"Progress signal not found: {progress_signal_name}")
 
-    def connect_extraction_signals(self, extraction_manager: ExtractionManagerProtocol) -> None:
+    def connect_extraction_signals(self, extraction_manager: CoreOperationsManager) -> None:
         """
         Connect extraction-specific signals.
 
@@ -111,7 +111,7 @@ class SignalConnectionHelper:
         self._connections.extend([connection1, connection2])
         logger.debug("Connected extraction-specific signals")
 
-    def connect_preview_signals(self, extraction_manager: ExtractionManagerProtocol) -> None:
+    def connect_preview_signals(self, extraction_manager: CoreOperationsManager) -> None:
         """
         Connect preview generation signals with proper error handling.
 

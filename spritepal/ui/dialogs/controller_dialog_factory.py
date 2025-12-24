@@ -87,10 +87,10 @@ class ControllerDialogFactory:
         """
         from core.di_container import inject
         from core.managers.application_state_manager import ApplicationStateManager
-        from core.protocols.manager_protocols import InjectionManagerProtocol
+        from core.managers.core_operations_manager import CoreOperationsManager
         from ui.injection_dialog import InjectionDialog
 
-        injection_manager = inject(InjectionManagerProtocol)
+        injection_manager = inject(CoreOperationsManager)
         settings_manager = inject(ApplicationStateManager)
         return InjectionDialog(
             parent, sprite_path, metadata_path, input_vram,

@@ -36,16 +36,10 @@ class PathSuggestionService:
     suggestions for VRAM and ROM files.
     """
 
-    # VRAM filename patterns to check (in order of specificity)
+    # VRAM filename patterns to check (common conventions only)
     VRAM_PATTERNS = [
         "{base}.dmp",
         "{base}_VRAM.dmp",
-        "{base}.VRAM.dmp",
-        "{base}.vram",
-        "{base}.SnesVideoRam.dmp",
-        "{base}.VideoRam.dmp",
-        "VRAM.dmp",
-        "vram.dmp",
     ]
 
     # Editor suffixes to strip when matching

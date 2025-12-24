@@ -49,14 +49,13 @@ if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.managers.registry import ManagerRegistry
-    from core.protocols.manager_protocols import InjectionManagerProtocol
     from core.services.rom_cache import ROMCache
     from tests.infrastructure.test_protocols import MockMainWindowProtocol
 
 # Runtime imports for inject() - needed to avoid deprecated ManagerRegistry methods
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
 # Import Qt fixtures for IS_HEADLESS constant
 try:
@@ -630,20 +629,18 @@ def real_extraction_manager(
     Depends on isolated_managers to ensure proper per-test isolation.
     The isolated_managers fixture handles initialization and cleanup.
 
-    NOTE: This returns the CoreOperationsManager which implements
-    ExtractionManagerProtocol. For mocks, use Mock(spec=ExtractionManagerProtocol).
+    NOTE: This returns the CoreOperationsManager directly (protocols removed).
     """
     # Use inject() to avoid deprecated ManagerRegistry.get_extraction_manager()
     _ = isolated_managers  # Ensures fixture runs first to initialize managers
-    return inject(ExtractionManagerProtocol)  # type: ignore[return-value]
+    return inject(CoreOperationsManager)
 
 
 @pytest.fixture
 def real_injection_manager(real_factory: RealComponentFactory) -> CoreOperationsManager:
     """Provide a fully configured real injection manager.
 
-    NOTE: Returns the CoreOperationsManager which implements
-    InjectionManagerProtocol. For mocks, use Mock(spec=InjectionManagerProtocol).
+    NOTE: Returns the CoreOperationsManager directly (protocols removed).
     """
     return real_factory.create_injection_manager()
 

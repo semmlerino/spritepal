@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, Any, cast, override
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import ExtractionManagerProtocol, ROMExtractorProtocol
+    from core.managers.core_operations_manager import CoreOperationsManager
+    from core.protocols.manager_protocols import ROMExtractorProtocol
     from core.rom_injector import SpritePointer
 
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -57,7 +58,7 @@ class DetachedGalleryWindow(QMainWindow):
         self,
         parent: QWidget | None = None,
         *,
-        extraction_manager: ExtractionManagerProtocol,
+        extraction_manager: CoreOperationsManager,
         settings_manager: ApplicationStateManager,
         rom_cache: ROMCacheProtocol,
     ):

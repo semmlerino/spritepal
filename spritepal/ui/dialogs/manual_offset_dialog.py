@@ -25,8 +25,8 @@ with contextlib.suppress(ImportError):
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from core.managers.core_operations_manager import CoreOperationsManager
     from core.protocols.manager_protocols import (
-        ExtractionManagerProtocol,
         ROMCacheProtocol,
         ROMExtractorProtocol,
     )
@@ -119,7 +119,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         *,
         rom_cache: ROMCacheProtocol,
         settings_manager: ApplicationStateManager,
-        extraction_manager: ExtractionManagerProtocol,
+        extraction_manager: CoreOperationsManager,
         rom_extractor: ROMExtractorProtocol | None = None,
     ) -> None:
         # Debug logging for singleton tracking
@@ -826,7 +826,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     # Public interface methods required by ROM extraction panel
 
-    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: ExtractionManagerProtocol) -> None:
+    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: CoreOperationsManager) -> None:
         """Set ROM data for the dialog."""
         with QMutexLocker(self._manager_mutex):
             self.rom_path = rom_path

@@ -21,7 +21,6 @@ from PySide6.QtTest import QSignalSpy
 
 from core.di_container import inject
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.manager_protocols import ExtractionManagerProtocol
 from core.workers.extraction import ROMExtractionWorker, VRAMExtractionWorker
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
@@ -46,7 +45,7 @@ class TestVRAMExtractionWorker:
     def extraction_manager(self, session_managers) -> CoreOperationsManager:
         """Get extraction manager from session managers."""
         from typing import cast
-        return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))  # cast-ok: getting concrete type from DI
+        return cast(CoreOperationsManager, inject(CoreOperationsManager))  # cast-ok: getting concrete type from DI
 
     @pytest.fixture
     def test_files(self, tmp_path):
@@ -279,7 +278,7 @@ class TestROMExtractionWorker:
     def extraction_manager(self, session_managers) -> CoreOperationsManager:
         """Get extraction manager from session managers."""
         from typing import cast
-        return cast(CoreOperationsManager, inject(ExtractionManagerProtocol))  # cast-ok: getting concrete type from DI
+        return cast(CoreOperationsManager, inject(CoreOperationsManager))  # cast-ok: getting concrete type from DI
 
     @pytest.fixture
     def test_rom_files(self, tmp_path):

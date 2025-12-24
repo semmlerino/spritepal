@@ -23,7 +23,7 @@ from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
-    from core.protocols.manager_protocols import ExtractionManagerProtocol
+    from core.managers.core_operations_manager import CoreOperationsManager
 
 logger = get_logger(__name__)
 
@@ -252,8 +252,8 @@ class SimilarityIndexingWorker(BaseWorker):
         """Background indexing of pending sprites."""
         try:
             from core.di_container import inject
-            from core.protocols.manager_protocols import ExtractionManagerProtocol
-            extraction_manager = inject(ExtractionManagerProtocol)
+            from core.managers.core_operations_manager import CoreOperationsManager
+            extraction_manager = inject(CoreOperationsManager)
             indexed_count = 0
 
             # Process pending sprites
@@ -320,7 +320,7 @@ class SimilarityIndexingWorker(BaseWorker):
             logger.exception("Similarity indexing failed")
             self.operation_finished.emit(False, f"Indexing failed: {e}")
 
-    def _extract_sprite_image(self, offset: int, extraction_manager: ExtractionManagerProtocol) -> Image.Image | None:
+    def _extract_sprite_image(self, offset: int, extraction_manager: CoreOperationsManager) -> Image.Image | None:
         """
         Extract sprite image for indexing.
 

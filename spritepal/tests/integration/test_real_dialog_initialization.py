@@ -21,12 +21,12 @@ from PySide6.QtWidgets import QApplication
 
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
-from core.protocols.manager_protocols import InjectionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
 
 def get_injection_manager():
     """Get injection manager via DI."""
-    return inject(InjectionManagerProtocol)
+    return inject(CoreOperationsManager)
 
 
 def get_settings_manager():
@@ -140,16 +140,13 @@ class TestRealDialogInitialization:
         """
         from core.di_container import inject
         from core.managers.application_state_manager import ApplicationStateManager
-        from core.protocols.manager_protocols import (
-            ExtractionManagerProtocol,
-            ROMCacheProtocol,
-        )
+        from core.protocols.manager_protocols import ROMCacheProtocol
         from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
         dialog = UnifiedManualOffsetDialog(
             rom_cache=inject(ROMCacheProtocol),
             settings_manager=inject(ApplicationStateManager),
-            extraction_manager=inject(ExtractionManagerProtocol),
+            extraction_manager=inject(CoreOperationsManager),
         )
         qtbot.addWidget(dialog)
 
