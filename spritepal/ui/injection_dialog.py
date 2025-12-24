@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
 # InjectionManager accessed via DI: inject(CoreOperationsManager)
 from core.sprite_validator import SpriteValidator
 from ui.common import WorkerManager
-from ui.common.spacing_constants import SPACING_SMALL
+from ui.common.spacing_constants import EXTRACTION_LABEL_MIN_WIDTH, SPACING_SMALL
 from ui.components import (
     FileSelector,
     FormRow,
@@ -443,13 +443,7 @@ class InjectionDialog(TabbedDialog):
 
         rom_layout.addWidget(self.output_rom_selector)
 
-        # Sprite location selector
-        location_layout = QHBoxLayout()
-
-        # Create label with mnemonic
-        location_label = QLabel("Sprite &Location:", self)
-        location_layout.addWidget(location_label)
-
+        # Sprite location selector - using FormRow for consistent alignment
         self.sprite_location_combo = QComboBox(self)
         if self.sprite_location_combo:
             self.sprite_location_combo.setMinimumWidth(200)
@@ -461,16 +455,11 @@ class InjectionDialog(TabbedDialog):
                 self._on_sprite_location_changed
             )
             self.sprite_location_combo.setToolTip("Select a predefined sprite location in the ROM")
-        location_label.setBuddy(self.sprite_location_combo)
         AccessibilityHelper.make_accessible(
             self.sprite_location_combo,
             "Sprite Location",
             "Select a predefined sprite location in the ROM or enter custom offset"
         )
-        location_layout.addWidget(self.sprite_location_combo)
-
-        custom_label = QLabel("or Custom &Offset:", self)
-        location_layout.addWidget(custom_label)
 
         self.rom_offset_input = HexOffsetInput(
             placeholder="0x0",
@@ -479,16 +468,33 @@ class InjectionDialog(TabbedDialog):
         )
         self.rom_offset_input.text_changed.connect(self._on_rom_offset_changed)
         self.rom_offset_input.setToolTip("Enter a custom ROM offset for sprite injection (e.g., 0x8000)")
-        custom_label.setBuddy(self.rom_offset_input)
         AccessibilityHelper.make_accessible(
             self.rom_offset_input,
             "Custom ROM Offset",
             "Enter a custom ROM offset for sprite injection"
         )
-        location_layout.addWidget(self.rom_offset_input)
 
-        location_layout.addStretch()
-        rom_layout.addLayout(location_layout)
+        # Create container for combo + custom offset controls
+        location_container = QWidget()
+        container_layout = QHBoxLayout(location_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(SPACING_SMALL)
+        container_layout.addWidget(self.sprite_location_combo)
+        custom_label = QLabel("or Custom &Offset:")
+        custom_label.setBuddy(self.rom_offset_input)
+        container_layout.addWidget(custom_label)
+        container_layout.addWidget(self.rom_offset_input)
+        container_layout.addStretch()
+
+        location_row = FormRow(
+            label_text="Sprite &Location:",
+            input_widget=location_container,
+            orientation="horizontal",
+            label_width=EXTRACTION_LABEL_MIN_WIDTH
+        )
+        # Set buddy for accessibility
+        location_row.label.setBuddy(self.sprite_location_combo)
+        rom_layout.addWidget(location_row)
 
         # Compression options
         compression_layout = QHBoxLayout()

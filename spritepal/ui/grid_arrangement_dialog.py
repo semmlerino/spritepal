@@ -26,6 +26,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QFrame,
     QGraphicsLineItem,
     QGraphicsRectItem,
     QGraphicsScene,
@@ -41,6 +42,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui.common.spacing_constants import SPACING_COMPACT_SMALL
 
 from .components import SplitterDialog
 from .row_arrangement import PaletteColorizer
@@ -798,6 +801,8 @@ class GridArrangementDialog(SplitterDialog):
         """
         left_widget = QWidget(self)
         left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(SPACING_COMPACT_SMALL)
 
         # Add selection mode controls
         mode_group = self._create_selection_mode_group(left_widget)
@@ -821,6 +826,8 @@ class GridArrangementDialog(SplitterDialog):
         """
         right_widget = QWidget(self)
         right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(SPACING_COMPACT_SMALL)
 
         # Add arrangement list
         list_group = self._create_arrangement_list_group(right_widget)
@@ -970,7 +977,10 @@ class GridArrangementDialog(SplitterDialog):
         self._add_action_buttons(actions_layout)
 
         # Add separator
-        actions_layout.addWidget(QLabel("|", self))
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        actions_layout.addWidget(separator)
 
         # Add zoom controls
         self._add_zoom_controls(actions_layout)

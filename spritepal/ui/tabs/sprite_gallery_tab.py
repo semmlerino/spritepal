@@ -30,9 +30,9 @@ from PySide6.QtWidgets import (
 from core.rom_extractor import ROMExtractor
 from core.sprite_finder import SpriteFinder
 from ui.common.file_dialogs import browse_for_directory, browse_for_save_file
+from ui.common.spacing_constants import COMPACT_BUTTON_HEIGHT, SPACING_SMALL, SPACING_TINY
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
-from ui.common.spacing_constants import COMPACT_BUTTON_HEIGHT, SPACING_TINY
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -161,6 +161,7 @@ class SpriteGalleryTab(QWidget):
         widget = QWidget()
         layout = QHBoxLayout()
         layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
+        layout.setSpacing(SPACING_SMALL)
 
         # Quick actions with responsive sizing
         self.compare_btn = QPushButton("Compare")

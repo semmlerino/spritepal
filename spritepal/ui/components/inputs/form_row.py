@@ -34,7 +34,8 @@ class FormRow(QWidget):
         orientation: str = "horizontal",  # "horizontal" or "vertical"
         label_width: int | None = None,
         spacing: int = 8,
-        help_text: str = ""
+        help_text: str = "",
+        label_alignment: Qt.AlignmentFlag | None = None
     ):
         super().__init__(parent)
 
@@ -56,9 +57,10 @@ class FormRow(QWidget):
             self.label.setMinimumWidth(label_width)
             self.label.setMaximumWidth(label_width)
 
-        # For horizontal layout, align label to top
+        # For horizontal layout, use provided alignment or default to VCenter
         if orientation == "horizontal":
-            self.label.setAlignment(Qt.AlignmentFlag.AlignTop)
+            alignment = label_alignment if label_alignment else Qt.AlignmentFlag.AlignVCenter
+            self.label.setAlignment(alignment)
 
         self.main_layout.addWidget(self.label)
 
@@ -166,7 +168,8 @@ def create_horizontal_form_row(
     label_text: str,
     input_widget: QWidget,
     label_width: int | None = None,
-    help_text: str = ""
+    help_text: str = "",
+    label_alignment: Qt.AlignmentFlag | None = None
 ) -> FormRow:
     """Convenience function to create a horizontal form row"""
     return FormRow(
@@ -174,7 +177,8 @@ def create_horizontal_form_row(
         input_widget=input_widget,
         orientation="horizontal",
         label_width=label_width,
-        help_text=help_text
+        help_text=help_text,
+        label_alignment=label_alignment
     )
 
 def create_vertical_form_row(

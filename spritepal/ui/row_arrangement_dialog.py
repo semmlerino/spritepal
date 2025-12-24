@@ -178,6 +178,7 @@ class RowArrangementDialog(SplitterDialog):
         _ = self.add_selected_btn.clicked.connect(self._add_selected_rows)
         buttons_layout.addWidget(self.add_selected_btn)
 
+        buttons_layout.addStretch()
         left_layout.addLayout(buttons_layout)
 
         # Right panel - Arranged rows
@@ -210,6 +211,7 @@ class RowArrangementDialog(SplitterDialog):
         _ = self.remove_selected_btn.clicked.connect(self._remove_selected_rows)
         controls_layout.addWidget(self.remove_selected_btn)
 
+        controls_layout.addStretch()
         right_layout.addLayout(controls_layout)
 
         # Add panels to horizontal content splitter

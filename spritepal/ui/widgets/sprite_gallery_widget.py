@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 from ui.common.spacing_constants import (
     MEDIUM_WIDTH,
     SPACING_LARGE,
+    SPACING_SMALL,
     SPACING_TINY,
 )
 from ui.delegates.sprite_gallery_delegate import SpriteGalleryDelegate
@@ -273,6 +274,7 @@ class SpriteGalleryWidget(QWidget):
         controls = QWidget()
         layout = QHBoxLayout()
         layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
+        layout.setSpacing(SPACING_SMALL)
 
         # Thumbnail size slider
         size_label = QLabel("Size:")
