@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.common.spacing_constants import SPACING_SMALL
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE
 
 
@@ -126,6 +127,10 @@ class SearchFiltersWidget(QWidget):
         container = QWidget()
         layout = QGridLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(SPACING_SMALL)
+        layout.setVerticalSpacing(SPACING_SMALL)
+        layout.setColumnStretch(1, 1)  # Min spinbox expands
+        layout.setColumnStretch(3, 1)  # Max spinbox expands
 
         # Size filter
         self.min_size_spin = QSpinBox()
@@ -144,7 +149,7 @@ class SearchFiltersWidget(QWidget):
         size_label.setToolTip(
             "Filter by sprite data size. 16x16 sprites are typically 128-512 bytes."
         )
-        layout.addWidget(size_label, 0, 0)
+        layout.addWidget(size_label, 0, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.min_size_spin, 0, 1)
         layout.addWidget(QLabel("-"), 0, 2)
         layout.addWidget(self.max_size_spin, 0, 3)
@@ -164,7 +169,7 @@ class SearchFiltersWidget(QWidget):
         tile_label.setToolTip(
             "SNES sprites are made of 8x8 tiles. A 16x16 sprite uses 4 tiles."
         )
-        layout.addWidget(tile_label, 1, 0)
+        layout.addWidget(tile_label, 1, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.min_tiles_spin, 1, 1)
         layout.addWidget(QLabel("-"), 1, 2)
         layout.addWidget(self.max_tiles_spin, 1, 3)
@@ -192,7 +197,7 @@ class SearchFiltersWidget(QWidget):
         alignment_label.setToolTip(
             "Some ROMs store sprites at aligned addresses for faster access."
         )
-        layout.addWidget(alignment_label, 3, 0)
+        layout.addWidget(alignment_label, 3, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.alignment_combo, 3, 1, 1, 3)
 
         return container
