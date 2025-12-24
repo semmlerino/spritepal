@@ -32,7 +32,7 @@ from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SP
 from ui.components.dialogs import RangeScanDialog
 from ui.components.visualization import ROMMapWidget
 from ui.rom_extraction.workers import RangeScanWorker
-from ui.styles import get_panel_style
+from ui.styles import get_panel_style, get_section_label_style
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
@@ -91,7 +91,7 @@ class ScanControlsPanel(QWidget):
         layout.setSpacing(SPACING_TINY)
 
         label = QLabel("Enhanced Controls")
-        label.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 4px;")  # Smaller and tighter
+        label.setStyleSheet(get_section_label_style())
         layout.addWidget(label)
 
         # Scan controls

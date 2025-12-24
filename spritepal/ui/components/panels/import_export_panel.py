@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
 from ui.components.visualization import ROMMapWidget
-from ui.styles import get_panel_style
+from ui.styles import get_panel_style, get_section_label_style
 
 
 class ImportExportPanel(QWidget):
@@ -56,7 +56,7 @@ class ImportExportPanel(QWidget):
         layout.setSpacing(SPACING_TINY)
 
         label = QLabel("Import/Export")
-        label.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 4px;")
+        label.setStyleSheet(get_section_label_style())
         layout.addWidget(label)
 
         # Export/Import controls

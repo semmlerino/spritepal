@@ -6,7 +6,11 @@ Provides utilities for safely disconnecting signals and checking Qt object valid
 from __future__ import annotations
 
 import warnings
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
+
+from PySide6.QtCore import QObject
 
 
 def safe_disconnect(signal: Any) -> None:  # pyright: ignore[reportExplicitAny] - Qt signal object
@@ -79,3 +83,35 @@ def is_valid_pixmap(pixmap: object) -> bool:
     if is_null_method is None:
         return False
     return not is_null_method()
+
+
+@contextmanager
+def blocked_signals(widget: QObject) -> Iterator[None]:
+    """Context manager to temporarily block signals from a QObject.
+
+    Useful for updating widget values without triggering connected slots,
+    which is a common pattern when synchronizing slider/spinbox pairs.
+
+    Args:
+        widget: Any QObject whose signals should be temporarily blocked.
+
+    Yields:
+        None. The widget's signals are blocked for the duration of the context.
+
+    Example:
+        from ui.common.signal_utils import blocked_signals
+
+        # Update spinbox without triggering valueChanged signal
+        with blocked_signals(self.spinbox):
+            self.spinbox.setValue(new_value)
+
+        # Sync slider and spinbox without infinite recursion
+        def _on_slider_changed(self, value: int) -> None:
+            with blocked_signals(self.spinbox):
+                self.spinbox.setValue(value)
+    """
+    widget.blockSignals(True)
+    try:
+        yield
+    finally:
+        widget.blockSignals(False)

@@ -580,6 +580,25 @@ def get_bold_text_style(color: str = "default") -> str:
     }}
     """
 
+
+def get_section_label_style() -> str:
+    """
+    Get section title label styling for panels.
+
+    Used for bold section headers in panel widgets like StatusPanel,
+    ScanControlsPanel, and ImportExportPanel.
+
+    Returns:
+        CSS string for bold section labels
+    """
+    return """
+    QLabel {
+        font-weight: bold;
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+    """
+
 def get_success_text_style() -> str:
     """
     Get success text styling CSS (green + bold)

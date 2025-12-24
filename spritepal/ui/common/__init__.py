@@ -15,7 +15,7 @@ from .file_dialogs import (
     browse_for_open_file,
     browse_for_save_file,
 )
-from .signal_utils import is_valid_pixmap, is_valid_qt, safe_disconnect
+from .signal_utils import blocked_signals, is_valid_pixmap, is_valid_qt, safe_disconnect
 from .sprite_search_coordinator import SpriteSearchCoordinator
 
 # Import spacing and sizing constants explicitly
@@ -129,6 +129,7 @@ __all__ = [
     # Error handler functions
     "get_error_handler",
     # Signal utilities
+    "blocked_signals",
     "is_valid_pixmap",
     "is_valid_qt",
     "reset_error_handler",
