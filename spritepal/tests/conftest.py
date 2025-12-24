@@ -257,6 +257,12 @@ def pytest_addoption(parser: Any) -> None:
         default=default_leak_mode,
         help=f"Leak policy: fail or warn for resource/thread leaks. Default: {'fail' if is_ci else 'warn'} ({'CI' if is_ci else 'local'}). Override with SPRITEPAL_LEAK_MODE env var."
     )
+    parser.addoption(
+        "--skip-factory-lint",
+        action="store_true",
+        default=False,
+        help="Skip AST scan for bare RealComponentFactory() calls (faster collection)"
+    )
     # NOTE: --run-segfault-tests option removed - segfault-prone tests have been deleted
 
 
@@ -436,7 +442,8 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     import warnings
 
     # === Check for bare RealComponentFactory() calls ===
-    _check_bare_factory_calls(items)
+    if not config.getoption("--skip-factory-lint", default=False):
+        _check_bare_factory_calls(items)
 
     # === Track real_hal tests for CI visibility ===
     real_hal_tests = [item for item in items if item.get_closest_marker('real_hal')]

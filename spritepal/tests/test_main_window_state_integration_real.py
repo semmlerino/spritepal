@@ -42,7 +42,6 @@ pytestmark = [
 # Import real testing infrastructure
 from tests.infrastructure import (
     ApplicationFactory,
-    DataRepository,
     RealComponentFactory,
 )
 from ui.dialogs.output_settings_dialog import OutputSettingsDialog
@@ -88,7 +87,7 @@ class TestRealMainWindowStateIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
@@ -96,15 +95,14 @@ class TestRealMainWindowStateIntegration:
         # Initialize real manager factory with proper test isolation
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
 
-        # Initialize test data repository
-        self.test_data = DataRepository()
+        # Use pytest-managed test data repository (cleanup handled by fixture)
+        self.test_data = isolated_data_repository
 
         yield
 
         # Cleanup
         self.manager_factory.cleanup()
-        self.test_data.cleanup()
-        # Manager cleanup handled by isolated_managers fixture
+        # Manager and test data cleanup handled by fixtures
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:
@@ -387,17 +385,16 @@ class TestRealMainWindowWorkflowIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
-        self.test_data = DataRepository()
+        self.test_data = isolated_data_repository
 
         yield
 
         self.manager_factory.cleanup()
-        self.test_data.cleanup()
-        # Manager cleanup handled by isolated_managers fixture
+        # Manager and test data cleanup handled by fixtures
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:
@@ -507,17 +504,16 @@ class TestBugDiscoveryRealVsMocked:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
-        self.test_data = DataRepository()
+        self.test_data = isolated_data_repository
 
         yield
 
         self.manager_factory.cleanup()
-        self.test_data.cleanup()
-        # Manager cleanup handled by isolated_managers fixture
+        # Manager and test data cleanup handled by fixtures
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:

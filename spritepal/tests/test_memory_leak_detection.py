@@ -18,6 +18,7 @@ import pytest
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
+    pytest.mark.slow,  # 16MB ROM fixtures, 10k iteration loops
 ]
 
 import gc

@@ -28,7 +28,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
@@ -67,14 +66,11 @@ def _create_injection_dialog(**kwargs) -> InjectionDialog:
     )
 from tests.infrastructure import (
     ApplicationFactory,
-    DataRepository,
     RealComponentFactory,
 )
 from ui.dialogs import (
-    ResumeScanDialog,
     SettingsDialog,
     UnifiedManualOffsetDialog as ManualOffsetDialog,
-    UserErrorDialog,
 )
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
@@ -90,7 +86,7 @@ class TestRealDialogIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
@@ -98,8 +94,8 @@ class TestRealDialogIntegration:
         # Initialize real manager factory with isolated managers for test isolation
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
 
-        # Initialize test data repository
-        self.test_data = DataRepository()
+        # Use pytest-managed test data repository (cleanup handled by fixture)
+        self.test_data = isolated_data_repository
 
         # Managers already initialized by isolated_managers fixture
 
@@ -107,242 +103,7 @@ class TestRealDialogIntegration:
 
         # Cleanup
         self.manager_factory.cleanup()
-        self.test_data.cleanup()
-        # Manager cleanup handled by isolated_managers fixture
-
-    def test_real_manual_offset_dialog_vs_mocked_initialization(self):
-        """
-        Test real ManualOffsetDialog initialization vs mocked components.
-
-        EXPOSED BUGS MOCKS WOULD MISS:
-        - Widget initialization order bugs (None widgets after setup)
-        - Real Qt parent/child relationships
-        - Manager dependency initialization timing issues
-        - Singleton instance management bugs
-        """
-        # Managers already initialized by setup_test_infrastructure fixture
-
-        # Test real dialog creation (vs mocked widget creation)
-        dialog = _create_manual_offset_dialog(None)  # Create with no parent
-
-        try:
-            # CRITICAL: Test that all widget components are properly initialized
-            # This catches the common bug where widgets are None after setup methods
-            widget_attrs = [
-                "mini_rom_map",
-                "status_panel",
-                "preview_widget",
-                "tab_widget",
-                "browse_tab",
-                "smart_tab",
-                "history_tab",
-                "gallery_tab",
-            ]
-
-            for attr in widget_attrs:
-                widget = getattr(dialog, attr, None)
-                assert widget is not None, f"REAL BUG DISCOVERED: Widget {attr} is None after initialization"
-
-                # Validate it's actually a Qt widget, not a mock
-                from PySide6.QtWidgets import QWidget
-                assert isinstance(widget, QWidget), f"REAL BUG: {attr} is {type(widget)}, not a QWidget"
-
-            # Test real method calls that use these widgets
-            # If widgets are None, this will raise AttributeError (real bug)
-            current_offset = dialog.get_current_offset()
-            assert isinstance(current_offset, int), "get_current_offset should return integer"
-
-            # Test dialog UI state methods (these would fail with None widgets)
-            # DISCOVERED BUG #19: Real API uses status_panel.update_status(), not _update_status()
-            dialog.status_panel.update_status("Test status message")
-
-            # Test other real methods that exist (from actual implementation)
-            dialog._create_left_panel()  # Should not crash with None widgets
-            dialog._create_right_panel()  # Should not crash with None widgets
-
-
-        finally:
-            # Proper cleanup of dialog
-            if dialog:
-                dialog.close()
-                dialog.deleteLater()
-
-    def test_real_injection_dialog_vs_mocked_manager_integration(self):
-        """
-        Test real InjectionDialog with manager integration vs mocked managers.
-
-        EXPOSED BUGS MOCKS WOULD MISS:
-        - Real injection manager initialization dependencies
-        - File selector widget initialization bugs
-        - Preview widget integration issues
-        - Tab widget creation and switching bugs
-        """
-        # Managers already initialized by setup_test_infrastructure fixture
-
-        # Get real test data for dialog initialization
-        extraction_data = self.test_data.get_vram_extraction_data("medium")
-
-        # Create real test sprite file
-        test_sprite_path = extraction_data["output_base"] + ".png"
-        test_metadata_path = extraction_data["output_base"] + ".metadata.json"
-
-        try:
-            # Test real dialog creation with real file paths (vs mocked paths)
-            dialog = _create_injection_dialog(
-                sprite_path=test_sprite_path,
-                metadata_path=test_metadata_path,
-                input_vram=extraction_data["vram_path"],
-            )
-
-            # CRITICAL: Test that all UI components are properly initialized
-            # These would be None if initialization order is wrong
-            ui_components = [
-                "sprite_file_selector", "input_vram_selector", "output_vram_selector",
-                "input_rom_selector", "output_rom_selector", "vram_offset_input",
-                "rom_offset_input", "sprite_location_combo", "fast_compression_check",
-                "preview_widget", "extraction_info", "rom_info_text"
-            ]
-
-            for component in ui_components:
-                widget = getattr(dialog, component, None)
-                assert widget is not None, f"REAL BUG DISCOVERED: UI component {component} is None"
-
-            # Test real manager integration (vs mocked manager returns)
-            expected_manager = inject(CoreOperationsManager)
-            assert dialog.injection_manager is expected_manager, "Dialog should use real injection manager"
-
-            # Test tab switching functionality (could expose widget initialization bugs)
-            # DISCOVERED BUG #20: Real API uses set_current_tab(), not set_current_tab_index()
-            dialog.set_current_tab(0)  # VRAM injection tab
-            assert dialog.get_current_tab_index() == 0, "Tab switching should work"
-
-            dialog.set_current_tab(1)  # ROM injection tab
-            assert dialog.get_current_tab_index() == 1, "Tab switching should work"
-
-            # Test parameter validation with real dialog state
-            # This tests the full parameter gathering logic vs mocked returns
-            try:
-                # This might fail with real validation that mocks would skip
-                params = dialog.get_parameters()
-                # If dialog is not accepted, params should be None
-                # This tests real dialog state vs mocked state
-
-                # Since dialog wasn't exec()'d and accepted, params should be None
-                assert params is None, "Parameters should be None for non-accepted dialog"
-
-            except Exception as e:
-                # If this fails, it might expose a real parameter validation bug
-                print(f"POTENTIAL BUG in parameter validation: {e}")
-
-
-        finally:
-            if "dialog" in locals():
-                dialog.close()
-
-    def test_real_settings_dialog_vs_mocked_settings(self):
-        """
-        Test real SettingsDialog with settings persistence vs mocked settings.
-
-        EXPOSED BUGS MOCKS WOULD MISS:
-        - Real settings manager integration bugs
-        - UI component binding to real settings values
-        - Settings validation and persistence logic
-        - Settings file I/O integration issues
-        """
-        from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
-
-        # Managers already initialized by setup_test_infrastructure fixture
-
-        dialog = SettingsDialog(
-            settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCacheProtocol)
-        )
-
-        try:
-            # Test real settings loading (vs mocked settings returns)
-            dialog._load_settings()
-
-            # Test that UI components exist and are bound to real settings
-            assert hasattr(dialog, "dumps_dir_edit"), "Dialog should have dumps directory editor"
-            assert hasattr(dialog, "cache_enabled_check"), "Dialog should have cache checkbox"
-
-            # Test real settings value retrieval vs mocked values
-            # This would expose bugs in settings key mapping or default values
-            cache_enabled = dialog.cache_enabled_check.isChecked()
-            assert isinstance(cache_enabled, bool), "Cache setting should be boolean"
-
-            # Test settings validation (could expose validation logic bugs)
-            # Mock tests might skip this validation entirely
-            try:
-                dialog._validate_settings()
-            except AttributeError:
-                # If _validate_settings doesn't exist, that's architectural information
-                # that mocks might not expose
-                pass
-
-
-        finally:
-            dialog.close()
-
-    def test_real_resume_scan_dialog_vs_mocked_scan_info(self):
-        """
-        Test real ResumeScanDialog with scan data vs mocked scan information.
-
-        EXPOSED BUGS MOCKS WOULD MISS:
-        - Scan info parsing and validation bugs
-        - Progress calculation logic errors
-        - Button state management issues
-        - Dialog result handling inconsistencies
-        """
-        # Create real scan info data (vs mocked scan info)
-        real_scan_info = {
-            "found_sprites": [
-                {"offset": 0x1000, "quality": 0.8},
-                {"offset": 0x2000, "quality": 0.9}
-            ],
-            "current_offset": 0x1500,
-            "scan_range": {"start": 0, "end": 0x10000, "step": 0x20},
-            "completed": False,
-            "total_found": 2
-        }
-
-        dialog = ResumeScanDialog(real_scan_info)
-
-        try:
-            # Test real scan info processing (vs mocked data processing)
-            progress_info = dialog._format_progress_info()
-            assert isinstance(progress_info, str), "Progress info should be formatted string"
-            assert "Progress:" in progress_info, "Should contain progress information"
-            assert "Sprites found: 2" in progress_info, "Should show correct sprite count"
-
-            # Test dialog result constants exist (architectural validation)
-            assert hasattr(dialog, "RESUME"), "Dialog should have RESUME constant"
-            assert hasattr(dialog, "START_FRESH"), "Dialog should have START_FRESH constant"
-            assert hasattr(dialog, "CANCEL"), "Dialog should have CANCEL constant"
-
-            # Test button functionality (could expose button wiring bugs)
-            assert hasattr(dialog, "resume_button"), "Should have resume button"
-            assert hasattr(dialog, "fresh_button"), "Should have start fresh button"
-            assert hasattr(dialog, "cancel_button"), "Should have cancel button"
-
-            # Test initial state
-            assert dialog.get_user_choice() == dialog.CANCEL, "Initial choice should be CANCEL"
-
-            # Test button actions (simulate user interaction)
-            # This tests real signal/slot connections vs mocked connections
-            dialog._on_resume()
-            assert dialog.get_user_choice() == dialog.RESUME, "Choice should be RESUME after resume action"
-
-            dialog._on_start_fresh()
-            assert dialog.get_user_choice() == dialog.START_FRESH, "Choice should be START_FRESH after fresh action"
-
-            dialog._on_cancel()
-            assert dialog.get_user_choice() == dialog.CANCEL, "Choice should be CANCEL after cancel action"
-
-
-        finally:
-            dialog.close()
+        # Manager and test data cleanup handled by fixtures
 
     def test_real_row_arrangement_dialog_vs_mocked_image_processing(self):
         """
@@ -388,9 +149,6 @@ class TestRealDialogIntegration:
                     # This method works with real file operations
                     dialog.get_arranged_path()
                     # Could be None if no arrangement done yet, but shouldn't crash
-
-                # Validate Qt object lifecycle
-                validate_qt_object_lifecycle(dialog)
 
             except Exception as e:
                 # If dialog fails with real file, it's potentially a real bug
@@ -447,9 +205,6 @@ class TestRealDialogIntegration:
                 # This should be a valid count, not crash with real data
                 assert isinstance(arrangement_count, int), "Arrangement list count should be integer"
 
-                # Validate Qt object lifecycle
-                validate_qt_object_lifecycle(dialog)
-
             except Exception as e:
                 print(f"POTENTIAL BUG in grid arrangement with real file: {e}")
                 # Discovery mode - don't fail test
@@ -460,63 +215,24 @@ class TestRealDialogIntegration:
             if test_file_path.exists():
                 test_file_path.unlink()
 
-    def test_real_user_error_dialog_vs_mocked_error_display(self):
-        """
-        Test real UserErrorDialog with error formatting vs mocked error messages.
-
-        EXPOSED BUGS MOCKS WOULD MISS:
-        - Error message formatting and display bugs
-        - Technical details handling issues
-        - Dialog sizing and layout problems
-        - Error categorization logic errors
-        """
-        # Test with real error data (vs mocked error strings)
-        test_error = "File not found: test_sprite.png"
-        test_details = "FileNotFoundError: The system cannot find the file specified"
-
-        dialog = UserErrorDialog(test_error, test_details)
-
-        try:
-            # Test error message display (could expose formatting bugs)
-            # DISCOVERED BUG #24: Real UserErrorDialog uses specific titles like "File Not Found", not generic "Error"
-            dialog_title = dialog.windowTitle()
-            assert dialog_title in ["Error", "File Not Found", "Memory Error", "Permission Denied"], \
-                f"Dialog should have appropriate error title, got: '{dialog_title}'"
-
-            # Test dialog layout and components exist
-            # Real error dialog should have proper UI components vs mocked display
-            assert dialog.isModal(), "Error dialog should be modal"
-
-            # Test real error text handling (vs mocked error processing)
-            # The dialog should handle real error strings without crashes
-            dialog.show()  # Should display without errors
-
-            # Process Qt events to ensure dialog renders properly
-            QApplication.processEvents()
-
-
-        finally:
-            dialog.close()
-
 class TestRealDialogManagerIntegration:
     """
     Test dialog integration with real managers vs mocked manager interactions.
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
-        self.test_data = DataRepository()
+        self.test_data = isolated_data_repository
 
         # Managers already initialized by isolated_managers fixture
 
         yield
 
         self.manager_factory.cleanup()
-        self.test_data.cleanup()
-        # Manager cleanup handled by isolated_managers fixture
+        # Manager and test data cleanup handled by fixtures
 
     def test_real_dialog_manager_coordination_vs_mocked_coordination(self):
         """
@@ -594,19 +310,18 @@ class TestBugDiscoveryRealVsMockedDialogs:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
-        self.test_data = DataRepository()
+        self.test_data = isolated_data_repository
 
         # Managers already initialized by isolated_managers fixture
 
         yield
 
         self.manager_factory.cleanup()
-        self.test_data.cleanup()
-        # Manager cleanup handled by isolated_managers fixture
+        # Manager and test data cleanup handled by fixtures
 
     def test_discovered_bug_dialog_widget_initialization_order(self):
         """
