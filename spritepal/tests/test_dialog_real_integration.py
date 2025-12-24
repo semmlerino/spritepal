@@ -86,7 +86,7 @@ class TestRealDialogIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
@@ -94,16 +94,13 @@ class TestRealDialogIntegration:
         # Initialize real manager factory with isolated managers for test isolation
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
 
-        # Use pytest-managed test data repository (cleanup handled by fixture)
-        self.test_data = isolated_data_repository
-
         # Managers already initialized by isolated_managers fixture
 
         yield
 
         # Cleanup
         self.manager_factory.cleanup()
-        # Manager and test data cleanup handled by fixtures
+        # Manager cleanup handled by fixtures
 
     def test_real_row_arrangement_dialog_vs_mocked_image_processing(self):
         """
@@ -221,18 +218,17 @@ class TestRealDialogManagerIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
-        self.test_data = isolated_data_repository
 
         # Managers already initialized by isolated_managers fixture
 
         yield
 
         self.manager_factory.cleanup()
-        # Manager and test data cleanup handled by fixtures
+        # Manager cleanup handled by fixtures
 
     def test_real_dialog_manager_coordination_vs_mocked_coordination(self):
         """
@@ -310,18 +306,18 @@ class TestBugDiscoveryRealVsMockedDialogs:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
+    def setup_test_infrastructure(self, isolated_managers, session_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
-        self.test_data = isolated_data_repository
+        self.test_data = session_data_repository
 
         # Managers already initialized by isolated_managers fixture
 
         yield
 
         self.manager_factory.cleanup()
-        # Manager and test data cleanup handled by fixtures
+        # Manager cleanup handled by fixtures
 
     def test_discovered_bug_dialog_widget_initialization_order(self):
         """

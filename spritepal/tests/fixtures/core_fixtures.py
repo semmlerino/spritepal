@@ -594,6 +594,30 @@ def isolated_data_repository(tmp_path: Path) -> Generator[Any, None, None]:
     # Cleanup handled automatically by tmp_path fixture
 
 
+@pytest.fixture(scope="session")
+def session_data_repository(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Generator[Any, None, None]:
+    """Session-scoped DataRepository for read-only test data access.
+
+    Use for tests that only READ from DataRepository and don't modify state.
+    Generated files are shared across all tests in the session.
+
+    For tests requiring isolation, use `isolated_data_repository` instead.
+
+    Example:
+        def test_readonly_access(session_data_repository):
+            data = session_data_repository.get_vram_extraction_data("medium")
+            # Use data for read-only operations...
+    """
+    from tests.infrastructure.data_repository import DataRepository
+
+    session_tmp = tmp_path_factory.mktemp("session_data")
+    repo = DataRepository(base_test_data_dir=str(session_tmp))
+    yield repo
+    repo.cleanup()
+
+
 @pytest.fixture
 def real_factory(
     request: pytest.FixtureRequest,

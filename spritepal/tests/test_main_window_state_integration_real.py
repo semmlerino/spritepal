@@ -87,7 +87,7 @@ class TestRealMainWindowStateIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
+    def setup_test_infrastructure(self, isolated_managers, session_data_repository):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = ApplicationFactory.get_application()
@@ -95,14 +95,14 @@ class TestRealMainWindowStateIntegration:
         # Initialize real manager factory with proper test isolation
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
 
-        # Use pytest-managed test data repository (cleanup handled by fixture)
-        self.test_data = isolated_data_repository
+        # Use session-scoped test data repository (read-only, shared across tests)
+        self.test_data = session_data_repository
 
         yield
 
         # Cleanup
         self.manager_factory.cleanup()
-        # Manager and test data cleanup handled by fixtures
+        # Manager cleanup handled by fixtures
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:
@@ -385,16 +385,15 @@ class TestRealMainWindowWorkflowIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
-        self.test_data = isolated_data_repository
 
         yield
 
         self.manager_factory.cleanup()
-        # Manager and test data cleanup handled by fixtures
+        # Manager cleanup handled by fixtures
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:
@@ -417,9 +416,6 @@ class TestRealMainWindowWorkflowIntegration:
         - Real threading integration with UI updates
         """
         with self.main_window_test() as main_window:
-            # Get real test data (vs mock file paths)
-            self.test_data.get_vram_extraction_data("medium")
-
             # Set up real UI for extraction (vs mock UI setup)
             settings = _apply_vram_output_settings(self.qt_app, main_window, "workflow_test")
 
@@ -504,16 +500,15 @@ class TestBugDiscoveryRealVsMocked:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
+    def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
         self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
-        self.test_data = isolated_data_repository
 
         yield
 
         self.manager_factory.cleanup()
-        # Manager and test data cleanup handled by fixtures
+        # Manager cleanup handled by fixtures
 
     @contextmanager
     def main_window_test(self) -> Generator[MainWindow, None, None]:
