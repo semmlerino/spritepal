@@ -19,9 +19,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, SignalInstance
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from core.palette_manager import PaletteManager
     from core.protocols.manager_protocols import ROMExtractorProtocol
 
@@ -69,11 +71,13 @@ class ROMService(QObject):
     # Instance attributes (set in __init__, never None after initialization)
     _rom_extractor: ROMExtractorProtocol
     _palette_manager: PaletteManager
+    _parent_signals: Mapping[str, SignalInstance] | None
 
     def __init__(
         self,
         rom_extractor: ROMExtractorProtocol | None = None,
         palette_manager: PaletteManager | None = None,
+        parent_signals: Mapping[str, SignalInstance] | None = None,
         parent: QObject | None = None,
     ) -> None:
         """
@@ -82,6 +86,8 @@ class ROMService(QObject):
         Args:
             rom_extractor: Optional ROMExtractor instance (uses DI if not provided)
             palette_manager: Optional PaletteManager instance (created if not provided)
+            parent_signals: Optional mapping of signal names to parent signal instances.
+                           When provided, signals are emitted to parent instead of own signals.
             parent: Qt parent object
         """
         super().__init__(parent)
@@ -92,7 +98,20 @@ class ROMService(QObject):
             rom_extractor = inject(ROMExtractorProtocol)
         self._rom_extractor = rom_extractor
         self._palette_manager = palette_manager or PaletteManager()
+        self._parent_signals = parent_signals
         self._logger.info("ROMService initialized")
+
+    def _emit(self, signal_name: str, *args: object) -> None:
+        """Emit to parent signal if available, otherwise emit to own signal.
+
+        Args:
+            signal_name: Name of the signal to emit
+            *args: Arguments to pass to the signal
+        """
+        if self._parent_signals and signal_name in self._parent_signals:
+            self._parent_signals[signal_name].emit(*args)
+        else:
+            getattr(self, signal_name).emit(*args)
 
     def cleanup(self) -> None:
         """Cleanup service resources.
@@ -149,83 +168,65 @@ class ROMService(QObject):
         if cgram_path:
             FileValidator.validate_cgram_file_or_raise(cgram_path)
 
-        try:
-            extracted_files = []
-            palette_extraction_failed = False
-            palette_error_msg = ""
+        extracted_files: list[str] = []
+        palette_extraction_failed = False
+        palette_error_msg = ""
 
-            # Extract from ROM
-            self.extraction_progress.emit(f"Extracting {sprite_name} from ROM...")
+        # Extract from ROM
+        self._emit("extraction_progress", f"Extracting {sprite_name} from ROM...")
 
-            # Pass output_base (without .png) and sprite_name to extractor
-            # Extractor appends .png internally and returns the actual output path
-            output_path, _extraction_info = self._rom_extractor.extract_sprite_from_rom(
-                rom_path, offset, output_base, sprite_name
-            )
+        # Pass output_base (without .png) and sprite_name to extractor
+        # Extractor appends .png internally and returns the actual output path
+        output_path, _extraction_info = self._rom_extractor.extract_sprite_from_rom(
+            rom_path, offset, output_base, sprite_name
+        )
 
-            if output_path:
-                # Create PIL image for preview using context manager to prevent resource leak
-                with Image.open(output_path) as img:
-                    tile_count = (img.width * img.height) // (8 * 8)
-                    # Copy image data before context exits (signal receiver needs valid data)
-                    img_copy = img.copy()
+        if output_path:
+            # Create PIL image for preview using context manager to prevent resource leak
+            with Image.open(output_path) as img:
+                tile_count = (img.width * img.height) // (8 * 8)
+                # Copy image data before context exits (signal receiver needs valid data)
+                img_copy = img.copy()
 
-                extracted_files.append(output_path)
-                self.preview_generated.emit(img_copy, tile_count)
+            extracted_files.append(output_path)
+            self._emit("preview_generated", img_copy, tile_count)
 
-                # Extract palettes if CGRAM provided - catch errors for partial success
-                if cgram_path:
-                    try:
-                        extracted_files.extend(
-                            self._extract_palettes(
-                                cgram_path,
-                                output_base,
-                                output_path,
-                                None,
-                                rom_path,
-                                offset,
-                                tile_count,
-                                True,
-                                True,
-                            )
+            # Extract palettes if CGRAM provided - catch errors for partial success
+            if cgram_path:
+                try:
+                    extracted_files.extend(
+                        self._extract_palettes(
+                            cgram_path,
+                            output_base,
+                            output_path,
+                            None,
+                            rom_path,
+                            offset,
+                            tile_count,
+                            True,
+                            True,
                         )
-                    except Exception as e:
-                        # Log and track palette failure but don't fail sprite extraction
-                        palette_extraction_failed = True
-                        palette_error_msg = str(e)
-                        self._logger.warning(f"Palette extraction failed: {e}")
-            else:
-                raise ExtractionError("Failed to extract sprite from ROM")
+                    )
+                except Exception as e:
+                    # Log and track palette failure but don't fail sprite extraction
+                    palette_extraction_failed = True
+                    palette_error_msg = str(e)
+                    self._logger.warning(f"Palette extraction failed: {e}")
+        else:
+            raise ExtractionError("Failed to extract sprite from ROM")
 
-            # Emit appropriate completion message
-            if palette_extraction_failed:
-                self.extraction_warning.emit(
-                    f"Sprite extracted but palette extraction failed: {palette_error_msg}"
-                )
-                self.extraction_progress.emit("ROM extraction complete (palettes failed)")
-            else:
-                self.extraction_progress.emit("ROM extraction complete!")
+        # Emit appropriate completion message
+        if palette_extraction_failed:
+            self._emit(
+                "extraction_warning",
+                f"Sprite extracted but palette extraction failed: {palette_error_msg}",
+            )
+            self._emit("extraction_progress", "ROM extraction complete (palettes failed)")
+        else:
+            self._emit("extraction_progress", "ROM extraction complete!")
 
-            self.files_created.emit(extracted_files)
-            return extracted_files
-
-        except (OSError, PermissionError) as e:
-            error_msg = f"File I/O error during ROM extraction: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise
-        except (ValueError, TypeError) as e:
-            error_msg = f"Data format error during ROM extraction: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise
-        except Exception as e:
-            if not isinstance(e, ExtractionError):
-                error_msg = f"ROM extraction failed: {e}"
-                self._logger.error(error_msg)
-                self.error_occurred.emit(error_msg)
-                raise ExtractionError(error_msg) from e
-            raise
+        self._emit("files_created", extracted_files)
+        return extracted_files
 
     def get_sprite_preview(
         self,
@@ -251,58 +252,41 @@ class ROMService(QObject):
         FileValidator.validate_rom_file_exists_or_raise(rom_path)
         self._validate_offset(offset)
 
-        try:
-            name = sprite_name or f"offset_0x{offset:X}"
-            self._logger.debug(f"Generating preview for {name} at offset 0x{offset:X}")
+        name = sprite_name or f"offset_0x{offset:X}"
+        self._logger.debug(f"Generating preview for {name} at offset 0x{offset:X}")
 
-            # Calculate preview dimensions and expected data size
-            width = DEFAULT_PREVIEW_WIDTH
-            height = DEFAULT_PREVIEW_HEIGHT
-            tile_count = (width * height) // (8 * 8)
-            expected_bytes = tile_count * BYTES_PER_TILE
+        # Calculate preview dimensions and expected data size
+        width = DEFAULT_PREVIEW_WIDTH
+        height = DEFAULT_PREVIEW_HEIGHT
+        tile_count = (width * height) // (8 * 8)
+        expected_bytes = tile_count * BYTES_PER_TILE
 
-            # Validate offset against ROM size BEFORE reading
-            rom_size = Path(rom_path).stat().st_size
-            if offset >= rom_size:
-                raise ValueError(f"Offset 0x{offset:X} exceeds ROM size 0x{rom_size:X}")
+        # Validate offset against ROM size BEFORE reading
+        rom_size = Path(rom_path).stat().st_size
+        if offset >= rom_size:
+            raise ValueError(f"Offset 0x{offset:X} exceeds ROM size 0x{rom_size:X}")
 
-            available_bytes = rom_size - offset
-            if expected_bytes > available_bytes:
-                raise ValueError(
-                    f"Insufficient data at offset 0x{offset:X}: "
-                    f"need {expected_bytes} bytes, only {available_bytes} available"
+        available_bytes = rom_size - offset
+        if expected_bytes > available_bytes:
+            raise ValueError(
+                f"Insufficient data at offset 0x{offset:X}: "
+                f"need {expected_bytes} bytes, only {available_bytes} available"
+            )
+
+        # Read raw data from ROM with validation
+        with Path(rom_path).open("rb") as f:
+            f.seek(offset)
+            # 4bpp = 32 bytes per tile
+            tile_data = f.read(expected_bytes)
+
+            # Verify we got the expected amount of data
+            if len(tile_data) != expected_bytes:
+                raise OSError(
+                    f"Incomplete read at offset 0x{offset:X}: "
+                    f"got {len(tile_data)}/{expected_bytes} bytes"
                 )
 
-            # Read raw data from ROM with validation
-            with Path(rom_path).open("rb") as f:
-                f.seek(offset)
-                # 4bpp = 32 bytes per tile
-                tile_data = f.read(expected_bytes)
-
-                # Verify we got the expected amount of data
-                if len(tile_data) != expected_bytes:
-                    raise OSError(
-                        f"Incomplete read at offset 0x{offset:X}: "
-                        f"got {len(tile_data)}/{expected_bytes} bytes"
-                    )
-
-            return tile_data, width, height
-
-        except (OSError, PermissionError) as e:
-            error_msg = f"File I/O error during preview generation: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise
-        except (ValueError, TypeError) as e:
-            error_msg = f"Data format error during preview generation: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise
-        except Exception as e:
-            error_msg = f"Preview generation failed: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise ExtractionError(error_msg) from e
+        return tile_data, width, height
 
     def extract_sprite_to_png(
         self,
@@ -340,8 +324,8 @@ class ROMService(QObject):
             # Return True if any files were created
             return len(created_files) > 0
 
-        except (ExtractionError, ValidationError) as e:
-            self.error_occurred.emit(f"Sprite extraction failed: {e}")
+        except (ExtractionError, ValidationError):
+            # Return False for interface compatibility; exceptions propagate to manager
             return False
 
     def get_known_sprite_locations(self, rom_path: str) -> dict[str, object]:
@@ -357,61 +341,44 @@ class ROMService(QObject):
         Raises:
             ExtractionError: If operation fails
         """
-        try:
-            # Validate ROM file exists
-            FileValidator.validate_rom_file_exists_or_raise(rom_path)
+        # Validate ROM file exists
+        FileValidator.validate_rom_file_exists_or_raise(rom_path)
 
-            # Try to load from cache first
-            start_time = time.time()
-            from core.di_container import inject
-            from core.protocols.manager_protocols import ROMCacheProtocol
-            rom_cache = inject(ROMCacheProtocol)
+        # Try to load from cache first
+        start_time = time.time()
+        from core.di_container import inject
+        from core.protocols.manager_protocols import ROMCacheProtocol
+        rom_cache = inject(ROMCacheProtocol)
 
-            # Signal that cache loading operation is starting
-            self.cache_operation_started.emit("Loading", "sprite_locations")
-            cached_locations = rom_cache.get_sprite_locations(rom_path)
+        # Signal that cache loading operation is starting
+        self._emit("cache_operation_started", "Loading", "sprite_locations")
+        cached_locations = rom_cache.get_sprite_locations(rom_path)
 
-            if cached_locations:
-                time_saved = 2.5  # Estimated time saved by not scanning ROM
-                self._logger.debug(f"Loaded sprite locations from cache: {rom_path}")
-                self.cache_hit.emit("sprite_locations", time_saved)
-                return dict(cached_locations)  # Convert Mapping to dict
+        if cached_locations:
+            time_saved = 2.5  # Estimated time saved by not scanning ROM
+            self._logger.debug(f"Loaded sprite locations from cache: {rom_path}")
+            self._emit("cache_hit", "sprite_locations", time_saved)
+            return dict(cached_locations)  # Convert Mapping to dict
 
-            # Cache miss - scan ROM file
-            self._logger.debug(f"Cache miss, scanning ROM for sprite locations: {rom_path}")
-            self.cache_miss.emit("sprite_locations")
-            locations = self._rom_extractor.get_known_sprite_locations(rom_path)
-            scan_time = time.time() - start_time
+        # Cache miss - scan ROM file
+        self._logger.debug(f"Cache miss, scanning ROM for sprite locations: {rom_path}")
+        self._emit("cache_miss", "sprite_locations")
+        locations = self._rom_extractor.get_known_sprite_locations(rom_path)
+        scan_time = time.time() - start_time
 
-            # Save to cache for future use
-            if locations:
-                # Signal that cache saving operation is starting
-                self.cache_operation_started.emit("Saving", "sprite_locations")
-                cache_success = rom_cache.save_sprite_locations(rom_path, locations)
-                if cache_success:
-                    self._logger.debug(
-                        f"Cached {len(locations)} sprite locations for future use "
-                        f"(scan took {scan_time:.1f}s)"
-                    )
-                    self.cache_saved.emit("sprite_locations", len(locations))
+        # Save to cache for future use
+        if locations:
+            # Signal that cache saving operation is starting
+            self._emit("cache_operation_started", "Saving", "sprite_locations")
+            cache_success = rom_cache.save_sprite_locations(rom_path, locations)
+            if cache_success:
+                self._logger.debug(
+                    f"Cached {len(locations)} sprite locations for future use "
+                    f"(scan took {scan_time:.1f}s)"
+                )
+                self._emit("cache_saved", "sprite_locations", len(locations))
 
-            return dict(locations)  # Convert Mapping to dict
-
-        except (OSError, PermissionError) as e:
-            error_msg = f"File I/O error getting sprite locations: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise
-        except (ImportError, AttributeError) as e:
-            error_msg = f"ROM analysis not available: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise ExtractionError(error_msg) from e
-        except Exception as e:
-            error_msg = f"Getting sprite locations failed: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise ExtractionError(error_msg) from e
+        return dict(locations)  # Convert Mapping to dict
 
     def read_rom_header(self, rom_path: str) -> dict[str, object]:
         """
@@ -426,28 +393,12 @@ class ROMService(QObject):
         Raises:
             ExtractionError: If operation fails
         """
-        try:
-            # Validate ROM file exists
-            FileValidator.validate_rom_file_exists_or_raise(rom_path)
+        # Validate ROM file exists
+        FileValidator.validate_rom_file_exists_or_raise(rom_path)
 
-            # Protocol defines rom_injector as object, runtime has read_rom_header method
-            header = self._rom_extractor.rom_injector.read_rom_header(rom_path)  # pyright: ignore[reportAttributeAccessIssue] - runtime type is ROMInjector
-            return asdict(header)
-        except (OSError, PermissionError) as e:
-            error_msg = f"File I/O error reading ROM header: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise
-        except (ValueError, TypeError) as e:
-            error_msg = f"Data format error reading ROM header: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise
-        except Exception as e:
-            error_msg = f"Reading ROM header failed: {e}"
-            self._logger.error(error_msg)
-            self.error_occurred.emit(error_msg)
-            raise ExtractionError(error_msg) from e
+        # Protocol defines rom_injector as object, runtime has read_rom_header method
+        header = self._rom_extractor.rom_injector.read_rom_header(rom_path)  # pyright: ignore[reportAttributeAccessIssue] - runtime type is ROMInjector
+        return asdict(header)
 
     # Private helper methods
 
@@ -469,18 +420,18 @@ class ROMService(QObject):
         Returns:
             List of created file paths
         """
-        created_files = []
+        created_files: list[str] = []
 
-        self.extraction_progress.emit("Extracting palettes...")
+        self._emit("extraction_progress", "Extracting palettes...")
         self._palette_manager.load_cgram(cgram_path)
 
         # Get sprite palettes
         sprite_palettes = self._palette_manager.get_sprite_palettes()
-        self.palettes_extracted.emit(sprite_palettes)
+        self._emit("palettes_extracted", sprite_palettes)
 
         # Create palette files
         if create_grayscale:
-            self.extraction_progress.emit("Creating palette files...")
+            self._emit("extraction_progress", "Creating palette files...")
 
             # Create main palette file (default to palette 8)
             main_pal_file = f"{output_base}.pal.json"
@@ -497,7 +448,7 @@ class ROMService(QObject):
 
             # Create metadata file
             if create_metadata:
-                self.extraction_progress.emit("Creating metadata file...")
+                self._emit("extraction_progress", "Creating metadata file...")
 
                 # Prepare extraction parameters
                 extraction_params = {
@@ -514,9 +465,9 @@ class ROMService(QObject):
 
         # Analyze OAM if available
         if oam_path:
-            self.extraction_progress.emit("Analyzing sprite palette usage...")
+            self._emit("extraction_progress", "Analyzing sprite palette usage...")
             active_palettes = self._palette_manager.analyze_oam_palettes(oam_path)
-            self.active_palettes_found.emit(active_palettes)
+            self._emit("active_palettes_found", active_palettes)
 
         return created_files
 

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 from PIL import Image
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal, SignalInstance
 
 from core.exceptions import (
     ExtractionError,
@@ -110,23 +110,26 @@ class CoreOperationsManager(BaseManager):
             from core.protocols.manager_protocols import ROMExtractorProtocol
             self._rom_extractor = inject(ROMExtractorProtocol)
 
-            # Initialize services
+            # Get signal mappings for services to emit directly to manager signals
+            rom_signals = self._get_rom_service_signals()
+            vram_signals = self._get_vram_service_signals()
+
+            # Initialize services with parent signals
             self._rom_service = ROMService(
                 rom_extractor=self._rom_extractor,
                 palette_manager=self._palette_manager,
+                parent_signals=rom_signals,
                 parent=self,
             )
             self._vram_service = VRAMService(
                 sprite_extractor=self._sprite_extractor,
                 palette_manager=self._palette_manager,
+                parent_signals=vram_signals,
                 parent=self,
             )
             self._path_suggestion_service = PathSuggestionService(
                 session_manager_getter=self._get_session_manager
             )
-
-            # Connect service signals for backward compatibility
-            self._connect_service_signals()
 
             self._is_initialized = True
             self._logger.info("CoreOperationsManager initialized successfully")
@@ -135,31 +138,33 @@ class CoreOperationsManager(BaseManager):
             self._handle_error(e, "initialization")
             raise
 
-    def _connect_service_signals(self) -> None:
-        """Connect service signals to manager signals for backward compatibility."""
-        if self._rom_service:
-            # Forward ROM service signals
-            self._rom_service.extraction_progress.connect(self.extraction_progress)
-            self._rom_service.extraction_warning.connect(self.extraction_warning)
-            self._rom_service.preview_generated.connect(self.preview_generated)
-            self._rom_service.palettes_extracted.connect(self.palettes_extracted)
-            self._rom_service.active_palettes_found.connect(self.active_palettes_found)
-            self._rom_service.files_created.connect(self.files_created)
-            self._rom_service.cache_operation_started.connect(self.cache_operation_started)
-            self._rom_service.cache_hit.connect(self.cache_hit)
-            self._rom_service.cache_miss.connect(self.cache_miss)
-            self._rom_service.cache_saved.connect(self.cache_saved)
-            self._rom_service.error_occurred.connect(self.error_occurred)
+    def _get_rom_service_signals(self) -> dict[str, SignalInstance]:
+        """Get signal mapping for ROMService to emit to manager signals."""
+        return {
+            "extraction_progress": self.extraction_progress,
+            "extraction_warning": self.extraction_warning,
+            "preview_generated": self.preview_generated,
+            "palettes_extracted": self.palettes_extracted,
+            "active_palettes_found": self.active_palettes_found,
+            "files_created": self.files_created,
+            "cache_operation_started": self.cache_operation_started,
+            "cache_hit": self.cache_hit,
+            "cache_miss": self.cache_miss,
+            "cache_saved": self.cache_saved,
+            "error_occurred": self.error_occurred,
+        }
 
-        if self._vram_service:
-            # Forward VRAM service signals
-            self._vram_service.extraction_progress.connect(self.extraction_progress)
-            self._vram_service.extraction_warning.connect(self.extraction_warning)
-            self._vram_service.preview_generated.connect(self.preview_generated)
-            self._vram_service.palettes_extracted.connect(self.palettes_extracted)
-            self._vram_service.active_palettes_found.connect(self.active_palettes_found)
-            self._vram_service.files_created.connect(self.files_created)
-            self._vram_service.error_occurred.connect(self.error_occurred)
+    def _get_vram_service_signals(self) -> dict[str, SignalInstance]:
+        """Get signal mapping for VRAMService to emit to manager signals."""
+        return {
+            "extraction_progress": self.extraction_progress,
+            "extraction_warning": self.extraction_warning,
+            "preview_generated": self.preview_generated,
+            "palettes_extracted": self.palettes_extracted,
+            "active_palettes_found": self.active_palettes_found,
+            "files_created": self.files_created,
+            "error_occurred": self.error_occurred,
+        }
 
     @override
     def cleanup(self) -> None:
