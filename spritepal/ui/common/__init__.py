@@ -16,6 +16,7 @@ from .file_dialogs import (
     browse_for_save_file,
 )
 from .signal_utils import is_valid_pixmap, is_valid_qt, safe_disconnect
+from .sprite_search_coordinator import SpriteSearchCoordinator
 
 # Import spacing and sizing constants explicitly
 # NOTE: Color constants moved to ui/styles/theme.py - use COLORS dict instead
@@ -119,6 +120,7 @@ __all__ = [
     "CollapsibleGroupBox",
     "ErrorHandler",
     "FileDialogHelper",
+    "SpriteSearchCoordinator",
     "WorkerManager",
     # File dialog functions
     "browse_for_directory",
