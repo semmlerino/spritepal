@@ -23,6 +23,7 @@ from core.managers.core_operations_manager import CoreOperationsManager
 from core.services.rom_service import ROMService
 from ui.injection_dialog import InjectionDialog
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
+from utils.file_validator import FileValidator
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -70,16 +71,15 @@ class TestROMServicePathHandling:
         service = ROMService()
         service._rom_extractor = mock_extractor
 
-        # Execute
-        with patch.object(service, "_validate_rom_file"):
-            with patch.object(service, "_validate_offset"):
-                result = service.extract_from_rom(
-                    str(rom_path),
-                    offset=0x1000,
-                    output_base=output_base,
-                    sprite_name="test_sprite",
-                    cgram_path=None,
-                )
+        # Execute - patch FileValidator to skip validation (test is about path handling)
+        with patch.object(FileValidator, "validate_rom_file_or_raise"):
+            result = service.extract_from_rom(
+                str(rom_path),
+                offset=0x1000,
+                output_base=output_base,
+                sprite_name="test_sprite",
+                cgram_path=None,
+            )
 
         # Verify: extractor was called with base path (no .png)
         mock_extractor.extract_sprite_from_rom.assert_called_once()

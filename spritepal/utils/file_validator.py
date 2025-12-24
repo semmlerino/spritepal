@@ -864,6 +864,22 @@ class FileValidator:
                 result.error_message or f"ROM file not found: {path}"
             )
 
+    @classmethod
+    def validate_rom_file_or_raise(cls, path: str) -> None:
+        """Validate ROM file with comprehensive checks and raise ValidationError if invalid.
+
+        Args:
+            path: Path to ROM file
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        result = cls.validate_rom_file(path)
+        if not result.is_valid:
+            raise ValidationError(
+                result.error_message or f"Invalid ROM file: {path}"
+            )
+
 
 # Windows-specific constants for atomic file operations
 _IS_WINDOWS = sys.platform == "win32"

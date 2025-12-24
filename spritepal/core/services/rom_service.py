@@ -161,8 +161,9 @@ class ROMService(QObject):
             ValidationError: If parameters are invalid
         """
         # Validate parameters
-        self._validate_rom_file(rom_path)
-        self._validate_offset(offset)
+        FileValidator.validate_rom_file_or_raise(rom_path)
+        if offset < 0:
+            raise ValidationError(f"offset must be >= 0, got {offset}")
         if cgram_path:
             FileValidator.validate_cgram_file_or_raise(cgram_path)
 
@@ -248,7 +249,8 @@ class ROMService(QObject):
         """
         # Validate parameters
         FileValidator.validate_rom_file_exists_or_raise(rom_path)
-        self._validate_offset(offset)
+        if offset < 0:
+            raise ValidationError(f"offset must be >= 0, got {offset}")
 
         name = sprite_name or f"offset_0x{offset:X}"
         self._logger.debug(f"Generating preview for {name} at offset 0x{offset:X}")
@@ -435,15 +437,3 @@ class ROMService(QObject):
             create_metadata=create_metadata,
             emit=self._emit,
         )
-
-    def _validate_rom_file(self, rom_path: str) -> None:
-        """Validate ROM file exists and has correct extension."""
-        result = FileValidator.validate_rom_file(rom_path)
-        if not result.is_valid:
-            raise ValidationError(result.error_message or f"Invalid ROM file: {rom_path}")
-
-    def _validate_offset(self, offset: int) -> None:
-        """Validate offset is a non-negative integer."""
-        # Type checking enforces int type; only validate non-negative
-        if offset < 0:
-            raise ValidationError(f"offset must be >= 0, got {offset}")
