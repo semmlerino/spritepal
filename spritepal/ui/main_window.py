@@ -44,11 +44,9 @@ from ui.common.spacing_constants import (
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
     OutputSettingsManager,
-    PreviewCoordinator,
-    SessionCoordinator,
     StatusBarManager,
-    TabCoordinator,
     ToolbarManager,
+    UICoordinator,
 )
 from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
@@ -104,9 +102,7 @@ class MainWindow(QMainWindow):
         self.toolbar_manager: ToolbarManager
         self.status_bar_manager: StatusBarManager
         self.output_settings_manager: OutputSettingsManager
-        self.tab_coordinator: TabCoordinator
-        self.preview_coordinator: PreviewCoordinator
-        self.session_coordinator: SessionCoordinator
+        self.ui_coordinator: UICoordinator
 
         self._output_path = ""
         self._extracted_files = []
@@ -120,7 +116,7 @@ class MainWindow(QMainWindow):
         # This breaks the circular dependency: tests can create MainWindow without hanging
 
         # Restore session after UI is set up
-        self.session_coordinator.restore_session()
+        self.ui_coordinator.restore_session()
 
         # Update initial UI state (after managers are fully set up)
         self._update_initial_ui_state()
@@ -144,13 +140,13 @@ class MainWindow(QMainWindow):
         # Left panel - Input and controls
         self.left_panel = self._create_left_panel()
 
-        # Right panel - Previews (will be created by PreviewCoordinator)
+        # Right panel - Previews (will be created by UICoordinator)
         self.sprite_preview = PreviewPanel()
         self.palette_preview = PalettePreviewWidget()
 
         # Add panels to main splitter (right panel created by manager)
         self.main_splitter.addWidget(self.left_panel)
-        # Right panel will be added by PreviewCoordinator
+        # Right panel will be added by UICoordinator
 
         # Configure main splitter with proper stretch factors
         # Calculate initial sizes based on DEFAULT_SPLITTER_RATIO
@@ -254,25 +250,23 @@ class MainWindow(QMainWindow):
         )
 
         self.toolbar_manager = ToolbarManager(self, self)
-        self.preview_coordinator = PreviewCoordinator(self.sprite_preview, self.palette_preview)
+
+        # Consolidated UI coordinator handles preview, session, and tab operations
+        self.ui_coordinator = UICoordinator(
+            sprite_preview=self.sprite_preview,
+            palette_preview=self.palette_preview,
+            main_window=self,
+            extraction_panel=self.extraction_panel,
+            output_settings_manager=self.output_settings_manager,
+            session_manager=self.session_manager,
+            extraction_tabs=self.extraction_tabs,
+            rom_extraction_panel=self.rom_extraction_panel,
+            toolbar_manager=self.toolbar_manager,
+            actions_handler=self,
+        )
 
         # Backward compatibility: expose preview_info for existing code/tests
-        self.preview_info = self.preview_coordinator.preview_info
-
-        self.session_coordinator = SessionCoordinator(
-            self, self.extraction_panel, self.output_settings_manager,
-            session_manager=self.session_manager
-        )
-
-        # Tab coordinator needs several managers
-        self.tab_coordinator = TabCoordinator(
-            self.extraction_tabs,
-            self.rom_extraction_panel,
-            self.extraction_panel,
-            self.output_settings_manager,
-            self.toolbar_manager,
-            self
-        )
+        self.preview_info = self.ui_coordinator.preview_info
 
         # Initialize manager UIs
         self._create_menus()
@@ -290,7 +284,7 @@ class MainWindow(QMainWindow):
             action_zone_layout.addLayout(button_layout)
 
         # Add preview panel to main splitter
-        right_panel = self.preview_coordinator.create_preview_panel(self)
+        right_panel = self.ui_coordinator.create_preview_panel(self)
         self.main_splitter.addWidget(right_panel)
         right_panel.setMinimumWidth(MIN_PANEL_WIDTH)
         # Ensure right panel has proper size policy
@@ -315,14 +309,14 @@ class MainWindow(QMainWindow):
         # Reset UI
         self.extraction_panel.clear_files()
         self.output_settings_manager.clear_output_name()
-        self.preview_coordinator.clear_previews()
+        self.ui_coordinator.clear_previews()
         self.toolbar_manager.reset_buttons()
         self._output_path = ""
         self._extracted_files = []
         self.status_bar_manager.show_message("Ready to extract sprites")
 
         # Clear session data
-        self.session_coordinator.clear_session()
+        self.ui_coordinator.clear_session()
 
     def show_settings(self) -> None:
         """Show the settings dialog"""
@@ -383,7 +377,7 @@ class MainWindow(QMainWindow):
         from ui.dialogs import OutputSettingsDialog
 
         # Determine if we're in ROM mode (affects dialog options)
-        is_rom_mode = self.tab_coordinator.is_rom_tab_active()
+        is_rom_mode = self.ui_coordinator.is_rom_tab_active()
 
         # Get suggested output name from the current state
         suggested_name = self.output_settings_manager.get_output_name()
@@ -452,7 +446,7 @@ class MainWindow(QMainWindow):
         vram_path = current_files.get("vram_path", "")
         return str(vram_path) if vram_path else ""
 
-    # TabCoordinatorActionsProtocol
+    # UICoordinator.TabCoordinatorActionsProtocol
     def get_rom_extraction_params(self) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - Extraction configuration
         """Get ROM extraction parameters"""
         return self.rom_extraction_panel.get_extraction_params()
@@ -475,7 +469,7 @@ class MainWindow(QMainWindow):
     # KeyboardActionsProtocol
     def can_open_manual_offset_dialog(self) -> bool:
         """Check if manual offset dialog can be opened"""
-        return (self.tab_coordinator.is_rom_tab_active() and
+        return (self.ui_coordinator.is_rom_tab_active() and
                 hasattr(self.rom_extraction_panel, "_manual_offset_mode") and
                 self.rom_extraction_panel._manual_offset_mode)
 
@@ -710,12 +704,12 @@ class MainWindow(QMainWindow):
             self.output_settings_manager.set_output_name(output_name)
 
         # Save session data when files change
-        self.session_coordinator.save_session()
+        self.ui_coordinator.save_session()
 
     def _on_vram_extraction_ready(self, ready: bool, reason: str = "") -> None:
         """Handle VRAM extraction ready state change"""
         # Only enable if VRAM tab is active
-        if self.tab_coordinator.is_vram_tab_active():
+        if self.ui_coordinator.is_vram_tab_active():
             self.toolbar_manager.set_extract_enabled(ready, reason)
 
     def _on_extraction_mode_changed(self, mode_index: int) -> None:
@@ -727,7 +721,7 @@ class MainWindow(QMainWindow):
     def _on_rom_extraction_ready(self, ready: bool, reason: str = "") -> None:
         """Handle ROM extraction ready state change"""
         # Only enable if ROM tab is active
-        if self.tab_coordinator.is_rom_tab_active():
+        if self.ui_coordinator.is_rom_tab_active():
             self.toolbar_manager.set_extract_enabled(ready, reason)
 
     def _on_rom_files_changed(self) -> None:
@@ -739,7 +733,7 @@ class MainWindow(QMainWindow):
         # Update main output field without triggering sync back
         self.output_settings_manager.set_output_name(text)
 
-    # Tab change handling now managed by TabCoordinator
+    # Tab change handling now managed by UICoordinator
 
     # Browse output now handled by OutputSettingsManager
 
@@ -829,7 +823,7 @@ class MainWindow(QMainWindow):
             self.toolbar_manager.set_post_extraction_buttons_enabled(True)
 
             # Update preview info with successful extraction
-            self.preview_coordinator.update_preview_info(f"Extracted {len(extracted_files)} files")
+            self.ui_coordinator.update_preview_info(f"Extracted {len(extracted_files)} files")
             self.status_bar_manager.show_message("Extraction complete!")
         else:
             # No PNG file found - this shouldn't happen with successful extraction
@@ -854,14 +848,14 @@ class MainWindow(QMainWindow):
         # Emit signal for controller/test communication
         self.extraction_error_occurred.emit(error_message)
 
-    # Session restore/save now handled by SessionCoordinator
+    # Session restore/save now handled by UICoordinator
 
-    # Session save now handled by SessionCoordinator
+    # Session save now handled by UICoordinator
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         """Handle window close event."""
-        self.session_coordinator.save_session()
+        self.ui_coordinator.save_session()
         self._cleanup_managers()
         if a0:
             super().closeEvent(a0)
@@ -878,9 +872,7 @@ class MainWindow(QMainWindow):
             self.status_bar_manager,
             self.output_settings_manager,
             self.toolbar_manager,
-            self.preview_coordinator,
-            self.session_coordinator,
-            self.tab_coordinator,
+            self.ui_coordinator,
         ]
         for manager in managers:
             cleanup_fn = getattr(manager, "cleanup", None)
@@ -943,14 +935,14 @@ class MainWindow(QMainWindow):
 
     def _navigate_to_next_tab(self) -> None:
         """Navigate to next tab"""
-        current = self.tab_coordinator.get_current_tab_index()
+        current = self.ui_coordinator.get_current_tab_index()
         tab_count = self.extraction_tabs.count()
         next_tab = (current + 1) % tab_count
         self.extraction_tabs.setCurrentIndex(next_tab)
 
     def _navigate_to_previous_tab(self) -> None:
         """Navigate to previous tab"""
-        current = self.tab_coordinator.get_current_tab_index()
+        current = self.ui_coordinator.get_current_tab_index()
         tab_count = self.extraction_tabs.count()
         prev_tab = (current - 1) % tab_count
         self.extraction_tabs.setCurrentIndex(prev_tab)

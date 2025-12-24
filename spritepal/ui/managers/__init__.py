@@ -10,20 +10,16 @@ from .output_settings_manager import (
     OutputSettingsActionsProtocol,
     OutputSettingsManager,
 )
-from .preview_coordinator import PreviewCoordinator
-from .session_coordinator import SessionCoordinator
 from .status_bar_manager import StatusBarManager
-from .tab_coordinator import TabCoordinator, TabCoordinatorActionsProtocol
 from .toolbar_manager import ToolbarActionsProtocol, ToolbarManager
+from .ui_coordinator import TabCoordinatorActionsProtocol, UICoordinator
 
 __all__ = [
     "OutputSettingsActionsProtocol",
     "OutputSettingsManager",
-    "PreviewCoordinator",
-    "SessionCoordinator",
     "StatusBarManager",
-    "TabCoordinator",
     "TabCoordinatorActionsProtocol",
     "ToolbarActionsProtocol",
     "ToolbarManager",
+    "UICoordinator",
 ]
