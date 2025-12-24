@@ -35,8 +35,7 @@ Application Entry Point (launch_spritepal.py)
     │                          ▼                                    │
     │  4. Create CoreOperationsManager                              │
     │     • Handles: extraction, injection, palette, nav            │
-    │     • Registers: ExtractionManagerProtocol,                   │
-    │                  InjectionManagerProtocol                     │
+    │     • Registered as: CoreOperationsManager (concrete class)   │
     └───────────────────────────────────────────────────────────────┘
                     │
                     ▼
@@ -162,7 +161,7 @@ MainWindow.on_extract_clicked()
          │
          └── ROM tab active → _handle_rom_extraction()
              ├── Get params from rom_extraction_panel
-             ├── Validate via ExtractionManagerProtocol
+             ├── Validate via CoreOperationsManager
              └── Call controller.start_rom_extraction(params)
                       │
                       ▼
@@ -392,4 +391,4 @@ User modifies sprite
 
 ---
 
-*Last updated: December 23, 2025 (Updated for consolidated ApplicationStateManager)*
+*Last updated: December 24, 2025 (Updated for consolidated managers)*

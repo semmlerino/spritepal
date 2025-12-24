@@ -143,8 +143,8 @@ uv run pytest -n auto --tb=short
 # Find signal connections for a specific signal
 rg "extraction_progress\.connect" --type py
 
-# Find all inject() calls for a protocol
-rg "inject\(ExtractionManagerProtocol" --type py
+# Find all inject() calls for a class
+rg "inject\(CoreOperationsManager" --type py
 ```
 
 ---

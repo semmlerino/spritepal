@@ -371,10 +371,10 @@ spritepal/
 
 | Looking for... | Location |
 |----------------|----------|
-| Manager protocols | `core/protocols/manager_protocols.py` (ExtractionManager, InjectionManager, ROMCache, ROMExtractor) |
+| Manager protocols | `core/protocols/manager_protocols.py` (ROMCache, ROMExtractor) |
 | Dialog protocols | `core/protocols/dialog_protocols.py` (ArrangementDialog, DialogFactory, ManualOffsetDialogFactory) |
-| All protocols (7 total) | `core/protocols/__init__.py` |
-| ExtractionManager, InjectionManager | `core/managers/` |
+| All protocols (5 total) | `core/protocols/__init__.py` |
+| CoreOperationsManager | `core/managers/core_operations_manager.py` (handles extraction and injection) |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
 | DI container, `inject()` | `core/di_container.py` |
 | Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
@@ -395,17 +395,17 @@ Use DI, never instantiate managers directly:
 
 ```python
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
 # Production code
-extraction_mgr = inject(ExtractionManagerProtocol)
+operations_mgr = inject(CoreOperationsManager)
 
 # Tests - use fixtures, not inject()
 def test_extraction(isolated_managers):
-    extraction_mgr = isolated_managers.extraction_manager
+    operations_mgr = isolated_managers.core_operations_manager
 ```
 
-Key managers: `ApplicationStateManager`, `CoreOperationsManager` (registered as both `ExtractionManagerProtocol` and `InjectionManagerProtocol`)
+Key managers: `ApplicationStateManager`, `CoreOperationsManager` (handles extraction and injection operations)
 
 ### Key Patterns
 
@@ -425,4 +425,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: December 23, 2025*
+*Last updated: December 24, 2025*

@@ -220,4 +220,4 @@ def test_something(isolated_managers):
 
 ---
 
-*Last updated: December 23, 2025 (Updated for consolidated ApplicationStateManager)*
+*Last updated: December 24, 2025 (Updated for consolidated managers)*

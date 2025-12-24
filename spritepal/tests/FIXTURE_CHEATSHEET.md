@@ -17,10 +17,10 @@
 ### Basic Manager Test
 ```python
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
 def test_extraction_validates(isolated_managers):
-    manager = inject(ExtractionManagerProtocol)
+    manager = inject(CoreOperationsManager)
     result = manager.validate_extraction_params({"path": "/test"})
     assert isinstance(result, bool)
 ```
@@ -104,3 +104,7 @@ Almost never. Use `isolated_managers` unless:
 | UI components | `tests/ui/test_<component>.py` |
 | End-to-end workflows | `tests/integration/` |
 | Controller logic | `tests/controllers/` |
+
+---
+
+*Last updated: December 24, 2025*

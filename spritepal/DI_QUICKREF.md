@@ -4,28 +4,26 @@
 
 ```python
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
-manager = inject(ExtractionManagerProtocol)
+manager = inject(CoreOperationsManager)
 ```
 
-## Available Protocols
+## Available Classes and Protocols
 
-| Protocol | What it does |
-|----------|--------------|
-| `ExtractionManagerProtocol` | Extract sprites from ROM/VRAM |
-| `InjectionManagerProtocol` | Inject sprites into ROM |
-| `ApplicationStateManagerProtocol` | Session, settings, workflow state |
-| `SettingsManagerProtocol` | Persistent settings (cache, paths) |
+| Class/Protocol | What it does |
+|----------------|--------------|
+| `CoreOperationsManager` | Extract/inject sprites (handles extraction and injection) |
+| `ApplicationStateManager` | Session, settings, workflow state |
 | `ROMCacheProtocol` | ROM file caching |
-| `ConfigurationServiceProtocol` | App directories and paths |
+| `ConfigurationService` | App directories and paths |
 
 ## In Tests
 
 ```python
 def test_extraction(isolated_managers):
     # isolated_managers sets up DI - just use inject()
-    manager = inject(ExtractionManagerProtocol)
+    manager = inject(CoreOperationsManager)
     result = manager.validate_extraction_params(params)
 ```
 
@@ -36,12 +34,12 @@ def test_extraction(isolated_managers):
 from core.managers.registry import ManagerRegistry
 manager = ManagerRegistry().get_extraction_manager()
 
-# WRONG - tight coupling
+# WRONG - direct instantiation bypasses DI
 from core.managers.core_operations_manager import CoreOperationsManager
-manager = CoreOperationsManager()
+manager = CoreOperationsManager()  # Missing dependencies!
 
-# RIGHT - loose coupling via protocol
-manager = inject(ExtractionManagerProtocol)
+# RIGHT - use inject()
+manager = inject(CoreOperationsManager)
 ```
 
 ## App Startup (for reference only)
@@ -58,4 +56,8 @@ register_ui_factories()  # MUST be after initialize_managers()
 - **DIContainer** (`inject()`) - Use this to get dependencies
 - **ManagerRegistry** - Internal lifecycle management (don't call directly)
 
-**Rule**: Always use `inject(ProtocolType)`. Never instantiate managers directly.
+**Rule**: Always use `inject(ManagerClass)`. Never instantiate managers directly.
+
+---
+
+*Last updated: December 24, 2025*

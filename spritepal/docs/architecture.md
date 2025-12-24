@@ -128,19 +128,19 @@ register_ui_factories()  # Must be called AFTER initialize_managers()
    Pass managers as constructor parameters:
    ```python
    # Required: Pass manager explicitly
-   def __init__(self, extraction_manager: ExtractionManagerProtocol):
-       self.extraction_manager = extraction_manager
+   def __init__(self, core_manager: CoreOperationsManager):
+       self.core_manager = core_manager
    ```
 
 3. **Protocol-Based Injection**
-   Use `inject()` for resolving protocols when constructing objects:
+   Use `inject()` for resolving managers when constructing objects:
    ```python
-   from spritepal.core.di_container import inject
-   from spritepal.core.protocols.manager_protocols import ExtractionManagerProtocol
+   from core.di_container import inject
+   from core.managers.core_operations_manager import CoreOperationsManager
 
    # At application entry point or factory
-   extraction_manager = inject(ExtractionManagerProtocol)
-   panel = ROMExtractionPanel(extraction_manager=extraction_manager)
+   core_manager = inject(CoreOperationsManager)
+   panel = ROMExtractionPanel(core_manager=core_manager)
    ```
 
    **Note:** The legacy `ManagerRegistry.get_*_manager()` methods are deprecated.
@@ -198,8 +198,8 @@ This pattern is acceptable ONLY in `utils/` modules that need to work independen
    manager = ManagerRegistry.get_extraction_manager()  # DEPRECATED
 
    # Good - Use inject() or constructor injection
-   from spritepal.core.di_container import inject
-   manager = inject(ExtractionManagerProtocol)
+   from core.di_container import inject
+   manager = inject(CoreOperationsManager)
    ```
 
 ### Testing Imports
@@ -373,7 +373,7 @@ The `isolated_managers` fixture handles all singleton cleanup automatically:
 ```python
 def test_something(isolated_managers):
     # Managers and DI container are fresh
-    manager = inject(ExtractionManagerProtocol)
+    manager = inject(CoreOperationsManager)
     # ... test ...
     # Cleanup happens automatically after test
 ```
@@ -392,10 +392,10 @@ The DIContainer maps protocol types to implementations. Use it to obtain depende
 
 ```python
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
+from core.managers.core_operations_manager import CoreOperationsManager
 
 # Get a manager instance
-manager = inject(ExtractionManagerProtocol)
+manager = inject(CoreOperationsManager)
 ```
 
 **Key functions:**
@@ -423,13 +423,13 @@ ManagerRegistry.initialize_managers()
 2. Create ApplicationStateManager  → Registers ApplicationStateManagerProtocol
    │
    ↓
-3. Create CoreOperationsManager    → Can now use inject(ApplicationStateManagerProtocol)
+3. Create CoreOperationsManager    → Can now use inject(ApplicationStateManager)
    │                                  via ROMCache → SettingsManager chain
    ↓
-4. register_managers()             → Registers ExtractionManagerProtocol,
-   │                                  InjectionManagerProtocol
+4. register_managers()             → Registers CoreOperationsManager
+   │                                  as concrete class (no protocol wrapper)
    ↓
-Application Code: inject(ExtractionManagerProtocol)
+Application Code: inject(CoreOperationsManager)
        ↓
 DIContainer returns the registered implementation
 ```
@@ -442,22 +442,20 @@ ApplicationStateManager isn't registered before CoreOperationsManager is created
 
 | Need | Use |
 |------|-----|
-| Get a manager in application code | `inject(ExtractionManagerProtocol)` |
-| Pass manager to a class | Constructor parameter: `def __init__(self, manager: ExtractionManagerProtocol)` |
+| Get a manager in application code | `inject(CoreOperationsManager)` |
+| Pass manager to a class | Constructor parameter: `def __init__(self, manager: CoreOperationsManager)` |
 | Initialize all managers | `ManagerRegistry().initialize_managers()` (done at app startup) |
 | Clean up at shutdown | `ManagerRegistry().cleanup_managers()` |
 | Reset for tests | Use `isolated_managers` fixture |
 
 ### Available Protocols
 
-SpritePal uses 7 protocols across two files:
+SpritePal uses 5 protocols across two files:
 
 **Manager protocols** (`core/protocols/manager_protocols.py`):
 
 | Protocol | Purpose |
 |----------|---------|
-| `ExtractionManagerProtocol` | Sprite extraction from ROM/VRAM |
-| `InjectionManagerProtocol` | Sprite injection into ROM |
 | `ROMCacheProtocol` | ROM file caching |
 | `ROMExtractorProtocol` | Low-level ROM extraction |
 
@@ -469,47 +467,48 @@ SpritePal uses 7 protocols across two files:
 | `ArrangementDialogProtocol` | Grid arrangement dialog |
 | `ManualOffsetDialogFactoryProtocol` | Manual offset entry dialog |
 
-**Consolidated managers** (no longer protocols - use concrete classes):
-- `ApplicationStateManager` - Session, state, settings (use directly, not via protocol)
-- `ConfigurationService` - App configuration (use directly, not via protocol)
+**Consolidated managers** (use concrete classes directly, not protocols):
+- `CoreOperationsManager` - Extraction and injection operations
+- `ApplicationStateManager` - Session, state, settings
+- `ConfigurationService` - App configuration
 
 ### What NOT to Do
 
 ```python
-# REMOVED - these methods no longer exist
+# REMOVED - ManagerRegistry getter methods no longer exist
 # from core.managers.registry import ManagerRegistry
 # manager = ManagerRegistry().get_extraction_manager()  # Method removed
 
-# CORRECT - use inject()
+# CORRECT - use inject() with concrete manager class
 from core.di_container import inject
-from core.protocols.manager_protocols import ExtractionManagerProtocol
-manager = inject(ExtractionManagerProtocol)
+from core.managers.core_operations_manager import CoreOperationsManager
+manager = inject(CoreOperationsManager)
 ```
 
 ```python
-# BAD - tight coupling
-from core.managers.extraction_manager import ExtractionManager
-manager = ExtractionManager()
+# BAD - direct instantiation
+from core.managers.core_operations_manager import CoreOperationsManager
+manager = CoreOperationsManager()  # Missing required dependencies
 
-# GOOD - loose coupling via protocol
-manager = inject(ExtractionManagerProtocol)
+# GOOD - use inject() for proper initialization
+from core.di_container import inject
+manager = inject(CoreOperationsManager)
 ```
 
 ---
 
-## Manager Adapter Pattern
+## Manager Architecture
 
-SpritePal uses an adapter pattern to maintain backward compatibility during the
-consolidation of managers into fewer, more cohesive classes.
+SpritePal uses consolidated managers for all business logic. The adapter pattern
+that was previously used for backward compatibility has been fully removed.
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│            DI Container (inject() via protocols)            │
-│  inject(ApplicationStateManagerProtocol) → ApplicationStateManager │
-│  inject(ExtractionManagerProtocol) → ExtractionAdapter      │
-│  inject(InjectionManagerProtocol)  → InjectionAdapter       │
+│      DI Container (inject() with concrete classes)          │
+│  inject(CoreOperationsManager) → CoreOperationsManager      │
+│  inject(ApplicationStateManager) → ApplicationStateManager  │
 └───────────────────────────┬─────────────────────────────────┘
                             │
                             ▼
@@ -518,55 +517,49 @@ consolidation of managers into fewer, more cohesive classes.
 │  CoreOperationsManager:                                      │
 │    - Owns ROMService, VRAMService, ROMExtractor             │
 │    - Owns all extraction/injection business logic            │
-│    - ExtractionAdapter and InjectionAdapter delegate here   │
+│    - Direct access via inject(CoreOperationsManager)         │
 │                                                              │
 │  ApplicationStateManager:                                    │
 │    - Owns session, settings, state, history                  │
-│    - Direct access via inject(ApplicationStateManagerProtocol) │
+│    - Direct access via inject(ApplicationStateManager)       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Rules
 
-1. **Adapters delegate everything**: Adapters must not create their own service
-   instances. All operations go through the consolidated manager.
+1. **Use inject() for access**: Always get managers via `inject(ManagerClass)`,
+   never instantiate directly.
 
-2. **Signals forward, don't duplicate**: Adapters forward signals from
-   consolidated managers. They don't emit their own copies of signals.
+2. **Single source of truth**: All business logic lives in consolidated managers.
+   No adapters or wrappers needed.
 
-3. **Deprecated base classes**: `ExtractionManager`, `InjectionManager`
-   exist only as base classes for adapters. Do not instantiate
-   them directly—use `inject()` with the protocol instead.
+3. **Services are shared**: ROMService, VRAMService, etc. are created once
+   by CoreOperationsManager and reused.
 
-### Example: ExtractionAdapter
+### Example: Using CoreOperationsManager
 
 ```python
-class ExtractionAdapter(ExtractionManager):
-    """Thin wrapper that delegates to CoreOperationsManager."""
+from core.di_container import inject
+from core.managers.core_operations_manager import CoreOperationsManager
 
-    def __init__(self, core_manager: CoreOperationsManager):
-        self._core = core_manager
-        # Forward signals from core manager
-        core_manager.extraction_progress.connect(self.extraction_progress.emit)
+# Get manager via DI
+manager = inject(CoreOperationsManager)
 
-    @property
-    def _rom_service(self) -> ROMService:
-        # Delegate to core manager's service
-        return self._core.rom_service
+# Connect to signals
+manager.extraction_progress.connect(self._on_progress)
+manager.extraction_complete.connect(self._on_complete)
 
-    def extract_from_rom(self, params: dict) -> dict:
-        # Delegate operation to core manager
-        return self._core.extract_from_rom(params)
+# Call extraction methods
+result = manager.extract_from_rom(params)
 ```
 
-### Why Adapters?
+### Benefits of Consolidation
 
-The adapter pattern allows:
-- **Backward compatibility**: Existing code using `ExtractionManagerProtocol` continues to work
-- **Single source of truth**: All business logic lives in consolidated managers
-- **Gradual migration**: New code can use consolidated managers directly if needed
-- **Reduced duplication**: Services are created once, not per-adapter
+- **Simpler code**: No adapter layers to maintain
+- **Single source of truth**: All business logic in one place
+- **Better discoverability**: Clear method locations
+- **Reduced duplication**: Services created once
 
 ---
 
-*Last updated: December 23, 2025 (Protocol simplification: 14 → 7 protocols)*
+*Last updated: December 24, 2025 (Protocol simplification: 7 → 5 protocols, adapters removed)*
