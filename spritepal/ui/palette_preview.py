@@ -27,6 +27,19 @@ COLLAPSED_SWATCH_SIZE = 12  # Smaller swatches for collapsed rows
 EXPANDED_SWATCH_SIZE = PALETTE_PREVIEW_SIZE  # Full size for expanded palette
 
 
+def _update_color_widgets(
+    color_widgets: list[PaletteColorWidget], colors: list[tuple[int, int, int]]
+) -> None:
+    """Update color widgets with the given colors.
+
+    Args:
+        color_widgets: List of PaletteColorWidget to update
+        colors: List of RGB tuples (up to 16 colors)
+    """
+    for i, color in enumerate(colors[:16]):
+        color_widgets[i].set_color(color)
+
+
 class PaletteColorWidget(QWidget):
     """Widget for displaying a single palette color"""
 
@@ -171,8 +184,7 @@ class PaletteWidget(QFrame):
     def set_palette(self, colors: list[tuple[int, int, int]]) -> None:
         """Set the palette colors"""
         self.colors = colors
-        for i, color in enumerate(colors[:16]):
-            self.color_widgets[i].set_color(color)
+        _update_color_widgets(self.color_widgets, colors)
 
     def clear(self):
         """Clear the palette to default placeholder color"""
@@ -247,8 +259,7 @@ class CollapsedPaletteRow(QFrame):
     def set_palette(self, colors: list[tuple[int, int, int]]) -> None:
         """Set the palette colors"""
         self.colors = colors
-        for i, color in enumerate(colors[:16]):
-            self.color_widgets[i].set_color(color)
+        _update_color_widgets(self.color_widgets, colors)
 
     def clear(self):
         """Clear the palette to default placeholder color"""

@@ -658,9 +658,7 @@ class InjectionDialog(TabbedDialog):
             self.sprite_location_combo.addItem("Loading ROM info...", None)
 
         # Clean up any existing worker
-        if self._rom_info_loader is not None:
-            WorkerManager.cleanup_worker(self._rom_info_loader)
-            self._rom_info_loader = None
+        WorkerManager.cleanup_worker_attr(self, "_rom_info_loader")
 
         # Create and start background worker
         self._rom_info_loader = ROMInfoLoaderWorker(
@@ -1176,8 +1174,7 @@ class InjectionDialog(TabbedDialog):
 
             if self._rom_info_loader.isRunning():
                 logger.debug("Stopping ROM info loader on dialog close")
-                WorkerManager.cleanup_worker(self._rom_info_loader, timeout=3000)
-            self._rom_info_loader = None
+            WorkerManager.cleanup_worker_attr(self, "_rom_info_loader", timeout=3000)
 
         if event:
             super().closeEvent(event)

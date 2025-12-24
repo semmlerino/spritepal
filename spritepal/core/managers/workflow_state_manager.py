@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Generator
-from contextlib import contextmanager
 from typing import ClassVar
 
 from PySide6.QtCore import QObject, Signal
@@ -86,12 +84,6 @@ class WorkflowStateManager(QObject):
         self._workflow_state = ExtractionState.IDLE
         self._workflow_error: str | None = None
         self._lock = threading.RLock()
-
-    @contextmanager
-    def _acquire_lock(self) -> Generator[None, None, None]:
-        """Acquire workflow lock."""
-        with self._lock:
-            yield
 
     # ========== State Properties ==========
 

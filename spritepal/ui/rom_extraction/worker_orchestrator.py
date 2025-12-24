@@ -124,10 +124,9 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_header_worker(self) -> None:
         """Clean up header worker resources."""
-        if self._header_worker:
-            WorkerManager.cleanup_worker(self._header_worker, timeout=2000)
-            self._header_worker = None
-            self._header_thread = None
+        WorkerManager.cleanup_worker_attr(
+            self, "_header_worker", "_header_thread", timeout=2000
+        )
 
     # ========== Sprite Location Loading ==========
 
@@ -171,10 +170,9 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_info_worker(self) -> None:
         """Clean up info worker resources."""
-        if self._info_worker:
-            WorkerManager.cleanup_worker(self._info_worker, timeout=2000)
-            self._info_worker = None
-            self._info_thread = None
+        WorkerManager.cleanup_worker_attr(
+            self, "_info_worker", "_info_thread", timeout=2000
+        )
 
     # ========== Sprite Scanning ==========
 
@@ -233,10 +231,9 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_scan_worker(self) -> None:
         """Clean up scan worker resources."""
-        if self._scan_worker:
-            WorkerManager.cleanup_worker(self._scan_worker, timeout=5000)
-            self._scan_worker = None
-            self._scan_thread = None
+        WorkerManager.cleanup_worker_attr(
+            self, "_scan_worker", "_scan_thread", timeout=5000
+        )
 
     # ========== Similarity Indexing ==========
 
@@ -292,10 +289,9 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_similarity_worker(self) -> None:
         """Clean up similarity worker resources."""
-        if self._similarity_worker:
-            WorkerManager.cleanup_worker(self._similarity_worker, timeout=5000)
-            self._similarity_worker = None
-            self._similarity_thread = None
+        WorkerManager.cleanup_worker_attr(
+            self, "_similarity_worker", "_similarity_thread", timeout=5000
+        )
 
     # ========== General Methods ==========
 

@@ -535,9 +535,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._update_status(f"Loading preview for 0x{current_offset:06X}...")
 
         # Clean up existing preview worker
-        if self.preview_worker is not None:
-            WorkerManager.cleanup_worker(self.preview_worker, timeout=1000)
-            self.preview_worker = None
+        WorkerManager.cleanup_worker_attr(self, "preview_worker", timeout=1000)
 
         # Create new preview worker
         with QMutexLocker(self._manager_mutex):
@@ -593,8 +591,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     @override
     def _cleanup_workers(self) -> None:
         """Clean up worker threads."""
-        WorkerManager.cleanup_worker(self.preview_worker, timeout=2000)
-        self.preview_worker = None
+        WorkerManager.cleanup_worker_attr(self, "preview_worker", timeout=2000)
 
         # Search workers now managed by SpriteSearchCoordinator
         if self._search_coordinator is not None:

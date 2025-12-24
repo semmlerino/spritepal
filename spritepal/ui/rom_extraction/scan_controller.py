@@ -222,11 +222,10 @@ class ScanController(QObject):
     def cleanup(self) -> None:
         """Clean up worker resources."""
         from ui.common import WorkerManager
-        
+
         if self._scan_worker:
             self._scan_worker.blockSignals(True)
-            WorkerManager.cleanup_worker(self._scan_worker)
-            self._scan_worker = None
+        WorkerManager.cleanup_worker_attr(self, "_scan_worker")
         self._current_dialog = None
         self._scan_context = None
 
@@ -321,7 +320,7 @@ class ScanController(QObject):
         from ui.common import WorkerManager
 
         # Clean up any existing scan worker
-        WorkerManager.cleanup_worker(self._scan_worker)
+        WorkerManager.cleanup_worker_attr(self, "_scan_worker")
 
         # Check cache and get user preference
         use_cache = self._check_scan_cache(dialog, rom_path)
@@ -536,8 +535,7 @@ class ScanController(QObject):
                 pass  # Already disconnected
 
         # NOW safe to cleanup
-        WorkerManager.cleanup_worker(self._scan_worker)
-        self._scan_worker = None
+        WorkerManager.cleanup_worker_attr(self, "_scan_worker")
 
         # Transition back to idle state
         if self._state_manager:

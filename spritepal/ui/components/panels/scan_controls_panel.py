@@ -333,12 +333,11 @@ class ScanControlsPanel(QWidget):
             return
 
         # Clean up existing range scan worker with enhanced error handling
-        if self.range_scan_worker is not None:
-            try:
-                WorkerManager.cleanup_worker(self.range_scan_worker, timeout=3000)
-            except RuntimeError as e:
-                logger.warning(f"Error during worker cleanup: {e}")
-                # Continue anyway, worker may already be cleaned up
+        try:
+            WorkerManager.cleanup_worker_attr(self, "range_scan_worker", timeout=3000)
+        except RuntimeError as e:
+            logger.warning(f"Error during worker cleanup: {e}")
+            # Continue anyway, worker may already be cleaned up
 
         # Create range scan worker with proper bounds and error handling
         try:
@@ -472,8 +471,7 @@ class ScanControlsPanel(QWidget):
 
     def cleanup_workers(self):
         """Clean up any running worker threads with timeouts to prevent hangs"""
-        WorkerManager.cleanup_worker(self.range_scan_worker, timeout=5000)
-        self.range_scan_worker = None
+        WorkerManager.cleanup_worker_attr(self, "range_scan_worker", timeout=5000)
 
     def get_found_sprites(self) -> list[tuple[int, float]]:
         """Get the list of found sprites"""

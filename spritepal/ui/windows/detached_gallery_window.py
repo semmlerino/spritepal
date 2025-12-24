@@ -841,9 +841,7 @@ class DetachedGalleryWindow(QMainWindow):
             self.scanning = False
             self.progress_bar.setVisible(False)
             self.status_bar.showMessage(f"Scan failed to start: {e}")
-            if self.scan_worker:
-                WorkerManager.cleanup_worker(self.scan_worker)
-                self.scan_worker = None
+            WorkerManager.cleanup_worker_attr(self, "scan_worker")
 
     def _on_sprite_found(self, sprite_info: dict[str, object]):
         """Handle sprite found during scan."""
@@ -900,8 +898,7 @@ class DetachedGalleryWindow(QMainWindow):
         # Clean up worker with proper signal disconnection
         if self.scan_worker:
             self._disconnect_scan_worker_signals()
-            WorkerManager.cleanup_worker(self.scan_worker)
-            self.scan_worker = None
+        WorkerManager.cleanup_worker_attr(self, "scan_worker")
 
     def _on_scan_finished(self):
         """Handle scan completion."""
@@ -927,8 +924,7 @@ class DetachedGalleryWindow(QMainWindow):
                     self.scan_worker.requestInterruption()
                     self.scan_worker.wait(3000)  # Wait up to 3 seconds
 
-                WorkerManager.cleanup_worker(self.scan_worker)
-                self.scan_worker = None
+            WorkerManager.cleanup_worker_attr(self, "scan_worker")
 
             # Generate thumbnails for found sprites
             if sprite_count > 0:
@@ -967,8 +963,7 @@ class DetachedGalleryWindow(QMainWindow):
             if self.scan_worker.isRunning():
                 self.scan_worker.requestInterruption()
                 self.scan_worker.wait(3000)
-            WorkerManager.cleanup_worker(self.scan_worker)
-            self.scan_worker = None
+            WorkerManager.cleanup_worker_attr(self, "scan_worker")
 
         # Clean up timer
         if self.scan_timeout_timer:
@@ -994,8 +989,7 @@ class DetachedGalleryWindow(QMainWindow):
                     if not self.scan_worker.wait(3000):  # Wait up to 3 seconds
                         logger.warning("Scan worker did not stop within timeout")
 
-                WorkerManager.cleanup_worker(self.scan_worker)
-                self.scan_worker = None
+                WorkerManager.cleanup_worker_attr(self, "scan_worker")
                 workers_cleaned += 1
                 logger.debug("Scan worker cleanup completed")
             except Exception as e:

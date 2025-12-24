@@ -915,16 +915,17 @@ class ROMExtractionPanel(QWidget):
         self._worker_orchestrator.cleanup()
 
         # Clean up scan worker (still managed locally)
+        from ui.common import WorkerManager
         if self.scan_worker is not None:
-            from ui.common import WorkerManager
             try:
                 if hasattr(self.scan_worker, 'cancel'):
                     self.scan_worker.cancel()
-                WorkerManager.cleanup_worker(self.scan_worker)
             except Exception as e:
-                logger.warning(f"Error cleaning up scan_worker: {e}")
-            finally:
-                self.scan_worker = None
+                logger.warning(f"Error cancelling scan_worker: {e}")
+        try:
+            WorkerManager.cleanup_worker_attr(self, "scan_worker")
+        except Exception as e:
+            logger.warning(f"Error cleaning up scan_worker: {e}")
 
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent stale handler calls after close."""

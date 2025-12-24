@@ -173,6 +173,44 @@ class WorkerManager:
         return stopped_cleanly
 
     @staticmethod
+    def cleanup_worker_attr(
+        obj: object,
+        worker_attr: str,
+        thread_attr: str | None = None,
+        timeout: int = DEFAULT_CLEANUP_TIMEOUT,
+    ) -> bool:
+        """Clean up a worker stored as an object attribute and set it to None.
+
+        This helper reduces boilerplate for the common pattern:
+            if self._my_worker:
+                WorkerManager.cleanup_worker(self._my_worker, timeout=2000)
+                self._my_worker = None
+                self._my_thread = None
+
+        Usage:
+            WorkerManager.cleanup_worker_attr(self, '_my_worker', '_my_thread', timeout=2000)
+
+        Args:
+            obj: The object containing the worker attribute
+            worker_attr: Name of the worker attribute (e.g., '_header_worker')
+            thread_attr: Optional name of the thread attribute to also clear
+            timeout: Milliseconds to wait for graceful shutdown
+
+        Returns:
+            True if worker stopped successfully or was None, False if still running.
+        """
+        worker = getattr(obj, worker_attr, None)
+        if worker is None:
+            return True
+
+        result = WorkerManager.cleanup_worker(worker, timeout=timeout)
+        setattr(obj, worker_attr, None)
+        if thread_attr:
+            setattr(obj, thread_attr, None)
+
+        return result
+
+    @staticmethod
     def start_worker(
         worker: QThread,
         cleanup_existing: QThread | None = None,

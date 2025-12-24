@@ -120,9 +120,7 @@ class SpriteSearchCoordinator(QObject):
             return
 
         # Clean up existing search worker
-        if self._search_worker is not None:
-            WorkerManager.cleanup_worker(self._search_worker)
-            self._search_worker = None
+        WorkerManager.cleanup_worker_attr(self, "_search_worker")
 
         # Create search worker with appropriate direction
         with QMutexLocker(self._manager_mutex):
@@ -156,9 +154,7 @@ class SpriteSearchCoordinator(QObject):
         logger.info(f"Starting sprite scan for ROM: {self._rom_path}")
 
         # Clean up any existing scan worker
-        if self._scan_worker is not None:
-            WorkerManager.cleanup_worker(self._scan_worker)
-            self._scan_worker = None
+        WorkerManager.cleanup_worker_attr(self, "_scan_worker")
 
         # Create progress dialog
         self._scan_progress_dialog = QProgressDialog(
@@ -184,8 +180,7 @@ class SpriteSearchCoordinator(QObject):
         logger.info("Sprite scan cancelled by user")
         if self._scan_worker is not None:
             self._scan_worker.cancel()
-            WorkerManager.cleanup_worker(self._scan_worker, timeout=1000)
-            self._scan_worker = None
+        WorkerManager.cleanup_worker_attr(self, "_scan_worker", timeout=1000)
 
     def _on_search_sprite_found(self, offset: int, quality: float) -> None:
         """Handle sprite found during navigation search."""
@@ -311,14 +306,10 @@ class SpriteSearchCoordinator(QObject):
         Call this before the parent dialog is destroyed.
         """
         # Cleanup search worker
-        if self._search_worker is not None:
-            WorkerManager.cleanup_worker(self._search_worker)
-            self._search_worker = None
+        WorkerManager.cleanup_worker_attr(self, "_search_worker")
 
         # Cleanup scan worker
-        if self._scan_worker is not None:
-            WorkerManager.cleanup_worker(self._scan_worker, timeout=1000)
-            self._scan_worker = None
+        WorkerManager.cleanup_worker_attr(self, "_scan_worker", timeout=1000)
 
         # Close progress dialog
         if self._scan_progress_dialog is not None:
