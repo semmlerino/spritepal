@@ -211,7 +211,6 @@ class ManagerRegistry:
         Uses the consolidated manager architecture where:
         - ApplicationStateManager handles session, settings, state, and history
         - CoreOperationsManager handles extraction and injection operations
-        - Adapters provide backward-compatible interfaces (SessionManager, etc.)
 
         Args:
             app_name: Application name for settings
@@ -541,8 +540,7 @@ def initialize_managers(
     """
     Initialize all managers with consolidated architecture.
 
-    Uses ApplicationStateManager + CoreOperationsManager with backward-compatible
-    adapters for SessionManager, ExtractionManager, and InjectionManager.
+    Uses ApplicationStateManager + CoreOperationsManager.
 
     Args:
         app_name: Application name for settings

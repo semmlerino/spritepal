@@ -31,8 +31,8 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
     """
     Worker for VRAM extraction operations.
 
-    Handles extraction of sprites from VRAM memory dumps using the
-    ExtractionManager, providing progress updates and preview generation.
+    Handles extraction of sprites from VRAM memory dumps using
+    CoreOperationsManager, providing progress updates and preview generation.
     """
 
     def __init__(
@@ -106,7 +106,7 @@ class ROMExtractionWorker(ExtractionWorkerBase):
     """
     Worker for ROM extraction operations.
 
-    Handles extraction of sprites from ROM files using the ExtractionManager,
+    Handles extraction of sprites from ROM files using CoreOperationsManager,
     providing progress updates during the extraction process.
     """
 

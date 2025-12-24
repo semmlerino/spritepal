@@ -9,8 +9,6 @@ to avoid overwriting widgets created in _setup_ui(). See CLAUDE.md for details.
 """
 from __future__ import annotations
 
-from typing import Any
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
@@ -59,7 +57,6 @@ class DialogBase(QDialog):
         default_tab: int | None = None,
         orientation: Qt.Orientation | None = None,  # For splitter dialogs
         splitter_handle_width: int = 8,  # For splitter dialogs
-        **kwargs: Any  # pyright: ignore[reportExplicitAny] - compatibility kwargs
     ) -> None:
         """
         Initialize the dialog base.
@@ -75,7 +72,6 @@ class DialogBase(QDialog):
             default_tab: Default tab index for tabbed dialogs (optional)
             orientation: Splitter orientation for splitter dialogs (optional)
             splitter_handle_width: Handle width for splitter dialogs (default: 8)
-            **kwargs: Additional keyword arguments (ignored, for compatibility)
         """
         # Call Qt's init FIRST - required for PySide6
         super().__init__(parent)
@@ -107,7 +103,6 @@ class DialogBase(QDialog):
 
         if with_status_bar:
             self.status_bar = QStatusBar(self)
-            self.setStatusBar = lambda: self.status_bar  # Mock for dialogs
         else:
             self.status_bar = None
 
@@ -187,9 +182,8 @@ class DialogBase(QDialog):
         self._tab_widget.addTab(widget, label)
 
         # Set default tab if specified
-        if hasattr(self, "_default_tab") and self._default_tab is not None:
-            if self._tab_widget:
-                self._tab_widget.setCurrentIndex(self._default_tab)
+        if self._default_tab is not None and self._tab_widget:
+            self._tab_widget.setCurrentIndex(self._default_tab)
 
     def add_horizontal_splitter(self, handle_width: int | None = None) -> QSplitter:
         """

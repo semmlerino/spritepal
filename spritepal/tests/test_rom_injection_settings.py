@@ -121,7 +121,7 @@ class TestROMInjectionSettingsPersistence:
         # Get injection manager from DI (requires session_managers fixture)
         injection_manager = get_injection_manager()
         with patch.object(
-            injection_manager, "_get_session_manager", return_value=settings_manager
+            injection_manager, "_ensure_session_manager", return_value=settings_manager
         ):
             mock_dialog.injection_manager = injection_manager
 
@@ -168,7 +168,7 @@ class TestROMInjectionSettingsPersistence:
         # Get injection manager from DI (requires session_managers fixture)
         injection_manager = get_injection_manager()
         with patch.object(
-            injection_manager, "_get_session_manager", return_value=settings_manager
+            injection_manager, "_ensure_session_manager", return_value=settings_manager
         ):
             mock_dialog.injection_manager = injection_manager
 
@@ -230,7 +230,7 @@ class TestROMInjectionSettingsPersistence:
         with (
             patch("pathlib.Path.exists", return_value=True),  # Path().exists() not os.path.exists
             patch.object(
-                injection_manager, "_get_session_manager", return_value=settings_manager
+                injection_manager, "_ensure_session_manager", return_value=settings_manager
             ),
         ):
             mock_dialog.injection_manager = injection_manager
@@ -270,7 +270,7 @@ class TestROMInjectionSettingsPersistence:
         injection_manager = get_injection_manager()
         with (
             patch.object(
-                injection_manager, "_get_session_manager", return_value=settings_manager
+                injection_manager, "_ensure_session_manager", return_value=settings_manager
             ),
             patch.object(
                 settings_manager, "save_session", side_effect=OSError("Permission denied")
@@ -315,7 +315,7 @@ class TestROMInjectionSettingsPersistence:
         # Get injection manager from DI (requires session_managers fixture)
         injection_manager = get_injection_manager()
         with patch.object(
-            injection_manager, "_get_session_manager", return_value=settings_manager
+            injection_manager, "_ensure_session_manager", return_value=settings_manager
         ):
             mock_dialog.injection_manager = injection_manager
             mock_dialog.extraction_vram_offset = None

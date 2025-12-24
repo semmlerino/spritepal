@@ -221,11 +221,11 @@ class TestInjectionCacheIntegration:
             manager._handle_worker_completion = MagicMock()
             manager.injection_finished = MagicMock()
 
-            # Mock the cache
+            # Mock the cache (now accessed via _ensure_rom_cache)
             mock_cache = MagicMock()
             mock_cache.invalidate_rom_cache.return_value = 5
 
-            with patch('core.di_container.inject', return_value=mock_cache):
+            with patch.object(manager, '_ensure_rom_cache', return_value=mock_cache):
                 manager._on_worker_finished(success=True, message="OK")
 
             # Verify cache invalidation was called

@@ -661,7 +661,7 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == str(vram_file)
 
-    @patch.object(CoreOperationsManager, "_get_session_manager")
+    @patch.object(CoreOperationsManager, "_ensure_session_manager")
     def test_get_smart_vram_suggestion_session_strategy(self, mock_get_session, tmp_path):
         """Test VRAM suggestion using session strategy"""
         manager = CoreOperationsManager()

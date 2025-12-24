@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# InjectionManager accessed via DI: inject(CoreOperationsManager)
+# CoreOperationsManager accessed via DI: inject(CoreOperationsManager)
 from core.sprite_validator import SpriteValidator
 from ui.common import WorkerManager
 from ui.common.spacing_constants import EXTRACTION_LABEL_MIN_WIDTH, SPACING_SMALL

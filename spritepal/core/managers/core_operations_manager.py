@@ -47,6 +47,7 @@ from .base_manager import BaseManager, with_operation_handling
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
 
 class CoreOperationsManager(BaseManager):
@@ -100,6 +101,10 @@ class CoreOperationsManager(BaseManager):
         self._rom_service: ROMService | None = None
         self._vram_service: VRAMService | None = None
 
+        # Cached DI dependencies (populated in _initialize)
+        self._session_manager: ApplicationStateManager | None = None
+        self._rom_cache: ROMCache | None = None
+
         # Thread safety for inherited methods
         self._lock = threading.RLock()
 
@@ -113,10 +118,14 @@ class CoreOperationsManager(BaseManager):
             self._sprite_extractor = SpriteExtractor()
             self._palette_manager = PaletteManager()
 
-            # ROMExtractor via DI
+            # Cache DI dependencies (singletons - safe to cache)
             from core.di_container import inject
             from core.rom_extractor import ROMExtractor
+            from core.services.rom_cache import ROMCache
+
             self._rom_extractor = inject(ROMExtractor)
+            self._session_manager = inject(ApplicationStateManager)
+            self._rom_cache = inject(ROMCache)
 
             # Get signal mappings for services to emit directly to manager signals
             rom_signals = self._get_rom_service_signals()
@@ -253,11 +262,15 @@ class CoreOperationsManager(BaseManager):
             self._palette_manager, "Palette manager", ExtractionError
         )
 
-    def _get_session_manager(self) -> ApplicationStateManager:
-        """Get session manager via dependency injection container."""
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        return inject(ApplicationStateManager)
+    def _ensure_rom_cache(self) -> ROMCache:
+        """Ensure ROM cache is available (cached from DI at initialization)."""
+        return self._ensure_component(self._rom_cache, "ROM cache", ExtractionError)
+
+    def _ensure_session_manager(self) -> ApplicationStateManager:
+        """Ensure session manager is available (cached from DI at initialization)."""
+        return self._ensure_component(
+            self._session_manager, "Session manager", ExtractionError
+        )
 
     def _raise_extraction_failed(self, message: str) -> None:
         """Helper method to raise ExtractionError (for TRY301 compliance)."""
@@ -846,10 +859,7 @@ class CoreOperationsManager(BaseManager):
             return
 
         try:
-            from core.di_container import inject
-            from core.services.rom_cache import ROMCache
-
-            rom_cache = inject(ROMCache)
+            rom_cache = self._ensure_rom_cache()
             removed = rom_cache.invalidate_rom_cache(str(output_rom))
             self._logger.debug(f"Cache invalidation removed {removed} entries for {output_rom}")
 
@@ -909,7 +919,7 @@ class CoreOperationsManager(BaseManager):
             metadata=metadata,
             pre_suggested=pre_suggested,
             strip_editor_suffixes=strip_editor_suffixes,
-            session_manager=self._get_session_manager(),
+            session_manager=self._ensure_session_manager(),
         )
 
     def get_smart_vram_suggestion(self, sprite_path: str, metadata_path: str = "") -> str:
@@ -926,7 +936,7 @@ class CoreOperationsManager(BaseManager):
         return get_smart_vram_suggestion(
             sprite_path=sprite_path,
             metadata_path=metadata_path,
-            session_manager=self._get_session_manager(),
+            session_manager=self._ensure_session_manager(),
         )
 
     # ========== Metadata and ROM Info ==========
@@ -1021,9 +1031,7 @@ class CoreOperationsManager(BaseManager):
                 return error_result
 
             # Try cache first
-            from core.di_container import inject
-            from core.services.rom_cache import ROMCache
-            rom_cache = inject(ROMCache)
+            rom_cache = self._ensure_rom_cache()
             cached_info = rom_cache.get_rom_info(rom_path)
 
             if cached_info:
@@ -1103,7 +1111,7 @@ class CoreOperationsManager(BaseManager):
             sprite_path=sprite_path,
             metadata=metadata,
             suggested_vram=suggested_vram,
-            session_manager=self._get_session_manager(),
+            session_manager=self._ensure_session_manager(),
         )
 
     def _suggest_output_path(
@@ -1193,7 +1201,7 @@ class CoreOperationsManager(BaseManager):
             custom_offset: Custom offset text if used
             fast_compression: Fast compression checkbox state
         """
-        session_manager = self._get_session_manager()
+        session_manager = self._ensure_session_manager()
 
         if input_rom:
             session_manager.set(
@@ -1236,7 +1244,7 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Dict containing input_rom, output_rom, rom_offset, etc.
         """
-        session_manager = self._get_session_manager()
+        session_manager = self._ensure_session_manager()
         result: dict[str, object] = {
             "input_rom": "",
             "output_rom": "",
@@ -1306,7 +1314,7 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Dict containing sprite_location_name, sprite_location_index, custom_offset
         """
-        session_manager = self._get_session_manager()
+        session_manager = self._ensure_session_manager()
         result: dict[str, object] = {
             "sprite_location_name": None,
             "sprite_location_index": None,
@@ -1342,9 +1350,7 @@ class CoreOperationsManager(BaseManager):
 
     def get_cache_stats(self) -> dict[str, object]:  # Cache stats with mixed types
         """Get ROM cache statistics."""
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
-        rom_cache = inject(ROMCache)
+        rom_cache = self._ensure_rom_cache()
         return dict(rom_cache.get_cache_stats())  # Convert Mapping to dict
 
     def clear_rom_cache(self, older_than_days: int | None = None) -> int:
@@ -1357,9 +1363,7 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Number of cache files removed
         """
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
-        rom_cache = inject(ROMCache)
+        rom_cache = self._ensure_rom_cache()
         removed_count = rom_cache.clear_cache(older_than_days)
         self._logger.info(f"ROM cache cleared: {removed_count} files removed")
         return removed_count
@@ -1377,9 +1381,7 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Dictionary with scan progress or None if not cached
         """
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
-        rom_cache = inject(ROMCache)
+        rom_cache = self._ensure_rom_cache()
         result = rom_cache.get_partial_scan_results(rom_path, scan_params)
         return dict(result) if result else None  # Convert Mapping to dict
 
@@ -1402,9 +1404,7 @@ class CoreOperationsManager(BaseManager):
         Returns:
             True if saved successfully, False otherwise
         """
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
-        rom_cache = inject(ROMCache)
+        rom_cache = self._ensure_rom_cache()
         return rom_cache.save_partial_scan_results(
             rom_path, scan_params, found_sprites, current_offset, completed
         )
@@ -1423,9 +1423,7 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Number of files removed
         """
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
-        rom_cache = inject(ROMCache)
+        rom_cache = self._ensure_rom_cache()
         removed_count = rom_cache.clear_scan_progress_cache(rom_path, scan_params)
         self._logger.info(f"Scan progress cache cleared: {removed_count} files removed")
         return removed_count

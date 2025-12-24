@@ -239,10 +239,10 @@ class TestInjectionManagerDI:
         """Test InjectionManager can access session manager via DI."""
         injection_mgr = inject(CoreOperationsManager)
 
-        # InjectionManager has _get_session_manager() - verify it works
-        # This is an internal method that needs to use DI
-        if hasattr(injection_mgr, "_get_session_manager"):
-            session = injection_mgr._get_session_manager()
+        # CoreOperationsManager has _ensure_session_manager() - verify it works
+        # This is an internal method that uses cached DI dependencies
+        if hasattr(injection_mgr, "_ensure_session_manager"):
+            session = injection_mgr._ensure_session_manager()
             assert session is not None
 
     def test_injection_manager_rom_cache_access(self, isolated_managers):

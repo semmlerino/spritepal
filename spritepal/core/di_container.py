@@ -244,13 +244,13 @@ def configure_container(
         # Create default ConfigurationService
         register_singleton(ConfigurationService, ConfigurationService())
 
-    # NOTE: Manager types (ApplicationStateManager, ExtractionManagerProtocol, etc.)
+    # NOTE: Manager types (ApplicationStateManager, CoreOperationsManager, etc.)
     # are registered by register_managers() AFTER managers are created.
     # This avoids circular dependency between DI container and ManagerRegistry.
 
     # Import ROMCache and ROMExtractor
-    from core.services.rom_cache import ROMCache
     from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
     # Register ROMCache - use concrete class directly (no protocol indirection)
     def _create_rom_cache() -> ROMCache:
