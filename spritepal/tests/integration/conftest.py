@@ -195,12 +195,12 @@ def test_rom_with_real_sprites(tmp_path, real_kirby_rom):
 def rom_extraction_panel(qtbot, managers_initialized):
     """Create a real ROM extraction panel for testing.
 
-    Includes cleanup to reset the ManualOffsetDialogSingleton to prevent
+    Includes cleanup to reset the dialog singleton to prevent
     test pollution when multiple tests open the manual offset dialog.
     """
     from core.di_container import inject
     from core.managers.core_operations_manager import CoreOperationsManager
-    from ui.rom_extraction.offset_dialog_manager import _ManualOffsetDialogSingleton
+    from ui.rom_extraction.offset_dialog_manager import OffsetDialogManager
     from ui.rom_extraction_panel import ROMExtractionPanel
 
     extraction_manager = inject(CoreOperationsManager)
@@ -212,7 +212,7 @@ def rom_extraction_panel(qtbot, managers_initialized):
 
     # Cleanup: Reset the singleton to prevent test pollution
     # This is critical for tests that call panel._open_manual_offset_dialog()
-    _ManualOffsetDialogSingleton.reset()
+    OffsetDialogManager.reset_singleton()
 
 
 @pytest.fixture

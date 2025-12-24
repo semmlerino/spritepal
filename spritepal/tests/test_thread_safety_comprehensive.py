@@ -30,9 +30,9 @@ import pytest
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Signal
 from PySide6.QtGui import QImage
 
+from ui.common.thumbnail_cache import ThumbnailCache
 from ui.workers.batch_thumbnail_worker import (
     BatchThumbnailWorker,
-    LRUCache,
     ThumbnailWorkerController,
 )
 
@@ -95,23 +95,23 @@ def mock_qimage():
     image.fill(0)  # Fill with transparent black
     return image
 
-class TestLRUCacheThreadSafety:
+class TestThumbnailCacheThreadSafety:
     """Test thread safety of LRU cache implementation."""
 
     def test_concurrent_get_operations(self, mock_qimage):
         """Test concurrent get operations don't corrupt cache."""
-        cache = LRUCache(maxsize=100)
+        cache = ThumbnailCache(max_items=100)
 
         # Pre-populate cache
         for i in range(50):
-            cache.put((i, i), mock_qimage)
+            cache.put(ThumbnailCache.make_key(i, i), mock_qimage)
 
         errors = []
 
         def get_operation(key_val: int):
             try:
                 for _ in range(100):
-                    result = cache.get((key_val, key_val))
+                    result = cache.get(ThumbnailCache.make_key(key_val, key_val))
                     if key_val < 50:  # Should be in cache
                         assert result is not None
             except Exception as e:
@@ -135,13 +135,13 @@ class TestLRUCacheThreadSafety:
 
     def test_concurrent_put_operations(self, mock_qimage):
         """Test concurrent put operations maintain cache integrity."""
-        cache = LRUCache(maxsize=50)
+        cache = ThumbnailCache(max_items=50)
         errors = []
 
         def put_operation(start: int):
             try:
                 for i in range(start, start + 20):
-                    cache.put((i, i), mock_qimage)
+                    cache.put(ThumbnailCache.make_key(i, i), mock_qimage)
             except Exception as e:
                 errors.append(str(e))
 
@@ -157,11 +157,11 @@ class TestLRUCacheThreadSafety:
         assert not errors, f"Errors during concurrent put: {errors}"
 
         # Cache should not exceed maxsize
-        assert cache.size() <= 50
+        assert len(cache) <= 50
 
     def test_concurrent_mixed_operations(self, mock_qimage):
         """Test mixed get/put/clear operations concurrently."""
-        cache = LRUCache(maxsize=100)
+        cache = ThumbnailCache(max_items=100)
         validator = ThreadSafetyValidator()
 
         def mixed_operations(thread_id: int):
@@ -169,9 +169,9 @@ class TestLRUCacheThreadSafety:
                 validator.record_thread_access(f"op_{i}_thread_{thread_id}")
 
                 if i % 3 == 0:
-                    cache.put((thread_id, i), mock_qimage)
+                    cache.put(ThumbnailCache.make_key(thread_id, i), mock_qimage)
                 elif i % 3 == 1:
-                    cache.get((thread_id, i - 1))
+                    cache.get(ThumbnailCache.make_key(thread_id, i - 1))
                 elif thread_id == 0 and i == 48:  # Only one thread clears
                     cache.clear()
 
@@ -186,12 +186,12 @@ class TestLRUCacheThreadSafety:
             thread.join()
 
         # Cache should be in valid state
-        assert cache.size() >= 0
-        assert cache.size() <= 100
+        assert len(cache) >= 0
+        assert len(cache) <= 100
 
     def test_lru_eviction_under_concurrent_load(self, mock_qimage):
         """Test LRU eviction works correctly under concurrent access."""
-        cache = LRUCache(maxsize=10)
+        cache = ThumbnailCache(max_items=10)
 
         def access_pattern(pattern_id: int):
             # Each thread has its own access pattern
@@ -200,17 +200,17 @@ class TestLRUCacheThreadSafety:
                 # Put 15 keys (5 more than maxsize=10)
                 # This guarantees keys 0-4 will be evicted when we put keys 10-14
                 for i in range(15):
-                    key = (pattern_id, i)
+                    key = ThumbnailCache.make_key(pattern_id, i)
                     cache.put(key, mock_qimage)
 
                 # Try to get keys 0-4 (guaranteed evicted) -> misses
                 for i in range(5):
-                    key = (pattern_id, i)
+                    key = ThumbnailCache.make_key(pattern_id, i)
                     cache.get(key)
 
                 # Try to get keys 10-14 (most recent, still in cache) -> hits
                 for i in range(10, 15):
-                    key = (pattern_id, i)
+                    key = ThumbnailCache.make_key(pattern_id, i)
                     cache.get(key)
 
         # Run concurrent access patterns
@@ -223,7 +223,7 @@ class TestLRUCacheThreadSafety:
                 future.result()
 
         # Cache should respect maxsize
-        assert cache.size() <= 10
+        assert len(cache) <= 10
 
         # Should have both hits and misses
         # Minimum expected: 3 threads × 5 rounds × 5 misses = 75 misses
@@ -290,14 +290,14 @@ class TestBatchThumbnailWorkerThreadSafety:
 
             # Pre-populate cache
             for i in range(20):
-                worker._cache.put((i * 0x1000, 128), mock_qimage)
+                worker._cache.put(ThumbnailCache.make_key(i * 0x1000, 128), mock_qimage)
 
             cache_errors = []
 
             def cache_reader(offset_base: int):
                 try:
                     for i in range(50):
-                        key = ((offset_base + i) * 0x1000, 128)
+                        key = ThumbnailCache.make_key((offset_base + i) * 0x1000, 128)
                         worker._cache.get(key)
                 except Exception as e:
                     cache_errors.append(str(e))
@@ -305,7 +305,7 @@ class TestBatchThumbnailWorkerThreadSafety:
             def cache_writer(offset_base: int):
                 try:
                     for i in range(50):
-                        key = ((offset_base + i) * 0x1000, 128)
+                        key = ThumbnailCache.make_key((offset_base + i) * 0x1000, 128)
                         worker._cache.put(key, mock_qimage)
                 except Exception as e:
                     cache_errors.append(str(e))
@@ -441,19 +441,19 @@ class TestRaceConditionPrevention:
 
     def test_cache_clear_during_access_race(self, mock_qimage):
         """Test cache.clear() during concurrent get/put doesn't crash."""
-        cache = LRUCache(maxsize=100)
+        cache = ThumbnailCache(max_items=100)
 
         # Pre-populate
         for i in range(50):
-            cache.put((i, i), mock_qimage)
+            cache.put(ThumbnailCache.make_key(i, i), mock_qimage)
 
         race_errors = []
 
         def accessor():
             try:
                 for _ in range(1000):
-                    cache.get((0, 0))
-                    cache.put((1, 1), mock_qimage)
+                    cache.get(ThumbnailCache.make_key(0, 0))
+                    cache.put(ThumbnailCache.make_key(1, 1), mock_qimage)
             except Exception as e:
                 race_errors.append(str(e))
 
@@ -536,17 +536,17 @@ class TestDeadlockPrevention:
 
     def test_no_deadlock_in_nested_mutex_operations(self, mock_qimage):
         """Test nested mutex operations don't cause deadlock."""
-        cache = LRUCache(maxsize=10)
+        cache = ThumbnailCache(max_items=10)
 
         # This should complete without deadlock
         start_time = time.time()
 
         # Simulate nested operations that could deadlock
         for i in range(100):
-            cache.put((i, i), mock_qimage)
+            cache.put(ThumbnailCache.make_key(i, i), mock_qimage)
             cache.get_stats()  # Nested mutex lock
             if i > 0:
-                cache.get((i-1, i-1))  # Another nested lock
+                cache.get(ThumbnailCache.make_key(i-1, i-1))  # Another nested lock
 
         elapsed = time.time() - start_time
 

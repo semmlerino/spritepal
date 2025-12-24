@@ -485,7 +485,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
     """Centralized ManualOffsetDialog singleton cleanup fixture.
 
-    This fixture ensures the ManualOffsetDialogSingleton is properly cleaned up
+    This fixture ensures the OffsetDialogManager singleton is properly cleaned up
     before and after each test with explicit ordering to prevent segfaults:
     1. Process pending events (ensure Qt is in stable state)
     2. Request dialog close (triggers Qt cleanup chain)
@@ -497,20 +497,20 @@ def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
     Usage:
         def test_something(cleanup_singleton):
             # Singleton is already reset before test
-            dialog = ManualOffsetDialogSingleton.get_dialog(panel)
+            dialog = OffsetDialogManager.get_dialog(panel)
             # ... test code ...
             # Singleton will be reset after test with proper ordering
     """
     from PySide6.QtWidgets import QApplication
 
-    from ui.rom_extraction_panel import ManualOffsetDialogSingleton
+    from ui.rom_extraction.offset_dialog_manager import OffsetDialogManager
 
     def _safe_cleanup_singleton():
         """Cleanup with explicit ordering to prevent segfaults.
 
         Thread-safe: Uses _singleton_cleanup_lock to prevent concurrent
         cleanup from multiple fixtures, which could cause race conditions
-        when accessing ManualOffsetDialogSingleton._instance.
+        when accessing OffsetDialogManager._dialog_instance.
         """
         with _singleton_cleanup_lock:
             app = QApplication.instance()
@@ -519,7 +519,7 @@ def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
             if app:
                 app.processEvents()
 
-            instance = ManualOffsetDialogSingleton._instance
+            instance = OffsetDialogManager._dialog_instance
             if instance is not None:
                 try:
                     # Step 2: Request close
@@ -547,7 +547,7 @@ def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
                     pass
 
             # Step 7: Reset singleton reference
-            ManualOffsetDialogSingleton.reset()
+            OffsetDialogManager.reset_singleton()
 
             # Final event processing
             if app:

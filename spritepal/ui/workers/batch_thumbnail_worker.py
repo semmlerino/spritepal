@@ -5,7 +5,6 @@ Handles queue management and priority-based generation.
 from __future__ import annotations
 
 import mmap
-from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -14,6 +13,8 @@ from queue import Empty, PriorityQueue
 from typing import TYPE_CHECKING, Any, override
 
 from PIL import Image
+
+from ui.common.thumbnail_cache import ThumbnailCache
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
@@ -47,86 +48,6 @@ class ThumbnailRequest:
         if not isinstance(other, ThumbnailRequest):
             return NotImplemented
         return self.priority < other.priority
-
-class LRUCache:
-    """Thread-safe LRU cache for QImage thumbnails."""
-
-    def __init__(self, maxsize: int = 100):
-        """
-        Initialize LRU cache with maximum size.
-
-        Args:
-            maxsize: Maximum number of items to store
-        """
-        self.maxsize = maxsize
-        self._cache: OrderedDict[tuple[int, int], QImage] = OrderedDict()
-        self._mutex = QMutex()
-        self._hits = 0
-        self._misses = 0
-
-    def get(self, key: tuple[int, int]) -> QImage | None:
-        """
-        Get item from cache, updating access order.
-
-        Args:
-            key: Cache key (offset, size)
-
-        Returns:
-            Cached QImage or None if not found
-        """
-        with QMutexLocker(self._mutex):
-            if key in self._cache:
-                # Move to end (most recently used)
-                self._cache.move_to_end(key)
-                self._hits += 1
-                return self._cache[key]
-            self._misses += 1
-            return None
-
-    def put(self, key: tuple[int, int], value: QImage) -> None:
-        """
-        Add item to cache with LRU eviction.
-
-        Args:
-            key: Cache key (offset, size)
-            value: QImage to cache
-        """
-        with QMutexLocker(self._mutex):
-            if key in self._cache:
-                # Update existing and move to end
-                self._cache.move_to_end(key)
-                self._cache[key] = value
-            else:
-                # Add new item
-                if len(self._cache) >= self.maxsize:
-                    # Remove least recently used (first item)
-                    self._cache.popitem(last=False)
-                self._cache[key] = value
-
-    def clear(self) -> None:
-        """Clear all cached items."""
-        with QMutexLocker(self._mutex):
-            if self._cache:
-                self._cache.clear()
-            self._hits = 0
-            self._misses = 0
-
-    def size(self) -> int:
-        """Get current cache size."""
-        with QMutexLocker(self._mutex):
-            return len(self._cache)
-
-    def get_stats(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Cache statistics dict
-        """Get cache statistics."""
-        with QMutexLocker(self._mutex):
-            total = self._hits + self._misses
-            hit_rate = (self._hits / total * 100) if total > 0 else 0
-            return {
-                'size': len(self._cache),
-                'hits': self._hits,
-                'misses': self._misses,
-                'hit_rate': hit_rate
-            }
 
 class BatchThumbnailWorker(QObject):
     """
@@ -189,7 +110,7 @@ class BatchThumbnailWorker(QObject):
         self._completed_count = 0
 
         # LRU Cache for recently generated thumbnails (store QImage, not QPixmap)
-        self._cache = LRUCache(maxsize=100)
+        self._cache = ThumbnailCache(max_items=100)
 
         # Memory-mapped ROM data
         self._rom_file = None
@@ -328,7 +249,7 @@ class BatchThumbnailWorker(QObject):
                         request = self._get_next_request()
                         if request:
                             # Check cache first
-                            cache_key = (request.offset, request.size)
+                            cache_key = ThumbnailCache.make_key(request.offset, request.size)
                             cached_image = self._get_cached_image(cache_key)
                             if cached_image:
                                 self.thumbnail_ready.emit(request.offset, cached_image)
@@ -382,7 +303,7 @@ class BatchThumbnailWorker(QObject):
                 logger.debug(f"Processing thumbnail request: offset=0x{request.offset:06X}, size={request.size}")
 
                 # Check cache first (thread-safe)
-                cache_key = (request.offset, request.size)
+                cache_key = ThumbnailCache.make_key(request.offset, request.size)
                 cached_image = self._get_cached_image(cache_key)
 
                 if cached_image:
@@ -537,7 +458,7 @@ class BatchThumbnailWorker(QObject):
                     pass
         return None
 
-    def _get_cached_image(self, key: tuple[int, int]) -> QImage | None:
+    def _get_cached_image(self, key: str) -> QImage | None:
         """Thread-safe cache read with LRU."""
         return self._cache.get(key)
 
@@ -574,7 +495,7 @@ class BatchThumbnailWorker(QObject):
                 qimage = future.result(timeout=2.0)  # 2 second timeout per thumbnail
                 if qimage:
                     # Cache the result
-                    cache_key = (request.offset, request.size)
+                    cache_key = ThumbnailCache.make_key(request.offset, request.size)
                     self._add_to_cache(cache_key, qimage)
 
                     # Emit result (thread-safe)
@@ -733,7 +654,7 @@ class BatchThumbnailWorker(QObject):
         # Since we're in a worker thread and the data is from tobytes(), we need the copy
         return qimage.copy()
 
-    def _add_to_cache(self, key: tuple[int, int], qimage: QImage):
+    def _add_to_cache(self, key: str, qimage: QImage) -> None:
         """Add an image to the cache (thread-safe with LRU eviction)."""
         self._cache.put(key, qimage)
 
@@ -752,7 +673,7 @@ class BatchThumbnailWorker(QObject):
 
     def get_cache_size(self) -> int:
         """Get the current cache size (thread-safe)."""
-        return self._cache.size()
+        return len(self._cache)
 
     def clear_cache(self) -> None:
         """Clear the thumbnail cache (thread-safe)."""
@@ -775,7 +696,7 @@ class BatchThumbnailWorker(QObject):
     def _clear_cache_memory(self) -> None:
         """Clear cache memory with logging."""
         if hasattr(self, '_cache') and self._cache:
-            cache_size = self._cache.size()
+            cache_size = len(self._cache)
             if self._cache:
                 self._cache.clear()
             if cache_size > 0:

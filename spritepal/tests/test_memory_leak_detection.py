@@ -32,9 +32,9 @@ import pytest
 from PySide6.QtCore import QObject
 from PySide6.QtGui import QImage, QPixmap
 
+from ui.common.thumbnail_cache import ThumbnailCache
 from ui.workers.batch_thumbnail_worker import (
     BatchThumbnailWorker,
-    LRUCache,
     ThumbnailWorkerController,
 )
 
@@ -134,12 +134,12 @@ def mock_rom_extractor() -> Mock:
     extractor.decompress.return_value = b'\x00' * 1024
     return extractor
 
-class TestLRUCacheMemoryManagement:
-    """Test memory management in LRU cache."""
+class TestThumbnailCacheMemoryManagement:
+    """Test memory management in ThumbnailCache."""
 
     def test_cache_eviction_frees_memory(self, memory_monitor, weakref_tracker):
         """Test that evicted items are properly freed."""
-        cache = LRUCache(maxsize=10)
+        cache = ThumbnailCache(max_items=10)
         memory_monitor.start()
 
         # Create tracked QImages
@@ -150,10 +150,10 @@ class TestLRUCacheMemoryManagement:
             img.fill(i)  # Different fill for each
             images.append(img)
             weakref_tracker.track(img)
-            cache.put((i, i), img)
+            cache.put(ThumbnailCache.make_key(i, i), img)
 
         # First 10 images should be evicted
-        cache_size = cache.size()
+        cache_size = len(cache)
         assert cache_size == 10
 
         # Clear references to evicted images
@@ -165,13 +165,13 @@ class TestLRUCacheMemoryManagement:
 
     def test_cache_stats_dont_leak(self, memory_monitor):
         """Test getting cache stats doesn't leak memory."""
-        cache = LRUCache(maxsize=50)
+        cache = ThumbnailCache(max_items=50)
         memory_monitor.start()
 
         # Populate cache
         for i in range(50):
             img = QImage(64, 64, QImage.Format.Format_RGBA8888)
-            cache.put((i, i), img)
+            cache.put(ThumbnailCache.make_key(i, i), img)
 
         # Repeatedly get stats
         for _ in range(10000):
