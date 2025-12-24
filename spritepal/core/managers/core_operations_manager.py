@@ -1036,7 +1036,7 @@ class CoreOperationsManager(BaseManager):
 
     def find_suggested_input_vram(
         self, sprite_path: str,
-        metadata: dict[str, object] | None = None,
+        metadata: Mapping[str, object] | None = None,
         suggested_vram: str = ""
     ) -> str:
         """

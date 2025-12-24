@@ -24,6 +24,7 @@ from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
+
 # ExtractionManagerProtocol and InjectionManagerProtocol removed - use CoreOperationsManager directly
 from tests.infrastructure.real_component_factory import RealComponentFactory
 

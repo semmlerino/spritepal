@@ -473,10 +473,8 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         else:
             pytest.fail(message)
 
-    # Cleanup
-    if IS_HEADLESS:
-        import gc
-        gc.collect()
+    # Note: We intentionally skip gc.collect() here to avoid Qt finalization race.
+    # WorkerManager.cleanup_all() already handles safe cleanup of Qt objects.
 
 
 # =============================================================================

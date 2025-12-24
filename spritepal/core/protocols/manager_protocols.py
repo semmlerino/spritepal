@@ -5,12 +5,7 @@ These protocols define the interfaces that managers must implement.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from PIL import Image
-    from PySide6.QtCore import Signal
-
+from typing import Any, Protocol, runtime_checkable
 
 # ExtractionManagerProtocol and InjectionManagerProtocol have been removed.
 # Use CoreOperationsManager directly via inject(CoreOperationsManager) for

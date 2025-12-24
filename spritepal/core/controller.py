@@ -7,7 +7,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
@@ -108,26 +108,22 @@ class ExtractionController(QObject):
             self.update_preview_with_offset
         )
 
-        # Connect injection manager signals - cast to concrete type for signal access
-        injection_mgr = cast(CoreOperationsManager, self.injection_manager)
-        _ = injection_mgr.injection_progress.connect(self._on_injection_progress)
-        _ = injection_mgr.injection_finished.connect(self._on_injection_finished)
-        _ = injection_mgr.cache_saved.connect(self._on_cache_saved)
+        # Connect injection manager signals
+        _ = self.injection_manager.injection_progress.connect(self._on_injection_progress)
+        _ = self.injection_manager.injection_finished.connect(self._on_injection_finished)
+        _ = self.injection_manager.cache_saved.connect(self._on_cache_saved)
 
-        # Connect extraction manager cache signals - cast to concrete type for signal access
-        extraction_mgr = cast(CoreOperationsManager, self.extraction_manager)
-        _ = extraction_mgr.cache_operation_started.connect(self._on_cache_operation_started)
-        _ = extraction_mgr.cache_hit.connect(self._on_cache_hit)
-        _ = extraction_mgr.cache_miss.connect(self._on_cache_miss)
-        _ = extraction_mgr.cache_saved.connect(self._on_cache_saved)
+        # Connect extraction manager cache signals
+        _ = self.extraction_manager.cache_operation_started.connect(self._on_cache_operation_started)
+        _ = self.extraction_manager.cache_hit.connect(self._on_cache_hit)
+        _ = self.extraction_manager.cache_miss.connect(self._on_cache_miss)
+        _ = self.extraction_manager.cache_saved.connect(self._on_cache_saved)
 
         # Initialize preview generator with managers
         self.preview_generator = get_preview_generator()
-        # Cast to concrete type for preview generator compatibility
-        extraction_mgr = cast(CoreOperationsManager, self.extraction_manager)
         self.preview_generator.set_managers(
-            extraction_manager=extraction_mgr,
-            rom_extractor=extraction_mgr.get_rom_extractor()
+            extraction_manager=self.extraction_manager,
+            rom_extractor=self.extraction_manager.get_rom_extractor()
         )
 
     def start_extraction(self) -> None:
@@ -204,8 +200,7 @@ class ExtractionController(QObject):
             "grayscale_mode": params.get("grayscale_mode", False),
         }
         # Pass extraction manager explicitly (B.2: constructor injection)
-        extraction_mgr = cast(CoreOperationsManager, self.extraction_manager)
-        self.worker = VRAMExtractionWorker(extraction_params, extraction_manager=extraction_mgr)
+        self.worker = VRAMExtractionWorker(extraction_params, extraction_manager=self.extraction_manager)
         _ = self.worker.progress.connect(self._on_progress)
         _ = self.worker.preview_ready.connect(self._on_preview_ready)
         _ = self.worker.preview_image_ready.connect(self._on_preview_image_ready)
@@ -662,8 +657,7 @@ class ExtractionController(QObject):
             "cgram_path": params.get("cgram_path"),
         }
         # Create and start ROM extraction worker (B.2: constructor injection)
-        extraction_mgr = cast(CoreOperationsManager, self.extraction_manager)
-        self.rom_worker = ROMExtractionWorker(rom_extraction_params, extraction_manager=extraction_mgr)
+        self.rom_worker = ROMExtractionWorker(rom_extraction_params, extraction_manager=self.extraction_manager)
         _ = self.rom_worker.progress.connect(self._on_rom_progress)
         _ = self.rom_worker.extraction_finished.connect(self._on_rom_extraction_finished)
         _ = self.rom_worker.error.connect(self._on_rom_extraction_error)

@@ -23,6 +23,7 @@ from utils.safe_logging import (
 )
 
 from .application_state_manager import ApplicationStateManager
+from .base_manager import BaseManager
 
 # Import consolidated managers
 from .core_operations_manager import CoreOperationsManager
@@ -59,15 +60,18 @@ def _ensure_dependency_maps() -> None:
 
     from .application_state_manager import ApplicationStateManager
     from .core_operations_manager import CoreOperationsManager
+    from .sprite_preset_manager import SpritePresetManager
 
     MANAGER_DEPENDENCIES.update({
         ApplicationStateManager: [],  # No dependencies - always first
+        SpritePresetManager: [],  # No dependencies on other managers
         CoreOperationsManager: [ApplicationStateManager],  # Needs state manager via DI chain
     })
 
     # Maps manager class to the DI registration types it provides
     MANAGER_TO_PROTOCOLS.update({
         ApplicationStateManager: [ApplicationStateManager],
+        SpritePresetManager: [SpritePresetManager],
         CoreOperationsManager: [CoreOperationsManager],  # Now uses concrete type directly
     })
 
@@ -138,9 +142,10 @@ class ManagerRegistry:
     _cleanup_registered: bool = False
 
     # List of manager classes in initialization order.
-    # Order: ApplicationStateManager → CoreOperationsManager
-    MANAGED_CLASSES: list[type] = [
+    # Order: ApplicationStateManager → SpritePresetManager → CoreOperationsManager
+    MANAGED_CLASSES: list[type[BaseManager]] = [
         ApplicationStateManager,
+        SpritePresetManager,
         CoreOperationsManager,
     ]
 
@@ -163,7 +168,7 @@ class ManagerRegistry:
             self._logger = get_logger("ManagerRegistry")
             # Track protocols in initialization order for proper cleanup sequencing
             # DI container is the single source of truth for manager instances
-            self._lifecycle_order: list[type] = []
+            self._lifecycle_order: list[type[BaseManager]] = []
             self._init_done = True
             self._managers_initialized = False
 
