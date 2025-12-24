@@ -29,6 +29,13 @@ from PySide6.QtWidgets import (
 
 from ui.common import WorkerManager
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
+from utils.constants import (
+    MAX_SAFE_SCAN_SIZE,
+    MAX_SCAN_SIZE,
+    MIN_SPRITE_SIZE,
+    ROM_SIZE_2MB,
+    ROM_SIZE_4MB,
+)
 from ui.components.dialogs import RangeScanDialog
 from ui.components.visualization import ROMMapWidget
 from ui.rom_extraction.workers import RangeScanWorker
@@ -54,8 +61,8 @@ class ScanControlsPanel(QWidget):
         # Step 1: Declare all instance variables with type hints
         # State
         self.rom_path: str = ""
-        self.rom_size: int = 0x400000
-        self.current_offset: int = 0x200000
+        self.rom_size: int = ROM_SIZE_4MB
+        self.current_offset: int = ROM_SIZE_2MB
         self.is_scanning: bool = False
         self.found_sprites: list[tuple[int, float]] = []
 
@@ -335,7 +342,7 @@ class ScanControlsPanel(QWidget):
 
         # Create range scan worker with proper bounds and error handling
         try:
-            step_size = 0x100  # 256 byte steps for comprehensive scanning
+            step_size = MIN_SPRITE_SIZE  # 256 byte steps for comprehensive scanning
             self.range_scan_worker = RangeScanWorker(
                 self.rom_path, start_offset, end_offset, step_size, rom_extractor,
                 rom_cache=self.rom_cache
@@ -474,10 +481,10 @@ class ScanControlsPanel(QWidget):
 
     def _validate_scan_parameters(self, start_offset: int, end_offset: int) -> bool:
         """Validate scan parameters before starting scan"""
-        # Validation constants
-        min_scan_size = 0x100  # 256 bytes minimum
-        max_safe_scan_size = 0x400000  # 4MB for safe performance
-        max_scan_size = 0x2000000  # 32MB absolute maximum
+        # Validation constants (imported from utils.constants)
+        min_scan_size = MIN_SPRITE_SIZE  # 256 bytes minimum
+        max_safe_scan_size = MAX_SAFE_SCAN_SIZE  # 4MB for safe performance
+        max_scan_size = MAX_SCAN_SIZE  # 32MB absolute maximum
 
         # Basic range validation
         if start_offset < 0:
@@ -543,7 +550,7 @@ class ScanControlsPanel(QWidget):
                 {
                     "start_offset": max(0, self.current_offset - 0x10000),  # 64KB before current
                     "end_offset": min(self.rom_size, self.current_offset + 0x10000),  # 64KB after current
-                    "step": 0x100,
+                    "step": MIN_SPRITE_SIZE,
                     "quality_threshold": 0.5,
                     "min_sprite_size": 512,
                     "max_sprite_size": 65536
@@ -552,7 +559,7 @@ class ScanControlsPanel(QWidget):
                 {
                     "start_offset": 0,
                     "end_offset": self.rom_size,
-                    "step": 0x100,
+                    "step": MIN_SPRITE_SIZE,
                     "quality_threshold": 0.5,
                     "min_sprite_size": 512,
                     "max_sprite_size": 65536
@@ -677,7 +684,7 @@ class ScanControlsPanel(QWidget):
             scan_params = {
                 "start_offset": start_offset,
                 "end_offset": end_offset,
-                "step": 0x100,
+                "step": MIN_SPRITE_SIZE,
                 "quality_threshold": 0.5,
                 "min_sprite_size": 512,
                 "max_sprite_size": 65536

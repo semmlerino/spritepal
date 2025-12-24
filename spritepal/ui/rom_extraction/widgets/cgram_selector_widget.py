@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, 
 from ui.common.spacing_constants import (
     CONTROL_PANEL_BUTTON_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
+    PATH_EDIT_MIN_WIDTH,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
 
@@ -38,7 +39,7 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
             "Select custom palette file..."
         )
         self.cgram_path_edit.setReadOnly(True)
-        self.cgram_path_edit.setMinimumWidth(250)
+        self.cgram_path_edit.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
         cgram_row.addWidget(self.cgram_path_edit, 1)
 
         self.browse_cgram_btn = QPushButton("Browse...")

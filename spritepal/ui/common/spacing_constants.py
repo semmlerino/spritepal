@@ -101,3 +101,37 @@ CHECKER_FADE_OPACITY = 30           # Opacity for background checker pattern
 # Progressive disclosure helpers
 COLLAPSIBLE_ANIMATION_DURATION = 150  # ms - for smooth transitions
 COLLAPSIBLE_EASING = "ease-in-out"     # CSS easing function
+
+# Toggle/Collapse widget sizing
+TOGGLE_BUTTON_SIZE = 20               # Size for toggle/collapse buttons (square)
+
+# ROM Map widget sizing
+ROM_MAP_HEIGHT_MIN = 40               # Minimum height for compact ROM map
+ROM_MAP_HEIGHT_DEFAULT = 60           # Default minimum height for ROM map
+ROM_MAP_HEIGHT_MAX = 80               # Maximum height for ROM map
+
+# Progress bar sizing
+LOADING_PROGRESS_HEIGHT = 4           # Thin loading progress bar height
+
+# Preview panel sizing
+PREVIEW_GROUP_MIN_HEIGHT = 200        # Minimum height for sprite preview groups
+PALETTE_GROUP_MIN_HEIGHT = 80         # Minimum height for palette groups
+PALETTE_GROUP_MAX_HEIGHT = 120        # Maximum height for palette groups
+
+# Palette display sizing
+PALETTE_LABEL_HEIGHT = 20             # Fixed height for palette labels
+
+# Path input field sizing
+PATH_EDIT_MIN_WIDTH = 250             # Minimum width for path input fields
+
+# Sprite selector sizing
+SPRITE_COMBO_MIN_WIDTH = 300          # Minimum width for sprite combo boxes
+
+# Thumbnail sizing
+THUMBNAIL_SIZE = 80                   # Standard thumbnail size (80x80)
+
+# Dialog sizing
+ADVANCED_SEARCH_MIN_SIZE = (800, 600)  # Minimum size for advanced search dialog
+
+# Qt maximum (use instead of magic number 16777215)
+QWIDGETSIZE_MAX = 16777215            # Qt's maximum widget size constant

@@ -48,6 +48,8 @@ from ui.rom_extraction.widgets import (
 from ui.styles.components import get_manual_offset_button_style
 from ui.styles.theme import COLORS
 from utils.constants import (
+    ROM_SIZE_2MB,
+    ROM_SIZE_4MB,
     SETTINGS_KEY_LAST_INPUT_ROM,
     SETTINGS_NS_ROM_INJECTION,
 )
@@ -129,7 +131,7 @@ class ROMExtractionPanel(QWidget):
         self._output_name: str = ""
 
         # Manual offset tracking
-        self._manual_offset = 0x200000  # Default offset
+        self._manual_offset = ROM_SIZE_2MB  # Default offset
 
         self._setup_ui()
         self._load_last_rom()
@@ -383,7 +385,7 @@ class ROMExtractionPanel(QWidget):
                     logger.debug(f"ROM size: {self.rom_size} bytes (0x{self.rom_size:X})")
             except Exception as e:
                 logger.warning(f"Could not determine ROM size: {e}")
-                self.rom_size = 0x400000  # Default 4MB
+                self.rom_size = ROM_SIZE_4MB  # Default 4MB
 
             # Save to settings
             from core.di_container import inject

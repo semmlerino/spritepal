@@ -16,6 +16,7 @@ from pathlib import Path
 
 from core.sprite_finder import SpriteFinder
 from utils.constants import (
+    CHUNK_SIZE_PARALLEL,
     DEFAULT_SCAN_STEP,
     MIN_SPRITE_SIZE,
     ROM_SCAN_STEP_TILE,
@@ -56,7 +57,7 @@ class ParallelSpriteFinder:
     def __init__(
         self,
         num_workers: int = 4,
-        chunk_size: int = 0x40000,  # 256KB chunks
+        chunk_size: int = CHUNK_SIZE_PARALLEL,
         step_size: int = DEFAULT_SCAN_STEP
     ):
         """

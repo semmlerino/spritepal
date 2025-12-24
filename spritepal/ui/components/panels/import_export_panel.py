@@ -25,6 +25,7 @@ from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
 from ui.components.visualization import ROMMapWidget
 from ui.styles import get_panel_style, get_section_label_style
+from utils.constants import ROM_SIZE_4MB
 
 
 class ImportExportPanel(QWidget):
@@ -40,7 +41,7 @@ class ImportExportPanel(QWidget):
 
         # State
         self.rom_path: str = ""
-        self.rom_size: int = 0x400000
+        self.rom_size: int = ROM_SIZE_4MB
         self.found_sprites: list[tuple[int, float]] = []
 
         # ROM map reference (set by parent)

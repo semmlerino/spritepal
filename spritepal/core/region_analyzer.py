@@ -16,6 +16,7 @@ from utils.constants import (
     EMPTY_REGION_PATTERN_THRESHOLD,
     EMPTY_REGION_SIZE,
     EMPTY_REGION_ZERO_THRESHOLD,
+    ROM_MIN_REGION_SIZE,
 )
 from utils.logging_config import get_logger
 
@@ -239,7 +240,7 @@ class EmptyRegionDetector:
 
         return non_empty_regions
 
-    def get_optimized_scan_ranges(self, rom_data: bytes, min_gap_size: int = 0x1000) -> list[tuple[int, int]]:
+    def get_optimized_scan_ranges(self, rom_data: bytes, min_gap_size: int = ROM_MIN_REGION_SIZE) -> list[tuple[int, int]]:
         """
         Get optimized scan ranges, merging small gaps between regions.
 

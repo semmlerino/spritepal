@@ -30,6 +30,7 @@ from ui.common.spacing_constants import (
     SPACING_STANDARD,
 )
 from ui.styles import get_prominent_action_button_style
+from utils.constants import MIN_SPRITE_SIZE, ROM_MIN_REGION_SIZE, ROM_SIZE_1MB, ROM_SIZE_2MB, ROM_SIZE_4MB
 from ui.styles.theme import COLORS
 
 
@@ -80,9 +81,9 @@ class SimpleBrowseTab(QWidget):
         super().__init__(parent)
 
         # State
-        self._current_offset: int = 0x200000
-        self._rom_size: int = 0x400000
-        self._step_size: int = 0x1000
+        self._current_offset: int = ROM_SIZE_2MB
+        self._rom_size: int = ROM_SIZE_4MB
+        self._step_size: int = ROM_MIN_REGION_SIZE
         self._rom_path: str = ""
         self._advanced_search_dialog: AdvancedSearchDialog | None = None
         self._smart_preview_coordinator: SmartPreviewCoordinator | None = None
@@ -310,8 +311,8 @@ class SimpleBrowseTab(QWidget):
         step_group.addWidget(step_label)
 
         self.step_spinbox = QSpinBox()
-        self.step_spinbox.setMinimum(0x100)
-        self.step_spinbox.setMaximum(0x100000)
+        self.step_spinbox.setMinimum(MIN_SPRITE_SIZE)
+        self.step_spinbox.setMaximum(ROM_SIZE_1MB)
         self.step_spinbox.setValue(self._step_size)
         self.step_spinbox.setDisplayIntegerBase(16)
         self.step_spinbox.setPrefix("0x")

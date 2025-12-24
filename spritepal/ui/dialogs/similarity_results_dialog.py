@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.visual_similarity_search import SimilarityMatch
-from ui.common.spacing_constants import SPACING_COMPACT_MEDIUM, SPACING_SMALL, SPACING_TINY
+from ui.common.spacing_constants import SPACING_COMPACT_MEDIUM, SPACING_SMALL, SPACING_TINY, THUMBNAIL_SIZE
 from ui.components import DialogBase
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
@@ -69,7 +69,7 @@ class SimilarityResultWidget(QFrame):
         if self.thumbnail and not self.thumbnail.isNull():
             # Scale thumbnail to reasonable size
             scaled_thumbnail = self.thumbnail.scaled(
-                80, 80,
+                THUMBNAIL_SIZE, THUMBNAIL_SIZE,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
@@ -79,7 +79,7 @@ class SimilarityResultWidget(QFrame):
             thumbnail_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic;")
 
         thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        thumbnail_label.setMinimumSize(80, 80)
+        thumbnail_label.setMinimumSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
         layout.addWidget(thumbnail_label)
 
         # Offset

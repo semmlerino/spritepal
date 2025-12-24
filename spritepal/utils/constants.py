@@ -388,3 +388,11 @@ PREVIEW_CACHE_DEFAULT_MAX_MB = 32             # Maximum cache size in MB
 PREVIEW_CACHE_MIN_MB = 8                      # Minimum cache size in MB
 PREVIEW_CACHE_MAX_MB = 256                    # Maximum cache size in MB
 PREVIEW_CACHE_STATS_LOG_INTERVAL = 60.0       # Seconds between stats logs
+
+# Parallel processing chunk sizes
+CHUNK_SIZE_PARALLEL = 0x40000                 # 256KB chunks for parallel sprite finding
+DECOMPRESSION_WINDOW_SIZE = 0x20000           # 128KB window for ROM decompression
+
+# Scan size limits
+MAX_SAFE_SCAN_SIZE = ROM_SIZE_4MB             # 4MB - Safe scan limit for performance
+MAX_SCAN_SIZE = 0x2000000                     # 32MB - Absolute maximum scan size

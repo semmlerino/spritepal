@@ -20,6 +20,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import (
+    PALETTE_GROUP_MAX_HEIGHT,
+    PALETTE_GROUP_MIN_HEIGHT,
+    PREVIEW_GROUP_MIN_HEIGHT,
+)
 from ui.styles import get_muted_text_style
 
 if TYPE_CHECKING:
@@ -148,9 +153,9 @@ class UICoordinator(QObject):
         right_splitter.setStretchFactor(1, 0)  # Palette panel fixed size
 
         # Set minimum sizes - more compact
-        preview_group.setMinimumHeight(200)
-        palette_group.setMinimumHeight(80)
-        palette_group.setMaximumHeight(120)  # Limit palette height
+        preview_group.setMinimumHeight(PREVIEW_GROUP_MIN_HEIGHT)
+        palette_group.setMinimumHeight(PALETTE_GROUP_MIN_HEIGHT)
+        palette_group.setMaximumHeight(PALETTE_GROUP_MAX_HEIGHT)
 
         return right_splitter
 

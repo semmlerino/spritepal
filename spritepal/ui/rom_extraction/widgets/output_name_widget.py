@@ -5,6 +5,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QWidget
 
 from ui.common.spacing_constants import (
+    PATH_EDIT_MIN_WIDTH,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
 
@@ -32,7 +33,7 @@ class OutputNameWidget(BaseExtractionWidget):
 
         self.output_name_edit = QLineEdit()
         self.output_name_edit.setPlaceholderText("Enter output base name...")
-        self.output_name_edit.setMinimumWidth(250)
+        self.output_name_edit.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
         _ = self.output_name_edit.textChanged.connect(self.text_changed.emit)
         output_layout.addWidget(self.output_name_edit, 1)
 

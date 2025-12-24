@@ -60,6 +60,7 @@ from ui.common.spacing_constants import (
     OFFSET_SPINBOX_MIN_WIDTH,
     SPACING_SMALL,
     SPACING_TINY,
+    TOGGLE_BUTTON_SIZE,
 )
 from ui.common.timing_constants import REFRESH_RATE_60FPS
 from ui.styles import (
@@ -141,7 +142,7 @@ class DropZone(QWidget):
 
         # Clear button - small "×" to clear file selection  # noqa: RUF003
         self.clear_btn = QPushButton("×")  # noqa: RUF001
-        self.clear_btn.setFixedSize(20, 20)
+        self.clear_btn.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
         self.clear_btn.setToolTip("Clear selected file")
         self.clear_btn.setStyleSheet(
             f"""

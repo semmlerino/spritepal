@@ -15,6 +15,8 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
+from utils.constants import ROM_ALIGNMENT_GAP_THRESHOLD
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -340,7 +342,7 @@ class SpriteGroupFinder:
 
     def find_animations(
         self,
-        offset_proximity: int = 0x10000,
+        offset_proximity: int = ROM_ALIGNMENT_GAP_THRESHOLD,
         similarity_threshold: float = 0.9
     ) -> list[list[int]]:
         """

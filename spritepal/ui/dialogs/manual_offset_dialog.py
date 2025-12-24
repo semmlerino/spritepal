@@ -73,6 +73,7 @@ from ui.dialogs.services import BookmarkManager, CacheStatusController, ViewStat
 from ui.rom_extraction.workers import SpritePreviewWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
+from utils.constants import ROM_SIZE_2MB, ROM_SIZE_4MB
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -131,7 +132,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Business logic state
         self.rom_path: str = ""
-        self.rom_size: int = 0x400000
+        self.rom_size: int = ROM_SIZE_4MB
 
         # Manager references with thread safety
         self._manager_mutex = QMutex()
@@ -909,7 +910,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """Get current offset."""
         if self.browse_tab is not None:
             return self.browse_tab.get_current_offset()
-        return 0x200000
+        return ROM_SIZE_2MB
 
     def add_found_sprite(self, offset: int, quality: float = 1.0) -> None:
         """Add found sprite to history."""

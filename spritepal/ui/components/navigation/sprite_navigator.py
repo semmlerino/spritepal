@@ -34,12 +34,13 @@ from PySide6.QtWidgets import (
 
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
-from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
+from ui.common.spacing_constants import ROM_MAP_HEIGHT_MIN, SPACING_SMALL, SPACING_TINY
 from ui.components.navigation.region_jump_widget import RegionJumpWidget
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.rom_extraction.workers import SpritePreviewWorker
 from ui.styles.theme import COLORS
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
+from utils.constants import ROM_SIZE_2MB, ROM_SIZE_4MB
 from utils.logging_config import get_logger
 from utils.sprite_regions import SpriteRegion, SpriteRegionDetector
 
@@ -178,9 +179,9 @@ class SpriteNavigator(QWidget):
         super().__init__(parent)
 
         # State
-        self.current_offset = 0x200000
+        self.current_offset = ROM_SIZE_2MB
         self.rom_path = ""
-        self.rom_size = 0x400000
+        self.rom_size = ROM_SIZE_4MB
         self.extraction_manager: CoreOperationsManager | None = None
         self.found_sprites: list[tuple[int, float]] = []
         self.sprite_regions: list[SpriteRegion] = []
@@ -283,7 +284,7 @@ class SpriteNavigator(QWidget):
         map_layout = QVBoxLayout(map_container)
 
         self.rom_map = ROMMapWidget()
-        self.rom_map.setMinimumHeight(40)  # Much smaller
+        self.rom_map.setMinimumHeight(ROM_MAP_HEIGHT_MIN)  # Compact height
         self.rom_map.setMaximumHeight(50)  # Compact height
         map_layout.addWidget(self.rom_map)
 

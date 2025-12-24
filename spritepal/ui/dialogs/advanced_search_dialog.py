@@ -46,7 +46,7 @@ from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngin
 from core.workers.base import BaseWorker, handle_worker_errors
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
-from ui.common.spacing_constants import INDENT_UNDER_CONTROL
+from ui.common.spacing_constants import ADVANCED_SEARCH_MIN_SIZE, INDENT_UNDER_CONTROL
 from ui.components.filters import SearchFiltersWidget
 from ui.components.filters.search_filters_widget import SearchFilter
 from ui.constants.help_text import TOOLTIPS
@@ -835,7 +835,7 @@ class AdvancedSearchDialog(QDialog):
     def _setup_ui(self) -> None:
         """Setup the user interface."""
         self.setWindowTitle("Advanced Sprite Search")
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(*ADVANCED_SEARCH_MIN_SIZE)
 
         layout = QVBoxLayout(self)
 

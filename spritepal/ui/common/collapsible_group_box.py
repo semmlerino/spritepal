@@ -36,7 +36,9 @@ from .spacing_constants import (
     COLLAPSIBLE_ANIMATION_DURATION,
     FONT_SIZE_MEDIUM,
     GROUP_PADDING,
+    QWIDGETSIZE_MAX,
     SPACING_SMALL,
+    TOGGLE_BUTTON_SIZE,
 )
 
 
@@ -144,7 +146,7 @@ class CollapsibleGroupBox(QFrame):
 
         # Collapse/expand button
         self._toggle_button = QPushButton(self)
-        self._toggle_button.setFixedSize(20, 20)
+        self._toggle_button.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
         if self._toggle_button:
             self._toggle_button.setStyleSheet(f"""
             QPushButton {{
@@ -222,7 +224,7 @@ class CollapsibleGroupBox(QFrame):
             else:
                 self._content_widget.setVisible(True)
                 self._content_widget.setMinimumHeight(0)
-                self._content_widget.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX
+                self._content_widget.setMaximumHeight(QWIDGETSIZE_MAX)
             self.collapsed.emit(collapsed)
             return
 
@@ -288,7 +290,7 @@ class CollapsibleGroupBox(QFrame):
             def on_finished() -> None:
                 if not self._is_collapsed and self._content_widget is not None:
                     self._content_widget.setMinimumHeight(0)
-                    self._content_widget.setMaximumHeight(16777215)
+                    self._content_widget.setMaximumHeight(QWIDGETSIZE_MAX)
 
             self._animation.finished.connect(on_finished)
 

@@ -12,6 +12,7 @@ from core.types import SpritePreset
 from ui.common.spacing_constants import (
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
+    SPRITE_COMBO_MIN_WIDTH,
 )
 from ui.styles import get_prominent_action_button_style
 from ui.styles.theme import COLORS
@@ -56,7 +57,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         sprite_row.addWidget(sprite_label)
 
         self.sprite_combo = QComboBox()
-        self.sprite_combo.setMinimumWidth(300)
+        self.sprite_combo.setMinimumWidth(SPRITE_COMBO_MIN_WIDTH)
         self.sprite_combo.addItem("Select ROM file first...", None)
         self.sprite_combo.setEnabled(False)
         _ = self.sprite_combo.currentIndexChanged.connect(self.sprite_changed.emit)

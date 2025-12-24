@@ -21,6 +21,8 @@ from ui.common.spacing_constants import (
     CONTROL_PANEL_BUTTON_WIDTH,
     CONTROL_PANEL_LABEL_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
+    LOADING_PROGRESS_HEIGHT,
+    PATH_EDIT_MIN_WIDTH,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
 )
 
@@ -60,7 +62,7 @@ class ROMFileWidget(BaseExtractionWidget):
         self.rom_path_edit = QLineEdit()
         self.rom_path_edit.setPlaceholderText("Select ROM file...")
         self.rom_path_edit.setReadOnly(True)
-        self.rom_path_edit.setMinimumWidth(250)
+        self.rom_path_edit.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
         rom_row.addWidget(self.rom_path_edit, 1)  # Stretch factor 1
 
         self.browse_rom_btn = QPushButton("Browse...")
@@ -81,7 +83,7 @@ class ROMFileWidget(BaseExtractionWidget):
         self.loading_progress = QProgressBar()
         self.loading_progress.setRange(0, 0)  # Indeterminate mode
         self.loading_progress.setTextVisible(False)
-        self.loading_progress.setMaximumHeight(4)
+        self.loading_progress.setMaximumHeight(LOADING_PROGRESS_HEIGHT)
         self.loading_progress.setStyleSheet(f"""
             QProgressBar {{
                 border: none;

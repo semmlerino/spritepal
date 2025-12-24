@@ -16,6 +16,8 @@ from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPe
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from ui.styles.theme import COLORS
+from ui.common.spacing_constants import ROM_MAP_HEIGHT_DEFAULT, ROM_MAP_HEIGHT_MAX
+from utils.constants import ROM_SIZE_4MB
 from utils.logging_config import get_logger
 from utils.sprite_regions import SpriteRegion
 
@@ -33,7 +35,7 @@ class ROMMapWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.rom_size: int = 0x400000  # Default 4MB
+        self.rom_size: int = ROM_SIZE_4MB  # Default 4MB
         self.current_offset: int = 0
         self.found_sprites: list[tuple[int, float]] = []  # List of (offset, quality) tuples
         self._needs_update: bool = False  # Track if widget needs visual update
@@ -43,8 +45,8 @@ class ROMMapWidget(QWidget):
         self.current_region_index: int = -1
         self.highlight_regions: bool = True
 
-        self.setMinimumHeight(60)
-        self.setMaximumHeight(80)
+        self.setMinimumHeight(ROM_MAP_HEIGHT_DEFAULT)
+        self.setMaximumHeight(ROM_MAP_HEIGHT_MAX)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         # Enable mouse tracking for hover effects

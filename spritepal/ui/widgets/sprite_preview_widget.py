@@ -36,6 +36,7 @@ from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.common.signal_utils import is_valid_qt
 from ui.common.spacing_constants import (
     COMPACT_BUTTON_HEIGHT,
+    QWIDGETSIZE_MAX,
     SPACING_TINY,
 )
 from ui.styles import get_muted_text_style
@@ -90,7 +91,7 @@ class SpritePreviewWidget(QWidget):
         self.preview_label = QLabel(self)
         if self.preview_label:
             self.preview_label.setMinimumSize(100, 100)  # UX-validated minimum
-            self.preview_label.setMaximumSize(16777215, 16777215)  # Use all available space
+            self.preview_label.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)  # Use all available space
             self.preview_label.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding  # Use ALL available space
             )

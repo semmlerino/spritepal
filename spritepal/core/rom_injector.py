@@ -17,6 +17,7 @@ from core.rom_validator import ROMHeader, ROMValidator
 from core.sprite_config_loader import SpriteConfigLoader
 from utils.file_validator import atomic_write
 from utils.logging_config import get_logger
+from utils.constants import DECOMPRESSION_WINDOW_SIZE
 from utils.rom_backup import ROMBackupManager
 
 logger = get_logger(__name__)
@@ -130,7 +131,7 @@ class ROMInjector(SpriteInjector):
         # Create temp file for decompression with only the relevant portion
         # Extract a window from offset to offset + 128KB (or end of ROM)
         # This reduces memory/disk usage from 4MB to ~128KB per operation
-        window_size = 0x20000  # 128KB window - sufficient for any SNES sprite
+        window_size = DECOMPRESSION_WINDOW_SIZE  # 128KB - sufficient for any SNES sprite
         window_end = min(len(rom_data), offset + window_size)
         rom_window = rom_data[offset:window_end]
         adjusted_offset = 0  # Offset within the window

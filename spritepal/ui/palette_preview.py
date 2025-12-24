@@ -13,7 +13,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from ui.common.spacing_constants import BORDER_THIN, PALETTE_PREVIEW_SIZE, SPACING_TINY
+from ui.common.spacing_constants import BORDER_THIN, PALETTE_LABEL_HEIGHT, PALETTE_PREVIEW_SIZE, SPACING_TINY
 from ui.styles.theme import COLORS
 
 # Constants for collapsed view
@@ -147,7 +147,7 @@ class PaletteWidget(QFrame):
         # Palette label - fixed height prevents overlap with color grid
         self.label = QLabel(f"{palette_index}", self)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setFixedHeight(20)
+        self.label.setFixedHeight(PALETTE_LABEL_HEIGHT)
         self.label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
         layout.addWidget(self.label, 0, 0, 1, 4)
 
