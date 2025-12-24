@@ -800,85 +800,43 @@ class FileValidator:
 
     # --- Convenience methods that raise ValidationError on failure ---
 
-    @classmethod
-    def validate_vram_file_or_raise(cls, path: str) -> None:
-        """Validate VRAM file and raise ValidationError if invalid.
+    @staticmethod
+    def _raise_if_invalid(result: ValidationResult, default_error: str) -> None:
+        """Raise ValidationError if result is invalid.
 
         Args:
-            path: Path to VRAM file
-
-        Raises:
-            ValidationError: If validation fails
+            result: Validation result to check
+            default_error: Default error message if result has no message
         """
-        result = cls.validate_vram_file(path)
         if not result.is_valid:
-            raise ValidationError(
-                result.error_message or f"Invalid VRAM file: {path}"
-            )
+            raise ValidationError(result.error_message or default_error)
+
+    @classmethod
+    def validate_vram_file_or_raise(cls, path: str) -> None:
+        """Validate VRAM file and raise ValidationError if invalid."""
+        cls._raise_if_invalid(cls.validate_vram_file(path), f"Invalid VRAM file: {path}")
 
     @classmethod
     def validate_cgram_file_or_raise(cls, path: str) -> None:
-        """Validate CGRAM file and raise ValidationError if invalid.
-
-        Args:
-            path: Path to CGRAM file
-
-        Raises:
-            ValidationError: If validation fails
-        """
-        result = cls.validate_cgram_file(path)
-        if not result.is_valid:
-            raise ValidationError(
-                result.error_message or f"Invalid CGRAM file: {path}"
-            )
+        """Validate CGRAM file and raise ValidationError if invalid."""
+        cls._raise_if_invalid(cls.validate_cgram_file(path), f"Invalid CGRAM file: {path}")
 
     @classmethod
     def validate_oam_file_or_raise(cls, path: str) -> None:
-        """Validate OAM file and raise ValidationError if invalid.
-
-        Args:
-            path: Path to OAM file
-
-        Raises:
-            ValidationError: If validation fails
-        """
-        result = cls.validate_oam_file(path)
-        if not result.is_valid:
-            raise ValidationError(
-                result.error_message or f"Invalid OAM file: {path}"
-            )
+        """Validate OAM file and raise ValidationError if invalid."""
+        cls._raise_if_invalid(cls.validate_oam_file(path), f"Invalid OAM file: {path}")
 
     @classmethod
     def validate_rom_file_exists_or_raise(cls, path: str) -> None:
-        """Validate ROM file exists and raise ValidationError if not.
-
-        Args:
-            path: Path to ROM file
-
-        Raises:
-            ValidationError: If file doesn't exist or validation fails
-        """
-        result = cls.validate_file_existence(path, "ROM file")
-        if not result.is_valid:
-            raise ValidationError(
-                result.error_message or f"ROM file not found: {path}"
-            )
+        """Validate ROM file exists and raise ValidationError if not."""
+        cls._raise_if_invalid(
+            cls.validate_file_existence(path, "ROM file"), f"ROM file not found: {path}"
+        )
 
     @classmethod
     def validate_rom_file_or_raise(cls, path: str) -> None:
-        """Validate ROM file with comprehensive checks and raise ValidationError if invalid.
-
-        Args:
-            path: Path to ROM file
-
-        Raises:
-            ValidationError: If validation fails
-        """
-        result = cls.validate_rom_file(path)
-        if not result.is_valid:
-            raise ValidationError(
-                result.error_message or f"Invalid ROM file: {path}"
-            )
+        """Validate ROM file with comprehensive checks and raise ValidationError if invalid."""
+        cls._raise_if_invalid(cls.validate_rom_file(path), f"Invalid ROM file: {path}")
 
 
 # Windows-specific constants for atomic file operations

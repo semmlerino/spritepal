@@ -414,19 +414,7 @@ class BatchThumbnailWorker(QObject):
         finally:
             logger.info("BatchThumbnailWorker stopped")
             # Shutdown thread pool first to prevent resource leak
-            # IMPORTANT: Use wait=True to ensure all executor threads finish
-            # before this worker's run() method exits. This prevents orphan
-            # threads that cause crashes during garbage collection.
-            if self._thread_pool:
-                try:
-                    # cancel_futures=True cancels queued work, wait=True waits
-                    # for in-progress work to complete
-                    self._thread_pool.shutdown(wait=True, cancel_futures=True)
-                    logger.debug("Thread pool shutdown complete in finally block")
-                except Exception as pool_error:
-                    logger.warning(f"Error shutting down thread pool: {pool_error}")
-                finally:
-                    self._thread_pool = None
+            self._shutdown_thread_pool()
             # Clear ROM data to free memory
             self._clear_rom_data()
             # Clear cache as well
@@ -771,6 +759,19 @@ class BatchThumbnailWorker(QObject):
         if self._cache:
             self._cache.clear()
 
+    def _shutdown_thread_pool(self) -> None:
+        """Shutdown thread pool safely with proper wait and error handling."""
+        if self._thread_pool:
+            try:
+                # cancel_futures=True cancels queued work, wait=True waits
+                # for in-progress work to complete
+                self._thread_pool.shutdown(wait=True, cancel_futures=True)
+                logger.debug("Thread pool shutdown complete")
+            except Exception as e:
+                logger.warning(f"Error shutting down thread pool: {e}")
+            finally:
+                self._thread_pool = None
+
     def _clear_cache_memory(self) -> None:
         """Clear cache memory with logging."""
         if hasattr(self, '_cache') and self._cache:
@@ -821,15 +822,8 @@ class BatchThumbnailWorker(QObject):
         # Request stop
         self.stop()
 
-        # Shutdown thread pool if it exists
-        if self._thread_pool:
-            try:
-                self._thread_pool.shutdown(wait=True, cancel_futures=True)
-                logger.debug("Thread pool shutdown complete")
-            except Exception as e:
-                logger.warning(f"Error shutting down thread pool: {e}")
-            finally:
-                self._thread_pool = None
+        # Shutdown thread pool
+        self._shutdown_thread_pool()
 
         # Clear resources thoroughly with error protection
         try:

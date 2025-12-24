@@ -815,12 +815,6 @@ class CoreOperationsManager(BaseManager):
             worker.compression_info.connect(self.compression_info.emit)  # type: ignore[attr-defined] - Signal from BaseWorker
 
     @override
-    def _on_worker_progress_adapter(self, *args: object) -> None:
-        """Adapter to handle different worker progress signal signatures."""
-        # Use inherited implementation from BaseManager
-        super()._on_worker_progress_adapter(*args)
-
-    @override
     def _on_worker_progress(self, message: str) -> None:
         """Handle worker progress - emit injection-specific signal."""
         self.injection_progress.emit(message)

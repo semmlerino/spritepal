@@ -267,76 +267,6 @@ class WorkerManager:
         return worker
 
     @staticmethod
-    def safe_cancel_worker(
-        worker: QThread | None,
-        timeout: int = 3000,
-        check_interruption: bool = True
-    ) -> bool:
-        """
-        Safely cancel a running worker without terminating the thread.
-
-        This method is designed for cancelling workers that are currently running
-        but should be stopped gracefully. Unlike cleanup_worker(), this method
-        focuses specifically on cancellation without deletion.
-
-        Args:
-            worker: The worker thread to cancel (can be None)
-            timeout: Milliseconds to wait for cancellation (default: 3000ms)
-            check_interruption: Whether to check isInterruptionRequested() (default: True)
-
-        Returns:
-            bool: True if worker was successfully cancelled or wasn't running,
-                  False if worker is still running after timeout
-
-        Note:
-            This method is useful when you want to cancel a worker but keep the
-            thread object alive for status checking or reuse.
-        """
-        if worker is None:
-            return True
-
-        worker_name = worker.__class__.__name__
-
-        if not worker.isRunning():
-            logger.debug(f"{worker_name}: Already stopped")
-            return True
-
-        logger.debug(f"{worker_name}: Requesting cancellation")
-
-        # Stage 1: Call cancel() if available (BaseWorker pattern)
-        if _is_cancellable(worker):
-            logger.debug(f"{worker_name}: Calling cancel()")
-            try:
-                cast(CancellableWorker, worker).cancel()
-            except Exception as e:
-                logger.warning(f"{worker_name}: Error during cancel(): {e}")
-
-        # Stage 2: Use Qt's built-in interruption mechanism
-        worker.requestInterruption()
-
-        # Stage 3: Wait briefly for worker to respond to cancellation
-        initial_wait = min(timeout // 2, 1000)  # Wait up to 1 second initially
-        if worker.wait(initial_wait):
-            logger.debug(f"{worker_name}: Cancelled successfully")
-            return True
-
-        # Stage 4: Check if worker is respecting interruption requests
-        # Note: isInterruptionRequested is always available on QThread
-        if check_interruption and worker.isInterruptionRequested():
-            logger.debug(f"{worker_name}: Interruption acknowledged, waiting longer")
-            remaining_timeout = timeout - initial_wait
-            if worker.wait(remaining_timeout):
-                logger.debug(f"{worker_name}: Cancelled after interruption")
-                return True
-
-        # Worker didn't respond to cancellation
-        logger.warning(
-            f"{worker_name}: Did not respond to cancellation within {timeout}ms. "
-            "Worker may be unresponsive or not checking cancellation flags."
-        )
-        return False
-
-    @staticmethod
     def is_worker_responsive(worker: QThread | None, test_timeout: int = 1000) -> bool:
         """
         Test if a worker thread is responsive to interruption requests.
@@ -401,20 +331,6 @@ class WorkerManager:
             worker: The worker thread to clean up (can be None)
         """
         WorkerManager.cleanup_worker(worker, timeout=QUICK_CLEANUP_TIMEOUT)
-
-    @staticmethod
-    def cleanup_workers(workers: list[QThread | None], quick: bool = False) -> None:
-        """
-        Clean up multiple workers efficiently.
-
-        Args:
-            workers: List of worker threads to clean up (can contain None values)
-            quick: If True, use QUICK_CLEANUP_TIMEOUT for faster shutdown
-        """
-        timeout = QUICK_CLEANUP_TIMEOUT if quick else DEFAULT_CLEANUP_TIMEOUT
-        for worker in workers:
-            if worker is not None:
-                WorkerManager.cleanup_worker(worker, timeout=timeout)
 
     @staticmethod
     def cleanup_all(timeout: int = QUICK_CLEANUP_TIMEOUT) -> int:
