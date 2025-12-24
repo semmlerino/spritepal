@@ -6,20 +6,14 @@ following the Single Responsibility Principle.
 """
 from __future__ import annotations
 
-from .output_settings_manager import (
-    OutputSettingsActionsProtocol,
-    OutputSettingsManager,
-)
+from .output_settings_manager import OutputSettingsManager
 from .status_bar_manager import StatusBarManager
-from .toolbar_manager import ToolbarActionsProtocol, ToolbarManager
-from .ui_coordinator import TabCoordinatorActionsProtocol, UICoordinator
+from .toolbar_manager import ToolbarManager
+from .ui_coordinator import UICoordinator
 
 __all__ = [
-    "OutputSettingsActionsProtocol",
     "OutputSettingsManager",
     "StatusBarManager",
-    "TabCoordinatorActionsProtocol",
-    "ToolbarActionsProtocol",
     "ToolbarManager",
     "UICoordinator",
 ]

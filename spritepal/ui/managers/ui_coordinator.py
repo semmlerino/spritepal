@@ -7,7 +7,7 @@ into a single class to reduce file count and boilerplate.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
@@ -31,26 +31,6 @@ if TYPE_CHECKING:
     from ui.palette_preview import PalettePreviewWidget
     from ui.rom_extraction_panel import ROMExtractionPanel
     from ui.zoomable_preview import PreviewPanel
-
-
-class TabCoordinatorActionsProtocol(Protocol):
-    """Protocol defining the interface for tab coordinator actions"""
-
-    def get_rom_extraction_params(self) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - Extraction configuration
-        """Get ROM extraction parameters"""
-        ...
-
-    def is_vram_extraction_ready(self) -> bool:
-        """Check if VRAM extraction is ready"""
-        ...
-
-    def is_grayscale_mode(self) -> bool:
-        """Check if in grayscale mode"""
-        ...
-
-    def get_extraction_mode_index(self) -> int:
-        """Get current extraction mode index"""
-        ...
 
 
 class UICoordinator(QObject):
@@ -79,7 +59,7 @@ class UICoordinator(QObject):
         extraction_tabs: QTabWidget,
         rom_extraction_panel: ROMExtractionPanel,
         toolbar_manager: ToolbarManager,
-        actions_handler: TabCoordinatorActionsProtocol,
+        actions_handler: "MainWindow",
     ) -> None:
         """Initialize the consolidated UI coordinator.
 

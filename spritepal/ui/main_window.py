@@ -371,7 +371,6 @@ class MainWindow(QMainWindow):
                 f"Failed to clear cache: {e!s}"
             )
 
-    # ToolbarActionsProtocol
     def on_extract_clicked(self) -> None:
         """Handle extract button click"""
         from ui.dialogs import OutputSettingsDialog
@@ -439,14 +438,12 @@ class MainWindow(QMainWindow):
         if self._output_path:
             self.inject_requested.emit()
 
-    # OutputSettingsActionsProtocol
     def get_current_vram_path(self) -> str:
         """Get current VRAM path for browse dialog default directory"""
         current_files = self.extraction_panel.get_session_data()
         vram_path = current_files.get("vram_path", "")
         return str(vram_path) if vram_path else ""
 
-    # UICoordinator.TabCoordinatorActionsProtocol
     def get_rom_extraction_params(self) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - Extraction configuration
         """Get ROM extraction parameters"""
         return self.rom_extraction_panel.get_extraction_params()

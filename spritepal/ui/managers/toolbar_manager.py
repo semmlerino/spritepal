@@ -3,7 +3,7 @@ Toolbar and action button management for MainWindow
 """
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QKeySequence
@@ -17,32 +17,12 @@ from ui.styles import (
     get_ready_status_style,
 )
 
+if TYPE_CHECKING:
+    from ui.main_window import MainWindow
+
 # Primary action button is taller for visual hierarchy
 PRIMARY_BUTTON_HEIGHT = BUTTON_HEIGHT + 8  # 36px for Extract button
 
-
-class ToolbarActionsProtocol(Protocol):
-    """Protocol defining the interface for toolbar actions"""
-
-    def on_extract_clicked(self) -> None:
-        """Handle extract button click"""
-        ...
-
-    def on_open_editor_clicked(self) -> None:
-        """Handle open editor button click"""
-        ...
-
-    def on_arrange_rows_clicked(self) -> None:
-        """Handle arrange rows button click"""
-        ...
-
-    def on_arrange_grid_clicked(self) -> None:
-        """Handle arrange grid button click"""
-        ...
-
-    def on_inject_clicked(self) -> None:
-        """Handle inject button click"""
-        ...
 
 class ToolbarManager(QObject):
     """Manages action buttons and toolbar for MainWindow"""
@@ -54,7 +34,7 @@ class ToolbarManager(QObject):
     arrange_grid_clicked = Signal()
     inject_clicked = Signal()
 
-    def __init__(self, parent: QWidget, actions_handler: ToolbarActionsProtocol) -> None:
+    def __init__(self, parent: QWidget, actions_handler: "MainWindow") -> None:
         """Initialize toolbar manager
 
         Args:

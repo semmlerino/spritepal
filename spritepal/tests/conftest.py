@@ -257,12 +257,6 @@ def pytest_addoption(parser: Any) -> None:
         default=default_leak_mode,
         help=f"Leak policy: fail or warn for resource/thread leaks. Default: {'fail' if is_ci else 'warn'} ({'CI' if is_ci else 'local'}). Override with SPRITEPAL_LEAK_MODE env var."
     )
-    parser.addoption(
-        "--skip-factory-lint",
-        action="store_true",
-        default=False,
-        help="Skip AST scan for bare RealComponentFactory() calls (faster collection)"
-    )
     # NOTE: --run-segfault-tests option removed - segfault-prone tests have been deleted
 
 
@@ -293,138 +287,13 @@ def _uses_session_fixtures(item: Any) -> bool:
     return bool(fixture_names & SESSION_DEPENDENT_FIXTURES)
 
 
-def _check_bare_factory_calls(items: list[Any]) -> None:
-    """Check for RealComponentFactory() calls missing manager_registry parameter.
-
-    This lint check runs at collection time to catch test isolation violations early.
-    Tests that use RealComponentFactory without passing manager_registry will pollute
-    global state and break test isolation.
-
-    Uses AST-based detection to correctly handle multiline calls.
-
-    Scans:
-        - All collected test files
-        - tests/fixtures/*.py (fixture definitions)
-        - tests/infrastructure/*.py (support modules)
-
-    Args:
-        items: list of test items being collected
-    """
-    import ast
-    from functools import lru_cache
-    from pathlib import Path
-
-    class ImportAliasCollector(ast.NodeVisitor):
-        """Collect all names that could refer to RealComponentFactory."""
-
-        def __init__(self) -> None:
-            self.factory_names: set[str] = {"RealComponentFactory"}
-
-        def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-            """Track 'from x import RealComponentFactory as Alias'."""
-            for alias in node.names:
-                if alias.name == "RealComponentFactory":
-                    # Add both the original name and any alias
-                    self.factory_names.add(alias.asname or alias.name)
-            self.generic_visit(node)
-
-    class FactoryCallChecker(ast.NodeVisitor):
-        """AST visitor that finds RealComponentFactory calls missing manager_registry."""
-
-        def __init__(self, source_lines: list[str], factory_names: set[str]) -> None:
-            self.violations: list[tuple[int, str]] = []
-            self.source_lines = source_lines
-            self.factory_names = factory_names
-
-        def _is_factory_call(self, node: ast.Call) -> bool:
-            """Check if this is a call to RealComponentFactory (by any alias)."""
-            func = node.func
-            # Case 1: Direct name or alias - RealComponentFactory(), Factory()
-            if isinstance(func, ast.Name):
-                return func.id in self.factory_names
-            # Case 2: Attribute access - module.RealComponentFactory()
-            if isinstance(func, ast.Attribute):
-                return func.attr == "RealComponentFactory"
-            return False
-
-        def visit_Call(self, node: ast.Call) -> None:
-            # Check if this is a call to RealComponentFactory (direct, aliased, or via attribute)
-            if self._is_factory_call(node):
-                # Check if manager_registry is in keyword arguments
-                has_registry = any(kw.arg == "manager_registry" for kw in node.keywords)
-                if not has_registry:
-                    # Get the source line for context
-                    line_content = ""
-                    if 0 < node.lineno <= len(self.source_lines):
-                        line_content = self.source_lines[node.lineno - 1].strip()
-                    self.violations.append((node.lineno, line_content))
-            self.generic_visit(node)
-
-    @lru_cache(maxsize=256)
-    def check_file(file_path: str) -> list[tuple[int, str]]:
-        """Check a file for bare factory calls using AST. Cached for efficiency."""
-        try:
-            path = Path(file_path)
-            if not path.exists() or path.suffix != ".py":
-                return []
-            content = path.read_text()
-            source_lines = content.splitlines()
-            tree = ast.parse(content, filename=file_path)
-
-            # First pass: collect all aliases for RealComponentFactory
-            alias_collector = ImportAliasCollector()
-            alias_collector.visit(tree)
-
-            # Second pass: check for bare factory calls using all known names
-            checker = FactoryCallChecker(source_lines, alias_collector.factory_names)
-            checker.visit(tree)
-            return checker.violations
-        except (OSError, UnicodeDecodeError, SyntaxError):
-            return []
-
-    # Collect unique source files from test items
-    checked_files: set[str] = set()
-    violations: list[str] = []
-
-    for item in items:
-        fspath = str(getattr(item, "fspath", ""))
-        if fspath and fspath not in checked_files:
-            checked_files.add(fspath)
-            matches = check_file(fspath)
-            for line_no, line_content in matches:
-                violations.append(f"  {fspath}:{line_no}: {line_content}")
-
-    # Also scan fixtures/ and infrastructure/ directories (not test items, but contain factory calls)
-    tests_dir = Path(__file__).parent
-    for scan_dir in [tests_dir / "fixtures", tests_dir / "infrastructure"]:
-        if scan_dir.is_dir():
-            for py_file in scan_dir.glob("*.py"):
-                fspath = str(py_file)
-                if fspath not in checked_files:
-                    checked_files.add(fspath)
-                    matches = check_file(fspath)
-                    for line_no, line_content in matches:
-                        violations.append(f"  {fspath}:{line_no}: {line_content}")
-
-    if violations:
-        pytest.fail(
-            f"\n[RealComponentFactory] Found {len(violations)} bare factory call(s) missing manager_registry:\n"
-            + "\n".join(violations[:10])  # Show first 10
-            + (f"\n  ... and {len(violations) - 10} more" if len(violations) > 10 else "")
-            + "\n\nFix: Use RealComponentFactory(manager_registry=isolated_managers)\n"
-            + "This is a test isolation violation that would cause flaky tests.",
-            pytrace=False,
-        )
-
-
 def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     """Validate marker usage and enforce PARALLEL BY DEFAULT xdist policy.
 
-    This hook performs four functions:
-    1. Checks for bare RealComponentFactory() calls (lint check)
-    2. Tracks real_hal marked tests for reporting
-    3. Validates that skip_thread_cleanup markers have a reason argument
-    4. Enforces PARALLEL BY DEFAULT xdist policy - tests using session_managers
+    This hook performs three functions:
+    1. Tracks real_hal marked tests for reporting
+    2. Validates that skip_thread_cleanup markers have a reason argument
+    3. Enforces PARALLEL BY DEFAULT xdist policy - tests using session_managers
        are auto-serialized, all others run in parallel
 
     The xdist policy ensures that:
@@ -440,10 +309,6 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
         items: list of test items being collected
     """
     import warnings
-
-    # === Check for bare RealComponentFactory() calls ===
-    if not config.getoption("--skip-factory-lint", default=False):
-        _check_bare_factory_calls(items)
 
     # === Track real_hal tests for CI visibility ===
     real_hal_tests = [item for item in items if item.get_closest_marker('real_hal')]

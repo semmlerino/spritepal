@@ -9,6 +9,7 @@ This panel coordinates ROM-based sprite extraction using:
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
@@ -690,50 +691,27 @@ class ROMExtractionPanel(QWidget):
 
     def _on_sprite_changed(self, index: int):
         """Handle sprite selection change"""
-        logger.debug(f"Sprite selection changed to index: {index}")
         try:
             if index > 0:
-                logger.debug("Sprite selected, getting data")
                 data = self.sprite_selector_widget.get_current_data()
-                logger.debug(f"Combo data: {data}")
-
                 if data:
                     sprite_name, offset = data
-                    logger.debug(f"Parsed sprite: {sprite_name}, offset: 0x{offset:06X}")
-
-                    # User selected a preset sprite - switch to preset mode
                     self._manual_offset_mode = False
-
                     self.sprite_selector_widget.set_offset_text(f"0x{offset:06X}")
-                    logger.debug("Updated offset label")
 
-                    # Auto-suggest output name based on sprite (via shared OutputSettingsManager)
-                    current_output = self._get_output_name()
-                    if not current_output:
-                        new_name = f"{sprite_name}_sprites"
-                        logger.debug(f"Auto-suggesting output name: {new_name}")
-                        self.output_name_changed.emit(new_name)
-
-                    # Show preview of selected sprite
-                    logger.debug("Showing preview of selected sprite")
-                    # Preview now handled in manual offset dialog
+                    # Auto-suggest output name based on sprite
+                    if not self._get_output_name():
+                        self.output_name_changed.emit(f"{sprite_name}_sprites")
                 else:
                     logger.warning("No data found for selected sprite")
             else:
-                logger.debug("No sprite selected, clearing displays")
                 self.sprite_selector_widget.set_offset_text("--")
 
-            logger.debug("Calling _check_extraction_ready")
             self._check_extraction_ready()
-            logger.debug("Sprite change handling completed successfully")
-
         except Exception:
             logger.exception("Error in _on_sprite_changed")
-            # Try to clear displays on error
-            try:
+            with contextlib.suppress(Exception):
                 self.sprite_selector_widget.set_offset_text("Error")
-            except Exception:
-                pass  # Silently ignore errors when trying to clear displays  # Silently ignore errors when trying to clear displays
 
     def _check_extraction_ready(self):
         """Check if extraction is ready - override to handle manual mode"""

@@ -4,7 +4,7 @@ Output settings management for MainWindow
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
@@ -22,13 +22,9 @@ from ui.common.file_dialogs import browse_for_save_file
 from ui.styles import get_muted_text_style
 from ui.styles.theme import COLORS
 
+if TYPE_CHECKING:
+    from ui.main_window import MainWindow
 
-class OutputSettingsActionsProtocol(Protocol):
-    """Protocol defining the interface for output settings actions"""
-
-    def get_current_vram_path(self) -> str:
-        """Get current VRAM path for browse dialog default directory"""
-        ...
 
 class OutputSettingsManager(QObject):
     """Manages output settings section for MainWindow"""
@@ -38,7 +34,7 @@ class OutputSettingsManager(QObject):
     grayscale_toggled = Signal(bool)
     metadata_toggled = Signal(bool)
 
-    def __init__(self, parent: QWidget, actions_handler: OutputSettingsActionsProtocol) -> None:
+    def __init__(self, parent: QWidget, actions_handler: "MainWindow") -> None:
         """Initialize output settings manager
 
         Args:

@@ -669,119 +669,57 @@ class ExtractionPanel(QGroupBox):
 
     def _on_preset_changed(self, index: int) -> None:
         """Handle preset change"""
-        logger.debug(f"Preset changed to index: {index}")
         try:
             # Show/hide custom offset controls based on preset
             if index == 1:  # Custom Range
-                logger.debug("Switching to Custom Range preset")
                 self.offset_widget.setVisible(True)
-                logger.debug("Offset widget made visible")
-
-                # Update display with current values
                 current_offset = self.offset_spinbox.value()
                 self._update_offset_display(current_offset)
-
-                # Trigger preview update if files are loaded
-                has_vram = self.has_vram()
-                logger.debug(f"Has VRAM: {has_vram}")
-                if has_vram:
-                    logger.debug(f"Emitting offset change for custom range: {current_offset} (0x{current_offset:04X})")
+                if self.has_vram():
                     self.offset_changed.emit(current_offset)
-                    logger.debug("Custom range offset change signal emitted")
             else:  # Kirby Sprites
-                logger.debug("Switching to Kirby Sprites preset")
                 self.offset_widget.setVisible(False)
-                logger.debug("Offset widget hidden")
-
-                # Reset to default Kirby offset
-                logger.debug(f"Resetting to default Kirby offset: {VRAM_SPRITE_OFFSET} (0x{VRAM_SPRITE_OFFSET:04X})")
                 self.offset_slider.setValue(VRAM_SPRITE_OFFSET)
                 self.offset_spinbox.setValue(VRAM_SPRITE_OFFSET)
-                logger.debug("Offset controls reset to default values")
-
-                # Trigger preview update with default offset
-                has_vram = self.has_vram()
-                logger.debug(f"Has VRAM: {has_vram}")
-                if has_vram:
-                    logger.debug(f"Emitting default offset change: {VRAM_SPRITE_OFFSET}")
+                if self.has_vram():
                     self.offset_changed.emit(VRAM_SPRITE_OFFSET)
-                    logger.debug("Default offset change signal emitted")
-
-            logger.debug("Preset change completed successfully")
-
         except Exception:
             logger.exception("Error in preset change handler")
-            # Don't re-raise to prevent crash, just log the error
 
     def _on_offset_slider_changed(self, value: int) -> None:
         """Handle offset slider change"""
-        logger.debug(f"Offset slider changed to: {value} (0x{value:04X})")
         try:
-            # Mark that this change is from the slider
             self._slider_changing = True
-            logger.debug("Marked slider as changing")
-
-            # Update spinbox (will trigger its handler)
-            logger.debug(f"Updating spinbox to value: {value}")
             self.offset_spinbox.setValue(value)
-            logger.debug("Spinbox updated successfully")
 
             # Emit change immediately for smooth real-time updates when dragging
-            preset_index = self.preset_combo.currentIndex()
-            has_vram = self.has_vram()
-            logger.debug(f"Preset index: {preset_index}, has VRAM: {has_vram}")
-
-            if preset_index == 1 and has_vram:  # Custom Range
-                logger.debug(f"Emitting offset change signal: {value}")
+            if self.preset_combo.currentIndex() == 1 and self.has_vram():
                 self.offset_changed.emit(value)
-                logger.debug("Offset change signal emitted successfully")
 
             self._slider_changing = False
-            logger.debug("Offset slider change completed successfully")
-
         except Exception:
             logger.exception("Error in offset slider change handler")
-            self._slider_changing = False  # Reset flag on error
-            # Don't re-raise to prevent crash, just log the error
+            self._slider_changing = False
 
     def _on_offset_spinbox_changed(self, value: int) -> None:
         """Handle offset spinbox change"""
-        logger.debug(f"Offset spinbox changed to: {value} (0x{value:04X})")
         try:
             # Update slider without triggering its handler
-            logger.debug("Blocking slider signals")
             self.offset_slider.blockSignals(True)
-
-            logger.debug(f"Setting slider value to: {value}")
             self.offset_slider.setValue(value)
-
-            logger.debug("Unblocking slider signals")
             self.offset_slider.blockSignals(False)
-            logger.debug("Slider updated successfully")
 
-            # Update all display elements
             self._update_offset_display(value)
 
             # Only use debounce for direct spinbox changes (not from slider)
-            preset_index = self.preset_combo.currentIndex()
-            is_slider_changing = self._slider_changing
-            logger.debug(f"Preset index: {preset_index}, slider changing: {is_slider_changing}")
-
-            if preset_index == 1 and not is_slider_changing:  # Custom Range
-                logger.debug(f"Setting pending offset and starting timer: {value}")
+            if self.preset_combo.currentIndex() == 1 and not self._slider_changing:
                 self._pending_offset = value
                 self._offset_timer.stop()
                 self._offset_timer.start()
-                logger.debug("Timer started for debounced offset change")
-
-            logger.debug("Offset spinbox change completed successfully")
-
         except Exception:
             logger.exception("Error in offset spinbox change handler")
-            # Try to reset slider signals state on error
             with contextlib.suppress(builtins.BaseException):
                 self.offset_slider.blockSignals(False)
-            # Don't re-raise to prevent crash, just log the error
 
     def _toggle_advanced_controls(self, checked: bool) -> None:
         """Toggle visibility of advanced offset controls"""
