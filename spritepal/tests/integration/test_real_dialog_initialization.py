@@ -50,12 +50,12 @@ class TestRealDialogInitialization:
         """
         from core.di_container import inject
         from core.managers.application_state_manager import ApplicationStateManager
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
         from ui.dialogs.settings_dialog import SettingsDialog
 
         dialog = SettingsDialog(
             settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCacheProtocol)
+            rom_cache=inject(ROMCache)
         )
         qtbot.addWidget(dialog)
 
@@ -140,11 +140,11 @@ class TestRealDialogInitialization:
         """
         from core.di_container import inject
         from core.managers.application_state_manager import ApplicationStateManager
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
         from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
         dialog = UnifiedManualOffsetDialog(
-            rom_cache=inject(ROMCacheProtocol),
+            rom_cache=inject(ROMCache),
             settings_manager=inject(ApplicationStateManager),
             extraction_manager=inject(CoreOperationsManager),
         )
@@ -227,12 +227,12 @@ class TestRealDialogLifecycle:
         """
         from core.di_container import inject
         from core.managers.application_state_manager import ApplicationStateManager
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
         from ui.dialogs.settings_dialog import SettingsDialog
 
         dialog = SettingsDialog(
             settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCacheProtocol)
+            rom_cache=inject(ROMCache)
         )
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
         from PySide6.QtCore import Qt

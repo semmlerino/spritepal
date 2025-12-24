@@ -57,10 +57,6 @@ class TestCoreOperationsManagerInit:
         assert manager._rom_service is not None
         assert manager._vram_service is not None
 
-    def test_path_suggestion_service_initialized(self, manager):
-        """Path suggestion service should be initialized."""
-        assert manager._path_suggestion_service is not None
-
 
 class TestServiceAccessors:
     """Tests for service accessor properties."""

@@ -17,7 +17,7 @@ from core.di_container import get_container, inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
-from core.protocols.manager_protocols import ROMCacheProtocol
+from core.services.rom_cache import ROMCache
 
 if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
@@ -65,9 +65,9 @@ class TestProtocolInjection:
         assert injection is not None
         assert hasattr(injection, "start_injection")
 
-    def test_inject_rom_cache_protocol(self, isolated_managers):
-        """Test ROMCacheProtocol injection."""
-        cache = inject(ROMCacheProtocol)
+    def test_inject_rom_cache(self, isolated_managers):
+        """Test ROMCache injection."""
+        cache = inject(ROMCache)
         assert cache is not None
         # ROMCache provides get_cache_stats
         assert hasattr(cache, "get_cache_stats")
@@ -127,7 +127,7 @@ class TestPureDIComponentInitialization:
         from ui.main_window import MainWindow
 
         settings_mgr = inject(ApplicationStateManager)
-        rom_cache = inject(ROMCacheProtocol)
+        rom_cache = inject(ROMCache)
         session_mgr = inject(ApplicationStateManager)
 
         # Create window with explicit deps
@@ -248,7 +248,7 @@ class TestInjectionManagerDI:
     def test_injection_manager_rom_cache_access(self, isolated_managers):
         """Test InjectionManager can access ROM cache via DI."""
         # Use DI to get ROM cache (replaces deprecated get_rom_cache())
-        cache = inject(ROMCacheProtocol)
+        cache = inject(ROMCache)
         assert cache is not None
 
         # Verify the cache has expected methods

@@ -69,17 +69,14 @@ except ImportError as e:
 def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
     """Create UnifiedManualOffsetDialog with injected dependencies."""
     from core.di_container import inject
-    from core.protocols.manager_protocols import (
-        ApplicationStateManager,
-        ExtractionManagerProtocol,
-    )
+    from core.managers import ApplicationStateManager, CoreOperationsManager
     from core.services.rom_cache import ROMCache
 
     return UnifiedManualOffsetDialog(
         parent,
         rom_cache=inject(ROMCache),
         settings_manager=inject(ApplicationStateManager),
-        extraction_manager=inject(ExtractionManagerProtocol),
+        extraction_manager=inject(CoreOperationsManager),
     )
 
 

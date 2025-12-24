@@ -11,14 +11,14 @@ from unittest.mock import patch
 import pytest
 
 from core.di_container import inject
-from core.protocols.manager_protocols import ROMCacheProtocol
+from core.services.rom_cache import ROMCache
 from core.rom_injector import SpritePointer
 from core.services.rom_cache import ROMCache
 
 
 def get_rom_cache():
     """Get ROM cache from DI container (replaces deprecated function)."""
-    return inject(ROMCacheProtocol)
+    return inject(ROMCache)
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
@@ -708,11 +708,11 @@ class TestROMCacheIntegration:
     def test_rom_file_widget_cache_check(self, qtbot, test_rom_file) -> None:
         """Test ROMFileWidget cache status checking."""
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
         from ui.rom_extraction.widgets.rom_file_widget import ROMFileWidget
 
         # Create widget with injected rom_cache
-        widget = ROMFileWidget(rom_cache=inject(ROMCacheProtocol))
+        widget = ROMFileWidget(rom_cache=inject(ROMCache))
         qtbot.addWidget(widget)
 
         # Set ROM path
@@ -763,8 +763,9 @@ class TestROMCacheIntegration:
         # Create worker that should resume from cache
         # Get extractor instance from DI (isolated_managers fixture sets up DI)
         from core.di_container import inject
-        from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
-        extractor = inject(ROMExtractorProtocol)
+        from core.rom_extractor import ROMExtractor
+        from core.services.rom_cache import ROMCache
+        extractor = inject(ROMExtractor)
 
         worker = SpriteScanWorker(
             test_rom_file,
@@ -772,7 +773,7 @@ class TestROMCacheIntegration:
             scan_params["end_offset"],
             step_size=scan_params["alignment"],
             extractor=extractor,
-            rom_cache=inject(ROMCacheProtocol)
+            rom_cache=inject(ROMCache)
         )
 
         # Collect signals

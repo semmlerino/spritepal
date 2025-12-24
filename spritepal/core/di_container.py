@@ -264,12 +264,6 @@ def configure_container(
 
     register_factory(ROMExtractor, _create_rom_extractor)
 
-    # DEPRECATED: Legacy protocol registrations for backward compatibility
-    # TODO: Remove after all callers migrate to inject(ROMCache) / inject(ROMExtractor)
-    from core.protocols.manager_protocols import ROMCacheProtocol, ROMExtractorProtocol
-    register_factory(ROMCacheProtocol, _create_rom_cache)
-    register_factory(ROMExtractorProtocol, _create_rom_extractor)
-
     # NOTE: UI factory registration (DialogFactoryProtocol) is handled by
     # ui.register_ui_factories() called by application entry points AFTER
     # initialize_managers() completes. This keeps UI dependencies out of core/ layer.

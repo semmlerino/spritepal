@@ -20,7 +20,6 @@ with only stdlib dependencies.
 from __future__ import annotations
 
 from core.services.path_suggestion_service import (
-    # Functions (preferred)
     find_suggested_input_vram,
     find_vram_path,
     get_smart_vram_suggestion,
@@ -28,8 +27,6 @@ from core.services.path_suggestion_service import (
     suggest_output_rom_path,
     suggest_output_vram_path,
     validate_path,
-    # DEPRECATED: Class wrapper for backward compatibility
-    PathSuggestionService,
 )
 from core.services.preview_generator import (
     LRUCache,
@@ -50,7 +47,7 @@ from core.services.worker_lifecycle import WorkerManager
 __all__ = [
     "LRUCache",
     "PaletteData",
-    # Path suggestion functions (preferred)
+    # Path suggestion functions
     "find_suggested_input_vram",
     "find_vram_path",
     "get_smart_vram_suggestion",
@@ -58,8 +55,6 @@ __all__ = [
     "suggest_output_rom_path",
     "suggest_output_vram_path",
     "validate_path",
-    # DEPRECATED: PathSuggestionService class wrapper
-    "PathSuggestionService",
     # Preview generator
     "PreviewGenerator",
     "PreviewRequest",

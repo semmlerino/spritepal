@@ -44,14 +44,14 @@ pytestmark = [
 from core.di_container import inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.protocols.manager_protocols import ROMCacheProtocol
+from core.services.rom_cache import ROMCache
 
 
 def _create_manual_offset_dialog(parent=None) -> ManualOffsetDialog:
     """Create ManualOffsetDialog with injected dependencies."""
     return ManualOffsetDialog(
         parent,
-        rom_cache=inject(ROMCacheProtocol),
+        rom_cache=inject(ROMCache),
         settings_manager=inject(ApplicationStateManager),
         extraction_manager=inject(CoreOperationsManager),
     )
@@ -240,7 +240,7 @@ class TestRealDialogManagerIntegration:
         - Manager initialization dependencies for dialogs
         - Dialog-manager communication protocol issues
         """
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
 
         # Managers already initialized by setup_test_infrastructure fixture
 
@@ -249,7 +249,7 @@ class TestRealDialogManagerIntegration:
         injection_manager = inject(CoreOperationsManager)
         session_manager = inject(ApplicationStateManager)
         settings_manager = inject(ApplicationStateManager)
-        rom_cache = inject(ROMCacheProtocol)
+        rom_cache = inject(ROMCache)
 
         # Test multiple dialogs using same managers (could expose resource conflicts)
         manual_dialog = _create_manual_offset_dialog()

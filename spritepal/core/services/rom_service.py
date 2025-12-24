@@ -37,7 +37,7 @@ from utils.constants import (
 from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
 
-# ROMCache accessed via DI: inject(ROMCacheProtocol)
+# ROMCache accessed via DI: inject(ROMCache)
 
 logger = get_logger(__name__)
 

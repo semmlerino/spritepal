@@ -101,9 +101,8 @@ class SimilarityIndexingWorker(BaseWorker):
         """Get the cache directory for similarity indices."""
         try:
             settings_manager = self.settings_manager
-            # Try to get custom cache directory from settings
-            # TODO: Implement get_cache_directory method on SettingsManager
-            cache_root_str = settings_manager.get_cache_location() # Call the correct method
+            # Get cache directory from settings
+            cache_root_str = settings_manager.get_cache_location()
             if not cache_root_str:
                 cache_root = Path.home() / ".spritepal"
             else:
