@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QProgressDialog,
-    QPushButton,
     QSizePolicy,
     QToolBar,
     QVBoxLayout,
@@ -29,8 +28,7 @@ from PySide6.QtWidgets import (
 
 from core.rom_extractor import ROMExtractor
 from core.sprite_finder import SpriteFinder
-from ui.common.file_dialogs import browse_for_directory
-from ui.common.spacing_constants import COMPACT_BUTTON_HEIGHT, SPACING_SMALL, SPACING_TINY
+from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 from utils.logging_config import get_logger

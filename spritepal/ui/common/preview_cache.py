@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast, override
 
 from core.services.lru_cache import BaseLRUCache
 from utils.logging_config import get_logger
@@ -88,6 +88,7 @@ class SpritePreviewCache(BaseLRUCache[PreviewData]):
         key_string = "|".join(key_parts)
         return hashlib.md5(key_string.encode()).hexdigest()[:16]
 
+    @override
     def get(self, key: str) -> PreviewData:
         """Get cached preview data.
 
@@ -102,19 +103,19 @@ class SpritePreviewCache(BaseLRUCache[PreviewData]):
             return (b"", 0, 0, None)
         return result
 
+    @override
     def get_stats(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - Cache statistics dict
         """Get cache statistics with backward-compatible keys."""
         base_stats = super().get_stats()
+        current_bytes = cast(int, base_stats["current_bytes"])
+        max_bytes = cast(int, base_stats["max_bytes"])
         # Add backward-compatible keys
         return {
             **base_stats,
             "entry_count": base_stats["cache_size"],
-            "memory_usage_bytes": base_stats["current_bytes"],
+            "memory_usage_bytes": current_bytes,
             "memory_usage_mb": base_stats["current_mb"],
-            "memory_utilization": (
-                base_stats["current_bytes"] / base_stats["max_bytes"]
-                if base_stats["max_bytes"] > 0 else 0
-            ),
+            "memory_utilization": current_bytes / max_bytes if max_bytes > 0 else 0,
         }
 
 

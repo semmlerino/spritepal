@@ -29,7 +29,6 @@ class TestROMExtractorInit:
         """Test that initialization creates all required components"""
         # Use DI to get ROMExtractor (session_managers fixture sets up DI)
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
 
         # Verify all components are created
@@ -61,7 +60,6 @@ class TestROMExtractor4bppConversion:
     def extractor(self):
         """Create ROM extractor for testing via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         return inject(ROMExtractor)
 
     def test_get_4bpp_pixel_basic(self, extractor):
@@ -197,7 +195,6 @@ class TestROMExtractorSpriteLocations:
     def mock_extractor(self):
         """Create ROM extractor with mocked dependencies via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
         extractor.rom_injector = Mock()
         return extractor
@@ -250,7 +247,6 @@ class TestROMExtractorMainExtraction:
     def mock_extractor(self):
         """Create ROM extractor with mocked dependencies via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
 
         # Mock all dependencies
@@ -484,7 +480,6 @@ class TestROMExtractorIntegration:
     def test_4bpp_conversion_integration(self, tmp_path):
         """Test 4bpp conversion with real data and file operations"""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
 
         # Create realistic 4bpp test data (2 tiles)
@@ -525,7 +520,6 @@ class TestROMExtractorIntegration:
     def test_error_recovery_file_cleanup(self, tmp_path):
         """Test that failed extractions don't leave partial files"""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
 
         # Mock dependencies to cause error after PNG creation starts
@@ -549,7 +543,6 @@ class TestROMExtractorIntegration:
     def test_large_sprite_processing(self, tmp_path):
         """Test processing of large sprite data"""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
 
         # Create data for 64 tiles (realistic sprite size)
@@ -571,7 +564,6 @@ class TestROMExtractorIntegration:
     def test_boundary_conditions(self, tmp_path):
         """Test boundary conditions and edge cases"""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
 
         # Test with exactly 16 tiles (one full row)
@@ -613,7 +605,6 @@ class TestROMExtractorScanMethods:
     def extractor(self):
         """Create ROM extractor with mocked dependencies via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
         extractor.rom_injector = Mock()
         return extractor
@@ -753,7 +744,6 @@ class TestROMExtractorQualityAssessment:
     def extractor(self):
         """Create ROM extractor for testing via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         return inject(ROMExtractor)
 
     def test_assess_sprite_quality_perfect_sprite(self, extractor):
@@ -898,7 +888,6 @@ class TestROMExtractorValidationMethods:
     def extractor(self):
         """Create ROM extractor for testing via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         return inject(ROMExtractor)
 
     def test_has_4bpp_characteristics_valid(self, extractor):
@@ -1041,7 +1030,6 @@ class TestROMExtractorFindBestOffsets:
     def extractor(self):
         """Create ROM extractor with mocked scan method via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
         extractor.scan_for_sprites = Mock()
         return extractor
@@ -1171,7 +1159,6 @@ class TestROMScanningComprehensive:
     def rom_extractor(self):
         """Create a ROM extractor instance via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         return inject(ROMExtractor)
 
     @pytest.fixture
@@ -1382,7 +1369,6 @@ class TestROMSpriteQualityAssessmentComprehensive:
     def rom_extractor(self):
         """Create a ROM extractor instance via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         return inject(ROMExtractor)
 
     def test_assess_sprite_quality_perfect_sprite_comprehensive(self, rom_extractor):
@@ -1456,7 +1442,6 @@ class TestROMExtractorAdvancedFeatures:
     def rom_extractor(self):
         """Create a ROM extractor instance via DI."""
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         return inject(ROMExtractor)
 
     @pytest.fixture

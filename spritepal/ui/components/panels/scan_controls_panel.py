@@ -29,6 +29,12 @@ from PySide6.QtWidgets import (
 
 from ui.common import WorkerManager
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
+from ui.common.widget_helpers import create_section_label
+from ui.components.dialogs import RangeScanDialog
+from ui.components.visualization import ROMMapWidget
+from ui.rom_extraction.workers import RangeScanWorker
+from ui.styles import get_panel_style
+from ui.styles.theme import COLORS
 from utils.constants import (
     MAX_SAFE_SCAN_SIZE,
     MAX_SCAN_SIZE,
@@ -36,11 +42,6 @@ from utils.constants import (
     ROM_SIZE_2MB,
     ROM_SIZE_4MB,
 )
-from ui.components.dialogs import RangeScanDialog
-from ui.components.visualization import ROMMapWidget
-from ui.rom_extraction.workers import RangeScanWorker
-from ui.styles import get_panel_style, get_section_label_style
-from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -97,8 +98,7 @@ class ScanControlsPanel(QWidget):
         layout.setContentsMargins(SPACING_SMALL, SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_COMPACT_SMALL)
         layout.setSpacing(SPACING_TINY)
 
-        label = QLabel("Enhanced Controls")
-        label.setStyleSheet(get_section_label_style())
+        label = create_section_label("Enhanced Controls")
         layout.addWidget(label)
 
         # Scan controls

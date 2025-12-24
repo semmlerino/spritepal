@@ -15,8 +15,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen, QShowEvent
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
-from ui.styles.theme import COLORS
 from ui.common.spacing_constants import ROM_MAP_HEIGHT_DEFAULT, ROM_MAP_HEIGHT_MAX
+from ui.styles.theme import COLORS
 from utils.constants import ROM_SIZE_4MB
 from utils.logging_config import get_logger
 from utils.sprite_regions import SpriteRegion

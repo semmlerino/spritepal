@@ -7,10 +7,8 @@ Manages and displays a history of found sprites for quick navigation.
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -24,21 +22,8 @@ from ui.common.spacing_constants import (
     GROUP_PADDING,
     SPACING_TINY,
 )
-from ui.styles.theme import COLORS
+from ui.common.widget_helpers import create_section_title
 from utils.logging_config import get_logger
-
-
-def _create_section_title(text: str) -> QLabel:
-    """Create a styled section title label."""
-    title = QLabel(text)
-    title_font = QFont()
-    title_font.setBold(True)
-    title_font.setPointSize(11)
-    title.setFont(title_font)
-    title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
-    return title
-
-
 from utils.sprite_history_manager import SpriteHistoryManager
 
 logger = get_logger(__name__)
@@ -74,7 +59,7 @@ class SimpleHistoryTab(QWidget):
         layout.setContentsMargins(GROUP_PADDING, GROUP_PADDING, GROUP_PADDING, GROUP_PADDING)
 
         # Compact title
-        title = _create_section_title("Found Sprites")
+        title = create_section_title("Found Sprites")
         layout.addWidget(title)
 
         # Sprite list

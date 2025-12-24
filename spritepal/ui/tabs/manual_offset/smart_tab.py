@@ -8,7 +8,6 @@ sprite exploration.
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -27,19 +26,8 @@ from ui.common.spacing_constants import (
     SPACING_SMALL,
     SPACING_TINY,
 )
-from ui.styles.theme import COLORS
+from ui.common.widget_helpers import create_section_title
 from utils.sprite_regions import SpriteRegion
-
-
-def _create_section_title(text: str) -> QLabel:
-    """Create a styled section title label."""
-    title = QLabel(text)
-    title_font = QFont()
-    title_font.setBold(True)
-    title_font.setPointSize(11)
-    title.setFont(title_font)
-    title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
-    return title
 
 
 class SimpleSmartTab(QWidget):
@@ -85,7 +73,7 @@ class SimpleSmartTab(QWidget):
         smart_layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
         # Single title for the entire smart tab
-        title = _create_section_title("Smart Navigation")
+        title = create_section_title("Smart Navigation")
         smart_layout.addWidget(title)
 
         # Smart mode checkbox

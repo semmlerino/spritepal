@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QVBoxLayout, QWidget
 
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
-from ui.styles import get_muted_text_style, get_panel_style, get_section_label_style
+from ui.common.widget_helpers import create_section_label
+from ui.styles import get_muted_text_style, get_panel_style
 from ui.styles.theme import COLORS
 
 if TYPE_CHECKING:
@@ -40,8 +41,7 @@ class StatusPanel(QWidget):
         layout.setSpacing(SPACING_TINY)
 
         # CRITICAL FIX: Set proper parent for all child widgets to prevent Qt lifecycle bugs
-        status_label = QLabel("Status", parent=self)
-        status_label.setStyleSheet(get_section_label_style())
+        status_label = create_section_label("Status", parent=self)
         layout.addWidget(status_label)
 
         self.detection_info = QLabel("Ready", parent=self)

@@ -21,7 +21,7 @@ from utils.constants import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Mapping
 
     from core.managers.application_state_manager import ApplicationStateManager
 

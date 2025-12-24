@@ -16,7 +16,6 @@ from .file_dialogs import (
     browse_for_save_file,
 )
 from .signal_utils import blocked_signals, is_valid_pixmap, is_valid_qt, safe_disconnect
-from .sprite_search_coordinator import SpriteSearchCoordinator
 
 # Import spacing and sizing constants explicitly
 # NOTE: Color constants moved to ui/styles/theme.py - use COLORS dict instead
@@ -67,10 +66,9 @@ from .spacing_constants import (
     TILE_GRID_THICKNESS,
     WIDE_WIDTH,
 )
+from .sprite_search_coordinator import SpriteSearchCoordinator
 
 __all__ = [
-    # Spacing and sizing constants
-    # NOTE: Color constants removed - use ui.styles.theme.COLORS instead
     "BASE_UNIT",
     "BORDER_THICK",
     "BORDER_THIN",
@@ -116,20 +114,16 @@ __all__ = [
     "TAB_SECTION_SPACING",
     "TILE_GRID_THICKNESS",
     "WIDE_WIDTH",
-    # Core components
     "CollapsibleGroupBox",
     "ErrorHandler",
     "FileDialogHelper",
     "SpriteSearchCoordinator",
     "WorkerManager",
-    # File dialog functions
+    "blocked_signals",
     "browse_for_directory",
     "browse_for_open_file",
     "browse_for_save_file",
-    # Error handler functions
     "get_error_handler",
-    # Signal utilities
-    "blocked_signals",
     "is_valid_pixmap",
     "is_valid_qt",
     "reset_error_handler",

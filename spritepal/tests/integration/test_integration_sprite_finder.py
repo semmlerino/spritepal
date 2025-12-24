@@ -77,7 +77,6 @@ class TestSpriteFinder:
 
         # Create ROM extractor via DI (verifies DI container is working)
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
         assert extractor is not None
 
@@ -221,7 +220,6 @@ class TestROMExtractor:
 
         # Use DI to get ROMExtractor
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
 
         # Extract at a known sprite offset
@@ -253,7 +251,6 @@ class TestROMExtractor:
 
         # Use DI to get ROMExtractor
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         extractor = inject(ROMExtractor)
 
         sprite_info = rom_info['sprites'][0]

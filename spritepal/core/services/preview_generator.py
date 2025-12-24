@@ -22,9 +22,10 @@ import struct
 import threading
 import time
 import weakref
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import numpy as np
 from PIL import Image
@@ -126,6 +127,7 @@ class PreviewCache(BaseLRUCache[PreviewResult]):
             name="preview_cache",
         )
 
+    @override
     def get(self, key: str) -> PreviewResult | None:
         """Get item from cache, marking it as cached."""
         result = super().get(key)

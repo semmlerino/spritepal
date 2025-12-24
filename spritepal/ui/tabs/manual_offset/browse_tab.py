@@ -29,20 +29,10 @@ from ui.common.spacing_constants import (
     SPACING_SMALL,
     SPACING_STANDARD,
 )
+from ui.common.widget_helpers import create_section_title
 from ui.styles import get_prominent_action_button_style
-from utils.constants import MIN_SPRITE_SIZE, ROM_MIN_REGION_SIZE, ROM_SIZE_1MB, ROM_SIZE_2MB, ROM_SIZE_4MB
 from ui.styles.theme import COLORS
-
-
-def _create_section_title(text: str) -> QLabel:
-    """Create a styled section title label."""
-    title = QLabel(text)
-    title_font = QFont()
-    title_font.setBold(True)
-    title_font.setPointSize(11)
-    title.setFont(title_font)
-    title.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
-    return title
+from utils.constants import MIN_SPRITE_SIZE, ROM_MIN_REGION_SIZE, ROM_SIZE_1MB, ROM_SIZE_2MB, ROM_SIZE_4MB
 
 # Import AdvancedSearchDialog lazily to avoid circular imports
 from utils.logging_config import get_logger
@@ -111,7 +101,7 @@ class SimpleBrowseTab(QWidget):
         controls_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)  # Comfortable padding
 
         # Section title with better styling
-        title = _create_section_title("ROM Offset Control")
+        title = create_section_title("ROM Offset Control")
         title.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLORS['highlight']};")
         controls_layout.addWidget(title)
 

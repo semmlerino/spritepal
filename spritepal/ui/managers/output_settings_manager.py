@@ -34,7 +34,7 @@ class OutputSettingsManager(QObject):
     grayscale_toggled = Signal(bool)
     metadata_toggled = Signal(bool)
 
-    def __init__(self, parent: QWidget, actions_handler: "MainWindow") -> None:
+    def __init__(self, parent: QWidget, actions_handler: MainWindow) -> None:
         """Initialize output settings manager
 
         Args:

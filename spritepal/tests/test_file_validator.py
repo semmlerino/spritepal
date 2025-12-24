@@ -587,8 +587,8 @@ class TestAtomicWrite:
     ) -> None:
         """Test _atomic_replace on Windows fails after max retries exhausted."""
         from utils.file_validator import (
-            _atomic_replace,
             _WINDOWS_RETRY_ATTEMPTS,
+            _atomic_replace,
         )
 
         src = tmp_path / "src.bin"

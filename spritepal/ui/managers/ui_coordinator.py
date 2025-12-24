@@ -64,7 +64,7 @@ class UICoordinator(QObject):
         extraction_tabs: QTabWidget,
         rom_extraction_panel: ROMExtractionPanel,
         toolbar_manager: ToolbarManager,
-        actions_handler: "MainWindow",
+        actions_handler: MainWindow,
     ) -> None:
         """Initialize the consolidated UI coordinator.
 

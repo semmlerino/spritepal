@@ -1848,10 +1848,9 @@ class AdvancedSearchDialog(QDialog):
                 if self.ref_preview_label:
                     self.ref_preview_label.setPixmap(scaled_pixmap)
                     self.ref_preview_label.setText("")
-            else:
-                if self.ref_preview_label:
-                    self.ref_preview_label.setText(f"Could not load sprite at 0x{offset:X}")
-                    self.ref_preview_label.setPixmap(QPixmap())
+            elif self.ref_preview_label:
+                self.ref_preview_label.setText(f"Could not load sprite at 0x{offset:X}")
+                self.ref_preview_label.setPixmap(QPixmap())
 
         except Exception as e:
             logger.exception(f"Failed to generate reference preview: {e}")

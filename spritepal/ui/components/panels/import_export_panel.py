@@ -14,7 +14,6 @@ from typing import Any
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QLabel,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
@@ -23,8 +22,9 @@ from PySide6.QtWidgets import (
 
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_TINY
+from ui.common.widget_helpers import create_section_label
 from ui.components.visualization import ROMMapWidget
-from ui.styles import get_panel_style, get_section_label_style
+from ui.styles import get_panel_style
 from utils.constants import ROM_SIZE_4MB
 
 
@@ -56,8 +56,7 @@ class ImportExportPanel(QWidget):
         layout.setContentsMargins(SPACING_SMALL, SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_COMPACT_SMALL)
         layout.setSpacing(SPACING_TINY)
 
-        label = QLabel("Import/Export")
-        label.setStyleSheet(get_section_label_style())
+        label = create_section_label("Import/Export")
         layout.addWidget(label)
 
         # Export/Import controls

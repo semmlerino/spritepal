@@ -358,8 +358,9 @@ class SpritePresetDialog(DialogBase):
 
     def _connect_signals(self) -> None:
         """Connect UI signals."""
+        # Both filter and search trigger the same refresh - use single handler
         self.filter_combo.currentIndexChanged.connect(self._on_filter_changed)
-        self.search_edit.textChanged.connect(self._on_search_changed)
+        self.search_edit.textChanged.connect(self._on_filter_changed)
         self.preset_list.currentItemChanged.connect(self._on_selection_changed)
         self.preset_list.itemDoubleClicked.connect(self._on_use_preset)
 
@@ -418,11 +419,7 @@ class SpritePresetDialog(DialogBase):
         self._update_status()
 
     def _on_filter_changed(self) -> None:
-        """Handle filter combo change."""
-        self._refresh_preset_list()
-
-    def _on_search_changed(self) -> None:
-        """Handle search text change."""
+        """Handle filter combo or search text change - refresh the preset list."""
         self._refresh_preset_list()
 
     def _on_selection_changed(self) -> None:

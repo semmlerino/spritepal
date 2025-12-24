@@ -29,7 +29,6 @@ class TestPNGRoundTrip:
         """Set up test fixtures"""
         # Use DI to get ROMExtractor (session_managers fixture sets up DI)
         from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
         self.injector = SpriteInjector()
         self.extractor = inject(ROMExtractor)
 

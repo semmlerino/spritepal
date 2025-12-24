@@ -15,7 +15,7 @@ from PySide6.QtCore import QObject, Signal
 
 from .workflow_manager import ExtractionState
 
-__all__ = ["WorkflowStateManager", "ExtractionState"]
+__all__ = ["ExtractionState", "WorkflowStateManager"]
 
 
 class WorkflowStateManager(QObject):

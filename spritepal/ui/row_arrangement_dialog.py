@@ -95,8 +95,8 @@ class RowArrangementDialog(SplitterDialog):
         self.arrangement_manager.arrangement_changed.connect(
             self._on_arrangement_changed
         )
-        self.colorizer.palette_mode_changed.connect(self._on_palette_mode_changed)
-        self.colorizer.palette_index_changed.connect(self._on_palette_index_changed)
+        # Note: palette_mode_changed and palette_index_changed signals are emitted by colorizer
+        # but no handlers needed - the logic is in toggle_palette_application() and _cycle_palette()
 
         self._update_panel_titles()
 
@@ -699,14 +699,6 @@ class RowArrangementDialog(SplitterDialog):
         """Handle arrangement change signal from manager"""
         # Already handled by individual add/remove methods
 
-    def _on_palette_mode_changed(self, enabled: bool) -> None:
-        """Handle palette mode change signal"""
-        # Already handled in toggle_palette_application
-
-    def _on_palette_index_changed(self, index: int) -> None:
-        """Handle palette index change signal"""
-        # Already handled in _cycle_palette
-
     def set_palettes(self, palettes_dict: dict[int, list[tuple[int, int, int]]]) -> None:
         """Set the available palettes for colorization"""
         self.colorizer.set_palettes(palettes_dict)
@@ -844,13 +836,7 @@ class RowArrangementDialog(SplitterDialog):
                 except disconnect_errors:
                     pass
 
-            # Disconnect colorizer signals
-            if hasattr(self, "colorizer"):
-                for signal_name in ("palette_mode_changed", "palette_index_changed"):
-                    try:
-                        getattr(self.colorizer, signal_name).disconnect()
-                    except disconnect_errors:
-                        pass
+            # Note: palette signals are not connected (logic in toggle_palette_application/_cycle_palette)
 
             # Disconnect list widget signals
             for list_name in ("available_list", "arranged_list"):

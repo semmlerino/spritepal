@@ -415,8 +415,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # History tab signals
         self.history_tab.sprite_selected.connect(self._on_sprite_selected)
 
-        # Gallery tab signals
-        self.gallery_tab.sprite_selected.connect(self._on_gallery_sprite_selected)
+        # Gallery tab signals - uses same handler as history (both navigate to browse tab)
+        self.gallery_tab.sprite_selected.connect(self._on_sprite_selected)
 
     def _on_offset_changed(self, offset: int) -> None:
         """Handle offset changes from browse tab."""
@@ -475,11 +475,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             self.tab_widget.setCurrentIndex(0)
 
     def _on_sprite_selected(self, offset: int) -> None:
-        """Handle sprite selection from history."""
-        self._navigate_to_browse_tab(offset)
-
-    def _on_gallery_sprite_selected(self, offset: int) -> None:
-        """Handle sprite selection from gallery - navigate to selected sprite."""
+        """Handle sprite selection from history or gallery - navigate to browse tab."""
         self._navigate_to_browse_tab(offset)
 
     def _on_smart_mode_changed(self, enabled: bool):

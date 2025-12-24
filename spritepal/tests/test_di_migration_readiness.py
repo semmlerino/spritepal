@@ -19,10 +19,6 @@ from core.managers.core_operations_manager import CoreOperationsManager
 from core.protocols.dialog_protocols import DialogFactoryProtocol
 from core.services.rom_cache import ROMCache
 
-if TYPE_CHECKING:
-    from core.services.rom_cache import ROMCache
-
-
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,

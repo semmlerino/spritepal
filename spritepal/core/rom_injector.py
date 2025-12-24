@@ -15,9 +15,9 @@ from core.hal_compression import HALCompressionError, HALCompressor
 from core.injector import SpriteInjector
 from core.rom_validator import ROMHeader, ROMValidator
 from core.sprite_config_loader import SpriteConfigLoader
+from utils.constants import DECOMPRESSION_WINDOW_SIZE
 from utils.file_validator import atomic_write
 from utils.logging_config import get_logger
-from utils.constants import DECOMPRESSION_WINDOW_SIZE
 from utils.rom_backup import ROMBackupManager
 
 logger = get_logger(__name__)

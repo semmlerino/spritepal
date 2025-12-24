@@ -34,7 +34,7 @@ class ToolbarManager(QObject):
     arrange_grid_clicked = Signal()
     inject_clicked = Signal()
 
-    def __init__(self, parent: QWidget, actions_handler: "MainWindow") -> None:
+    def __init__(self, parent: QWidget, actions_handler: MainWindow) -> None:
         """Initialize toolbar manager
 
         Args:

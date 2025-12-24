@@ -6,13 +6,9 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QInputDialog, QMenu, QWidget
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
