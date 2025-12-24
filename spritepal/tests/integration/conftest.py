@@ -231,11 +231,11 @@ def manual_offset_dialog(qtbot, managers_initialized):
     from core.di_container import inject
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.protocols.manager_protocols import ROMCacheProtocol
+    from core.services.rom_cache import ROMCache
     from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
     dialog = UnifiedManualOffsetDialog(
-        rom_cache=inject(ROMCacheProtocol),
+        rom_cache=inject(ROMCache),
         settings_manager=inject(ApplicationStateManager),
         extraction_manager=inject(CoreOperationsManager),
     )

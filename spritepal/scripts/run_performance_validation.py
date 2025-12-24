@@ -72,12 +72,12 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
     from core.protocols.manager_protocols import (
         ApplicationStateManager,
         ExtractionManagerProtocol,
-        ROMCacheProtocol,
     )
+    from core.services.rom_cache import ROMCache
 
     return UnifiedManualOffsetDialog(
         parent,
-        rom_cache=inject(ROMCacheProtocol),
+        rom_cache=inject(ROMCache),
         settings_manager=inject(ApplicationStateManager),
         extraction_manager=inject(ExtractionManagerProtocol),
     )

@@ -595,7 +595,12 @@ class CoreOperationsManager(BaseManager):
 
         try:
             from core.services.worker_lifecycle import WorkerManager
-            from core.workers import InjectionWorker, ROMInjectionParams, ROMInjectionWorker
+            from core.workers import (
+                ROMInjectionParams,
+                ROMInjectionWorker,
+                VRAMInjectionParams,
+                VRAMInjectionWorker,
+            )
 
             # Validate parameters
             self.validate_injection_params(params)
@@ -622,18 +627,23 @@ class CoreOperationsManager(BaseManager):
             # Create appropriate worker based on mode
             mode = cast(str, params["mode"])
             if mode == "vram":
-                sprite_path = cast(str, params["sprite_path"])
-                input_vram = cast(str, params["input_vram"])
-                output_vram = cast(str, params["output_vram"])
-                offset = cast(int, params["offset"])
-                metadata_path = cast(str | None, params.get("metadata_path"))
-                worker = InjectionWorker(
-                    sprite_path,
-                    input_vram,
-                    output_vram,
-                    offset,
-                    metadata_path
-                )
+                # Build VRAM params with type casts
+                sprite_path_val = cast(str, params["sprite_path"])
+                input_vram_val = cast(str, params["input_vram"])
+                output_vram_val = cast(str, params["output_vram"])
+                offset_val = cast(int, params["offset"])
+                metadata_path_val = cast(str | None, params.get("metadata_path"))
+
+                vram_params: VRAMInjectionParams = {
+                    "mode": "vram",
+                    "sprite_path": sprite_path_val,
+                    "input_vram": input_vram_val,
+                    "output_vram": output_vram_val,
+                    "offset": offset_val,
+                    "metadata_path": metadata_path_val,
+                }
+                # Use self as the injection manager
+                worker = VRAMInjectionWorker(vram_params, self)
             elif mode == "rom":
                 # Build ROM params with type casts
                 sprite_path_val = cast(str, params["sprite_path"])

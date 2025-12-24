@@ -1164,7 +1164,6 @@ class AdvancedSearchDialog(QDialog):
 
         # History list
         self.history_list = QListWidget()
-        self.history_list.itemDoubleClicked.connect(self._replay_search)
         layout.addWidget(self.history_list)
 
         # History actions
@@ -1173,10 +1172,6 @@ class AdvancedSearchDialog(QDialog):
         self.clear_history_button = QPushButton("Clear History")
         self.clear_history_button.clicked.connect(self._clear_history)
         actions_layout.addWidget(self.clear_history_button)
-
-        self.export_history_button = QPushButton("Export...")
-        self.export_history_button.clicked.connect(self._export_history)
-        actions_layout.addWidget(self.export_history_button)
 
         actions_layout.addStretch()
         layout.addLayout(actions_layout)
@@ -1964,10 +1959,6 @@ class AdvancedSearchDialog(QDialog):
             if self.results_label:
                 self.results_label.setText(f"Error: {e}")
 
-    def _replay_search(self, item: QListWidgetItem):
-        """Replay a search from history."""
-        # TODO: Implement search replay
-
     def _clear_history(self):
         """Clear search history."""
         if self.search_history:
@@ -1975,10 +1966,6 @@ class AdvancedSearchDialog(QDialog):
         if self.history_list:
             self.history_list.clear()
         self._save_history()
-
-    def _export_history(self):
-        """Export search history."""
-        # TODO: Implement history export
 
     def _update_history_display(self):
         """Update history list display."""

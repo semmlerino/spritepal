@@ -226,11 +226,11 @@ def run_tests():
             from core.protocols.manager_protocols import (
                 ApplicationStateManager,
                 ExtractionManagerProtocol,
-                ROMCacheProtocol,
             )
+            from core.services.rom_cache import ROMCache
             extraction_manager = inject(ExtractionManagerProtocol)
             settings_manager = inject(ApplicationStateManager)
-            rom_cache = inject(ROMCacheProtocol)
+            rom_cache = inject(ROMCache)
             window = DetachedGalleryWindow(
                 extraction_manager=extraction_manager,
                 settings_manager=settings_manager,

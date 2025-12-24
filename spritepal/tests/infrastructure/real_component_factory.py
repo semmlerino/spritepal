@@ -229,11 +229,11 @@ class RealComponentFactory:
         # B.7: Create MainWindow with explicit DI dependencies (matching B.6 pattern)
         from core.di_container import inject
         from core.managers.application_state_manager import ApplicationStateManager
-        from core.protocols.manager_protocols import ROMCacheProtocol
+        from core.services.rom_cache import ROMCache
 
         window = MainWindow(
             settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCacheProtocol),
+            rom_cache=inject(ROMCache),
             session_manager=inject(ApplicationStateManager),  # type: ignore[arg-type]  # Protocol vs concrete type mismatch
         )
         self._created_components.append(window)

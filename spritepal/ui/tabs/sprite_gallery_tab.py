@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from core.rom_extractor import ROMExtractor
 from core.sprite_finder import SpriteFinder
-from ui.common.file_dialogs import browse_for_directory, browse_for_save_file
+from ui.common.file_dialogs import browse_for_directory
 from ui.common.spacing_constants import COMPACT_BUTTON_HEIGHT, SPACING_SMALL, SPACING_TINY
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
@@ -121,11 +121,6 @@ class SpriteGalleryTab(QWidget):
         export_action.triggered.connect(self._export_selected)
         toolbar.addAction(export_action)
 
-        export_sheet_action = QAction("📋 Export Sheet", self)
-        export_sheet_action.setToolTip("Export as sprite sheet")
-        export_sheet_action.triggered.connect(self._export_sprite_sheet)
-        toolbar.addAction(export_sheet_action)
-
         toolbar.addSeparator()
 
         # View options
@@ -162,23 +157,6 @@ class SpriteGalleryTab(QWidget):
         layout = QHBoxLayout()
         layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
         layout.setSpacing(SPACING_SMALL)
-
-        # Quick actions with responsive sizing
-        self.compare_btn = QPushButton("Compare")
-        if self.compare_btn:
-            self.compare_btn.setEnabled(False)
-        self.compare_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.compare_btn.setFixedHeight(COMPACT_BUTTON_HEIGHT)
-        self.compare_btn.clicked.connect(self._compare_sprites)
-        layout.addWidget(self.compare_btn)
-
-        self.palette_btn = QPushButton("Apply Palette")
-        if self.palette_btn:
-            self.palette_btn.setEnabled(False)
-        self.palette_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.palette_btn.setFixedHeight(COMPACT_BUTTON_HEIGHT)
-        self.palette_btn.clicked.connect(self._apply_palette)
-        layout.addWidget(self.palette_btn)
 
         layout.addStretch()
 
@@ -473,12 +451,6 @@ class SpriteGalleryTab(QWidget):
         """Handle selection change in gallery."""
         count = len(selected_offsets)
 
-        # Enable/disable actions based on selection
-        if self.compare_btn:
-            self.compare_btn.setEnabled(count >= 2)
-        if self.palette_btn:
-            self.palette_btn.setEnabled(count >= 1)
-
         # Update toolbar actions
         for action in self.toolbar.actions():
             if "Export" in action.text():
@@ -527,62 +499,6 @@ class SpriteGalleryTab(QWidget):
                 f"Exported {len(exported)} sprites to {export_dir}"
             )
             self.sprites_exported.emit(exported)
-
-    def _export_sprite_sheet(self):
-        """Export selected sprites as a sprite sheet."""
-        selected = self.gallery_widget.get_selected_sprites()
-        if not selected:
-            QMessageBox.information(self, "No Selection", "Please select sprites to export")
-            return
-
-        # Get save location
-        filepath = browse_for_save_file(
-            self,
-            "Save Sprite Sheet",
-            "PNG Files (*.png)",
-            "sprite_sheet.png"
-        )
-
-        if not filepath:
-            return
-
-        # TODO: Implement sprite sheet generation
-        QMessageBox.information(
-            self,
-            "Not Implemented",
-            "Sprite sheet export will be implemented soon"
-        )
-
-    def _compare_sprites(self):
-        """Open comparison view for selected sprites."""
-        selected = self.gallery_widget.get_selected_sprites()
-        if len(selected) < 2:
-            QMessageBox.information(
-                self,
-                "Select More",
-                "Please select at least 2 sprites to compare"
-            )
-            return
-
-        # TODO: Implement comparison dialog
-        QMessageBox.information(
-            self,
-            "Not Implemented",
-            "Sprite comparison will be implemented soon"
-        )
-
-    def _apply_palette(self):
-        """Apply a palette to selected sprites."""
-        selected = self.gallery_widget.get_selected_sprites()
-        if not selected:
-            return
-
-        # TODO: Implement palette application
-        QMessageBox.information(
-            self,
-            "Not Implemented",
-            "Batch palette application will be implemented soon"
-        )
 
     def _open_detached_gallery(self):
         """Open the gallery in a separate window to avoid stretching issues."""

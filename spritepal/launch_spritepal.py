@@ -20,7 +20,7 @@ from core.managers import (
     validate_manager_dependencies,
 )
 from core.managers.application_state_manager import ApplicationStateManager
-from core.protocols.manager_protocols import ROMCacheProtocol
+from core.services.rom_cache import ROMCache
 from ui.main_window import MainWindow
 from ui.styles.accessibility import initialize_accessibility
 from utils.logging_config import get_logger, setup_logging
@@ -76,7 +76,7 @@ class SpritePalApp(QApplication):
         # This eliminates deprecation warnings and makes dependencies explicit
         self.main_window = MainWindow(
             settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCacheProtocol),
+            rom_cache=inject(ROMCache),
             session_manager=inject(ApplicationStateManager),
         )
 
