@@ -486,17 +486,20 @@ class WorkerManager:
 
         # Defensive check: Warn if there are QThreads running that weren't registered
         # This helps catch workers started directly with .start() bypassing WorkerManager
+        # Note: We only check for explicitly named QThread instances, not 'Dummy-N' threads
+        # which are Python's internal representation of C-level threads (Qt internals,
+        # pytest-xdist workers, etc.) and would produce too many false positives.
         try:
             import threading
 
             active_threads = threading.enumerate()
             unknown_workers = []
             for t in active_threads:
-                # Check if this is a QThread-backed thread
-                if 'QThread' in t.name or 'Dummy-' in t.name:
-                    # Don't warn about the main thread or known helper threads
-                    if t.name not in ('MainThread', 'QThread'):
-                        unknown_workers.append(t.name)
+                # Check if this is an explicitly named QThread
+                # Skip 'Dummy-N' threads - they're Python's internal representation
+                # of non-Python threads and produce false positives in parallel tests
+                if 'QThread' in t.name and t.name not in ('MainThread', 'QThread'):
+                    unknown_workers.append(t.name)
             if unknown_workers:
                 logger.warning(
                     f"Found {len(unknown_workers)} potential unregistered QThread(s) after cleanup: "

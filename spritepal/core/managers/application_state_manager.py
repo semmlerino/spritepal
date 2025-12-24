@@ -66,8 +66,8 @@ class ApplicationStateManager(BaseManager):
     #   preview_ready - UI updates
     # =========================================
 
-    # Unified signals (canonical)
-    state_changed = Signal(str, dict)  # category, data
+    # Unified signals (canonical) - use object to avoid PySide6 copy warning
+    state_changed = Signal(str, object)  # category, data
     # Note: workflow_state_changed is delegated from WorkflowStateManager
 
     # Session signals (persistence) - use object to avoid PySide6 copy warning
