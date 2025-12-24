@@ -218,49 +218,6 @@ class SpritePresetManager(BaseManager):
         """
         return list(self._presets.values())
 
-    def get_presets_for_game(self, game_title: str) -> list[SpritePreset]:
-        """Get all presets for a specific game.
-
-        Args:
-            game_title: The game title to match
-
-        Returns:
-            List of matching presets
-        """
-        return [
-            p for p in self._presets.values()
-            if p.game_title.upper() == game_title.upper()
-        ]
-
-    def get_presets_for_checksum(self, checksum: int) -> list[SpritePreset]:
-        """Get all presets that match a ROM checksum.
-
-        Args:
-            checksum: The ROM checksum to match
-
-        Returns:
-            List of matching presets
-        """
-        return [
-            p for p in self._presets.values()
-            if checksum in p.game_checksums
-        ]
-
-    def get_presets_by_tag(self, tag: str) -> list[SpritePreset]:
-        """Get all presets with a specific tag.
-
-        Args:
-            tag: The tag to match (case-insensitive)
-
-        Returns:
-            List of matching presets
-        """
-        tag_lower = tag.lower()
-        return [
-            p for p in self._presets.values()
-            if any(t.lower() == tag_lower for t in p.tags)
-        ]
-
     # =========================================================================
     # Import/Export
     # =========================================================================
@@ -394,34 +351,3 @@ class SpritePresetManager(BaseManager):
             Number of presets
         """
         return len(self._presets)
-
-    def get_all_game_titles(self) -> list[str]:
-        """Get list of unique game titles in presets.
-
-        Returns:
-            Sorted list of unique game titles
-        """
-        return sorted({p.game_title for p in self._presets.values()})
-
-    def get_all_tags(self) -> list[str]:
-        """Get list of all unique tags.
-
-        Returns:
-            Sorted list of unique tags
-        """
-        all_tags: set[str] = set()
-        for preset in self._presets.values():
-            all_tags.update(preset.tags)
-        return sorted(all_tags)
-
-    def clear_all(self) -> None:
-        """Remove all presets."""
-        self._presets.clear()
-        self._save_presets()
-        self.presets_loaded.emit()
-        self._logger.info("Cleared all user presets")
-
-    def reload(self) -> None:
-        """Reload presets from disk."""
-        self._presets.clear()
-        self._load_presets()

@@ -952,16 +952,6 @@ class TestRuntimeState:
 class TestConvenienceMethods:
     """Tests for convenience methods."""
 
-    def test_get_ui_data(self, manager):
-        """get_ui_data should return UI settings."""
-        manager.set("ui", "window_width", 1200)
-        manager.set("ui", "theme", "dark")
-
-        ui_data = manager.get_ui_data()
-
-        assert ui_data.get("window_width") == 1200
-        assert ui_data.get("theme") == "dark"
-
     def test_validate_file_paths(self, manager, tmp_path):
         """validate_file_paths should check existence."""
         # Create a file that exists
@@ -975,18 +965,6 @@ class TestConvenienceMethods:
 
         assert validated["vram_path"] == str(vram_file)
         assert validated["cgram_path"] == ""  # Invalid path cleared
-
-    def test_has_valid_session(self, manager, tmp_path):
-        """has_valid_session should check for valid files."""
-        # Initially no valid session
-        assert manager.has_valid_session() is False
-
-        # Add valid file
-        vram_file = tmp_path / "vram.dmp"
-        vram_file.touch()
-        manager.set("session", "vram_path", str(vram_file))
-
-        assert manager.has_valid_session() is True
 
     def test_get_default_directory(self, manager, tmp_path):
         """get_default_directory should return appropriate path."""

@@ -466,33 +466,6 @@ class ApplicationStateManager(BaseManager):
         if category == "session" and key in ["vram_path", "cgram_path", "oam_path"]:
             self.files_updated.emit({key: value})
 
-    def get_value(
-        self, category: str, key: str, default: object = None
-    ) -> object:
-        """
-        Get a setting value (alias for get method).
-
-        Args:
-            category: Setting category
-            key: Setting key
-            default: Default value if not found
-
-        Returns:
-            Setting value or default
-        """
-        return self.get(category, key, default)
-
-    def set_value(self, category: str, key: str, value: object) -> None:
-        """
-        Set a setting value (alias for set method).
-
-        Args:
-            category: Setting category
-            key: Setting key
-            value: Value to set
-        """
-        self.set(category, key, value)
-
     def save(self) -> bool:
         """
         Save settings to file (alias for save_session).
@@ -1053,21 +1026,6 @@ class ApplicationStateManager(BaseManager):
         """Get the application name."""
         return self._app_name
 
-    def get_ui_data(self) -> dict[str, object]:
-        """Get UI settings."""
-        ui_data: dict[str, object] = {}
-        for key in ["window_width", "window_height", "window_x", "window_y", "restore_position", "theme"]:
-            value = self.get("ui", key)
-            if value is not None:
-                ui_data[key] = value
-        return ui_data
-
-    def save_ui_data(self, ui_data: dict[str, object]) -> None:
-        """Save UI settings."""
-        for key, value in ui_data.items():
-            self.set("ui", key, value)
-        self.save_session()
-
     def validate_file_paths(self) -> dict[str, str]:
         """Validate and return existing file paths from session."""
         session = self.get_session_data()
@@ -1081,11 +1039,6 @@ class ApplicationStateManager(BaseManager):
                 validated_paths[key] = ""
 
         return validated_paths
-
-    def has_valid_session(self) -> bool:
-        """Check if there's a valid session to restore."""
-        validated = self.validate_file_paths()
-        return bool(validated.get("vram_path") or validated.get("cgram_path"))
 
     def get_default_directory(self) -> str:
         """Get the default directory for file operations."""

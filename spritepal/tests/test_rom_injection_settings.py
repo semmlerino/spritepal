@@ -130,25 +130,25 @@ class TestROMInjectionSettingsPersistence:
 
         # Verify saved values in the actual settings manager
         assert (
-            settings_manager.get_value(
+            settings_manager.get(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM
             )
             == "/path/to/test.sfc"
         )
         assert (
-            settings_manager.get_value(
+            settings_manager.get(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_SPRITE_LOCATION
             )
             == "Kirby Sprite (0x123456)"
         )
         assert (
-            settings_manager.get_value(
+            settings_manager.get(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET
             )
             == "0x123456"
         )
         assert (
-            settings_manager.get_value(
+            settings_manager.get(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION
             )
             is True
@@ -176,13 +176,13 @@ class TestROMInjectionSettingsPersistence:
             mock_dialog.save_rom_injection_parameters()
 
         # Verify empty custom offset is saved as empty string
-        value = settings_manager.get_value(
+        value = settings_manager.get(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET, None
         )
         assert value == ""  # Empty string is saved
 
         # Verify fast compression is saved as False
-        value = settings_manager.get_value(
+        value = settings_manager.get(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION, None
         )
         assert value is False
@@ -190,7 +190,7 @@ class TestROMInjectionSettingsPersistence:
     def test_save_vram_injection_paths(self, settings_manager):
         """Test saving VRAM injection paths using ROM injection namespace"""
         # Save VRAM paths
-        settings_manager.set_value(
+        settings_manager.set(
             SETTINGS_NS_ROM_INJECTION,
             SETTINGS_KEY_LAST_INPUT_VRAM,
             "/path/to/input.dmp",
@@ -200,7 +200,7 @@ class TestROMInjectionSettingsPersistence:
         # Create a new settings manager to verify persistence
         # The settings should persist through the ApplicationStateManager
         assert (
-            settings_manager.get_value(
+            settings_manager.get(
                 SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM
             )
             == "/path/to/input.dmp"
@@ -210,18 +210,18 @@ class TestROMInjectionSettingsPersistence:
     def test_load_rom_injection_defaults(self, mock_dialog, settings_manager, session_managers):
         """Test loading ROM injection defaults"""
         # Pre-populate settings
-        settings_manager.set_value(
+        settings_manager.set(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "/test/rom.sfc"
         )
-        settings_manager.set_value(
+        settings_manager.set(
             SETTINGS_NS_ROM_INJECTION,
             SETTINGS_KEY_LAST_SPRITE_LOCATION,
             "Kirby Sprite (0x123456)",
         )
-        settings_manager.set_value(
+        settings_manager.set(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET, "0x789ABC"
         )
-        settings_manager.set_value(
+        settings_manager.set(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION, True
         )
 
@@ -306,7 +306,7 @@ class TestROMInjectionSettingsPersistence:
 
         # Mock settings with saved sprite location
         # Note: The saved value includes the full text with offset, as saved by the dialog
-        settings_manager.set_value(
+        settings_manager.set(
             SETTINGS_NS_ROM_INJECTION,
             SETTINGS_KEY_LAST_SPRITE_LOCATION,
             "Helper Sprite (0x234567)"
@@ -328,10 +328,10 @@ class TestROMInjectionSettingsPersistence:
     def test_settings_namespace_consistency(self, settings_manager):
         """Test that all ROM injection settings use consistent namespace"""
         # Save various settings
-        settings_manager.set_value(
+        settings_manager.set(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "/test.sfc"
         )
-        settings_manager.set_value(
+        settings_manager.set(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, "/test.dmp"
         )
         settings_manager.save()
