@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QStatusBar, QWidget
 
+from ui.common.spacing_constants import SPACING_TINY
 from ui.styles import get_muted_text_style
 from ui.styles.theme import COLORS
 
@@ -54,7 +55,7 @@ class StatusBarManager:
         self.cache_status_widget = QWidget()
         cache_layout = QHBoxLayout()
         cache_layout.setContentsMargins(0, 0, 0, 0)
-        cache_layout.setSpacing(4)
+        cache_layout.setSpacing(SPACING_TINY)
 
         # Cache icon
         self.cache_icon_label = QLabel()

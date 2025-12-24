@@ -13,7 +13,13 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from ui.common.spacing_constants import BORDER_THIN, PALETTE_LABEL_HEIGHT, PALETTE_PREVIEW_SIZE, SPACING_TINY
+from ui.common.spacing_constants import (
+    BORDER_THIN,
+    COMPACT_ROW_MARGIN,
+    PALETTE_LABEL_HEIGHT,
+    PALETTE_PREVIEW_SIZE,
+    SPACING_TINY,
+)
 from ui.styles.theme import COLORS
 
 # Constants for collapsed view
@@ -200,7 +206,7 @@ class CollapsedPaletteRow(QFrame):
         # Horizontal layout for collapsed view - no spacing for seamless swatches
         layout = QHBoxLayout(self)
         layout.setSpacing(0)
-        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setContentsMargins(SPACING_TINY, COMPACT_ROW_MARGIN, SPACING_TINY, COMPACT_ROW_MARGIN)
 
         # Palette number label
         self.label = QLabel(f"{palette_index}:")
@@ -293,7 +299,7 @@ class PalettePreviewWidget(QWidget):
         # Container for collapsed palette rows
         self._collapsed_container = QWidget(self)
         self._collapsed_layout = QVBoxLayout(self._collapsed_container)
-        self._collapsed_layout.setSpacing(2)
+        self._collapsed_layout.setSpacing(COMPACT_ROW_MARGIN)
         self._collapsed_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create collapsed rows for all palettes

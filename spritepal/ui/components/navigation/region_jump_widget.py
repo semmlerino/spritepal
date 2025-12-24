@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import SPACING_COMPACT_SMALL, SPACING_TINY
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 from utils.sprite_regions import SpriteRegion
@@ -64,7 +65,7 @@ class RegionJumpWidget(QWidget):
     def _setup_ui(self) -> None:
         """Create the UI layout"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(6)
+        layout.setSpacing(SPACING_COMPACT_SMALL)
         layout.setContentsMargins(0, 0, 0, 0)
 
         # Main container frame
@@ -78,7 +79,8 @@ class RegionJumpWidget(QWidget):
             }}
         """)
         container_layout = QVBoxLayout(container)
-        container_layout.setSpacing(6)
+        container_layout.setSpacing(SPACING_COMPACT_SMALL)
+        container_layout.setContentsMargins(0, 0, 0, 0)
 
         # Title row
         title_row = QHBoxLayout()
@@ -99,7 +101,7 @@ class RegionJumpWidget(QWidget):
 
         # Region selector row
         region_row = QHBoxLayout()
-        region_row.setSpacing(4)
+        region_row.setSpacing(SPACING_TINY)
 
         region_label = QLabel("Region:")
         region_label.setMinimumWidth(50)
@@ -161,7 +163,7 @@ class RegionJumpWidget(QWidget):
 
         # Direct offset row
         offset_row = QHBoxLayout()
-        offset_row.setSpacing(4)
+        offset_row.setSpacing(SPACING_TINY)
 
         offset_label = QLabel("Offset:")
         offset_label.setMinimumWidth(50)

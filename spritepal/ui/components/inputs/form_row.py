@@ -9,6 +9,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
+from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
 from ui.styles import get_muted_text_style
 
 
@@ -33,7 +34,7 @@ class FormRow(QWidget):
         input_widget: QWidget | None = None,
         orientation: str = "horizontal",  # "horizontal" or "vertical"
         label_width: int | None = None,
-        spacing: int = 8,
+        spacing: int = SPACING_SMALL,
         help_text: str = "",
         label_alignment: Qt.AlignmentFlag | None = None
     ):
@@ -55,7 +56,6 @@ class FormRow(QWidget):
         self.label = QLabel(label_text)
         if label_width:
             self.label.setMinimumWidth(label_width)
-            self.label.setMaximumWidth(label_width)
 
         # For horizontal layout, use provided alignment or default to VCenter
         if orientation == "horizontal":
@@ -73,7 +73,7 @@ class FormRow(QWidget):
             self.input_layout = self.main_layout
 
         self.input_layout.setContentsMargins(0, 0, 0, 0)
-        self.input_layout.setSpacing(4)
+        self.input_layout.setSpacing(SPACING_TINY)
 
         # Initialize help label
         self.help_label: QLabel | None = None
@@ -158,7 +158,6 @@ class FormRow(QWidget):
     def set_label_width(self, width: int):
         """Set the label width"""
         self.label.setMinimumWidth(width)
-        self.label.setMaximumWidth(width)
 
     def add_stretch(self):
         """Add stretch to the main layout"""

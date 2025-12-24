@@ -22,6 +22,9 @@ SPACING_COMPACT_MEDIUM = 10         # 10px - compact standard spacing
 SPACING_COMPACT_LARGE = 16          # 16px - compact generous spacing
 SPACING_COMPACT_XLARGE = 20         # 20px - compact section separation
 
+# Compact row margin for dense layouts (e.g., palette rows with asymmetric margins)
+COMPACT_ROW_MARGIN = 2              # 2px - minimal vertical margin for dense row layouts
+
 # Extraction panel widget sizes
 EXTRACTION_BUTTON_MIN_HEIGHT = 32   # Minimum button height for extraction widgets
 EXTRACTION_COMBO_MIN_WIDTH = 200    # Minimum combo box width
