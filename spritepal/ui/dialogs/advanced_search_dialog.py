@@ -1808,16 +1808,12 @@ class AdvancedSearchDialog(QDialog):
         if not offset_text:
             if self.ref_preview_label:
                 self.ref_preview_label.setText("No reference sprite selected")
-            if self.ref_preview_label:
                 self.ref_preview_label.setPixmap(QPixmap())
             return
 
         try:
-            # Parse offset
-            if offset_text.startswith("0x"):
-                offset = int(offset_text, 16)
-            else:
-                offset = int(offset_text, 16)
+            # Parse offset (always base-16, "0x" prefix is optional)
+            offset = int(offset_text.removeprefix("0x"), 16)
 
             # Update preview
             self._update_reference_preview(offset)
@@ -1825,7 +1821,6 @@ class AdvancedSearchDialog(QDialog):
         except ValueError:
             if self.ref_preview_label:
                 self.ref_preview_label.setText("Invalid offset format")
-            if self.ref_preview_label:
                 self.ref_preview_label.setPixmap(QPixmap())
 
     def _update_reference_preview(self, offset: int):
@@ -1852,19 +1847,16 @@ class AdvancedSearchDialog(QDialog):
                 )
                 if self.ref_preview_label:
                     self.ref_preview_label.setPixmap(scaled_pixmap)
-                if self.ref_preview_label:
                     self.ref_preview_label.setText("")
             else:
                 if self.ref_preview_label:
                     self.ref_preview_label.setText(f"Could not load sprite at 0x{offset:X}")
-                if self.ref_preview_label:
                     self.ref_preview_label.setPixmap(QPixmap())
 
         except Exception as e:
             logger.exception(f"Failed to generate reference preview: {e}")
             if self.ref_preview_label:
                 self.ref_preview_label.setText(f"Preview error: {str(e)[:50]}...")
-            if self.ref_preview_label:
                 self.ref_preview_label.setPixmap(QPixmap())
 
     def _show_visual_search_results(self, results: list[Any]):  # pyright: ignore[reportExplicitAny] - SearchResult list from worker
@@ -1872,7 +1864,7 @@ class AdvancedSearchDialog(QDialog):
         try:
             # Convert SearchResult objects back to SimilarityMatch for the dialog
             ref_offset_text = self.ref_offset_edit.text().strip()
-            ref_offset = int(ref_offset_text, 16) if ref_offset_text.startswith("0x") else int(ref_offset_text, 16)
+            ref_offset = int(ref_offset_text.removeprefix("0x"), 16)
 
             matches = []
             for result in results:
@@ -2040,8 +2032,7 @@ class AdvancedSearchDialog(QDialog):
             # Disconnect signals first to prevent late signal delivery to destroyed dialog
             self._disconnect_worker_signals()
             # Use WorkerManager for safe cleanup - never uses terminate()
-            WorkerManager.cleanup_worker(self.search_worker, timeout=3000)
-            self.search_worker = None
+            WorkerManager.cleanup_worker_attr(self, "search_worker", timeout=3000)
             logger.debug("Search worker cleanup completed")
 
         # Save history before closing

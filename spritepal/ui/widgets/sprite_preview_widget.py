@@ -350,9 +350,7 @@ class SpritePreviewWidget(QWidget):
         # No palette selection for indexed sprites
         if self.palette_combo:
             self.palette_combo.setEnabled(False)
-        if self.palette_combo:
             self.palette_combo.clear()
-        if self.palette_combo:
             self.palette_combo.addItem("Built-in Palette")
 
     def _update_preview_with_palette(self, grayscale_img: Image.Image) -> None:
@@ -839,9 +837,7 @@ class SpritePreviewWidget(QWidget):
             # (since pixmaps are already rendered with colors)
             if self.palette_combo:
                 self.palette_combo.clear()
-            if self.palette_combo:
                 self.palette_combo.setEnabled(False)
-            if self.palette_combo:
                 self.palette_combo.addItem("Direct Display")
 
             # Clear sprite data since this is a direct pixmap
@@ -1176,7 +1172,6 @@ class SpritePreviewWidget(QWidget):
             self.preview_label.setPixmap(scaled)
         if self.info_label:
             self.info_label.setText("No sprite data at this offset (all zeros)")
-        if self.info_label:
             self.info_label.setVisible(True)
 
         # Ensure it's displayed
@@ -1185,9 +1180,7 @@ class SpritePreviewWidget(QWidget):
         # Disable palette selection for empty data
         if self.palette_combo:
             self.palette_combo.setEnabled(False)
-        if self.palette_combo:
             self.palette_combo.clear()
-        if self.palette_combo:
             self.palette_combo.addItem("No Data")
 
     def _force_visibility(self) -> None:
@@ -1214,8 +1207,7 @@ class SpritePreviewWidget(QWidget):
         """Show visual loading state for immediate user feedback."""
         if self.preview_label is not None:
             self.preview_label.setText("Loading...")
-            if self.preview_label:
-                self.preview_label.setStyleSheet(f"""
+            self.preview_label.setStyleSheet(f"""
                 QLabel {{
                     border: 1px solid {COLORS["info"]};
                     background-color: {COLORS["background"]};
@@ -1234,8 +1226,7 @@ class SpritePreviewWidget(QWidget):
         """Show visual error state with clear feedback."""
         if self.preview_label is not None:
             self.preview_label.setText(f"Error: {error_type}")
-            if self.preview_label:
-                self.preview_label.setStyleSheet(f"""
+            self.preview_label.setStyleSheet(f"""
                 QLabel {{
                     border: 1px solid {COLORS["danger"]};
                     background-color: {COLORS["background"]};
