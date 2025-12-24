@@ -93,13 +93,6 @@ _MAX_MINI_MAP_HEIGHT = 60
 _MIN_MINI_MAP_HEIGHT = 40
 
 
-def _create_section_title(text: str) -> QLabel:
-    """Create a styled section title label."""
-    label = QLabel(text)
-    label.setStyleSheet(f"font-weight: bold; font-size: 12px; color: {COLORS['text_primary']};")
-    return label
-
-
 # Signal utilities imported from shared module
 from ui.common.signal_utils import is_valid_qt as _is_valid_qt, safe_disconnect as _safe_disconnect
 
@@ -229,10 +222,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Set up custom buttons
         self._setup_custom_buttons()
-
-        # Connect tab change signal for dynamic sizing
-        if self.tab_widget:
-            self.tab_widget.currentChanged.connect(self._on_tab_changed)
 
     def _create_left_panel(self) -> QWidget:
         """Create the left panel with tabs and collapsible status."""
@@ -427,103 +416,68 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Gallery tab signals
         self.gallery_tab.sprite_selected.connect(self._on_gallery_sprite_selected)
 
-    def _on_offset_changed(self, offset: int):
+    def _on_offset_changed(self, offset: int) -> None:
         """Handle offset changes from browse tab."""
-        # CRITICAL: Prevent re-entrant calls for the same offset
-        # This prevents crashes from duplicate signals
+        # Prevent re-entrant calls for the same offset
         if hasattr(self, '_last_offset_processed') and self._last_offset_processed == offset:
-            logger.debug(f"[OFFSET_CHANGED] Skipping duplicate offset: 0x{offset:06X}")
             return
-
-        logger.info(f"[OFFSET_CHANGED] ========== START: 0x{offset:06X} ===========")
         self._last_offset_processed = offset
 
         # Update cache stats
         self._cache_stats["total_requests"] += 1
-        logger.debug(f"[OFFSET_CHANGED] Cache stats updated: total_requests={self._cache_stats['total_requests']}")
 
-        # Update mini ROM map
+        # Update UI elements
         if self.mini_rom_map is not None:
             self.mini_rom_map.set_current_offset(offset)
-            logger.debug(f"[OFFSET_CHANGED] Updated mini ROM map to offset: 0x{offset:06X}")
-
-        # Update preview widget with current offset for similarity search
         if self.preview_widget is not None:
             self.preview_widget.set_current_offset(offset)
-            logger.debug("[OFFSET_CHANGED] Updated preview widget offset")
 
-        # Emit signal immediately for external listeners (with robust safety checks)
-        try:
-            # Check if dialog and signal are still valid before emitting
-            if not hasattr(self, 'offset_changed'):
-                logger.warning("[OFFSET_CHANGED] Signal attribute missing, skipping emit")
-                return
+        # Emit signal for external listeners
+        self._emit_offset_changed(offset)
 
-            # Check if the underlying Qt object is still valid
-            try:
-                # Additional check for Qt object validity
-                if hasattr(self, 'isWidgetType') and not self.isWidgetType():
-                    logger.warning("[OFFSET_CHANGED] Dialog widget type invalid, skipping emit")
-                    return
-
-            except Exception as validity_check_error:
-                logger.warning(f"[OFFSET_CHANGED] Validity check failed: {validity_check_error}, skipping emit")
-                return
-
-            logger.debug(f"[OFFSET_CHANGED] About to emit offset_changed signal for offset 0x{offset:06X}")
-
-            # Emit signal with additional safety wrapper
-            self.offset_changed.emit(offset)
-            logger.debug("[OFFSET_CHANGED] Successfully emitted offset_changed signal")
-        except RuntimeError as e:
-            if "Signal source has been deleted" in str(e) or "deleted" in str(e).lower():
-                logger.error(f"[OFFSET_CHANGED] CRITICAL: Signal source deleted during emit: {e}")
-                logger.error(f"[OFFSET_CHANGED] Dialog state - type: {type(self)}")
-                logger.warning("[OFFSET_CHANGED] Skipping signal emit to prevent crash")
-            else:
-                logger.error(f"[OFFSET_CHANGED] Unexpected RuntimeError during signal emit: {e}")
-                raise
-        except Exception as e:
-            logger.error(f"[OFFSET_CHANGED] Unexpected error during signal emit: {e}")
-            # Don't re-raise to prevent crashes, just log the error
-
-        # CRITICAL FIX: Request preview when offset changes!
-        # Use request_manual_preview for immediate response without debounce
+        # Request preview
         if self._smart_preview_coordinator is not None:
-            logger.info(f"[OFFSET_CHANGED] Requesting manual preview for offset 0x{offset:06X}")
             try:
                 self._smart_preview_coordinator.request_manual_preview(offset)
-                logger.info("[OFFSET_CHANGED] request_manual_preview() returned successfully")
             except Exception as e:
-                logger.exception(f"[OFFSET_CHANGED] EXCEPTION calling request_manual_preview: {e}")
-        else:
-            logger.error("[OFFSET_CHANGED] No smart preview coordinator available!")
+                logger.exception(f"Failed to request manual preview: {e}")
 
         # Schedule predictive preloading for adjacent offsets
         self._schedule_adjacent_preloading(offset)
 
-        logger.info(f"[OFFSET_CHANGED] ========== END: 0x{offset:06X} ===========")
+    def _emit_offset_changed(self, offset: int) -> None:
+        """Emit offset changed signal safely.
+
+        Handles the case where the dialog is being destroyed during emission.
+        """
+        try:
+            self.offset_changed.emit(offset)
+        except RuntimeError as e:
+            # Dialog deleted during emit - normal during shutdown
+            if "deleted" in str(e).lower():
+                logger.debug(f"Signal source deleted during offset emit: {e}")
+            else:
+                raise
 
     def _on_offset_requested(self, offset: int):
         """Handle offset request from smart tab."""
         if self.browse_tab is not None:
             self.browse_tab.set_offset(offset)
 
-    def _on_sprite_selected(self, offset: int):
-        """Handle sprite selection from history."""
+    def _navigate_to_browse_tab(self, offset: int) -> None:
+        """Set offset and switch to browse tab."""
         if self.browse_tab is not None:
             self.browse_tab.set_offset(offset)
-        # Switch to browse tab
         if self.tab_widget is not None:
             self.tab_widget.setCurrentIndex(0)
 
-    def _on_gallery_sprite_selected(self, offset: int):
+    def _on_sprite_selected(self, offset: int) -> None:
+        """Handle sprite selection from history."""
+        self._navigate_to_browse_tab(offset)
+
+    def _on_gallery_sprite_selected(self, offset: int) -> None:
         """Handle sprite selection from gallery - navigate to selected sprite."""
-        if self.browse_tab is not None:
-            self.browse_tab.set_offset(offset)
-        # Switch to browse tab to show the selected sprite
-        if self.tab_widget is not None:
-            self.tab_widget.setCurrentIndex(0)
+        self._navigate_to_browse_tab(offset)
 
     def _on_smart_mode_changed(self, enabled: bool):
         """Handle smart mode toggle."""
@@ -533,38 +487,20 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """Handle region change."""
         # Could implement region-specific behavior here
 
-    def _find_next_sprite(self):
+    def _find_next_sprite(self) -> None:
         """Find next sprite with region awareness."""
-        if not self.browse_tab or not self._has_rom_data():
-            return
+        self._find_sprite(forward=True)
 
-        current_offset = self.browse_tab.get_current_offset()
-
-        # Clean up existing search worker
-        if self.search_worker is not None:
-            WorkerManager.cleanup_worker(self.search_worker)
-            self.search_worker = None
-
-        # Create search worker for forward search
-        with QMutexLocker(self._manager_mutex):
-            extractor = self.rom_extractor
-            if extractor is not None:
-                self.search_worker = SpriteSearchWorker(
-                    self.rom_path,
-                    current_offset,
-                    self.rom_size,
-                    1,  # Forward direction
-                    extractor,
-                    parent=self
-                )
-                self.search_worker.sprite_found.connect(self._on_search_sprite_found)
-                self.search_worker.search_complete.connect(self._on_search_complete)
-                self.search_worker.start()
-
-                self._update_status("Searching for next sprite...")
-
-    def _find_prev_sprite(self):
+    def _find_prev_sprite(self) -> None:
         """Find previous sprite with region awareness."""
+        self._find_sprite(forward=False)
+
+    def _find_sprite(self, forward: bool) -> None:
+        """Find next or previous sprite.
+
+        Args:
+            forward: True to search forward, False to search backward.
+        """
         if not self.browse_tab or not self._has_rom_data():
             return
 
@@ -575,15 +511,17 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             WorkerManager.cleanup_worker(self.search_worker)
             self.search_worker = None
 
-        # Create search worker for backward search
+        # Create search worker with appropriate direction
         with QMutexLocker(self._manager_mutex):
             extractor = self.rom_extractor
             if extractor is not None:
+                limit = self.rom_size if forward else 0
+                direction = 1 if forward else -1
                 self.search_worker = SpriteSearchWorker(
                     self.rom_path,
                     current_offset,
-                    0,  # Search back to start
-                    -1,  # Backward direction
+                    limit,
+                    direction,
                     extractor,
                     parent=self
                 )
@@ -591,7 +529,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 self.search_worker.search_complete.connect(self._on_search_complete)
                 self.search_worker.start()
 
-                self._update_status("Searching for previous sprite...")
+                status = "next" if forward else "previous"
+                self._update_status(f"Searching for {status} sprite...")
 
     def _request_preview_update(self, delay_ms: int = 100):
         """Request preview update with debouncing."""
@@ -1427,21 +1366,6 @@ Cache Misses: {session_stats['misses']}"""
         super().showEvent(event)
         self.view_state_manager.handle_show_event()
 
-        # Set initial splitter sizes based on current tab
-        self._update_splitter_for_tab()
-
-    def _on_tab_changed(self, index: int) -> None:
-        """Handle tab change."""
-        pass  # Tab-specific adjustments handled elsewhere
-
-    def _update_splitter_for_tab(self, index: int | None = None) -> None:
-        """Update splitter sizes based on active tab."""
-        pass  # Splitter adjustment is optional - no-op for now
-
-    def _create_section_title(self, text: str) -> QLabel:
-        """Create a styled section title label."""
-        return _create_section_title(text)
-
     @override
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Handle resize event."""
@@ -1449,64 +1373,40 @@ Cache Misses: {session_stats['misses']}"""
 
     @override
     def moveEvent(self, event: QMoveEvent) -> None:
-        """Handle dialog move event - constrain to screen bounds"""
+        """Handle dialog move event - constrain to screen bounds."""
         super().moveEvent(event)
 
-        # Skip validation during initialization or if dialog is not visible
         if not self.isVisible():
             return
 
+        try:
+            self._constrain_to_screen_bounds(event.pos())
+        except (AttributeError, TypeError):
+            # Skip validation if event/geometry objects are mocks
+            pass
+
+    def _constrain_to_screen_bounds(self, pos: QPoint) -> None:
+        """Constrain dialog position to screen bounds."""
         from PySide6.QtGui import QGuiApplication
 
-        # Defensive check for test environments with mock objects
-        try:
-            new_pos = event.pos()
-            x, y = new_pos.x(), new_pos.y()
-        except (AttributeError, TypeError):
-            # In test environment with mocks, skip geometry validation
+        screen = QGuiApplication.primaryScreen()
+        if not screen:
             return
 
-        # Get available screen geometry
-        screen = QGuiApplication.primaryScreen()
-        if screen:
-            available = screen.availableGeometry()
+        available = screen.availableGeometry()
+        x, y = pos.x(), pos.y()
+        margin = 50
 
-            # Defensive check for mock geometry objects in tests
-            try:
-                available_x = available.x()
-                available_y = available.y()
-                available_width = available.width()
-                available_height = available.height()
-                dialog_width = self.width()
-                dialog_height = self.height()
+        min_x = available.x() - self.width() + margin
+        max_x = available.x() + available.width() - margin
+        min_y = available.y() - self.height() + margin
+        max_y = available.y() + available.height() - margin
 
-                # Verify all values are numeric before arithmetic (defensive check for mocks)
-                # Note: Qt geometry methods always return int, but this guards against test mocks
-                values = [available_x, available_y, available_width, available_height,
-                          dialog_width, dialog_height]
-                if not all(isinstance(v, (int, float)) for v in values):  # pyright: ignore[reportUnnecessaryIsInstance] - guards against test mocks returning non-int
-                    # Skip validation if any values are not numeric (likely mocks)
-                    return
+        constrained_x = max(min_x, min(x, max_x))
+        constrained_y = max(min_y, min(y, max_y))
 
-                # Ensure dialog stays within screen bounds with small margin
-                margin = 50  # Allow some overlap with screen edge
-                min_x = available_x - dialog_width + margin
-                max_x = available_x + available_width - margin
-                min_y = available_y - dialog_height + margin
-                max_y = available_y + available_height - margin
-
-                # Constrain position
-                constrained_x = max(min_x, min(x, max_x))
-                constrained_y = max(min_y, min(y, max_y))
-
-                # Move back if position was adjusted
-                if constrained_x != x or constrained_y != y:
-                    logger.debug(f"Constraining dialog position from ({x},{y}) to ({constrained_x},{constrained_y})")
-                    self.move(constrained_x, constrained_y)
-
-            except (AttributeError, TypeError):
-                # In test environment with mocks, skip geometry validation
-                return
+        if constrained_x != x or constrained_y != y:
+            self.move(constrained_x, constrained_y)
 
     def _on_search_sprite_found(self, offset: int, quality: float):
         """Handle sprite found during navigation search"""
