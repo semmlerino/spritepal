@@ -169,7 +169,7 @@ class DialogBase(QDialog):
             layout: The layout to set as the dialog's content
         """
         layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.addLayout(layout)
+        self.content_widget.setLayout(layout)
 
     def add_tab(self, widget: QWidget, label: str) -> None:
         """
