@@ -43,6 +43,7 @@ from .registry import (
 )
 from .sprite_preset_manager import SpritePresetManager
 from .workflow_manager import ExtractionState
+from .workflow_state_manager import WorkflowStateManager
 
 __all__ = [
     "ApplicationStateManager",
@@ -58,6 +59,7 @@ __all__ = [
     "SessionError",
     "SpritePresetManager",
     "ValidationError",
+    "WorkflowStateManager",
     "cleanup_managers",
     "initialize_managers",
     "validate_manager_dependencies",

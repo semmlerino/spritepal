@@ -18,7 +18,7 @@ import pytest
 from PySide6.QtGui import QImage
 
 from core.exceptions import SessionError, ValidationError
-from core.managers.application_state_manager import ApplicationStateManager, ExtractionState
+from core.managers.application_state_manager import ApplicationStateManager
 from tests.fixtures.timeouts import signal_timeout
 
 pytestmark = [
@@ -73,7 +73,6 @@ class TestApplicationStateManagerInit:
         )
 
         assert manager.app_name == "TestApp"
-        assert manager.workflow_state == ExtractionState.IDLE
         manager.cleanup()
 
     def test_init_with_custom_settings_path(self, tmp_path):
@@ -125,8 +124,7 @@ class TestApplicationStateManagerInit:
     def test_init_thread_locks_created(self, manager):
         """Manager should create thread locks on init."""
         assert hasattr(manager, "_state_lock")
-        assert hasattr(manager, "_workflow_lock")
-        assert hasattr(manager, "_cache_stats_lock")
+        assert hasattr(manager, "_workflow_manager")  # Workflow lock is in WorkflowStateManager
 
 
 class TestSettingsPersistence:
@@ -213,195 +211,8 @@ class TestSettingsPersistence:
             manager.save_settings()
 
 
-class TestWorkflowStateMachine:
-    """Tests for workflow state machine transitions."""
-
-    def test_initial_workflow_state_is_idle(self, manager):
-        """Initial workflow state should be IDLE."""
-        assert manager.workflow_state == ExtractionState.IDLE
-
-    def test_transition_idle_to_loading_rom(self, manager):
-        """Should allow IDLE -> LOADING_ROM transition."""
-        result = manager.transition_workflow(ExtractionState.LOADING_ROM)
-
-        assert result is True
-        assert manager.workflow_state == ExtractionState.LOADING_ROM
-
-    def test_transition_idle_to_scanning_sprites(self, manager):
-        """Should allow IDLE -> SCANNING_SPRITES transition."""
-        result = manager.transition_workflow(ExtractionState.SCANNING_SPRITES)
-
-        assert result is True
-        assert manager.workflow_state == ExtractionState.SCANNING_SPRITES
-
-    def test_transition_idle_to_previewing_sprite(self, manager):
-        """Should allow IDLE -> PREVIEWING_SPRITE transition."""
-        result = manager.transition_workflow(ExtractionState.PREVIEWING_SPRITE)
-
-        assert result is True
-        assert manager.workflow_state == ExtractionState.PREVIEWING_SPRITE
-
-    def test_transition_idle_to_searching_sprite(self, manager):
-        """Should allow IDLE -> SEARCHING_SPRITE transition."""
-        result = manager.transition_workflow(ExtractionState.SEARCHING_SPRITE)
-
-        assert result is True
-        assert manager.workflow_state == ExtractionState.SEARCHING_SPRITE
-
-    def test_transition_idle_to_extracting(self, manager):
-        """Should allow IDLE -> EXTRACTING transition."""
-        result = manager.transition_workflow(ExtractionState.EXTRACTING)
-
-        assert result is True
-        assert manager.workflow_state == ExtractionState.EXTRACTING
-
-    def test_transition_loading_rom_to_idle(self, manager):
-        """Should allow LOADING_ROM -> IDLE transition."""
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-
-        result = manager.transition_workflow(ExtractionState.IDLE)
-
-        assert result is True
-        assert manager.workflow_state == ExtractionState.IDLE
-
-    def test_transition_loading_rom_to_error(self, manager):
-        """Should allow LOADING_ROM -> ERROR transition."""
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-
-        result = manager.transition_workflow(ExtractionState.ERROR, error_message="Test error")
-
-        assert result is True
-        assert manager.workflow_state == ExtractionState.ERROR
-        assert manager.workflow_error_message == "Test error"
-
-    def test_transition_error_to_idle(self, manager):
-        """Should allow ERROR -> IDLE transition (reset)."""
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-        manager.transition_workflow(ExtractionState.ERROR, error_message="Test")
-
-        result = manager.transition_workflow(ExtractionState.IDLE)
-
-        assert result is True
-        assert manager.workflow_state == ExtractionState.IDLE
-        assert manager.workflow_error_message is None
-
-    def test_invalid_transition_returns_false(self, manager):
-        """Invalid transitions should return False."""
-        # Cannot go directly from IDLE to ERROR
-        result = manager.transition_workflow(ExtractionState.ERROR)
-
-        assert result is False
-        assert manager.workflow_state == ExtractionState.IDLE
-
-    def test_invalid_transition_preserves_state(self, manager):
-        """Invalid transitions should not change state."""
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-
-        # Cannot go from LOADING_ROM to EXTRACTING
-        result = manager.transition_workflow(ExtractionState.EXTRACTING)
-
-        assert result is False
-        assert manager.workflow_state == ExtractionState.LOADING_ROM
-
-    def test_workflow_state_changed_signal(self, manager, qtbot):
-        """workflow_state_changed signal should be emitted."""
-        with qtbot.waitSignal(manager.workflow_state_changed, timeout=signal_timeout()) as blocker:
-            manager.transition_workflow(ExtractionState.LOADING_ROM)
-
-        old_state, new_state = blocker.args
-        assert old_state == ExtractionState.IDLE
-        assert new_state == ExtractionState.LOADING_ROM
-
-    def test_state_changed_signal_with_workflow_category(self, manager, qtbot):
-        """state_changed signal should emit with 'workflow' category."""
-        with qtbot.waitSignal(manager.state_changed, timeout=signal_timeout()) as blocker:
-            manager.transition_workflow(ExtractionState.LOADING_ROM)
-
-        category, data = blocker.args
-        assert category == "workflow"
-        assert data["old"] == "IDLE"
-        assert data["new"] == "LOADING_ROM"
-
-    def test_error_state_stores_message(self, manager):
-        """ERROR state should store error message."""
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-        manager.transition_workflow(ExtractionState.ERROR, error_message="ROM load failed")
-
-        assert manager.workflow_error_message == "ROM load failed"
-
-    def test_reset_workflow_returns_to_idle(self, manager):
-        """reset_workflow should return to IDLE from any valid state."""
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-        manager.transition_workflow(ExtractionState.ERROR)
-
-        manager.reset_workflow()
-
-        assert manager.workflow_state == ExtractionState.IDLE
-
-
-class TestWorkflowStateProperties:
-    """Tests for workflow state property methods."""
-
-    def test_is_workflow_busy_in_blocking_states(self, manager):
-        """is_workflow_busy should be True in blocking states."""
-        blocking_states = [
-            ExtractionState.LOADING_ROM,
-            ExtractionState.SCANNING_SPRITES,
-            ExtractionState.EXTRACTING,
-        ]
-
-        for state in blocking_states:
-            manager._workflow_state = ExtractionState.IDLE  # Reset
-            manager.transition_workflow(state)
-            assert manager.is_workflow_busy is True, f"Should be busy in {state.name}"
-
-    def test_is_workflow_busy_in_non_blocking_states(self, manager):
-        """is_workflow_busy should be False in non-blocking states."""
-        non_blocking_states = [
-            ExtractionState.IDLE,
-            ExtractionState.PREVIEWING_SPRITE,
-            ExtractionState.SEARCHING_SPRITE,
-        ]
-
-        for state in non_blocking_states:
-            manager._workflow_state = state  # Direct set for testing
-            assert manager.is_workflow_busy is False, f"Should not be busy in {state.name}"
-
-    def test_can_extract_when_idle(self, manager):
-        """can_extract should be True only when IDLE."""
-        assert manager.can_extract is True
-
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-        assert manager.can_extract is False
-
-    def test_can_preview_when_idle(self, manager):
-        """can_preview should be True when IDLE or SEARCHING."""
-        assert manager.can_preview is True
-
-        manager.transition_workflow(ExtractionState.SEARCHING_SPRITE)
-        assert manager.can_preview is True
-
-        manager.transition_workflow(ExtractionState.IDLE)
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-        assert manager.can_preview is False
-
-    def test_can_scan_when_idle(self, manager):
-        """can_scan should be True only when IDLE."""
-        assert manager.can_scan is True
-
-        manager.transition_workflow(ExtractionState.PREVIEWING_SPRITE)
-        assert manager.can_scan is False
-
-    def test_can_search_when_idle_or_previewing(self, manager):
-        """can_search should be True when IDLE or PREVIEWING."""
-        assert manager.can_search is True
-
-        manager.transition_workflow(ExtractionState.PREVIEWING_SPRITE)
-        assert manager.can_search is True
-
-        manager.transition_workflow(ExtractionState.IDLE)
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-        assert manager.can_search is False
+# Note: Workflow state machine tests are in tests/unit/test_workflow_state_logic.py
+# The delegation methods were removed from ApplicationStateManager as dead code.
 
 
 class TestSessionManagement:
@@ -543,77 +354,6 @@ class TestRecentFiles:
         assert len(recent) <= 20
 
 
-class TestCacheStatistics:
-    """Tests for cache session statistics."""
-
-    def test_record_cache_hit(self, manager, qtbot):
-        """record_cache_hit should increment hit counter."""
-        with qtbot.waitSignal(manager.cache_stats_updated, timeout=signal_timeout()):
-            manager.record_cache_hit()
-
-        stats = manager.get_cache_session_stats()
-        assert stats["hits"] == 1
-        assert stats["total_requests"] == 1
-
-    def test_record_cache_miss(self, manager, qtbot):
-        """record_cache_miss should increment miss counter."""
-        with qtbot.waitSignal(manager.cache_stats_updated, timeout=signal_timeout()):
-            manager.record_cache_miss()
-
-        stats = manager.get_cache_session_stats()
-        assert stats["misses"] == 1
-        assert stats["total_requests"] == 1
-
-    def test_get_cache_session_stats(self, manager):
-        """get_cache_session_stats should return read-only stats."""
-        manager.record_cache_hit()
-        manager.record_cache_miss()
-        manager.record_cache_hit()
-
-        stats = manager.get_cache_session_stats()
-
-        assert stats["hits"] == 2
-        assert stats["misses"] == 1
-        assert stats["total_requests"] == 3
-
-    def test_reset_cache_session_stats(self, manager, qtbot):
-        """reset_cache_session_stats should zero all counters."""
-        manager.record_cache_hit()
-        manager.record_cache_miss()
-
-        with qtbot.waitSignal(manager.cache_stats_updated, timeout=signal_timeout()):
-            manager.reset_cache_session_stats()
-
-        stats = manager.get_cache_session_stats()
-        assert stats["hits"] == 0
-        assert stats["misses"] == 0
-        assert stats["total_requests"] == 0
-
-    def test_cache_hit_rate_calculation(self, manager):
-        """cache_hit_rate should calculate percentage correctly."""
-        # 3 hits, 1 miss = 75% hit rate
-        manager.record_cache_hit()
-        manager.record_cache_hit()
-        manager.record_cache_hit()
-        manager.record_cache_miss()
-
-        assert manager.cache_hit_rate == 75.0
-
-    def test_cache_hit_rate_zero_requests(self, manager):
-        """cache_hit_rate should be 0 with no requests."""
-        assert manager.cache_hit_rate == 0.0
-
-    def test_cache_stats_updated_signal(self, manager, qtbot):
-        """cache_stats_updated signal should emit with stats."""
-        with qtbot.waitSignal(manager.cache_stats_updated, timeout=signal_timeout()) as blocker:
-            manager.record_cache_hit()
-
-        stats = blocker.args[0]
-        assert "hits" in stats
-        assert "misses" in stats
-        assert "total_requests" in stats
-
-
 class TestWindowState:
     """Tests for window geometry persistence."""
 
@@ -742,61 +482,6 @@ class TestThreadSafety:
 
         assert len(errors) == 0
 
-    def test_concurrent_workflow_transitions(self, manager):
-        """Concurrent workflow transitions should not corrupt state."""
-        errors: list[Exception] = []
-        iterations = 50
-
-        def transition_loop():
-            try:
-                for _ in range(iterations):
-                    # Try various transitions
-                    manager.transition_workflow(ExtractionState.LOADING_ROM)
-                    manager.transition_workflow(ExtractionState.IDLE)
-            except Exception as e:
-                errors.append(e)
-
-        threads = [
-            threading.Thread(target=transition_loop),
-            threading.Thread(target=transition_loop),
-        ]
-
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        assert len(errors) == 0
-        # Final state should be valid
-        assert manager.workflow_state in ExtractionState
-
-    def test_concurrent_cache_stats(self, manager):
-        """Concurrent cache stats updates should not corrupt counters."""
-        iterations = 100
-
-        def record_hits():
-            for _ in range(iterations):
-                manager.record_cache_hit()
-
-        def record_misses():
-            for _ in range(iterations):
-                manager.record_cache_miss()
-
-        threads = [
-            threading.Thread(target=record_hits),
-            threading.Thread(target=record_misses),
-        ]
-
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        stats = manager.get_cache_session_stats()
-        assert stats["hits"] == iterations
-        assert stats["misses"] == iterations
-        assert stats["total_requests"] == iterations * 2
-
 
 class TestExportImportSettings:
     """Tests for settings export/import."""
@@ -844,23 +529,6 @@ class TestExportImportSettings:
 class TestUICoordination:
     """Tests for UI coordination signals."""
 
-    def test_set_current_offset(self, manager, qtbot):
-        """set_current_offset should emit signal."""
-        with qtbot.waitSignal(manager.current_offset_changed, timeout=signal_timeout()) as blocker:
-            manager.set_current_offset(0x1234)
-
-        assert blocker.args[0] == 0x1234
-
-    def test_get_current_offset(self, manager):
-        """get_current_offset should return stored offset."""
-        manager.set_current_offset(0xABCD)
-
-        assert manager.get_current_offset() == 0xABCD
-
-    def test_get_current_offset_none(self, manager):
-        """get_current_offset should return None if not set."""
-        assert manager.get_current_offset() is None
-
     def test_emit_preview_ready(self, manager, qtbot):
         """emit_preview_ready should emit signal with image."""
         test_image = QImage(10, 10, QImage.Format.Format_ARGB32)
@@ -876,22 +544,6 @@ class TestUICoordination:
 class TestResetState:
     """Tests for reset_state method."""
 
-    def test_reset_state_clears_runtime(self, manager):
-        """reset_state should clear runtime state."""
-        manager.set_state("temp", "key", "value")
-
-        manager.reset_state()
-
-        assert manager.get_state("temp", "key") is None
-
-    def test_reset_state_resets_workflow(self, manager):
-        """reset_state should reset workflow to IDLE."""
-        manager.transition_workflow(ExtractionState.LOADING_ROM)
-
-        manager.reset_state()
-
-        assert manager.workflow_state == ExtractionState.IDLE
-
     def test_reset_state_full_resets_settings(self, manager):
         """reset_state with full_reset should reset settings."""
         manager.set_setting("custom", "key", "value")
@@ -901,70 +553,9 @@ class TestResetState:
         # Custom setting should be gone
         assert manager.get_setting("custom", "key") is None
 
-    def test_reset_state_clears_cache_stats(self, manager):
-        """reset_state should clear cache statistics."""
-        manager.record_cache_hit()
-        manager.record_cache_miss()
-
-        manager.reset_state()
-
-        stats = manager.get_cache_session_stats()
-        assert stats["hits"] == 0
-        assert stats["misses"] == 0
-
-
-class TestRuntimeState:
-    """Tests for runtime state management."""
-
-    def test_set_and_get_state(self, manager):
-        """set_state and get_state should work."""
-        manager.set_state("dialog", "visible", True)
-
-        assert manager.get_state("dialog", "visible") is True
-
-    def test_get_state_default(self, manager):
-        """get_state should return default for missing."""
-        result = manager.get_state("nonexistent", "key", "default")
-
-        assert result == "default"
-
-    def test_clear_state_namespace(self, manager):
-        """clear_state should clear specific namespace."""
-        manager.set_state("ns1", "key", "value")
-        manager.set_state("ns2", "key", "value")
-
-        manager.clear_state("ns1")
-
-        assert manager.get_state("ns1", "key") is None
-        assert manager.get_state("ns2", "key") == "value"
-
-    def test_clear_state_all(self, manager):
-        """clear_state without namespace should clear all."""
-        manager.set_state("ns1", "key", "value")
-        manager.set_state("ns2", "key", "value")
-
-        manager.clear_state()
-
-        assert manager.get_state("ns1", "key") is None
-        assert manager.get_state("ns2", "key") is None
-
 
 class TestConvenienceMethods:
     """Tests for convenience methods."""
-
-    def test_validate_file_paths(self, manager, tmp_path):
-        """validate_file_paths should check existence."""
-        # Create a file that exists
-        vram_file = tmp_path / "vram.dmp"
-        vram_file.touch()
-
-        manager.set("session", "vram_path", str(vram_file))
-        manager.set("session", "cgram_path", "/nonexistent/path")
-
-        validated = manager.validate_file_paths()
-
-        assert validated["vram_path"] == str(vram_file)
-        assert validated["cgram_path"] == ""  # Invalid path cleared
 
     def test_get_default_directory(self, manager, tmp_path):
         """get_default_directory should return appropriate path."""

@@ -12,10 +12,9 @@ import threading
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
-from types import MappingProxyType
-from typing import TYPE_CHECKING, ClassVar, TypeVar, cast, override
+from typing import TYPE_CHECKING, TypeVar, cast, override
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, SignalInstance
 from PySide6.QtGui import QImage
 
 from core.exceptions import SessionError, ValidationError
@@ -29,7 +28,6 @@ from utils.constants import (
 if TYPE_CHECKING:
     from core.configuration_service import ConfigurationService
 from utils.file_validator import atomic_write
-from utils.state_manager import StateEntry
 
 from .base_manager import BaseManager
 
@@ -38,11 +36,12 @@ T = TypeVar("T")
 
 # ========== Workflow State Machine ==========
 # ExtractionState is now defined in workflow_manager.py
-# Re-exported here for backward compatibility
+# WorkflowStateManager handles workflow state machine
 from core.managers.workflow_manager import ExtractionState
+from core.managers.workflow_state_manager import WorkflowStateManager
 
 # Re-export at module level for backward compatibility
-__all__ = ["ApplicationStateManager", "ExtractionState"]
+__all__ = ["ApplicationStateManager", "ExtractionState", "WorkflowStateManager"]
 
 
 class ApplicationStateManager(BaseManager):
@@ -50,72 +49,26 @@ class ApplicationStateManager(BaseManager):
     Consolidated manager for all application state:
     - Session management (persistent settings)
     - Settings management (configuration)
-    - State management (temporary runtime state)
-    - Workflow management (extraction state machine)
+    - Workflow management (delegated to WorkflowStateManager)
 
     This manager provides a unified interface for all state-related operations
-    while maintaining backward compatibility through embedded adapters.
+    while maintaining backward compatibility through delegation.
     """
-
-    # ========== Workflow State Machine Configuration ==========
-
-    # Valid state transitions for the workflow state machine
-    VALID_TRANSITIONS: ClassVar[dict[ExtractionState, set[ExtractionState]]] = {
-        ExtractionState.IDLE: {
-            ExtractionState.LOADING_ROM,
-            ExtractionState.SCANNING_SPRITES,
-            ExtractionState.PREVIEWING_SPRITE,
-            ExtractionState.SEARCHING_SPRITE,
-            ExtractionState.EXTRACTING,
-        },
-        ExtractionState.LOADING_ROM: {
-            ExtractionState.IDLE,
-            ExtractionState.ERROR,
-        },
-        ExtractionState.SCANNING_SPRITES: {
-            ExtractionState.IDLE,
-            ExtractionState.ERROR,
-        },
-        ExtractionState.PREVIEWING_SPRITE: {
-            ExtractionState.IDLE,
-            ExtractionState.ERROR,
-            ExtractionState.SEARCHING_SPRITE,  # Can search while preview loads
-        },
-        ExtractionState.SEARCHING_SPRITE: {
-            ExtractionState.IDLE,
-            ExtractionState.ERROR,
-            ExtractionState.PREVIEWING_SPRITE,  # Preview after finding
-        },
-        ExtractionState.EXTRACTING: {
-            ExtractionState.IDLE,
-            ExtractionState.ERROR,
-        },
-        ExtractionState.ERROR: {
-            ExtractionState.IDLE,  # Reset to idle from error
-        },
-    }
-
-    # States that block new operations
-    BLOCKING_STATES: ClassVar[set[ExtractionState]] = {
-        ExtractionState.LOADING_ROM,
-        ExtractionState.SCANNING_SPRITES,
-        ExtractionState.EXTRACTING,
-    }
 
     # ========== Signal Architecture ==========
     #
     # CANONICAL SIGNALS (use in new code):
     #   state_changed - Unified state change with category and data
-    #   workflow_state_changed - Workflow state machine transitions
+    #   workflow_state_changed - From WorkflowStateManager (delegated)
     #
     # DOMAIN-SPECIFIC SIGNALS (simplified for specific use cases):
     #   session_changed, settings_saved - Persistence events
-    #   preview_ready, current_offset_changed - UI updates
+    #   preview_ready - UI updates
     # =========================================
 
     # Unified signals (canonical)
     state_changed = Signal(str, dict)  # category, data
-    workflow_state_changed = Signal(object, object)  # old_state, new_state
+    # Note: workflow_state_changed is delegated from WorkflowStateManager
 
     # Session signals (persistence) - use object to avoid PySide6 copy warning
     session_changed = Signal()  # session data modified
@@ -123,11 +76,7 @@ class ApplicationStateManager(BaseManager):
     settings_saved = Signal()  # settings persisted to disk
     session_restored = Signal(object)  # session loaded from disk
 
-    # Cache signals (monitoring) - use object to avoid PySide6 copy warning
-    cache_stats_updated = Signal(object)  # updated cache metrics
-
     # UI coordination signals
-    current_offset_changed = Signal(int)  # ROM offset changed
     preview_ready = Signal(int, QImage)  # offset, preview_image
 
     def __init__(self, app_name: str = "SpritePal", settings_path: Path | None = None,
@@ -172,25 +121,17 @@ class ApplicationStateManager(BaseManager):
         self._settings: dict[str, dict[str, object]] = {}
         self._session_dirty = False
 
-        # Runtime state (temporary, not saved) - dynamic namespaces with varied shapes
-        self._runtime_state: dict[str, dict[str, object]] = {}
+        # Workflow state manager (composition - owns its own state and lock)
+        self._workflow_manager = WorkflowStateManager(parent=None)
 
-        # Workflow state machine
-        self._workflow_state = ExtractionState.IDLE
-        self._workflow_error: str | None = None
-
-        # Cache session statistics (per-session tracking, not persisted)
-        self._cache_session_stats: dict[str, int] = {"hits": 0, "misses": 0, "total_requests": 0}
-
-        # Thread safety - Lock hierarchy (acquire in this order to prevent deadlock):
-        #   1. _state_lock     - protects general state (_settings, _runtime_state, etc.)
-        #   2. _workflow_lock  - protects workflow transitions (_workflow_state)
-        #   3. _cache_stats_lock - protects cache statistics (_cache_session_stats)
+        # Thread safety - state lock protects general state (_settings, etc.)
+        # Note: Workflow locking is handled by WorkflowStateManager internally
         self._state_lock = threading.RLock()
-        self._workflow_lock = threading.RLock()
-        self._cache_stats_lock = threading.RLock()
 
         super().__init__("ApplicationStateManager", parent)
+
+        # Forward workflow state changes to unified state_changed signal
+        self._workflow_manager.workflow_state_changed.connect(self._on_workflow_state_changed)
 
     # ========== Lock Helper Methods ==========
 
@@ -200,17 +141,11 @@ class ApplicationStateManager(BaseManager):
         with self._state_lock:
             yield
 
-    @contextmanager
-    def _acquire_workflow_lock(self) -> Generator[None, None, None]:
-        """Acquire workflow lock."""
-        with self._workflow_lock:
-            yield
-
-    @contextmanager
-    def _acquire_cache_stats_lock(self) -> Generator[None, None, None]:
-        """Acquire cache stats lock."""
-        with self._cache_stats_lock:
-            yield
+    def _on_workflow_state_changed(
+        self, old_state: ExtractionState, new_state: ExtractionState
+    ) -> None:
+        """Forward workflow state changes to unified state_changed signal."""
+        self.state_changed.emit("workflow", {"old": old_state.name, "new": new_state.name})
 
     @override
     def _initialize(self) -> None:
@@ -221,14 +156,6 @@ class ApplicationStateManager(BaseManager):
 
             # Ensure default settings exist (migrated from SettingsManager)
             self._ensure_default_settings()
-
-            # Initialize runtime state with default namespaces
-            self._runtime_state = {
-                "ui": {},
-                "dialog": {},
-                "widget": {},
-                "temp": {}
-            }
 
             self._is_initialized = True
             self._logger.info("ApplicationStateManager initialized successfully")
@@ -244,18 +171,14 @@ class ApplicationStateManager(BaseManager):
         if self._session_dirty:
             self.save_settings()
 
-        # Clear runtime state
-        with self._state_lock:
-            self._runtime_state.clear()
-
         self._logger.info("ApplicationStateManager cleaned up")
 
     def reset_state(self, full_reset: bool = False) -> None:
         """Reset internal state for test isolation.
 
         This method resets mutable state without fully re-initializing the manager.
-        Use this for test isolation when you need to clear runtime state and workflow
-        state but don't want the overhead of full manager re-initialization.
+        Use this for test isolation when you need to clear workflow state but don't
+        want the overhead of full manager re-initialization.
 
         Args:
             full_reset: If True, also reset settings to defaults and clear the
@@ -263,22 +186,14 @@ class ApplicationStateManager(BaseManager):
                        since this manager requires settings to function.
         """
         with self._state_lock:
-            # Clear runtime state (always reset)
-            self._runtime_state.clear()
             self._session_dirty = False
 
             if full_reset:
                 # Reset settings to defaults
                 self._settings = self._get_default_settings()
 
-        # Reset workflow state (use workflow lock for consistency)
-        with self._workflow_lock:
-            self._workflow_state = ExtractionState.IDLE
-            self._workflow_error = None
-
-        # Reset cache session stats
-        with self._cache_stats_lock:
-            self._cache_session_stats = {"hits": 0, "misses": 0, "total_requests": 0}
+        # Reset workflow state (delegated to WorkflowStateManager)
+        self._workflow_manager.reset_state()
 
         self._logger.debug("ApplicationStateManager state reset (full_reset=%s)", full_reset)
 
@@ -756,69 +671,6 @@ class ApplicationStateManager(BaseManager):
 
             self._session_dirty = True
 
-    # ========== State Management (Runtime/Temporary) ==========
-
-    def get_state(self, namespace: str, key: str, default: object = None) -> object:
-        """
-        Get runtime state value (not persisted).
-
-        Args:
-            namespace: State namespace (e.g., "dialog", "widget")
-            key: State key
-            default: Default value if not found
-
-        Returns:
-            State value or default
-        """
-        with self._state_lock:
-            if namespace in self._runtime_state and key in self._runtime_state[namespace]:
-                entry = self._runtime_state[namespace][key]
-                if isinstance(entry, StateEntry):
-                    if not entry.is_expired():
-                        entry.touch()
-                        return entry.value
-                    # Remove expired entry
-                    del self._runtime_state[namespace][key]
-                else:
-                    return entry
-            return default
-
-    def set_state(self, namespace: str, key: str, value: object,
-                  ttl_seconds: float | None = None) -> None:
-        """
-        Set runtime state value.
-
-        Args:
-            namespace: State namespace
-            key: State key
-            value: State value
-            ttl_seconds: Optional time-to-live in seconds
-        """
-        with self._state_lock:
-            if namespace not in self._runtime_state:
-                self._runtime_state[namespace] = {}
-
-            if ttl_seconds is not None:
-                self._runtime_state[namespace][key] = StateEntry(value, ttl_seconds)
-            else:
-                self._runtime_state[namespace][key] = value
-
-            self.state_changed.emit("runtime", {namespace: {key: value}})
-
-    def clear_state(self, namespace: str | None = None) -> None:
-        """
-        Clear runtime state.
-
-        Args:
-            namespace: Specific namespace to clear, or None for all
-        """
-        with self._state_lock:
-            if namespace:
-                if namespace in self._runtime_state:
-                    self._runtime_state[namespace].clear()
-            else:
-                self._runtime_state.clear()
-
     # ========== Recent Files ==========
 
     def get_recent_files(self, max_files: int = 10) -> list[str]:
@@ -850,164 +702,29 @@ class ApplicationStateManager(BaseManager):
 
         self.set_setting("session", "recent_files", recent)
 
-    # ========== Workflow State Machine ==========
-
-    @property
-    def workflow_state(self) -> ExtractionState:
-        """Get current workflow state."""
-        return self._workflow_state
-
-    @property
-    def is_workflow_busy(self) -> bool:
-        """Check if a blocking operation is in progress."""
-        return self._workflow_state in self.BLOCKING_STATES
-
-    @property
-    def can_extract(self) -> bool:
-        """Check if extraction can be started."""
-        return self._workflow_state == ExtractionState.IDLE
-
-    @property
-    def can_preview(self) -> bool:
-        """Check if preview can be started."""
-        return self._workflow_state in {ExtractionState.IDLE, ExtractionState.SEARCHING_SPRITE}
-
-    @property
-    def can_search(self) -> bool:
-        """Check if search can be started."""
-        return self._workflow_state in {ExtractionState.IDLE, ExtractionState.PREVIEWING_SPRITE}
+    # ========== Workflow State Machine (Delegated to WorkflowStateManager) ==========
+    # Only scanning operations and signal passthrough are used in production.
+    # Direct workflow state queries use WorkflowStateManager directly.
 
     @property
     def can_scan(self) -> bool:
         """Check if sprite scanning can be started."""
-        return self._workflow_state == ExtractionState.IDLE
+        return self._workflow_manager.can_scan
 
     @property
-    def workflow_error_message(self) -> str | None:
-        """Get error message if in error state."""
-        return self._workflow_error if self._workflow_state == ExtractionState.ERROR else None
+    def workflow_state_changed(self) -> SignalInstance:
+        """Get workflow state changed signal from WorkflowStateManager."""
+        return self._workflow_manager.workflow_state_changed
 
-    def transition_workflow(
-        self, new_state: ExtractionState, error_message: str | None = None
-    ) -> bool:
-        """
-        Attempt to transition to a new workflow state.
-
-        Args:
-            new_state: Target state
-            error_message: Error message if transitioning to ERROR state
-
-        Returns:
-            True if transition was successful, False otherwise
-        """
-        with self._workflow_lock:
-            # Check if transition is valid
-            valid_targets = self.VALID_TRANSITIONS.get(self._workflow_state, set())
-            if new_state not in valid_targets:
-                self._logger.warning(
-                    f"Invalid workflow transition: {self._workflow_state.name} -> {new_state.name}"
-                )
-                return False
-
-            old_state = self._workflow_state
-            self._workflow_state = new_state
-
-            # Handle error state
-            if new_state == ExtractionState.ERROR:
-                self._workflow_error = error_message
-            else:
-                self._workflow_error = None
-
-            # Emit state change signal
-            self.workflow_state_changed.emit(old_state, new_state)
-            self.state_changed.emit("workflow", {"old": old_state.name, "new": new_state.name})
-
-            self._logger.debug(f"Workflow transition: {old_state.name} -> {new_state.name}")
-            return True
-
-    def reset_workflow(self) -> None:
-        """Reset workflow to idle state."""
-        self.transition_workflow(ExtractionState.IDLE)
-
-    # Convenience methods for workflow transitions (only scanning is used)
     def start_scanning(self) -> bool:
         """Start sprite scanning operation."""
-        return self.transition_workflow(ExtractionState.SCANNING_SPRITES)
+        return self._workflow_manager.start_scanning()
 
     def finish_scanning(self, success: bool = True, error: str | None = None) -> bool:
         """Finish sprite scanning operation."""
-        if success:
-            return self.transition_workflow(ExtractionState.IDLE)
-        return self.transition_workflow(ExtractionState.ERROR, error)
-
-    # ========== Cache Session Statistics ==========
-
-    def record_cache_hit(self) -> None:
-        """Record a cache hit in session statistics."""
-        with self._cache_stats_lock:
-            self._cache_session_stats["hits"] += 1
-            self._cache_session_stats["total_requests"] += 1
-            stats_copy = self._cache_session_stats.copy()
-        self.cache_stats_updated.emit(stats_copy)
-
-    def record_cache_miss(self) -> None:
-        """Record a cache miss in session statistics."""
-        with self._cache_stats_lock:
-            self._cache_session_stats["misses"] += 1
-            self._cache_session_stats["total_requests"] += 1
-            stats_copy = self._cache_session_stats.copy()
-        self.cache_stats_updated.emit(stats_copy)
-
-    def get_cache_session_stats(self) -> Mapping[str, int]:
-        """Get current cache session statistics (read-only view).
-
-        Returns:
-            Read-only dict with 'hits', 'misses', and 'total_requests' counts
-        """
-        with self._cache_stats_lock:
-            return MappingProxyType(self._cache_session_stats.copy())
-
-    def reset_cache_session_stats(self) -> None:
-        """Reset cache session statistics to zero."""
-        with self._cache_stats_lock:
-            self._cache_session_stats = {"hits": 0, "misses": 0, "total_requests": 0}
-            stats_copy = self._cache_session_stats.copy()
-        self.cache_stats_updated.emit(stats_copy)
-
-    @property
-    def cache_hit_rate(self) -> float:
-        """Calculate cache hit rate as a percentage.
-
-        Returns:
-            Hit rate as percentage (0.0 to 100.0), or 0.0 if no requests
-        """
-        with self._cache_stats_lock:
-            total = self._cache_session_stats["total_requests"]
-            if total == 0:
-                return 0.0
-            return (self._cache_session_stats["hits"] / total) * 100.0
+        return self._workflow_manager.finish_scanning(success, error)
 
     # ========== UI Coordination ==========
-
-    def set_current_offset(self, offset: int) -> None:
-        """Set the current ROM offset and emit signal.
-
-        Args:
-            offset: The new current ROM offset
-        """
-        self.set_state("ui", "current_offset", offset)
-        self.current_offset_changed.emit(offset)
-
-    def get_current_offset(self) -> int | None:
-        """Get the current ROM offset.
-
-        Returns:
-            Current offset or None if not set
-        """
-        offset = self.get_state("ui", "current_offset")
-        if isinstance(offset, int):
-            return offset
-        return None
 
     def emit_preview_ready(self, offset: int, image: QImage) -> None:
         """Emit signal that a preview is ready for display.
@@ -1025,20 +742,6 @@ class ApplicationStateManager(BaseManager):
     def app_name(self) -> str:
         """Get the application name."""
         return self._app_name
-
-    def validate_file_paths(self) -> dict[str, str]:
-        """Validate and return existing file paths from session."""
-        session = self.get_session_data()
-        validated_paths: dict[str, str] = {}
-
-        for key in ["vram_path", "cgram_path", "oam_path"]:
-            path = str(session.get(key, ""))
-            if path and Path(path).exists():
-                validated_paths[key] = path
-            else:
-                validated_paths[key] = ""
-
-        return validated_paths
 
     def get_default_directory(self) -> str:
         """Get the default directory for file operations."""
