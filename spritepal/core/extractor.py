@@ -15,7 +15,6 @@ from core.tile_utils import decode_4bpp_tile
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_TILES_PER_ROW,
-    PREVIEW_TILES_PER_ROW,
     TILE_HEIGHT,
     TILE_WIDTH,
     VRAM_SPRITE_OFFSET,

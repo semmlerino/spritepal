@@ -199,45 +199,6 @@ class ApplicationStateManager(BaseManager):
 
     # ========== Settings Management (Persistent) ==========
 
-    def get_setting(self, category: str, key: str, default: object = None) -> object:
-        """
-        Get a persistent setting value.
-
-        Args:
-            category: Setting category (e.g., "ui", "cache", "paths")
-            key: Setting key
-            default: Default value if not found
-
-        Returns:
-            Setting value or default
-        """
-        with self._lock:
-            if category in self._settings and key in self._settings[category]:
-                return self._settings[category][key]
-            return default
-
-    def set_setting(self, category: str, key: str, value: object) -> None:
-        """
-        Set a persistent setting value.
-
-        Args:
-            category: Setting category
-            key: Setting key
-            value: Setting value
-        """
-        with self._lock:
-            if category not in self._settings:
-                self._settings[category] = {}
-
-            self._settings[category][key] = value
-            self._session_dirty = True
-
-            # Emit signals
-            self.session_changed.emit()
-            self.state_changed.emit("settings", {category: {key: value}})
-
-            self._logger.debug(f"Setting updated: {category}.{key} = {value}")
-
     def save_settings(self) -> bool:
         """
         Save settings to disk.
@@ -354,28 +315,42 @@ class ApplicationStateManager(BaseManager):
         self, category: str, key: str, default: object = None
     ) -> object:
         """
-        Get a setting value (alias for get_setting for SessionManagerProtocol).
+        Get a persistent setting value.
 
         Args:
-            category: Setting category
+            category: Setting category (e.g., "ui", "cache", "paths")
             key: Setting key
             default: Default value if not found
 
         Returns:
             Setting value or default
         """
-        return self.get_setting(category, key, default)
+        with self._lock:
+            if category in self._settings and key in self._settings[category]:
+                return self._settings[category][key]
+            return default
 
     def set(self, category: str, key: str, value: object) -> None:
         """
-        Set a setting value (alias for set_setting for SessionManagerProtocol).
+        Set a persistent setting value.
 
         Args:
             category: Setting category
             key: Setting key
-            value: Value to set
+            value: Setting value
         """
-        self.set_setting(category, key, value)
+        with self._lock:
+            if category not in self._settings:
+                self._settings[category] = {}
+
+            self._settings[category][key] = value
+            self._session_dirty = True
+
+            # Emit signals
+            self.session_changed.emit()
+            self.state_changed.emit("settings", {category: {key: value}})
+
+            self._logger.debug(f"Setting updated: {category}.{key} = {value}")
 
         # Emit specific signals for file updates
         if category == "session" and key in ["vram_path", "cgram_path", "oam_path"]:
@@ -633,14 +608,14 @@ class ApplicationStateManager(BaseManager):
 
     def get_recent_files(self, max_files: int = 10) -> list[str]:
         """Get list of recent files."""
-        recent = self.get_setting("session", "recent_files", [])
+        recent = self.get("session", "recent_files", [])
         if isinstance(recent, list):
             return recent[:max_files]
         return []
 
     def add_recent_file(self, file_path: str) -> None:
         """Add file to recent files list."""
-        recent_obj = self.get_setting("session", "recent_files", [])
+        recent_obj = self.get("session", "recent_files", [])
 
         # Ensure we have a list to work with
         if not isinstance(recent_obj, list):
@@ -658,7 +633,7 @@ class ApplicationStateManager(BaseManager):
         # Limit size
         recent = recent[:20]
 
-        self.set_setting("session", "recent_files", recent)
+        self.set("session", "recent_files", recent)
 
     # ========== Workflow State Machine (Delegated to WorkflowStateManager) ==========
     # Only scanning operations and signal passthrough are used in production.

@@ -131,26 +131,26 @@ class TestSettingsPersistence:
     """Tests for settings get/set/save/load."""
 
     def test_set_and_get_setting(self, manager):
-        """set_setting and get_setting should work correctly."""
-        manager.set_setting("custom", "test_key", "test_value")
+        """set and get should work correctly."""
+        manager.set("custom", "test_key", "test_value")
 
-        assert manager.get_setting("custom", "test_key") == "test_value"
+        assert manager.get("custom", "test_key") == "test_value"
 
     def test_get_setting_with_default(self, manager):
-        """get_setting should return default for missing keys."""
-        result = manager.get_setting("nonexistent", "key", "default_value")
+        """get should return default for missing keys."""
+        result = manager.get("nonexistent", "key", "default_value")
 
         assert result == "default_value"
 
     def test_get_setting_missing_returns_none(self, manager):
-        """get_setting should return None if no default specified."""
-        result = manager.get_setting("nonexistent", "key")
+        """get should return None if no default specified."""
+        result = manager.get("nonexistent", "key")
 
         assert result is None
 
     def test_save_settings_creates_file(self, manager, settings_file):
         """save_settings should create settings file."""
-        manager.set_setting("test", "key", "value")
+        manager.set("test", "key", "value")
 
         result = manager.save_settings()
 
@@ -164,11 +164,11 @@ class TestSettingsPersistence:
     def test_save_settings_creates_backup(self, manager, settings_file):
         """save_settings should create backup of existing file."""
         # Initial save
-        manager.set_setting("version", "num", 1)
+        manager.set("version", "num", 1)
         manager.save_settings()
 
         # Second save should create backup
-        manager.set_setting("version", "num", 2)
+        manager.set("version", "num", 2)
         manager.save_settings()
 
         backup_file = settings_file.with_suffix(".json.bak")
@@ -456,7 +456,7 @@ class TestThreadSafety:
         def writer():
             try:
                 for i in range(iterations):
-                    manager.set_setting("concurrent", f"key_{i % 10}", i)
+                    manager.set("concurrent", f"key_{i % 10}", i)
             except Exception as e:
                 errors.append(e)
 
@@ -464,7 +464,7 @@ class TestThreadSafety:
             try:
                 for _ in range(iterations):
                     for j in range(10):
-                        manager.get_setting("concurrent", f"key_{j}")
+                        manager.get("concurrent", f"key_{j}")
             except Exception as e:
                 errors.append(e)
 
@@ -546,12 +546,12 @@ class TestResetState:
 
     def test_reset_state_full_resets_settings(self, manager):
         """reset_state with full_reset should reset settings."""
-        manager.set_setting("custom", "key", "value")
+        manager.set("custom", "key", "value")
 
         manager.reset_state(full_reset=True)
 
         # Custom setting should be gone
-        assert manager.get_setting("custom", "key") is None
+        assert manager.get("custom", "key") is None
 
 
 class TestConvenienceMethods:
