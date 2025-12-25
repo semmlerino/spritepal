@@ -252,7 +252,7 @@ class CollapsibleGroupBox(QFrame):
 
             def on_collapse_value_changed(value: int) -> None:
                 if self._content_widget is not None:
-                    self._content_widget.setFixedHeight(value)
+                    self._content_widget.setMaximumHeight(value)
 
             self._animation.valueChanged.connect(on_collapse_value_changed)
 
@@ -285,7 +285,7 @@ class CollapsibleGroupBox(QFrame):
 
             def on_value_changed(value: int) -> None:
                 if self._content_widget is not None:
-                    self._content_widget.setFixedHeight(value)
+                    self._content_widget.setMaximumHeight(value)
 
             self._animation.valueChanged.connect(on_value_changed)
 
