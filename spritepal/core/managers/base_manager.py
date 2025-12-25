@@ -3,16 +3,13 @@ Base manager class providing common functionality for all managers
 """
 from __future__ import annotations
 
-import functools
 import logging
 import threading
 from collections.abc import Callable
-from typing import Any, ParamSpec, TypeVar
+from typing import TypeVar
 
 # Type variable for generic _ensure_component method
 T = TypeVar("T")
-# ParamSpec for decorator type preservation
-P = ParamSpec("P")
 
 from PySide6.QtCore import QObject, Signal
 
@@ -27,9 +24,6 @@ except ImportError:
         import logging
         def get_logger(name: str) -> logging.Logger:
             return logging.getLogger(name)
-
-from core.exceptions import ValidationError
-
 
 class BaseManager(QObject):
     """Abstract base class for all manager classes"""
@@ -270,6 +264,7 @@ class BaseManager(QObject):
 
         return ensure_component(component, name, error_type)
 
+    # Thin wrappers that delegate to error_helpers for backward compatibility
     def _handle_categorized_error(
         self,
         error: Exception,
@@ -280,9 +275,7 @@ class BaseManager(QObject):
     ) -> None:
         """Handle errors with standardized logging and re-raising.
 
-        This is a unified error handler that replaces the separate
-        _handle_file_io_error, _handle_data_format_error, and
-        _handle_operation_error methods.
+        Delegates to error_helpers.handle_categorized_error.
 
         Args:
             error: The original exception
@@ -294,29 +287,34 @@ class BaseManager(QObject):
         Raises:
             Exception: Re-raises with enhanced error message
         """
-        context_suffix = f" {context}" if context else ""
-        enhanced_msg = f"{category} error during {operation}{context_suffix}: {error!s}"
+        from .error_helpers import handle_categorized_error
 
-        # Use specified error class or keep original type
-        exc_class = error_class if error_class is not None else type(error)
-        enhanced_error = exc_class(enhanced_msg)
-        enhanced_error.__cause__ = error
+        enhanced = handle_categorized_error(
+            error, operation, category, context, error_class, on_error=self._handle_error
+        )
+        raise enhanced
 
-        self._handle_error(enhanced_error, operation)
-        raise enhanced_error
-
-    # Convenience wrappers for backwards compatibility
     def _handle_file_io_error(
         self, error: Exception, operation: str, context: str = ""
     ) -> None:
-        """Handle file I/O errors. Wrapper for _handle_categorized_error."""
-        self._handle_categorized_error(error, operation, "File I/O", context)
+        """Handle file I/O errors. Delegates to error_helpers."""
+        from .error_helpers import handle_file_io_error
+
+        enhanced = handle_file_io_error(
+            error, operation, context, on_error=self._handle_error
+        )
+        raise enhanced
 
     def _handle_data_format_error(
         self, error: Exception, operation: str, context: str = ""
     ) -> None:
-        """Handle data format errors. Wrapper for _handle_categorized_error."""
-        self._handle_categorized_error(error, operation, "Data format", context)
+        """Handle data format errors. Delegates to error_helpers."""
+        from .error_helpers import handle_data_format_error
+
+        enhanced = handle_data_format_error(
+            error, operation, context, on_error=self._handle_error
+        )
+        raise enhanced
 
     def _handle_operation_error(
         self,
@@ -325,73 +323,14 @@ class BaseManager(QObject):
         error_class: type[Exception],
         context: str = "",
     ) -> None:
-        """Handle operation-specific errors. Wrapper for _handle_categorized_error."""
-        self._handle_categorized_error(
-            error, operation, operation.title(), context, error_class
+        """Handle operation-specific errors. Delegates to error_helpers."""
+        from .error_helpers import handle_operation_error
+
+        enhanced = handle_operation_error(
+            error, operation, error_class, context, on_error=self._handle_error
         )
+        raise enhanced
 
 
-def with_operation_handling(
-    operation: str,
-    context: str,
-    *,
-    with_progress: bool = True,
-    exclusive: bool = True,
-    target_error: type[Exception] | None = None,
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
-    """Decorator for operations with standardized error handling.
-
-    Handles:
-    - Operation lifecycle (start/finish)
-    - Progress updates (optional)
-    - Categorized exception handling for File I/O, data format, and general errors
-
-    Args:
-        operation: Operation identifier for tracking
-        context: Human-readable context for error messages
-        with_progress: If True, emit progress at 0% and 100%
-        exclusive: If True, raise if operation already in progress
-        target_error: Exception type for wrapping unexpected errors (default: Exception)
-
-    Usage:
-        @with_operation_handling("extraction", "file extraction", with_progress=True)
-        def extract(self, path: str) -> list[str]:
-            return self._service.extract(path)
-    """
-    final_target_error = target_error if target_error is not None else Exception
-
-    def decorator(method: Callable[..., T]) -> Callable[..., T]:
-        @functools.wraps(method)
-        def wrapper(
-            self: BaseManager, *args: Any, **kwargs: Any  # pyright: ignore[reportExplicitAny] - generic decorator
-        ) -> T:
-            started = self._start_operation(operation)
-            if exclusive and not started:
-                raise final_target_error(f"{operation} already in progress")
-
-            try:
-                if with_progress:
-                    self._update_progress(operation, 0, 100)
-                result = method(self, *args, **kwargs)
-                if with_progress:
-                    self._update_progress(operation, 100, 100)
-                return result
-            except (OSError, PermissionError) as e:
-                self._handle_file_io_error(e, operation, context)
-                raise  # Handler already raises, but kept for safety/clarity
-            except (ValueError, TypeError) as e:
-                self._handle_data_format_error(e, operation, context)
-                raise
-            except ValidationError:
-                raise
-            except Exception as e:
-                if not isinstance(e, final_target_error):
-                    self._handle_operation_error(e, operation, final_target_error, context)
-                raise
-            finally:
-                if started:
-                    self._finish_operation(operation)
-
-        return wrapper
-
-    return decorator
+# Re-export decorator for backward compatibility
+from .operation_decorator import with_operation_handling as with_operation_handling

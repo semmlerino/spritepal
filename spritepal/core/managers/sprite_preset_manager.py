@@ -8,24 +8,25 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QObject, Signal
 
-from core.managers.base_manager import BaseManager
 from core.types import SpritePreset
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from PySide6.QtCore import QObject
-
     from core.configuration_service import ConfigurationService
 
 
-class SpritePresetManager(BaseManager):
+class SpritePresetManager(QObject):
     """Manages user-defined sprite presets with persistence and ROM matching.
 
     Presets are stored in a user-specific JSON file separate from built-in
     configurations, allowing community sharing via import/export.
+
+    This is a lightweight manager that doesn't need BaseManager's operation
+    tracking, error handling, or worker coordination features.
     """
 
     # Signals for UI updates
@@ -49,14 +50,16 @@ class SpritePresetManager(BaseManager):
             config_service: Optional configuration service for paths
             parent: Optional Qt parent object
         """
-        # Store config before super().__init__ calls _initialize
+        super().__init__(parent)
+
         self._config_service = config_service
         self._presets: dict[str, SpritePreset] = {}
         self._presets_file: Path | None = None
+        self._is_initialized = False
+        self._logger = get_logger("managers.SpritePresetManager")
 
-        super().__init__(name="SpritePresetManager", parent=parent)
+        self._initialize()
 
-    @override
     def _initialize(self) -> None:
         """Initialize the manager by setting up paths and loading presets."""
         # Determine presets file path
@@ -71,12 +74,15 @@ class SpritePresetManager(BaseManager):
 
         self._is_initialized = True
 
-    @override
     def cleanup(self) -> None:
         """Clean up manager resources."""
         self._presets.clear()
         self._is_initialized = False
         self._logger.debug("SpritePresetManager cleaned up")
+
+    def is_initialized(self) -> bool:
+        """Check if manager is initialized."""
+        return self._is_initialized
 
     def _load_presets(self) -> None:
         """Load presets from the user presets file."""

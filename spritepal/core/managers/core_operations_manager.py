@@ -42,7 +42,8 @@ from utils.constants import (
 from utils.file_validator import FileValidator
 from utils.validation import validate_range, validate_required_params, validate_type
 
-from .base_manager import BaseManager, with_operation_handling
+from .base_manager import BaseManager
+from .operation_decorator import with_operation_handling
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
