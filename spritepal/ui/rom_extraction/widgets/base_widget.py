@@ -112,7 +112,7 @@ class BaseExtractionWidget(QWidget):
         self.setLayout(outer_layout)
 
     def _setup_widget_collapsible(
-        self, title: str, inner_layout: QLayout, collapsed: bool = True
+        self, title: str, inner_layout: QLayout, collapsed: bool = True, muted: bool = False
     ) -> CollapsibleGroupBox:
         """Set up the widget with a collapsible group box wrapper.
 
@@ -122,6 +122,7 @@ class BaseExtractionWidget(QWidget):
             title: The group box title
             inner_layout: The layout containing the widget's content
             collapsed: Whether to start collapsed (default True)
+            muted: Whether to use subdued styling for optional sections (default False)
 
         Returns:
             The CollapsibleGroupBox instance for external control
@@ -131,7 +132,7 @@ class BaseExtractionWidget(QWidget):
         outer_layout.setSpacing(0)
 
         # Create collapsible group box
-        collapsible = CollapsibleGroupBox(title=title, collapsed=collapsed, parent=self)
+        collapsible = CollapsibleGroupBox(title=title, collapsed=collapsed, muted=muted, parent=self)
         collapsible.add_layout(inner_layout)
         outer_layout.addWidget(collapsible)
 

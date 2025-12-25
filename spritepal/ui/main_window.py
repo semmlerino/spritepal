@@ -56,7 +56,7 @@ from ui.zoomable_preview import PreviewPanel
 # Layout constants for consistent sizing and spacing
 MAIN_WINDOW_MIN_SIZE = (1000, 650)  # Much more compact
 DEFAULT_SPLITTER_RATIO = 0.40  # Give more space to preview panel
-MIN_PANEL_WIDTH = 380  # Slightly smaller minimum
+MIN_PANEL_WIDTH = 440  # Minimum width to prevent button truncation
 LAYOUT_MARGINS = SPACING_SMALL  # 8px - standard margins
 LAYOUT_SPACING = SPACING_COMPACT_SMALL  # 6px - compact spacing
 
@@ -205,13 +205,16 @@ class MainWindow(QMainWindow):
             extraction_manager=extraction_manager
         )
         self.extraction_tabs.addTab(self.rom_extraction_panel, "ROM Extraction")
+        self.extraction_tabs.setTabToolTip(
+            0, "Extract sprites directly from game ROM files"
+        )
 
         # VRAM extraction tab
         self.extraction_panel = ExtractionPanel(settings_manager=self.settings_manager)
         self.extraction_tabs.addTab(self.extraction_panel, "VRAM Extraction")
-
-        # Add tab navigation shortcuts
-        self.extraction_tabs.setToolTip("Switch tabs with Ctrl+Tab/Ctrl+Shift+Tab")
+        self.extraction_tabs.setTabToolTip(
+            1, "Extract from emulator memory dumps (VRAM/CGRAM/OAM)"
+        )
 
         content_layout.addWidget(self.extraction_tabs)
         content_layout.addStretch()  # Push content to top, keep compact

@@ -10,7 +10,7 @@ from core.types import SpritePreset
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
-    EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
+    EXTRACTION_ACTION_BUTTON_HEIGHT,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
     SPRITE_COMBO_MIN_WIDTH,
 )
@@ -86,7 +86,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
 
         # Find Sprites button - primary discovery action
         self.find_sprites_btn = QPushButton("🔍 Find Sprites in ROM (Ctrl+F)")
-        self.find_sprites_btn.setMinimumHeight(BUTTON_MIN_HEIGHT + 4)  # Slightly taller
+        self.find_sprites_btn.setMinimumHeight(EXTRACTION_ACTION_BUTTON_HEIGHT)
         self.find_sprites_btn.setShortcut(QKeySequence("Ctrl+F"))
         self.find_sprites_btn.setToolTip("Scan ROM for valid sprite offsets\n\nKeyboard shortcut: Ctrl+F")
         self.find_sprites_btn.setStyleSheet(get_prominent_action_button_style())
@@ -96,7 +96,9 @@ class SpriteSelectorWidget(BaseExtractionWidget):
 
         # Presets button - manage saved sprite presets
         self.presets_btn = QPushButton("📁 Presets")
-        self.presets_btn.setMinimumHeight(BUTTON_MIN_HEIGHT + 4)
+        self.presets_btn.setMinimumHeight(EXTRACTION_ACTION_BUTTON_HEIGHT)
+        self.presets_btn.setMinimumWidth(105)  # Fits "📁 Presets" with emoji
+        self.presets_btn.setMaximumWidth(130)  # Keep compact
         self.presets_btn.setToolTip(
             "Manage saved sprite presets\n\n"
             "Save and load known sprite offsets for quick access.\n"

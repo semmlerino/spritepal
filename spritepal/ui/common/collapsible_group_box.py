@@ -81,12 +81,14 @@ class CollapsibleGroupBox(QFrame):
         self,
         title: str = "",
         collapsed: bool = False,
+        muted: bool = False,
         parent: QWidget | None = None
     ) -> None:
         super().__init__(parent)
 
         # Declare all instance variables with type hints first
         self._is_collapsed: bool = collapsed
+        self._muted: bool = muted  # Use subdued styling for optional sections
         self._animation_duration: int = COLLAPSIBLE_ANIMATION_DURATION
         self._content_widget: QWidget | None = None
         self._content_layout: QVBoxLayout | None = None
@@ -132,14 +134,14 @@ class CollapsibleGroupBox(QFrame):
         header_layout.setContentsMargins(GROUP_PADDING, GROUP_PADDING, GROUP_PADDING, GROUP_PADDING)
         header_layout.setSpacing(SPACING_SMALL)
 
-        # Title label
+        # Title label - use muted color for optional sections
         self._title_label = QLabel(title)
         title_font = QFont()
         title_font.setPointSize(int(FONT_SIZE_MEDIUM.replace("px", "")))
         title_font.setBold(True)
         self._title_label.setFont(title_font)
-        if self._title_label:
-            self._title_label.setStyleSheet(f"color: {COLORS['highlight']};")
+        title_color = COLORS['text_muted'] if self._muted else COLORS['highlight']
+        self._title_label.setStyleSheet(f"color: {title_color};")
         header_layout.addWidget(self._title_label)
 
         header_layout.addStretch()

@@ -5,7 +5,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, 
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
-    CONTROL_PANEL_BUTTON_WIDTH,
     EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
     PATH_EDIT_MIN_WIDTH,
     SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
@@ -44,7 +43,8 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
 
         self.browse_cgram_btn = QPushButton("Browse...")
         self.browse_cgram_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.browse_cgram_btn.setFixedWidth(CONTROL_PANEL_BUTTON_WIDTH)
+        self.browse_cgram_btn.setMinimumWidth(90)   # Fits "Browse..." text
+        self.browse_cgram_btn.setMaximumWidth(120)  # Prevents over-expansion
         self.browse_cgram_btn.setToolTip(
             "Palettes are extracted from ROM when available.\n"
             "Common sprites have default palette fallbacks.\n"
@@ -56,8 +56,9 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         cgram_layout.addLayout(cgram_row)
 
         # Use collapsible group box, starts collapsed since this is optional
+        # muted=True uses subdued styling for optional sections
         self._collapsible = self._setup_widget_collapsible(
-            "Palette Override (optional)", cgram_layout, collapsed=True
+            "Palette Override (optional)", cgram_layout, collapsed=True, muted=True
         )
 
     def get_cgram_path(self) -> str:
