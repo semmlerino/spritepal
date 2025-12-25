@@ -1,12 +1,26 @@
-"""Minimal DI container - thread-safe singletons and lazy factories."""
+"""Minimal DI container - thread-safe singletons and lazy factories.
+
+DEPRECATED: Use get_app_context() from core.app_context instead.
+
+The DI container is being phased out in favor of explicit AppContext wiring.
+New code should use:
+    from core.app_context import get_app_context
+    context = get_app_context()
+    state_manager = context.application_state_manager
+
+This module remains for backward compatibility during the transition.
+"""
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Callable
 from threading import RLock
 from typing import TypeVar, cast
 
 logger = logging.getLogger(__name__)
+
+_deprecation_warned = False
 T = TypeVar("T")
 
 
@@ -81,9 +95,29 @@ def get_container() -> DIContainer:
 def inject(interface: type[T]) -> T:
     """Get an injected dependency.
 
-    During the transition to explicit wiring, this function checks AppContext first
+    DEPRECATED: Use get_app_context() instead.
+
+    Example migration:
+        # Old pattern
+        from core.di_container import inject
+        manager = inject(ApplicationStateManager)
+
+        # New pattern
+        from core.app_context import get_app_context
+        manager = get_app_context().application_state_manager
+
+    During the transition, this function checks AppContext first
     and falls back to the container if AppContext is not initialized.
     """
+    global _deprecation_warned
+    if not _deprecation_warned:
+        warnings.warn(
+            "inject() is deprecated. Use get_app_context() from core.app_context instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _deprecation_warned = True  # Only warn once per session
+
     # Try AppContext first (new pattern)
     from core.app_context import get_app_context_optional
 

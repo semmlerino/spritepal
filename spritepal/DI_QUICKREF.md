@@ -1,60 +1,80 @@
-# Dependency Injection Quick Reference
+# Dependency Access Quick Reference
 
-## Getting a Manager (99% of cases)
+## Recommended Pattern: AppContext
 
 ```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
-manager = inject(CoreOperationsManager)
+context = get_app_context()
+state_manager = context.application_state_manager
+operations_manager = context.core_operations_manager
 ```
 
-## Available Classes
+## Available via AppContext
 
-| Class | What it does |
-|-------|--------------|
-| `CoreOperationsManager` | Extract/inject sprites (handles extraction and injection) |
-| `ApplicationStateManager` | Session, settings, workflow state |
-| `ROMCache` | ROM file caching |
-| `ConfigurationService` | App directories and paths |
+| Attribute | What it does |
+|-----------|--------------|
+| `application_state_manager` | Session, settings, workflow state |
+| `core_operations_manager` | Extract/inject sprites |
+| `sprite_preset_manager` | Sprite presets and configurations |
+| `configuration_service` | App directories and paths |
+| `rom_cache` | ROM file caching (lazy-initialized) |
+| `rom_extractor` | ROM extraction operations (lazy-initialized) |
 
 ## In Tests
 
 ```python
 def test_extraction(isolated_managers):
-    # isolated_managers sets up DI - just use inject()
-    manager = inject(CoreOperationsManager)
+    # isolated_managers sets up DI - use get_app_context()
+    context = get_app_context()
+    manager = context.core_operations_manager
     result = manager.validate_extraction_params(params)
+```
+
+## Legacy Pattern (Deprecated)
+
+```python
+# DEPRECATED - still works but will emit warning
+from core.di_container import inject
+from core.managers.core_operations_manager import CoreOperationsManager
+
+manager = inject(CoreOperationsManager)  # Deprecated
 ```
 
 ## What NOT To Do
 
 ```python
-# WRONG - deprecated, methods removed
-from core.managers.registry import ManagerRegistry
-manager = ManagerRegistry().get_extraction_manager()
-
 # WRONG - direct instantiation bypasses DI
 from core.managers.core_operations_manager import CoreOperationsManager
 manager = CoreOperationsManager()  # Missing dependencies!
 
-# RIGHT - use inject()
-manager = inject(CoreOperationsManager)
+# RIGHT - use get_app_context()
+from core.app_context import get_app_context
+manager = get_app_context().core_operations_manager
 ```
 
 ## App Startup (for reference only)
 
 ```python
 # In launch_spritepal.py - already done for you
-initialize_managers("SpritePal", settings_path=...)
+from core.app_context import create_app_context
+context = create_app_context("SpritePal", settings_path=...)
 ```
 
-## Two Systems, One Rule
+## Migration Guide
 
-- **DIContainer** (`inject()`) - Use this to get dependencies
-- **ManagerRegistry** - Internal lifecycle management (don't call directly)
+Replace inject() calls with get_app_context():
 
-**Rule**: Always use `inject(ManagerClass)`. Never instantiate managers directly.
+```python
+# Before
+from core.di_container import inject
+from core.managers.application_state_manager import ApplicationStateManager
+manager = inject(ApplicationStateManager)
+
+# After
+from core.app_context import get_app_context
+manager = get_app_context().application_state_manager
+```
 
 ---
 

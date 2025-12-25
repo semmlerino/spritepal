@@ -305,7 +305,8 @@ spritepal/
 | CoreOperationsManager | `core/managers/core_operations_manager.py` (handles extraction and injection) |
 | ApplicationStateManager | `core/managers/application_state_manager.py` (session, settings, state) |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
-| DI container, `inject()` | `core/di_container.py` |
+| AppContext, `get_app_context()` | `core/app_context.py` |
+| DI container (deprecated) | `core/di_container.py` |
 | Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
 | Qt mocks | `tests/infrastructure/qt_mocks.py` |
 | ThreadSafeTestImage | `tests/infrastructure/thread_safe_test_image.py` |
@@ -320,16 +321,17 @@ spritepal/
 
 ### Manager Architecture
 
-Use DI, never instantiate managers directly:
+Use AppContext to access managers, never instantiate directly:
 
 ```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
 # Production code
-operations_mgr = inject(CoreOperationsManager)
+context = get_app_context()
+state_mgr = context.application_state_manager
+operations_mgr = context.core_operations_manager
 
-# Tests - use fixtures, not inject()
+# Tests - use fixtures
 def test_extraction(isolated_managers):
     operations_mgr = isolated_managers.core_operations_manager
 ```
