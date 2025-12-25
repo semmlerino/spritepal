@@ -107,11 +107,11 @@ class PerformanceValidationRunner:
         try:
             # Test unified dialog startup
 
-            with patch("ui.dialogs.manual_offset_unified.get_preview_generator") as mock_prev, \
-                 patch("ui.dialogs.manual_offset_unified.get_error_handler") as mock_err:
-
-                mock_prev.return_value = Mock()
-                mock_err.return_value = Mock()
+            # Note: These patches target components now accessed via AppContext
+            # The dialogs get preview_generator from AppContext, not direct import
+            with patch("core.app_context.get_app_context") as mock_context:
+                mock_context.return_value = Mock()
+                mock_context.return_value.preview_generator = Mock()
 
                 # Initialize managers if not done
                 if not self._managers_initialized:
@@ -161,11 +161,11 @@ class PerformanceValidationRunner:
             profiler = MemoryProfiler()
             profiler.start_profiling()
 
-            with patch("ui.dialogs.manual_offset_unified.get_preview_generator") as mock_prev, \
-                 patch("ui.dialogs.manual_offset_unified.get_error_handler") as mock_err:
-
-                mock_prev.return_value = Mock()
-                mock_err.return_value = Mock()
+            # Note: These patches target components now accessed via AppContext
+            # The dialogs get preview_generator from AppContext, not direct import
+            with patch("core.app_context.get_app_context") as mock_context:
+                mock_context.return_value = Mock()
+                mock_context.return_value.preview_generator = Mock()
 
                 # Initialize managers if not done
                 if not self._managers_initialized:
@@ -220,11 +220,11 @@ class PerformanceValidationRunner:
         print("-" * 50)
 
         try:
-            with patch("ui.dialogs.manual_offset_unified.get_preview_generator") as mock_prev, \
-                 patch("ui.dialogs.manual_offset_unified.get_error_handler") as mock_err:
-
-                mock_prev.return_value = Mock()
-                mock_err.return_value = Mock()
+            # Note: These patches target components now accessed via AppContext
+            # The dialogs get preview_generator from AppContext, not direct import
+            with patch("core.app_context.get_app_context") as mock_context:
+                mock_context.return_value = Mock()
+                mock_context.return_value.preview_generator = Mock()
 
                 # Initialize managers if not done
                 if not self._managers_initialized:
