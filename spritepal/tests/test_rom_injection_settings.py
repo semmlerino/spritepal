@@ -12,14 +12,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 from ui.injection_dialog import InjectionDialog
 
 
 def get_injection_manager():
     """Get injection manager via DI."""
-    return inject(CoreOperationsManager)
+    return get_app_context().core_operations_manager
 
 
 from utils.constants import (

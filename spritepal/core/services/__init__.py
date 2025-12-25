@@ -34,10 +34,8 @@ from core.services.preview_generator import (
     PreviewGenerator,
     PreviewRequest,
     PreviewResult,
-    cleanup_preview_generator,
     create_rom_preview_request,
     create_vram_preview_request,
-    get_preview_generator,
 )
 from core.services.rom_cache import ROMCache
 from core.services.rom_service import ROMService
@@ -54,12 +52,10 @@ __all__ = [
     "ROMService",
     "VRAMService",
     "WorkerManager",
-    "cleanup_preview_generator",
     "create_rom_preview_request",
     "create_vram_preview_request",
     "find_suggested_input_vram",
     "find_vram_path",
-    "get_preview_generator",
     "get_smart_vram_suggestion",
     "suggest_output_path",
     "suggest_output_rom_path",

@@ -16,11 +16,11 @@
 
 ### Basic Manager Test
 ```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
 def test_extraction_validates(isolated_managers):
-    manager = inject(CoreOperationsManager)
+    context = get_app_context()
+    manager = context.core_operations_manager
     result = manager.validate_extraction_params({"path": "/test"})
     assert isinstance(result, bool)
 ```
@@ -61,6 +61,27 @@ def test_worker_with_image():
     image = ThreadSafeTestImage.create(100, 100)
     worker = ImageWorker(image)
 ```
+
+## Manager Access Pattern
+
+**Current (recommended):**
+```python
+from core.app_context import get_app_context
+
+context = get_app_context()
+manager = context.core_operations_manager
+state = context.application_state_manager
+```
+
+**Legacy (deprecated but still works):**
+```python
+from core.di_container import inject
+from core.managers.core_operations_manager import CoreOperationsManager
+
+manager = inject(CoreOperationsManager)
+```
+
+The `get_app_context()` pattern is preferred for explicit access and better IDE support.
 
 ## Timeout Functions
 

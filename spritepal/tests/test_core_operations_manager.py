@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from core.di_container import inject
+from core.app_context import get_app_context
 from core.exceptions import ExtractionError, ValidationError
 from core.managers.core_operations_manager import CoreOperationsManager
 from tests.fixtures.timeouts import signal_timeout
@@ -31,8 +31,8 @@ pytestmark = [
 @pytest.fixture
 def manager(isolated_managers) -> CoreOperationsManager:
     """Get CoreOperationsManager via DI injection."""
-    # isolated_managers sets up the DI container; we use inject() to get the manager
-    mgr = inject(CoreOperationsManager)
+    # isolated_managers sets up the app context; we use get_app_context() to get the manager
+    mgr = get_app_context().core_operations_manager
     assert isinstance(mgr, CoreOperationsManager)
     return mgr
 

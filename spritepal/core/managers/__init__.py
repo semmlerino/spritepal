@@ -2,13 +2,13 @@
 Manager classes for SpritePal business logic.
 
 This package provides the consolidated manager architecture. The recommended
-way to access managers is via dependency injection::
+way to access managers is via AppContext::
 
-    from core.di_container import inject
-    from core.managers import ApplicationStateManager, CoreOperationsManager
+    from core.app_context import get_app_context
 
-    state_mgr = inject(ApplicationStateManager)
-    ops_mgr = inject(CoreOperationsManager)
+    ctx = get_app_context()
+    state_mgr = ctx.application_state_manager
+    ops_mgr = ctx.core_operations_manager
 
 Architecture:
     - ApplicationStateManager: Consolidated manager for session, settings, state
@@ -121,18 +121,18 @@ def initialize_managers(
             _logger.debug("SpritePresetManager created and registered")
 
             # 4. Register lazy factories BEFORE CoreOperationsManager
-            # (CoreOperationsManager._initialize() calls inject(ROMExtractor))
+            # (These factories are used when inject() is called and AppContext doesn't have the instance yet)
             def _create_rom_cache() -> ROMCache:
-                from core.di_container import inject
-
-                return ROMCache(state_manager=inject(ApplicationStateManager))
+                return ROMCache(state_manager=state_mgr)
 
             register_factory(ROMCache, _create_rom_cache)
 
             def _create_rom_extractor() -> ROMExtractor:
-                from core.di_container import inject
+                from core.di_container import get_container
 
-                return ROMExtractor(rom_cache=inject(ROMCache))
+                # Get or create ROMCache first
+                rom_cache = get_container().get(ROMCache)
+                return ROMExtractor(rom_cache=rom_cache)
 
             register_factory(ROMExtractor, _create_rom_extractor)
             _logger.debug("ROMCache and ROMExtractor factories registered")

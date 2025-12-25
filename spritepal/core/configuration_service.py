@@ -246,37 +246,3 @@ class ConfigurationService:
             f"app_root={self._app_root}, "
             f"settings_file={self.settings_file})"
         )
-
-
-# Module-level singleton for convenient access
-_configuration_service: ConfigurationService | None = None
-
-
-def get_configuration_service(app_root: Path | None = None) -> ConfigurationService:
-    """
-    Get or create the global ConfigurationService singleton.
-
-    This provides a convenient way to access the configuration service
-    without needing DI. However, DI injection is preferred in most cases.
-
-    Args:
-        app_root: Optional app root for first-time initialization.
-                 Ignored if singleton already exists.
-
-    Returns:
-        The ConfigurationService singleton
-    """
-    global _configuration_service
-    if _configuration_service is None:
-        _configuration_service = ConfigurationService(app_root=app_root)
-    return _configuration_service
-
-
-def reset_configuration_service() -> None:
-    """
-    Reset the global ConfigurationService singleton.
-
-    Primarily for testing purposes.
-    """
-    global _configuration_service
-    _configuration_service = None

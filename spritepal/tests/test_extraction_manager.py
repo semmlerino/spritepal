@@ -547,9 +547,8 @@ class TestExtractionParameterValidation:
     @pytest.fixture
     def mgr(self, isolated_managers):
         """Create ExtractionManager instance with proper DI setup."""
-        from core.di_container import inject
-        from core.managers.core_operations_manager import CoreOperationsManager
-        return inject(CoreOperationsManager)
+        from core.app_context import get_app_context
+        return get_app_context().core_operations_manager
 
     @pytest.fixture
     def valid_rom_file(self, tmp_path):
@@ -700,9 +699,8 @@ class TestExtractionErrorPaths:
     @pytest.fixture
     def mgr(self, isolated_managers):
         """Create ExtractionManager via DI."""
-        from core.di_container import inject
-        from core.managers.core_operations_manager import CoreOperationsManager
-        return inject(CoreOperationsManager)
+        from core.app_context import get_app_context
+        return get_app_context().core_operations_manager
 
     # ── Invalid Input Validation Errors ─────────────────────────────────────────
 

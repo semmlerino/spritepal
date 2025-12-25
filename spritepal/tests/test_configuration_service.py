@@ -15,21 +15,11 @@ import pytest
 from core.configuration_service import (
     ApplicationPaths,
     ConfigurationService,
-    get_configuration_service,
-    reset_configuration_service,
 )
 
 pytestmark = [
     pytest.mark.headless,
 ]
-
-
-@pytest.fixture
-def clean_singleton():
-    """Ensure singleton is reset before and after each test."""
-    reset_configuration_service()
-    yield
-    reset_configuration_service()
 
 
 @pytest.fixture
@@ -309,43 +299,6 @@ class TestConfigurationServiceEnvOverrides:
         service = ConfigurationService(app_root=tmp_path)
 
         assert service.log_directory == log_dir
-
-
-class TestConfigurationServiceSingleton:
-    """Tests for singleton pattern."""
-
-    def test_get_configuration_service_returns_singleton(self, tmp_path, clean_singleton, clean_env):
-        """get_configuration_service should return same instance."""
-        service1 = get_configuration_service(app_root=tmp_path)
-        service2 = get_configuration_service()  # No app_root, should use existing
-
-        assert service1 is service2
-
-    def test_get_configuration_service_ignores_later_app_root(self, tmp_path, clean_singleton, clean_env):
-        """get_configuration_service should ignore app_root after first call."""
-        other_path = tmp_path / "other"
-        other_path.mkdir()
-
-        service1 = get_configuration_service(app_root=tmp_path)
-        service2 = get_configuration_service(app_root=other_path)
-
-        # Second call should return same instance, ignoring other_path
-        assert service1 is service2
-        assert service2.app_root == tmp_path.resolve()
-
-    def test_reset_configuration_service_clears_singleton(self, tmp_path, clean_singleton, clean_env):
-        """reset_configuration_service should allow new instance creation."""
-        service1 = get_configuration_service(app_root=tmp_path)
-
-        reset_configuration_service()
-
-        other_path = tmp_path / "other"
-        other_path.mkdir()
-        service2 = get_configuration_service(app_root=other_path)
-
-        # After reset, should be different instance with new app_root
-        assert service1 is not service2
-        assert service2.app_root == other_path.resolve()
 
 
 class TestConfigurationServiceSetSettingsManager:

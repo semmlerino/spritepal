@@ -203,12 +203,12 @@ class ManagerTestContext:
             worker = self._factory.create_extraction_worker(params)
         elif manager_type == "injection":
             # Create injection worker inline (factory method removed for simplification)
-            from core.di_container import inject
+            from core.app_context import get_app_context
             from core.workers import VRAMInjectionWorker
 
             if params is None:
                 params = self._data_repo.get_injection_data("small")
-            injection_manager = inject(CoreOperationsManager)
+            injection_manager = get_app_context().core_operations_manager
             worker = VRAMInjectionWorker(params, injection_manager=injection_manager)
         else:
             raise ValueError(f"No worker type for manager: {manager_type}")
@@ -274,8 +274,7 @@ class ManagerTestContext:
             # Only reset if we own the registry (initialized it ourselves)
             if getattr(self, '_owns_registry', True):
                 try:
-                    from core.managers import cleanup_managers as manager_cleanup
-                    from core.managers import reset_for_tests
+                    from core.managers import cleanup_managers as manager_cleanup, reset_for_tests
 
                     manager_cleanup()
                     reset_for_tests()

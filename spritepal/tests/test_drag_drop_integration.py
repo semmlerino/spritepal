@@ -60,10 +60,9 @@ def sample_files(tmp_path):
 @pytest.fixture
 def vram_drop_zone(qtbot, isolated_managers):
     """Create a real DropZone widget for VRAM files."""
-    from core.di_container import inject
-    from core.managers.application_state_manager import ApplicationStateManager
+    from core.app_context import get_app_context
 
-    drop_zone = DropZone(file_type="VRAM", settings_manager=inject(ApplicationStateManager))
+    drop_zone = DropZone(file_type="VRAM", settings_manager=get_app_context().application_state_manager)
     qtbot.addWidget(drop_zone)
     return drop_zone
 
@@ -71,10 +70,9 @@ def vram_drop_zone(qtbot, isolated_managers):
 @pytest.fixture
 def cgram_drop_zone(qtbot, isolated_managers):
     """Create a real DropZone widget for CGRAM files."""
-    from core.di_container import inject
-    from core.managers.application_state_manager import ApplicationStateManager
+    from core.app_context import get_app_context
 
-    drop_zone = DropZone(file_type="CGRAM", settings_manager=inject(ApplicationStateManager))
+    drop_zone = DropZone(file_type="CGRAM", settings_manager=get_app_context().application_state_manager)
     qtbot.addWidget(drop_zone)
     return drop_zone
 
@@ -82,10 +80,9 @@ def cgram_drop_zone(qtbot, isolated_managers):
 @pytest.fixture
 def oam_drop_zone(qtbot, isolated_managers):
     """Create a real DropZone widget for OAM files."""
-    from core.di_container import inject
-    from core.managers.application_state_manager import ApplicationStateManager
+    from core.app_context import get_app_context
 
-    drop_zone = DropZone(file_type="OAM", settings_manager=inject(ApplicationStateManager))
+    drop_zone = DropZone(file_type="OAM", settings_manager=get_app_context().application_state_manager)
     qtbot.addWidget(drop_zone)
     return drop_zone
 

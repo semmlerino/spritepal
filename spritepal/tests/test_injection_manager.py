@@ -50,9 +50,8 @@ def injection_manager_real(isolated_managers):
 
     Uses CoreOperationsManager which implements InjectionManagerProtocol.
     """
-    from core.di_container import inject
-    from core.managers.core_operations_manager import CoreOperationsManager
-    return inject(CoreOperationsManager)
+    from core.app_context import get_app_context
+    return get_app_context().core_operations_manager
 
 @pytest.fixture
 def temp_files_with_real_content(tmp_path):
@@ -185,9 +184,8 @@ class TestInjectionManagerParameterValidation:
         GREEN: Real FileValidator should validate actual file content
         REFACTOR: No mocking - tests real validation logic
         """
-        from core.di_container import inject
-        from core.managers.core_operations_manager import CoreOperationsManager
-        manager = inject(CoreOperationsManager)
+        from core.app_context import get_app_context
+        manager = get_app_context().core_operations_manager
 
         params = {
             "mode": "vram",
@@ -224,9 +222,8 @@ class TestInjectionManagerParameterValidation:
         Tests real ROM file validation including header checks, size validation,
         and format verification that mocks cannot test.
         """
-        from core.di_container import inject
-        from core.managers.core_operations_manager import CoreOperationsManager
-        manager = inject(CoreOperationsManager)
+        from core.app_context import get_app_context
+        manager = get_app_context().core_operations_manager
 
         params = {
             "mode": "rom",

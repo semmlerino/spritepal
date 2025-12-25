@@ -128,14 +128,13 @@ class TestScanControlsPanel:
         """Test ScanControlsPanel creation"""
         from PySide6.QtWidgets import QWidget
 
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.components.panels.scan_controls_panel import ScanControlsPanel
 
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
-        panel = ScanControlsPanel(parent_widget, rom_cache=inject(ROMCache))
+        panel = ScanControlsPanel(parent_widget, rom_cache=get_app_context().rom_cache)
         qtbot.addWidget(panel)
 
 
@@ -143,14 +142,13 @@ class TestScanControlsPanel:
         """Test scan parameter validation"""
         from PySide6.QtWidgets import QWidget
 
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.components.panels.scan_controls_panel import ScanControlsPanel
 
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
-        panel = ScanControlsPanel(parent_widget, rom_cache=inject(ROMCache))
+        panel = ScanControlsPanel(parent_widget, rom_cache=get_app_context().rom_cache)
         qtbot.addWidget(panel)
 
         # Test the validation method directly with mock parameters
@@ -218,18 +216,17 @@ class TestStatusPanel:
         """Test StatusPanel creation"""
         from PySide6.QtWidgets import QWidget
 
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.components.panels.status_panel import StatusPanel
 
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
+        context = get_app_context()
         panel = StatusPanel(
             parent_widget,
-            settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCache)
+            settings_manager=context.application_state_manager,
+            rom_cache=context.rom_cache
         )
         qtbot.addWidget(panel)
 
@@ -238,18 +235,17 @@ class TestStatusPanel:
         """Test status message updates"""
         from PySide6.QtWidgets import QWidget
 
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.components.panels.status_panel import StatusPanel
 
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
+        context = get_app_context()
         panel = StatusPanel(
             parent_widget,
-            settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCache)
+            settings_manager=context.application_state_manager,
+            rom_cache=context.rom_cache
         )
         qtbot.addWidget(panel)
 

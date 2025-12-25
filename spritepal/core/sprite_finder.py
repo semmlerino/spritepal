@@ -111,12 +111,12 @@ class SpriteFinder:
         output_dir: str = "sprite_candidates",
         region_config: EmptyRegionConfig | None = None,
         *,
-        rom_extractor: "ROMExtractor | None" = None,
+        rom_extractor: ROMExtractor | None = None,
     ) -> None:
         if rom_extractor is None:
-            from core.di_container import inject
-            from core.rom_extractor import ROMExtractor
-            rom_extractor = inject(ROMExtractor)
+            from core.app_context import get_app_context
+
+            rom_extractor = get_app_context().rom_extractor
 
         self.extractor = rom_extractor
         self.validator = SpriteVisualValidator()

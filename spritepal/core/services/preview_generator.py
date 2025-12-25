@@ -642,50 +642,6 @@ class PreviewGenerator(QObject):
             self.cleanup()
 
 
-class _PreviewGeneratorSingleton:
-    """Thread-safe singleton holder for PreviewGenerator."""
-    _instance: PreviewGenerator | None = None
-    _lock = threading.Lock()
-
-    @classmethod
-    def get(cls) -> PreviewGenerator:
-        """Get global preview generator instance with thread-safe initialization."""
-        if cls._instance is not None:
-            return cls._instance
-
-        with cls._lock:
-            if cls._instance is None:
-                logger.debug("Initializing global PreviewGenerator instance")
-                cls._instance = PreviewGenerator()
-                logger.debug("Global PreviewGenerator instance created")
-
-        return cls._instance
-
-    @classmethod
-    def cleanup(cls) -> None:
-        """Clean up the global preview generator instance."""
-        with cls._lock:
-            if cls._instance is not None:
-                logger.debug("Cleaning up global PreviewGenerator instance")
-                try:
-                    cls._instance.cleanup()
-                except Exception:
-                    logger.exception("Error during PreviewGenerator cleanup")
-                finally:
-                    cls._instance = None
-                    logger.debug("Global PreviewGenerator instance cleaned up")
-
-
-def get_preview_generator() -> PreviewGenerator:
-    """Get global preview generator instance with thread-safe initialization."""
-    return _PreviewGeneratorSingleton.get()
-
-
-def cleanup_preview_generator() -> None:
-    """Clean up the global preview generator instance."""
-    _PreviewGeneratorSingleton.cleanup()
-
-
 def create_vram_preview_request(vram_path: str,
                                offset: int,
                                sprite_name: str = "",

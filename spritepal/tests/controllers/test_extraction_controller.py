@@ -23,8 +23,7 @@ from PIL import Image
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtTest import QSignalSpy
 
-from core.di_container import inject
-from core.managers.application_state_manager import ApplicationStateManager
+from core.app_context import get_app_context
 from tests.fixtures.timeouts import worker_timeout
 from tests.infrastructure.real_component_factory import RealComponentFactory
 from ui.extraction_controller import ExtractionController
@@ -169,7 +168,7 @@ class TestExtractionControllerIntegration:
             extraction_manager = factory.create_extraction_manager()
             injection_manager = factory.create_injection_manager()
             session_manager = factory.create_session_manager("TestControllerApp")
-            settings_manager = inject(ApplicationStateManager)
+            settings_manager = get_app_context().application_state_manager
 
             yield {
                 "extraction_manager": extraction_manager,

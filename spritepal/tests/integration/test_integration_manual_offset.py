@@ -7,13 +7,12 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
 
 def get_extraction_manager():
-    """Get extraction manager via DI."""
-    return inject(CoreOperationsManager)
+    """Get extraction manager via app context."""
+    return get_app_context().core_operations_manager
 
 
 @pytest.mark.integration

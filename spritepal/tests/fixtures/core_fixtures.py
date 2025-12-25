@@ -56,8 +56,8 @@ if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
     from ui.main_window import MainWindow
 
-# Runtime imports for inject()
-from core.di_container import inject
+# Runtime imports for AppContext access
+from core.app_context import get_app_context
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 
@@ -175,11 +175,7 @@ def reset_all_singletons() -> None:
         cleanup_test_data_repository()
     _try_reset("DataRepository", cleanup_data_repo)
 
-    # Reset PreviewGenerator singleton
-    def reset_preview_gen() -> None:
-        from core.services.preview_generator import cleanup_preview_generator
-        cleanup_preview_generator()
-    _try_reset("PreviewGenerator", reset_preview_gen)
+    # NOTE: PreviewGenerator is now handled by AppContext cleanup (reset via reset_app_context)
 
     # Cleanup all workers and clear registry (waits for thread termination)
     def cleanup_worker_registry() -> None:
@@ -214,18 +210,21 @@ def _reset_manager_caches(_unused: Any = None) -> None:
     between tests (prevents settings leakage). Other managers use full_reset=False
     to preserve services and initialized state within the session.
     """
-    from core.di_container import get_optional
-    from core.managers import ApplicationStateManager, CoreOperationsManager
+    from core.app_context import get_app_context_optional
+
+    ctx = get_app_context_optional()
+    if ctx is None:
+        return
 
     # Reset ApplicationStateManager with full_reset to clear settings
-    state_mgr = get_optional(ApplicationStateManager)
-    if state_mgr and hasattr(state_mgr, 'reset_state'):
+    state_mgr = ctx.application_state_manager
+    if hasattr(state_mgr, 'reset_state'):
         with contextlib.suppress(Exception):
             state_mgr.reset_state(full_reset=True)
 
     # Reset CoreOperationsManager without full_reset (preserves services)
-    ops_mgr = get_optional(CoreOperationsManager)
-    if ops_mgr and hasattr(ops_mgr, 'reset_state'):
+    ops_mgr = ctx.core_operations_manager
+    if hasattr(ops_mgr, 'reset_state'):
         with contextlib.suppress(Exception):
             ops_mgr.reset_state()
 
@@ -327,7 +326,7 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
     Usage:
         def test_something_that_modifies_state(isolated_managers):
             # Fresh managers, isolated from other tests
-            ops_mgr = inject(CoreOperationsManager)
+            ops_mgr = get_app_context().core_operations_manager
             # ... test code that modifies manager state ...
     """
     from PySide6.QtWidgets import QApplication
@@ -625,7 +624,7 @@ def real_extraction_manager(
     NOTE: This returns the CoreOperationsManager directly.
     """
     _ = isolated_managers  # Ensures fixture runs first to initialize managers
-    return inject(CoreOperationsManager)
+    return get_app_context().core_operations_manager
 
 
 @pytest.fixture
@@ -650,7 +649,7 @@ def real_session_manager(
     For mocks, create them locally with Mock(spec=ApplicationStateManager).
     """
     _ = isolated_managers  # Ensures fixture runs first to initialize managers
-    return inject(ApplicationStateManager)
+    return get_app_context().application_state_manager
 
 
 @pytest.fixture

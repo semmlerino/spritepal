@@ -21,7 +21,8 @@ if TYPE_CHECKING:
 from core.console_error_handler import ConsoleErrorHandler
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.services.image_utils import pil_to_qpixmap
-from core.services.preview_generator import create_vram_preview_request, get_preview_generator
+from core.app_context import get_app_context
+from core.services.preview_generator import create_vram_preview_request
 from core.types import ROMExtractionParams, VRAMExtractionParams
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 from utils.constants import (
@@ -115,12 +116,8 @@ class ExtractionController(QObject):
         _ = self.extraction_manager.cache_miss.connect(self._on_cache_miss)
         _ = self.extraction_manager.cache_saved.connect(self._on_cache_saved)
 
-        # Initialize preview generator with managers
-        self.preview_generator = get_preview_generator()
-        self.preview_generator.set_managers(
-            extraction_manager=self.extraction_manager,
-            rom_extractor=self.extraction_manager.get_rom_extractor()
-        )
+        # Get preview generator from AppContext (already configured)
+        self.preview_generator = get_app_context().preview_generator
 
     def start_extraction(self) -> None:
         """Start the extraction process"""

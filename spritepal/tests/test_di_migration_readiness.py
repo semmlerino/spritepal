@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from core.app_context import get_app_context
 from core.di_container import get_container, inject
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
@@ -75,11 +76,12 @@ class TestPureDIComponentInitialization:
         """Test ExtractionController works with all deps passed explicitly."""
         from ui.extraction_controller import ExtractionController
 
-        # Get all dependencies via DI
-        extraction_mgr = inject(CoreOperationsManager)
-        session_mgr = inject(ApplicationStateManager)
-        injection_mgr = inject(CoreOperationsManager)
-        settings_mgr = inject(ApplicationStateManager)
+        # Get all dependencies via AppContext
+        context = get_app_context()
+        extraction_mgr = context.core_operations_manager
+        session_mgr = context.application_state_manager
+        injection_mgr = context.core_operations_manager
+        settings_mgr = context.application_state_manager
 
         # Create mock main window
         mock_window = Mock()
@@ -119,9 +121,10 @@ class TestPureDIComponentInitialization:
         """
         from ui.main_window import MainWindow
 
-        settings_mgr = inject(ApplicationStateManager)
-        rom_cache = inject(ROMCache)
-        session_mgr = inject(ApplicationStateManager)
+        context = get_app_context()
+        settings_mgr = context.application_state_manager
+        rom_cache = context.rom_cache
+        session_mgr = context.application_state_manager
 
         # Create window with explicit deps
         window = MainWindow(
@@ -143,8 +146,9 @@ class TestPureDIComponentInitialization:
         from core.managers.application_state_manager import ApplicationStateManager
         from ui.injection_dialog import InjectionDialog
 
-        injection_mgr = inject(CoreOperationsManager)
-        settings_mgr = inject(ApplicationStateManager)
+        context = get_app_context()
+        injection_mgr = context.core_operations_manager
+        settings_mgr = context.application_state_manager
 
         # Create with explicit deps
         dialog = InjectionDialog(
@@ -162,7 +166,8 @@ class TestPureDIComponentInitialization:
         """Test ROMExtractionPanel works with extraction_manager passed explicitly."""
         from ui.rom_extraction_panel import ROMExtractionPanel
 
-        extraction_mgr = inject(CoreOperationsManager)
+        context = get_app_context()
+        extraction_mgr = context.core_operations_manager
 
         # Create with explicit dep
         panel = ROMExtractionPanel(extraction_manager=extraction_mgr)
@@ -224,7 +229,8 @@ class TestInjectionManagerDI:
 
     def test_injection_manager_session_access(self, isolated_managers):
         """Test InjectionManager can access session manager via DI."""
-        injection_mgr = inject(CoreOperationsManager)
+        context = get_app_context()
+        injection_mgr = context.core_operations_manager
 
         # CoreOperationsManager has _ensure_session_manager() - verify it works
         # This is an internal method that uses cached DI dependencies
@@ -234,8 +240,9 @@ class TestInjectionManagerDI:
 
     def test_injection_manager_rom_cache_access(self, isolated_managers):
         """Test InjectionManager can access ROM cache via DI."""
-        # Use DI to get ROM cache (replaces deprecated get_rom_cache())
-        cache = inject(ROMCache)
+        # Use AppContext to get ROM cache (replaces deprecated get_rom_cache())
+        context = get_app_context()
+        cache = context.rom_cache
         assert cache is not None
 
         # Verify the cache has expected methods

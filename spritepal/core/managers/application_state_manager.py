@@ -108,10 +108,12 @@ class ApplicationStateManager(BaseManager):
                 except (ImportError, ValueError):
                     config = None
 
-                # Fall back to singleton only if DI not available
+                # Fall back to creating a new instance if DI not available
+                # This should rarely happen in practice since AppContext
+                # creates ConfigurationService before ApplicationStateManager
                 if config is None:
-                    from core.configuration_service import get_configuration_service
-                    config = get_configuration_service()
+                    from core.configuration_service import ConfigurationService
+                    config = ConfigurationService()
 
             # At this point config is guaranteed to be set (fallback always provides one)
             assert config is not None, "ConfigurationService should always be available"

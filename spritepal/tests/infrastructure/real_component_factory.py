@@ -143,20 +143,19 @@ class RealComponentFactory:
         # This ensures proper test isolation and prevents global state pollution
 
     def _get_extraction_manager_from_registry(self) -> CoreOperationsManager:
-        """Get extraction manager (CoreOperationsManager) via DI."""
-        from core.di_container import inject
-        return inject(CoreOperationsManager)
+        """Get extraction manager (CoreOperationsManager) via AppContext."""
+        from core.app_context import get_app_context
+        return get_app_context().core_operations_manager
 
     def _get_injection_manager_from_registry(self) -> CoreOperationsManager:
-        """Get injection manager (CoreOperationsManager) via DI."""
-        from core.di_container import inject
-        return inject(CoreOperationsManager)
+        """Get injection manager (CoreOperationsManager) via AppContext."""
+        from core.app_context import get_app_context
+        return get_app_context().core_operations_manager
 
     def _get_session_manager_from_registry(self) -> ApplicationStateManager:
-        """Get session manager (ApplicationStateManager) via DI."""
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        return inject(ApplicationStateManager)  # type: ignore[return-value]
+        """Get session manager (ApplicationStateManager) via AppContext."""
+        from core.app_context import get_app_context
+        return get_app_context().application_state_manager
 
     def create_extraction_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """
@@ -223,15 +222,14 @@ class RealComponentFactory:
             if not is_initialized():
                 initialize_managers("TestApp", settings_path=self._settings_path)
 
-        # B.7: Create MainWindow with explicit DI dependencies (matching B.6 pattern)
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        from core.services.rom_cache import ROMCache
+        # B.7: Create MainWindow with explicit AppContext dependencies
+        from core.app_context import get_app_context
 
+        ctx = get_app_context()
         window = MainWindow(
-            settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCache),
-            session_manager=inject(ApplicationStateManager),  # type: ignore[arg-type]  # Protocol vs concrete type mismatch
+            settings_manager=ctx.application_state_manager,
+            rom_cache=ctx.rom_cache,
+            session_manager=ctx.application_state_manager,  # type: ignore[arg-type]  # Protocol vs concrete type mismatch
         )
         self._created_components.append(window)
 
@@ -260,7 +258,7 @@ class RealComponentFactory:
         Returns:
             Real VRAMExtractionWorker or ROMExtractionWorker instance
         """
-        from core.di_container import inject
+        from core.app_context import get_app_context
         from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 
         if params is None:
@@ -269,7 +267,7 @@ class RealComponentFactory:
             else:
                 params = self._data_repo.get_rom_extraction_data("small")
 
-        extraction_manager = inject(CoreOperationsManager)
+        extraction_manager = get_app_context().core_operations_manager
 
         if worker_type == "vram":
             worker = VRAMExtractionWorker(params, extraction_manager=extraction_manager)

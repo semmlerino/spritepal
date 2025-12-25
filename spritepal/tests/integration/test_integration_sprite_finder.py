@@ -75,9 +75,9 @@ class TestSpriteFinder:
 
         rom_path = str(rom_info['path'])
 
-        # Create ROM extractor via DI (verifies DI container is working)
-        from core.di_container import inject
-        extractor = inject(ROMExtractor)
+        # Create ROM extractor via app context (verifies app context is working)
+        from core.app_context import get_app_context
+        extractor = get_app_context().rom_extractor
         assert extractor is not None
 
         # Create sprite finder
@@ -218,9 +218,9 @@ class TestROMExtractor:
         if not rom_info['sprites']:
             pytest.skip("No test sprites in ROM - real Kirby ROM not available")
 
-        # Use DI to get ROMExtractor
-        from core.di_container import inject
-        extractor = inject(ROMExtractor)
+        # Use app context to get ROMExtractor
+        from core.app_context import get_app_context
+        extractor = get_app_context().rom_extractor
 
         # Extract at a known sprite offset
         sprite_info = rom_info['sprites'][0]
@@ -249,9 +249,9 @@ class TestROMExtractor:
         if not rom_info['sprites']:
             pytest.skip("No test sprites in ROM - real Kirby ROM not available")
 
-        # Use DI to get ROMExtractor
-        from core.di_container import inject
-        extractor = inject(ROMExtractor)
+        # Use app context to get ROMExtractor
+        from core.app_context import get_app_context
+        extractor = get_app_context().rom_extractor
 
         sprite_info = rom_info['sprites'][0]
         output_path = tmp_path / "decompressed_sprite.bin"

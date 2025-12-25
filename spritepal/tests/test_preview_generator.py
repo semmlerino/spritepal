@@ -22,10 +22,8 @@ from core.services.preview_generator import (
     PreviewGenerator,
     PreviewRequest,
     PreviewResult,
-    cleanup_preview_generator,
     create_rom_preview_request,
     create_vram_preview_request,
-    get_preview_generator,
 )
 from tests.fixtures.timeouts import signal_timeout
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
@@ -584,14 +582,6 @@ class TestHelperFunctions:
         assert request.sprite_config is sprite_config
         assert request.size == (128, 128)
 
-    def test_global_preview_generator(self):
-        """Test global preview generator instance."""
-        gen1 = get_preview_generator()
-        gen2 = get_preview_generator()
-
-        # Should return the same instance
-        assert gen1 is gen2
-        assert isinstance(gen1, PreviewGenerator)
 
 def test_preview_generation_performance():
     """Test preview generation performance."""
@@ -688,70 +678,11 @@ def _make_mock_preview_result(tile_count: int, sprite_name: str) -> PreviewResul
 
 
 class TestPreviewGeneratorThreadSafety:
-    """Test thread safety of PreviewGenerator singleton."""
-
-    @pytest.fixture(autouse=True)
-    def cleanup_singleton(self):
-        """Ensure singleton is cleaned up after each test."""
-        yield
-        cleanup_preview_generator()
-
-    def test_singleton_concurrent_initialization(self):
-        """Test that concurrent initialization creates only one instance."""
-        # Clean up any existing instance
-        cleanup_preview_generator()
-
-        instances = []
-        init_count = 0
-        lock = threading.Lock()
-
-        # Patch PreviewGenerator.__init__ to count initializations
-        original_init = PreviewGenerator.__init__
-
-        def counted_init(self, *args, **kwargs):
-            nonlocal init_count
-            with lock:
-                init_count += 1
-            original_init(self, *args, **kwargs)
-
-        with patch.object(PreviewGenerator, "__init__", counted_init):
-            # Try to get instance from multiple threads simultaneously
-            def get_instance():
-                instance = get_preview_generator()
-                instances.append(instance)
-                return instance
-
-            # Use ThreadPoolExecutor for concurrent access
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                futures = [executor.submit(get_instance) for _ in range(100)]
-                concurrent.futures.wait(futures)
-
-            # Verify only one instance was created
-            assert init_count == 1, f"Expected 1 initialization, got {init_count}"
-
-            # Verify all threads got the same instance
-            first_instance = instances[0]
-            for instance in instances:
-                assert instance is first_instance, "Multiple instances created!"
-
-    def test_singleton_fast_path_performance(self):
-        """Test that initialized singleton uses fast path without locking."""
-        # Ensure instance exists
-        instance = get_preview_generator()
-
-        # Time multiple accesses
-        start_time = time.time()
-        for _ in range(10000):
-            retrieved = get_preview_generator()
-            assert retrieved is instance
-        elapsed = time.time() - start_time
-
-        # Should be very fast (no lock contention)
-        assert elapsed < 0.1, f"Fast path too slow: {elapsed:.4f}s for 10000 accesses"
+    """Test thread safety of PreviewGenerator LRU cache."""
 
     def test_cache_concurrent_access(self):
         """Test LRU cache thread safety with concurrent reads/writes."""
-        generator = get_preview_generator()
+        generator = PreviewGenerator(cache_size=200)
         cache = generator._cache
 
         # Clear cache

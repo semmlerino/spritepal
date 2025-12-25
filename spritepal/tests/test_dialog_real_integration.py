@@ -41,27 +41,26 @@ pytestmark = [
 
 # Import real testing infrastructure
 # Import real dialogs and managers (not mocked!)
-from core.di_container import inject
-from core.managers.application_state_manager import ApplicationStateManager
-from core.managers.core_operations_manager import CoreOperationsManager
-from core.services.rom_cache import ROMCache
+from core.app_context import get_app_context
 
 
 def _create_manual_offset_dialog(parent=None) -> ManualOffsetDialog:
     """Create ManualOffsetDialog with injected dependencies."""
+    context = get_app_context()
     return ManualOffsetDialog(
         parent,
-        rom_cache=inject(ROMCache),
-        settings_manager=inject(ApplicationStateManager),
-        extraction_manager=inject(CoreOperationsManager),
+        rom_cache=context.rom_cache,
+        settings_manager=context.application_state_manager,
+        extraction_manager=context.core_operations_manager,
     )
 
 
 def _create_injection_dialog(**kwargs) -> InjectionDialog:
     """Create InjectionDialog with injected dependencies."""
+    context = get_app_context()
     return InjectionDialog(
-        injection_manager=inject(CoreOperationsManager),
-        settings_manager=inject(ApplicationStateManager),
+        injection_manager=context.core_operations_manager,
+        settings_manager=context.application_state_manager,
         **kwargs,
     )
 from tests.infrastructure import (
@@ -240,16 +239,15 @@ class TestRealDialogManagerIntegration:
         - Manager initialization dependencies for dialogs
         - Dialog-manager communication protocol issues
         """
-        from core.services.rom_cache import ROMCache
-
         # Managers already initialized by setup_test_infrastructure fixture
 
         # Get real managers for coordination testing
-        extraction_manager = inject(CoreOperationsManager)
-        injection_manager = inject(CoreOperationsManager)
-        session_manager = inject(ApplicationStateManager)
-        settings_manager = inject(ApplicationStateManager)
-        rom_cache = inject(ROMCache)
+        context = get_app_context()
+        extraction_manager = context.core_operations_manager
+        injection_manager = context.core_operations_manager
+        session_manager = context.application_state_manager
+        settings_manager = context.application_state_manager
+        rom_cache = context.rom_cache
 
         # Test multiple dialogs using same managers (could expose resource conflicts)
         manual_dialog = _create_manual_offset_dialog()

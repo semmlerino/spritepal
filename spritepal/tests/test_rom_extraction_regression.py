@@ -18,8 +18,7 @@ import pytest
 from PIL import Image
 from PySide6.QtWidgets import QApplication
 
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 from core.services.rom_service import ROMService
 from ui.injection_dialog import InjectionDialog
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
@@ -101,13 +100,10 @@ class TestROMServicePathHandling:
 @pytest.fixture
 def injection_dialog(qtbot, isolated_managers):
     """Create injection dialog for testing."""
-    from core.managers.application_state_manager import ApplicationStateManager
-
-    injection_manager = inject(CoreOperationsManager)
-    settings_manager = inject(ApplicationStateManager)
+    context = get_app_context()
     dialog = InjectionDialog(
-        injection_manager=injection_manager,
-        settings_manager=settings_manager,
+        injection_manager=context.core_operations_manager,
+        settings_manager=context.application_state_manager,
     )
     qtbot.addWidget(dialog)
     return dialog

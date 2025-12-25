@@ -9,25 +9,25 @@ from pathlib import Path
 
 import pytest
 
-from core.di_container import inject
+from core.app_context import get_app_context
 from core.exceptions import ValidationError
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 
 
 def get_extraction_manager():
-    """Get extraction manager via DI."""
-    return inject(CoreOperationsManager)
+    """Get extraction manager from app context."""
+    return get_app_context().core_operations_manager
 
 
 def get_injection_manager():
-    """Get injection manager via DI."""
-    return inject(CoreOperationsManager)
+    """Get injection manager from app context."""
+    return get_app_context().core_operations_manager
 
 
 def get_session_manager():
-    """Get session manager via DI."""
-    return inject(ApplicationStateManager)
+    """Get session manager from app context."""
+    return get_app_context().application_state_manager
 
 
 from tests.fixtures.test_data_factory import TestDataFactory

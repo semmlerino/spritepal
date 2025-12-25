@@ -10,14 +10,14 @@ from unittest.mock import patch
 
 import pytest
 
-from core.di_container import inject
+from core.app_context import get_app_context
 from core.rom_injector import SpritePointer
 from core.services.rom_cache import ROMCache
 
 
 def get_rom_cache():
-    """Get ROM cache from DI container (replaces deprecated function)."""
-    return inject(ROMCache)
+    """Get ROM cache from app context."""
+    return get_app_context().rom_cache
 
 # Serial execution required: Thread safety concerns
 pytestmark = [
@@ -706,12 +706,10 @@ class TestROMCacheIntegration:
 
     def test_rom_file_widget_cache_check(self, qtbot, test_rom_file) -> None:
         """Test ROMFileWidget cache status checking."""
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
         from ui.rom_extraction.widgets.rom_file_widget import ROMFileWidget
 
-        # Create widget with injected rom_cache
-        widget = ROMFileWidget(rom_cache=inject(ROMCache))
+        # Create widget with rom_cache from app context
+        widget = ROMFileWidget(rom_cache=get_app_context().rom_cache)
         qtbot.addWidget(widget)
 
         # Set ROM path
@@ -760,19 +758,17 @@ class TestROMCacheIntegration:
         )
 
         # Create worker that should resume from cache
-        # Get extractor instance from DI (isolated_managers fixture sets up DI)
-        from core.di_container import inject
+        # Get extractor and rom_cache from app context
         from core.rom_extractor import ROMExtractor
-        from core.services.rom_cache import ROMCache
-        extractor = inject(ROMExtractor)
+        context = get_app_context()
 
         worker = SpriteScanWorker(
             test_rom_file,
             scan_params["start_offset"],
             scan_params["end_offset"],
             step_size=scan_params["alignment"],
-            extractor=extractor,
-            rom_cache=inject(ROMCache)
+            extractor=context.rom_extractor,
+            rom_cache=context.rom_cache
         )
 
         # Collect signals

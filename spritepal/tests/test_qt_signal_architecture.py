@@ -19,8 +19,7 @@ import pytest
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtWidgets import QApplication
 
-from core.di_container import inject
-from core.managers.application_state_manager import ApplicationStateManager
+from core.app_context import get_app_context
 from core.managers.core_operations_manager import CoreOperationsManager
 
 # ExtractionManagerProtocol and InjectionManagerProtocol removed - use CoreOperationsManager directly
@@ -116,12 +115,13 @@ class TestQtSignalArchitecture:
         main_window = mock_factory.create_main_window()
 
         # Create controller with managers as protocols
+        context = get_app_context()
         controller = ExtractionController(
             main_window=main_window,
             extraction_manager=extraction_mgr,
-            session_manager=inject(ApplicationStateManager),
+            session_manager=context.application_state_manager,
             injection_manager=injection_mgr,
-            settings_manager=inject(ApplicationStateManager),
+            settings_manager=context.application_state_manager,
         )
 
         # Connect signal capture to manager signals
@@ -347,12 +347,13 @@ class TestQtSignalArchitecture:
         extraction_mgr = CoreOperationsManager()
         main_window = mock_factory.create_main_window()
 
+        context = get_app_context()
         controller = ExtractionController(
             main_window=main_window,
             extraction_manager=extraction_mgr,
-            session_manager=inject(ApplicationStateManager),
+            session_manager=context.application_state_manager,
             injection_manager=injection_mgr,
-            settings_manager=inject(ApplicationStateManager),
+            settings_manager=context.application_state_manager,
         )
 
         # Capture controller's handling of manager signals

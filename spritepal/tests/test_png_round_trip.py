@@ -27,10 +27,10 @@ class TestPNGRoundTrip:
 
     def setup_method(self):
         """Set up test fixtures"""
-        # Use DI to get ROMExtractor (session_managers fixture sets up DI)
-        from core.di_container import inject
+        # Use app context to get ROMExtractor (session_managers fixture sets up context)
+        from core.app_context import get_app_context
         self.injector = SpriteInjector()
-        self.extractor = inject(ROMExtractor)
+        self.extractor = get_app_context().rom_extractor
 
     def create_test_tile_data(self) -> bytes:
         """Create test 4bpp tile data with known pattern"""

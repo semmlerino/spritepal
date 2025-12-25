@@ -19,19 +19,17 @@ from typing import TYPE_CHECKING
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from core.di_container import inject
-from core.managers.application_state_manager import ApplicationStateManager
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
 
 def get_injection_manager():
-    """Get injection manager via DI."""
-    return inject(CoreOperationsManager)
+    """Get injection manager via app context."""
+    return get_app_context().core_operations_manager
 
 
 def get_settings_manager():
-    """Get settings manager via DI."""
-    return inject(ApplicationStateManager)
+    """Get settings manager via app context."""
+    return get_app_context().application_state_manager
 
 
 if TYPE_CHECKING:
@@ -48,14 +46,13 @@ class TestRealDialogInitialization:
 
         Requires isolated_managers because SettingsDialog uses DI.
         """
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.dialogs.settings_dialog import SettingsDialog
 
+        context = get_app_context()
         dialog = SettingsDialog(
-            settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCache)
+            settings_manager=context.application_state_manager,
+            rom_cache=context.rom_cache
         )
         qtbot.addWidget(dialog)
 
@@ -138,15 +135,14 @@ class TestRealDialogInitialization:
 
         This dialog requires managers to be initialized.
         """
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
+        context = get_app_context()
         dialog = UnifiedManualOffsetDialog(
-            rom_cache=inject(ROMCache),
-            settings_manager=inject(ApplicationStateManager),
-            extraction_manager=inject(CoreOperationsManager),
+            rom_cache=context.rom_cache,
+            settings_manager=context.application_state_manager,
+            extraction_manager=context.core_operations_manager,
         )
         qtbot.addWidget(dialog)
 
@@ -225,14 +221,13 @@ class TestRealDialogLifecycle:
 
         Requires isolated_managers because SettingsDialog uses DI.
         """
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.dialogs.settings_dialog import SettingsDialog
 
+        context = get_app_context()
         dialog = SettingsDialog(
-            settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCache)
+            settings_manager=context.application_state_manager,
+            rom_cache=context.rom_cache
         )
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
         from PySide6.QtCore import Qt

@@ -90,16 +90,14 @@ class ROMService:
             rom_cache: Optional ROMCache instance (uses DI if not provided)
         """
         self._logger = get_logger(f"services.{self.__class__.__name__}")
-        if rom_extractor is None:
-            from core.di_container import inject
-            from core.rom_extractor import ROMExtractor
+        if rom_extractor is None or rom_cache is None:
+            from core.app_context import get_app_context
 
-            rom_extractor = inject(ROMExtractor)
-        if rom_cache is None:
-            from core.di_container import inject
-            from core.services.rom_cache import ROMCache as ROMCacheClass
-
-            rom_cache = inject(ROMCacheClass)
+            ctx = get_app_context()
+            if rom_extractor is None:
+                rom_extractor = ctx.rom_extractor
+            if rom_cache is None:
+                rom_cache = ctx.rom_cache
         self._rom_extractor = rom_extractor
         self._rom_cache = rom_cache
         self._palette_manager = palette_manager or PaletteManager()

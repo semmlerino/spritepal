@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def app_context(tmp_path: Path) -> Generator["AppContext", None, None]:
+def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
     """
     Function-scoped isolated AppContext for clean test isolation.
 
@@ -90,7 +90,7 @@ def app_context(tmp_path: Path) -> Generator["AppContext", None, None]:
 
 
 @pytest.fixture
-def state_manager(app_context: "AppContext") -> "ApplicationStateManager":
+def state_manager(app_context: AppContext) -> ApplicationStateManager:
     """
     Get the ApplicationStateManager from the test context.
 
@@ -105,7 +105,7 @@ def state_manager(app_context: "AppContext") -> "ApplicationStateManager":
 
 
 @pytest.fixture
-def core_operations(app_context: "AppContext") -> "CoreOperationsManager":
+def core_operations(app_context: AppContext) -> CoreOperationsManager:
     """
     Get the CoreOperationsManager from the test context.
 

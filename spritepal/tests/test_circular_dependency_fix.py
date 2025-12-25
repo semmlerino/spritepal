@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from core.di_container import inject
+from core.app_context import get_app_context
 from core.managers.application_state_manager import ApplicationStateManager
 from core.services.rom_cache import ROMCache
 from ui.extraction_controller import ExtractionController
@@ -29,11 +29,12 @@ class TestCircularDependencyFix:
 
     @pytest.fixture
     def main_window_deps(self, isolated_managers):
-        """Get MainWindow dependencies from DI container."""
+        """Get MainWindow dependencies from app context."""
+        context = get_app_context()
         return {
-            "settings_manager": inject(ApplicationStateManager),
-            "rom_cache": inject(ROMCache),
-            "session_manager": inject(ApplicationStateManager),
+            "settings_manager": context.application_state_manager,
+            "rom_cache": context.rom_cache,
+            "session_manager": context.application_state_manager,
         }
 
     def test_main_window_creates_without_controller(self, qtbot, app, main_window_deps):

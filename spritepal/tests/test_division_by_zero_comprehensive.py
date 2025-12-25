@@ -22,8 +22,7 @@ class TestDivisionByZeroFixes:
 
     def test_scan_worker_zero_range(self):
         """Test SpriteScanWorker with zero scan range."""
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
@@ -42,7 +41,7 @@ class TestDivisionByZeroFixes:
                 start_offset=0x1000,
                 end_offset=0x1000,  # Same as start = zero range
                 parallel_finder=parallel_finder,
-                rom_cache=inject(ROMCache)
+                rom_cache=get_app_context().rom_cache
             )
 
             # Should not raise division by zero
@@ -56,8 +55,7 @@ class TestDivisionByZeroFixes:
 
     def test_scan_worker_progress_callback_zero_range(self):
         """Test SpriteScanWorker progress callback with zero range."""
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
@@ -72,7 +70,7 @@ class TestDivisionByZeroFixes:
                 start_offset=0x500,
                 end_offset=0x500,  # Zero range
                 parallel_finder=parallel_finder,
-                rom_cache=inject(ROMCache)
+                rom_cache=get_app_context().rom_cache
             )
 
             # Capture the progress callback
@@ -102,8 +100,7 @@ class TestDivisionByZeroFixes:
 
     def test_range_scan_worker_zero_range(self):
         """Test RangeScanWorker with zero scan range."""
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.rom_extraction.workers.range_scan_worker import RangeScanWorker
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
@@ -117,7 +114,7 @@ class TestDivisionByZeroFixes:
                 end_offset=0x100,  # Same as start
                 step_size=0x100,
                 extractor=MagicMock(),
-                rom_cache=inject(ROMCache)
+                rom_cache=get_app_context().rom_cache
             )
 
             # Should not raise division by zero
@@ -129,8 +126,7 @@ class TestDivisionByZeroFixes:
 
     def test_similarity_indexing_no_sprites(self):
         """Test SimilarityIndexingWorker with no sprites to index."""
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
+        from core.app_context import get_app_context
         from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
@@ -139,7 +135,7 @@ class TestDivisionByZeroFixes:
 
             worker = SimilarityIndexingWorker(
                 rom_path=tmp.name,
-                settings_manager=inject(ApplicationStateManager),
+                settings_manager=get_app_context().application_state_manager,
             )
 
             # Don't add any sprites - should handle empty list gracefully
@@ -213,8 +209,7 @@ class TestDivisionByZeroFixes:
 
     def test_scan_worker_zero_rom_size(self):
         """Test SpriteScanWorker with zero ROM size."""
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
@@ -230,7 +225,7 @@ class TestDivisionByZeroFixes:
                 extractor=MagicMock(),
                 use_cache=False,
                 parallel_finder=parallel_finder,
-                rom_cache=inject(ROMCache)
+                rom_cache=get_app_context().rom_cache
                 # No custom offsets, will use defaults based on file size
             )
 
@@ -243,15 +238,14 @@ class TestDivisionByZeroFixes:
 
     def test_all_workers_with_realistic_edge_cases(self):
         """Integration test with realistic edge cases that could cause division by zero."""
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.rom_extraction.workers.range_scan_worker import RangeScanWorker
         from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
         from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
 
-        rom_cache = inject(ROMCache)
-        settings_manager = inject(ApplicationStateManager)
+        context = get_app_context()
+        rom_cache = context.rom_cache
+        settings_manager = context.application_state_manager
 
         with tempfile.NamedTemporaryFile(suffix='.rom') as tmp:
             # Small file that might not have sprites
@@ -304,11 +298,10 @@ class TestDivisionByZeroFixes:
 
     def test_progress_calculations_boundary_conditions(self):
         """Test progress calculations at boundary conditions."""
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 
-        rom_cache = inject(ROMCache)
+        rom_cache = get_app_context().rom_cache
 
         test_cases = [
             (0, 0),      # Zero range

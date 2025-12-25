@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.di_container import inject
+from core.app_context import get_app_context
 from core.hal_compression import HALCompressionError, HALCompressor
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
@@ -207,11 +207,10 @@ class TestROMInjectionDialog(unittest.TestCase):
         """Test that dialog can be created"""
         from ui.injection_dialog import InjectionDialog
 
-        injection_manager = inject(CoreOperationsManager)
-        settings_manager = inject(ApplicationStateManager)
+        context = get_app_context()
         dialog = InjectionDialog(
-            injection_manager=injection_manager,
-            settings_manager=settings_manager,
+            injection_manager=context.core_operations_manager,
+            settings_manager=context.application_state_manager,
         )
         self.qtbot.addWidget(dialog)
 

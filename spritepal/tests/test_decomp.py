@@ -17,15 +17,15 @@ Test decompression at a known sprite offset.
 from pathlib import Path
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
 
 def test_decompression():
     """Test if decompression works at a known sprite offset."""
 
     # Managers initialized by session_managers fixture
-    extraction_manager = inject(CoreOperationsManager)
+    context = get_app_context()
+    extraction_manager = context.core_operations_manager
     rom_extractor = extraction_manager.get_rom_extractor()
 
     test_rom = "Kirby Super Star (USA).sfc"

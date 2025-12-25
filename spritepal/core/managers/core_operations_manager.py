@@ -101,9 +101,9 @@ class CoreOperationsManager(BaseManager):
 
         Args:
             parent: Qt parent object for proper lifecycle management
-            session_manager: Optional ApplicationStateManager (uses inject() if not provided)
-            rom_cache: Optional ROMCache (uses inject() if not provided)
-            rom_extractor: Optional ROMExtractor (uses inject() if not provided)
+            session_manager: Optional ApplicationStateManager (uses AppContext if not provided)
+            rom_cache: Optional ROMCache (uses AppContext if not provided)
+            rom_extractor: Optional ROMExtractor (uses AppContext if not provided)
         """
         # Initialize components
         self._sprite_extractor: SpriteExtractor | None = None
@@ -132,18 +132,21 @@ class CoreOperationsManager(BaseManager):
             self._sprite_extractor = SpriteExtractor()
             self._palette_manager = PaletteManager()
 
-            # Get DI dependencies - use passed values or fall back to inject()
+            # Get dependencies from DI container if not passed explicitly
+            # Note: We use the container directly here (not AppContext) because this runs
+            # during manager initialization, before CoreOperationsManager is registered.
             if self._rom_extractor is None or self._session_manager is None or self._rom_cache is None:
-                from core.di_container import inject
+                from core.di_container import get_container
                 from core.rom_extractor import ROMExtractor
                 from core.services.rom_cache import ROMCache
 
-                if self._rom_extractor is None:
-                    self._rom_extractor = inject(ROMExtractor)
+                container = get_container()
                 if self._session_manager is None:
-                    self._session_manager = inject(ApplicationStateManager)
+                    self._session_manager = container.get(ApplicationStateManager)
                 if self._rom_cache is None:
-                    self._rom_cache = inject(ROMCache)
+                    self._rom_cache = container.get(ROMCache)
+                if self._rom_extractor is None:
+                    self._rom_extractor = container.get(ROMExtractor)
 
             # Initialize services (pure helpers returning results)
             self._rom_service = ROMService(

@@ -10,11 +10,11 @@ This directory contains the pytest test suite for SpritePal, featuring **Real Co
 
 ### Basic Test with Managers
 ```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
 def test_extraction(isolated_managers):
-    manager = inject(CoreOperationsManager)
+    context = get_app_context()
+    manager = context.core_operations_manager
     result = manager.validate_extraction_params({"path": "/test"})
     assert isinstance(result, bool)
 ```
@@ -79,6 +79,31 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 # Coverage report
 uv run pytest --cov=core --cov=ui --cov-report=html
 ```
+
+---
+
+## Manager Access Pattern
+
+**Current (recommended):**
+```python
+from core.app_context import get_app_context
+
+context = get_app_context()
+manager = context.core_operations_manager
+```
+
+**Legacy (deprecated but still works):**
+```python
+from core.di_container import inject
+from core.managers.core_operations_manager import CoreOperationsManager
+
+manager = inject(CoreOperationsManager)
+```
+
+The `get_app_context()` pattern is preferred because:
+- Explicit manager access via attributes (better IDE support)
+- Clearer dependency relationships
+- No need to import manager classes for type lookup
 
 ---
 

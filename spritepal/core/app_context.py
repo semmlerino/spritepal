@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.managers.sprite_preset_manager import SpritePresetManager
     from core.rom_extractor import ROMExtractor
+    from core.services.preview_generator import PreviewGenerator
     from core.services.rom_cache import ROMCache
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class AppContext:
     Lazy-initialized (via properties):
         rom_cache: ROM caching service (created on first access)
         rom_extractor: ROM extraction service (created on first access)
+        preview_generator: Preview image generation service (created on first access)
     """
 
     configuration_service: ConfigurationService
@@ -63,6 +65,7 @@ class AppContext:
     # Lazy-initialized (created on first access)
     _rom_cache: ROMCache | None = field(default=None, repr=False)
     _rom_extractor: ROMExtractor | None = field(default=None, repr=False)
+    _preview_generator: PreviewGenerator | None = field(default=None, repr=False)
 
     # Thread safety for lazy initialization
     _lazy_lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
@@ -89,11 +92,38 @@ class AppContext:
                 logger.debug("Created ROMExtractor via lazy initialization")
             return self._rom_extractor
 
+    @property
+    def preview_generator(self) -> PreviewGenerator:
+        """Lazy-initialize PreviewGenerator on first access.
+
+        Automatically configures the generator with required managers.
+        """
+        with self._lazy_lock:
+            if self._preview_generator is None:
+                from core.services.preview_generator import PreviewGenerator
+
+                self._preview_generator = PreviewGenerator()
+                # Auto-configure with available managers
+                self._preview_generator.set_managers(
+                    extraction_manager=self.core_operations_manager,
+                    rom_extractor=self.rom_extractor,
+                )
+                logger.debug("Created PreviewGenerator via lazy initialization")
+            return self._preview_generator
+
     def cleanup(self) -> None:
         """Cleanup all managers in reverse initialization order."""
         logger.info("Cleaning up AppContext...")
 
-        # Cleanup in reverse order of initialization
+        # Cleanup lazy services first (they depend on managers)
+        if self._preview_generator is not None:
+            try:
+                self._preview_generator.cleanup()
+                logger.debug("Cleaned up PreviewGenerator")
+            except Exception:
+                logger.warning("Error cleaning up PreviewGenerator", exc_info=True)
+
+        # Cleanup managers in reverse order of initialization
         for mgr in [
             self.core_operations_manager,
             self.sprite_preset_manager,

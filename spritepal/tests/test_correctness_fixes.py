@@ -17,13 +17,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
 
 def get_extraction_manager():
     """Get extraction manager via DI."""
-    return inject(CoreOperationsManager)
+    return get_app_context().core_operations_manager
 
 
 # Mark all tests as headless and integration

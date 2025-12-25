@@ -11,15 +11,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.di_container import inject
+from core.app_context import get_app_context
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from ui.extraction_controller import ExtractionController
 
 
 def get_settings_manager():
-    """Get settings manager from DI container."""
-    return inject(ApplicationStateManager)
+    """Get settings manager from app context."""
+    return get_app_context().application_state_manager
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -99,11 +99,12 @@ class TestSettingsIntegration:
         settings.save_settings()
 
         # Create controller with all required dependencies
+        context = get_app_context()
         ExtractionController(
             main_window=mock_main_window,
-            extraction_manager=inject(CoreOperationsManager),
-            session_manager=inject(ApplicationStateManager),
-            injection_manager=inject(CoreOperationsManager),
+            extraction_manager=context.core_operations_manager,
+            session_manager=context.application_state_manager,
+            injection_manager=context.core_operations_manager,
             settings_manager=settings,
         )
 
