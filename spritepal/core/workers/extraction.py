@@ -1,8 +1,8 @@
 """
-Extraction worker implementations using the new base classes.
+Extraction worker implementations.
 
 These workers handle VRAM and ROM extraction operations by delegating
-to the ExtractionManager while providing consistent threading interfaces.
+to the CoreOperationsManager while providing consistent threading interfaces.
 """
 
 from __future__ import annotations
@@ -14,26 +14,32 @@ if TYPE_CHECKING:
 
     from core.managers.core_operations_manager import CoreOperationsManager
 
+from PySide6.QtCore import Signal
+
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.types import ROMExtractionParams, VRAMExtractionParams
 from utils.logging_config import get_logger
 
-from .base import handle_worker_errors
-from .specialized import (
-    ExtractionWorkerBase,
-    SignalConnectionHelper,
-)
+from .base import ManagedWorker, handle_worker_errors
+from .specialized import SignalConnectionHelper
 
 logger = get_logger(__name__)
 
 
-class VRAMExtractionWorker(ExtractionWorkerBase):
+class VRAMExtractionWorker(ManagedWorker):
     """
     Worker for VRAM extraction operations.
 
     Handles extraction of sprites from VRAM memory dumps using
     CoreOperationsManager, providing progress updates and preview generation.
     """
+
+    # Extraction-specific signals
+    preview_ready = Signal(object, int)  # pixmap/image, tile_count
+    preview_image_ready = Signal(object)  # PIL image for palette application
+    palettes_ready = Signal(object)  # palette data
+    active_palettes_ready = Signal(list)  # active palette indices
+    extraction_finished = Signal(list)  # list of extracted files
 
     def __init__(
         self,
@@ -102,13 +108,20 @@ class VRAMExtractionWorker(ExtractionWorkerBase):
 
         logger.info(f"{self._operation_name}: Extraction completed successfully")
 
-class ROMExtractionWorker(ExtractionWorkerBase):
+class ROMExtractionWorker(ManagedWorker):
     """
     Worker for ROM extraction operations.
 
     Handles extraction of sprites from ROM files using CoreOperationsManager,
     providing progress updates during the extraction process.
     """
+
+    # Extraction-specific signals
+    preview_ready = Signal(object, int)  # pixmap/image, tile_count
+    preview_image_ready = Signal(object)  # PIL image for palette application
+    palettes_ready = Signal(object)  # palette data
+    active_palettes_ready = Signal(list)  # active palette indices
+    extraction_finished = Signal(list)  # list of extracted files
 
     def __init__(
         self,

@@ -1,8 +1,8 @@
 """
-Specialized worker base classes for different operation types.
+Signal connection helper for worker threads.
 
-These classes extend the base worker classes with domain-specific
-signals and behavior for extraction, injection, and scanning operations.
+Provides reusable methods for connecting manager signals to worker signals,
+reducing boilerplate and ensuring consistent signal wiring.
 """
 
 from __future__ import annotations
@@ -15,12 +15,9 @@ if TYPE_CHECKING:
 
     from core.managers.core_operations_manager import CoreOperationsManager
 
-from PySide6.QtCore import QObject, Signal
-
-from core.managers.base_manager import BaseManager
 from utils.logging_config import get_logger
 
-from .base import BaseWorker, ManagedWorker
+from .base import ManagedWorker
 
 logger = get_logger(__name__)
 
@@ -183,121 +180,4 @@ class SignalConnectionHelper:
         logger.debug("Connected injection completion signals")
 
 
-class ExtractionWorkerBase(ManagedWorker):
-    """
-    Base class for extraction workers with extraction-specific signals.
-
-    Provides signals for preview generation, palette data, and other
-    extraction-specific events.
-    """
-
-    # Extraction-specific signals
-    preview_ready = Signal(object, int)  # pixmap/image, tile_count
-    preview_image_ready = Signal(object)  # PIL image for palette application
-    palettes_ready = Signal(object)  # palette data - use object to avoid PySide6 copy warning
-    active_palettes_ready = Signal(list)  # active palette indices
-    extraction_finished = Signal(list)  # list of extracted files
-
-    def __init__(self, manager: BaseManager, parent: QObject | None = None) -> None:
-        super().__init__(manager=manager, parent=parent)
-        self._operation_name = "ExtractionWorker"
-
-class InjectionWorkerBase(ManagedWorker):
-    """
-    Base class for injection workers with injection-specific signals.
-
-    Provides signals for compression information, progress percentages,
-    and other injection-specific events.
-    """
-
-    # Injection-specific signals
-    progress_percent = Signal(int)  # Progress percentage (0-100)
-    compression_info = Signal(object)  # Compression statistics - use object to avoid PySide6 copy warning
-    injection_finished = Signal(bool, str)  # success, message
-
-    def __init__(self, manager: BaseManager, parent: QObject | None = None) -> None:
-        super().__init__(manager=manager, parent=parent)
-        self._operation_name = "InjectionWorker"
-
-class ScanWorkerBase(BaseWorker):
-    """
-    Base class for scanning workers with scan-specific signals.
-
-    Used for ROM scanning, sprite searching, and other discovery operations.
-    Note: Inherits from BaseWorker (not ManagedWorker) as scan operations
-    often contain their own business logic.
-    """
-
-    # Scan-specific signals
-    item_found = Signal(object)  # Found item information - use object to avoid PySide6 copy warning
-    scan_stats = Signal(object)  # Scan statistics and metadata - use object to avoid PySide6 copy warning
-    scan_progress = Signal(int, int)  # current, total
-    scan_finished = Signal(bool)  # success
-
-    # Cache-related signals (for ROM scanning)
-    cache_status = Signal(str)  # Cache status message
-    cache_progress = Signal(int)  # Cache save progress 0-100
-
-    def __init__(self, parent: QObject | None = None) -> None:
-        super().__init__(parent)
-        self._operation_name = "ScanWorker"
-
-    def emit_item_found(self, item_info: dict[str, object]) -> None:
-        """
-        Emit when an item is found during scanning.
-
-        Args:
-            item_info: Dictionary containing item details
-        """
-        self.item_found.emit(item_info)
-
-    def emit_scan_progress(self, current: int, total: int) -> None:
-        """
-        Emit scan progress in current/total format.
-
-        Args:
-            current: Current item being processed
-            total: Total items to process
-        """
-        self.scan_progress.emit(current, total)
-
-        # Also emit standard progress percentage
-        if total > 0:
-            percent = int((current / total) * 100)
-            self.emit_progress(percent, f"Scanning {current}/{total}")
-
-class PreviewWorkerBase(BaseWorker):
-    """
-    Base class for preview generation workers.
-
-    Used for generating sprite previews, ROM map visualizations,
-    and other UI preview operations.
-    """
-
-    # Preview-specific signals
-    preview_ready = Signal(object)  # Generated preview (QPixmap, PIL Image, etc.)
-    preview_failed = Signal(str)  # Preview generation failed
-
-    def __init__(self, parent: QObject | None = None) -> None:
-        super().__init__(parent)
-        self._operation_name = "PreviewWorker"
-
-    def emit_preview_ready(self, preview: object) -> None:
-        """
-        Emit when preview is ready.
-
-        Args:
-            preview: Generated preview object
-        """
-        self.preview_ready.emit(preview)
-
-    def emit_preview_failed(self, error_message: str) -> None:
-        """
-        Emit when preview generation fails.
-
-        Args:
-            error_message: Error description
-        """
-        self.preview_failed.emit(error_message)
-        self.emit_error(error_message)
 

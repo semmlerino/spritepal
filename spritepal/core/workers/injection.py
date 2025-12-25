@@ -1,31 +1,25 @@
 """
-Injection worker implementations using the new base classes.
+Injection worker implementations.
 
 These workers handle VRAM and ROM injection operations by delegating
-to the InjectionManager while providing consistent threading interfaces.
+to the CoreOperationsManager while providing consistent threading interfaces.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict, cast
-
-try:
-    from typing import override
-except ImportError:
-    from typing import override
+from typing import TYPE_CHECKING, TypedDict, cast, override
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
+
+from PySide6.QtCore import Signal
 
 from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from utils.logging_config import get_logger
 
-from .base import handle_worker_errors
-from .specialized import (
-    InjectionWorkerBase,
-    SignalConnectionHelper,
-)
+from .base import ManagedWorker, handle_worker_errors
+from .specialized import SignalConnectionHelper
 
 logger = get_logger(__name__)
 
@@ -49,13 +43,18 @@ class ROMInjectionParams(TypedDict, total=False):
     fast_compression: bool
     metadata_path: str | None
 
-class VRAMInjectionWorker(InjectionWorkerBase):
+class VRAMInjectionWorker(ManagedWorker):
     """
-    Worker for VRAM injection operations using singleton InjectionManager.
+    Worker for VRAM injection operations.
 
-    Handles injection of sprites into VRAM memory dumps using the global
-    InjectionManager, providing progress updates during the injection process.
+    Handles injection of sprites into VRAM memory dumps using
+    CoreOperationsManager, providing progress updates during the injection process.
     """
+
+    # Injection-specific signals
+    progress_percent = Signal(int)  # Progress percentage (0-100)
+    compression_info = Signal(object)  # Compression statistics
+    injection_finished = Signal(bool, str)  # success, message
 
     def __init__(
         self,
@@ -63,7 +62,7 @@ class VRAMInjectionWorker(InjectionWorkerBase):
         injection_manager: BaseManager,
         parent: QObject | None = None,
     ) -> None:
-        super().__init__(injection_manager, parent)
+        super().__init__(manager=injection_manager, parent=parent)
         self.params = params
         self._operation_name = "VRAMInjectionWorker"
 
@@ -114,13 +113,18 @@ class VRAMInjectionWorker(InjectionWorkerBase):
             self.emit_error(error_msg)
             self.operation_finished.emit(False, error_msg)
 
-class ROMInjectionWorker(InjectionWorkerBase):
+class ROMInjectionWorker(ManagedWorker):
     """
-    Worker for ROM injection operations using singleton InjectionManager.
+    Worker for ROM injection operations.
 
-    Handles injection of sprites into ROM files using the global
-    InjectionManager, providing progress updates and compression info.
+    Handles injection of sprites into ROM files using
+    CoreOperationsManager, providing progress updates and compression info.
     """
+
+    # Injection-specific signals
+    progress_percent = Signal(int)  # Progress percentage (0-100)
+    compression_info = Signal(object)  # Compression statistics
+    injection_finished = Signal(bool, str)  # success, message
 
     def __init__(
         self,
@@ -128,7 +132,7 @@ class ROMInjectionWorker(InjectionWorkerBase):
         injection_manager: BaseManager,
         parent: QObject | None = None,
     ) -> None:
-        super().__init__(injection_manager, parent)
+        super().__init__(manager=injection_manager, parent=parent)
         self.params = params
         self._operation_name = "ROMInjectionWorker"
 

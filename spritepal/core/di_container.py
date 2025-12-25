@@ -83,6 +83,11 @@ def inject(interface: type[T]) -> T:
     return _container.get(interface)
 
 
+def get_optional(interface: type[T]) -> T | None:
+    """Get an injected dependency if registered, otherwise None."""
+    return _container.get_optional(interface)
+
+
 def register_singleton(interface: type[T], implementation: T) -> None:
     """Register a singleton instance."""
     _container.register_singleton(interface, implementation)
