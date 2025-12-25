@@ -9,7 +9,7 @@ Key fixtures:
 - qtbot: Standard pytest-qt fixture (delegates to pytest-qt)
 - main_window: Class-scoped mock main window
 - cleanup_workers: Autouse worker thread cleanup
-- cleanup_singleton: ManualOffsetDialog singleton cleanup
+- cleanup_singleton: Dialog cleanup fixture
 - signal_timeout, wait_timeout, worker_timeout: Configurable timeouts
 """
 from __future__ import annotations
@@ -54,9 +54,6 @@ _SESSION_THREAD_BASELINE: int = threading.active_count()
 _SESSION_THREAD_IDENTITIES: dict[int, str] = {
     t.ident: t.name for t in threading.enumerate() if t.ident is not None
 }
-
-# Lock for singleton cleanup to prevent race conditions during parallel fixture execution
-_singleton_cleanup_lock = threading.Lock()
 
 # Module logger for fixture diagnostics
 _logger = logging.getLogger(__name__)
@@ -483,80 +480,32 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 
 @pytest.fixture
 def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
-    """Centralized ManualOffsetDialog singleton cleanup fixture.
+    """Dialog cleanup fixture for tests using OffsetDialogManager.
 
-    This fixture ensures the OffsetDialogManager singleton is properly cleaned up
-    before and after each test with explicit ordering to prevent segfaults:
-    1. Process pending events (ensure Qt is in stable state)
-    2. Request dialog close (triggers Qt cleanup chain)
-    3. Wait for dialog to be hidden (confirm close completed)
-    4. Schedule deferred deletion (let Qt handle memory)
-    5. Process events again (flush deferred deletions)
-    6. Reset singleton reference
+    With per-instance dialog management, cleanup is handled automatically
+    by Qt's parent-child hierarchy. This fixture processes pending events
+    to ensure clean state between tests.
 
     Usage:
         def test_something(cleanup_singleton):
-            # Singleton is already reset before test
-            dialog = OffsetDialogManager.get_dialog(panel)
+            # Events processed before test
+            manager = OffsetDialogManager(parent_widget=widget)
+            dialog = manager.get_dialog()
             # ... test code ...
-            # Singleton will be reset after test with proper ordering
+            # Events processed after test
     """
     from PySide6.QtWidgets import QApplication
 
-    from ui.rom_extraction.offset_dialog_manager import OffsetDialogManager
+    def _process_events():
+        """Process Qt events to ensure clean state."""
+        app = QApplication.instance()
+        if app:
+            app.processEvents()
 
-    def _safe_cleanup_singleton():
-        """Cleanup with explicit ordering to prevent segfaults.
-
-        Thread-safe: Uses _singleton_cleanup_lock to prevent concurrent
-        cleanup from multiple fixtures, which could cause race conditions
-        when accessing OffsetDialogManager._dialog_instance.
-        """
-        with _singleton_cleanup_lock:
-            app = QApplication.instance()
-
-            # Step 1: Process pending events first
-            if app:
-                app.processEvents()
-
-            instance = OffsetDialogManager._dialog_instance
-            if instance is not None:
-                try:
-                    # Step 2: Request close
-                    instance.close()
-
-                    # Step 3: Process events to complete close
-                    if app:
-                        app.processEvents()
-
-                    # Step 4: Check if hidden (close completed)
-                    if hasattr(instance, 'isHidden') and not instance.isHidden():
-                        # Force hide if close didn't work
-                        instance.hide()
-                        if app:
-                            app.processEvents()
-
-                    # Step 5: Schedule deferred deletion
-                    instance.deleteLater()
-
-                    # Step 6: Process deferred deletions
-                    if app:
-                        app.processEvents()
-                except (RuntimeError, AttributeError):
-                    # Widget may already be deleted, ignore
-                    pass
-
-            # Step 7: Reset singleton reference
-            OffsetDialogManager.reset_singleton()
-
-            # Final event processing
-            if app:
-                app.processEvents()
-
-    # Clean before test
-    _safe_cleanup_singleton()
+    # Process events before test
+    _process_events()
 
     yield
 
-    # Clean after test with same careful ordering
-    _safe_cleanup_singleton()
+    # Process events after test
+    _process_events()

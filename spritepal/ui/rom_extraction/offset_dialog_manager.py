@@ -1,13 +1,13 @@
 """
 Offset dialog manager for ROM extraction panel.
 
-This module manages the ManualOffsetDialog singleton lifecycle,
+This module manages the ManualOffsetDialog lifecycle per-manager instance,
 providing a clean interface for opening, closing, and tracking the dialog state.
 """
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 class OffsetDialogManager(QObject):
     """
-    Manages the ManualOffsetDialog singleton lifecycle.
+    Manages the ManualOffsetDialog lifecycle per-instance.
 
     This class provides a clean interface for:
     - Opening and showing the dialog
@@ -33,14 +33,8 @@ class OffsetDialogManager(QObject):
     - Forwarding dialog signals
     - Proper cleanup on close
 
-    The dialog instance is managed at the class level to ensure only one
-    exists across the entire application.
+    Each OffsetDialogManager instance owns its own dialog instance.
     """
-
-    # Class-level singleton management
-    _dialog_instance: ClassVar[UnifiedManualOffsetDialog | None] = None
-    _dialog_lock: ClassVar[threading.Lock] = threading.Lock()
-    _creator_manager: ClassVar[OffsetDialogManager | None] = None
 
     # Signals forwarded from dialog
     offset_changed = Signal(int)  # New offset value
@@ -66,27 +60,27 @@ class OffsetDialogManager(QObject):
         self._rom_path: str | None = None
         self._extractor: ROMExtractor | None = None
 
+        # Instance-level dialog management
+        self._dialog: UnifiedManualOffsetDialog | None = None
+        self._dialog_lock = threading.Lock()
+
         logger.debug("OffsetDialogManager initialized")
 
-    @classmethod
-    def _is_dialog_destroyed(cls) -> bool:
+    def _is_dialog_destroyed(self) -> bool:
         """Check if the dialog instance has been destroyed by Qt."""
-        if cls._dialog_instance is None:
+        if self._dialog is None:
             return True
         try:
             # Try to access a property - raises RuntimeError if deleted
-            _ = cls._dialog_instance.isVisible()
+            _ = self._dialog.isVisible()
             return False
         except RuntimeError:
             return True
 
-    @classmethod
-    def _create_dialog(cls, manager: OffsetDialogManager | None) -> UnifiedManualOffsetDialog:
+    def _create_dialog(self) -> UnifiedManualOffsetDialog:
         """Create the dialog instance with injected dependencies."""
         from core.app_context import get_app_context
         from ui.dialogs import UnifiedManualOffsetDialog
-
-        parent = manager._parent_widget if manager else None
 
         # Get dependencies from AppContext
         context = get_app_context()
@@ -96,56 +90,47 @@ class OffsetDialogManager(QObject):
         rom_extractor = extraction_manager.get_rom_extractor()
 
         dialog = UnifiedManualOffsetDialog(
-            parent=parent,
+            parent=self._parent_widget,
             rom_cache=rom_cache,
             settings_manager=settings_manager,
             extraction_manager=extraction_manager,
             rom_extractor=rom_extractor,
         )
-        cls._creator_manager = manager
         return dialog
 
-    @classmethod
-    def get_dialog(cls, manager: OffsetDialogManager | None = None) -> UnifiedManualOffsetDialog | None:
+    def get_dialog(self) -> UnifiedManualOffsetDialog | None:
         """
-        Get the singleton dialog instance, creating if needed.
-
-        Args:
-            manager: The OffsetDialogManager requesting the dialog
+        Get the dialog instance, creating if needed.
 
         Returns:
             The dialog instance, or None if creation failed
         """
-        with cls._dialog_lock:
-            if cls._dialog_instance is None or cls._is_dialog_destroyed():
-                cls._dialog_instance = cls._create_dialog(manager)
-            return cls._dialog_instance
+        with self._dialog_lock:
+            if self._dialog is None or self._is_dialog_destroyed():
+                self._dialog = self._create_dialog()
+            return self._dialog
 
-    @classmethod
-    def get_current_dialog(cls) -> UnifiedManualOffsetDialog | None:
+    def get_current_dialog(self) -> UnifiedManualOffsetDialog | None:
         """Get the current dialog without creating a new one."""
-        with cls._dialog_lock:
-            if cls._is_dialog_destroyed():
+        with self._dialog_lock:
+            if self._is_dialog_destroyed():
                 return None
-            return cls._dialog_instance
+            return self._dialog
 
-    @classmethod
-    def is_dialog_open(cls) -> bool:
+    def is_dialog_open(self) -> bool:
         """Check if a dialog instance exists and is not destroyed."""
-        with cls._dialog_lock:
-            return cls._dialog_instance is not None and not cls._is_dialog_destroyed()
+        with self._dialog_lock:
+            return self._dialog is not None and not self._is_dialog_destroyed()
 
-    @classmethod
-    def reset_singleton(cls) -> None:
-        """Reset the singleton state, closing any open dialog."""
-        with cls._dialog_lock:
-            if cls._dialog_instance is not None:
+    def reset_dialog(self) -> None:
+        """Reset the dialog state, closing any open dialog."""
+        with self._dialog_lock:
+            if self._dialog is not None:
                 try:
-                    cls._dialog_instance.close()
+                    self._dialog.close()
                 except RuntimeError:
                     pass  # Already deleted
-            cls._dialog_instance = None
-            cls._creator_manager = None
+            self._dialog = None
 
     def open_dialog(
         self,
@@ -171,7 +156,7 @@ class OffsetDialogManager(QObject):
         self._rom_path = rom_path
         self._extractor = extractor
 
-        dialog = self.get_dialog(self)
+        dialog = self.get_dialog()
         if dialog is None:
             logger.error("Failed to get dialog instance")
             return None
@@ -234,8 +219,7 @@ class OffsetDialogManager(QObject):
     def _on_dialog_destroyed(self) -> None:
         """Handle dialog destroyed."""
         with self._dialog_lock:
-            OffsetDialogManager._dialog_instance = None
-            OffsetDialogManager._creator_manager = None
+            self._dialog = None
         self._signals_connected = False
         self.dialog_closed.emit()
         logger.debug("Manual offset dialog destroyed")
@@ -252,7 +236,7 @@ class OffsetDialogManager(QObject):
                 dialog.close()
             except RuntimeError:
                 pass  # Already deleted
-        self.reset_singleton()
+        self.reset_dialog()
         self._signals_connected = False
 
     def cleanup(self) -> None:

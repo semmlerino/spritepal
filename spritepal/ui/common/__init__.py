@@ -8,7 +8,7 @@ from __future__ import annotations
 from core.services.worker_lifecycle import WorkerManager
 
 from .collapsible_group_box import CollapsibleGroupBox
-from .error_handler import ErrorHandler, get_error_handler, reset_error_handler
+from .error_handler import ErrorHandler
 from .file_dialogs import (
     FileDialogHelper,
     browse_for_directory,
@@ -123,9 +123,7 @@ __all__ = [
     "browse_for_directory",
     "browse_for_open_file",
     "browse_for_save_file",
-    "get_error_handler",
     "is_valid_pixmap",
     "is_valid_qt",
-    "reset_error_handler",
     "safe_disconnect",
 ]

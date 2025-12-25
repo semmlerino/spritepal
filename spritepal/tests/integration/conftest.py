@@ -194,7 +194,6 @@ def rom_extraction_panel(qtbot, managers_initialized):
     test pollution when multiple tests open the manual offset dialog.
     """
     from core.app_context import get_app_context
-    from ui.rom_extraction.offset_dialog_manager import OffsetDialogManager
     from ui.rom_extraction_panel import ROMExtractionPanel
 
     extraction_manager = get_app_context().core_operations_manager
@@ -204,9 +203,7 @@ def rom_extraction_panel(qtbot, managers_initialized):
 
     yield panel
 
-    # Cleanup: Reset the singleton to prevent test pollution
-    # This is critical for tests that call panel._open_manual_offset_dialog()
-    OffsetDialogManager.reset_singleton()
+    # Cleanup is handled by Qt parent-child hierarchy - panel owns its dialog manager
 
 
 @pytest.fixture

@@ -5,7 +5,6 @@ This allows for proper testing and separation of concerns.
 
 from __future__ import annotations
 
-import threading
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
@@ -82,41 +81,3 @@ class ErrorHandler(QObject):
         """Default handler for info messages - shows QMessageBox"""
         if self._show_dialogs and self._parent_widget is not None:
             QMessageBox.information(self._parent_widget, title, message)
-
-class _ErrorHandlerSingleton:
-    """Thread-safe singleton holder for ErrorHandler."""
-    _instance: ErrorHandler | None = None
-    _lock = threading.Lock()
-
-    @classmethod
-    def get(cls, parent: QWidget | None = None) -> ErrorHandler:
-        """Get or create the global error handler instance (thread-safe)"""
-        # Fast path - check without lock
-        if cls._instance is not None:
-            if parent is not None and cls._instance._parent_widget is None:
-                with cls._lock:
-                    if cls._instance._parent_widget is None:
-                        cls._instance._parent_widget = parent
-                        cls._instance.setParent(parent)
-            return cls._instance
-
-        # Slow path - create with lock
-        with cls._lock:
-            # Double-check pattern
-            if cls._instance is None:
-                cls._instance = ErrorHandler(parent)
-            return cls._instance
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reset the global error handler (useful for testing)"""
-        with cls._lock:
-            cls._instance = None
-
-def get_error_handler(parent: QWidget | None = None) -> ErrorHandler:
-    """Get or create the global error handler instance (thread-safe)"""
-    return _ErrorHandlerSingleton.get(parent)
-
-def reset_error_handler() -> None:
-    """Reset the global error handler (useful for testing)"""
-    _ErrorHandlerSingleton.reset()

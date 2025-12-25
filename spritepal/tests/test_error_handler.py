@@ -7,7 +7,7 @@ import pytest
 from PySide6.QtTest import QSignalSpy
 from PySide6.QtWidgets import QWidget
 
-from ui.common import get_error_handler, reset_error_handler
+from ui.common import ErrorHandler
 
 # Test characteristics: Real GUI components requiring display
 pytestmark = [
@@ -19,21 +19,14 @@ pytestmark = [
 class TestErrorHandler:
     """Test error handler signal-based approach"""
 
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        """Reset error handler before each test"""
-        reset_error_handler()
-        yield
-        reset_error_handler()
-
     def test_error_handler_emits_signals(self, qtbot):
         """Test that error handler emits signals instead of showing dialogs"""
         # Create a parent widget
         parent = QWidget()
         qtbot.addWidget(parent)
 
-        # Get error handler
-        handler = get_error_handler(parent)
+        # Create error handler
+        handler = ErrorHandler(parent)
         handler.set_show_dialogs(False)  # Disable dialogs for testing
 
         # Create signal spies
@@ -61,7 +54,7 @@ class TestErrorHandler:
         parent = QWidget()
         qtbot.addWidget(parent)
 
-        handler = get_error_handler(parent)
+        handler = ErrorHandler(parent)
         handler.set_show_dialogs(False)
 
         critical_spy = QSignalSpy(handler.critical_error)
@@ -74,18 +67,12 @@ class TestErrorHandler:
         assert critical_spy.at(0)[0] == "Error"
         assert "Test context: Test exception" in critical_spy.at(0)[1]
 
-    def test_error_handler_singleton(self):
-        """Test that get_error_handler returns singleton"""
-        handler1 = get_error_handler()
-        handler2 = get_error_handler()
-        assert handler1 is handler2
-
     def test_custom_signal_handlers(self, qtbot):
         """Test that custom handlers can be connected to error signals"""
         parent = QWidget()
         qtbot.addWidget(parent)
 
-        handler = get_error_handler(parent)
+        handler = ErrorHandler(parent)
         handler.set_show_dialogs(False)
 
         # Track custom handler calls

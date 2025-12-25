@@ -130,14 +130,17 @@ def reset_all_singletons() -> None:
     Call this instead of resetting individual singletons scattered across tests.
 
     Resets:
-        - Manager state (core managers)
+        - Manager state (DI container, initialization flags)
         - HALProcessPool (real HAL compression)
         - MockHALProcessPool (mock HAL compression)
         - DataRepository (test data cleanup)
-        - PreviewGenerator (preview caching)
         - WorkerManager (thread registry)
 
-    Note: Failures are logged but don't stop the reset process.
+    Note: PreviewGenerator and ConfigurationService are now handled by AppContext
+    cleanup (via reset_app_context in app_context_fixtures.py).
+    OffsetDialogManager cleanup is per-instance, handled by Qt parent-child hierarchy.
+
+    Failures are logged but don't stop the reset process.
     Some resets are expected to fail in certain contexts (e.g., MockHALProcessPool
     not imported in non-mock tests).
     """

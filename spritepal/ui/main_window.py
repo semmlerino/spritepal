@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 # Session manager accessed via get_app_context().application_state_manager
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
 from core.types import VRAMExtractionParams
+from ui.common import ErrorHandler
 from ui.common.spacing_constants import (
     SPACING_COMPACT_SMALL,
     SPACING_SMALL,
@@ -86,12 +87,16 @@ class MainWindow(QMainWindow):
         self._output_path: str
         self._extracted_files: list[str]
         self._controller: ExtractionController | None
+        self._error_handler: ErrorHandler
         self.left_panel: QWidget
         self.extraction_tabs: QTabWidget
         self.rom_extraction_panel: ROMExtractionPanel
         self.extraction_panel: ExtractionPanel
         self.sprite_preview: PreviewPanel
         self.palette_preview: PalettePreviewWidget
+
+        # Create error handler (owned by MainWindow)
+        self._error_handler = ErrorHandler(parent=self)
 
         # Store injected dependencies
         self.settings_manager = settings_manager
@@ -1070,3 +1075,8 @@ class MainWindow(QMainWindow):
     def controller(self, value: ExtractionController) -> None:
         """Allow setting controller for testing purposes."""
         self._controller = value
+
+    @property
+    def error_handler(self) -> ErrorHandler:
+        """Get the application error handler (owned by MainWindow)."""
+        return self._error_handler

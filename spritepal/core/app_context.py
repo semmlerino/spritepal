@@ -202,7 +202,7 @@ def get_app_context() -> AppContext:
         except (ImportError, RuntimeError):
             raise RuntimeError(
                 "AppContext not initialized. Call create_app_context() first."
-            )
+            ) from None
 
 
 def get_app_context_optional() -> AppContext | None:
