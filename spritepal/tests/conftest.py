@@ -671,25 +671,6 @@ def standard_test_params(
         "oam_data": oam_data,
     }
 
-@pytest.fixture
-def minimal_sprite_data(
-    test_data_factory: Callable[..., bytearray],
-) -> dict[str, Any]:
-    """
-    Create minimal but valid sprite data for quick tests.
-
-    Provides a lightweight alternative to full test data for tests
-    that just need basic sprite data structure.
-    """
-    return {
-        "vram": test_data_factory("vram", size=0x1000),  # 4KB
-        "cgram": test_data_factory("cgram", size=32),    # 1 palette
-        "width": 64,
-        "height": 64,
-        "tile_count": 8,
-    }
-
-
 # ============================================================================
 # Function-scoped fixtures for proper test isolation
 # ============================================================================

@@ -30,6 +30,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.services.dump_file_detection_service import (
+    DetectedFiles,
+    auto_detect_all,
+    detect_related_files,
+)
 from ui.common.spacing_constants import (
     COMBO_BOX_MIN_WIDTH,
     OFFSET_LABEL_MIN_WIDTH,
@@ -46,11 +51,6 @@ from ui.styles import (
     get_success_text_style,
 )
 from ui.widgets.drop_zone import DropZone
-from core.services.dump_file_detection_service import (
-    DetectedFiles,
-    auto_detect_all,
-    detect_related_files,
-)
 from utils.constants import VRAM_SPRITE_OFFSET
 from utils.logging_config import get_logger
 

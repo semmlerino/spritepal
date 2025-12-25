@@ -29,7 +29,7 @@ from ui.common.spacing_constants import (
     SPACING_SMALL,
     SPACING_STANDARD,
 )
-from ui.common.widget_helpers import create_section_title
+from ui.common.widget_helpers import create_styled_label
 from ui.styles import get_prominent_action_button_style
 from ui.styles.theme import COLORS
 from utils.constants import MIN_SPRITE_SIZE, ROM_MIN_REGION_SIZE, ROM_SIZE_1MB, ROM_SIZE_2MB, ROM_SIZE_4MB
@@ -101,7 +101,7 @@ class SimpleBrowseTab(QWidget):
         controls_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)  # Comfortable padding
 
         # Section title with better styling
-        title = create_section_title("ROM Offset Control")
+        title = create_styled_label("ROM Offset Control", style="title")
         title.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLORS['highlight']};")
         controls_layout.addWidget(title)
 

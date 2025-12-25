@@ -22,13 +22,11 @@ from utils.constants import (
     MIN_SPRITE_SIZE,
     MIN_SPRITE_TILES,
     ROM_SCAN_STEP_DEFAULT,
-    ROM_SCAN_STEP_QUICK,
     ROM_SPRITE_AREA_1_START,
-    get_sprite_search_areas,
     normalize_address,
 )
 from utils.logging_config import get_logger
-from utils.rom_utils import detect_smc_offset, detect_smc_offset_from_size
+from utils.rom_utils import detect_smc_offset
 
 logger = get_logger(__name__)
 
@@ -569,56 +567,6 @@ class SpriteFinder:
                 f.write("\n\n")
 
         logger.info(f"Saved search report: {report_path}")
-
-    def quick_scan_known_areas(self, rom_path: str) -> list[SpriteCandidate]:
-        """
-        Quick scan of areas where sprites are commonly found in SNES games.
-
-        Dynamically adjusts search areas based on ROM size to find sprites
-        in larger ROMs that exceed the traditional 3MB sprite area.
-        """
-        # Get ROM size to determine appropriate search areas
-        rom_file = Path(rom_path)
-        if not rom_file.exists():
-            logger.error(f"ROM file not found: {rom_path}")
-            return []
-
-        file_size = rom_file.stat().st_size
-        # Adjust for SMC header if present
-        smc_offset = detect_smc_offset_from_size(file_size)
-        rom_size = file_size - smc_offset
-
-        # Get search areas appropriate for this ROM size
-        common_sprite_ranges = get_sprite_search_areas(rom_size)
-
-        logger.info(
-            f"Quick scanning {len(common_sprite_ranges)} areas for "
-            f"{rom_size / 1024 / 1024:.1f}MB ROM"
-        )
-
-        all_candidates = []
-
-        for start, end in common_sprite_ranges:
-            logger.info(f"Quick scanning range 0x{start:06X}-0x{end:06X}")
-
-            # Use larger step for quick scan
-            candidates = self.find_sprites_in_rom(
-                rom_path,
-                start_offset=start,
-                end_offset=end,
-                step=ROM_SCAN_STEP_QUICK,  # Larger step for quick scan
-                min_confidence=0.7,  # Higher threshold
-                save_previews=True,
-                max_candidates=10  # Limit per range
-            )
-
-            all_candidates.extend(candidates)
-
-            if len(all_candidates) >= 20:
-                logger.info("Found enough candidates in quick scan")
-                break
-
-        return all_candidates
 
     def find_sprite_at_offset(self, rom_data: bytes, offset: int) -> SpriteInfo | None:
         """

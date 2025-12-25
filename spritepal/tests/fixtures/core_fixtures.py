@@ -46,9 +46,9 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 if TYPE_CHECKING:
     from pytest import FixtureRequest, TempPathFactory
 
+    from core.managers import ManagerRegistry
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.managers import ManagerRegistry
     from core.services.rom_cache import ROMCache
     from tests.infrastructure.test_protocols import MockMainWindowProtocol
 
@@ -282,8 +282,7 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[ManagerRegis
 
     from PySide6.QtWidgets import QApplication
 
-    from core.managers import cleanup_managers, initialize_managers
-    from core.managers import ManagerRegistry
+    from core.managers import ManagerRegistry, cleanup_managers, initialize_managers
 
     # Create session-specific settings directory for isolation
     # Priority: SPRITEPAL_SETTINGS_DIR env var (xdist) > tmp_path_factory
@@ -309,7 +308,6 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[ManagerRegis
     initialize_managers("TestApp", settings_path=settings_path)
 
     # Get the global registry that was just initialized
-    from core.managers import ManagerRegistry
     registry = ManagerRegistry()
 
     yield registry
@@ -348,8 +346,7 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     """
     from PySide6.QtWidgets import QApplication
 
-    from core.managers import cleanup_managers, initialize_managers
-    from core.managers import ManagerRegistry
+    from core.managers import ManagerRegistry, cleanup_managers, initialize_managers
 
     test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
     session_active = _session_state.is_initialized
@@ -487,8 +484,7 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
     from PySide6.QtWidgets import QApplication
 
     from core.di_container import reset_container
-    from core.managers import cleanup_managers, initialize_managers
-    from core.managers import ManagerRegistry
+    from core.managers import ManagerRegistry, cleanup_managers, initialize_managers
 
     session_active = _session_state.is_initialized
     session_settings_path = _session_state.settings_path
@@ -737,70 +733,6 @@ def mock_settings_manager(
 def mock_main_window(real_factory: RealComponentFactory) -> MockMainWindowProtocol:
     """Provide a fully configured mock main window using real components."""
     return real_factory.create_main_window()
-
-
-@pytest.fixture
-def mock_extraction_worker(real_factory: RealComponentFactory) -> Mock:
-    """Provide a fully configured mock extraction worker using real components."""
-    return real_factory.create_extraction_worker()
-
-
-@pytest.fixture
-def mock_file_dialogs(real_factory: RealComponentFactory) -> dict[str, Mock]:
-    """Provide mock file dialog functions."""
-    return real_factory.create_file_dialogs()
-
-
-# ============================================================================
-# Controller Fixture
-# ============================================================================
-
-# Import for controller fixture
-try:
-    from ui.extraction_controller import ExtractionController
-except ImportError:
-    ExtractionController = None  # type: ignore[misc, assignment]
-
-
-@pytest.fixture
-def mock_controller() -> Mock:
-    """Function-scoped MOCK controller for fast unit tests.
-
-    Creates a fresh mock controller with mock manager dependencies.
-    For tests needing real signal behavior, use the real main_window
-    fixture and create a real controller locally.
-
-    Returns a Mock(spec=ExtractionController) with mocked manager dependencies.
-    """
-    if ExtractionController is None:
-        # Return mock if controller class unavailable
-        return Mock()
-
-    # Create a mock main window inline (no class-scoped dependency)
-    mock_main_window = Mock()
-    mock_main_window.extract_requested = MagicMock()
-    mock_main_window.open_in_editor_requested = MagicMock()
-    mock_main_window.arrange_rows_requested = MagicMock()
-    mock_main_window.arrange_grid_requested = MagicMock()
-    mock_main_window.inject_requested = MagicMock()
-    mock_main_window.extraction_completed = MagicMock()
-    mock_main_window.extraction_error_occurred = MagicMock()
-    mock_main_window.extraction_panel = Mock()
-    mock_main_window.rom_extraction_panel = Mock()
-    mock_main_window.output_settings_manager = Mock()
-    mock_main_window.toolbar_manager = Mock()
-
-    # Create a mock controller to avoid manager initialization issues
-    mock_ctrl = Mock(spec=ExtractionController if ExtractionController else None)
-    mock_ctrl.main_window = mock_main_window
-    mock_ctrl.session_manager = Mock()
-    mock_ctrl.extraction_manager = Mock()
-    mock_ctrl.injection_manager = Mock()
-    mock_ctrl.palette_manager = Mock()
-    mock_ctrl.worker_manager = Mock()
-    mock_ctrl.error_handler = Mock()
-
-    return mock_ctrl
 
 
 # ============================================================================

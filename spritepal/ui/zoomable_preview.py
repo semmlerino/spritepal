@@ -16,7 +16,6 @@ from PySide6.QtGui import (
     QTransform,
     QWheelEvent,
 )
-
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -599,10 +598,6 @@ class PreviewPanel(QWidget):
             self.palette_selector.setEnabled(False)
         if self.preview:
             self.preview.clear()
-
-    def clear_preview(self) -> None:
-        """Clear the preview (alias for clear)"""
-        self.clear()
 
     def get_tile_info(self) -> tuple[int, int]:
         """Get tile information from the preview widget"""

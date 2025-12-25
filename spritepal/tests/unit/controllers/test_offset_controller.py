@@ -7,12 +7,12 @@ from PySide6.QtCore import SignalInstance
 from ui.controllers.offset_controller import (
     BYTES_PER_TILE,
     DEFAULT_STEP_INDEX,
-    JumpLocation,
-    OffsetController,
-    OffsetDisplayInfo,
     PRESET_CUSTOM_RANGE,
     PRESET_KIRBY_SPRITES,
     STEP_SIZES,
+    JumpLocation,
+    OffsetController,
+    OffsetDisplayInfo,
 )
 from utils.constants import VRAM_SPRITE_OFFSET
 

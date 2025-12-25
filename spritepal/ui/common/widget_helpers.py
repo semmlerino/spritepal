@@ -49,14 +49,3 @@ def create_styled_label(
         label.setStyleSheet(get_section_label_style())
 
     return label
-
-
-# Backwards-compatible aliases (deprecated - use create_styled_label directly)
-def create_section_title(text: str) -> QLabel:
-    """Deprecated: Use create_styled_label(text, style='title') instead."""
-    return create_styled_label(text, style="title")
-
-
-def create_section_label(text: str, parent: QWidget | None = None) -> QLabel:
-    """Deprecated: Use create_styled_label(text, style='section') instead."""
-    return create_styled_label(text, style="section", parent=parent)

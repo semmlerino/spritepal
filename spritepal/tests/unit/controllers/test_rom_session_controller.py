@@ -9,11 +9,11 @@ import pytest
 from PySide6.QtCore import SignalInstance
 
 from ui.controllers.rom_session_controller import (
+    SETTINGS_KEY_LAST_INPUT_ROM,
+    SETTINGS_NS_ROM_INJECTION,
     HeaderDisplayInfo,
     ROMInfo,
     ROMSessionController,
-    SETTINGS_KEY_LAST_INPUT_ROM,
-    SETTINGS_NS_ROM_INJECTION,
 )
 
 

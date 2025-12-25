@@ -967,8 +967,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         try:
             # Use SmartPreviewCoordinator's worker pool for background preloading
-            # Request with very low priority so it doesn't interfere with user actions
-            self._smart_preview_coordinator.request_preview(offset, priority=-1)
+            self._smart_preview_coordinator.request_preview(offset)
 
         except Exception as e:
             logger.debug(f"Error preloading offset 0x{offset:06X}: {e}")

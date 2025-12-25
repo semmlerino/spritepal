@@ -27,9 +27,7 @@ from core.palette_manager import PaletteManager
 from core.services import ROMService, VRAMService
 from core.services.path_suggestion_service import (
     find_suggested_input_vram,
-    find_vram_path,
     get_smart_vram_suggestion,
-    suggest_output_path,
     suggest_output_rom_path,
     suggest_output_vram_path,
     validate_path,
@@ -886,36 +884,6 @@ class CoreOperationsManager(BaseManager):
         """Validate and return VRAM path if it exists, empty string otherwise."""
         return validate_path(path)
 
-    def _find_vram_path_internal(
-        self,
-        sprite_path: str,
-        metadata_path: str = "",
-        metadata: dict[str, object] | None = None,
-        pre_suggested: str = "",
-        strip_editor_suffixes: bool = False,
-    ) -> str:
-        """
-        Find VRAM path using multiple strategies in priority order.
-
-        Args:
-            sprite_path: Path to sprite file
-            metadata_path: Optional metadata file path (loads and parses)
-            metadata: Pre-loaded metadata dict (from load_metadata)
-            pre_suggested: Pre-suggested VRAM path to check first
-            strip_editor_suffixes: Strip editor suffixes from sprite name
-
-        Returns:
-            Suggested VRAM path or empty string if none found
-        """
-        return find_vram_path(
-            sprite_path=sprite_path,
-            metadata_path=metadata_path,
-            metadata=metadata,
-            pre_suggested=pre_suggested,
-            strip_editor_suffixes=strip_editor_suffixes,
-            session_manager=self._ensure_session_manager(),
-        )
-
     def get_smart_vram_suggestion(self, sprite_path: str, metadata_path: str = "") -> str:
         """
         Get smart suggestion for input VRAM path using multiple strategies.
@@ -1106,32 +1074,6 @@ class CoreOperationsManager(BaseManager):
             metadata=metadata,
             suggested_vram=suggested_vram,
             session_manager=self._ensure_session_manager(),
-        )
-
-    def _suggest_output_path(
-        self,
-        input_path: str,
-        suffix: str,
-        extension: str | None = None,
-        preserve_parent: bool = False,
-    ) -> str:
-        """
-        Generic output path suggestion with smart numbering.
-
-        Args:
-            input_path: Input file path
-            suffix: Suffix to add (e.g., "_injected", "_modified")
-            extension: Override extension (e.g., ".dmp") or None to preserve original
-            preserve_parent: Whether to keep file in same directory as input
-
-        Returns:
-            Suggested non-existent output path
-        """
-        return suggest_output_path(
-            input_path=input_path,
-            suffix=suffix,
-            extension=extension,
-            preserve_parent=preserve_parent,
         )
 
     def suggest_output_vram_path(self, input_vram_path: str) -> str:

@@ -19,10 +19,10 @@ from typing import Any, TypeVar, cast
 from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QApplication
 
+from core.managers import ManagerRegistry
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.managers import ManagerRegistry
 
 from .data_repository import get_test_data_repository
 from .qt_application_factory import ApplicationFactory
@@ -275,8 +275,7 @@ class ManagerTestContext:
             # Only reset if we own the registry (initialized it ourselves)
             if getattr(self, '_owns_registry', True):
                 try:
-                    from core.managers import cleanup_managers as registry_cleanup
-                    from core.managers import ManagerRegistry
+                    from core.managers import ManagerRegistry, cleanup_managers as registry_cleanup
 
                     registry_cleanup()
                     ManagerRegistry.reset_for_tests()

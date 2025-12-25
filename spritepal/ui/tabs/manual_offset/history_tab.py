@@ -23,7 +23,7 @@ from ui.common.spacing_constants import (
     SPACING_COMPACT_SMALL,
     SPACING_TINY,
 )
-from ui.common.widget_helpers import create_section_title
+from ui.common.widget_helpers import create_styled_label
 from utils.logging_config import get_logger
 from utils.sprite_history_manager import SpriteHistoryManager
 
@@ -60,7 +60,7 @@ class SimpleHistoryTab(QWidget):
         layout.setContentsMargins(GROUP_PADDING, GROUP_PADDING, GROUP_PADDING, GROUP_PADDING)
 
         # Compact title
-        title = create_section_title("Found Sprites")
+        title = create_styled_label("Found Sprites", style="title")
         layout.addWidget(title)
 
         # Sprite list

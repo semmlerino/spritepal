@@ -15,9 +15,6 @@ from core.services.dump_file_detection_service import (
     scan_directory_for_dumps,
 )
 
-if TYPE_CHECKING:
-    pass
-
 
 class TestGetBaseName:
     """Tests for get_base_name function."""

@@ -37,14 +37,14 @@ if TYPE_CHECKING:
 
 # ExtractionManager accessed via DI: inject(CoreOperationsManager)
 from core.managers.workflow_manager import ExtractionState
-
-# Import extracted components
-from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
 from ui.controllers import (
     ExtractionParamsController,
     ROMSessionController,
     format_sprite_list,
 )
+
+# Import extracted components
+from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
     ROMFileWidget,

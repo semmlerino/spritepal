@@ -6,8 +6,9 @@ No Qt dependencies, no side effects, fully testable.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping, cast
+from typing import cast
 
 # Unicode cache indicator (floppy disk emoji)
 CACHE_INDICATOR = " \U0001F4BE"

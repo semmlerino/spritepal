@@ -24,13 +24,13 @@ from core.di_container import reset_container
 from core.managers import (
     # Serial execution required: Thread safety concerns
     ManagerError,
+    ManagerRegistry,
     cleanup_managers,
     initialize_managers,
 )
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.managers import ManagerRegistry
 
 
 def are_managers_initialized() -> bool:
@@ -239,10 +239,9 @@ class TestManagerRegistry:
         """Test that atexit cleanup works when QApplication is not available."""
         from unittest.mock import patch
 
-        from core.managers import cleanup_managers as _cleanup_global_registry
-
         # Reset state - both module and class level
         import core.managers as managers_module
+        from core.managers import cleanup_managers as _cleanup_global_registry
         managers_module._cleanup_registered = False
         ManagerRegistry._cleanup_registered = False
 

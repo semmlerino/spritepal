@@ -27,7 +27,7 @@ from ui.common.spacing_constants import (
     SPACING_SMALL,
     SPACING_TINY,
 )
-from ui.common.widget_helpers import create_section_title
+from ui.common.widget_helpers import create_styled_label
 from utils.sprite_regions import SpriteRegion
 
 
@@ -74,7 +74,7 @@ class SimpleSmartTab(QWidget):
         smart_layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
         # Single title for the entire smart tab
-        title = create_section_title("Smart Navigation")
+        title = create_styled_label("Smart Navigation", style="title")
         smart_layout.addWidget(title)
 
         # Smart mode checkbox

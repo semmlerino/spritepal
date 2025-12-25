@@ -469,8 +469,7 @@ class MainWindow(QMainWindow):
     def can_open_manual_offset_dialog(self) -> bool:
         """Check if manual offset dialog can be opened"""
         return (self.ui_coordinator.is_rom_tab_active() and
-                hasattr(self.rom_extraction_panel, "_manual_offset_mode") and
-                self.rom_extraction_panel._manual_offset_mode)
+                bool(self.rom_extraction_panel.rom_path))
 
     def open_manual_offset_dialog(self) -> None:
         """Open manual offset dialog"""
