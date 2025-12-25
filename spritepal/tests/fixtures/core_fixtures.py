@@ -697,39 +697,6 @@ def rom_cache(
 # ============================================================================
 
 @pytest.fixture
-def mock_settings_manager(
-    tmp_path: Path,
-) -> Mock:
-    """Function-scoped mock settings manager for test isolation.
-
-    Uses tmp_path for worker-isolated temp directories (parallel-safe).
-
-    Provides a mock settings manager with common configuration methods.
-    """
-    manager = Mock()
-
-    # Add common settings methods
-    manager.get_setting = Mock()
-    manager.set_setting = Mock()
-    manager.save_settings = Mock()
-    manager.load_settings = Mock()
-    manager.reset_to_defaults = Mock()
-
-    # Use tmp_path for worker-isolated temp directory (xdist-safe)
-    temp_output = str(tmp_path / "test_output")
-
-    # Add common settings with default values
-    manager.get_setting.side_effect = lambda key, default=None: {
-        'output_path': temp_output,
-        'create_grayscale': True,
-        'create_metadata': True,
-        'auto_save': False,
-    }.get(key, default)
-
-    return manager
-
-
-@pytest.fixture
 def mock_main_window(real_factory: RealComponentFactory) -> MockMainWindowProtocol:
     """Provide a fully configured mock main window using real components."""
     return real_factory.create_main_window()

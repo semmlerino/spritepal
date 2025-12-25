@@ -250,10 +250,10 @@ def reset_for_tests() -> None:
         _cleanup_registered = False
 
 
-# Backwards compatibility: ManagerRegistry class
-# This is a thin shim for test infrastructure that imports ManagerRegistry
+# Backwards compatibility shim - kept for test infrastructure that still uses the class
+# TODO: Refactor tests/infrastructure/* to use module-level functions, then remove this
 class ManagerRegistry:
-    """Backwards-compatible shim for test infrastructure.
+    """Minimal backwards-compatible shim for test infrastructure.
 
     DEPRECATED: Use module-level functions instead:
         - initialize_managers()
@@ -267,7 +267,6 @@ class ManagerRegistry:
     _cleanup_registered: bool = False
 
     def __new__(cls) -> ManagerRegistry:
-        """Singleton pattern for backwards compatibility."""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -283,53 +282,24 @@ class ManagerRegistry:
         settings_path: Path | None = None,
         configuration_service: ConfigurationService | None = None,
     ) -> None:
-        """Delegate to module-level function."""
         initialize_managers(app_name, settings_path, configuration_service)
 
     def cleanup_managers(self) -> None:
-        """Delegate to module-level function."""
         cleanup_managers()
 
     def is_initialized(self) -> bool:
-        """Delegate to module-level function."""
         return is_initialized()
-
-    def validate_manager_dependencies(self) -> bool:
-        """Delegate to module-level function."""
-        return validate_manager_dependencies()
-
-    def get_all_managers(self) -> dict[str, object]:
-        """Get all registered managers (for testing/debugging)."""
-        from core.di_container import get_container
-
-        container = get_container()
-        result: dict[str, object] = {}
-
-        for mgr_type in [ApplicationStateManager, SpritePresetManager, CoreOperationsManager]:
-            mgr = container.get_optional(mgr_type)
-            if mgr is not None:
-                result[mgr_type.__name__] = mgr
-
-        return result
 
     @classmethod
     def is_clean(cls) -> bool:
-        """Check if the registry is in a clean (uninitialized) state."""
         return not _initialized
 
     @classmethod
     def reset_for_tests(cls) -> None:
-        """Reset singleton state for test isolation."""
         with cls._lock:
             reset_for_tests()
             cls._instance = None
             cls._cleanup_registered = False
-
-
-# For backwards compatibility with imports from registry
-def _ensure_registry() -> ManagerRegistry:  # pyright: ignore[reportUnusedFunction]
-    """Ensure the global registry is available and return it."""
-    return ManagerRegistry()
 
 
 __all__ = [

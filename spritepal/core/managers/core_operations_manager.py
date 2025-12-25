@@ -242,24 +242,6 @@ class CoreOperationsManager(BaseManager):
 
     # ========== Helper Methods ==========
 
-    def _ensure_sprite_extractor(self) -> SpriteExtractor:
-        """Ensure sprite extractor is initialized."""
-        return self._ensure_component(
-            self._sprite_extractor, "Sprite extractor", ExtractionError
-        )
-
-    def _ensure_rom_extractor(self) -> ROMExtractor:
-        """Ensure ROM extractor is initialized."""
-        return self._ensure_component(
-            self._rom_extractor, "ROM extractor", ExtractionError
-        )
-
-    def _ensure_palette_manager(self) -> PaletteManager:
-        """Ensure palette manager is initialized."""
-        return self._ensure_component(
-            self._palette_manager, "Palette manager", ExtractionError
-        )
-
     def _ensure_rom_cache(self) -> ROMCache:
         """Ensure ROM cache is available (cached from DI at initialization)."""
         return self._ensure_component(self._rom_cache, "ROM cache", ExtractionError)
@@ -465,27 +447,6 @@ class CoreOperationsManager(BaseManager):
     def get_rom_extractor(self) -> ROMExtractor:
         """Get the ROM extractor instance for advanced operations."""
         return self.rom_service.get_rom_extractor()
-
-    def extract_sprite_to_png(self, rom_path: str, sprite_offset: int,
-                             output_path: str, cgram_path: str | None = None) -> bool:
-        """
-        Extract a single sprite to PNG file.
-
-        Args:
-            rom_path: Path to ROM file
-            sprite_offset: Offset of sprite in ROM
-            output_path: Full path where PNG should be saved
-            cgram_path: Optional CGRAM file for palette data
-
-        Returns:
-            True if extraction successful
-
-        Raises:
-            ExtractionError: If operation fails (service not initialized, etc.)
-        """
-        return self.rom_service.extract_sprite_to_png(
-            rom_path, sprite_offset, output_path, cgram_path
-        )
 
     def get_known_sprite_locations(
         self, rom_path: str

@@ -95,22 +95,6 @@ class TestServiceAccessors:
         with pytest.raises(ExtractionError, match="VRAM service not initialized"):
             _ = mgr.vram_service
 
-    def test_ensure_sprite_extractor(self, manager):
-        """_ensure_sprite_extractor should return extractor."""
-        extractor = manager._ensure_sprite_extractor()
-
-        assert extractor is not None
-        from core.extractor import SpriteExtractor
-        assert isinstance(extractor, SpriteExtractor)
-
-    def test_ensure_palette_manager(self, manager):
-        """_ensure_palette_manager should return palette manager."""
-        palette_mgr = manager._ensure_palette_manager()
-
-        assert palette_mgr is not None
-        from core.palette_manager import PaletteManager
-        assert isinstance(palette_mgr, PaletteManager)
-
 
 class TestExtractionValidation:
     """Tests for extraction parameter validation."""
@@ -675,12 +659,6 @@ class TestROMInjectionSettings:
 
 class TestEnsureComponents:
     """Tests for component initialization guards."""
-
-    def test_ensure_rom_extractor(self, manager):
-        """_ensure_rom_extractor should return extractor."""
-        extractor = manager._ensure_rom_extractor()
-
-        assert extractor is not None
 
     def test_ensure_component_raises_when_none(self):
         """_ensure_component should raise when component is None."""

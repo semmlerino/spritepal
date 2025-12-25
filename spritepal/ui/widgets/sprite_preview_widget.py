@@ -303,10 +303,6 @@ class SpritePreviewWidget(QWidget):
         self._update_preview_with_palette(img)
 
         # Diagnostic check after loading
-        logger.debug("[DEBUG_SPRITE] Calling diagnostic check after loading")
-        self._diagnose_preview_state()
-
-        # Additional diagnostic
         self.diagnose_display_issue()
 
     def _load_indexed_sprite(self, img: Image.Image) -> None:
@@ -536,9 +532,6 @@ class SpritePreviewWidget(QWidget):
 
         logger.debug(f"[SPRITE_DISPLAY] load_sprite_from_4bpp called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}")
         try:
-            # Don't show loading state during rapid updates to prevent flashing
-            # self._show_loading_state()  # REMOVED - causes flashing
-
             # Validate tile data with detailed logging
             if not tile_data:
                 logger.debug("[SPRITE_DISPLAY] No tile data")
@@ -1112,22 +1105,6 @@ class SpritePreviewWidget(QWidget):
             # Note: repaint() already forces synchronous paint; processEvents() removed
             # to prevent reentrancy bugs
 
-    def _diagnose_preview_state(self) -> None:
-        """Diagnostic method to check preview widget state."""
-        logger.info("[DIAGNOSIS] === Preview Widget State ===")
-        logger.info(f"  preview_label exists: {self.preview_label is not None}")
-        if self.preview_label is not None:
-            logger.info(f"  preview_label visible: {self.preview_label.isVisible()}")
-            logger.info(f"  preview_label size: {self.preview_label.size()}")
-            pixmap = self.preview_label.pixmap()
-            # QLabel.pixmap() always returns QPixmap, check if it's null
-            logger.info(f"  pixmap size: {pixmap.width()}x{pixmap.height()}")
-            logger.info(f"  pixmap null: {pixmap.isNull()}")
-            logger.info(f"  label text: '{self.preview_label.text()}'")
-        logger.info(f"  sprite_pixmap exists: {self.sprite_pixmap is not None}")
-        logger.info(f"  sprite_data exists: {self.sprite_data is not None}")
-        logger.info("====================================")
-
     def _show_no_data_pattern(self, width: int, height: int) -> None:
         """Show a checkerboard pattern to indicate no sprite data at this offset."""
         logger.debug(f"[SPRITE_DISPLAY] Showing no data pattern for {width}x{height}")
@@ -1203,25 +1180,6 @@ class SpritePreviewWidget(QWidget):
 
         logger.debug("[TRACE] Forced visibility update complete")
 
-    def _show_loading_state(self) -> None:
-        """Show visual loading state for immediate user feedback."""
-        if self.preview_label is not None:
-            self.preview_label.setText("Loading...")
-            self.preview_label.setStyleSheet(f"""
-                QLabel {{
-                    border: 1px solid {COLORS["info"]};
-                    background-color: {COLORS["background"]};
-                    color: {COLORS["info"]};
-                    margin: 0px;
-                    padding: 10px;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    font-weight: bold;
-                }}
-            """)
-            # Force immediate update for loading state
-            self._force_widget_update()
-
     def _show_error_state(self, error_type: str) -> None:
         """Show visual error state with clear feedback."""
         if self.preview_label is not None:
@@ -1243,16 +1201,6 @@ class SpritePreviewWidget(QWidget):
 
         if self.essential_info_label is not None:
             self.essential_info_label.setText(error_type)
-
-    def _load_grayscale_sprite_with_update(
-        self, img: Image.Image, sprite_name: str | None = None
-    ) -> None:
-        """Load grayscale sprite with guaranteed Qt widget updates."""
-        # Use original method for core functionality
-        self._load_grayscale_sprite(img, sprite_name)
-
-        # Then apply Qt-specific update guarantees
-        self._ensure_pixmap_displayed()
 
     def _load_grayscale_sprite_with_validation_and_update(
         self, img: Image.Image, sprite_name: str | None = None

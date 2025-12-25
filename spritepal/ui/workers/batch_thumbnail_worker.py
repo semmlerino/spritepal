@@ -123,7 +123,7 @@ class BatchThumbnailWorker(QObject):
         self._max_workers = 4  # Optimal for I/O + CPU bound tasks
         
         # Cleanup tracking for idempotent cleanup
-        self._cleanup_called = False  # Optimal for I/O + CPU bound tasks
+        self._cleanup_called = False
 
     def queue_thumbnail(
         self,
