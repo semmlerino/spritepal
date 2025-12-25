@@ -1,5 +1,7 @@
 """
-Extraction panel with drag & drop zones for dump files
+Extraction panel with drag & drop zones for dump files.
+
+Uses DropZone widget for file input with visual state feedback.
 """
 from __future__ import annotations
 
@@ -8,32 +10,14 @@ import contextlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, Signal
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import (
-        QColor,
-        QDragEnterEvent,
-        QDragLeaveEvent,
-        QDropEvent,
-        QKeyEvent,
-        QPainter,
-        QPaintEvent,
-        QPen,
-    )
+    from PySide6.QtGui import QKeyEvent
 
     from core.managers.application_state_manager import ApplicationStateManager
 else:
-    from PySide6.QtGui import (
-        QColor,
-        QDragEnterEvent,
-        QDragLeaveEvent,
-        QDropEvent,
-        QKeyEvent,
-        QPainter,
-        QPaintEvent,
-        QPen,
-    )
+    from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -46,273 +30,32 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.common.file_dialogs import browse_for_open_file
 from ui.common.spacing_constants import (
-    BORDER_THICK,
-    BROWSE_BUTTON_MAX_WIDTH,
-    CHECKMARK_OFFSET,
-    CIRCLE_INDICATOR_MARGIN,
-    CIRCLE_INDICATOR_SIZE,
     COMBO_BOX_MIN_WIDTH,
-    DROP_ZONE_MIN_HEIGHT,
-    LINE_THICK,
     OFFSET_LABEL_MIN_WIDTH,
     OFFSET_SPINBOX_MIN_WIDTH,
     SPACING_MEDIUM,
-    SPACING_SMALL,
     SPACING_TINY,
-    TOGGLE_BUTTON_SIZE,
 )
-from ui.common.timing_constants import REFRESH_RATE_60FPS
+from ui.controllers.offset_controller import OffsetController
 from ui.styles import (
-    get_drop_zone_badge_style,
-    get_drop_zone_style,
     get_hex_label_style,
     get_link_text_style,
     get_muted_text_style,
     get_slider_style,
     get_success_text_style,
 )
-from ui.styles.theme import COLORS
+from ui.widgets.drop_zone import DropZone
+from core.services.dump_file_detection_service import (
+    DetectedFiles,
+    auto_detect_all,
+    detect_related_files,
+)
 from utils.constants import VRAM_SPRITE_OFFSET
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-class DropZone(QWidget):
-    """Drag and drop zone for file input with visual state feedback"""
-
-    file_dropped = Signal(str)
-
-    def __init__(
-        self,
-        file_type: str,
-        parent: QWidget | None = None,
-        *,
-        settings_manager: ApplicationStateManager,
-        required: bool = True,
-    ) -> None:
-        super().__init__(parent)
-        self.file_type = file_type
-        self.file_path = ""
-        self._required = required
-        self.setAcceptDrops(True)
-        self.setMinimumHeight(DROP_ZONE_MIN_HEIGHT)
-
-        # Apply initial styling based on required state
-        self._update_style()
-
-        # Store injected dependency
-        self.settings_manager = settings_manager
-
-        # Layout
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(SPACING_TINY)
-
-        # Top row with badge
-        top_row = QHBoxLayout()
-        top_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        top_row.setSpacing(SPACING_SMALL)
-
-        # Status badge (Required/Optional/Loaded)
-        self.status_badge = QLabel("Required" if required else "Optional")
-        self._update_badge_style()
-        top_row.addWidget(self.status_badge)
-
-        layout.addLayout(top_row)
-
-        # Icon and label
-        self.label = QLabel(f"Drop {file_type} file here")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if self.label:
-            self.label.setStyleSheet(get_muted_text_style(color_level="light"))
-        layout.addWidget(self.label)
-
-        # File path row with clear button
-        path_row = QHBoxLayout()
-        path_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        path_row.setSpacing(SPACING_TINY)
-
-        self.path_label = QLabel("")
-        self.path_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if self.path_label:
-            self.path_label.setStyleSheet(get_link_text_style("extract"))
-        self.path_label.setWordWrap(True)
-        path_row.addWidget(self.path_label)
-
-        # Clear button - small "×" to clear file selection  # noqa: RUF003
-        self.clear_btn = QPushButton("×")  # noqa: RUF001
-        self.clear_btn.setFixedSize(TOGGLE_BUTTON_SIZE, TOGGLE_BUTTON_SIZE)
-        self.clear_btn.setToolTip("Clear selected file")
-        self.clear_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                border: none;
-                border-radius: 10px;
-                background-color: {COLORS["text_muted"]};
-                color: white;
-                font-weight: bold;
-                font-size: 12px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS["danger"]};
-            }}
-            """
-        )
-        _ = self.clear_btn.clicked.connect(self.clear)
-        self.clear_btn.setVisible(False)
-        path_row.addWidget(self.clear_btn)
-
-        layout.addLayout(path_row)
-
-        # Browse button
-        self.browse_button = QPushButton("Browse")
-        self.browse_button.setMaximumWidth(BROWSE_BUTTON_MAX_WIDTH)
-        _ = self.browse_button.clicked.connect(self._browse_file)
-        layout.addWidget(self.browse_button, alignment=Qt.AlignmentFlag.AlignCenter)
-
-    def _update_style(self) -> None:
-        """Update the drop zone styling based on current state"""
-        if self.file_path:
-            self.setStyleSheet(get_drop_zone_style("loaded"))
-        else:
-            self.setStyleSheet(get_drop_zone_style("empty", required=self._required))
-
-    def _update_badge_style(self) -> None:
-        """Update the badge styling based on current state"""
-        if self.file_path:
-            self.status_badge.setText("✓ Loaded")
-            self.status_badge.setStyleSheet(get_drop_zone_badge_style("loaded"))
-        elif self._required:
-            self.status_badge.setText("Required")
-            self.status_badge.setStyleSheet(get_drop_zone_badge_style("required"))
-        else:
-            self.status_badge.setText("Optional")
-            self.status_badge.setStyleSheet(get_drop_zone_badge_style("optional"))
-
-    def set_required(self, required: bool) -> None:
-        """Update whether this drop zone is required"""
-        self._required = required
-        self._update_style()
-        self._update_badge_style()
-
-    @override
-    def dragEnterEvent(self, event: QDragEnterEvent | None):
-        """Handle drag enter events"""
-        if event:
-            mime_data = event.mimeData()
-            if mime_data and mime_data.hasUrls():
-                event.acceptProposedAction()
-                self.setStyleSheet(get_drop_zone_style("hover"))
-
-    @override
-    def dragLeaveEvent(self, event: QDragLeaveEvent | None):
-        """Handle drag leave events"""
-        # Restore appropriate style based on current state
-        self._update_style()
-
-    @override
-    def dropEvent(self, event: QDropEvent | None):
-        """Handle drop events"""
-        if event:
-            mime_data = event.mimeData()
-            if mime_data:
-                files = [url.toLocalFile() for url in mime_data.urls()]
-                if files:
-                    self.set_file(files[0])
-        self.dragLeaveEvent(None)  # Just reset the style
-
-    @override
-    def paintEvent(self, event: QPaintEvent | None) -> None:
-        """Custom paint event to show status"""
-        if event:
-            super().paintEvent(event)
-
-        if self.file_path:
-            # Draw green checkmark
-            painter = QPainter(self)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-            # Draw circle
-            painter.setPen(QPen(QColor(16, 124, 65), BORDER_THICK))
-            painter.setBrush(QColor(16, 124, 65, 30))
-            painter.drawEllipse(self.width() - CIRCLE_INDICATOR_MARGIN, CHECKMARK_OFFSET, CIRCLE_INDICATOR_SIZE, CIRCLE_INDICATOR_SIZE)
-
-            # Draw checkmark
-            painter.setPen(QPen(QColor(16, 124, 65), LINE_THICK))
-            painter.drawLine(self.width() - 28, 22, self.width() - 23, 27)
-            painter.drawLine(self.width() - 23, 27, self.width() - 15, 19)
-
-    def _browse_file(self):
-        """Browse for file"""
-        file_filter = f"{self.file_type} Files (*.dmp);;All Files (*)"
-        filename = browse_for_open_file(
-            self, f"Select {self.file_type} File", file_filter
-        )
-
-        if filename:
-            self.set_file(filename)
-
-    def set_file(self, file_path: str):
-        """Set the file path"""
-        if Path(file_path).exists():
-            self.file_path = file_path
-            if self.label:
-                self.label.setText(f"✓ {self.file_type}")
-            if self.label:
-                self.label.setStyleSheet(get_success_text_style())
-
-            # Show filename with full path in tooltip
-            filename = Path(file_path).name
-            if self.path_label:
-                self.path_label.setText(filename)
-                self.path_label.setToolTip(file_path)  # Full path on hover
-
-            # Show clear button
-            if self.clear_btn:
-                self.clear_btn.setVisible(True)
-
-            # Update visual state
-            self._update_style()
-            self._update_badge_style()
-
-            self.file_dropped.emit(file_path)
-            self.update()  # Trigger repaint
-
-    def clear(self):
-        """Clear the current file"""
-        old_path = self.file_path
-        self.file_path = ""
-        if self.label:
-            self.label.setText(f"Drop {self.file_type} file here")
-        if self.label:
-            self.label.setStyleSheet(get_muted_text_style(color_level="light"))
-        if self.path_label:
-            self.path_label.setText("")
-            self.path_label.setToolTip("")  # Clear tooltip
-
-        # Hide clear button
-        if self.clear_btn:
-            self.clear_btn.setVisible(False)
-
-        # Update visual state
-        self._update_style()
-        self._update_badge_style()
-
-        self.update()
-
-        # Emit file_dropped signal with empty path to trigger UI updates
-        if old_path:
-            self.file_dropped.emit("")
-
-    def has_file(self):
-        """Check if a file is loaded"""
-        return bool(self.file_path)
-
-    def get_file_path(self):
-        """Get the current file path"""
-        return self.file_path
 
 class ExtractionPanel(QGroupBox):
     """
@@ -327,12 +70,8 @@ class ExtractionPanel(QGroupBox):
 
     def __init__(self, settings_manager: ApplicationStateManager, parent: QWidget | None = None) -> None:
         super().__init__("Input Files", parent)
-        # Timer for debouncing offset changes
-        self._offset_timer = QTimer(self)  # Parent this timer to prevent crashes
-        self._offset_timer.setInterval(REFRESH_RATE_60FPS)  # 16ms delay for ~60fps updates
-        self._offset_timer.setSingleShot(True)
-        self._pending_offset: int | None = None
-        self._slider_changing = False  # Track if change is from slider
+        # Offset controller handles debouncing and state
+        self._offset_controller = OffsetController(parent=self)
 
         # Injected dependencies
         self.settings_manager = settings_manager
@@ -340,8 +79,10 @@ class ExtractionPanel(QGroupBox):
         self._setup_ui()
         self._connect_signals()
 
-        # Connect timer after UI setup
-        _ = self._offset_timer.timeout.connect(self._emit_offset_changed)
+        # Connect controller signals to panel signals
+        _ = self._offset_controller.offset_changed.connect(self._on_controller_offset_changed)
+        _ = self._offset_controller.offset_changing.connect(self._on_controller_offset_changing)
+        _ = self._offset_controller.step_changed.connect(self._on_controller_step_changed)
 
         # Enable keyboard focus for shortcuts
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -576,148 +317,104 @@ class ExtractionPanel(QGroupBox):
             self.extraction_ready.emit(ready, " | ".join(reasons))
 
     def _auto_detect_related(self, file_path: str) -> None:
-        """Try to auto-detect related dump files"""
+        """Try to auto-detect related dump files using detection service."""
         path = Path(file_path)
-        directory = path.parent
-        base_name = path.stem
+        existing = self._get_existing_files()
+        detected = detect_related_files(path, existing)
+        self._apply_detected_files(detected)
 
-        # Remove common suffixes to get base name
-        for suffix in [
-            "_VRAM",
-            "_CGRAM",
-            "_OAM",
-            ".SnesVideoRam",
-            ".SnesCgRam",
-            ".SnesSpriteRam",
-        ]:
-            if base_name.endswith(suffix):
-                base_name = base_name[: -len(suffix)]
-                break
+    def _get_existing_files(self) -> DetectedFiles:
+        """Get currently loaded files as DetectedFiles for skip detection."""
+        return DetectedFiles(
+            vram_path=Path(self.vram_drop.file_path) if self.vram_drop.has_file() else None,
+            cgram_path=Path(self.cgram_drop.file_path) if self.cgram_drop.has_file() else None,
+            oam_path=Path(self.oam_drop.file_path) if self.oam_drop.has_file() else None,
+        )
 
-        # Look for related files
-        patterns = [
-            # Standard patterns
-            (f"{base_name}_VRAM.dmp", self.vram_drop),
-            (f"{base_name}_CGRAM.dmp", self.cgram_drop),
-            (f"{base_name}_OAM.dmp", self.oam_drop),
-            # SNES patterns
-            (f"{base_name}.SnesVideoRam.dmp", self.vram_drop),
-            (f"{base_name}.SnesCgRam.dmp", self.cgram_drop),
-            (f"{base_name}.SnesSpriteRam.dmp", self.oam_drop),
-            # Simple patterns
-            (f"{base_name}.VRAM.dmp", self.vram_drop),
-            (f"{base_name}.CGRAM.dmp", self.cgram_drop),
-            (f"{base_name}.OAM.dmp", self.oam_drop),
-        ]
-
-        for filename, drop_zone in patterns:
-            candidate_path = directory / filename
-            if candidate_path.exists() and not drop_zone.has_file():
-                drop_zone.set_file(str(candidate_path))
-
-    def _find_files_for_type(
-        self, directory: Path, patterns: list[str], drop_zone: DropZone
-    ) -> bool:
-        """Helper method to find and set files for a specific dump type"""
-        if drop_zone.has_file():
-            return False
-
-        for pattern in patterns:
-            files = list(directory.glob(pattern))
-            if files:
-                drop_zone.set_file(str(files[0]))
-                return True
-        return False
+    def _apply_detected_files(self, detected: DetectedFiles) -> None:
+        """Apply detected files to drop zones."""
+        if detected.vram_path and not self.vram_drop.has_file():
+            self.vram_drop.set_file(str(detected.vram_path))
+        if detected.cgram_path and not self.cgram_drop.has_file():
+            self.cgram_drop.set_file(str(detected.cgram_path))
+        if detected.oam_path and not self.oam_drop.has_file():
+            self.oam_drop.set_file(str(detected.oam_path))
 
     def _auto_detect_files(self) -> None:
-        """Auto-detect dump files in default directory (Mesen2 Debugger first, then current directory)"""
+        """Auto-detect dump files in default directory using detection service."""
         settings = self.settings_manager
 
-        # Define file type configurations
-        file_configs = [
-            (["*VRAM*.dmp", "*VideoRam*.dmp"], self.vram_drop),
-            (["*CGRAM*.dmp", "*CgRam*.dmp"], self.cgram_drop),
-            (["*OAM*.dmp", "*SpriteRam*.dmp"], self.oam_drop),
-        ]
-
-        found_any = False
-
-        # Try directories in order: default (Mesen2), last used, current
+        # Build search directories in priority order: default (Mesen2), last used, current
         directories_to_try_raw: list[object] = [
             settings.get("paths", "default_dumps_dir", ""),
             settings.get("paths", "last_used_dir", ""),
             str(Path.cwd()),
         ]
-        directories_to_try = [d for d in directories_to_try_raw if isinstance(d, str)]
+        search_dirs = [
+            Path(d) for d in directories_to_try_raw
+            if isinstance(d, str) and d and Path(d).exists()
+        ]
 
-        for directory_str in directories_to_try:
-            if not directory_str or not Path(directory_str).exists():
-                continue
+        existing = self._get_existing_files()
+        detected = auto_detect_all(
+            trigger_file=None,
+            search_directories=search_dirs,
+            existing=existing,
+        )
 
-            directory = Path(directory_str)
-
-            # Try to find files in this directory
-            for patterns, drop_zone in file_configs:
-                if self._find_files_for_type(directory, patterns, drop_zone):
-                    found_any = True
-
-            # If we found any files in this directory, stop searching
-            if found_any:
-                break
-
-        if found_any:
+        if detected.has_any():
+            self._apply_detected_files(detected)
             self.files_changed.emit()
             self._check_extraction_ready()
 
     def _on_preset_changed(self, index: int) -> None:
-        """Handle preset change"""
+        """Handle preset change - delegate to controller"""
         try:
-            # Show/hide custom offset controls based on preset
-            if index == 1:  # Custom Range
-                self.offset_widget.setVisible(True)
+            is_custom = index == 1
+            self.offset_widget.setVisible(is_custom)
+
+            if is_custom:
                 current_offset = self.offset_spinbox.value()
                 self._update_offset_display(current_offset)
-                if self.has_vram():
-                    self.offset_changed.emit(current_offset)
-            else:  # Kirby Sprites
-                self.offset_widget.setVisible(False)
+            else:
+                # Reset to Kirby sprite offset
                 self.offset_slider.setValue(VRAM_SPRITE_OFFSET)
                 self.offset_spinbox.setValue(VRAM_SPRITE_OFFSET)
-                if self.has_vram():
-                    self.offset_changed.emit(VRAM_SPRITE_OFFSET)
+
+            # Delegate mode switching to controller (will emit offset_changed if needed)
+            self._offset_controller.set_preset_mode(is_custom=is_custom)
         except Exception:
             logger.exception("Error in preset change handler")
 
     def _on_offset_slider_changed(self, value: int) -> None:
-        """Handle offset slider change"""
+        """Handle offset slider change - delegate to controller"""
         try:
-            self._slider_changing = True
+            # Sync spinbox
+            self.offset_spinbox.blockSignals(True)
             self.offset_spinbox.setValue(value)
+            self.offset_spinbox.blockSignals(False)
 
-            # Emit change immediately for smooth real-time updates when dragging
-            if self.preset_combo.currentIndex() == 1 and self.has_vram():
-                self.offset_changed.emit(value)
+            self._update_offset_display(value)
 
-            self._slider_changing = False
+            # Delegate to controller (emits offset_changing for real-time updates)
+            self._offset_controller.on_slider_change(value)
         except Exception:
             logger.exception("Error in offset slider change handler")
-            self._slider_changing = False
+            with contextlib.suppress(builtins.BaseException):
+                self.offset_spinbox.blockSignals(False)
 
     def _on_offset_spinbox_changed(self, value: int) -> None:
-        """Handle offset spinbox change"""
+        """Handle offset spinbox change - delegate to controller"""
         try:
-            # Update slider without triggering its handler
+            # Sync slider
             self.offset_slider.blockSignals(True)
             self.offset_slider.setValue(value)
             self.offset_slider.blockSignals(False)
 
             self._update_offset_display(value)
 
-            # Only use debounce for direct spinbox changes (not from slider)
-            if self.preset_combo.currentIndex() == 1 and not self._slider_changing:
-                self._pending_offset = value
-                self._offset_timer.stop()
-                self._offset_timer.start()
+            # Delegate to controller (handles debouncing)
+            self._offset_controller.on_spinbox_change(value)
         except Exception:
             logger.exception("Error in offset spinbox change handler")
             with contextlib.suppress(builtins.BaseException):
@@ -740,78 +437,52 @@ class ExtractionPanel(QGroupBox):
             self.oam_toggle.setText("+ Show OAM input (optional)")
 
     def _update_offset_display(self, value: int) -> None:
-        """Update all offset display elements"""
-        # Update hex label
-        hex_text = f"0x{value:04X}"
-        if self.offset_hex_label:
-            self.offset_hex_label.setText(hex_text)
+        """Update all offset display elements using controller's display info"""
+        # Update controller's max offset for percentage calculation
+        self._offset_controller.set_max_offset(self.offset_slider.maximum())
 
-        # Update tooltip with tile info and position percentage
-        tile_number = value // 32  # 32 bytes per tile
-        max_val = self.offset_slider.maximum()
-        if max_val > 0:
-            percentage = (value / max_val) * 100
-        else:
-            percentage = 0.0
+        # Get formatted display info from controller
+        info = self._offset_controller.get_display_info(value)
 
-        tooltip = f"Current offset in VRAM\nTile #{tile_number} | {percentage:.1f}%"
         if self.offset_hex_label:
-            self.offset_hex_label.setToolTip(tooltip)
+            self.offset_hex_label.setText(info.hex_text)
+            self.offset_hex_label.setToolTip(info.tooltip)
 
     def _on_step_changed(self, index: int) -> None:
-        """Handle step size change"""
-        step_sizes = [0x20, 0x100, 0x1000, 0x4000]
-        step_size = step_sizes[index]
-
-        # Update spinbox step
-        self.offset_spinbox.setSingleStep(step_size)
-
-        # Update slider step
-        self.offset_slider.setSingleStep(step_size)
-        self.offset_slider.setPageStep(step_size * 4)
-
-        logger.debug(f"Step size changed to: 0x{step_size:04X}")
+        """Handle step size change - delegate to controller"""
+        # Delegate to controller (will emit step_changed signal)
+        self._offset_controller.set_step_index(index)
 
     def _on_jump_selected(self, index: int) -> None:
-        """Handle quick jump selection"""
+        """Handle quick jump selection - delegate to controller"""
         if index > 0:
             jump_text = self.jump_combo.currentText()
-            # Extract hex value from text like "0xC000 - Kirby sprites"
-            hex_part = jump_text.split(" - ")[0]
-            try:
-                offset = int(hex_part, 16)
+            offset = self._offset_controller.parse_jump_text(jump_text)
+
+            if offset is not None:
                 self.offset_spinbox.setValue(offset)
                 logger.debug(f"Jumped to offset: 0x{offset:04X}")
-            except ValueError:
-                logger.exception("Invalid jump offset: %s", hex_part)
 
             # Reset combo to "Select..."
             if self.jump_combo:
                 self.jump_combo.setCurrentIndex(0)
 
-    def _emit_offset_changed(self):
-        """Emit the pending offset change after debounce"""
-        # Check if widget is still valid
-        try:
-            if not hasattr(self, "_pending_offset"):
-                return
-        except (RuntimeError, AttributeError):
-            # Widget may have been deleted
-            return
+    def _on_controller_offset_changed(self, offset: int) -> None:
+        """Handle debounced offset change from controller"""
+        if self.has_vram():
+            logger.debug(f"Controller offset changed: {offset} (0x{offset:04X})")
+            self.offset_changed.emit(offset)
 
-        logger.debug(f"Timer triggered - emitting pending offset: {self._pending_offset}")
-        try:
-            if self._pending_offset is not None:
-                offset_value = self._pending_offset
-                logger.debug(f"Emitting debounced offset change: {offset_value} (0x{offset_value:04X})")
-                self.offset_changed.emit(offset_value)
-                logger.debug("Debounced offset change signal emitted successfully")
-            else:
-                logger.debug("No pending offset to emit")
+    def _on_controller_offset_changing(self, offset: int) -> None:
+        """Handle real-time offset change from controller (slider drag)"""
+        if self.has_vram():
+            self.offset_changed.emit(offset)
 
-        except Exception:
-            logger.exception("Error in debounced offset emission")
-            # Don't re-raise to prevent crash, just log the error
+    def _on_controller_step_changed(self, step: int, page_step: int) -> None:
+        """Handle step size change from controller"""
+        self.offset_spinbox.setSingleStep(step)
+        self.offset_slider.setSingleStep(step)
+        self.offset_slider.setPageStep(page_step)
 
     def clear_files(self):
         """Clear all loaded files"""

@@ -344,10 +344,10 @@ class TestDialogIntegrationWithPanel:
         dialog.set_offset(new_offset)
         qtbot.waitUntil(lambda: dialog.get_current_offset() == new_offset, timeout=500)
 
-        # Verify panel received the offset change
-        # This depends on signal connections
-        # The panel should track the manual offset
-        assert hasattr(panel, '_manual_offset')
+        # Verify panel's extraction params controller tracks the manual offset
+        # The offset is now managed by ExtractionParamsController
+        assert panel._params_controller.manual_offset == new_offset
+        assert panel._params_controller.is_manual_mode is True
 
     def test_multiple_dialog_opens_reuse_singleton(self, loaded_rom_panel, qtbot, wait_for_signal_processed):
         """Test that opening dialog multiple times creates consistent dialogs.

@@ -40,6 +40,11 @@ from core.managers.workflow_manager import ExtractionState
 
 # Import extracted components
 from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
+from ui.controllers import (
+    ExtractionParamsController,
+    ROMSessionController,
+    format_sprite_list,
+)
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
     ROMFileWidget,
@@ -48,7 +53,6 @@ from ui.rom_extraction.widgets import (
 from ui.styles.components import get_manual_offset_button_style
 from ui.styles.theme import COLORS
 from utils.constants import (
-    ROM_SIZE_2MB,
     ROM_SIZE_4MB,
     SETTINGS_KEY_LAST_INPUT_ROM,
     SETTINGS_NS_ROM_INJECTION,
@@ -97,8 +101,11 @@ class ROMExtractionPanel(QWidget):
         self.extraction_manager = extraction_manager
         self.rom_extractor: ROMExtractor = self.extraction_manager.get_rom_extractor()
         self.rom_size = 0  # Track ROM size for slider limits
-        self._manual_offset_mode = False  # Default to preset mode (sprite picker visible)
         self._current_header: ROMHeader | None = None  # Stored header for preset matching
+
+        # Controllers for extraction logic
+        self._params_controller = ExtractionParamsController(parent=self)
+        self._rom_session = ROMSessionController(parent=self)
 
         # State manager for coordinating operations (ApplicationStateManager)
         from core.di_container import inject
@@ -130,8 +137,8 @@ class ROMExtractionPanel(QWidget):
         # Output name (set via signal from OutputSettingsManager)
         self._output_name: str = ""
 
-        # Manual offset tracking
-        self._manual_offset = ROM_SIZE_2MB  # Default offset
+        # Connect controller signals
+        self._params_controller.readiness_changed.connect(self.extraction_ready.emit)
 
         self._setup_ui()
         self._load_last_rom()
@@ -343,26 +350,12 @@ class ROMExtractionPanel(QWidget):
             )
         # If CANCEL, do nothing
 
-    def _load_last_rom(self):
-        """Load the last used ROM file from settings"""
-        try:
-            from core.di_container import inject
-            from core.managers.application_state_manager import ApplicationStateManager
-            settings = inject(ApplicationStateManager)
-            last_rom = settings.get(
-                SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, ""
-            )
-
-            if last_rom and isinstance(last_rom, str) and Path(last_rom).exists():
-                logger.info(f"Loading last used ROM: {last_rom}")
-                self._load_rom_file(last_rom)
-            elif last_rom:
-                logger.warning(f"Last used ROM not found: {last_rom}")
-            else:
-                logger.debug("No last used ROM in settings")
-
-        except Exception:
-            logger.exception("Error loading last ROM")
+    def _load_last_rom(self) -> None:
+        """Load the last used ROM file from settings."""
+        last_rom = self._rom_session.get_last_rom_path()
+        if last_rom:
+            logger.info(f"Loading last used ROM: {last_rom}")
+            self._load_rom_file(last_rom)
 
     def _load_rom_file(self, filename: str):
         """Load a ROM file and update UI"""
@@ -464,8 +457,8 @@ class ROMExtractionPanel(QWidget):
         self._load_rom_sprites()
         self._init_similarity_indexing()
 
-    def _open_manual_offset_dialog(self):
-        """Open the manual offset control dialog using manager"""
+    def _open_manual_offset_dialog(self) -> None:
+        """Open the manual offset control dialog using manager."""
         from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
 
         logger.debug("_open_manual_offset_dialog called")
@@ -484,25 +477,22 @@ class ROMExtractionPanel(QWidget):
             extractor=self.rom_extractor,
             rom_size=self.rom_size,
             extraction_manager=self.extraction_manager,
-            initial_offset=self._manual_offset,
+            initial_offset=self._params_controller.manual_offset,
         )
 
         if dialog:
             logger.debug("Opened ManualOffsetDialog via manager")
 
-    def _on_dialog_offset_changed(self, offset: int):
-        """Handle offset changes from the dialog"""
-        self._manual_offset = offset
-        self._manual_offset_mode = True  # User chose manual offset mode
+    def _on_dialog_offset_changed(self, offset: int) -> None:
+        """Handle offset changes from the dialog."""
+        self._params_controller.set_manual_mode(enabled=True, offset=offset)
         self._check_extraction_ready()
         # Preview now handled in manual offset dialog
 
     def _on_dialog_sprite_found(self, sprite_data: Mapping[str, object]) -> None:
-        """Handle sprite found signal from dialog"""
+        """Handle sprite found signal from dialog."""
         offset = cast(int, sprite_data.get("offset", 0))
-        self._manual_offset = offset
-        self._manual_offset_mode = True  # User chose manual offset mode via dialog
-        # Check extraction readiness
+        self._params_controller.set_manual_mode(enabled=True, offset=offset)
         self._check_extraction_ready()
 
     def _open_presets_dialog(self) -> None:
@@ -534,9 +524,8 @@ class ROMExtractionPanel(QWidget):
         """
         logger.info(f"Applying preset '{preset.name}' at offset 0x{preset.offset:06X}")
 
-        # Set the manual offset from the preset
-        self._manual_offset = preset.offset
-        self._manual_offset_mode = True
+        # Set the manual offset from the preset via controller
+        self._params_controller.set_manual_mode(enabled=True, offset=preset.offset)
 
         # Update the offset display
         if self.sprite_selector_widget:
@@ -594,50 +583,31 @@ class ROMExtractionPanel(QWidget):
 
         is_from_cache = getattr(self, '_is_sprites_from_cache', False)
 
-        # Convert list to dict format expected by sprite selector
+        # Use formatter to get display items
+        formatted = format_sprite_list(locations, is_from_cache=is_from_cache)
+
+        # Build locations dict for internal tracking
         locations_dict: dict[str, Mapping[str, object]] = {}
         for loc in locations:
             name = cast(str, loc.get("name", f"sprite_0x{cast(int, loc.get('offset', 0)):X}"))
             locations_dict[name] = loc
 
-        if locations_dict:
-            # Show count of known sprites to make it clear they're available
-            cache_text = " (cached)" if is_from_cache else ""
-            self.sprite_selector_widget.add_sprite(
-                f"-- {len(locations_dict)} Known Sprites Available{cache_text} --", None
-            )
-
-            # Add separator for clarity
-            self.sprite_selector_widget.insert_separator(1)
-
-            for name, info in locations_dict.items():
-                offset = cast(int, info.get("offset", 0))
-                display_name = name.replace("_", " ").title()
-                # Add cache indicator if sprites came from cache
-                cache_indicator = " \U0001F4BE" if is_from_cache else ""  # floppy disk emoji
-                self.sprite_selector_widget.add_sprite(
-                    f"{display_name} (0x{offset:06X}){cache_indicator}",
-                    (name, offset)
+        # Populate sprite selector with formatted items
+        for item in formatted.items:
+            if item.is_separator:
+                self.sprite_selector_widget.insert_separator(
+                    self.sprite_selector_widget.count()
                 )
-            self.sprite_locations = locations_dict
-            self.sprite_selector_widget.set_enabled(True)
+            else:
+                self.sprite_selector_widget.add_sprite(item.display_text, item.data)
 
-            # Change button text to indicate scanner is optional
-            self.sprite_selector_widget.set_find_button_text("Scan for More Sprites")
-            self.sprite_selector_widget.set_find_button_tooltip(
-                ": Scan ROM for additional sprites not in the known list"
-            )
-            self.sprite_selector_widget.set_find_button_enabled(True)
-        else:
-            self.sprite_selector_widget.add_sprite("No known sprites - use scanner", None)
-            self.sprite_selector_widget.set_enabled(False)
+        self.sprite_locations = locations_dict
+        self.sprite_selector_widget.set_enabled(formatted.has_sprites)
 
-            # Change button text to indicate scanner is needed
-            self.sprite_selector_widget.set_find_button_text("Find Sprites")
-            self.sprite_selector_widget.set_find_button_tooltip(
-                "Scan ROM for valid sprite offsets (required for unknown ROMs)"
-            )
-            self.sprite_selector_widget.set_find_button_enabled(True)
+        # Update button text and tooltip
+        self.sprite_selector_widget.set_find_button_text(formatted.button_text)
+        self.sprite_selector_widget.set_find_button_tooltip(formatted.button_tooltip)
+        self.sprite_selector_widget.set_find_button_enabled(True)
 
     def _on_sprite_locations_error(self, message: str) -> None:
         """Handle sprite locations loading error.
@@ -691,14 +661,15 @@ class ROMExtractionPanel(QWidget):
         """Handle similarity indexing errors"""
         logger.error(f"Similarity indexing error: {error_message}")
 
-    def _on_sprite_changed(self, index: int):
-        """Handle sprite selection change"""
+    def _on_sprite_changed(self, index: int) -> None:
+        """Handle sprite selection change."""
         try:
             if index > 0:
                 data = self.sprite_selector_widget.get_current_data()
                 if data:
                     sprite_name, offset = data
-                    self._manual_offset_mode = False
+                    # Switch to preset mode via controller
+                    self._params_controller.set_preset_mode(offset=offset)
                     self.sprite_selector_widget.set_offset_text(f"0x{offset:06X}")
 
                     # Auto-suggest output name based on sprite
@@ -715,74 +686,47 @@ class ROMExtractionPanel(QWidget):
             with contextlib.suppress(Exception):
                 self.sprite_selector_widget.set_offset_text("Error")
 
-    def _check_extraction_ready(self):
-        """Check if extraction is ready - override to handle manual mode"""
+    def _check_extraction_ready(self) -> None:
+        """Check if extraction is ready using controller."""
         try:
-            # Build list of missing requirements for user feedback
-            reasons: list[str] = []
-
             has_rom = bool(self.rom_path)
-            if not has_rom:
-                reasons.append("Load a ROM file")
-
             has_output_name = bool(self._get_output_name())
-            if not has_output_name:
-                reasons.append("Enter output name")
+            has_sprite = self.sprite_selector_widget.get_current_index() > 0
 
             # Show/hide output name hint (appears when ROM loaded but no output name)
             if hasattr(self, "output_hint_label") and self.output_hint_label:
                 show_hint = has_rom and not has_output_name
                 self.output_hint_label.setVisible(show_hint)
 
-            if self._manual_offset_mode:
-                # In manual mode, just need ROM and output name
-                ready = has_rom and has_output_name
-            else:
-                # In preset mode, also need sprite selection
-                has_sprite = self.sprite_selector_widget.get_current_index() > 0
-                if not has_sprite:
-                    reasons.append("Select a sprite")
-                ready = has_rom and has_sprite and has_output_name
-
-            reason_text = " | ".join(reasons) if reasons else ""
-            logger.debug(f"Extraction ready: {ready} (manual_mode={self._manual_offset_mode})")
-            self.extraction_ready.emit(ready, reason_text)
+            # Delegate to controller (emits readiness_changed -> extraction_ready)
+            self._params_controller.check_readiness(
+                has_rom=has_rom,
+                has_sprite=has_sprite,
+                has_output_name=has_output_name,
+            )
 
         except Exception:
             logger.exception("Error in _check_extraction_ready")
             self.extraction_ready.emit(False, "Internal error")
 
     def get_extraction_params(self) -> dict[str, object] | None:
-        """Get parameters for ROM extraction.
+        """Get parameters for ROM extraction using controller.
 
         Returns:
             Dict with keys: rom_path, sprite_offset, sprite_name, output_base, cgram_path
         """
-        if not self.rom_path:
-            return None
+        # Get sprite data for preset mode
+        sprite_data: tuple[str, int] | None = None
+        if not self._params_controller.is_manual_mode:
+            if self.sprite_selector_widget.get_current_index() > 0:
+                sprite_data = self.sprite_selector_widget.get_current_data()
 
-        # Handle manual mode
-        if self._manual_offset_mode:
-            offset = self._manual_offset
-            sprite_name = f"manual_0x{offset:X}"
-        else:
-            # Preset mode
-            if self.sprite_selector_widget.get_current_index() <= 0:
-                return None
-            data = self.sprite_selector_widget.get_current_data()
-            if not data:
-                return None
-            sprite_name, offset = data
-
-        return {
-            "rom_path": self.rom_path,
-            "sprite_offset": offset,
-            "sprite_name": sprite_name,
-            "output_base": self._get_output_name(),
-            "cgram_path": (
-                self.cgram_selector_widget.get_cgram_path() if self.cgram_selector_widget.get_cgram_path() else None
-            ),
-        }
+        return self._params_controller.get_params_dict(
+            rom_path=self.rom_path,
+            output_base=self._get_output_name(),
+            sprite_data=sprite_data,
+            cgram_path=self.cgram_selector_widget.get_cgram_path() or None,
+        )
 
     def clear_files(self):
         """Clear all file selections.
