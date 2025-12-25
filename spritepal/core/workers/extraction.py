@@ -57,11 +57,7 @@ class VRAMExtractionWorker(ManagedWorker):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_extraction_manager() -> CoreOperationsManager:
-            from core.di_container import inject
-            from core.managers.core_operations_manager import CoreOperationsManager
-            return inject(CoreOperationsManager)
-        if not helper.validate_manager_type(_get_extraction_manager, "VRAM extraction"):
+        if not helper.validate_manager_type(CoreOperationsManager, "VRAM extraction"):
             return
 
         # Type cast for better type checking - we know this is CoreOperationsManager from __init__
@@ -139,11 +135,7 @@ class ROMExtractionWorker(ManagedWorker):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_extraction_manager() -> CoreOperationsManager:
-            from core.di_container import inject
-            from core.managers.core_operations_manager import CoreOperationsManager
-            return inject(CoreOperationsManager)
-        if not helper.validate_manager_type(_get_extraction_manager, "ROM extraction"):
+        if not helper.validate_manager_type(CoreOperationsManager, "ROM extraction"):
             return
 
         # Connect standard progress signal using helper

@@ -14,10 +14,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PySide6.QtCore import QObject, Signal, SignalInstance
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable
 
     from core.extractor import SpriteExtractor
     from core.palette_manager import PaletteManager
@@ -25,13 +24,14 @@ if TYPE_CHECKING:
 from core.exceptions import ValidationError
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
+from core.services.extraction_results import ExtractionResult
 from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-class VRAMService(QObject):
+class VRAMService:
     """
     Service for VRAM-based sprite extraction operations.
 
@@ -40,24 +40,10 @@ class VRAMService(QObject):
     - VRAM preview generation
     """
 
-    # Signals for VRAM operations
-    extraction_progress = Signal(str)  # Progress message
-    extraction_warning = Signal(str)  # Warning message (partial success)
-    preview_generated = Signal(object, int)  # PIL Image, tile count
-    palettes_extracted = Signal(object)  # Palette data - use object to avoid PySide6 copy warning
-    active_palettes_found = Signal(list)  # Active palette indices
-    files_created = Signal(list)  # List of created files
-    error_occurred = Signal(str)  # Error message
-
-    # Instance attribute for parent signals
-    _parent_signals: Mapping[str, SignalInstance] | None
-
     def __init__(
         self,
         sprite_extractor: SpriteExtractor | None = None,
         palette_manager: PaletteManager | None = None,
-        parent_signals: Mapping[str, SignalInstance] | None = None,
-        parent: QObject | None = None,
     ) -> None:
         """
         Initialize the VRAM service.
@@ -65,28 +51,11 @@ class VRAMService(QObject):
         Args:
             sprite_extractor: Optional SpriteExtractor instance (created if not provided)
             palette_manager: Optional PaletteManager instance (created if not provided)
-            parent_signals: Optional mapping of signal names to parent signal instances.
-                           When provided, signals are emitted to parent instead of own signals.
-            parent: Qt parent object
         """
-        super().__init__(parent)
         self._logger = get_logger(f"services.{self.__class__.__name__}")
         self._sprite_extractor = sprite_extractor or SpriteExtractor()
         self._palette_manager = palette_manager or PaletteManager()
-        self._parent_signals = parent_signals
         self._logger.info("VRAMService initialized")
-
-    def _emit(self, signal_name: str, *args: object) -> None:
-        """Emit to parent signal if available, otherwise emit to own signal.
-
-        Args:
-            signal_name: Name of the signal to emit
-            *args: Arguments to pass to the signal
-        """
-        if self._parent_signals and signal_name in self._parent_signals:
-            self._parent_signals[signal_name].emit(*args)
-        else:
-            getattr(self, signal_name).emit(*args)
 
     def cleanup(self) -> None:
         """Cleanup service resources."""
@@ -102,7 +71,8 @@ class VRAMService(QObject):
         create_grayscale: bool = True,
         create_metadata: bool = True,
         grayscale_mode: bool = False,
-    ) -> list[str]:
+        progress_callback: Callable[[str], None] | None = None,
+    ) -> ExtractionResult:
         """
         Extract sprites from VRAM dump.
 
@@ -115,9 +85,10 @@ class VRAMService(QObject):
             create_grayscale: Create grayscale palette files
             create_metadata: Create metadata JSON file
             grayscale_mode: Skip palette extraction entirely
+            progress_callback: Optional callback for progress messages
 
         Returns:
-            List of created file paths
+            ExtractionResult with files, preview, palettes, and any warnings
 
         Raises:
             ExtractionError: If extraction fails
@@ -125,7 +96,9 @@ class VRAMService(QObject):
         """
         # Validate parameters
         if not vram_path or not output_base:
-            raise ValidationError("Missing required parameters: vram_path and output_base are required")
+            raise ValidationError(
+                "Missing required parameters: vram_path and output_base are required"
+            )
 
         FileValidator.validate_vram_file_or_raise(vram_path)
 
@@ -135,12 +108,17 @@ class VRAMService(QObject):
         if oam_path:
             FileValidator.validate_oam_file_or_raise(oam_path)
 
+        def _progress(msg: str) -> None:
+            if progress_callback:
+                progress_callback(msg)
+
         extracted_files: list[str] = []
-        palette_extraction_failed = False
-        palette_error_msg = ""
+        warning: str | None = None
+        palettes: list[tuple[str, list[tuple[int, int, int]]]] = []
+        active_palette_indices: list[int] = []
 
         # Extract sprites
-        self._emit("extraction_progress", "Extracting sprites from VRAM...")
+        _progress("Extracting sprites from VRAM...")
 
         output_file = f"{output_base}.png"
         img, num_tiles = self._sprite_extractor.extract_sprites_grayscale(
@@ -149,43 +127,48 @@ class VRAMService(QObject):
         extracted_files.append(output_file)
 
         # Generate preview
-        self._emit("extraction_progress", "Creating preview...")
-        self._emit("preview_generated", img, num_tiles)
+        _progress("Creating preview...")
 
         # Extract palettes if requested - catch errors for partial success
         if not grayscale_mode and cgram_path:
             try:
-                extracted_files.extend(
-                    self._extract_palettes(
-                        cgram_path,
-                        output_base,
-                        output_file,
-                        oam_path,
-                        vram_path,
-                        vram_offset,
-                        num_tiles,
-                        create_grayscale,
-                        create_metadata,
-                    )
+                from core.services.palette_utils import extract_palettes_and_create_files
+
+                palette_result = extract_palettes_and_create_files(
+                    palette_manager=self._palette_manager,
+                    cgram_path=cgram_path,
+                    output_base=output_base,
+                    png_file=output_file,
+                    oam_path=oam_path,
+                    source_path=vram_path,
+                    source_offset=vram_offset,
+                    num_tiles=num_tiles,
+                    create_grayscale=create_grayscale,
+                    create_metadata=create_metadata,
+                    progress_callback=progress_callback,
                 )
+                extracted_files.extend(palette_result.files)
+                palettes = palette_result.palettes
+                active_palette_indices = palette_result.active_palette_indices
             except Exception as e:
                 # Log and track palette failure but don't fail sprite extraction
-                palette_extraction_failed = True
-                palette_error_msg = str(e)
+                warning = f"Sprites extracted but palette extraction failed: {e}"
                 self._logger.warning(f"Palette extraction failed: {e}")
 
-        # Emit appropriate completion message
-        if palette_extraction_failed:
-            self._emit(
-                "extraction_warning",
-                f"Sprites extracted but palette extraction failed: {palette_error_msg}",
-            )
-            self._emit("extraction_progress", "Extraction complete (palettes failed)")
+        # Log completion
+        if warning:
+            _progress("Extraction complete (palettes failed)")
         else:
-            self._emit("extraction_progress", "Extraction complete!")
+            _progress("Extraction complete!")
 
-        self._emit("files_created", extracted_files)
-        return extracted_files
+        return ExtractionResult(
+            files=extracted_files,
+            preview_image=img,
+            tile_count=num_tiles,
+            palettes=palettes,
+            active_palette_indices=active_palette_indices,
+            warning=warning,
+        )
 
     def generate_preview(self, vram_path: str, offset: int) -> tuple[Image.Image, int]:
         """
@@ -210,41 +193,3 @@ class VRAMService(QObject):
         # Create grayscale image
         img = self._sprite_extractor.create_grayscale_image(tiles)
         return img, num_tiles
-
-    # Private helper methods
-
-    def _extract_palettes(
-        self,
-        cgram_path: str,
-        output_base: str,
-        png_file: str,
-        oam_path: str | None,
-        source_path: str,
-        source_offset: int | None,
-        num_tiles: int,
-        create_grayscale: bool,
-        create_metadata: bool,
-    ) -> list[str]:
-        """
-        Extract palettes and create palette/metadata files.
-
-        Delegates to shared palette_utils.extract_palettes_and_create_files.
-
-        Returns:
-            List of created file paths
-        """
-        from core.services.palette_utils import extract_palettes_and_create_files
-
-        return extract_palettes_and_create_files(
-            palette_manager=self._palette_manager,
-            cgram_path=cgram_path,
-            output_base=output_base,
-            png_file=png_file,
-            oam_path=oam_path,
-            source_path=source_path,
-            source_offset=source_offset,
-            num_tiles=num_tiles,
-            create_grayscale=create_grayscale,
-            create_metadata=create_metadata,
-            emit=self._emit,
-        )

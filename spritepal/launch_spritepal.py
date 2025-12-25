@@ -13,14 +13,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
-from core.di_container import inject
-from core.managers import (
-    cleanup_managers,
-    initialize_managers,
-    validate_manager_dependencies,
-)
-from core.managers.application_state_manager import ApplicationStateManager
-from core.services.rom_cache import ROMCache
+from core.app_context import AppContext, create_app_context, reset_app_context
+from core.managers import validate_manager_dependencies
 from ui.main_window import MainWindow
 from ui.styles.accessibility import initialize_accessibility
 from utils.logging_config import get_logger, setup_logging
@@ -58,8 +52,11 @@ def apply_dark_theme(app: QApplication) -> None:
 class SpritePalApp(QApplication):
     """Main application class for SpritePal"""
 
-    def __init__(self, argv: list[str]) -> None:
+    def __init__(self, argv: list[str], context: AppContext) -> None:
         super().__init__(argv)
+
+        # Store context reference
+        self._context = context
 
         # Set application metadata
         self.setApplicationName("SpritePal")
@@ -72,12 +69,11 @@ class SpritePalApp(QApplication):
         # Initialize accessibility features
         initialize_accessibility()
 
-        # B.6: Create main window with explicit DI dependencies
-        # This eliminates deprecation warnings and makes dependencies explicit
+        # Create main window with explicit dependencies from context
         self.main_window = MainWindow(
-            settings_manager=inject(ApplicationStateManager),
-            rom_cache=inject(ROMCache),
-            session_manager=inject(ApplicationStateManager),
+            settings_manager=context.application_state_manager,
+            rom_cache=context.rom_cache,
+            session_manager=context.application_state_manager,
         )
 
     def _apply_dark_theme(self):
@@ -439,15 +435,15 @@ def main():
     sys.excepthook = handle_exception
     logger.info("Global exception handler installed")
 
-    # Initialize managers with enhanced error handling
-    logger.info("Initializing managers...")
+    # Create app context with explicit wiring
+    logger.info("Creating app context...")
     try:
-        initialize_managers(
+        context = create_app_context(
             "SpritePal",
             settings_path=config_service.settings_file,
             configuration_service=config_service,
         )
-        logger.info("Managers initialized successfully")
+        logger.info("App context created successfully")
 
         # Validate manager dependencies
         if validate_manager_dependencies():
@@ -456,13 +452,13 @@ def main():
             logger.warning("Manager dependency validation failed - some features may not work correctly")
 
     except Exception as e:
-        logger.critical(f"Failed to initialize managers: {e}")
+        logger.critical(f"Failed to create app context: {e}")
         logger.critical("Application cannot start without properly initialized managers")
         sys.exit(1)
 
     try:
-        # Create application
-        app = SpritePalApp(sys.argv)
+        # Create application with context
+        app = SpritePalApp(sys.argv, context=context)
 
         # Show main window
         app.show()
@@ -470,10 +466,10 @@ def main():
         # Run event loop
         result = app.exec()
     finally:
-        # Cleanup managers on exit
-        logger.info("Cleaning up managers...")
-        cleanup_managers()
-        logger.info("Managers cleaned up")
+        # Cleanup context on exit
+        logger.info("Cleaning up app context...")
+        reset_app_context()
+        logger.info("App context cleaned up")
 
     sys.exit(result)
 

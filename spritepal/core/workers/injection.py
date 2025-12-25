@@ -72,10 +72,7 @@ class VRAMInjectionWorker(ManagedWorker):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_expected_manager() -> CoreOperationsManager:
-            from core.di_container import inject
-            return inject(CoreOperationsManager)
-        if not helper.validate_manager_type(_get_expected_manager, "VRAM injection"):
+        if not helper.validate_manager_type(CoreOperationsManager, "VRAM injection"):
             return
 
         # Type cast for better type checking
@@ -142,10 +139,7 @@ class ROMInjectionWorker(ManagedWorker):
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
-        def _get_expected_manager() -> CoreOperationsManager:
-            from core.di_container import inject
-            return inject(CoreOperationsManager)
-        if not helper.validate_manager_type(_get_expected_manager, "ROM injection"):
+        if not helper.validate_manager_type(CoreOperationsManager, "ROM injection"):
             return
 
         # Type cast for better type checking

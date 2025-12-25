@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from core.services.extraction_results import PaletteExtractionResult
 from utils.constants import (
     BYTES_PER_TILE,
     SPRITE_PALETTE_END,
@@ -32,8 +33,8 @@ def extract_palettes_and_create_files(
     num_tiles: int,
     create_grayscale: bool,
     create_metadata: bool,
-    emit: Callable[[str, object], None] | None = None,
-) -> list[str]:
+    progress_callback: Callable[[str], None] | None = None,
+) -> PaletteExtractionResult:
     """
     Extract palettes and create palette/metadata files.
 
@@ -51,27 +52,26 @@ def extract_palettes_and_create_files(
         num_tiles: Number of tiles extracted (for metadata)
         create_grayscale: Whether to create grayscale palette files
         create_metadata: Whether to create metadata JSON file
-        emit: Optional callback for emitting progress signals (name, value)
+        progress_callback: Optional callback for progress messages
 
     Returns:
-        List of created file paths
+        PaletteExtractionResult with files, palettes, and active indices
     """
     created_files: list[str] = []
 
-    def _emit(name: str, value: object) -> None:
-        if emit:
-            emit(name, value)
+    def _progress(msg: str) -> None:
+        if progress_callback:
+            progress_callback(msg)
 
-    _emit("extraction_progress", "Extracting palettes...")
+    _progress("Extracting palettes...")
     palette_manager.load_cgram(cgram_path)
 
     # Get sprite palettes
     sprite_palettes = palette_manager.get_sprite_palettes()
-    _emit("palettes_extracted", sprite_palettes)
 
     # Create palette files
     if create_grayscale:
-        _emit("extraction_progress", "Creating palette files...")
+        _progress("Creating palette files...")
 
         # Create main palette file (default to palette 8)
         main_pal_file = f"{output_base}.pal.json"
@@ -88,7 +88,7 @@ def extract_palettes_and_create_files(
 
         # Create metadata file
         if create_metadata:
-            _emit("extraction_progress", "Creating metadata file...")
+            _progress("Creating metadata file...")
 
             # Prepare extraction parameters
             extraction_params = {
@@ -104,9 +104,13 @@ def extract_palettes_and_create_files(
             created_files.append(metadata_file)
 
     # Analyze OAM if available
+    active_palettes: list[int] = []
     if oam_path:
-        _emit("extraction_progress", "Analyzing sprite palette usage...")
+        _progress("Analyzing sprite palette usage...")
         active_palettes = palette_manager.analyze_oam_palettes(oam_path)
-        _emit("active_palettes_found", active_palettes)
 
-    return created_files
+    return PaletteExtractionResult(
+        files=created_files,
+        palettes=sprite_palettes,
+        active_palette_indices=active_palettes,
+    )

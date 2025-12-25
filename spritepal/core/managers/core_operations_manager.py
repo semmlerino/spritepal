@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 from PIL import Image
-from PySide6.QtCore import QObject, QThread, Signal, SignalInstance
+from PySide6.QtCore import QObject, QThread, Signal
 
 from core.exceptions import (
     ExtractionError,
@@ -88,11 +88,25 @@ class CoreOperationsManager(BaseManager):
     cache_miss = Signal(str)  # key
     cache_saved = Signal(str, int)  # key, size_bytes
 
-    def __init__(self, parent: QObject | None = None) -> None:
-        """Initialize the core operations manager."""
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        *,
+        session_manager: ApplicationStateManager | None = None,
+        rom_cache: ROMCache | None = None,
+        rom_extractor: ROMExtractor | None = None,
+    ) -> None:
+        """Initialize the core operations manager.
+
+        Args:
+            parent: Qt parent object for proper lifecycle management
+            session_manager: Optional ApplicationStateManager (uses inject() if not provided)
+            rom_cache: Optional ROMCache (uses inject() if not provided)
+            rom_extractor: Optional ROMExtractor (uses inject() if not provided)
+        """
         # Initialize components
         self._sprite_extractor: SpriteExtractor | None = None
-        self._rom_extractor: ROMExtractor | None = None
+        self._rom_extractor: ROMExtractor | None = rom_extractor
         self._palette_manager: PaletteManager | None = None
         self._current_worker: QThread | None = None
 
@@ -100,9 +114,9 @@ class CoreOperationsManager(BaseManager):
         self._rom_service: ROMService | None = None
         self._vram_service: VRAMService | None = None
 
-        # Cached DI dependencies (populated in _initialize)
-        self._session_manager: ApplicationStateManager | None = None
-        self._rom_cache: ROMCache | None = None
+        # DI dependencies (passed explicitly or populated in _initialize)
+        self._session_manager: ApplicationStateManager | None = session_manager
+        self._rom_cache: ROMCache | None = rom_cache
 
         # Thread safety for inherited methods
         self._lock = threading.RLock()
@@ -117,31 +131,28 @@ class CoreOperationsManager(BaseManager):
             self._sprite_extractor = SpriteExtractor()
             self._palette_manager = PaletteManager()
 
-            # Cache DI dependencies (singletons - safe to cache)
-            from core.di_container import inject
-            from core.rom_extractor import ROMExtractor
-            from core.services.rom_cache import ROMCache
+            # Get DI dependencies - use passed values or fall back to inject()
+            if self._rom_extractor is None or self._session_manager is None or self._rom_cache is None:
+                from core.di_container import inject
+                from core.rom_extractor import ROMExtractor
+                from core.services.rom_cache import ROMCache
 
-            self._rom_extractor = inject(ROMExtractor)
-            self._session_manager = inject(ApplicationStateManager)
-            self._rom_cache = inject(ROMCache)
+                if self._rom_extractor is None:
+                    self._rom_extractor = inject(ROMExtractor)
+                if self._session_manager is None:
+                    self._session_manager = inject(ApplicationStateManager)
+                if self._rom_cache is None:
+                    self._rom_cache = inject(ROMCache)
 
-            # Get signal mappings for services to emit directly to manager signals
-            rom_signals = self._get_rom_service_signals()
-            vram_signals = self._get_vram_service_signals()
-
-            # Initialize services with parent signals
+            # Initialize services (pure helpers returning results)
             self._rom_service = ROMService(
                 rom_extractor=self._rom_extractor,
                 palette_manager=self._palette_manager,
-                parent_signals=rom_signals,
-                parent=self,
+                rom_cache=self._rom_cache,
             )
             self._vram_service = VRAMService(
                 sprite_extractor=self._sprite_extractor,
                 palette_manager=self._palette_manager,
-                parent_signals=vram_signals,
-                parent=self,
             )
 
             self._is_initialized = True
@@ -150,34 +161,6 @@ class CoreOperationsManager(BaseManager):
         except Exception as e:
             self._handle_error(e, "initialization")
             raise
-
-    def _get_rom_service_signals(self) -> dict[str, SignalInstance]:
-        """Get signal mapping for ROMService to emit to manager signals."""
-        return {
-            "extraction_progress": self.extraction_progress,
-            "extraction_warning": self.extraction_warning,
-            "preview_generated": self.preview_generated,
-            "palettes_extracted": self.palettes_extracted,
-            "active_palettes_found": self.active_palettes_found,
-            "files_created": self.files_created,
-            "cache_operation_started": self.cache_operation_started,
-            "cache_hit": self.cache_hit,
-            "cache_miss": self.cache_miss,
-            "cache_saved": self.cache_saved,
-            "error_occurred": self.error_occurred,
-        }
-
-    def _get_vram_service_signals(self) -> dict[str, SignalInstance]:
-        """Get signal mapping for VRAMService to emit to manager signals."""
-        return {
-            "extraction_progress": self.extraction_progress,
-            "extraction_warning": self.extraction_warning,
-            "preview_generated": self.preview_generated,
-            "palettes_extracted": self.palettes_extracted,
-            "active_palettes_found": self.active_palettes_found,
-            "files_created": self.files_created,
-            "error_occurred": self.error_occurred,
-        }
 
     @override
     def cleanup(self) -> None:
@@ -305,7 +288,7 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If extraction fails
             ValidationError: If parameters are invalid
         """
-        return self.vram_service.extract_from_vram(
+        result = self.vram_service.extract_from_vram(
             vram_path=vram_path,
             output_base=output_base,
             cgram_path=cgram_path,
@@ -314,7 +297,21 @@ class CoreOperationsManager(BaseManager):
             create_grayscale=create_grayscale,
             create_metadata=create_metadata,
             grayscale_mode=grayscale_mode,
+            progress_callback=self.extraction_progress.emit,
         )
+
+        # Emit signals from result
+        if result.preview_image:
+            self.preview_generated.emit(result.preview_image, result.tile_count)
+        if result.palettes:
+            self.palettes_extracted.emit(result.palettes)
+        if result.active_palette_indices:
+            self.active_palettes_found.emit(result.active_palette_indices)
+        if result.warning:
+            self.extraction_warning.emit(result.warning)
+        self.files_created.emit(result.files)
+
+        return result.files
 
     @with_operation_handling(
         "rom_extraction", "ROM extraction", with_progress=True, exclusive=True, target_error=ExtractionError
@@ -339,13 +336,27 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If extraction fails
             ValidationError: If parameters are invalid
         """
-        return self.rom_service.extract_from_rom(
+        result = self.rom_service.extract_from_rom(
             rom_path=rom_path,
             offset=offset,
             output_base=output_base,
             sprite_name=sprite_name,
             cgram_path=cgram_path,
+            progress_callback=self.extraction_progress.emit,
         )
+
+        # Emit signals from result
+        if result.preview_image:
+            self.preview_generated.emit(result.preview_image, result.tile_count)
+        if result.palettes:
+            self.palettes_extracted.emit(result.palettes)
+        if result.active_palette_indices:
+            self.active_palettes_found.emit(result.active_palette_indices)
+        if result.warning:
+            self.extraction_warning.emit(result.warning)
+        self.files_created.emit(result.files)
+
+        return result.files
 
     @with_operation_handling(
         "sprite_preview", "preview generation", with_progress=False, exclusive=False, target_error=ExtractionError
@@ -366,7 +377,8 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ExtractionError: If preview generation fails
         """
-        return self.rom_service.get_sprite_preview(rom_path, offset, sprite_name)
+        result = self.rom_service.get_sprite_preview(rom_path, offset, sprite_name)
+        return result.tile_data, result.width, result.height
 
     def validate_extraction_params(
         self, params: Mapping[str, object]
@@ -465,7 +477,19 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If operation fails
         """
         try:
-            return self.rom_service.get_known_sprite_locations(rom_path)
+            locations, cache_result = self.rom_service.get_known_sprite_locations(rom_path)
+
+            # Emit cache signals based on result
+            self.cache_operation_started.emit("Loading", "sprite_locations")
+            if cache_result.hit:
+                self.cache_hit.emit("sprite_locations", cache_result.time_saved)
+            else:
+                self.cache_miss.emit("sprite_locations")
+                if cache_result.items_saved > 0:
+                    self.cache_operation_started.emit("Saving", "sprite_locations")
+                    self.cache_saved.emit("sprite_locations", cache_result.items_saved)
+
+            return locations
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "get_known_sprite_locations", "getting sprite locations")
             raise

@@ -79,7 +79,39 @@ def get_container() -> DIContainer:
 
 
 def inject(interface: type[T]) -> T:
-    """Get an injected dependency."""
+    """Get an injected dependency.
+
+    During the transition to explicit wiring, this function checks AppContext first
+    and falls back to the container if AppContext is not initialized.
+    """
+    # Try AppContext first (new pattern)
+    from core.app_context import get_app_context_optional
+
+    ctx = get_app_context_optional()
+    if ctx is not None:
+        # Import types locally to avoid circular imports
+        from core.configuration_service import ConfigurationService
+        from core.managers.application_state_manager import ApplicationStateManager
+        from core.managers.core_operations_manager import CoreOperationsManager
+        from core.managers.sprite_preset_manager import SpritePresetManager
+        from core.rom_extractor import ROMExtractor
+        from core.services.rom_cache import ROMCache
+
+        # Map types to context attributes
+        if interface is ApplicationStateManager:
+            return cast(T, ctx.application_state_manager)
+        if interface is CoreOperationsManager:
+            return cast(T, ctx.core_operations_manager)
+        if interface is SpritePresetManager:
+            return cast(T, ctx.sprite_preset_manager)
+        if interface is ConfigurationService:
+            return cast(T, ctx.configuration_service)
+        if interface is ROMCache:
+            return cast(T, ctx.rom_cache)
+        if interface is ROMExtractor:
+            return cast(T, ctx.rom_extractor)
+
+    # Fall back to container (legacy pattern)
     return _container.get(interface)
 
 

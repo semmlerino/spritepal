@@ -7,10 +7,15 @@ import json
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PIL import Image
 
 from core.region_analyzer import EmptyRegionConfig, EmptyRegionDetector
+
+if TYPE_CHECKING:
+    from core.rom_extractor import ROMExtractor
+
 from core.sprite_visual_validator import SpriteVisualValidator
 from core.tile_renderer import TileRenderer
 from core.types import SpriteInfo
@@ -101,11 +106,19 @@ class ScanResult:
 class SpriteFinder:
     """Finds actual character sprites in ROM files"""
 
-    def __init__(self, output_dir: str = "sprite_candidates", region_config: EmptyRegionConfig | None = None) -> None:
-        from core.di_container import inject
-        from core.rom_extractor import ROMExtractor
+    def __init__(
+        self,
+        output_dir: str = "sprite_candidates",
+        region_config: EmptyRegionConfig | None = None,
+        *,
+        rom_extractor: "ROMExtractor | None" = None,
+    ) -> None:
+        if rom_extractor is None:
+            from core.di_container import inject
+            from core.rom_extractor import ROMExtractor
+            rom_extractor = inject(ROMExtractor)
 
-        self.extractor = inject(ROMExtractor)
+        self.extractor = rom_extractor
         self.validator = SpriteVisualValidator()
         self.tile_renderer = TileRenderer()
         self.output_dir = output_dir

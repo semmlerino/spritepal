@@ -7,7 +7,6 @@ reducing boilerplate and ensuring consistent signal wiring.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -40,26 +39,17 @@ class SignalConnectionHelper:
         self.manager = worker.manager
         self._connections = worker._connections
 
-    def validate_manager_type(self, expected_manager_getter: Callable[[], object], operation_type: str) -> bool:
+    def validate_manager_type(self, expected_type: type, operation_type: str) -> bool:
         """
         Validate that the manager is of the expected type.
 
         Args:
-            expected_manager_getter: Function that returns expected manager type
+            expected_type: The expected manager class type
             operation_type: Description of operation type for error logging
 
         Returns:
             True if manager type is valid, False otherwise
         """
-        try:
-            expected_manager = expected_manager_getter()
-            expected_type = type(expected_manager)
-        except Exception:
-            # In test contexts, the global registry might not be initialized
-            # In this case, we allow any manager (including Mock objects)
-            logger.debug(f"Could not get expected manager type for {operation_type}, allowing any manager")
-            return True
-
         if not isinstance(self.manager, expected_type):
             # Check if it's a Mock object (common in tests)
             if hasattr(self.manager, '_spec_class'):
