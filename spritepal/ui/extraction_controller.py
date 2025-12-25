@@ -67,7 +67,6 @@ class ExtractionController(QObject):
     cache_badge_show = Signal(str)  # Badge text
     cache_badge_hide = Signal()
     cache_status_updated = Signal(str, float)  # cache_type, time_saved
-    cache_refresh_requested = Signal()  # Request UI to refresh cache display
 
     def __init__(
         self,
@@ -651,7 +650,6 @@ class ExtractionController(QObject):
         if settings_manager.get("cache", "show_indicators", True):
             message = f"Saved {count} {cache_type.replace('_', ' ')} to cache"
             self.status_message_timed.emit(message, 5000)
-            self.cache_refresh_requested.emit()
 
     def start_rom_extraction(self, params: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - params are dynamic extraction config
         """Start ROM sprite extraction process"""

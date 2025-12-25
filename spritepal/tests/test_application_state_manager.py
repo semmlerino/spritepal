@@ -333,8 +333,8 @@ class TestRecentFiles:
         test_file.touch()
         manager.add_recent_file(str(test_file))
 
-        # Use internal method for typed recent files
-        manager._add_recent_file("vram", str(test_file))
+        # Set up typed recent files list via public API
+        manager.set("recent_files", "vram", [str(test_file)])
         manager.clear_recent_files("vram")
 
         # The typed list should be cleared

@@ -381,15 +381,6 @@ class ApplicationStateManager(BaseManager):
         if category == "session" and key in ["vram_path", "cgram_path", "oam_path"]:
             self.files_updated.emit({key: value})
 
-    def save(self) -> bool:
-        """
-        Save settings to file (alias for save_session).
-
-        Returns:
-            bool: True if save successful
-        """
-        return self.save_session()
-
     def save_session(self) -> bool:
         """
         Save current session to file (alias for save_settings).
@@ -637,39 +628,6 @@ class ApplicationStateManager(BaseManager):
 
         except (OSError, json.JSONDecodeError) as e:
             raise SessionError(f"Could not import settings: {e}") from e
-
-    def _add_recent_file(self, file_type: str, file_path: str) -> None:
-        """Add a file to recent files list."""
-        if not file_path or not Path(file_path).exists():
-            return
-
-        with self._lock:
-            if "recent_files" not in self._settings:
-                self._settings["recent_files"] = {}
-
-            recent = self._settings["recent_files"]
-            if file_type not in recent:
-                recent[file_type] = []
-
-            # Get the list for this file type and validate it's a list
-            file_list_obj = recent[file_type]
-            if not isinstance(file_list_obj, list):
-                file_list_obj = []
-                recent[file_type] = file_list_obj
-
-            # Remove if already in list
-            if file_path in file_list_obj:
-                file_list_obj.remove(file_path)
-
-            # Add to front
-            file_list_obj.insert(0, file_path)
-
-            # Limit size
-            max_recent_obj = recent.get("max_recent", 10)
-            max_recent = max_recent_obj if isinstance(max_recent_obj, int) else 10
-            recent[file_type] = file_list_obj[:max_recent]
-
-            self._session_dirty = True
 
     # ========== Recent Files ==========
 

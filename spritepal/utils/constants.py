@@ -176,48 +176,6 @@ ROM_SPRITE_AREA_6_END = 0x380000    # 4MB ROM area 1 end
 ROM_SPRITE_AREA_7_START = 0x380000  # 4MB ROM area 2 start
 ROM_SPRITE_AREA_7_END = 0x400000    # 4MB ROM area 2 end
 
-
-def get_sprite_search_areas(rom_size: int) -> list[tuple[int, int]]:
-    """
-    Get sprite search areas dynamically based on ROM size.
-
-    Instead of hardcoded ranges, this returns areas appropriate for the
-    actual ROM being scanned. Larger ROMs get more search areas.
-
-    Args:
-        rom_size: Size of the ROM in bytes (after SMC header removal)
-
-    Returns:
-        List of (start, end) tuples for search areas
-    """
-    # Base areas common to most ROMs (0x80000 - 0x300000)
-    areas = [
-        (ROM_SPRITE_AREA_1_START, ROM_SPRITE_AREA_1_END),
-        (ROM_SPRITE_AREA_2_START, ROM_SPRITE_AREA_2_END),
-        (ROM_SPRITE_AREA_3_START, ROM_SPRITE_AREA_3_END),
-        (ROM_SPRITE_AREA_4_START, ROM_SPRITE_AREA_4_END),
-        (ROM_SPRITE_AREA_5_START, ROM_SPRITE_AREA_5_END),
-    ]
-
-    # Add extended areas for 4MB+ ROMs
-    if rom_size >= ROM_SIZE_4MB:
-        areas.extend([
-            (ROM_SPRITE_AREA_6_START, ROM_SPRITE_AREA_6_END),
-            (ROM_SPRITE_AREA_7_START, ROM_SPRITE_AREA_7_END),
-        ])
-
-    # For even larger ROMs (6MB+), extend scanning to available space
-    if rom_size >= ROM_SIZE_6MB:
-        # Add 512KB chunks up to ROM size, avoiding overlap with existing areas
-        current_end = ROM_SPRITE_AREA_7_END
-        while current_end < rom_size:
-            next_end = min(current_end + 0x80000, rom_size)  # 512KB chunks
-            areas.append((current_end, next_end))
-            current_end = next_end
-
-    # Filter out areas that exceed the actual ROM size
-    return [(start, min(end, rom_size)) for start, end in areas if start < rom_size]
-
 # ROM header offsets
 ROM_HEADER_OFFSET_LOROM = 0x7FC0     # LoROM header offset
 ROM_HEADER_OFFSET_HIROM = 0xFFC0     # HiROM header offset

@@ -30,12 +30,12 @@ from PySide6.QtCore import (
     QTimer,
     Signal,
 )
-from PySide6.QtWidgets import QApplication, QDialog, QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 
 # Re-export MemoryHelper from memory_helpers for backwards compatibility
 from tests.fixtures.memory_helpers import MemoryHelper
 
-__all__ = ["MemoryHelper", "QtTestCase", "EventLoopHelper", "WidgetFactory", "ThreadSafetyHelper", "WidgetPool"]
+__all__ = ["MemoryHelper", "QtTestCase", "EventLoopHelper", "ThreadSafetyHelper"]
 
 # Type variable for generic widget types
 W = TypeVar("W", bound=QWidget)
@@ -165,55 +165,6 @@ class QtTestCase:
         self.threads.append(thread)
         return thread
 
-class WidgetFactory:
-    """Factory for creating common Qt widgets with standard configurations."""
-
-    @staticmethod
-    def create_dialog(
-        title: str = "Test Dialog",
-        modal: bool = True,
-        size: tuple[int, int] = (400, 300),
-        parent: QWidget | None = None
-    ) -> QDialog:
-        """
-        Create a dialog with standard configuration.
-
-        Args:
-            title: Dialog window title
-            modal: Whether dialog is modal
-            size: Dialog size (width, height)
-            parent: Parent widget
-
-        Returns:
-            Configured dialog instance
-        """
-        dialog = QDialog(parent)
-        dialog.setWindowTitle(title)
-        dialog.setModal(modal)
-        dialog.resize(*size)
-        return dialog
-
-    @staticmethod
-    def create_widget_with_layout(
-        widget_class: type[W],
-        layout_class: type,
-        parent: QWidget | None = None
-    ) -> tuple[W, Any]:
-        """
-        Create a widget with a layout.
-
-        Args:
-            widget_class: Widget class to create
-            layout_class: Layout class to apply
-            parent: Parent widget
-
-        Returns:
-            Tuple of (widget, layout)
-        """
-        widget = widget_class(parent)
-        layout = layout_class(widget)
-        widget.setLayout(layout)
-        return widget, layout
 
 class EventLoopHelper:
     """Helper class for managing Qt event loops in tests."""
@@ -253,83 +204,6 @@ class EventLoopHelper:
                 wait_time = min(10, int(remaining))
                 app.processEvents(QEventLoop.AllEvents | QEventLoop.WaitForMoreEvents, wait_time)
 
-    @staticmethod
-    @contextmanager
-    def wait_for_signal(
-        signal: Signal,
-        timeout_ms: int = 1000
-    ) -> Generator[list[Any], None, None]:
-        """
-        Context manager to wait for a signal to be emitted.
-
-        Handles fast signals that emit before the event loop starts by tracking
-        whether the signal was already received during the context body.
-
-        Args:
-            signal: Signal to wait for
-            timeout_ms: Maximum wait time in milliseconds
-
-        Yields:
-            List to collect signal arguments
-
-        Example:
-            with EventLoopHelper.wait_for_signal(widget.clicked, 1000) as args:
-                widget.click()
-            assert len(args) > 0
-        """
-        loop = QEventLoop()
-        args: list[Any] = []
-        received = [False]  # List for closure mutation
-
-        def on_signal(*signal_args: Any) -> None:
-            args.extend(signal_args)
-            received[0] = True
-            if loop.isRunning():
-                loop.quit()
-
-        signal.connect(on_signal)
-
-        # Setup timeout
-        timer = QTimer()
-        timer.setSingleShot(True)
-        timer.timeout.connect(loop.quit)
-        timer.start(timeout_ms)
-
-        try:
-            yield args
-            # Only enter event loop if signal wasn't already received
-            if not received[0]:
-                loop.exec()
-        finally:
-            signal.disconnect(on_signal)
-            timer.stop()
-
-    @staticmethod
-    def wait_until(
-        condition: Callable[[], bool],
-        timeout_ms: int = 1000,
-        interval_ms: int = 10
-    ) -> bool:
-        """
-        Wait until a condition becomes true.
-
-        Args:
-            condition: Callable that returns True when condition is met
-            timeout_ms: Maximum wait time in milliseconds
-            interval_ms: Check interval in milliseconds
-
-        Returns:
-            True if condition was met, False if timeout
-        """
-        from PySide6.QtTest import QTest
-
-        elapsed = 0
-        while elapsed < timeout_ms:
-            if condition():
-                return True
-            QTest.qWait(interval_ms)
-            elapsed += interval_ms
-        return False
 
 class ThreadSafetyHelper:
     """Helper class for thread-safe Qt testing."""
@@ -409,70 +283,3 @@ class ThreadSafetyHelper:
                 if thread.isRunning():
                     thread.terminate()
                     thread.wait()
-
-# Widget pool for performance optimization
-class WidgetPool:
-    """Pool of reusable widgets for test performance optimization."""
-
-    def __init__(self, widget_class: type[W], pool_size: int = 5):
-        """
-        Initialize widget pool.
-
-        Args:
-            widget_class: Class of widgets to pool
-            pool_size: Maximum pool size
-        """
-        self.widget_class = widget_class
-        self.pool_size = pool_size
-        self._available: list[W] = []
-        self._in_use: set[W] = set()
-
-    def acquire(self, *args, **kwargs) -> W:
-        """
-        Acquire a widget from the pool.
-
-        Args:
-            *args: Arguments for widget creation if pool is empty
-            **kwargs: Keyword arguments for widget creation
-
-        Returns:
-            Widget instance
-        """
-        if self._available:
-            widget = self._available.pop()
-        else:
-            widget = self.widget_class(*args, **kwargs)
-
-        self._in_use.add(widget)
-        return widget
-
-    def release(self, widget: W):
-        """
-        Release a widget back to the pool.
-
-        Args:
-            widget: Widget to release
-        """
-        if widget not in self._in_use:
-            return
-
-        self._in_use.remove(widget)
-
-        # Reset widget state
-        widget.hide()
-        widget.setParent(None)
-
-        # Add back to pool if not at capacity
-        if len(self._available) < self.pool_size:
-            self._available.append(widget)
-        else:
-            widget.deleteLater()
-
-    def clear(self):
-        """Clear the pool and delete all widgets."""
-        for widget in self._available:
-            widget.deleteLater()
-        for widget in self._in_use:
-            widget.deleteLater()
-        self._available.clear()
-        self._in_use.clear()

@@ -105,7 +105,7 @@ last_rom = app_state.settings.get("rom_injection.last_input_rom", "")
 
 # Write a setting
 app_state.settings.set("some_key", new_value)
-app_state.settings.save()  # Persist to disk
+app_state.settings.save_session()  # Persist to disk
 ```
 
 **Note:** `SettingsManagerProtocol` has been consolidated into `ApplicationStateManager`. Use the concrete class directly.
@@ -207,7 +207,7 @@ def test_something(isolated_managers):
 
 **Settings not persisting?**
 - Check file permissions on `.spritepal_settings.json`
-- Ensure `settings_manager.save()` is called after changes
+- Ensure `settings_manager.save_session()` is called after changes
 
 **Test affecting production settings?**
 - Always use `isolated_managers` fixture in tests

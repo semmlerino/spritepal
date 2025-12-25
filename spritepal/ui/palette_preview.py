@@ -40,6 +40,16 @@ def _update_color_widgets(
         color_widgets[i].set_color(color)
 
 
+def _clear_palette_widgets(color_widgets: list[PaletteColorWidget]) -> None:
+    """Clear color widgets to default placeholder color.
+
+    Args:
+        color_widgets: List of PaletteColorWidget to clear
+    """
+    for widget in color_widgets:
+        widget.set_color(PaletteColorWidget.DEFAULT_COLOR)
+
+
 class PaletteColorWidget(QWidget):
     """Widget for displaying a single palette color"""
 
@@ -186,11 +196,10 @@ class PaletteWidget(QFrame):
         self.colors = colors
         _update_color_widgets(self.color_widgets, colors)
 
-    def clear(self):
-        """Clear the palette to default placeholder color"""
+    def clear(self) -> None:
+        """Clear the palette to default placeholder color."""
         self.colors = []
-        for widget in self.color_widgets:
-            widget.set_color(PaletteColorWidget.DEFAULT_COLOR)
+        _clear_palette_widgets(self.color_widgets)
 
     def set_name(self, name: str):
         """Set the palette name"""
@@ -261,11 +270,10 @@ class CollapsedPaletteRow(QFrame):
         self.colors = colors
         _update_color_widgets(self.color_widgets, colors)
 
-    def clear(self):
-        """Clear the palette to default placeholder color"""
+    def clear(self) -> None:
+        """Clear the palette to default placeholder color."""
         self.colors = []
-        for widget in self.color_widgets:
-            widget.set_color(PaletteColorWidget.DEFAULT_COLOR)
+        _clear_palette_widgets(self.color_widgets)
 
     def set_highlighted(self, highlighted: bool) -> None:
         """Set highlight state"""
@@ -288,8 +296,6 @@ class PalettePreviewWidget(QWidget):
     - Other palettes shown as collapsed single-row thumbnails
     - Click collapsed row to expand it
     """
-
-    palette_expanded = Signal(int)  # Emitted when a palette is expanded
 
     def __init__(self):
         super().__init__()
@@ -358,7 +364,6 @@ class PalettePreviewWidget(QWidget):
             self._collapsed_rows[palette_index].setVisible(False)
 
         self._update_expanded_view()
-        self.palette_expanded.emit(palette_index)
 
     def _update_expanded_view(self) -> None:
         """Update the expanded widget to show current expanded palette"""

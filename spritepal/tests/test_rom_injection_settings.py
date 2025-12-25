@@ -195,7 +195,7 @@ class TestROMInjectionSettingsPersistence:
             SETTINGS_KEY_LAST_INPUT_VRAM,
             "/path/to/input.dmp",
         )
-        settings_manager.save()
+        settings_manager.save_session()
 
         # Create a new settings manager to verify persistence
         # The settings should persist through the ApplicationStateManager
@@ -334,7 +334,7 @@ class TestROMInjectionSettingsPersistence:
         settings_manager.set(
             SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, "/test.dmp"
         )
-        settings_manager.save()
+        settings_manager.save_session()
 
         # Verify namespace structure in raw settings
         raw_settings = settings_manager._get_settings()

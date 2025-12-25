@@ -124,26 +124,6 @@ def _add_incrementing_pattern(data: bytearray, offset: int = 0x1000, length: int
 
 
 @pytest.fixture
-def test_rom_data_factory() -> Callable[[int], bytearray]:
-    """Factory fixture for creating raw ROM data of any size.
-
-    Returns:
-        A callable that creates ROM data: (size: int) -> bytearray
-
-    Example:
-        def test_something(test_rom_data_factory):
-            data = test_rom_data_factory(32 * 1024)  # 32KB
-    """
-    def _create_rom_data(size: int = ROM_SIZES["default"]) -> bytearray:
-        data = bytearray(size)
-        # Add some non-zero content for tests that check for actual data
-        _add_incrementing_pattern(data)
-        return data
-
-    return _create_rom_data
-
-
-@pytest.fixture
 def test_rom_file(tmp_path: Path) -> Callable[..., str]:
     """Factory fixture for creating test ROM files with various configurations.
 
@@ -253,34 +233,8 @@ def test_vram_file(tmp_path: Path) -> Callable[..., str]:
     return _create_vram_file
 
 
-# Legacy compatibility fixtures for tests that use the old simple interface
-@pytest.fixture
-def simple_test_rom_file(tmp_path: Path) -> str:
-    """Simple ROM file fixture for backward compatibility.
-
-    Creates a 13KB ROM file with basic test data.
-    Prefer test_rom_file factory for new tests.
-    """
-    rom_file = tmp_path / "test.sfc"
-    rom_file.write_bytes(b"TEST_ROM_DATA" * 1000)  # ~13KB
-    return str(rom_file)
-
-
-@pytest.fixture
-def simple_test_rom_data() -> bytearray:
-    """Simple ROM data fixture for backward compatibility.
-
-    Creates 32KB of test data.
-    Prefer test_rom_data_factory for new tests.
-    """
-    return bytearray(b'\x00\x01\x02\x03' * 256 * 32)  # 32KB
-
-
 __all__ = [
     "ROM_SIZES",
-    "test_rom_data_factory",
     "test_rom_file",
     "test_vram_file",
-    "simple_test_rom_file",
-    "simple_test_rom_data",
 ]
