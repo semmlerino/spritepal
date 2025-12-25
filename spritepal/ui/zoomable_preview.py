@@ -24,6 +24,7 @@ else:
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -36,11 +37,13 @@ from core.services.image_utils import pil_to_qpixmap
 from core.types import PILImage
 from ui.common.spacing_constants import (
     BORDER_THIN,
+    HELP_BUTTON_MAX_WIDTH,
     MAX_ZOOM,
     PALETTE_SELECTOR_MIN_WIDTH,
     PREVIEW_MIN_SIZE,
     SPACING_COMPACT_SMALL,
     TILE_GRID_THICKNESS,
+    ZOOM_BUTTON_MAX_WIDTH,
 )
 from ui.styles.theme import COLORS
 from utils.constants import (
@@ -140,7 +143,7 @@ class ZoomablePreviewWidget(QWidget):
             painter.drawText(
                 self.rect(),
                 Qt.AlignmentFlag.AlignCenter,
-                "No sprites loaded",
+                "Select a file and sprite to preview",
             )
 
     def _draw_checkerboard(self, painter: QPainter, transform: QTransform) -> None:
@@ -435,25 +438,38 @@ class PreviewPanel(QWidget):
         # Zoom controls
         self.zoom_fit_btn = QPushButton("Fit")
         _ = self.zoom_fit_btn.clicked.connect(self.preview.zoom_to_fit)
-        self.zoom_fit_btn.setMaximumWidth(60)
+        self.zoom_fit_btn.setMaximumWidth(ZOOM_BUTTON_MAX_WIDTH)
 
         self.zoom_reset_btn = QPushButton("1:1")
         _ = self.zoom_reset_btn.clicked.connect(self.preview.reset_view)
-        self.zoom_reset_btn.setMaximumWidth(60)
+        self.zoom_reset_btn.setMaximumWidth(ZOOM_BUTTON_MAX_WIDTH)
 
-        # Help text - slightly larger for readability
-        help_label = QLabel(
-            "Scroll: Zoom | Drag/MMB: Pan | Right-click: Reset | G: Grid | C: Palette | Ctrl+0: 4x | Ctrl+Shift+0: Fit"
+        # Help button with tooltip (cleaner than inline text)
+        help_btn = QPushButton("?")
+        help_btn.setMaximumWidth(HELP_BUTTON_MAX_WIDTH)
+        help_btn.setToolTip(
+            "Scroll: Zoom\n"
+            "Drag/MMB: Pan\n"
+            "Right-click: Reset\n"
+            "G: Toggle grid\n"
+            "C: Toggle palette\n"
+            "Ctrl+0: Zoom 4x\n"
+            "Ctrl+Shift+0: Fit to window"
         )
-        help_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
+        help_btn.setFlat(True)
+        help_btn.setStyleSheet(f"color: {COLORS['text_secondary']};")
 
         controls.addWidget(self.palette_toggle)
         controls.addWidget(self.palette_selector)
         controls.addWidget(self.transparency_toggle)
-        controls.addWidget(QLabel("|"))  # Separator
+        # Proper vertical separator instead of text
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        controls.addWidget(separator)
         controls.addWidget(self.zoom_fit_btn)
         controls.addWidget(self.zoom_reset_btn)
-        controls.addWidget(help_label)
+        controls.addWidget(help_btn)
         controls.addStretch()
 
         layout.addLayout(controls)

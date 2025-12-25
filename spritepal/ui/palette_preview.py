@@ -53,7 +53,7 @@ class PaletteColorWidget(QWidget):
         self.index = index
         self.color = QColor(*color)
         self._size = size
-        self.setFixedSize(QSize(size, size))
+        self.setMinimumSize(QSize(size, size))
         self.setToolTip(f"Color {index}: RGB({color[0]}, {color[1]}, {color[2]})")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # Ensure proper repaint behavior - prevents ghosting artifacts

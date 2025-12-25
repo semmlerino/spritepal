@@ -65,7 +65,7 @@ class SpriteThumbnail(QWidget):
 
         # UI components
         self.preview_label = QLabel()
-        self.preview_label.setFixedSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+        self.preview_label.setMinimumSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
         # Don't use setScaledContents - preserve aspect ratio
         self.preview_label.setScaledContents(False)
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -83,8 +83,7 @@ class SpriteThumbnail(QWidget):
         """)
 
         self.offset_label = QLabel(f"0x{offset:06X}")
-        if self.offset_label:
-            self.offset_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
+        self.offset_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         self.offset_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Layout - very tight spacing for compact thumbnails
@@ -109,12 +108,10 @@ class SpriteThumbnail(QWidget):
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
-            if self.preview_label:
-                self.preview_label.setPixmap(scaled)
-        elif self.preview_label:
+            self.preview_label.setPixmap(scaled)
+        else:
             self.preview_label.setPixmap(pixmap)
-        if self.offset_label:
-            self.offset_label.setText(f"0x{offset:06X}")
+        self.offset_label.setText(f"0x{offset:06X}")
 
         # Update border color based on quality
         if quality > 0.8:
@@ -124,8 +121,7 @@ class SpriteThumbnail(QWidget):
         else:
             border_color = COLORS["danger"]  # Red for low quality
 
-        if self.preview_label:
-            self.preview_label.setStyleSheet(f"""
+        self.preview_label.setStyleSheet(f"""
             QLabel {{
                 background: {COLORS["input_background"]};
                 border: 2px solid {border_color};
@@ -140,12 +136,9 @@ class SpriteThumbnail(QWidget):
 
     def clear(self):
         """Clear thumbnail display"""
-        if self.preview_label:
-            self.preview_label.clear()
-        if self.preview_label:
-            self.preview_label.setText("Empty")
-        if self.preview_label:
-            self.preview_label.setStyleSheet(f"""
+        self.preview_label.clear()
+        self.preview_label.setText("Empty")
+        self.preview_label.setStyleSheet(f"""
             QLabel {{
                 background: {COLORS["preview_background"]};
                 border: 2px solid {COLORS["panel_background"]};
@@ -154,8 +147,7 @@ class SpriteThumbnail(QWidget):
                 color: {COLORS["border"]};
             }}
         """)
-        if self.offset_label:
-            self.offset_label.setText("--")
+        self.offset_label.setText("--")
 
 class SpriteNavigator(QWidget):
     """

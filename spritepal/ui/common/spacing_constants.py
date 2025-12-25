@@ -27,6 +27,7 @@ COMPACT_ROW_MARGIN = 2              # 2px - minimal vertical margin for dense ro
 
 # Extraction panel widget sizes
 EXTRACTION_BUTTON_MIN_HEIGHT = 32   # Minimum button height for extraction widgets
+EXTRACTION_ACTION_BUTTON_HEIGHT = 36  # Primary action buttons (Find Sprites, Presets)
 EXTRACTION_COMBO_MIN_WIDTH = 200    # Minimum combo box width
 EXTRACTION_BUTTON_MAX_WIDTH = 150   # Maximum button width
 EXTRACTION_LABEL_MIN_WIDTH = 120    # Minimum label width for alignment
@@ -74,6 +75,8 @@ MAX_ZOOM = 20.0                      # Maximum zoom level for preview widgets
 
 # Button and control sizes
 BROWSE_BUTTON_MAX_WIDTH = 100        # Maximum width for browse buttons
+ZOOM_BUTTON_MAX_WIDTH = 60           # Maximum width for zoom control buttons
+HELP_BUTTON_MAX_WIDTH = 30           # Maximum width for help indicator buttons
 OFFSET_LABEL_MIN_WIDTH = 80          # Minimum width for offset hex labels
 OFFSET_SPINBOX_MIN_WIDTH = 100       # Minimum width for offset spinboxes
 COMBO_BOX_MIN_WIDTH = 150           # Minimum width for combo boxes
