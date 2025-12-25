@@ -54,7 +54,7 @@ from ui.styles.components import get_action_zone_style
 from ui.zoomable_preview import PreviewPanel
 
 # Layout constants for consistent sizing and spacing
-MAIN_WINDOW_MIN_SIZE = (1000, 650)  # Much more compact
+MAIN_WINDOW_MIN_SIZE = (800, 500)  # Responsive for small screens
 DEFAULT_SPLITTER_RATIO = 0.40  # Give more space to preview panel
 MIN_PANEL_WIDTH = 440  # Minimum width to prevent button truncation
 LAYOUT_MARGINS = SPACING_SMALL  # 8px - standard margins
@@ -146,16 +146,7 @@ class MainWindow(QMainWindow):
 
         # Add panels to main splitter (right panel created by manager)
         self.main_splitter.addWidget(self.left_panel)
-        # Right panel will be added by UICoordinator
-
-        # Configure main splitter with proper stretch factors
-        # Calculate initial sizes based on DEFAULT_SPLITTER_RATIO
-        total_width = MAIN_WINDOW_MIN_SIZE[0] - (2 * LAYOUT_MARGINS)
-        left_width = int(total_width * DEFAULT_SPLITTER_RATIO)
-        right_width = total_width - left_width
-        self.main_splitter.setSizes([left_width, right_width])
-        self.main_splitter.setStretchFactor(0, 1)  # Left panel stretches proportionally
-        self.main_splitter.setStretchFactor(1, 3)  # Right panel stretches more for preview
+        # Right panel will be added by UICoordinator, sizing configured there
 
         # Set minimum sizes for panels
         self.left_panel.setMinimumWidth(MIN_PANEL_WIDTH)
@@ -293,6 +284,14 @@ class MainWindow(QMainWindow):
         # Ensure right panel has proper size policy
         from PySide6.QtWidgets import QSizePolicy
         right_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+        # Configure splitter now that both panels exist
+        total_width = MAIN_WINDOW_MIN_SIZE[0] - (2 * LAYOUT_MARGINS)
+        left_width = int(total_width * DEFAULT_SPLITTER_RATIO)
+        right_width = total_width - left_width
+        self.main_splitter.setSizes([left_width, right_width])
+        self.main_splitter.setStretchFactor(0, 1)  # Left: lower stretch priority
+        self.main_splitter.setStretchFactor(1, 3)  # Right: higher stretch priority
 
     def _update_initial_ui_state(self) -> None:
         """Update initial UI state after setup"""
