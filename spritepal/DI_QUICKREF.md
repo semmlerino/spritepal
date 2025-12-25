@@ -9,13 +9,13 @@ from core.managers.core_operations_manager import CoreOperationsManager
 manager = inject(CoreOperationsManager)
 ```
 
-## Available Classes and Protocols
+## Available Classes
 
-| Class/Protocol | What it does |
-|----------------|--------------|
+| Class | What it does |
+|-------|--------------|
 | `CoreOperationsManager` | Extract/inject sprites (handles extraction and injection) |
 | `ApplicationStateManager` | Session, settings, workflow state |
-| `ROMCacheProtocol` | ROM file caching |
+| `ROMCache` | ROM file caching |
 | `ConfigurationService` | App directories and paths |
 
 ## In Tests

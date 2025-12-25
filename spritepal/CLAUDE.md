@@ -302,8 +302,6 @@ spritepal/
 
 | Looking for... | Location |
 |----------------|----------|
-| Dialog protocols | `core/protocols/dialog_protocols.py` (ArrangementDialog, DialogFactory) |
-| All protocols (2 dialog protocols) | `core/protocols/__init__.py` |
 | CoreOperationsManager | `core/managers/core_operations_manager.py` (handles extraction and injection) |
 | ApplicationStateManager | `core/managers/application_state_manager.py` (session, settings, state) |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |

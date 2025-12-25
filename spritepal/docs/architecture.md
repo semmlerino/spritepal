@@ -415,16 +415,16 @@ Application Start
 ManagerRegistry.initialize_managers()
        ↓
 1. configure_container()           → Registers services (ConfigurationService,
-   │                                  SettingsManager, ROMCache, etc.)
+   │                                  ROMCache, etc.)
    ↓
-2. Create ApplicationStateManager  → Registers ApplicationStateManagerProtocol
+2. Create ApplicationStateManager  → Registers as concrete class
    │
    ↓
 3. Create CoreOperationsManager    → Can now use inject(ApplicationStateManager)
-   │                                  via ROMCache → SettingsManager chain
+   │                                  via ROMCache chain
    ↓
 4. register_managers()             → Registers CoreOperationsManager
-   │                                  as concrete class (no protocol wrapper)
+   │                                  as concrete class
    ↓
 Application Code: inject(CoreOperationsManager)
        ↓
@@ -432,8 +432,8 @@ DIContainer returns the registered implementation
 ```
 
 **Why this order matters:** CoreOperationsManager creates ROMExtractor, which needs
-ROMCache, which needs SettingsManager, which needs ApplicationStateManager. If
-ApplicationStateManager isn't registered before CoreOperationsManager is created, the DI chain fails.
+ROMCache, which needs ApplicationStateManager. If ApplicationStateManager isn't
+registered before CoreOperationsManager is created, the DI chain fails.
 
 ### Quick Reference
 
@@ -447,12 +447,7 @@ ApplicationStateManager isn't registered before CoreOperationsManager is created
 
 ### Available Protocols
 
-SpritePal uses 2 dialog protocols defined in `core/protocols/dialog_protocols.py`:
-
-| Protocol | Purpose |
-|----------|---------|
-| `DialogFactoryProtocol` | Create dialog instances |
-| `ArrangementDialogProtocol` | Grid arrangement dialog |
+SpritePal uses concrete classes directly via DI. The `core/protocols/` directory is reserved for future protocol definitions.
 
 **Use concrete classes directly** (no protocol wrappers needed):
 - `CoreOperationsManager` - Extraction and injection operations
@@ -551,4 +546,4 @@ result = manager.extract_from_rom(params)
 
 ---
 
-*Last updated: December 25, 2025 (Added new services: dump_file_detection_service, extraction_readiness_service)*
+*Last updated: December 25, 2025 (Removed obsolete dialog protocol references)*

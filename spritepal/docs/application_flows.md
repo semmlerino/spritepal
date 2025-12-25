@@ -16,16 +16,14 @@ Application Entry Point (launch_spritepal.py)
     │  initialize_managers("SpritePal", settings_path=...)          │
     │                                                               │
     │  1. configure_container()                                     │
-    │     Registers SERVICES (not managers):                        │
-    │     • ConfigurationServiceProtocol → ConfigurationService     │
-    │     • SettingsManagerProtocol → factory (lazy)                │
-    │     • ROMCacheProtocol → factory (lazy)                       │
-    │     • ROMExtractorProtocol → factory (lazy)                   │
+    │     Registers SERVICES as concrete classes:                   │
+    │     • ConfigurationService                                    │
+    │     • ROMCache (factory, lazy)                                │
+    │     • ROMExtractor (factory, lazy)                            │
     │                          │                                    │
     │                          ▼                                    │
     │  2. Create ApplicationStateManager                            │
     │     • Handles: session, settings, state, history              │
-    │     • Registers: ApplicationStateManagerProtocol              │
     │     ⚠️ CRITICAL: Must be registered BEFORE CoreOperations     │
     │                          │                                    │
     │                          ▼                                    │
@@ -35,7 +33,6 @@ Application Entry Point (launch_spritepal.py)
     │                          ▼                                    │
     │  4. Create CoreOperationsManager                              │
     │     • Handles: extraction, injection, palette, nav            │
-    │     • Registered as: CoreOperationsManager (concrete class)   │
     └───────────────────────────────────────────────────────────────┘
                     │
                     ▼
@@ -44,20 +41,19 @@ Application Entry Point (launch_spritepal.py)
 
 ### Dependency Chain
 
-When you call `inject(ROMExtractorProtocol)`:
+When you call `inject(ROMExtractor)`:
 
 ```
-ROMExtractor needs ROMCacheProtocol
-    └── ROMCache needs SettingsManagerProtocol
-            └── SettingsManager needs ApplicationStateManagerProtocol
-                    └── ✓ Already registered (step 2)
+ROMExtractor needs ROMCache
+    └── ROMCache needs ApplicationStateManager (for settings)
+            └── ✓ Already registered (step 2)
 ```
 
 ### Common Initialization Errors
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| "No registration for ApplicationStateManagerProtocol" | CoreOperationsManager created before ApplicationStateManager | Ensure `configure_container()` runs first |
+| "No registration for ApplicationStateManager" | CoreOperationsManager created before ApplicationStateManager | Ensure `configure_container()` runs first |
 | "Factory for X previously failed" | Factory threw exception, container cached failure | Call `reset_container()` and reinitialize |
 
 ---
@@ -252,7 +248,7 @@ app_state = inject(ApplicationStateManager)
 value = app_state.settings.get("some_setting", default_value)
 ```
 
-**Note:** `SettingsManagerProtocol` has been consolidated into `ApplicationStateManager`. Use the concrete class directly.
+**Note:** Settings functionality is integrated into `ApplicationStateManager`. Use the concrete class directly via `inject(ApplicationStateManager)`.
 
 ---
 
@@ -381,4 +377,4 @@ User modifies sprite
 
 ---
 
-*Last updated: December 25, 2025 (Added dump file detection and extraction readiness services)*
+*Last updated: December 25, 2025 (Removed obsolete protocol references, updated DI examples)*

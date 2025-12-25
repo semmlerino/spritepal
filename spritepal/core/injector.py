@@ -275,10 +275,3 @@ class SpriteInjector:
             logger.exception("Sprite injection failed")
             return False, f"Error injecting sprite: {e!s}"
 
-    def get_extraction_info(self) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
-        """Get extraction information from metadata"""
-        if self.metadata and "extraction" in self.metadata:
-            extraction_info = self.metadata["extraction"]
-            return extraction_info if isinstance(extraction_info, dict) else None
-        return None
-

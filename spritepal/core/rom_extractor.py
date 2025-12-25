@@ -1210,35 +1210,3 @@ class ROMExtractor:
 
         # Expect some pattern matches in real sprite data
         return pattern_matches >= 2
-
-    def find_best_sprite_offsets(
-        self, rom_path: str, base_offset: int, search_range: int = ROM_SEARCH_RANGE_DEFAULT
-    ) -> list[int]:
-        """
-        Find the best sprite offsets around a base offset.
-
-        Args:
-            rom_path: Path to ROM file
-            base_offset: Base offset to search around
-            search_range: Range to search in both directions
-
-        Returns:
-            List of valid offsets, sorted by quality
-        """
-        logger.info(f"Finding best sprite offsets around 0x{base_offset:X} (range: ±0x{search_range:X})")
-
-        # Calculate search bounds
-        start_offset = max(0, base_offset - search_range)
-        end_offset = base_offset + search_range
-
-        # Scan with smaller steps for more precise results
-        found_sprites = self.scan_for_sprites(rom_path, start_offset, end_offset, step=ROM_SCAN_STEP_FINE)
-
-        # Extract just the offsets from high-quality results
-        best_offsets = []
-        for sprite_info in found_sprites:
-            if sprite_info["quality"] >= 0.5:  # Only high-quality sprites
-                best_offsets.append(sprite_info["offset"])
-
-        logger.info(f"Found {len(best_offsets)} high-quality sprite offsets")
-        return best_offsets[:5]  # Return top 5 offsets

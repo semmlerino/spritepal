@@ -652,31 +652,3 @@ class SpriteGalleryTab(QWidget):
         except Exception as e:
             logger.error(f"Failed to load scan cache: {e}")
             return False
-
-    def _generate_mock_thumbnails(self):
-        """Generate mock thumbnails for sprites when no real thumbnails are available."""
-        try:
-            from generate_mock_thumbnails import generate_mock_sprite_thumbnail  # type: ignore[import-not-found]
-
-            for sprite_info in self.sprites_data:
-                offset = sprite_info.get('offset', 0)
-                if isinstance(offset, str):
-                    offset = int(offset, 16) if offset.startswith('0x') else int(offset)
-
-                # Generate mock thumbnail
-                thumbnail_size = self.gallery_widget.thumbnail_size
-                pixmap = generate_mock_sprite_thumbnail(sprite_info, thumbnail_size)
-
-                # Find the thumbnail widget and set its pixmap
-                if offset in self.gallery_widget.thumbnails:
-                    from typing import TYPE_CHECKING, cast
-                    if TYPE_CHECKING:
-                        from ui.widgets.sprite_thumbnail_widget import SpriteThumbnailWidget
-                    thumbnail_widget_obj = self.gallery_widget.thumbnails[offset]
-                    # Cast to access set_sprite_data method
-                    thumbnail_widget = cast("SpriteThumbnailWidget", thumbnail_widget_obj)
-                    thumbnail_widget.set_sprite_data(pixmap, sprite_info)
-
-            logger.info(f"Generated mock thumbnails for {len(self.sprites_data)} sprites")
-        except Exception as e:
-            logger.error(f"Failed to generate mock thumbnails: {e}")

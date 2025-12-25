@@ -71,10 +71,9 @@ launch_spritepal.py (Application Entry)
 The ConfigurationService computes all application paths from a single root:
 
 ```python
-from core.di_container import inject
-from core.protocols.manager_protocols import ConfigurationServiceProtocol
+from core.configuration_service import ConfigurationService
 
-config = inject(ConfigurationServiceProtocol)
+config = ConfigurationService()
 
 # Available paths:
 config.app_root              # Project root (spritepal/)
@@ -108,7 +107,7 @@ app_state.settings.set("some_key", new_value)
 app_state.settings.save_session()  # Persist to disk
 ```
 
-**Note:** `SettingsManagerProtocol` has been consolidated into `ApplicationStateManager`. Use the concrete class directly.
+**Note:** Settings functionality is integrated into `ApplicationStateManager`. Use the concrete class directly via `inject(ApplicationStateManager)`.
 
 ---
 

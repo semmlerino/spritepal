@@ -115,8 +115,64 @@ class TestROMInjector(unittest.TestCase):
         # Verify checksum and complement XOR to 0xFFFF
         assert checksum ^ complement == 65535
 
-    def test_sprite_location_finding(self):
-        """Test finding sprite locations using real Kirby Super Star ROM"""
+    def test_sprite_location_finding_synthetic_rom(self):
+        """Test finding sprite locations with synthetic ROM (deterministic, always runs)"""
+        from core.sprite_config_loader import SpriteConfig
+
+        # Use the synthetic ROM from setUp (already has valid header)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".sfc") as tmp:
+            tmp.write(self.test_rom)
+            tmp_path = tmp.name
+
+        try:
+            # Mock sprite_config_loader to return known configurations for our test ROM
+            mock_configs = {
+                "Test_Sprite_1": SpriteConfig(
+                    name="Test_Sprite_1",
+                    offset=0x10000,
+                    description="Test sprite 1",
+                    compressed=True,
+                    estimated_size=1024,
+                ),
+                "Test_Sprite_2": SpriteConfig(
+                    name="Test_Sprite_2",
+                    offset=0x20000,
+                    description="Test sprite 2",
+                    compressed=True,
+                    estimated_size=2048,
+                ),
+            }
+
+            with patch.object(
+                self.injector.sprite_config_loader,
+                "get_game_sprites",
+                return_value=mock_configs,
+            ):
+                locations = self.injector.find_sprite_locations(tmp_path)
+
+            # Should return the mocked locations
+            assert "Test_Sprite_1" in locations
+            assert "Test_Sprite_2" in locations
+
+            # Verify SpritePointer structure is correctly derived from config
+            sprite1 = locations["Test_Sprite_1"]
+            assert sprite1.offset == 0x10000
+            assert sprite1.bank == 0x01  # (0x10000 >> 16) & 0xFF
+            assert sprite1.address == 0x0000  # 0x10000 & 0xFFFF
+            assert sprite1.compressed_size == 1024
+
+            sprite2 = locations["Test_Sprite_2"]
+            assert sprite2.offset == 0x20000
+            assert sprite2.bank == 0x02
+            assert sprite2.address == 0x0000
+            assert sprite2.compressed_size == 2048
+
+        finally:
+            Path(tmp_path).unlink()
+
+    @pytest.mark.real_hal
+    def test_sprite_location_finding_real_rom(self):
+        """Test finding sprite locations using real Kirby Super Star ROM (optional)"""
         # Use real ROM file for testing
         rom_path = Path(__file__).parent.parent / "Kirby Super Star (USA).sfc"
 

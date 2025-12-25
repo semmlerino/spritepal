@@ -161,10 +161,6 @@ class WorkflowStateManager(QObject):
         self.workflow_state_changed.emit(old_state, new_state)
         return True
 
-    def reset(self) -> None:
-        """Reset workflow to idle state."""
-        self.transition(ExtractionState.IDLE)
-
     def reset_state(self) -> None:
         """Reset internal state for test isolation."""
         with self._lock:
