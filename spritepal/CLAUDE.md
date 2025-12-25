@@ -136,113 +136,46 @@ Tests run parallel by default (pyproject.toml sets `-n auto --dist=loadscope`).
 
 ## Writing Tests
 
-### Minimal Template
+> **Comprehensive testing guide:** [docs/testing_guide.md](docs/testing_guide.md)
+> **Fixture reference:** [tests/README.md](tests/README.md)
+
+### Quick Template
 
 ```python
+from core.di_container import inject
+from core.managers.core_operations_manager import CoreOperationsManager
 from tests.fixtures.timeouts import worker_timeout
 
 def test_my_feature(isolated_managers, tmp_path):
     """One-line description."""
-    manager = isolated_managers.extraction_manager
+    manager = inject(CoreOperationsManager)
     output_file = tmp_path / "output.bin"
     result = manager.some_method()
     assert result is not None
-```
 
-### Signal Testing
-
-```python
-from tests.fixtures.timeouts import worker_timeout, LONG
-
-# CORRECT: Context manager catches signals regardless of timing
-def test_async_op(qtbot, worker):
+# Signal wait - ALWAYS use context manager
+def test_async_op(qtbot, isolated_managers):
+    worker = MyWorker()
     with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
         worker.start()
-
-# For slow operations (2x default timeout)
-def test_slow_op(qtbot, worker):
-    with qtbot.waitSignal(worker.finished, timeout=worker_timeout(LONG)):
-        worker.start()
 ```
 
-**Anti-pattern (causes flaky tests):**
-```python
-worker.start()
-qtbot.waitSignal(worker.finished)  # Signal may emit before wait starts!
-```
+### Critical Rules
 
-### Fixture Selection
-
-**Default: `isolated_managers`** - slower but always safe.
-
-| Need | Use |
+| Rule | Why |
 |------|-----|
-| Standard test | `isolated_managers` (function-scoped, clean state) |
-| Read-only, verified stateless | `session_managers` + `@pytest.mark.shared_state_safe` |
-| Clean counters only | `isolated_managers` |
-| HAL operations | `hal_pool` (mock by default) |
-| Real HAL | `@pytest.mark.real_hal` (skips if binary unavailable) |
-
-**Do not mix `session_managers` and `isolated_managers` in the same module.**
-
-### Advanced Fixtures
-
-For integration tests and real component testing:
-
-| Fixture | Scope | Purpose |
-|---------|-------|---------|
-| `real_factory` | function | RealComponentFactory wrapper with cleanup |
-| `manager_context_factory` | function | Factory for creating test contexts |
-| `test_injection_manager` | function | Context-based injection manager |
-| `test_extraction_manager` | function | Context-based extraction manager |
-| `real_extraction_manager` | function | Direct real extraction manager |
-| `real_injection_manager` | function | Direct real injection manager |
-| `real_session_manager` | function | Direct real session manager |
-| `isolated_data_repository` | function | Clean DataRepository per test |
-| `rom_cache` | function | ROM cache for extraction tests |
-| `mock_rom_cache` | function | Mock ROM cache |
-| `mock_settings_manager` | function | Mock settings manager |
-| `mock_file_dialogs` | function | Patches QFileDialog for testing |
-
-### Test Markers
-
-| Marker | Effect | Enforced |
-|--------|--------|----------|
-| `@pytest.mark.requires_display` | Skips in offscreen mode | Yes (autouse fixture) |
-| `@pytest.mark.shared_state_safe` | **Required** for `session_managers` | Yes (test fails without it) |
-| `@pytest.mark.parallel_unsafe` | Co-locates on one xdist worker | Via `xdist_group` marker |
-| `@pytest.mark.skip_thread_cleanup(reason='...')` | Skip thread check | Yes (**reason required**) |
-| `@pytest.mark.real_hal` | Use real HAL (skips if unavailable) | Yes (fixture check) |
-
-Categorization markers (`@pytest.mark.gui`, `@pytest.mark.headless`) have no behavioral effect.
-
-### Timeout Functions
-
-Import from `tests/fixtures/timeouts.py` (functions, not fixtures):
-
-| Function | Base (ms) | Use For |
-|----------|-----------|---------|
-| `ui_timeout()` | 1000 | Widget visibility, layout updates |
-| `signal_timeout()` | 2000 | Generic signal waits |
-| `dialog_timeout()` | 3000 | Dialog accept/reject |
-| `worker_timeout()` | 5000 | Background workers, QThread |
-| `cleanup_timeout()` | 2000 | Thread termination |
-
-Multipliers: `SHORT=0.5`, `MEDIUM=1.0` (default), `LONG=2.0`
-
-Scale all with `PYTEST_TIMEOUT_MULTIPLIER` env var for slow CI.
+| Use `isolated_managers` fixture | Clean state, always safe |
+| Use `with qtbot.waitSignal()` | Non-context form causes flaky tests |
+| Use `ThreadSafeTestImage` in workers | `QPixmap` in threads crashes Python |
+| Use `tmp_path` for files | Hardcoded paths break parallel tests |
+| Use timeout functions | Hardcoded ms values don't scale |
 
 ### Key Imports
 
 ```python
 from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout, LONG
-from tests.fixtures.qt_waits import wait_for_condition  # Function (requires qtbot arg)
-from tests.infrastructure.qt_mocks import MockMainWindow
-from tests.infrastructure.real_component_factory import RealComponentFactory
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
-
-# wait_for is a fixture - use as test parameter, not import:
-# def test_foo(wait_for): wait_for(lambda: condition, timeout=1000)
+from tests.infrastructure.real_component_factory import RealComponentFactory
 ```
 
 ## Other Development Commands
@@ -371,10 +304,10 @@ spritepal/
 
 | Looking for... | Location |
 |----------------|----------|
-| Manager protocols | `core/protocols/manager_protocols.py` (ROMCache, ROMExtractor) |
-| Dialog protocols | `core/protocols/dialog_protocols.py` (ArrangementDialog, DialogFactory, ManualOffsetDialogFactory) |
-| All protocols (5 total) | `core/protocols/__init__.py` |
+| Dialog protocols | `core/protocols/dialog_protocols.py` (ArrangementDialog, DialogFactory) |
+| All protocols (2 dialog protocols) | `core/protocols/__init__.py` |
 | CoreOperationsManager | `core/managers/core_operations_manager.py` (handles extraction and injection) |
+| ApplicationStateManager | `core/managers/application_state_manager.py` (session, settings, state) |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
 | DI container, `inject()` | `core/di_container.py` |
 | Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
@@ -425,4 +358,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: December 24, 2025*
+*Last updated: December 25, 2025*

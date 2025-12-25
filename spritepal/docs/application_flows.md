@@ -241,14 +241,10 @@ Application Launch
          │
          ▼
 ┌────────────────────────────┐
-│ SessionManager             │  core/managers/session_manager.py
+│ ApplicationStateManager    │  core/managers/application_state_manager.py
 │ _load_settings()           │  Loads JSON settings
 │ _merge_with_defaults()     │  Fills missing values
-└────────────────────────────┘
-         │
-         ▼
-┌────────────────────────────┐
-│ ApplicationStateManager    │  Emits workflow_state_changed
+│                            │  Emits workflow_state_changed
 │                            │  UI components listen to this
 └────────────────────────────┘
 ```
@@ -384,11 +380,13 @@ User modifies sprite
 | VRAM extraction | `core/extractor.py` | `SpriteExtractor.extract_tiles()` |
 | ROM extraction | `core/rom_extractor.py` | `ROMExtractor.extract_sprite_from_rom()` |
 | HAL compression | `core/hal_compression.py` | `HALProcessPool.compress/decompress()` |
-| Settings load | `core/managers/session_manager.py` | `SessionManager._load_settings()` |
+| Settings load | `core/managers/application_state_manager.py` | `ApplicationStateManager._load_settings()` |
 | Error handling | `ui/common/error_handler.py` | `ErrorHandler.handle_error()` |
 | Preview generation | `core/services/preview_generator.py` | `PreviewGenerator.generate()` |
 | DI injection | `core/di_container.py` | `inject()` |
+| Dump file detection | `core/services/dump_file_detection_service.py` | `detect_related_files()`, `auto_detect_all()` |
+| Extraction readiness | `core/services/extraction_readiness_service.py` | `check_vram_readiness()`, `check_rom_extraction_readiness()` |
 
 ---
 
-*Last updated: December 24, 2025 (Updated for consolidated managers)*
+*Last updated: December 25, 2025 (Added dump file detection and extraction readiness services)*

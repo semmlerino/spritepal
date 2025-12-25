@@ -56,7 +56,7 @@ launch_spritepal.py (Application Entry)
          │
          ▼
 ┌──────────────────────────────────────┐
-│ Step 5: SessionManager Load          │  core/managers/session_manager.py
+│ Step 5: ApplicationStateManager      │  core/managers/application_state_manager.py
 │ _load_settings()                     │
 │ Merges JSON with defaults            │
 └──────────────────────────────────────┘
@@ -114,7 +114,7 @@ app_state.settings.save()  # Persist to disk
 
 ## 5. Adding a New Setting
 
-1. **Add default value** in `core/managers/session_manager.py`:
+1. **Add default value** in `core/managers/application_state_manager.py`:
    ```python
    DEFAULT_SETTINGS = {
        "my_new_feature": {
@@ -220,4 +220,4 @@ def test_something(isolated_managers):
 
 ---
 
-*Last updated: December 24, 2025 (Updated for consolidated managers)*
+*Last updated: December 25, 2025*

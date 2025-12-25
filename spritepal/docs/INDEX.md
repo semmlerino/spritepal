@@ -15,8 +15,7 @@ This is the central entry point for all SpritePal documentation.
 |----------|---------|
 | [architecture.md](architecture.md) | Layer structure, import rules, DI, dialogs, singletons |
 | [application_flows.md](application_flows.md) | Initialization, extraction, injection, error flows |
-| [qt_patterns.md](qt_patterns.md) | Signals, workers, Qt testing best practices |
-| [testing_guide.md](testing_guide.md) | Comprehensive testing patterns |
+| [testing_guide.md](testing_guide.md) | Comprehensive testing patterns, Qt signals, threading |
 | [configuration_guide.md](configuration_guide.md) | Settings and configuration system |
 
 ## Test Documentation
@@ -43,7 +42,7 @@ This is the central entry point for all SpritePal documentation.
 | Understand DI | [architecture.md](architecture.md) → Dependency Injection |
 | Debug singletons | [architecture.md](architecture.md) → Singletons and Cleanup |
 | Trace data flows | [application_flows.md](application_flows.md) |
-| Qt signals/workers | [qt_patterns.md](qt_patterns.md) |
+| Qt signals/workers | [testing_guide.md](testing_guide.md) → Signal Reference |
 
 ### Key Commands
 
@@ -70,4 +69,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: December 24, 2025*
+*Last updated: December 25, 2025*

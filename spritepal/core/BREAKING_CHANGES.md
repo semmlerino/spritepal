@@ -35,7 +35,7 @@ These changes have historically caused "spooky action at a distance" bugs.
 
 ## Before Changing Protocol Methods
 
-**Files**: `core/protocols/manager_protocols.py`, `core/protocols/dialog_protocols.py`
+**Files**: `core/protocols/dialog_protocols.py`
 
 - [ ] Find all implementations:
   ```bash
@@ -84,7 +84,7 @@ These changes have historically caused "spooky action at a distance" bugs.
 
 ## Before Changing Settings Keys
 
-**Files**: `utils/constants.py`, `core/services/settings_manager.py`
+**Files**: `utils/constants.py`, `core/managers/application_state_manager.py`
 
 - [ ] Find all usages of the key:
   ```bash
@@ -114,14 +114,40 @@ These changes have historically caused "spooky action at a distance" bugs.
 ## Before Adding a New Manager
 
 1. [ ] Create manager class in `core/managers/`
-2. [ ] Define protocol in `core/protocols/manager_protocols.py`
-3. [ ] Add to `MANAGER_DEPENDENCIES` (document what it needs)
-4. [ ] Add to `MANAGER_TO_PROTOCOLS` (document what it provides)
-5. [ ] Add to `MANAGED_CLASSES` in correct order
-6. [ ] Register in `initialize_managers()` after dependencies
-7. [ ] Export from `core/managers/__init__.py`
-8. [ ] Update `docs/initialization_flow.md`
-9. [ ] Add tests using `isolated_managers` fixture
+2. [ ] Add to `MANAGER_DEPENDENCIES` (document what it needs)
+3. [ ] Add to `MANAGER_TO_PROTOCOLS` (document what it provides)
+4. [ ] Add to `MANAGED_CLASSES` in correct order
+5. [ ] Register in `initialize_managers()` after dependencies
+6. [ ] Export from `core/managers/__init__.py`
+7. [ ] Update `docs/application_flows.md` initialization section
+8. [ ] Add tests using `isolated_managers` fixture
+
+**Note**: Protocols are only needed for UI/dialog factories. Most managers use concrete classes directly via `inject()`.
+
+---
+
+## Before Adding a New Service
+
+**Files**: `core/services/`
+
+1. [ ] Create service file in `core/services/`
+2. [ ] Export from `core/services/__init__.py`
+3. [ ] Update `docs/architecture.md` Services Layer section
+4. [ ] Update `docs/application_flows.md` Quick Reference section
+5. [ ] Add tests for the service
+
+**Current services**:
+- `dump_file_detection_service.py` - Auto-detection of VRAM/CGRAM/OAM dump files
+- `extraction_readiness_service.py` - Validation for extraction readiness
+- `image_utils.py` - Image format conversions
+- `lru_cache.py` - LRU cache implementation
+- `palette_utils.py` - Palette handling utilities
+- `path_suggestion_service.py` - File path suggestions
+- `preview_generator.py` - Thumbnail/preview generation (singleton)
+- `rom_cache.py` - ROM file caching
+- `rom_service.py` - ROM file operations
+- `vram_service.py` - VRAM extraction operations
+- `worker_lifecycle.py` - Background worker management
 
 ---
 

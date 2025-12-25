@@ -107,4 +107,4 @@ Almost never. Use `isolated_managers` unless:
 
 ---
 
-*Last updated: December 24, 2025*
+*Last updated: December 25, 2025*

@@ -3,16 +3,17 @@
 
 ## Table of Contents
 1. [Supported Stack](#supported-stack)
-2. [Core Principles](#core-principles) (includes System Boundaries, Deterministic Time)
-3. [When to Mock](#when-to-mock)
-4. [Signal Testing](#signal-testing) (includes TestSignal vs QSignalSpy guidance)
-5. [Essential Test Doubles](#essential-test-doubles)
-6. [Parametrized Tests](#parametrized-tests)
-7. [Error Path Testing Strategy](#error-path-testing-strategy)
-8. [Qt-Specific Patterns](#qt-specific-patterns)
-9. [Qt Threading Safety](#qt-threading-safety)
-10. [Critical Pitfalls](#critical-pitfalls)
-11. [Quick Reference](#quick-reference)
+2. [Signal Reference](#signal-reference) (manager and worker signals)
+3. [Core Principles](#core-principles) (includes System Boundaries, Deterministic Time)
+4. [When to Mock](#when-to-mock)
+5. [Signal Testing](#signal-testing) (includes TestSignal vs QSignalSpy guidance)
+6. [Essential Test Doubles](#essential-test-doubles)
+7. [Parametrized Tests](#parametrized-tests)
+8. [Error Path Testing Strategy](#error-path-testing-strategy)
+9. [Qt-Specific Patterns](#qt-specific-patterns)
+10. [Qt Threading Safety](#qt-threading-safety)
+11. [Critical Pitfalls](#critical-pitfalls)
+12. [Quick Reference](#quick-reference)
 
 ---
 
@@ -31,6 +32,71 @@
 from PySide6.QtCore import Signal, QObject
 from PySide6.QtWidgets import QWidget, QDialog
 ```
+
+---
+
+## Signal Reference
+
+This section documents the signals emitted by SpritePal managers and workers.
+
+### Core Manager Signals
+
+#### CoreOperationsManager (`core/managers/core_operations_manager.py`)
+
+| Signal | Payload | When emitted |
+|--------|---------|--------------|
+| `extraction_progress` | `str` | Progress message during extraction |
+| `extraction_warning` | `str` | Partial success warning |
+| `preview_generated` | `(object, int)` | QPixmap and offset after preview |
+| `palettes_extracted` | `dict` | Palette data extracted |
+| `files_created` | `list[str]` | Paths of extracted files |
+| `injection_progress` | `str` | Progress message during injection |
+| `injection_finished` | `(bool, str)` | Success flag and message |
+| `compression_info` | `dict` | Compression statistics |
+
+#### ApplicationStateManager (`core/managers/application_state_manager.py`)
+
+| Signal | Payload | When emitted |
+|--------|---------|--------------|
+| `state_changed` | `(str, dict)` | Category and data when state changes |
+| `workflow_state_changed` | `(object, object)` | Old and new workflow states |
+| `session_changed` | `()` | Session data modified |
+| `current_offset_changed` | `int` | ROM offset selection changed |
+| `preview_ready` | `(int, QImage)` | Offset and preview image |
+
+#### BaseManager (`core/managers/base_manager.py`)
+
+All managers inherit these signals:
+
+| Signal | Payload | When emitted |
+|--------|---------|--------------|
+| `error_occurred` | `str` | Any error during operation |
+| `warning_occurred` | `str` | Non-fatal warning |
+| `operation_started` | `str` | Operation name when starting |
+| `operation_finished` | `str` | Operation name when complete |
+| `progress_updated` | `(str, int, int)` | Operation, current, total |
+
+### Worker Signals
+
+#### BaseWorker (`core/workers/base.py`)
+
+| Signal | Payload | When emitted |
+|--------|---------|--------------|
+| `progress` | `(int, str)` | Percent complete and message |
+| `error` | `(str,)` | Error message for display |
+| `warning` | `(str,)` | Warning message |
+| `operation_finished` | `(bool, str)` | Success flag and message |
+
+### Signal Naming Conventions
+
+| Pattern | Meaning |
+|---------|---------|
+| `*_ready` | Data is available for use |
+| `*_changed` | State has been modified |
+| `*_requested` | User action needs handling |
+| `*_completed` / `*_finished` | Operation done |
+| `*_error` / `*_failed` | Operation failed |
+| `*_progress` | Intermediate status update |
 
 ---
 
@@ -950,6 +1016,6 @@ QT_QPA_PLATFORM=offscreen pytest tests/
 - Cache consistency
 
 ---
-*Last Updated: December 24, 2025 | SpritePal Testing Reference - DO NOT DELETE*
+*Last Updated: December 25, 2025 | SpritePal Testing Reference - DO NOT DELETE*
 
 **Critical**: ThreadSafeTestImage implementation required to prevent Qt threading violations that cause "Fatal Python error: Aborted" crashes in worker tests.

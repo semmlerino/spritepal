@@ -40,12 +40,16 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
    - ❌ CANNOT import from: `ui/`, `core/managers/` (except via protocols)
    - Purpose: Stateless operations, data transformations
    - Files:
+     - `dump_file_detection_service.py` - Auto-detection of VRAM/CGRAM/OAM dump files
+     - `extraction_readiness_service.py` - Validation for extraction readiness
      - `image_utils.py` - Image format conversions
+     - `lru_cache.py` - LRU cache implementation
+     - `palette_utils.py` - Palette handling utilities
+     - `path_suggestion_service.py` - File path suggestions
      - `preview_generator.py` - Thumbnail/preview generation (singleton)
-     - `rom_service.py` - ROM file operations
      - `rom_cache.py` - ROM file caching with async support
+     - `rom_service.py` - ROM file operations
      - `vram_service.py` - VRAM extraction operations
-     - `settings_manager.py` - Settings persistence
      - `worker_lifecycle.py` - Background worker management
 
 4. **Core Layer (`core/`)**
@@ -450,26 +454,19 @@ ApplicationStateManager isn't registered before CoreOperationsManager is created
 
 ### Available Protocols
 
-SpritePal uses 5 protocols across two files:
-
-**Manager protocols** (`core/protocols/manager_protocols.py`):
-
-| Protocol | Purpose |
-|----------|---------|
-| `ROMCacheProtocol` | ROM file caching |
-| `ROMExtractorProtocol` | Low-level ROM extraction |
-
-**Dialog protocols** (`core/protocols/dialog_protocols.py`):
+SpritePal uses 2 dialog protocols defined in `core/protocols/dialog_protocols.py`:
 
 | Protocol | Purpose |
 |----------|---------|
 | `DialogFactoryProtocol` | Create dialog instances |
 | `ArrangementDialogProtocol` | Grid arrangement dialog |
 
-**Consolidated managers** (use concrete classes directly, not protocols):
+**Use concrete classes directly** (no protocol wrappers needed):
 - `CoreOperationsManager` - Extraction and injection operations
 - `ApplicationStateManager` - Session, state, settings
 - `ConfigurationService` - App configuration
+- `ROMCache` - ROM file caching
+- `ROMExtractor` - Low-level ROM extraction
 
 ### What NOT to Do
 
@@ -561,4 +558,4 @@ result = manager.extract_from_rom(params)
 
 ---
 
-*Last updated: December 24, 2025 (Protocol simplification: 7 → 5 protocols, adapters removed)*
+*Last updated: December 25, 2025 (Added new services: dump_file_detection_service, extraction_readiness_service)*
