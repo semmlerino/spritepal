@@ -16,10 +16,10 @@ from .grid_arrangement_manager import (
 )
 from .grid_image_processor import GridImageProcessor
 from .palette_colorizer import PaletteColorizer
-from .preview_generator import PreviewGenerator
+from .preview_generator import ArrangementPreviewGenerator
 
 
-class GridPreviewGenerator(PreviewGenerator):
+class GridPreviewGenerator(ArrangementPreviewGenerator):
     """Extended preview generator with grid-based arrangement support"""
 
     def __init__(self, colorizer: PaletteColorizer | None = None):

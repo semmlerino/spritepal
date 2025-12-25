@@ -20,7 +20,6 @@ HAL_POOL_SIZE_MIN = 1                # Minimum pool size
 HAL_POOL_SIZE_MAX = 16               # Maximum pool size
 HAL_POOL_TIMEOUT_SECONDS = 30        # Pool process timeout in seconds
 HAL_POOL_RETRY_ATTEMPTS = 3          # Number of retry attempts for failed operations
-HAL_POOL_BATCH_SIZE_DEFAULT = 10     # Default batch size for bulk operations
 HAL_POOL_SHUTDOWN_TIMEOUT = 5        # Timeout for graceful pool shutdown
 HAL_POOL_MIN_WORKER_RATIO = 0.75     # FIX T2.4: Minimum ratio of workers that must respond
 
@@ -30,7 +29,6 @@ EMPTY_REGION_ZERO_THRESHOLD = 0.9     # Percentage of zeros to consider empty
 EMPTY_REGION_PATTERN_THRESHOLD = 0.85 # Repetition score to consider pattern
 EMPTY_REGION_MAX_UNIQUE_BYTES = 4     # Max unique bytes to consider empty
 EMPTY_REGION_SIZE = 4096              # Size of regions to analyze (4KB)
-EMPTY_REGION_TIMEOUT_MS = 1.0         # Max time per region analysis (1ms)
 
 # Sprite format
 BYTES_PER_TILE = 32  # 4bpp format

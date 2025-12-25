@@ -33,8 +33,8 @@ from ui.styles.theme import COLORS
 from .components import SplitterDialog
 from .row_arrangement import (
     ArrangementManager,
+    ArrangementPreviewGenerator,
     PaletteColorizer,
-    PreviewGenerator,
     RowImageProcessor,
 )
 from .row_arrangement.undo_redo import (
@@ -68,7 +68,7 @@ class RowArrangementDialog(SplitterDialog):
         self.image_processor: RowImageProcessor = RowImageProcessor()
         self.arrangement_manager: ArrangementManager = ArrangementManager()
         self.colorizer: PaletteColorizer = PaletteColorizer()
-        self.preview_generator: PreviewGenerator = PreviewGenerator(self.colorizer)
+        self.preview_generator: ArrangementPreviewGenerator = ArrangementPreviewGenerator(self.colorizer)
 
         # Initialize undo/redo stack
         self.undo_stack: UndoRedoStack = UndoRedoStack()

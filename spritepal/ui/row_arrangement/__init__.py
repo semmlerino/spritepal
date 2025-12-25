@@ -14,16 +14,16 @@ from .grid_image_processor import GridImageProcessor
 from .grid_preview_generator import GridPreviewGenerator
 from .image_processor import RowImageProcessor
 from .palette_colorizer import PaletteColorizer
-from .preview_generator import PreviewGenerator
+from .preview_generator import ArrangementPreviewGenerator
 
 __all__ = [
     "ArrangementManager",
+    "ArrangementPreviewGenerator",
     "ArrangementType",
     "GridArrangementManager",
     "GridImageProcessor",
     "GridPreviewGenerator",
     "PaletteColorizer",
-    "PreviewGenerator",
     "RowImageProcessor",
     "TileGroup",
     "TilePosition",

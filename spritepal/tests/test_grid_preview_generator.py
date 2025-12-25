@@ -145,12 +145,12 @@ class TestGridPreviewGenerator:
         assert generator.grid_color == (128, 128, 128, 128)
         assert generator.selection_color == (255, 255, 0, 64)
 
-    def test_inheritance_from_preview_generator(self):
-        """Test that GridPreviewGenerator inherits from PreviewGenerator"""
-        from ui.row_arrangement.preview_generator import PreviewGenerator
+    def test_inheritance_from_arrangement_preview_generator(self):
+        """Test that GridPreviewGenerator inherits from ArrangementPreviewGenerator"""
+        from ui.row_arrangement.preview_generator import ArrangementPreviewGenerator
 
         generator = GridPreviewGenerator()
-        assert isinstance(generator, PreviewGenerator)
+        assert isinstance(generator, ArrangementPreviewGenerator)
 
     def test_create_grid_arranged_image_empty_arrangement(self):
         """Test creating arranged image with empty arrangement"""

@@ -11,8 +11,8 @@ from PIL import Image
 from ui.row_arrangement import (
     # Systematic pytest markers applied based on test content analysis
     ArrangementManager,
+    ArrangementPreviewGenerator,
     PaletteColorizer,
-    PreviewGenerator,
     RowImageProcessor,
 )
 
@@ -306,23 +306,23 @@ class TestPaletteColorizer:
             mock_apply.assert_not_called()  # Should use cache
             assert result2 is result1  # Same object
 
-class TestPreviewGenerator:
-    """Test the PreviewGenerator component"""
+class TestArrangementPreviewGenerator:
+    """Test the ArrangementPreviewGenerator component"""
 
     def test_init_without_colorizer(self):
         """Test generator initialization without colorizer"""
-        generator = PreviewGenerator()
+        generator = ArrangementPreviewGenerator()
         assert generator.colorizer is None
 
     def test_init_with_colorizer(self):
         """Test generator initialization with colorizer"""
         colorizer = Mock()
-        generator = PreviewGenerator(colorizer)
+        generator = ArrangementPreviewGenerator(colorizer)
         assert generator.colorizer is colorizer
 
     def test_create_arranged_image_empty(self):
         """Test creating arranged image with no rows"""
-        generator = PreviewGenerator()
+        generator = ArrangementPreviewGenerator()
 
         original = Image.new("L", (128, 64))
         tile_rows = []
@@ -336,7 +336,7 @@ class TestPreviewGenerator:
 
     def test_create_arranged_image_single_row(self):
         """Test creating arranged image with single row"""
-        generator = PreviewGenerator()
+        generator = ArrangementPreviewGenerator()
 
         original = Image.new("L", (128, 64))
         row_image = Image.new("L", (128, 8))
@@ -352,7 +352,7 @@ class TestPreviewGenerator:
 
     def test_create_arranged_image_multiple_rows(self):
         """Test creating arranged image with multiple rows"""
-        generator = PreviewGenerator()
+        generator = ArrangementPreviewGenerator()
 
         original = Image.new("L", (128, 64))
         tile_rows = [
@@ -375,7 +375,7 @@ class TestPreviewGenerator:
         colorizer.is_palette_mode.return_value = True
         colorizer.get_display_image.return_value = Image.new("RGBA", (128, 8))
 
-        generator = PreviewGenerator(colorizer)
+        generator = ArrangementPreviewGenerator(colorizer)
 
         original = Image.new("L", (128, 64))
         tile_rows = [{"index": 0, "image": Image.new("L", (128, 8)), "tiles": 16}]
@@ -391,7 +391,7 @@ class TestPreviewGenerator:
 
     def test_export_arranged_image(self):
         """Test exporting arranged image"""
-        generator = PreviewGenerator()
+        generator = ArrangementPreviewGenerator()
 
         test_image = Image.new("L", (128, 16))
 
@@ -405,7 +405,7 @@ class TestPreviewGenerator:
 
     def test_generate_output_filename(self):
         """Test output filename generation"""
-        generator = PreviewGenerator()
+        generator = ArrangementPreviewGenerator()
 
         assert (
             generator.generate_output_filename("/path/to/sprite.png")

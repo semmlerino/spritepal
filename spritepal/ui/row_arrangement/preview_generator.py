@@ -11,7 +11,7 @@ from PIL import Image
 from .palette_colorizer import PaletteColorizer
 
 
-class PreviewGenerator:
+class ArrangementPreviewGenerator:
     """Generates preview images for sprite row arrangements"""
 
     def __init__(self, colorizer: PaletteColorizer | None = None):
