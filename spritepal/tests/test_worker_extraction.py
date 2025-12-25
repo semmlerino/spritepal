@@ -38,7 +38,7 @@ class TestVRAMExtractionWorker:
     @pytest.fixture
     def real_factory(self, isolated_managers):
         """Provide real component factory."""
-        with RealComponentFactory(manager_registry=isolated_managers) as factory:
+        with RealComponentFactory() as factory:
             yield factory
 
     @pytest.fixture

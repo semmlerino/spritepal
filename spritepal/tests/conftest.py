@@ -340,7 +340,7 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
                     f"Test {item.nodeid} uses @pytest.mark.allows_registry_state "
                     "without a reason. Add reason='...' explaining why registry "
                     "state pollution is acceptable for this test.\n"
-                    "Example: @pytest.mark.allows_registry_state(reason='Tests ManagerRegistry lifecycle')"
+                    "Example: @pytest.mark.allows_registry_state(reason='Tests manager lifecycle')"
                 )
 
     # === Auto-serialize session-dependent tests for xdist ===
@@ -483,15 +483,14 @@ def pytest_runtest_setup(item: Any) -> None:
     """
     # Always check actual registry state - don't assume
     try:
-        from core.managers import ManagerRegistry
-        is_clean = ManagerRegistry.is_clean()
-        item._registry_was_clean = is_clean
+        from core.managers import is_clean
+        item._registry_was_clean = is_clean()
     except ImportError:
         item._registry_was_clean = True  # Assume clean if can't import
 
 
 def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
-    """Enforce ManagerRegistry cleanup after each test.
+    """Enforce manager cleanup after each test.
 
     This hook converts documentation ("use isolated_managers") into runtime
     enforcement. Tests that DIRTY the registry (change it from clean to dirty)
@@ -521,20 +520,20 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     # for tests without known manager-related fixtures. That created a gap where
     # direct manager instantiation could bypass detection. Now we always check.
     try:
-        from core.managers import ManagerRegistry
+        from core.managers import is_clean
 
         was_clean = getattr(item, '_registry_was_clean', True)
-        is_clean_now = ManagerRegistry.is_clean()
+        is_clean_now = is_clean()
 
         # Only fail if the test changed state from clean to dirty
         if was_clean and not is_clean_now:
             pytest.fail(
-                f"Test '{item.name}' initialized ManagerRegistry without a manager fixture.\n"
+                f"Test '{item.name}' initialized managers without a manager fixture.\n"
                 "Fix: Use isolated_managers fixture, or add "
                 "@pytest.mark.allows_registry_state if intentional."
             )
     except ImportError:
-        pass  # ManagerRegistry not available, skip check
+        pass  # Manager module not available, skip check
 
 
 # ============================================================================
@@ -764,25 +763,27 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
     yield
 
     # Verify no lingering manager state
-    from core.managers import ManagerRegistry
+    from core.managers import is_initialized
 
-    registry = ManagerRegistry()
-    if not registry.is_initialized():
+    if not is_initialized():
         return
 
     leak_mode = request.config.getoption("--leak-mode", default="fail")
     leaks_found: list[str] = []
 
-    # Check for active operations that weren't cleaned up
-    for manager_name in ['extraction_manager', 'injection_manager', 'session_manager']:
-        if hasattr(registry, manager_name):
-            manager = getattr(registry, manager_name)
-            # Use public API instead of private _active_operations attribute
-            if manager and hasattr(manager, 'has_active_operations'):
-                if manager.has_active_operations():
-                    leaks_found.append(
-                        f"Manager '{manager_name}' has active operations (not cleaned up)"
-                    )
+    # Check for active operations via DI
+    try:
+        from core.di_container import get_optional
+        from core.managers import CoreOperationsManager
+
+        ops_mgr = get_optional(CoreOperationsManager)
+        if ops_mgr and hasattr(ops_mgr, 'has_active_operations'):
+            if ops_mgr.has_active_operations():
+                leaks_found.append(
+                    "CoreOperationsManager has active operations (not cleaned up)"
+                )
+    except ImportError:
+        pass  # DI not available
 
     if leaks_found:
         message = (

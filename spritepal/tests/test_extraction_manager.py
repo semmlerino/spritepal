@@ -71,7 +71,7 @@ class TestExtractionManager:
     @pytest.fixture
     def real_factory(self, isolated_managers) -> Generator[RealComponentFactory, None, None]:
         """Provide real component factory for creating actual managers."""
-        with RealComponentFactory(manager_registry=isolated_managers) as factory:
+        with RealComponentFactory() as factory:
             yield factory
 
     @pytest.fixture
@@ -562,7 +562,7 @@ class TestExtractionParameterValidation:
     # ── ROM Offset Validation Tests ─────────────────────────────────────────────
 
     @pytest.mark.parametrize("offset,should_pass", [
-        # Note: offset=0 is treated as "missing" due to falsy check in _validate_required
+        # Note: offset=0 is treated as "missing" due to falsy check in validate_required_params
         # This is arguably a bug but documenting current behavior
         (0x1, True),           # Near start of ROM (valid)
         (0x1000, True),        # Typical sprite offset

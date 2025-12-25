@@ -49,7 +49,7 @@ pytestmark = [
 @pytest.fixture
 def real_factory(tmp_path, session_managers):
     """Create RealComponentFactory for integration tests."""
-    with RealComponentFactory(manager_registry=session_managers) as factory:
+    with RealComponentFactory() as factory:
         yield factory
 
 
@@ -420,7 +420,7 @@ class TestWorkflowEdgeCases:
 
     def test_factory_cleanup_on_exit(self, tmp_path, session_managers):
         """Test that factory properly cleans up resources."""
-        with RealComponentFactory(manager_registry=session_managers) as factory:
+        with RealComponentFactory() as factory:
             cache = factory.create_rom_cache()
             manager = factory.create_extraction_manager()
             assert cache is not None

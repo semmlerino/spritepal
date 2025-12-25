@@ -40,6 +40,7 @@ from utils.constants import (
     SETTINGS_NS_ROM_INJECTION,
 )
 from utils.file_validator import FileValidator
+from utils.validation import validate_range, validate_required_params, validate_type
 
 from .base_manager import BaseManager, with_operation_handling
 
@@ -387,15 +388,15 @@ class CoreOperationsManager(BaseManager):
             # VRAM extraction - check for missing VRAM file specifically
             if not params.get("vram_path"):
                 raise ValidationError("VRAM file is required for extraction")
-            self._validate_required(params, ["output_base"])
+            validate_required_params(params, ["output_base"])
         elif "rom_path" in params:
             # ROM extraction
-            self._validate_required(params, ["rom_path", "offset", "output_base"])
+            validate_required_params(params, ["rom_path", "offset", "output_base"])
             rom_path = cast(str, params["rom_path"])
             FileValidator.validate_rom_file_exists_or_raise(rom_path)
-            self._validate_type(params["offset"], "offset", int)
+            validate_type(params["offset"], "offset", int)
             offset = cast(int, params["offset"])
-            self._validate_range(offset, "offset", min_val=0)
+            validate_range(offset, "offset", min_val=0)
         else:
             raise ValidationError("Must provide either vram_path or rom_path")
 
@@ -690,11 +691,11 @@ class CoreOperationsManager(BaseManager):
         """
         # Check required common parameters
         required = ["mode", "sprite_path", "offset"]
-        self._validate_required(params, required)
+        validate_required_params(params, required)
 
-        self._validate_type(params["mode"], "mode", str)
-        self._validate_type(params["sprite_path"], "sprite_path", str)
-        self._validate_type(params["offset"], "offset", int)
+        validate_type(params["mode"], "mode", str)
+        validate_type(params["sprite_path"], "sprite_path", str)
+        validate_type(params["offset"], "offset", int)
 
         # Use FileValidator for sprite file validation
         sprite_path = cast(str, params["sprite_path"])
@@ -705,13 +706,13 @@ class CoreOperationsManager(BaseManager):
             )
 
         offset = cast(int, params["offset"])
-        self._validate_range(offset, "offset", min_val=0)
+        validate_range(offset, "offset", min_val=0)
 
         # Check mode-specific parameters
         mode = cast(str, params["mode"])
         if mode == "vram":
             vram_required = ["input_vram", "output_vram"]
-            self._validate_required(params, vram_required)
+            validate_required_params(params, vram_required)
 
             input_vram = cast(str, params["input_vram"])
             vram_result = FileValidator.validate_vram_file(input_vram)
@@ -722,7 +723,7 @@ class CoreOperationsManager(BaseManager):
 
         elif mode == "rom":
             rom_required = ["input_rom", "output_rom"]
-            self._validate_required(params, rom_required)
+            validate_required_params(params, rom_required)
 
             input_rom = cast(str, params["input_rom"])
             rom_result = FileValidator.validate_rom_file(input_rom)
@@ -733,7 +734,7 @@ class CoreOperationsManager(BaseManager):
 
             # Validate optional fast_compression parameter
             if "fast_compression" in params:
-                self._validate_type(
+                validate_type(
                     params["fast_compression"], "fast_compression", bool
                 )
         else:

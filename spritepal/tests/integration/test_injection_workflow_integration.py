@@ -35,7 +35,7 @@ def real_factory(tmp_path, isolated_managers):
 
     Uses isolated_managers for proper test isolation.
     """
-    with RealComponentFactory(manager_registry=isolated_managers) as factory:
+    with RealComponentFactory() as factory:
         yield factory
 
 

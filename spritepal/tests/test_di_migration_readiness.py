@@ -214,15 +214,9 @@ class TestNoFallbackScenario:
         assert not hasattr(core.managers, "get_navigation_manager"), \
             "get_navigation_manager should have been removed"
 
-        # Deprecated methods have been removed from registry as well
-        from core.managers import ManagerRegistry
-        registry = ManagerRegistry()
-        assert not hasattr(registry, "get_extraction_manager"), \
-            "Registry get_extraction_manager method should have been removed"
-        assert not hasattr(registry, "get_injection_manager"), \
-            "Registry get_injection_manager method should have been removed"
-        assert not hasattr(registry, "get_session_manager"), \
-            "Registry get_session_manager method should have been removed"
+        # ManagerRegistry class has been removed (deprecated shim deleted)
+        assert not hasattr(core.managers, "ManagerRegistry"), \
+            "ManagerRegistry class should have been removed"
 
 
 class TestInjectionManagerDI:

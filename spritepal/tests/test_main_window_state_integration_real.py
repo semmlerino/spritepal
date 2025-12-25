@@ -93,7 +93,7 @@ class TestRealMainWindowStateIntegration:
         self.qt_app = ApplicationFactory.get_application()
 
         # Initialize real manager factory with proper test isolation
-        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
+        self.manager_factory = RealComponentFactory()
 
         # Use session-scoped test data repository (read-only, shared across tests)
         self.test_data = session_data_repository
@@ -388,7 +388,7 @@ class TestRealMainWindowWorkflowIntegration:
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
+        self.manager_factory = RealComponentFactory()
 
         yield
 
@@ -503,7 +503,7 @@ class TestBugDiscoveryRealVsMocked:
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
         self.qt_app = ApplicationFactory.get_application()
-        self.manager_factory = RealComponentFactory(manager_registry=isolated_managers)
+        self.manager_factory = RealComponentFactory()
 
         yield
 

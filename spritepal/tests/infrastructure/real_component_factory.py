@@ -7,10 +7,10 @@ providing proper type safety without unsafe cast() operations.
 USAGE:
     from tests.infrastructure.real_component_factory import RealComponentFactory
 
-    # REQUIRED: Pass manager_registry from isolated_managers fixture
     @pytest.fixture
     def real_factory(isolated_managers, tmp_path):
-        with RealComponentFactory(manager_registry=isolated_managers) as factory:
+        # isolated_managers ensures managers are initialized
+        with RealComponentFactory() as factory:
             yield factory
 
     def test_extraction(real_factory):
@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QApplication, QWidget
 
-from core.managers import ManagerRegistry
+from core.managers import is_initialized
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.services.rom_cache import ROMCache
@@ -69,7 +69,6 @@ class RealComponentFactory:
     def __init__(
         self,
         *,
-        manager_registry: ManagerRegistry,
         data_repository: DataRepository | None = None,
         settings_dir: Path | None = None,
         fail_on_leaks: bool | None = None,
@@ -79,10 +78,6 @@ class RealComponentFactory:
         Initialize the real component factory.
 
         Args:
-            manager_registry: Pre-initialized ManagerRegistry for test isolation.
-                            REQUIRED. Pass `isolated_managers` fixture from tests.
-                            This ensures proper test isolation and prevents global
-                            state pollution.
             data_repository: Optional test data repository to use
             settings_dir: Optional directory for test settings files.
                          If not provided, a temp directory will be created
@@ -90,10 +85,15 @@ class RealComponentFactory:
             fail_on_leaks: If True, raise AssertionError on resource leaks.
                           If False, emit warnings instead.
                           If None, uses FAIL_ON_LEAKS class variable (default: True).
-            manage_registry: If True, this factory takes ownership of the ManagerRegistry
+            manage_registry: If True, this factory takes ownership of the manager
                            lifecycle and will reset it during cleanup(). Use this when
                            the factory is used standalone without manager fixtures.
-                           Default: False (registry lifecycle owned by test fixtures).
+                           Default: False (manager lifecycle owned by test fixtures).
+
+        Note:
+            Managers must be initialized before using this factory.
+            Use the `isolated_managers` or `session_managers` fixture to ensure
+            managers are properly initialized.
         """
         self._data_repo = data_repository or get_test_data_repository()
         self._temp_dirs: list[Path] = []
@@ -102,13 +102,13 @@ class RealComponentFactory:
         self._leaked_resources: list[str] = []
         self._manage_registry = manage_registry
         self._initialized_registry = False  # Track if we initialized it
-        # Runtime validation - manager_registry is required for test isolation
-        if manager_registry is None:
+
+        # Verify managers are initialized (done by isolated_managers/session_managers fixtures)
+        if not is_initialized():
             raise ValueError(
-                "RealComponentFactory requires manager_registry. "
-                "Pass the isolated_managers or session_managers fixture."
+                "RealComponentFactory requires managers to be initialized. "
+                "Use isolated_managers or session_managers fixture."
             )
-        self._manager_registry = manager_registry  # Store provided registry for isolation
         # Use UUID for guaranteed uniqueness (id() can be reused after object deletion)
         self._unique_id = str(uuid.uuid4())
 
@@ -218,9 +218,10 @@ class RealComponentFactory:
         """
         if with_managers:
             # Ensure managers are initialized with isolated settings
-            registry = ManagerRegistry()
-            if not registry.is_initialized():
-                registry.initialize_managers("TestApp", settings_path=self._settings_path)
+            from core.managers import initialize_managers
+
+            if not is_initialized():
+                initialize_managers("TestApp", settings_path=self._settings_path)
 
         # B.7: Create MainWindow with explicit DI dependencies (matching B.6 pattern)
         from core.di_container import inject
@@ -462,23 +463,21 @@ class RealComponentFactory:
 
         self._temp_dirs.clear()
 
-        # Step 7: Registry cleanup (if we initialized it)
-        # Clean up the registry if we were the ones who initialized it.
+        # Step 7: Manager cleanup (if we initialized them)
+        # Clean up managers if we were the ones who initialized them.
         # Note: With manage_registry=False (default), cleanup will still happen
-        # if WE initialized the registry - this prevents pollution between tests.
+        # if WE initialized managers - this prevents pollution between tests.
         if self._initialized_registry:
             try:
-                from core.managers import ManagerRegistry
-                registry = ManagerRegistry()
-                if registry.is_initialized():
-                    registry.cleanup_managers()
-                    # Reset the singleton for full isolation
-                    if hasattr(registry, 'reset_for_tests'):
-                        registry.reset_for_tests()
+                from core.managers import cleanup_managers, reset_for_tests
+
+                if is_initialized():
+                    cleanup_managers()
+                    reset_for_tests()
                 self._initialized_registry = False
             except Exception as e:
                 warnings.warn(
-                    f"Failed to clean up ManagerRegistry: {e}",
+                    f"Failed to clean up managers: {e}",
                     ResourceWarning,
                     stacklevel=2,
                 )

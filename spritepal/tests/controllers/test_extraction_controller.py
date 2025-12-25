@@ -32,8 +32,6 @@ from ui.extraction_controller import ExtractionController
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from tests.fixtures.core_fixtures import ManagerRegistry
-
 pytestmark = [
     pytest.mark.gui,
     pytest.mark.integration,
@@ -164,10 +162,10 @@ class TestExtractionControllerIntegration:
 
     @pytest.fixture
     def real_managers(
-        self, isolated_managers: ManagerRegistry
+        self, isolated_managers: None
     ) -> Any:
         """Create real managers using RealComponentFactory."""
-        with RealComponentFactory(manager_registry=isolated_managers) as factory:
+        with RealComponentFactory() as factory:
             extraction_manager = factory.create_extraction_manager()
             injection_manager = factory.create_injection_manager()
             session_manager = factory.create_session_manager("TestControllerApp")

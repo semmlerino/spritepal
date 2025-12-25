@@ -102,7 +102,7 @@ class TestQtSignalArchitecture:
     @pytest.fixture
     def mock_factory(self, session_managers):
         """Get mock factory instance"""
-        return RealComponentFactory(manager_registry=session_managers)
+        return RealComponentFactory()
 
     def test_signal_connection_with_casting(self, app, mock_factory, signal_capture):
         """Test that signal connections work correctly with protocol casting"""

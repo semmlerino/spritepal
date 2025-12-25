@@ -154,7 +154,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 @pytest.fixture
 def real_factory(isolated_managers):
-    with RealComponentFactory(manager_registry=isolated_managers) as factory:
+    with RealComponentFactory() as factory:
         yield factory
 
 def test_workflow(real_factory):

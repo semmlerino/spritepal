@@ -11,7 +11,7 @@ import weakref
 import pytest
 from PySide6.QtCore import QTimer
 
-from core.managers import BaseManager, ValidationError
+from core.managers import BaseManager
 from tests.fixtures.timeouts import signal_timeout
 
 # Test characteristics: Real GUI components requiring display, Timer usage
@@ -73,52 +73,6 @@ class TestBaseManager:
         manager._finish_operation("test_op")
         assert not manager.has_active_operations()
         assert not manager.is_operation_active("test_op")
-
-    def test_validation_required(self):
-        """Test required parameter validation"""
-        manager = ConcreteManager()
-
-        # All required present
-        manager._validate_required(
-            {"a": 1, "b": "test", "c": None},
-            ["a", "b"]
-        )
-
-        # Missing required
-        with pytest.raises(ValidationError, match="Missing required parameters: b, c"):
-            manager._validate_required(
-                {"a": 1},
-                ["a", "b", "c"]
-            )
-
-    def test_validation_type(self):
-        """Test type validation"""
-        manager = ConcreteManager()
-
-        # Correct type
-        manager._validate_type("test", "param", str)
-        manager._validate_type(123, "param", int)
-        manager._validate_type([1, 2], "param", list)
-
-        # Wrong type
-        with pytest.raises(ValidationError, match="Invalid type for 'param'"):
-            manager._validate_type("test", "param", int)
-
-    def test_validation_range(self):
-        """Test range validation"""
-        manager = ConcreteManager()
-
-        # Within range
-        manager._validate_range(5, "value", min_val=0, max_val=10)
-        manager._validate_range(0, "value", min_val=0)
-        manager._validate_range(10, "value", max_val=10)
-
-        # Out of range
-        with pytest.raises(ValidationError, match="value must be >= 0"):
-            manager._validate_range(-1, "value", min_val=0)
-
-        with pytest.raises(ValidationError, match="value must be <= 10"):
-            manager._validate_range(11, "value", max_val=10)
 
     @pytest.mark.qt_no_exception_capture
     def test_signal_emission(self, qtbot):

@@ -30,7 +30,7 @@ pytestmark = [
 @pytest.fixture
 def real_factory(tmp_path, session_managers):
     """Create RealComponentFactory for integration tests."""
-    with RealComponentFactory(manager_registry=session_managers) as factory:
+    with RealComponentFactory() as factory:
         yield factory
 
 

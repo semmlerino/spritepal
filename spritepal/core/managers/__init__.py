@@ -141,8 +141,6 @@ def initialize_managers(
             if not _cleanup_registered:
                 if qt_parent is not None:
                     qt_parent.aboutToQuit.connect(cleanup_managers)
-                    # Sync with ManagerRegistry class variable for backwards compat
-                    ManagerRegistry._cleanup_registered = True
                 atexit.register(cleanup_managers)
                 _cleanup_registered = True
                 _logger.debug("Cleanup hooks registered")
@@ -250,56 +248,12 @@ def reset_for_tests() -> None:
         _cleanup_registered = False
 
 
-# Backwards compatibility shim - kept for test infrastructure that still uses the class
-# TODO: Refactor tests/infrastructure/* to use module-level functions, then remove this
-class ManagerRegistry:
-    """Minimal backwards-compatible shim for test infrastructure.
+def is_clean() -> bool:
+    """Check if manager state is clean (not initialized).
 
-    DEPRECATED: Use module-level functions instead:
-        - initialize_managers()
-        - cleanup_managers()
-        - is_initialized()
-        - reset_for_tests()
+    Used by test infrastructure to verify test isolation.
     """
-
-    _instance: ManagerRegistry | None = None
-    _lock: threading.RLock = threading.RLock()
-    _cleanup_registered: bool = False
-
-    def __new__(cls) -> ManagerRegistry:
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(self) -> None:
-        pass
-
-    def initialize_managers(
-        self,
-        app_name: str = "SpritePal",
-        settings_path: Path | None = None,
-        configuration_service: ConfigurationService | None = None,
-    ) -> None:
-        initialize_managers(app_name, settings_path, configuration_service)
-
-    def cleanup_managers(self) -> None:
-        cleanup_managers()
-
-    def is_initialized(self) -> bool:
-        return is_initialized()
-
-    @classmethod
-    def is_clean(cls) -> bool:
-        return not _initialized
-
-    @classmethod
-    def reset_for_tests(cls) -> None:
-        with cls._lock:
-            reset_for_tests()
-            cls._instance = None
-            cls._cleanup_registered = False
+    return not _initialized
 
 
 __all__ = [
@@ -311,7 +265,6 @@ __all__ = [
     "FileOperationError",
     "InjectionError",
     "ManagerError",
-    "ManagerRegistry",
     "NavigationError",
     "PreviewError",
     "SessionError",
@@ -320,6 +273,7 @@ __all__ = [
     "WorkflowStateManager",
     "cleanup_managers",
     "initialize_managers",
+    "is_clean",
     "is_initialized",
     "reset_for_tests",
     "validate_manager_dependencies",

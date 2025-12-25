@@ -70,7 +70,7 @@ class TestManagerPerformanceBenchmarksTDD:
         - Memory overhead: < 10MB
         """
         def create_extraction_manager():
-            with RealComponentFactory(manager_registry=isolated_managers) as factory:
+            with RealComponentFactory() as factory:
                 manager = factory.create_extraction_manager(with_test_data=True)
 
                 # Verify manager is fully initialized
@@ -90,7 +90,7 @@ class TestManagerPerformanceBenchmarksTDD:
     def test_injection_manager_initialization_performance_tdd(self, benchmark, isolated_managers):
         """TDD: Injection manager initialization performance baseline."""
         def create_injection_manager():
-            with RealComponentFactory(manager_registry=isolated_managers) as factory:
+            with RealComponentFactory() as factory:
                 manager = factory.create_injection_manager(with_test_data=True)
 
                 # Verify manager is fully initialized
@@ -358,7 +358,7 @@ class TestManagerMemoryPerformanceTDD:
 
             # Create and destroy many managers to test memory management
             for i in range(10):
-                with RealComponentFactory(manager_registry=isolated_managers) as factory:
+                with RealComponentFactory() as factory:
                     extraction_mgr = factory.create_extraction_manager()
                     injection_mgr = factory.create_injection_manager()
 

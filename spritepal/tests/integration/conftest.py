@@ -26,11 +26,10 @@ def managers_initialized(qt_app, request, tmp_path):
 
     Uses isolated settings path to avoid polluting repository root.
     """
-    from core.managers import ManagerRegistry, cleanup_managers, initialize_managers
+    from core.managers import cleanup_managers, initialize_managers, is_initialized
     from tests.fixtures.core_fixtures import is_session_managers_active
 
-    registry = ManagerRegistry()
-    was_already_initialized = registry.is_initialized()
+    was_already_initialized = is_initialized()
 
     if not was_already_initialized:
         # Use isolated temp settings path - CRITICAL for preventing repo pollution

@@ -19,7 +19,7 @@ from typing import Any, TypeVar, cast
 from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QApplication
 
-from core.managers import ManagerRegistry
+from core.managers import is_initialized
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
@@ -80,7 +80,7 @@ class ManagerTestContext:
             self._settings_dir = None
             self._owns_registry = False
         else:
-            # Initialize the global ManagerRegistry singleton
+            # Initialize managers
             # This ensures managers are available when RealComponentFactory accesses them
             from core.managers import initialize_managers
             self._settings_dir = Path(tempfile.mkdtemp(prefix="manager_test_context_"))
@@ -88,9 +88,8 @@ class ManagerTestContext:
             initialize_managers("ManagerTestContext", settings_path=settings_path)
             self._owns_registry = True
 
-        # Now create the factory with the initialized registry
-        self._registry = ManagerRegistry()
-        self._factory = RealComponentFactory(manager_registry=self._registry)
+        # Now create the factory (managers already initialized)
+        self._factory = RealComponentFactory()
 
     def initialize_managers(self, *manager_types: str) -> None:
         """
@@ -132,8 +131,8 @@ class ManagerTestContext:
 
         self._managers[manager_type] = manager
 
-        # Note: ManagerRegistry is a singleton that manages its own state internally
-        # We don't need to manually register/unregister as the singleton pattern handles this
+        # Note: Managers are registered in DI container by initialize_managers()
+        # We don't need to manually register/unregister here
 
         return manager
 
@@ -257,9 +256,9 @@ class ManagerTestContext:
         self._workers.clear()
 
     def cleanup_managers(self) -> None:
-        """Clean up all managers and reset global registry singleton."""
+        """Clean up all managers and reset global state."""
         with self._lock:
-            # Clean up our managers (the ManagerRegistry is a singleton and doesn't support direct registration)
+            # Clean up our managers
             for manager in self._managers.values():
                 try:
                     if hasattr(manager, "cleanup"):
@@ -271,14 +270,15 @@ class ManagerTestContext:
             self._managers.clear()
             self._original_registry_state.clear()
 
-            # Reset global registry singleton to prevent state pollution
+            # Reset global state to prevent state pollution
             # Only reset if we own the registry (initialized it ourselves)
             if getattr(self, '_owns_registry', True):
                 try:
-                    from core.managers import ManagerRegistry, cleanup_managers as registry_cleanup
+                    from core.managers import cleanup_managers as manager_cleanup
+                    from core.managers import reset_for_tests
 
-                    registry_cleanup()
-                    ManagerRegistry.reset_for_tests()
+                    manager_cleanup()
+                    reset_for_tests()
                 except Exception:
                     pass  # Best-effort cleanup
 
@@ -342,8 +342,8 @@ def isolated_manager_test() -> Iterator[ManagerTestContext]:
     Yields:
         ManagerTestContext for isolated testing
     """
-    # Note: ManagerRegistry is a singleton, so we can't truly isolate it
-    # Instead, we create an isolated context that uses its own managers
+    # Note: Manager state is global, so we clean up after the test
+    # This context provides isolated initialization and cleanup
     context = ManagerTestContext()
     try:
         yield context
