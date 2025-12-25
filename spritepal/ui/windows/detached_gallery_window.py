@@ -34,6 +34,10 @@ from PySide6.QtWidgets import (
 from core.services.rom_cache import ROMCache
 from ui.common import WorkerManager
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
+from ui.common.spacing_constants import (
+    DEFAULT_GALLERY_WINDOW_SIZE,
+    DEFAULT_RESULTS_DIALOG_SIZE,
+)
 
 # Dialog imports moved to lazy imports in methods that use them (see _set_rom_file, _perform_extraction)
 from ui.rom_extraction.workers import SpriteScanWorker
@@ -103,7 +107,7 @@ class DetachedGalleryWindow(QMainWindow):
         self._setup_ui()
 
         # Set initial size
-        self.resize(1024, 768)
+        self.resize(*DEFAULT_GALLERY_WINDOW_SIZE)
 
         # Load last ROM if available
         self._load_last_rom()
@@ -1301,7 +1305,7 @@ class DetachedGalleryWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Scan Results")
         dialog.setModal(True)
-        dialog.resize(600, 400)
+        dialog.resize(*DEFAULT_RESULTS_DIALOG_SIZE)
 
         layout = QVBoxLayout()
 

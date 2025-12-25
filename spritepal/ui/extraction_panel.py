@@ -58,6 +58,7 @@ from ui.common.spacing_constants import (
     LINE_THICK,
     OFFSET_LABEL_MIN_WIDTH,
     OFFSET_SPINBOX_MIN_WIDTH,
+    SPACING_MEDIUM,
     SPACING_SMALL,
     SPACING_TINY,
     TOGGLE_BUTTON_SIZE,
@@ -458,7 +459,7 @@ class ExtractionPanel(QGroupBox):
         self.step_combo.setToolTip("Select step size for navigation")
         advanced_layout.addWidget(self.step_combo)
 
-        advanced_layout.addSpacing(16)
+        advanced_layout.addSpacing(SPACING_MEDIUM)
 
         # Quick jump dropdown
         advanced_layout.addWidget(QLabel("Quick Jump:"))

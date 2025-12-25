@@ -135,6 +135,10 @@ THUMBNAIL_SIZE = 80                   # Standard thumbnail size (80x80)
 
 # Dialog sizing
 ADVANCED_SEARCH_MIN_SIZE = (800, 600)  # Minimum size for advanced search dialog
+DEFAULT_RESULTS_DIALOG_SIZE = (600, 400)  # Default size for results dialogs
+
+# Window sizing
+DEFAULT_GALLERY_WINDOW_SIZE = (1024, 768)  # Default size for gallery windows
 
 # Qt maximum (use instead of magic number 16777215)
 QWIDGETSIZE_MAX = 16777215            # Qt's maximum widget size constant

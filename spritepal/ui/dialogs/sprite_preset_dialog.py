@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 from core.managers.sprite_preset_manager import SpritePresetManager
 from core.types import SpritePreset, WidgetParent
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
+from ui.common.spacing_constants import SPACING_COMPACT_MEDIUM
 from ui.components.base import DialogBase
 
 if TYPE_CHECKING:
@@ -316,7 +317,7 @@ class SpritePresetDialog(DialogBase):
         self.delete_btn.setEnabled(False)
         actions_layout.addWidget(self.delete_btn)
 
-        actions_layout.addSpacing(10)
+        actions_layout.addSpacing(SPACING_COMPACT_MEDIUM)
 
         self.use_btn = QPushButton("Use Selected")
         self.use_btn.setEnabled(False)

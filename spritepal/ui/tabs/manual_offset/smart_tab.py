@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from ui.common.spacing_constants import (
     COMPACT_BUTTON_HEIGHT,
     GROUP_PADDING,
+    SPACING_COMPACT_SMALL,
     SPACING_SMALL,
     SPACING_TINY,
 )
@@ -84,7 +85,7 @@ class SimpleSmartTab(QWidget):
 
         # Compact region selection row
         region_row = QHBoxLayout()
-        region_row.setSpacing(6)
+        region_row.setSpacing(SPACING_COMPACT_SMALL)
 
         region_row.addWidget(QLabel("Region:"))
 

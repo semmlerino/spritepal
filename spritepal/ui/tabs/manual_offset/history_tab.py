@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from ui.common.spacing_constants import (
     COMPACT_BUTTON_HEIGHT,
     GROUP_PADDING,
+    SPACING_COMPACT_SMALL,
     SPACING_TINY,
 )
 from ui.common.widget_helpers import create_section_title
@@ -69,7 +70,7 @@ class SimpleHistoryTab(QWidget):
 
         # Compact controls row
         controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(6)
+        controls_layout.setSpacing(SPACING_COMPACT_SMALL)
 
         clear_button = QPushButton("Clear")
         clear_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
