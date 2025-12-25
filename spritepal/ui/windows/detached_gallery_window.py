@@ -1252,9 +1252,8 @@ class DetachedGalleryWindow(QMainWindow):
             if not self.rom_path:
                 raise ValueError("ROM path is not set")
 
-            # Perform extraction using the extraction manager
-            # Use variables directly to avoid type narrowing issues with dict indexing
-            result = self.extraction_manager.extract_sprite_to_png(
+            # Perform extraction using the ROM service
+            result = self.extraction_manager.rom_service.extract_sprite_to_png(
                 self.rom_path,
                 offset,
                 output_path,

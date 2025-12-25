@@ -55,7 +55,8 @@ def mock_extraction_manager():
     """Create mock extraction manager for integration tests."""
     manager = Mock()
     manager.get_rom_extractor.return_value = Mock()
-    manager.extract_sprite_to_png.return_value = True
+    # Mock rom_service.extract_sprite_to_png (called via rom_service now)
+    manager.rom_service.extract_sprite_to_png.return_value = True
     manager.get_known_sprite_locations.return_value = {
         'sprite_1': Mock(offset=0x10000),
         'sprite_2': Mock(offset=0x20000),
@@ -445,8 +446,8 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         # Perform extraction
         self.window._perform_extraction(0x10000, output_file)
 
-        # Verify extraction manager was called
-        mock_extraction_manager.extract_sprite_to_png.assert_called_once_with(
+        # Verify rom_service.extract_sprite_to_png was called
+        mock_extraction_manager.rom_service.extract_sprite_to_png.assert_called_once_with(
             "test_rom.sfc",
             0x10000,
             output_file,
