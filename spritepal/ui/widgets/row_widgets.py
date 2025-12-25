@@ -46,7 +46,7 @@ class RowPreviewWidget(QWidget):
         self.is_hovered = False
         # Use minimum height + policy for better Qt layout compatibility
         self.setMinimumHeight(ROW_WIDGET_HEIGHT)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.setMinimumWidth(ROW_WIDGET_MIN_WIDTH)
         self.setMouseTracking(True)
 
