@@ -35,7 +35,7 @@ def get_settings_manager():
 
 
 if TYPE_CHECKING:
-    from tests.infrastructure.test_protocols import MockQtBotProtocol
+    from pytestqt.qtbot import QtBot
 
 pytestmark = [pytest.mark.gui]
 
@@ -43,7 +43,7 @@ pytestmark = [pytest.mark.gui]
 class TestRealDialogInitialization:
     """Test actual Qt dialogs can be created without crashes."""
 
-    def test_settings_dialog_real(self, qtbot: MockQtBotProtocol, isolated_managers) -> None:
+    def test_settings_dialog_real(self, qtbot: QtBot, isolated_managers) -> None:
         """Test SettingsDialog can be created with real Qt widgets.
 
         Requires isolated_managers because SettingsDialog uses DI.
@@ -65,7 +65,7 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_user_error_dialog_real(self, qtbot: MockQtBotProtocol) -> None:
+    def test_user_error_dialog_real(self, qtbot: QtBot) -> None:
         """Test UserErrorDialog can be created with real Qt widgets."""
         from ui.dialogs.user_error_dialog import UserErrorDialog
 
@@ -81,7 +81,7 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_resume_scan_dialog_real(self, qtbot: MockQtBotProtocol) -> None:
+    def test_resume_scan_dialog_real(self, qtbot: QtBot) -> None:
         """Test ResumeScanDialog can be created with real Qt widgets."""
         from ui.dialogs.resume_scan_dialog import ResumeScanDialog
 
@@ -101,7 +101,7 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_range_scan_dialog_real(self, qtbot: MockQtBotProtocol) -> None:
+    def test_range_scan_dialog_real(self, qtbot: QtBot) -> None:
         """Test RangeScanDialog can be created with real Qt widgets."""
         from ui.components.dialogs.range_scan_dialog import RangeScanDialog
 
@@ -115,7 +115,7 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_advanced_search_dialog_real(self, qtbot: MockQtBotProtocol, tmp_path) -> None:
+    def test_advanced_search_dialog_real(self, qtbot: QtBot, tmp_path) -> None:
         """Test AdvancedSearchDialog can be created with real Qt widgets."""
         from ui.dialogs.advanced_search_dialog import AdvancedSearchDialog
 
@@ -132,7 +132,7 @@ class TestRealDialogInitialization:
         dialog.close()
 
     def test_manual_offset_dialog_real(
-        self, qtbot: MockQtBotProtocol, isolated_managers
+        self, qtbot: QtBot, isolated_managers
     ) -> None:
         """Test UnifiedManualOffsetDialog can be created with real Qt widgets.
 
@@ -161,7 +161,7 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_similarity_results_dialog_real(self, qtbot: MockQtBotProtocol) -> None:
+    def test_similarity_results_dialog_real(self, qtbot: QtBot) -> None:
         """Test SimilarityResultsDialog can be created with real Qt widgets."""
         from ui.dialogs.similarity_results_dialog import SimilarityResultsDialog
 
@@ -174,7 +174,7 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_row_arrangement_dialog_real(self, qtbot: MockQtBotProtocol, tmp_path) -> None:
+    def test_row_arrangement_dialog_real(self, qtbot: QtBot, tmp_path) -> None:
         """Test RowArrangementDialog can be created with real Qt widgets."""
         from PIL import Image
 
@@ -195,7 +195,7 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_grid_arrangement_dialog_real(self, qtbot: MockQtBotProtocol, tmp_path) -> None:
+    def test_grid_arrangement_dialog_real(self, qtbot: QtBot, tmp_path) -> None:
         """Test GridArrangementDialog can be created with real Qt widgets."""
         from PIL import Image
 
@@ -220,7 +220,7 @@ class TestRealDialogInitialization:
 class TestRealDialogLifecycle:
     """Test dialog show/hide/close lifecycle with real widgets."""
 
-    def test_dialog_show_close_cycle(self, qtbot: MockQtBotProtocol, isolated_managers) -> None:
+    def test_dialog_show_close_cycle(self, qtbot: QtBot, isolated_managers) -> None:
         """Test that dialogs can be shown and closed without crashes.
 
         Requires isolated_managers because SettingsDialog uses DI.
@@ -252,7 +252,7 @@ class TestRealDialogLifecycle:
         # Verify it's no longer visible
         assert not dialog.isVisible()
 
-    def test_dialog_accept_reject(self, qtbot: MockQtBotProtocol) -> None:
+    def test_dialog_accept_reject(self, qtbot: QtBot) -> None:
         """Test dialog accept/reject methods work correctly."""
         from PySide6.QtCore import Qt
 
@@ -278,7 +278,7 @@ class TestRealDialogWithManagers:
     """Test dialogs that require manager dependencies."""
 
     def test_injection_dialog_real(
-        self, qtbot: MockQtBotProtocol, isolated_managers
+        self, qtbot: QtBot, isolated_managers
     ) -> None:
         """Test InjectionDialog can be created with real managers."""
         from PySide6.QtCore import Qt

@@ -70,7 +70,6 @@ def validate_syntax():
         "tests/conftest.py",
         "tests/test_type_safety_example.py",
         "tests/test_worker_base.py",
-        "tests/infrastructure/test_protocols.py"
     ]
 
     for file_path in test_files:
@@ -98,7 +97,6 @@ def run_import_tests():
     import_tests = [
         "import tests.conftest",
         "import tests.test_type_safety_example",
-        "from tests.infrastructure.test_protocols import MockMainWindowProtocol",
     ]
 
     for import_test in import_tests:

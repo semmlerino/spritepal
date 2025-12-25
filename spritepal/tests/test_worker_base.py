@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 if TYPE_CHECKING:
-    from tests.infrastructure.test_protocols import MockQtBotProtocol
+    from pytestqt.qtbot import QtBot
 
 import pytest
 from PySide6.QtTest import QSignalSpy
@@ -32,7 +32,7 @@ pytestmark = [
 class TestBaseWorker:
     """Test the BaseWorker base class."""
 
-    def test_worker_initialization(self, qtbot: MockQtBotProtocol) -> None:
+    def test_worker_initialization(self, qtbot: QtBot) -> None:
         """Test worker initialization with proper default values."""
 
         class TestWorker(BaseWorker):
@@ -46,7 +46,7 @@ class TestBaseWorker:
         assert not worker.is_paused
         assert worker._operation_name == "TestWorker"
 
-    def test_worker_cancellation(self, qtbot: MockQtBotProtocol) -> None:
+    def test_worker_cancellation(self, qtbot: QtBot) -> None:
         """Test worker cancellation mechanism."""
 
         class TestWorker(BaseWorker):
@@ -64,7 +64,7 @@ class TestBaseWorker:
         with pytest.raises(InterruptedError, match="Operation was cancelled"):
             worker.check_cancellation()
 
-    def test_worker_pause_resume(self, qtbot: MockQtBotProtocol) -> None:
+    def test_worker_pause_resume(self, qtbot: QtBot) -> None:
         """Test worker pause and resume mechanism."""
 
         class TestWorker(BaseWorker):
@@ -87,7 +87,7 @@ class TestBaseWorker:
         worker.resume()
         assert not worker.is_paused
 
-    def test_progress_emission(self, qtbot: MockQtBotProtocol) -> None:
+    def test_progress_emission(self, qtbot: QtBot) -> None:
         """Test progress signal emission with proper clamping."""
 
         class TestWorker(BaseWorker):

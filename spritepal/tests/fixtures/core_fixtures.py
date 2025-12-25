@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.services.rom_cache import ROMCache
-    from tests.infrastructure.test_protocols import MockMainWindowProtocol
+    from ui.main_window import MainWindow
 
 # Runtime imports for inject()
 from core.di_container import inject
@@ -676,7 +676,7 @@ def rom_cache(
 # ============================================================================
 
 @pytest.fixture
-def mock_main_window(real_factory: RealComponentFactory) -> MockMainWindowProtocol:
+def mock_main_window(real_factory: RealComponentFactory) -> MainWindow:
     """Provide a fully configured mock main window using real components."""
     return real_factory.create_main_window()
 

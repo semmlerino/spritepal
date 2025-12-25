@@ -78,10 +78,6 @@ if TYPE_CHECKING:
 
     from pytest import FixtureRequest
 
-    from tests.infrastructure.test_protocols import (
-        MockMainWindowProtocol,
-    )
-
 # Import consolidated mock utilities
 import contextlib
 import sys
