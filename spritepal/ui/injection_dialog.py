@@ -139,31 +139,26 @@ class InjectionDialog(TabbedDialog):
         self.sprite_file_selector.path_changed.connect(self._on_sprite_path_changed)
         self.sprite_file_selector.setToolTip("Select the PNG sprite file to inject into VRAM or ROM")
 
-        # Add sprite selector above tabs by wrapping tab widget
-        # Get the tab widget that was created by parent
+        # Add sprite selector above tabs - insert directly into main_layout
         tab_widget = self._main_tab_widget
 
-        # Create container to hold sprite selector and tab widget
-        container = QWidget()
-        container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(SPACING_SMALL)
+        # Remove tab widget from main layout so we can insert sprite group first
+        if tab_widget:
+            self.main_layout.removeWidget(tab_widget)
 
-        # Add sprite selector at dialog level
+        # Create sprite group
         sprite_group = QGroupBox("Sprite to Inject")
         sprite_layout = QVBoxLayout()
         sprite_layout.addWidget(self.sprite_file_selector)
         sprite_group.setLayout(sprite_layout)
-        container_layout.addWidget(sprite_group)
 
-        # Add tab widget below sprite selector
+        # Insert sprite group at position 0, tab widget at position 1
+        self.main_layout.insertWidget(0, sprite_group)
         if tab_widget:
-            container_layout.addWidget(tab_widget)
+            self.main_layout.insertWidget(1, tab_widget)
 
-        # Replace tab widget with container in main layout
-        if tab_widget:
-            self.main_layout.removeWidget(tab_widget)
-        self.main_layout.insertWidget(0, container)
+        # Set spacing on main layout (was on container_layout before)
+        self.main_layout.setSpacing(SPACING_SMALL)
 
         # Create VRAM injection tab
         vram_tab_widget = self._create_vram_tab()

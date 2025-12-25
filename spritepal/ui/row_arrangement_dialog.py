@@ -23,12 +23,11 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QScrollArea,
     QVBoxLayout,
 )
 
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL
-from ui.styles.theme import COLORS
+from ui.components.visualization import ScrollablePreviewGroup
 
 from .components import SplitterDialog
 from .row_arrangement import (
@@ -220,23 +219,14 @@ class RowArrangementDialog(SplitterDialog):
         content_splitter.setStretchFactor(0, 1)
         content_splitter.setStretchFactor(1, 1)
 
-        # Preview area
-        preview_group = QGroupBox("Preview")
-        preview_group.setMinimumHeight(150)
-        preview_layout = QVBoxLayout(preview_group)
-
-        # Preview scroll area (now resizable)
-        scroll_area = QScrollArea(self)
-        self.preview_label: QLabel = QLabel(self)
-        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if self.preview_label:
-            self.preview_label.setStyleSheet(
-            f"background-color: {COLORS['background']}; border: 1px solid {COLORS['border']};"
+        # Preview area using reusable component
+        preview_group = ScrollablePreviewGroup(
+            title="Preview",
+            min_height=150,
+            with_styling=True,
+            parent=self,
         )
-        scroll_area.setWidget(self.preview_label)
-        scroll_area.setWidgetResizable(True)
-        # Removed setMaximumHeight to allow resizing
-        preview_layout.addWidget(scroll_area)
+        self.preview_label: QLabel = preview_group.preview_label
 
         # Add content and preview to main vertical splitter
         # Main splitter is already created by SplitterDialog in vertical orientation

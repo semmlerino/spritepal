@@ -38,12 +38,12 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL
+from ui.components.visualization import ScrollablePreviewGroup
 
 from .components import SplitterDialog
 from .row_arrangement import PaletteColorizer
@@ -1059,26 +1059,21 @@ class GridArrangementDialog(SplitterDialog):
         list_group.setLayout(list_layout)
         return list_group
 
-    def _create_preview_group(self, parent: QWidget) -> QGroupBox:
+    def _create_preview_group(self, parent: QWidget) -> ScrollablePreviewGroup:
         """Create the preview group with scrollable area.
 
         Args:
             parent: Parent widget for the group
 
         Returns:
-            QGroupBox: The configured preview group
+            ScrollablePreviewGroup: The configured preview group
         """
-        preview_group = QGroupBox("Arrangement Preview", parent)
-        preview_layout = QVBoxLayout()
-
-        scroll_area = QScrollArea(self)
-        self.preview_label = QLabel(self)
-        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        scroll_area.setWidget(self.preview_label)
-        scroll_area.setWidgetResizable(True)
-        preview_layout.addWidget(scroll_area)
-
-        preview_group.setLayout(preview_layout)
+        preview_group = ScrollablePreviewGroup(
+            title="Arrangement Preview",
+            with_styling=True,
+            parent=parent,
+        )
+        self.preview_label = preview_group.preview_label
         return preview_group
 
     def _on_undo(self) -> None:

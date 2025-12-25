@@ -104,10 +104,8 @@ class BaseExtractionWidget(QWidget):
         outer_layout.setContentsMargins(0, 0, 0, SPACING_MEDIUM if with_separator else 0)
         outer_layout.setSpacing(0)
 
-        # Create a container widget for the inner layout
-        container = QWidget()
-        container.setLayout(inner_layout)
-        outer_layout.addWidget(container)
+        # Add inner layout directly without container wrapper
+        outer_layout.addLayout(inner_layout)
 
         self.setLayout(outer_layout)
 
