@@ -39,13 +39,6 @@ Application Entry Point (launch_spritepal.py)
     └───────────────────────────────────────────────────────────────┘
                     │
                     ▼
-    ┌───────────────────────────────────────────────────────────────┐
-    │  register_ui_factories()                                      │
-    │  ⚠️ MUST be called AFTER initialize_managers()               │
-    │  Registers: DialogFactoryProtocol, etc.                       │
-    └───────────────────────────────────────────────────────────────┘
-                    │
-                    ▼
            Application Ready
 ```
 
@@ -65,7 +58,6 @@ ROMExtractor needs ROMCacheProtocol
 | Error | Cause | Fix |
 |-------|-------|-----|
 | "No registration for ApplicationStateManagerProtocol" | CoreOperationsManager created before ApplicationStateManager | Ensure `configure_container()` runs first |
-| "No registration for DialogFactoryProtocol" | UI code called inject before `register_ui_factories()` | Call `register_ui_factories()` after managers |
 | "Factory for X previously failed" | Factory threw exception, container cached failure | Call `reset_container()` and reinitialize |
 
 ---

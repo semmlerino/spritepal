@@ -449,15 +449,6 @@ def main():
         )
         logger.info("Managers initialized successfully")
 
-        # Register UI factories with DI container
-        # This must happen AFTER initialize_managers() but BEFORE using dialogs
-        try:
-            from ui import register_ui_factories
-            register_ui_factories()
-            logger.info("UI factories registered")
-        except Exception as e:
-            raise RuntimeError(f"Failed to register UI factories: {e}") from e
-
         # Validate manager dependencies
         if validate_manager_dependencies():
             logger.info("Manager dependencies validated successfully")

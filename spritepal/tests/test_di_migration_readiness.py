@@ -215,7 +215,7 @@ class TestNoFallbackScenario:
             "get_navigation_manager should have been removed"
 
         # Deprecated methods have been removed from registry as well
-        from core.managers.registry import ManagerRegistry
+        from core.managers import ManagerRegistry
         registry = ManagerRegistry()
         assert not hasattr(registry, "get_extraction_manager"), \
             "Registry get_extraction_manager method should have been removed"

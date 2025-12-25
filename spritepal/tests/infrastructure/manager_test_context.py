@@ -22,7 +22,7 @@ from PySide6.QtWidgets import QApplication
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.managers.registry import ManagerRegistry
+from core.managers import ManagerRegistry
 
 from .data_repository import get_test_data_repository
 from .qt_application_factory import ApplicationFactory
@@ -87,10 +87,6 @@ class ManagerTestContext:
             settings_path = self._settings_dir / ".test_settings.json"
             initialize_managers("ManagerTestContext", settings_path=settings_path)
             self._owns_registry = True
-
-        # Register UI factories with DI container (after managers are initialized)
-        from ui import register_ui_factories
-        register_ui_factories()
 
         # Now create the factory with the initialized registry
         self._registry = ManagerRegistry()
@@ -280,7 +276,7 @@ class ManagerTestContext:
             if getattr(self, '_owns_registry', True):
                 try:
                     from core.managers import cleanup_managers as registry_cleanup
-                    from core.managers.registry import ManagerRegistry
+                    from core.managers import ManagerRegistry
 
                     registry_cleanup()
                     ManagerRegistry.reset_for_tests()

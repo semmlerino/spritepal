@@ -10,8 +10,6 @@ from PIL import Image
 
 if TYPE_CHECKING:
     import logging
-else:
-    pass
 
 from core.tile_utils import decode_4bpp_tile
 from utils.constants import (

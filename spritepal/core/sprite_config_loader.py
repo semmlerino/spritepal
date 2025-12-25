@@ -74,10 +74,6 @@ class SpriteConfigLoader:
         Returns:
             Sprite size in bytes
         """
-        # Prefer 'estimated_size' for backward compatibility with existing code
-        if "estimated_size" in sprite_data:
-            return int(sprite_data["estimated_size"])
-        # Fall back to 'expected_size' (used in newer JSON configs from scanner)
         if "expected_size" in sprite_data:
             return int(sprite_data["expected_size"])
         return default

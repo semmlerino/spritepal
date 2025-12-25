@@ -26,7 +26,7 @@ def managers_initialized(qt_app, request, tmp_path):
 
     Uses isolated settings path to avoid polluting repository root.
     """
-    from core.managers.registry import ManagerRegistry, cleanup_managers, initialize_managers
+    from core.managers import ManagerRegistry, cleanup_managers, initialize_managers
     from tests.fixtures.core_fixtures import is_session_managers_active
 
     registry = ManagerRegistry()
@@ -36,10 +36,6 @@ def managers_initialized(qt_app, request, tmp_path):
         # Use isolated temp settings path - CRITICAL for preventing repo pollution
         settings_path = tmp_path / ".test_integration_settings.json"
         initialize_managers("TestApp_Integration", settings_path=settings_path)
-
-        # Register UI factories with DI container (after managers are initialized)
-        from ui import register_ui_factories
-        register_ui_factories()
 
     yield
 

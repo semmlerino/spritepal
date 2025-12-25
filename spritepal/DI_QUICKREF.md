@@ -47,8 +47,6 @@ manager = inject(CoreOperationsManager)
 ```python
 # In launch_spritepal.py - already done for you
 initialize_managers("SpritePal", settings_path=...)
-from ui import register_ui_factories
-register_ui_factories()  # MUST be after initialize_managers()
 ```
 
 ## Two Systems, One Rule

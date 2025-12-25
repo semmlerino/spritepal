@@ -3,7 +3,7 @@ Zoomable sprite preview widget for SpritePal
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, override
+from typing import override
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt
 from PySide6.QtGui import (
@@ -17,16 +17,11 @@ from PySide6.QtGui import (
     QWheelEvent,
 )
 
-if TYPE_CHECKING:
-    pass
-else:
-    pass
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
     QHBoxLayout,
-    QLabel,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,

@@ -98,12 +98,7 @@ SpritePal uses two naming patterns for orchestration classes. Choose based on **
 
 The Core layer (`core/`) has **zero runtime imports from UI** (`ui/`). This clean separation is maintained through:
 
-1. **Self-Registration Pattern** for UI Factories
-   - UI factories (dialogs, workers) are registered by application entry points
-   - Entry points call `register_ui_factories()` from `ui/__init__.py` AFTER `initialize_managers()`
-   - Core code accesses factories via DI protocols, never importing UI directly
-
-2. **Protocol-Based DI**
+1. **Protocol-Based DI**
    - Core defines protocols in `core/protocols/`
    - UI implements these protocols
    - DI container maps protocols to implementations at runtime
@@ -112,8 +107,6 @@ The Core layer (`core/`) has **zero runtime imports from UI** (`ui/`). This clea
 ```python
 # In launch_spritepal.py or test fixtures:
 initialize_managers("AppName", settings_path=...)
-from ui import register_ui_factories
-register_ui_factories()  # Must be called AFTER initialize_managers()
 ```
 
 ### Common Patterns

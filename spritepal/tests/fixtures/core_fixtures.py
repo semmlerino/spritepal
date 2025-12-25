@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
-    from core.managers.registry import ManagerRegistry
+    from core.managers import ManagerRegistry
     from core.services.rom_cache import ROMCache
     from tests.infrastructure.test_protocols import MockMainWindowProtocol
 
@@ -149,7 +149,7 @@ def reset_all_singletons() -> None:
 
     # Reset ManagerRegistry
     def reset_manager_registry() -> None:
-        from core.managers.registry import ManagerRegistry
+        from core.managers import ManagerRegistry
         ManagerRegistry.reset_for_tests()
     _try_reset("ManagerRegistry", reset_manager_registry)
 
@@ -283,7 +283,7 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[ManagerRegis
     from PySide6.QtWidgets import QApplication
 
     from core.managers import cleanup_managers, initialize_managers
-    from core.managers.registry import ManagerRegistry
+    from core.managers import ManagerRegistry
 
     # Create session-specific settings directory for isolation
     # Priority: SPRITEPAL_SETTINGS_DIR env var (xdist) > tmp_path_factory
@@ -308,13 +308,9 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[ManagerRegis
 
     initialize_managers("TestApp", settings_path=settings_path)
 
-    # Register UI factories with DI container (after managers are initialized)
-    from ui import register_ui_factories
-    register_ui_factories()
-
     # Get the global registry that was just initialized
-    from core.managers.registry import _ensure_registry
-    registry = _ensure_registry()
+    from core.managers import ManagerRegistry
+    registry = ManagerRegistry()
 
     yield registry
     cleanup_managers()
@@ -346,14 +342,14 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     Usage:
         def test_something_that_modifies_state(isolated_managers):
             # Fresh managers, isolated from other tests
-            from core.managers.registry import ManagerRegistry
+            from core.managers import ManagerRegistry
             registry = ManagerRegistry()
             # ... test code that modifies manager state ...
     """
     from PySide6.QtWidgets import QApplication
 
     from core.managers import cleanup_managers, initialize_managers
-    from core.managers.registry import ManagerRegistry
+    from core.managers import ManagerRegistry
 
     test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
     session_active = _session_state.is_initialized
@@ -407,10 +403,6 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     # Initialize fresh managers for this test with isolated settings
     initialize_managers("TestApp_Isolated", settings_path=settings_path)
 
-    # Register UI factories with DI container (after managers are initialized)
-    from ui import register_ui_factories
-    register_ui_factories()
-
     # Yield the registry for convenience
     yield ManagerRegistry()  # type: ignore[misc]
 
@@ -423,9 +415,6 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[Manag
     if session_active and session_settings_path:
         try:
             initialize_managers("TestApp", settings_path=session_settings_path)
-            # Re-register UI factories after restore
-            from ui import register_ui_factories
-            register_ui_factories()
             # Verify restoration succeeded
             registry = ManagerRegistry()
             if not registry.is_initialized():
@@ -462,7 +451,7 @@ def detect_session_manager_cleanup(request: FixtureRequest) -> Generator[None, N
     Note: Under xdist, parallel_safe tests use isolated_managers and don't
     share session state, so this check is skipped for them.
     """
-    from core.managers.registry import ManagerRegistry
+    from core.managers import ManagerRegistry
     from tests.fixtures.xdist_fixtures import is_xdist_worker
 
     # Skip check for parallel_safe tests under xdist - they use isolated_managers
@@ -499,7 +488,7 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
 
     from core.di_container import reset_container
     from core.managers import cleanup_managers, initialize_managers
-    from core.managers.registry import ManagerRegistry
+    from core.managers import ManagerRegistry
 
     session_active = _session_state.is_initialized
     session_settings_path = _session_state.settings_path
@@ -525,8 +514,6 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
         if app is None:
             app = QApplication([])
         initialize_managers("TestApp", settings_path=session_settings_path)
-        from ui import register_ui_factories
-        register_ui_factories()
         if not ManagerRegistry().is_initialized():
             test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
             pytest.fail(
@@ -552,7 +539,7 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
     be written to be order-independent since xdist_group("serial") only
     co-locates tests on one worker, it does not guarantee execution order.
     """
-    from core.managers.registry import ManagerRegistry
+    from core.managers import ManagerRegistry
 
     fixture_names = getattr(request, 'fixturenames', [])
     uses_session = 'session_managers' in fixture_names

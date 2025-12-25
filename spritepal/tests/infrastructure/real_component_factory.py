@@ -41,7 +41,7 @@ from PySide6.QtWidgets import QApplication, QWidget
 
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.managers.registry import ManagerRegistry
+from core.managers import ManagerRegistry
 from core.services.rom_cache import ROMCache
 from ui.common import WorkerManager
 from ui.main_window import MainWindow
@@ -221,10 +221,6 @@ class RealComponentFactory:
             registry = ManagerRegistry()
             if not registry.is_initialized():
                 registry.initialize_managers("TestApp", settings_path=self._settings_path)
-
-                # Register UI factories with DI container (after managers are initialized)
-                from ui import register_ui_factories
-                register_ui_factories()
 
         # B.7: Create MainWindow with explicit DI dependencies (matching B.6 pattern)
         from core.di_container import inject
@@ -472,7 +468,7 @@ class RealComponentFactory:
         # if WE initialized the registry - this prevents pollution between tests.
         if self._initialized_registry:
             try:
-                from core.managers.registry import ManagerRegistry
+                from core.managers import ManagerRegistry
                 registry = ManagerRegistry()
                 if registry.is_initialized():
                     registry.cleanup_managers()

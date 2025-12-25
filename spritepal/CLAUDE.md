@@ -236,8 +236,6 @@ from core.configuration_service import ConfigurationService
 config_service = ConfigurationService()
 config_service.ensure_directories_exist()
 initialize_managers('SpritePal', settings_path=config_service.settings_file, configuration_service=config_service)
-from ui import register_ui_factories
-register_ui_factories()
 
 from launch_spritepal import SpritePalApp
 app = SpritePalApp(sys.argv)

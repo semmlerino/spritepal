@@ -483,7 +483,7 @@ def pytest_runtest_setup(item: Any) -> None:
     """
     # Always check actual registry state - don't assume
     try:
-        from core.managers.registry import ManagerRegistry
+        from core.managers import ManagerRegistry
         is_clean = ManagerRegistry.is_clean()
         item._registry_was_clean = is_clean
     except ImportError:
@@ -521,7 +521,7 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     # for tests without known manager-related fixtures. That created a gap where
     # direct manager instantiation could bypass detection. Now we always check.
     try:
-        from core.managers.registry import ManagerRegistry
+        from core.managers import ManagerRegistry
 
         was_clean = getattr(item, '_registry_was_clean', True)
         is_clean_now = ManagerRegistry.is_clean()
@@ -783,7 +783,7 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
     yield
 
     # Verify no lingering manager state
-    from core.managers.registry import ManagerRegistry
+    from core.managers import ManagerRegistry
 
     registry = ManagerRegistry()
     if not registry.is_initialized():

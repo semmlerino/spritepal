@@ -311,9 +311,3 @@ def initialize_accessibility() -> None:
     """Initialize all accessibility features for the application."""
     apply_global_accessibility_styles()
     configure_accessibility_settings()
-
-    # Import and apply any additional accessibility helpers
-    from ui.utils.accessibility import (
-        apply_global_accessibility_styles as apply_utils_styles,
-    )
-    apply_utils_styles()

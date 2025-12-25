@@ -180,10 +180,6 @@ class StandaloneGalleryLauncher:
             from core.managers import initialize_managers
             initialize_managers()
 
-            # Register UI factories with DI container (after managers are initialized)
-            from ui import register_ui_factories
-            register_ui_factories()
-
             print("✅ SpritePal managers initialized successfully")
         except Exception as e:
             print(f"❌ Failed to initialize managers: {e}")

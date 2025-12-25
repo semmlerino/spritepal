@@ -30,7 +30,7 @@ from core.managers import (
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.base_manager import BaseManager
 from core.managers.core_operations_manager import CoreOperationsManager
-from core.managers.registry import ManagerRegistry
+from core.managers import ManagerRegistry
 
 
 def are_managers_initialized() -> bool:
@@ -239,7 +239,7 @@ class TestManagerRegistry:
         """Test that atexit cleanup works when QApplication is not available."""
         from unittest.mock import patch
 
-        from core.managers.registry import _cleanup_global_registry
+        from core.managers import cleanup_managers as _cleanup_global_registry
 
         # Reset state - both module and class level
         import core.managers as managers_module
