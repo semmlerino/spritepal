@@ -87,8 +87,8 @@ class TestROMServicePathHandling:
         assert call_args[0][2] == output_base, "Should pass output_base without .png"
         assert call_args[0][3] == "test_sprite", "Should pass sprite_name"
 
-        # Verify: result uses correct path
-        assert str(expected_png) in result
+        # Verify: result uses correct path (result is now ExtractionResult)
+        assert str(expected_png) in result.files
         assert not wrong_png.exists(), "Should not create .png.png file"
 
 

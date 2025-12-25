@@ -114,7 +114,7 @@ class VRAMService:
 
         extracted_files: list[str] = []
         warning: str | None = None
-        palettes: list[tuple[str, list[tuple[int, int, int]]]] = []
+        palettes: dict[int, list[list[int]]] = {}
         active_palette_indices: list[int] = []
 
         # Extract sprites

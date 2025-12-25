@@ -171,7 +171,7 @@ class ROMService:
         warning: str | None = None
         preview_image: Image.Image | None = None
         tile_count = 0
-        palettes: list[tuple[str, list[tuple[int, int, int]]]] = []
+        palettes: dict[int, list[list[int]]] = {}
         active_palette_indices: list[int] = []
 
         # Extract from ROM
