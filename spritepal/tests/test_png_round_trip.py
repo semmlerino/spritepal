@@ -55,28 +55,28 @@ class TestPNGRoundTrip:
             self.extractor._convert_4bpp_to_png(original_data, str(png_path))
 
             # Verify grayscale image properties
-            img = Image.open(png_path)
-            assert img.mode == "P"  # Should be indexed after conversion
-            # ROM extractor creates sheets with 16 tiles per row
-            assert img.size == (128, 8)  # Single tile padded to 16 tiles width
+            with Image.open(png_path) as img:
+                assert img.mode == "P"  # Should be indexed after conversion
+                # ROM extractor creates sheets with 16 tiles per row
+                assert img.size == (128, 8)  # Single tile padded to 16 tiles width
 
-            # Check first tile's pixel values
-            first_tile_pixels = []
-            for y in range(8):
-                for x in range(8):
-                    pixel = img.getpixel((x, y))
-                    first_tile_pixels.append(pixel)
+                # Check first tile's pixel values
+                first_tile_pixels = []
+                for y in range(8):
+                    for x in range(8):
+                        pixel = img.getpixel((x, y))
+                        first_tile_pixels.append(pixel)
 
-            # Verify grayscale conversion (index * 17)
-            for i, pixel in enumerate(first_tile_pixels):
-                expected = ((i // 8) * 2 + ((i % 8) // 4)) % 16
-                # In indexed mode after save, should be the actual value
-                assert pixel == expected * 17
+                # Verify grayscale conversion (index * 17)
+                for i, pixel in enumerate(first_tile_pixels):
+                    expected = ((i // 8) * 2 + ((i % 8) // 4)) % 16
+                    # In indexed mode after save, should be the actual value
+                    assert pixel == expected * 17
 
-            # Step 2: Convert back to 4bpp (simulating injection)
-            # First convert to grayscale to simulate what happens after editing
-            img = img.convert("L")
-            img.save(png_path)
+                # Step 2: Convert back to 4bpp (simulating injection)
+                # First convert to grayscale to simulate what happens after editing
+                img_converted = img.convert("L")
+                img_converted.save(png_path)
 
             converted_data = self.injector.convert_png_to_4bpp(str(png_path))
 
@@ -148,8 +148,9 @@ class TestPNGRoundTrip:
             self.extractor._convert_4bpp_to_png(black_tile, str(png_path))
 
             # Convert to grayscale and back
-            img = Image.open(png_path).convert("L")
-            img.save(png_path)
+            with Image.open(png_path) as img:
+                img_gray = img.convert("L")
+                img_gray.save(png_path)
             converted = self.injector.convert_png_to_4bpp(str(png_path))
             # Extract first tile only
             first_tile = converted[:32]
@@ -161,8 +162,9 @@ class TestPNGRoundTrip:
             self.extractor._convert_4bpp_to_png(white_tile, str(png_path))
 
             # Convert to grayscale and back
-            img = Image.open(png_path).convert("L")
-            img.save(png_path)
+            with Image.open(png_path) as img:
+                img_gray = img.convert("L")
+                img_gray.save(png_path)
             converted = self.injector.convert_png_to_4bpp(str(png_path))
             # Extract first tile only
             first_tile = converted[:32]
@@ -183,12 +185,12 @@ class TestPNGRoundTrip:
             self.extractor._convert_4bpp_to_png(bytes(tiles_data), str(png_path))
 
             # Verify dimensions
-            img = Image.open(png_path)
-            assert img.size == (128, 8)  # 16 tiles in one row (16*8, 8)
+            with Image.open(png_path) as img:
+                assert img.size == (128, 8)  # 16 tiles in one row (16*8, 8)
 
-            # Convert to grayscale and back
-            img = img.convert("L")
-            img.save(png_path)
+                # Convert to grayscale and back
+                img_gray = img.convert("L")
+                img_gray.save(png_path)
             converted_data = self.injector.convert_png_to_4bpp(str(png_path))
 
             # Verify all tiles preserved

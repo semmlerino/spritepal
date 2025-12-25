@@ -258,14 +258,14 @@ class TestExtractionManager:
                 assert Path(output_png).exists()
 
                 # Verify the extracted image is real with reasonable properties
-                img = Image.open(output_png)
-                assert img.mode in ["L", "P", "RGBA"]  # Valid image modes
-                assert img.size[0] > 0 and img.size[1] > 0
-                assert img.size[0] * img.size[1] >= 64  # Reasonable minimum size
+                with Image.open(output_png) as img:
+                    assert img.mode in ["L", "P", "RGBA"]  # Valid image modes
+                    assert img.size[0] > 0 and img.size[1] > 0
+                    assert img.size[0] * img.size[1] >= 64  # Reasonable minimum size
 
-                # Verify file has real image data (not just empty)
-                img_bytes = img.tobytes()
-                assert len(img_bytes) > 0
+                    # Verify file has real image data (not just empty)
+                    img_bytes = img.tobytes()
+                    assert len(img_bytes) > 0
 
             except ExtractionError as e:
                 # Real extraction may find issues with test data - this is valuable

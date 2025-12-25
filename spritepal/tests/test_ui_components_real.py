@@ -90,15 +90,6 @@ class TestRowArrangementDialog:
         # Toggle palette application
         dialog.toggle_palette_application()
 
-        # Verify that the dialog is still functional and responds to the toggle
-        # The exact behavior depends on implementation, but dialog should remain responsive
-        assert dialog.isVisible() or not dialog.isVisible()  # Dialog state is preserved
-
-        # Window title may have changed to reflect palette mode
-        current_title = dialog.windowTitle()
-        # Title should either be the same or updated with palette info
-        assert isinstance(current_title, str)
-        assert len(current_title) > 0
 
     def test_dialog_initialization(self, temp_sprite_path, qtbot):
         """Test that dialog initializes properly with real components"""

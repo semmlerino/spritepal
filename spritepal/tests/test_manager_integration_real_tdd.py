@@ -108,8 +108,8 @@ class TestManagerIntegrationTDD:
             assert Path(sprite_file).exists(), "Sprite file should exist"
 
             # Verify real image was created
-            img = Image.open(sprite_file)
-            assert img.size[0] > 0 and img.size[1] > 0
+            with Image.open(sprite_file) as img:
+                assert img.size[0] > 0 and img.size[1] > 0
 
             # Phase 2: Inject extracted sprite back to VRAM (real injection)
             # Create VRAM file for injection target

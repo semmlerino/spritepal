@@ -27,8 +27,8 @@ class TestManualOffsetDialog:
         dialog = manual_offset_dialog
 
         # Show the dialog
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Verify main components exist
         assert dialog.browse_tab is not None
@@ -55,8 +55,8 @@ class TestManualOffsetDialog:
             extraction_manager
         )
 
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Get initial offset
 
@@ -88,8 +88,8 @@ class TestManualOffsetDialog:
             extraction_manager
         )
 
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Set offset via spinbox
         target_offset = 0x20000
@@ -116,8 +116,8 @@ class TestManualOffsetDialog:
             extraction_manager
         )
 
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Mock the scan method to avoid actual slow scanning (we just want to verify it's called)
         scan_mock = mocker.patch.object(dialog, '_scan_for_sprites')
@@ -149,8 +149,8 @@ class TestManualOffsetDialog:
             extraction_manager
         )
 
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Track preview updates
         preview_updated = False
@@ -192,8 +192,8 @@ class TestManualOffsetDialog:
             extraction_manager
         )
 
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Set initial offset
         initial_offset = 0x10000
@@ -252,8 +252,8 @@ class TestSpriteScanDialog:
             extraction_manager
         )
 
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Start scan - with exec mocked, this won't block
         dialog._scan_for_sprites()
@@ -291,8 +291,8 @@ class TestSpriteScanDialog:
             extraction_manager
         )
 
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Directly test jumping to a known sprite
         sprite_offset = rom_info['sprites'][0]['offset']
@@ -336,8 +336,8 @@ class TestDialogIntegrationWithPanel:
         dialog = panel._offset_dialog_manager.get_current_dialog()
         assert dialog is not None
 
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Change offset in dialog
         new_offset = 0x30000

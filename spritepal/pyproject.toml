@@ -422,8 +422,6 @@ filterwarnings = [
     "ignore::RuntimeWarning:PySide6",
     "ignore:.*QApplication.*:RuntimeWarning",
     "ignore:.*QThread.*:RuntimeWarning",
-    # pytest-qt deprecation: waitForWindowShown -> waitExposed
-    "ignore:waitForWindowShown is deprecated:DeprecationWarning",
     # Qt deprecated QMouseEvent constructor
     "ignore:.*QMouseEvent.*deprecated:DeprecationWarning",
     # multiprocessing fork warning in multi-threaded process (expected in tests)

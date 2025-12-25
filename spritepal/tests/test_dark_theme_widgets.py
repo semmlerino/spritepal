@@ -1069,3 +1069,44 @@ class TestIntegrationHeadless:
             css = func()
             assert isinstance(css, str), f"Function {func.__name__} should return CSS string"
             assert len(css) > 0, f"Function {func.__name__} should return non-empty CSS"
+
+
+class TestRealWorldUsage:
+    """Test styling functions in realistic usage scenarios.
+
+    Migrated from test_ui_styling_system.py - tests semantic equality
+    (CSS outputs identical across contexts) rather than string-contains.
+    """
+
+    def test_splitter_style_in_dialog_context(self) -> None:
+        """Test splitter style works in dialog context."""
+        # Simulate usage in RowArrangementDialog
+        main_splitter_css = get_splitter_style(8)
+        content_splitter_css = get_splitter_style(8)
+
+        # Both should be identical and well-formed
+        assert main_splitter_css == content_splitter_css
+        assert "QSplitter::handle" in main_splitter_css
+
+    def test_dialog_button_box_realistic_usage(self) -> None:
+        """Test dialog button box style in realistic scenario."""
+        # Simulate usage across multiple dialogs
+        error_dialog_css = get_dialog_button_box_style()
+        row_dialog_css = get_dialog_button_box_style()
+        grid_dialog_css = get_dialog_button_box_style()
+
+        # All should be identical (consistent styling)
+        assert error_dialog_css == row_dialog_css == grid_dialog_css
+
+    def test_scroll_area_different_contexts(self) -> None:
+        """Test scroll area style in different contexts."""
+        # Different background contexts
+        default_css = get_scroll_area_style()
+        light_css = get_scroll_area_style("light_gray")
+        panel_css = get_scroll_area_style("panel_background")
+
+        # Should all be valid but different
+        assert default_css != light_css != panel_css
+        assert "QScrollArea" in default_css
+        assert "QScrollArea" in light_css
+        assert "QScrollArea" in panel_css

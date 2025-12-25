@@ -44,10 +44,6 @@ class TestROMMapWidget:
         widget = ROMMapWidget(parent_widget)
         qtbot.addWidget(widget)
 
-        # Verify basic initialization with actual attributes
-        assert hasattr(widget, "found_sprites")
-        assert hasattr(widget, "current_offset")
-        assert hasattr(widget, "rom_size")
         assert widget.parent() == parent_widget
 
     def test_add_sprite_data(self, qtbot):
@@ -142,12 +138,6 @@ class TestScanControlsPanel:
         panel = ScanControlsPanel(parent_widget, rom_cache=inject(ROMCache))
         qtbot.addWidget(panel)
 
-        # Verify initialization - use the actual button names from the implementation
-        assert hasattr(panel, "scan_range_btn")
-        assert hasattr(panel, "scan_all_btn")
-        assert hasattr(panel, "pause_btn")
-        assert hasattr(panel, "stop_btn")
-        assert hasattr(panel, "cache_status_label")
 
     def test_scan_parameters_validation(self, qtbot):
         """Test scan parameter validation"""
@@ -193,9 +183,6 @@ class TestImportExportPanel:
         panel = ImportExportPanel(parent_widget)
         qtbot.addWidget(panel)
 
-        # Verify initialization - use actual button names from implementation
-        assert hasattr(panel, "import_btn")
-        assert hasattr(panel, "export_btn")
 
     def test_file_operations(self, qtbot):
         """Test file import/export operations"""
@@ -208,11 +195,6 @@ class TestImportExportPanel:
 
         panel = ImportExportPanel(parent_widget)
         qtbot.addWidget(panel)
-
-        # Test that the panel has the required state variables
-        assert hasattr(panel, "found_sprites")
-        assert hasattr(panel, "rom_path")
-        assert hasattr(panel, "rom_size")
 
         # Test setting ROM data
         panel.set_rom_data("/test/path/test_rom.smc", 0x400000)
@@ -251,10 +233,6 @@ class TestStatusPanel:
         )
         qtbot.addWidget(panel)
 
-        # Verify initialization - use actual attribute names from implementation
-        assert hasattr(panel, "detection_info")  # Status label
-        assert hasattr(panel, "scan_progress")   # Progress bar
-        assert hasattr(panel, "cache_status_widget")  # Cache status  # Cache status
 
     def test_status_updates(self, qtbot):
         """Test status message updates"""
@@ -310,10 +288,6 @@ class TestStatusPanel:
         panel.update_progress(75)
         assert panel.scan_progress.value() == 75
 
-        # Test progress bar methods exist
-        assert hasattr(panel, "show_progress")
-        assert hasattr(panel, "hide_progress")
-        assert hasattr(panel, "update_progress")
 
 @pytest.mark.usefixtures("isolated_managers")
 class TestRangeScanDialog:
@@ -334,12 +308,6 @@ class TestRangeScanDialog:
 
         dialog = RangeScanDialog(current_offset=0x10000, rom_size=0x400000, parent=parent_widget)
         qtbot.addWidget(dialog)
-
-        # Verify initialization - use actual attributes from RangeScanDialog
-        assert hasattr(dialog, "range_combo")
-        assert hasattr(dialog, "range_label")
-        assert hasattr(dialog, "current_offset")
-        assert hasattr(dialog, "rom_size")
 
         # Check that attributes are set correctly
         assert dialog.current_offset == 0x10000

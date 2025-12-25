@@ -125,11 +125,11 @@ class TestROMExtractor4bppConversion:
         assert output_path.exists()
 
         # Verify image dimensions
-        img = Image.open(output_path)
-        # 4 tiles in 16-tile-wide rows: 1 row of 4 tiles
-        expected_width = 16 * TILE_WIDTH  # Standard sprite sheet width
-        expected_height = 1 * TILE_HEIGHT  # 1 row needed for 4 tiles
-        assert img.size == (expected_width, expected_height)
+        with Image.open(output_path) as img:
+            # 4 tiles in 16-tile-wide rows: 1 row of 4 tiles
+            expected_width = 16 * TILE_WIDTH  # Standard sprite sheet width
+            expected_height = 1 * TILE_HEIGHT  # 1 row needed for 4 tiles
+            assert img.size == (expected_width, expected_height)
 
     def test_convert_4bpp_to_png_large_sprite(self, extractor, tmp_path):
         """Test PNG conversion with larger sprite data"""
@@ -143,11 +143,11 @@ class TestROMExtractor4bppConversion:
         assert output_path.exists()
 
         # Verify image dimensions
-        img = Image.open(output_path)
-        # 20 tiles in 16-tile-wide rows: 2 rows (16 + 4 tiles)
-        expected_width = 16 * TILE_WIDTH
-        expected_height = 2 * TILE_HEIGHT  # ceil(20/16) = 2 rows
-        assert img.size == (expected_width, expected_height)
+        with Image.open(output_path) as img:
+            # 20 tiles in 16-tile-wide rows: 2 rows (16 + 4 tiles)
+            expected_width = 16 * TILE_WIDTH
+            expected_height = 2 * TILE_HEIGHT  # ceil(20/16) = 2 rows
+            assert img.size == (expected_width, expected_height)
 
     def test_convert_4bpp_to_png_pixel_values(self, extractor, tmp_path):
         """Test that PNG conversion produces correct pixel values"""
@@ -164,11 +164,11 @@ class TestROMExtractor4bppConversion:
         extractor._convert_4bpp_to_png(tile_data, str(output_path))
 
         # Verify pixel value
-        img = Image.open(output_path)
-        pixel_value = img.getpixel((0, 0))
+        with Image.open(output_path) as img:
+            pixel_value = img.getpixel((0, 0))
 
-        # 4-bit value 15 should become 8-bit value 255 (15 * 17 = 255)
-        assert pixel_value == 255
+            # 4-bit value 15 should become 8-bit value 255 (15 * 17 = 255)
+            assert pixel_value == 255
 
     def test_convert_4bpp_to_png_empty_data(self, extractor, tmp_path):
         """Test PNG conversion with empty data"""
@@ -184,9 +184,9 @@ class TestROMExtractor4bppConversion:
 
         # If image was created, verify it has reasonable dimensions
         if output_path.exists():
-            img = Image.open(output_path)
-            assert img.size[0] > 0  # Width should be positive
-            assert img.size[1] >= 0  # Height should be non-negative
+            with Image.open(output_path) as img:
+                assert img.size[0] > 0  # Width should be positive
+                assert img.size[1] >= 0  # Height should be non-negative
 
 class TestROMExtractorSpriteLocations:
     """Test sprite location discovery functionality"""
@@ -509,13 +509,13 @@ class TestROMExtractorIntegration:
         assert output_path.exists()
 
         # Verify image properties
-        img = Image.open(output_path)
-        assert img.mode == "P"  # Palette mode
-        assert img.size == (16 * TILE_WIDTH, 1 * TILE_HEIGHT)
+        with Image.open(output_path) as img:
+            assert img.mode == "P"  # Palette mode
+            assert img.size == (16 * TILE_WIDTH, 1 * TILE_HEIGHT)
 
-        # Verify some pixels have non-zero values (pattern was applied)
-        pixels = list(img.getdata())
-        assert any(p > 0 for p in pixels)  # Should have non-black pixels
+            # Verify some pixels have non-zero values (pattern was applied)
+            pixels = list(img.getdata())
+            assert any(p > 0 for p in pixels)  # Should have non-black pixels
 
     def test_error_recovery_file_cleanup(self, tmp_path):
         """Test that failed extractions don't leave partial files"""
@@ -556,10 +556,10 @@ class TestROMExtractorIntegration:
         assert output_path.exists()
 
         # Verify large image dimensions
-        img = Image.open(output_path)
-        expected_width = 16 * TILE_WIDTH
-        expected_height = 4 * TILE_HEIGHT  # ceil(64/16) = 4 rows
-        assert img.size == (expected_width, expected_height)
+        with Image.open(output_path) as img:
+            expected_width = 16 * TILE_WIDTH
+            expected_height = 4 * TILE_HEIGHT  # ceil(64/16) = 4 rows
+            assert img.size == (expected_width, expected_height)
 
     def test_boundary_conditions(self, tmp_path):
         """Test boundary conditions and edge cases"""
@@ -573,8 +573,8 @@ class TestROMExtractorIntegration:
         tile_count = extractor._convert_4bpp_to_png(tile_data, str(output_path))
 
         assert tile_count == 16
-        img = Image.open(output_path)
-        assert img.size == (16 * TILE_WIDTH, 1 * TILE_HEIGHT)
+        with Image.open(output_path) as img:
+            assert img.size == (16 * TILE_WIDTH, 1 * TILE_HEIGHT)
 
         # Test with 17 tiles (one tile into second row)
         tile_data = b"\x00" * (17 * BYTES_PER_TILE)
@@ -583,8 +583,8 @@ class TestROMExtractorIntegration:
         tile_count = extractor._convert_4bpp_to_png(tile_data, str(output_path))
 
         assert tile_count == 17
-        img = Image.open(output_path)
-        assert img.size == (16 * TILE_WIDTH, 2 * TILE_HEIGHT)
+        with Image.open(output_path) as img:
+            assert img.size == (16 * TILE_WIDTH, 2 * TILE_HEIGHT)
 
 
 # =============================================================================
