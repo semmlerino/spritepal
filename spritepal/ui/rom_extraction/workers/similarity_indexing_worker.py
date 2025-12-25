@@ -250,9 +250,8 @@ class SimilarityIndexingWorker(BaseWorker):
     def run(self) -> None:
         """Background indexing of pending sprites."""
         try:
-            from core.di_container import inject
-            from core.managers.core_operations_manager import CoreOperationsManager
-            extraction_manager = inject(CoreOperationsManager)
+            from core.app_context import get_app_context
+            extraction_manager = get_app_context().core_operations_manager
             indexed_count = 0
 
             # Process pending sprites

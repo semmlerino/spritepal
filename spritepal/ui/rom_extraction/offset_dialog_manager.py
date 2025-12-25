@@ -83,18 +83,16 @@ class OffsetDialogManager(QObject):
     @classmethod
     def _create_dialog(cls, manager: OffsetDialogManager | None) -> UnifiedManualOffsetDialog:
         """Create the dialog instance with injected dependencies."""
-        from core.di_container import inject
-        from core.managers.application_state_manager import ApplicationStateManager
-        from core.managers.core_operations_manager import CoreOperationsManager
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.dialogs import UnifiedManualOffsetDialog
 
         parent = manager._parent_widget if manager else None
 
-        # Inject dependencies at singleton boundary
-        rom_cache = inject(ROMCache)
-        settings_manager = inject(ApplicationStateManager)
-        extraction_manager = inject(CoreOperationsManager)
+        # Get dependencies from AppContext
+        context = get_app_context()
+        rom_cache = context.rom_cache
+        settings_manager = context.application_state_manager
+        extraction_manager = context.core_operations_manager
         rom_extractor = extraction_manager.get_rom_extractor()
 
         dialog = UnifiedManualOffsetDialog(

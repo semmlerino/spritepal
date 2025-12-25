@@ -315,8 +315,7 @@ class ScanController(QObject):
             rom_path: Path to the ROM file
             extractor: ROM extractor for decompression
         """
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.common import WorkerManager
 
         # Clean up any existing scan worker
@@ -329,8 +328,8 @@ class ScanController(QObject):
             dialog.reject()
             return
 
-        # Get rom_cache from self._cache or inject
-        rom_cache = self._cache if self._cache is not None else inject(ROMCache)
+        # Get rom_cache from self._cache or AppContext
+        rom_cache = self._cache if self._cache is not None else get_app_context().rom_cache
 
         # Create scan worker
         self._scan_worker = SpriteScanWorker(
@@ -360,11 +359,10 @@ class ScanController(QObject):
         Returns:
             True to use cache, False to start fresh, None if cancelled
         """
-        from core.di_container import inject
-        from core.services.rom_cache import ROMCache
+        from core.app_context import get_app_context
         from ui.dialogs import ResumeScanDialog
 
-        rom_cache = inject(ROMCache)
+        rom_cache = get_app_context().rom_cache
 
         # Compute scan parameters from ROM size (matches SpriteScanWorker)
         scan_params = compute_scan_params(rom_path)

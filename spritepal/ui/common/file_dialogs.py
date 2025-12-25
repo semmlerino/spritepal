@@ -4,8 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QWidget
 
-from core.di_container import inject
-from core.managers.application_state_manager import ApplicationStateManager
+from core.app_context import get_app_context
 
 
 class FileDialogHelper:
@@ -37,7 +36,7 @@ class FileDialogHelper:
         Returns:
             Selected directory path, or empty string if cancelled
         """
-        settings = inject(ApplicationStateManager)
+        settings = get_app_context().application_state_manager
 
         # Determine initial directory
         if initial_dir and Path(initial_dir).exists():
@@ -78,7 +77,7 @@ class FileDialogHelper:
         Returns:
             Selected file path, or empty string if cancelled
         """
-        settings = inject(ApplicationStateManager)
+        settings = get_app_context().application_state_manager
 
         # Determine initial directory
         if initial_path and Path(initial_path).exists():
@@ -132,7 +131,7 @@ class FileDialogHelper:
         Returns:
             Selected file path, or empty string if cancelled
         """
-        settings = inject(ApplicationStateManager)
+        settings = get_app_context().application_state_manager
 
         # Determine initial path
         if initial_path:
@@ -180,7 +179,7 @@ class FileDialogHelper:
         Returns:
             Best initial directory to use
         """
-        settings = inject(ApplicationStateManager)
+        settings = get_app_context().application_state_manager
 
         # Check current path first
         if current_path:

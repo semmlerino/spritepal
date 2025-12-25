@@ -120,14 +120,59 @@ _cleanup_registered = False
 def get_app_context() -> AppContext:
     """Get the global app context.
 
+    If AppContext was not explicitly created via create_app_context(),
+    this will attempt to create a bridge AppContext from the DI container
+    (for backward compatibility with code using initialize_managers()).
+
     Raises:
-        RuntimeError: If AppContext not initialized (call create_app_context first)
+        RuntimeError: If neither AppContext nor DI container are initialized
     """
-    if _app_context is None:
-        raise RuntimeError(
-            "AppContext not initialized. Call create_app_context() first."
-        )
-    return _app_context
+    global _app_context
+
+    if _app_context is not None:
+        return _app_context
+
+    # Try to create bridge AppContext from DI container
+    with _context_lock:
+        # Double-check after acquiring lock
+        if _app_context is not None:
+            return _app_context
+
+        try:
+            from core.di_container import get_container
+
+            container = get_container()
+
+            # Check if DI container has managers
+            from core.configuration_service import ConfigurationService as ConfigService
+            from core.managers.application_state_manager import ApplicationStateManager
+            from core.managers.core_operations_manager import CoreOperationsManager
+            from core.managers.sprite_preset_manager import SpritePresetManager
+
+            state_mgr = container.get_optional(ApplicationStateManager)
+            if state_mgr is None:
+                raise RuntimeError(
+                    "AppContext not initialized. Call create_app_context() first."
+                )
+
+            # Get or create configuration service
+            config = container.get_optional(ConfigService)
+            if config is None:
+                config = ConfigService()
+
+            # Create bridge AppContext from DI container
+            _app_context = AppContext(
+                configuration_service=config,
+                application_state_manager=state_mgr,
+                sprite_preset_manager=container.get(SpritePresetManager),
+                core_operations_manager=container.get(CoreOperationsManager),
+            )
+            return _app_context
+
+        except (ImportError, RuntimeError):
+            raise RuntimeError(
+                "AppContext not initialized. Call create_app_context() first."
+            )
 
 
 def get_app_context_optional() -> AppContext | None:

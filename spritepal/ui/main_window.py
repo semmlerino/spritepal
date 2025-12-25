@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# Session manager accessed via DI: inject(ApplicationStateManager)
+# Session manager accessed via get_app_context().application_state_manager
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
 from core.types import VRAMExtractionParams
 from ui.common.spacing_constants import (
@@ -188,9 +188,8 @@ class MainWindow(QMainWindow):
         self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
         # ROM extraction tab (first tab, selected by default)
-        from core.di_container import inject
-        from core.managers.core_operations_manager import CoreOperationsManager
-        extraction_manager = inject(CoreOperationsManager)
+        from core.app_context import get_app_context
+        extraction_manager = get_app_context().core_operations_manager
         self.rom_extraction_panel = ROMExtractionPanel(
             parent=self,
             extraction_manager=extraction_manager
@@ -488,10 +487,9 @@ class MainWindow(QMainWindow):
 
             # Validate parameters using extraction manager
             # Delayed import to avoid initialization order issues
-            from core.di_container import inject
-            from core.managers.core_operations_manager import CoreOperationsManager
+            from core.app_context import get_app_context
             try:
-                extraction_manager = inject(CoreOperationsManager)
+                extraction_manager = get_app_context().core_operations_manager
                 extraction_manager.validate_extraction_params(params)
             except (ValueError, TypeError) as e:
                 QMessageBox.warning(
@@ -1004,17 +1002,15 @@ class MainWindow(QMainWindow):
         """
         if self._controller is None:
             # Import here to avoid circular dependency at module level
-            from core.di_container import inject
-            from core.managers.application_state_manager import ApplicationStateManager
-            from core.managers.core_operations_manager import CoreOperationsManager
+            from core.app_context import get_app_context
             from ui.extraction_controller import ExtractionController
 
-            core_ops_manager = inject(CoreOperationsManager)
+            context = get_app_context()
             self._controller = ExtractionController(
                 self,
-                extraction_manager=core_ops_manager,
-                session_manager=inject(ApplicationStateManager),
-                injection_manager=core_ops_manager,
+                extraction_manager=context.core_operations_manager,
+                session_manager=context.application_state_manager,
+                injection_manager=context.core_operations_manager,
                 settings_manager=self.settings_manager,
             )
             # Connect controller output signals for decoupled UI updates

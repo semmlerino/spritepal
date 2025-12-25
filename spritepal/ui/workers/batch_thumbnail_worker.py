@@ -91,9 +91,8 @@ class BatchThumbnailWorker(QObject):
 
         self.rom_path = rom_path
         if rom_extractor is None:
-            from core.di_container import inject
-            from core.rom_extractor import ROMExtractor
-            rom_extractor = inject(ROMExtractor)
+            from core.app_context import get_app_context
+            rom_extractor = get_app_context().rom_extractor
         self.rom_extractor = rom_extractor
         self.tile_renderer = TileRenderer()
 

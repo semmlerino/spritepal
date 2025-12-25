@@ -126,10 +126,9 @@ class ROMSessionController(QObject):
             Path to last ROM if it exists, None otherwise
         """
         try:
-            from core.di_container import inject
-            from core.managers.application_state_manager import ApplicationStateManager
+            from core.app_context import get_app_context
 
-            settings = inject(ApplicationStateManager)
+            settings = get_app_context().application_state_manager
             last_rom = settings.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "")
 
             if last_rom and isinstance(last_rom, str) and Path(last_rom).exists():
@@ -219,10 +218,9 @@ class ROMSessionController(QObject):
             filename: Path to the ROM file
         """
         try:
-            from core.di_container import inject
-            from core.managers.application_state_manager import ApplicationStateManager
+            from core.app_context import get_app_context
 
-            settings = inject(ApplicationStateManager)
+            settings = get_app_context().application_state_manager
             settings.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
             settings.set_last_used_directory(str(Path(filename).parent))
             logger.debug(f"Saved ROM to settings: {filename}")

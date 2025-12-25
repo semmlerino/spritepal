@@ -88,8 +88,10 @@ class TestGetLastRomPath:
 
         mock_settings = MagicMock()
         mock_settings.get.return_value = str(rom_file)
+        mock_context = MagicMock()
+        mock_context.application_state_manager = mock_settings
 
-        with patch("core.di_container.inject", return_value=mock_settings):
+        with patch("core.app_context.get_app_context", return_value=mock_context):
             result = controller.get_last_rom_path()
 
         assert result == str(rom_file)
@@ -103,8 +105,10 @@ class TestGetLastRomPath:
 
         mock_settings = MagicMock()
         mock_settings.get.return_value = str(tmp_path / "nonexistent.sfc")
+        mock_context = MagicMock()
+        mock_context.application_state_manager = mock_settings
 
-        with patch("core.di_container.inject", return_value=mock_settings):
+        with patch("core.app_context.get_app_context", return_value=mock_context):
             result = controller.get_last_rom_path()
 
         assert result is None
@@ -115,8 +119,10 @@ class TestGetLastRomPath:
 
         mock_settings = MagicMock()
         mock_settings.get.return_value = ""
+        mock_context = MagicMock()
+        mock_context.application_state_manager = mock_settings
 
-        with patch("core.di_container.inject", return_value=mock_settings):
+        with patch("core.app_context.get_app_context", return_value=mock_context):
             result = controller.get_last_rom_path()
 
         assert result is None
@@ -126,7 +132,7 @@ class TestGetLastRomPath:
         controller = ROMSessionController()
 
         with patch(
-            "core.di_container.inject",
+            "core.app_context.get_app_context",
             side_effect=Exception("Settings error"),
         ):
             result = controller.get_last_rom_path()
@@ -145,8 +151,10 @@ class TestLoadRomFile:
 
         controller = ROMSessionController()
         mock_settings = MagicMock()
+        mock_context = MagicMock()
+        mock_context.application_state_manager = mock_settings
 
-        with patch("core.di_container.inject", return_value=mock_settings):
+        with patch("core.app_context.get_app_context", return_value=mock_context):
             with qtbot.waitSignal(controller.rom_loaded, timeout=1000) as blocker:
                 result = controller.load_rom_file(str(rom_file))
 
@@ -167,8 +175,10 @@ class TestLoadRomFile:
 
         controller = ROMSessionController()
         mock_settings = MagicMock()
+        mock_context = MagicMock()
+        mock_context.application_state_manager = mock_settings
 
-        with patch("core.di_container.inject", return_value=mock_settings):
+        with patch("core.app_context.get_app_context", return_value=mock_context):
             controller.load_rom_file(str(rom_file))
 
         assert controller.rom_path == str(rom_file)
@@ -181,8 +191,10 @@ class TestLoadRomFile:
 
         controller = ROMSessionController()
         mock_settings = MagicMock()
+        mock_context = MagicMock()
+        mock_context.application_state_manager = mock_settings
 
-        with patch("core.di_container.inject", return_value=mock_settings):
+        with patch("core.app_context.get_app_context", return_value=mock_context):
             controller.load_rom_file(str(rom_file))
 
         mock_settings.set.assert_any_call(
@@ -212,8 +224,10 @@ class TestLoadRomFile:
 
         controller = ROMSessionController()
         mock_settings = MagicMock()
+        mock_context = MagicMock()
+        mock_context.application_state_manager = mock_settings
 
-        with patch("core.di_container.inject", return_value=mock_settings):
+        with patch("core.app_context.get_app_context", return_value=mock_context):
             result = controller.load_rom_file(str(rom_file))
 
         assert result is not None
