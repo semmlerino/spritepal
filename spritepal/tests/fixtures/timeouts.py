@@ -28,6 +28,7 @@ __all__ = [
     "signal_timeout",
     "dialog_timeout",
     "cleanup_timeout",
+    "perf_bound",
     "SHORT",
     "MEDIUM",
     "LONG",
@@ -171,3 +172,23 @@ def cleanup_timeout(multiplier: float = MEDIUM) -> int:
         thread.wait(cleanup_timeout())
     """
     return _scaled_timeout(_BASE_CLEANUP_TIMEOUT, multiplier)
+
+
+def perf_bound(base_seconds: float, headroom: float = 3.0) -> float:
+    """
+    Environment-scaled performance bound for sanity checks.
+
+    Use for performance assertions that need to pass reliably on both
+    fast local machines and slow CI environments.
+
+    Args:
+        base_seconds: Expected max time in ideal conditions
+        headroom: Safety multiplier (default 3.0x for CI variability)
+
+    Returns:
+        Scaled bound in seconds
+
+    Example:
+        assert elapsed < perf_bound(0.1)  # 0.1s base, scales in slow CI
+    """
+    return base_seconds * get_timeout_multiplier() * headroom
