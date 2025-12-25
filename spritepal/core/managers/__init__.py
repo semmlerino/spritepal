@@ -192,6 +192,11 @@ def cleanup_managers() -> None:
                     _logger.warning("Error cleaning up %s", mgr_type.__name__, exc_info=True)
 
         reset_container()
+
+        # Also reset AppContext if it was created
+        from core.app_context import reset_app_context
+        reset_app_context()
+
         _initialized = False
         _logger.info("All managers cleaned up")
 

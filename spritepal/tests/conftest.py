@@ -95,6 +95,7 @@ from .infrastructure.environment_detection import get_environment_info
 pytest_plugins = [
     "tests.fixtures.qt_fixtures",
     "tests.fixtures.core_fixtures",
+    "tests.fixtures.app_context_fixtures",  # Simplified AppContext-based fixtures
     "tests.fixtures.hal_fixtures",
     "tests.fixtures.xdist_fixtures",  # Parallel test execution support
     "tests.fixtures.test_data_fixtures",  # Consolidated ROM/VRAM test data

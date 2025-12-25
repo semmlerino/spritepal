@@ -6,6 +6,10 @@ Core manager fixtures for SpritePal tests.
 This module provides fixtures for manager initialization, state management,
 and dependency injection testing.
 
+MIGRATION NOTE: For new tests, prefer the simplified `app_context` fixture
+from `tests/fixtures/app_context_fixtures.py`. It provides cleaner isolation
+and direct access to managers without inject() calls.
+
 Key fixtures:
     - session_managers: Session-scoped shared managers (fastest, state persists)
     - isolated_managers: Function-scoped isolated managers (full isolation)
@@ -16,6 +20,7 @@ Fixture Selection Guide:
     |-----------------------------|--------------------| -----------------|
     | Fast tests, shared state OK | session_managers   | isolated_managers|
     | Full isolation between tests| isolated_managers  | session_managers |
+    | Simple isolation (NEW)      | app_context        | isolated_managers|
     | Test initialization itself  | clean_registry_state| session_managers|
 
 Note: Cache reset is handled automatically by the `auto_reset_session_state`
