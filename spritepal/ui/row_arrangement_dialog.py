@@ -93,8 +93,6 @@ class RowArrangementDialog(SplitterDialog):
             splitter_handle_width=8,
         )
 
-        # Connect signals after UI is created
-        self.arrangement_manager.arrangement_changed.connect(self._on_arrangement_changed)
         # Note: palette_mode_changed and palette_index_changed signals are emitted by colorizer
         # but no handlers needed - the logic is in toggle_palette_application() and _cycle_palette()
 
@@ -600,10 +598,6 @@ class RowArrangementDialog(SplitterDialog):
     def get_arranged_path(self):
         """Get the path to the arranged sprite sheet"""
         return self.output_path
-
-    def _on_arrangement_changed(self):
-        """Handle arrangement change signal from manager"""
-        # Already handled by individual add/remove methods
 
     def set_palettes(self, palettes_dict: dict[int, list[tuple[int, int, int]]]) -> None:
         """Set the available palettes for colorization"""

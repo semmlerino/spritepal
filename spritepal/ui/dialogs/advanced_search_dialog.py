@@ -47,6 +47,7 @@ from core.visual_similarity_search import SimilarityMatch, VisualSimilarityEngin
 from core.workers.base import BaseWorker, handle_worker_errors
 from ui.common import WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.common.file_dialogs import FileDialogHelper
 from ui.common.spacing_constants import ADVANCED_SEARCH_MIN_SIZE, INDENT_UNDER_CONTROL
 from ui.components.filters import SearchFiltersWidget
 from ui.components.filters.search_filters_widget import SearchFilter
@@ -1295,13 +1296,24 @@ class AdvancedSearchDialog(QDialog):
     def _start_parallel_search(self):
         """Start parallel search."""
         # Get parameters
-        try:
-            start = int(self.start_offset_edit.text(), 16) if self.start_offset_edit.text() else 0
-            end = int(self.end_offset_edit.text(), 16) if self.end_offset_edit.text() else None
-        except ValueError:
+        start_text = self.start_offset_edit.text()
+        end_text = self.end_offset_edit.text()
+
+        start = self._parse_hex_offset(start_text) if start_text else 0
+        end = self._parse_hex_offset(end_text) if end_text else None
+
+        # Check for invalid offset format
+        if start_text and start is None:
             if self.results_label:
-                self.results_label.setText("Invalid offset format")
+                self.results_label.setText("Invalid start offset format")
             return
+        if end_text and end is None:
+            if self.results_label:
+                self.results_label.setText("Invalid end offset format")
+            return
+
+        # Ensure start has a value (0 if empty)
+        start = start if start is not None else 0
 
         # Get filters from widget
         filters = self.filters_widget.get_filters()
@@ -1366,9 +1378,8 @@ class AdvancedSearchDialog(QDialog):
                     self.results_label.setText("Please specify a reference sprite offset")
                 return
 
-            try:
-                ref_offset = int(ref_text, 16) if ref_text.startswith("0x") else int(ref_text, 16)
-            except ValueError:
+            ref_offset = self._parse_hex_offset(ref_text)
+            if ref_offset is None:
                 if self.results_label:
                     self.results_label.setText("Invalid offset format. Use hex format like 0x12345")
                 return
@@ -1710,23 +1721,18 @@ class AdvancedSearchDialog(QDialog):
             )
 
             if ok and offset_text.strip():
-                try:
-                    # Validate the offset format
-                    if offset_text.startswith("0x"):
-                        offset = int(offset_text, 16)
-                    else:
-                        offset = int(offset_text, 16)
-
-                    # Set the offset in the edit field
-                    if self.ref_offset_edit:
-                        self.ref_offset_edit.setText(f"0x{offset:X}")
-
-                    # Try to generate and show a preview
-                    self._update_reference_preview(offset)
-
-                except ValueError:
+                offset = self._parse_hex_offset(offset_text)
+                if offset is None:
                     if self.results_label:
                         self.results_label.setText("Invalid offset format")
+                    return
+
+                # Set the offset in the edit field
+                if self.ref_offset_edit:
+                    self.ref_offset_edit.setText(f"0x{offset:X}")
+
+                # Try to generate and show a preview
+                self._update_reference_preview(offset)
         except Exception as e:
             logger.exception(f"Error in _browse_reference_sprite: {e}")
             if self.results_label:
@@ -1756,14 +1762,31 @@ class AdvancedSearchDialog(QDialog):
 
     def _browse_image_file(self) -> None:
         """Browse for an image file to use as reference."""
-        from PySide6.QtWidgets import QFileDialog
-
-        filename, _ = QFileDialog.getOpenFileName(
-            self, "Select Reference Image", "", "Image Files (*.png *.bmp *.gif *.jpg *.jpeg);;All Files (*.*)"
+        filename = FileDialogHelper.browse_open_file(
+            parent=self,
+            title="Select Reference Image",
+            file_filter="Image Files (*.png *.bmp *.gif *.jpg *.jpeg);;All Files (*.*)",
+            settings_key="advanced_search_reference_image",
         )
 
         if filename:
             self.image_path_edit.setText(filename)
+
+    def _parse_hex_offset(self, text: str) -> int | None:
+        """Parse hex offset text, returning None on invalid input.
+
+        Handles both with and without '0x'/'0X' prefix.
+        Strips whitespace and handles case-insensitively.
+        """
+        text = text.strip()
+        if not text:
+            return None
+        if text.lower().startswith(("0x", "0X")):
+            text = text[2:]
+        try:
+            return int(text, 16)
+        except ValueError:
+            return None
 
     def _on_image_path_changed(self) -> None:
         """Handle changes to the image path."""
@@ -1866,17 +1889,15 @@ class AdvancedSearchDialog(QDialog):
                 self.ref_preview_label.setPixmap(QPixmap())
             return
 
-        try:
-            # Parse offset (always base-16, "0x" prefix is optional)
-            offset = int(offset_text.removeprefix("0x"), 16)
-
-            # Update preview
-            self._update_reference_preview(offset)
-
-        except ValueError:
+        offset = self._parse_hex_offset(offset_text)
+        if offset is None:
             if self.ref_preview_label:
                 self.ref_preview_label.setText("Invalid offset format")
                 self.ref_preview_label.setPixmap(QPixmap())
+            return
+
+        # Update preview
+        self._update_reference_preview(offset)
 
     def _update_reference_preview(self, offset: int):
         """Update the reference sprite preview."""
@@ -1911,7 +1932,10 @@ class AdvancedSearchDialog(QDialog):
         try:
             # Convert SearchResult objects back to SimilarityMatch for the dialog
             ref_offset_text = self.ref_offset_edit.text().strip()
-            ref_offset = int(ref_offset_text.removeprefix("0x"), 16)
+            ref_offset = self._parse_hex_offset(ref_offset_text)
+            if ref_offset is None:
+                logger.warning("Could not parse reference offset for results display")
+                return
 
             matches = []
             for result in results:
