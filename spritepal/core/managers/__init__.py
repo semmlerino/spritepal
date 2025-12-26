@@ -32,8 +32,7 @@ from .application_state_manager import ApplicationStateManager
 from .base_manager import BaseManager
 from .core_operations_manager import CoreOperationsManager
 from .sprite_preset_manager import SpritePresetManager
-from .workflow_manager import ExtractionState
-from .workflow_state_manager import WorkflowStateManager
+from .workflow_state_manager import ExtractionState, WorkflowStateManager
 
 _logger = get_logger("managers")
 

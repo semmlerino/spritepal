@@ -11,7 +11,7 @@ from __future__ import annotations
 import io
 
 from PIL import Image
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QImage, QPixmap
 
 from utils.logging_config import get_logger
 
@@ -72,6 +72,81 @@ def pil_to_qpixmap(pil_image: Image.Image | None) -> QPixmap | None:
             getattr(pil_image, "mode", "unknown"),
         )
         return None
+
+
+def pil_to_qimage(
+    image: Image.Image,
+    *,
+    with_alpha: bool = False,
+    thread_safe: bool = False,
+) -> QImage:
+    """
+    Convert PIL Image to QImage with consistent mode handling.
+
+    This is the canonical conversion function that should be used throughout
+    the codebase to ensure consistent image display behavior.
+
+    Args:
+        image: PIL Image to convert
+        with_alpha: If True, convert palette/RGB images to RGBA for transparency support.
+                   Use this when the image may have transparency or needs alpha blending.
+        thread_safe: If True, return a deep copy of the QImage. Required when calling
+                    from worker threads since Qt images share underlying data.
+
+    Returns:
+        QImage ready for display or further Qt operations
+
+    Note:
+        - Palette (P) mode images are converted to RGB/RGBA, preserving palette colors
+        - Grayscale (L) mode images remain grayscale
+        - Already RGBA images are used as-is
+    """
+    width, height = image.size
+
+    if image.mode == "RGBA":
+        # Already in RGBA - most efficient path
+        bytes_data = image.tobytes("raw", "RGBA")
+        qimage = QImage(bytes_data, width, height, width * 4, QImage.Format.Format_RGBA8888)
+    elif image.mode == "RGB":
+        if with_alpha:
+            # Convert to RGBA for alpha support
+            image = image.convert("RGBA")
+            bytes_data = image.tobytes("raw", "RGBA")
+            qimage = QImage(bytes_data, width, height, width * 4, QImage.Format.Format_RGBA8888)
+        else:
+            # Keep as RGB
+            bytes_data = image.tobytes("raw", "RGB")
+            qimage = QImage(bytes_data, width, height, width * 3, QImage.Format.Format_RGB888)
+    elif image.mode == "L":
+        # Grayscale - use native grayscale format
+        bytes_data = image.tobytes("raw", "L")
+        qimage = QImage(bytes_data, width, height, width, QImage.Format.Format_Grayscale8)
+    elif image.mode == "P":
+        # Palette mode - convert to RGB/RGBA to preserve palette colors
+        if with_alpha:
+            image = image.convert("RGBA")
+            bytes_data = image.tobytes("raw", "RGBA")
+            qimage = QImage(bytes_data, width, height, width * 4, QImage.Format.Format_RGBA8888)
+        else:
+            image = image.convert("RGB")
+            bytes_data = image.tobytes("raw", "RGB")
+            qimage = QImage(bytes_data, width, height, width * 3, QImage.Format.Format_RGB888)
+    else:
+        # Fallback for other modes (LA, CMYK, etc.)
+        if with_alpha:
+            image = image.convert("RGBA")
+            bytes_data = image.tobytes("raw", "RGBA")
+            qimage = QImage(bytes_data, width, height, width * 4, QImage.Format.Format_RGBA8888)
+        else:
+            image = image.convert("RGB")
+            bytes_data = image.tobytes("raw", "RGB")
+            qimage = QImage(bytes_data, width, height, width * 3, QImage.Format.Format_RGB888)
+
+    # For thread safety, return a copy since bytes_data may be garbage collected
+    # and the QImage references that memory
+    if thread_safe:
+        return qimage.copy()
+    return qimage.copy()  # Always copy since bytes_data is local
 
 
 def create_checkerboard_pattern(

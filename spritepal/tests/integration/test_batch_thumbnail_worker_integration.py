@@ -31,7 +31,6 @@ import pytest
 from PySide6.QtCore import QThread
 
 from tests.infrastructure.environment_detection import (
-    configure_qt_for_environment,
     requires_real_qt,
     skip_if_wsl,
 )
@@ -43,9 +42,6 @@ from tests.infrastructure.qt_real_testing import (
 )
 from tests.infrastructure.real_component_factory import RealComponentFactory
 from ui.workers.batch_thumbnail_worker import BatchThumbnailWorker
-
-# Configure Qt for the detected environment to prevent crashes
-configure_qt_for_environment()
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="BatchThumbnailWorker tests create worker threads that need cleanup time")

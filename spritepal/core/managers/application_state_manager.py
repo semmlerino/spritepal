@@ -34,10 +34,7 @@ T = TypeVar("T")
 
 
 # ========== Workflow State Machine ==========
-# ExtractionState is now defined in workflow_manager.py
-# WorkflowStateManager handles workflow state machine
-from core.managers.workflow_manager import ExtractionState
-from core.managers.workflow_state_manager import WorkflowStateManager
+from core.managers.workflow_state_manager import ExtractionState, WorkflowStateManager
 
 # Re-export at module level for backward compatibility
 __all__ = ["ApplicationStateManager", "ExtractionState", "WorkflowStateManager"]

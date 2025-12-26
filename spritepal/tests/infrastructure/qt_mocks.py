@@ -58,129 +58,14 @@ else:
                     pass
 
 
-class SignalHolder(QObject):
-    """
-    Helper class to hold Qt signals for mock objects.
-
-    Since Qt signals must be class attributes on QObject subclasses,
-    this class provides a way to attach real signals to mock objects.
-    """
-
-    # Common signals used across tests - defined at class level
-    # These will be overridden with specific signal types as needed
-    pass
-
-
-def create_signal_holder(**signals):
-    """
-    Get a CommonSignalHolder with pre-defined signals.
-
-    NOTE: The **signals argument is accepted for API compatibility but is IGNORED
-    in Qt environments. Qt signals must be class attributes defined at class
-    definition time, so dynamic signal creation is not supported.
-
-    Instead, CommonSignalHolder has all common signals pre-defined. The signals
-    argument is only used in non-Qt fallback environments (for testing without Qt).
-
-    Args:
-        **signals: Ignored in Qt environments. In non-Qt fallback, creates mock
-                   signals for the specified names.
-
-    Returns:
-        CommonSignalHolder instance with pre-defined common signals
-    """
-    if not QT_AVAILABLE:
-        # Fallback for non-Qt environments - here we CAN create dynamic signals
-        holder = Mock()
-        for name in signals:
-            setattr(holder, name, MockSignal())
-        return holder
-
-    # For Qt environments, ensure QApplication exists
-    from PySide6.QtWidgets import QApplication
-
-    if QApplication.instance() is None:
-        QApplication([])
-
-    # Return pre-defined signal holder - has all common signals at class level
-    return CommonSignalHolder()
-
-
 class CommonSignalHolder(QObject):
+    """Signal holder with signals used by mock Qt components.
+
+    Qt signals must be class attributes. This class provides commonly
+    needed signals for mocks like MockQThread.
     """
-    Pre-defined signal holder with all common signals used in tests.
 
-    This avoids runtime signal creation issues by defining all signals
-    at class definition time.
-    """
-
-    # Main window signals
-    extract_requested = Signal()
-    open_in_editor_requested = Signal(str)
-    arrange_rows_requested = Signal(str)
-    arrange_grid_requested = Signal(str)
-    inject_requested = Signal()
-
-    # Worker/manager signals
-    progress = Signal(int)
-    preview_ready = Signal(bytes, int, int, str)
-    preview_image_ready = Signal(object)
-    preview_error = Signal(str)
-    palettes_ready = Signal(list)
-    active_palettes_ready = Signal(list)
-    extraction_complete = Signal(object)
-    extraction_failed = Signal(str)
-    extraction_finished = Signal(list)
-    error = Signal(str, object)
-
-    # Injection signals
-    injection_started = Signal()
-    injection_progress = Signal(int)
-    injection_complete = Signal(object)
-    injection_failed = Signal(str)
-
-    # Navigation signals
-    offset_changed = Signal(int)
-    navigation_bounds_changed = Signal(int, int)
-    step_size_changed = Signal(int)
-
-    # Coordinator signals
-    preview_requested = Signal(int)
-    preview_cleared = Signal()
-    sprite_found = Signal(int, object)
-    search_started = Signal()
-    search_completed = Signal(int)
-
-    # Tab signals
-    tab_switch_requested = Signal(int)
-    update_title_requested = Signal(str)
-    status_message = Signal(str)
-    navigation_enabled = Signal(bool)
-    step_size_synchronized = Signal(int)
-    preview_update_queued = Signal(int)
-    preview_generation_started = Signal()
-    preview_generation_completed = Signal()
-
-    # Registry signals
-    sprite_added = Signal(int, object)
-    sprite_removed = Signal(int)
-    sprites_cleared = Signal()
-    sprites_imported = Signal(int)
-
-    # Worker manager signals
-    worker_started = Signal(str)
-    worker_finished = Signal(str)
-    worker_error = Signal(str, object)
-
-    # Dialog tab signals
-    find_next_clicked = Signal()
-    find_prev_clicked = Signal()
-    smart_mode_changed = Signal(bool)
-    offset_requested = Signal(int)
-    sprite_selected = Signal(int)
-    clear_requested = Signal()
-
-    # Thread signals
+    # Thread signals (used by MockQThread)
     started = Signal()
     finished = Signal()
 
@@ -348,9 +233,9 @@ class MockQThread:
         self.isRunning = Mock(return_value=False)
         self.terminate = Mock()
 
-        # Create a signal holder for thread signals
+        # Create signal holder for thread signals
         if QT_AVAILABLE:
-            signal_holder = create_signal_holder(finished=Signal(), started=Signal())
+            signal_holder = CommonSignalHolder()
             self.finished = signal_holder.finished
             self.started = signal_holder.started
         else:

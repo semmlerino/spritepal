@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from core.types import SpritePreset
 
 # ExtractionManager accessed via get_app_context().core_operations_manager
-from core.managers.workflow_manager import ExtractionState
+from core.managers.workflow_state_manager import ExtractionState
 from ui.controllers import (
     ExtractionParamsController,
     ROMSessionController,

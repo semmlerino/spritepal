@@ -17,13 +17,14 @@ from PySide6.QtGui import (
     QCloseEvent,
     QColor,
     QFocusEvent,
-    QImage,
     QKeyEvent,
     QMouseEvent,
     QPen,
     QPixmap,
     QWheelEvent,
 )
+
+from core.services.image_utils import pil_to_qimage
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -1298,52 +1299,8 @@ class GridArrangementDialog(SplitterDialog):
                 self.preview_label.setText("No arrangement")
 
     def _create_pixmap_from_image(self, image: Image.Image) -> QPixmap:
-        """Convert PIL Image to QPixmap"""
-        if image.mode == "RGBA":
-            qimage = QImage(
-                image.tobytes(),
-                image.width,
-                image.height,
-                image.width * 4,
-                QImage.Format.Format_RGBA8888,
-            )
-        elif image.mode == "RGB":
-            qimage = QImage(
-                image.tobytes(),
-                image.width,
-                image.height,
-                image.width * 3,
-                QImage.Format.Format_RGB888,
-            )
-        elif image.mode == "L":
-            qimage = QImage(
-                image.tobytes(),
-                image.width,
-                image.height,
-                image.width,
-                QImage.Format.Format_Grayscale8,
-            )
-        elif image.mode == "P":
-            # Convert palette mode to RGB
-            rgb_image = image.convert("RGB")
-            qimage = QImage(
-                rgb_image.tobytes(),
-                rgb_image.width,
-                rgb_image.height,
-                rgb_image.width * 3,
-                QImage.Format.Format_RGB888,
-            )
-        else:
-            # Fallback conversion
-            rgb_image = image.convert("RGB")
-            qimage = QImage(
-                rgb_image.tobytes(),
-                rgb_image.width,
-                rgb_image.height,
-                rgb_image.width * 3,
-                QImage.Format.Format_RGB888,
-            )
-
+        """Convert PIL Image to QPixmap using centralized utility."""
+        qimage = pil_to_qimage(image)
         return QPixmap.fromImage(qimage)
 
     def _export_arrangement(self):

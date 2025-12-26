@@ -16,7 +16,9 @@ logger = get_logger(__name__)
 from typing import override
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCloseEvent, QImage, QKeyEvent, QPixmap
+from PySide6.QtGui import QCloseEvent, QKeyEvent, QPixmap
+
+from core.services.image_utils import pil_to_qimage
 from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -476,34 +478,8 @@ class RowArrangementDialog(SplitterDialog):
         arranged_image = self._create_arranged_image()
 
         if arranged_image:
-            # Convert to QPixmap
-            if arranged_image.mode == "RGBA":
-                # For RGBA images, use appropriate format
-                qimage = QImage(
-                    arranged_image.tobytes(),
-                    arranged_image.width,
-                    arranged_image.height,
-                    arranged_image.width * 4,  # 4 bytes per pixel for RGBA
-                    QImage.Format.Format_RGBA8888,
-                )
-            elif arranged_image.mode == "P":
-                img_rgb = arranged_image.convert("L")
-                qimage = QImage(
-                    img_rgb.tobytes(),
-                    img_rgb.width,
-                    img_rgb.height,
-                    img_rgb.width,
-                    QImage.Format.Format_Grayscale8,
-                )
-            else:
-                qimage = QImage(
-                    arranged_image.tobytes(),
-                    arranged_image.width,
-                    arranged_image.height,
-                    arranged_image.width,
-                    QImage.Format.Format_Grayscale8,
-                )
-
+            # Convert to QPixmap using centralized utility (preserves palette colors)
+            qimage = pil_to_qimage(arranged_image)
             pixmap = QPixmap.fromImage(qimage)
 
             # Scale for preview
@@ -527,34 +503,8 @@ class RowArrangementDialog(SplitterDialog):
                 if colorized:
                     display_image = colorized
 
-            # Convert to QPixmap
-            if display_image.mode == "RGBA":
-                # For RGBA images, use appropriate format
-                qimage = QImage(
-                    display_image.tobytes(),
-                    display_image.width,
-                    display_image.height,
-                    display_image.width * 4,  # 4 bytes per pixel for RGBA
-                    QImage.Format.Format_RGBA8888,
-                )
-            elif display_image.mode == "P":
-                img_rgb = display_image.convert("L")
-                qimage = QImage(
-                    img_rgb.tobytes(),
-                    img_rgb.width,
-                    img_rgb.height,
-                    img_rgb.width,
-                    QImage.Format.Format_Grayscale8,
-                )
-            else:
-                qimage = QImage(
-                    display_image.tobytes(),
-                    display_image.width,
-                    display_image.height,
-                    display_image.width,
-                    QImage.Format.Format_Grayscale8,
-                )
-
+            # Convert to QPixmap using centralized utility (preserves palette colors)
+            qimage = pil_to_qimage(display_image)
             pixmap = QPixmap.fromImage(qimage)
 
             # Scale for preview

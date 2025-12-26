@@ -30,6 +30,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QImage, QPixmap
 
+from core.services.image_utils import pil_to_qimage
 from core.tile_renderer import TileRenderer
 from utils.logging_config import get_logger
 from utils.rom_utils import BytesMMAPWrapper, detect_smc_offset
@@ -590,35 +591,8 @@ class BatchThumbnailWorker(QObject):
         Returns:
             QImage (thread-safe alternative to QPixmap)
         """
-        width, height = image.size
-
-        # Optimize based on image mode to avoid unnecessary conversions
-        if image.mode == "RGBA":
-            # Already in RGBA - most efficient path
-            bytes_data = image.tobytes("raw", "RGBA")
-            qimage = QImage(bytes_data, width, height, width * 4, QImage.Format.Format_RGBA8888)
-        elif image.mode == "RGB":
-            # RGB - convert directly without alpha
-            bytes_data = image.tobytes("raw", "RGB")
-            qimage = QImage(bytes_data, width, height, width * 3, QImage.Format.Format_RGB888)
-        elif image.mode == "L":
-            # Grayscale - use native grayscale format
-            bytes_data = image.tobytes("raw", "L")
-            qimage = QImage(bytes_data, width, height, width, QImage.Format.Format_Grayscale8)
-        elif image.mode == "P":
-            # Palette mode - convert to RGB (more efficient than RGBA)
-            image = image.convert("RGB")
-            bytes_data = image.tobytes("raw", "RGB")
-            qimage = QImage(bytes_data, width, height, width * 3, QImage.Format.Format_RGB888)
-        else:
-            # Fallback for other modes
-            image = image.convert("RGBA")
-            bytes_data = image.tobytes("raw", "RGBA")
-            qimage = QImage(bytes_data, width, height, width * 4, QImage.Format.Format_RGBA8888)
-
-        # Use copy() only when necessary - if the bytes_data might be garbage collected
-        # Since we're in a worker thread and the data is from tobytes(), we need the copy
-        return qimage.copy()
+        # Use centralized utility with thread_safe=True for worker thread safety
+        return pil_to_qimage(image, thread_safe=True)
 
     def _add_to_cache(self, key: str, qimage: QImage) -> None:
         """Add an image to the cache (thread-safe with LRU eviction)."""

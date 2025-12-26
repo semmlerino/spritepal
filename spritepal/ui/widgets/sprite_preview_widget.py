@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 
 from PIL import Image
 from PySide6.QtCore import QSize, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QAction, QImage, QPixmap
+from PySide6.QtGui import QAction, QPixmap
+
+from core.services.image_utils import pil_to_qimage
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -308,27 +310,9 @@ class SpritePreviewWidget(QWidget):
 
     def _load_indexed_sprite(self, img: Image.Image) -> None:
         """Load indexed sprite with its palette"""
-        # Convert to RGBA for display
-        img_rgba = img.convert("RGBA")
-
-        # Convert to QPixmap
-        logger.debug(f"[DEBUG_SPRITE] Converting PIL Image to QImage: {img_rgba.width}x{img_rgba.height}")
-
-        # Get byte data and verify
-        img_bytes = img_rgba.tobytes()
-        logger.debug(f"[DEBUG_SPRITE] Image byte data: {len(img_bytes)} bytes")
-        logger.debug(
-            f"[DEBUG_SPRITE] First 100 bytes (hex): {img_bytes[:100].hex() if len(img_bytes) > 0 else 'EMPTY'}"
-        )
-
-        qimg = QImage(
-            img_bytes,
-            img_rgba.width,
-            img_rgba.height,
-            img_rgba.width * 4,
-            QImage.Format.Format_RGBA8888,
-        )
-
+        # Convert to QImage using centralized utility (with alpha for transparency support)
+        logger.debug(f"[DEBUG_SPRITE] Converting PIL Image to QImage: {img.width}x{img.height}, mode={img.mode}")
+        qimg = pil_to_qimage(img, with_alpha=True)
         logger.debug(f"[DEBUG_SPRITE] QImage created: {qimg.width()}x{qimg.height()}, null={qimg.isNull()}")
 
         pixmap = QPixmap.fromImage(qimg)
@@ -426,24 +410,9 @@ class SpritePreviewWidget(QWidget):
                 # Convert to RGBA for display
                 img_rgba = indexed.convert("RGBA")
 
-            # Convert to QPixmap
+            # Convert to QImage using centralized utility
             logger.debug(f"[DEBUG_SPRITE] Converting PIL Image to QImage: {img_rgba.width}x{img_rgba.height}")
-
-            # Get byte data and verify
-            img_bytes = img_rgba.tobytes()
-            logger.debug(f"[DEBUG_SPRITE] Image byte data: {len(img_bytes)} bytes")
-            logger.debug(
-                f"[DEBUG_SPRITE] First 100 bytes (hex): {img_bytes[:100].hex() if len(img_bytes) > 0 else 'EMPTY'}"
-            )
-
-            qimg = QImage(
-                img_bytes,
-                img_rgba.width,
-                img_rgba.height,
-                img_rgba.width * 4,
-                QImage.Format.Format_RGBA8888,
-            )
-
+            qimg = pil_to_qimage(img_rgba, with_alpha=True)
             logger.debug(f"[DEBUG_SPRITE] QImage created: {qimg.width()}x{qimg.height()}, null={qimg.isNull()}")
 
             pixmap = QPixmap.fromImage(qimg)
@@ -1136,19 +1105,8 @@ class SpritePreviewWidget(QWidget):
                         for dx in range(min(square_size, width - x)):
                             img.putpixel((x + dx, y + dy), 128)  # Light gray
 
-        # Convert to RGBA for display
-        img_rgba = img.convert("RGBA")
-
-        # Convert to QPixmap
-        img_bytes = img_rgba.tobytes()
-        qimg = QImage(
-            img_bytes,
-            img_rgba.width,
-            img_rgba.height,
-            img_rgba.width * 4,
-            QImage.Format.Format_RGBA8888,
-        )
-
+        # Convert to QPixmap using centralized utility
+        qimg = pil_to_qimage(img, with_alpha=True)
         pixmap = QPixmap.fromImage(qimg)
 
         # Scale for preview

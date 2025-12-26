@@ -9,13 +9,27 @@ from __future__ import annotations
 
 import logging
 import threading
+from enum import Enum, auto
 from typing import ClassVar
 
 from PySide6.QtCore import QObject, Signal
 
-from .workflow_manager import ExtractionState
-
 __all__ = ["ExtractionState", "WorkflowStateManager"]
+
+
+class ExtractionState(Enum):
+    """States for the extraction workflow.
+
+    This enum is the canonical source for workflow states.
+    """
+
+    IDLE = auto()  # No operation in progress
+    LOADING_ROM = auto()  # Loading ROM file
+    SCANNING_SPRITES = auto()  # Scanning for sprite locations
+    PREVIEWING_SPRITE = auto()  # Loading sprite preview
+    SEARCHING_SPRITE = auto()  # Searching for next/prev sprite
+    EXTRACTING = auto()  # Performing extraction
+    ERROR = auto()  # Error state
 
 
 class WorkflowStateManager(QObject):

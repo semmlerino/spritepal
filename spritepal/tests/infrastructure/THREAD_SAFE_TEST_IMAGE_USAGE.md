@@ -113,51 +113,6 @@ def cache_worker(worker_id, keys):
             cache[key] = image
 ```
 
-## Performance Optimization with TestImagePool
-
-For performance-critical tests, use `TestImagePool` to reuse image instances:
-
-### Basic Pool Usage
-```python
-from tests.infrastructure.thread_safe_test_image import TestImagePool
-
-pool = TestImagePool()
-
-# Get image from pool (creates new if empty)
-image = pool.get_test_image(100, 100)
-
-# Use image...
-image.fill(QColor(255, 0, 0))
-
-# Return to pool for reuse
-pool.return_image(image)
-
-# Next get_test_image(100, 100) will reuse the same instance
-reused_image = pool.get_test_image(100, 100)
-assert reused_image is image  # Same instance, reset to white
-```
-
-### Pool Features
-```python
-pool = TestImagePool()
-
-# Pool automatically matches image dimensions
-image1 = pool.get_test_image(100, 100)
-image2 = pool.get_test_image(200, 200)
-
-pool.return_image(image1)
-pool.return_image(image2)
-
-# Requesting specific size gets matching image
-retrieved = pool.get_test_image(200, 200)
-assert retrieved is image2
-
-# Pool has size limit (10 images) and can be cleared
-assert pool.size() <= 10
-pool.clear()
-assert pool.size() == 0
-```
-
 ## Integration with Mocking
 
 When mocking Qt operations, mock `QImage` operations, not `QPixmap`:
@@ -253,10 +208,9 @@ print(repr(image))  # ThreadSafeTestImage(width=100, height=100, format=..., byt
 ## Best Practices
 
 1. **Always use ThreadSafeTestImage in worker threads** - Never create QPixmap in worker threads
-2. **Use TestImagePool for performance** - Reuse images in performance-sensitive tests
-3. **Mock QImage operations** - When mocking, patch QImage, not QPixmap
-4. **Track thread IDs for debugging** - Use created_in_thread() to debug threading issues
-5. **Test both single-threaded and multi-threaded scenarios** - Ensure code works in all contexts
+2. **Mock QImage operations** - When mocking, patch QImage, not QPixmap
+3. **Track thread IDs for debugging** - Use created_in_thread() to debug threading issues
+4. **Test both single-threaded and multi-threaded scenarios** - Ensure code works in all contexts
 
 ## Error Handling
 

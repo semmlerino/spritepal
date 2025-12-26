@@ -7,22 +7,21 @@ to QPixmap and prevents Qt threading violations that cause crashes.
 Test Categories:
 1. Basic functionality tests
 2. Thread safety verification tests
-3. Pool performance tests
-4. Error handling tests
-5. Qt compatibility tests
+3. Error handling tests
+4. Qt compatibility tests
+5. Performance tests
 """
 
 from __future__ import annotations
 
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QColor, QImage
 
-from tests.infrastructure.thread_safe_test_image import ImagePool, ThreadSafeTestImage
+from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
@@ -222,116 +221,6 @@ class TestThreadSafeTestImageThreadSafety:
         assert main_image.created_in_thread() != worker_image.created_in_thread()
 
 
-class TestTestImagePool:
-    """Test TestImagePool functionality."""
-
-    def test_pool_get_and_return(self):
-        """Test basic pool get and return operations."""
-        pool = ImagePool()
-
-        # Get image from empty pool (creates new)
-        image1 = pool.get_test_image(100, 100)
-        assert image1.width() == 100
-        assert image1.height() == 100
-        assert pool.size() == 0
-
-        # Return image to pool
-        pool.return_image(image1)
-        assert pool.size() == 1
-
-        # Get image from pool (reuses existing)
-        image2 = pool.get_test_image(100, 100)
-        assert image2 is image1  # Same instance
-        assert pool.size() == 0
-
-    def test_pool_size_matching(self):
-        """Test pool returns matching size images."""
-        pool = ImagePool()
-
-        # Create images of different sizes
-        image1 = pool.get_test_image(100, 100)
-        image2 = pool.get_test_image(200, 200)
-
-        pool.return_image(image1)
-        pool.return_image(image2)
-        assert pool.size() == 2
-
-        # Request specific size should get matching image
-        retrieved = pool.get_test_image(200, 200)
-        assert retrieved is image2
-        assert pool.size() == 1
-
-    def test_pool_creates_new_when_no_match(self):
-        """Test pool creates new image when no size match."""
-        pool = ImagePool()
-
-        # Add 100x100 image to pool
-        image1 = pool.get_test_image(100, 100)
-        pool.return_image(image1)
-
-        # Request different size should create new
-        image2 = pool.get_test_image(150, 150)
-        assert image2 is not image1
-        assert image2.width() == 150
-        assert image2.height() == 150
-
-    def test_pool_size_limit(self):
-        """Test pool respects size limit."""
-        pool = ImagePool()
-
-        # Add many images (more than limit of 10)
-        images = []
-        for i in range(15):
-            image = pool.get_test_image(100 + i, 100 + i)
-            images.append(image)
-
-        # Return all images
-        for image in images:
-            pool.return_image(image)
-
-        # Pool should not exceed limit
-        assert pool.size() <= 10
-
-    def test_pool_clear(self):
-        """Test pool clear functionality."""
-        pool = ImagePool()
-
-        # Add some images with different dimensions to prevent reuse
-        images = []
-        for i in range(5):
-            image = pool.get_test_image(100 + i, 100 + i)
-            images.append(image)
-
-        # Return all images to pool
-        for image in images:
-            pool.return_image(image)
-
-        assert pool.size() == 5
-
-        # Clear pool
-        pool.clear()
-        assert pool.size() == 0
-
-    def test_pool_reset_on_retrieval(self):
-        """Test that images are reset when retrieved from pool."""
-        pool = ImagePool()
-
-        # Create image and fill with color
-        image = pool.get_test_image(50, 50)
-        image.fill(QColor(255, 0, 0))  # Red
-
-        # Return to pool
-        pool.return_image(image)
-
-        # Get from pool should be reset (filled with white)
-        retrieved = pool.get_test_image(50, 50)
-        assert retrieved is image
-
-        # Image should be reset to white (default)
-        # We can't directly check color, but we can verify it was reset
-        assert not retrieved.isNull()
-
-
 class TestQtCompatibility:
     """Test Qt compatibility and interface matching."""
 
@@ -441,32 +330,6 @@ class TestErrorHandling:
 
 class TestPerformance:
     """Performance and optimization tests."""
-
-    @pytest.mark.slow
-    def test_pool_performance_benefit(self):
-        """Test that pool provides performance benefit."""
-        # Test without pool
-        start_time = time.time()
-        images_no_pool = []
-        for _ in range(50):
-            image = ThreadSafeTestImage(100, 100)
-            images_no_pool.append(image)
-        no_pool_time = time.time() - start_time
-
-        # Test with pool
-        pool = ImagePool()
-        start_time = time.time()
-        for _ in range(50):
-            image = pool.get_test_image(100, 100)
-            pool.return_image(image)
-        pool_time = time.time() - start_time
-
-        # Pool should be faster for reuse scenarios
-        # (This is a rough performance test, actual benefit may vary)
-        print(f"No pool: {no_pool_time:.4f}s, Pool: {pool_time:.4f}s")
-
-        # At minimum, pool should not be significantly slower
-        assert pool_time < no_pool_time * 2  # Allow for overhead
 
     def test_memory_usage_reasonable(self):
         """Test that memory usage is reasonable."""
