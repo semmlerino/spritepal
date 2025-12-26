@@ -13,7 +13,6 @@ import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from pathlib import Path
 
 from core.sprite_finder import SpriteFinder
 from utils.constants import (
@@ -22,7 +21,7 @@ from utils.constants import (
     MIN_SPRITE_SIZE,
     ROM_SCAN_STEP_TILE,
 )
-from utils.rom_utils import detect_smc_offset
+from utils.rom_utils import load_rom_data_stripped
 
 logger = logging.getLogger(__name__)
 
@@ -117,15 +116,7 @@ class ParallelSpriteFinder:
             List of found sprites sorted by offset
         """
         # Read ROM data, stripping SMC header if present
-        with Path(rom_path).open("rb") as f:
-            rom_data = f.read()
-
-        # Detect and strip SMC header
-        smc_offset = detect_smc_offset(rom_data)
-        if smc_offset > 0:
-            logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
-            rom_data = rom_data[smc_offset:]
-
+        rom_data = load_rom_data_stripped(rom_path)
         rom_size = len(rom_data)
         end_offset = rom_size if end_offset is None else min(end_offset, rom_size)
 

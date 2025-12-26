@@ -21,11 +21,8 @@ import threading
 
 from core.exceptions import (
     ExtractionError,
-    FileOperationError,
     InjectionError,
     ManagerError,
-    NavigationError,
-    PreviewError,
     SessionError,
     ValidationError,
 )
@@ -134,11 +131,8 @@ __all__ = [
     "CoreOperationsManager",
     "ExtractionError",
     "ExtractionState",
-    "FileOperationError",
     "InjectionError",
     "ManagerError",
-    "NavigationError",
-    "PreviewError",
     "SessionError",
     "SpritePresetManager",
     "ValidationError",

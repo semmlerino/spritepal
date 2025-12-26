@@ -244,12 +244,6 @@ def main_window(qtbot: Any) -> Any:
 # QT_QPA_PLATFORM=offscreen handles headless mode automatically.
 
 
-@pytest.fixture
-def safe_qapp(qt_app: Any) -> Any:
-    """Alias for qt_app for backwards compatibility."""
-    return qt_app
-
-
 # =============================================================================
 # Worker Thread Management
 # =============================================================================

@@ -39,7 +39,6 @@ import os
 import tempfile
 import warnings
 from collections.abc import Callable, Generator, Iterator
-from contextlib import AbstractContextManager as ContextManager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -700,54 +699,3 @@ def mock_main_window(real_factory: RealComponentFactory) -> MainWindow:
 # ============================================================================
 
 
-@pytest.fixture
-def manager_context_factory() -> Callable[..., ContextManager[Any]]:
-    """
-    Factory for creating manager contexts for dependency injection tests.
-
-    This fixture provides a clean way to create test contexts with specific
-    manager instances, enabling proper isolation between tests.
-
-    Usage:
-        def test_my_dialog(manager_context_factory):
-            with manager_context_factory():
-                dialog = InjectionDialog()
-                # dialog will use real managers from context
-    """
-    # Import from new location - manager_context is now in app_context_fixtures
-    from tests.fixtures.app_context_fixtures import (
-        _ManagerContextWrapper,
-        manager_context,
-    )
-
-    def _create_context(
-        managers: dict[str, Any] | list[str] | None = None, name: str = "test_context"
-    ) -> ContextManager[_ManagerContextWrapper]:
-        """
-        Create a manager context for testing.
-
-        Args:
-            managers: Dict of manager instances (ignored - uses real managers),
-                     or list of manager type names ("extraction", "injection", "session")
-            name: Context name for debugging (unused, kept for compatibility)
-
-        Returns:
-            Context manager for use in with statements
-        """
-        # Determine which managers to initialize
-        if managers is None:
-            # Create complete test context with all managers
-            manager_types = ("extraction", "injection", "session")
-        elif isinstance(managers, list):
-            # Use specified manager types
-            manager_types = tuple(managers)
-        elif isinstance(managers, dict):
-            # Dict provided - extract keys as manager types
-            # Note: Actual instances are ignored; we use real managers
-            manager_types = tuple(managers.keys())
-        else:
-            manager_types = ("extraction", "injection", "session")
-
-        return manager_context(*manager_types)
-
-    return _create_context

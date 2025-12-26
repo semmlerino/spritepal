@@ -4,7 +4,6 @@ Tile renderer for converting 4bpp SNES tile data to images.
 
 from __future__ import annotations
 
-import numpy as np
 from PIL import Image
 
 from core.default_palette_loader import DefaultPaletteLoader
@@ -124,41 +123,3 @@ class TileRenderer:
         except Exception as e:
             logger.error(f"Failed to render tiles: {e}", exc_info=True)
             return None
-
-    def render_sprite_preview(
-        self, sprite_data: bytes, palette_index: int = 8, max_width: int = 256, max_height: int = 256
-    ) -> Image.Image | None:
-        """
-        Render a sprite preview with automatic layout.
-
-        Args:
-            sprite_data: Sprite tile data
-            palette_index: Palette to use
-            max_width: Maximum width in pixels
-            max_height: Maximum height in pixels
-
-        Returns:
-            PIL Image or None
-        """
-        if not sprite_data:
-            return None
-
-        # Calculate tile count
-        tile_count = len(sprite_data) // 32
-        if tile_count == 0:
-            return None
-
-        # Calculate optimal layout
-        max_width_tiles = max_width // 8
-        max_height_tiles = max_height // 8
-
-        # Try to make roughly square
-        width_tiles = min(max_width_tiles, int(np.sqrt(tile_count)) + 1)
-        height_tiles = min(max_height_tiles, (tile_count + width_tiles - 1) // width_tiles)
-
-        # Adjust if we cut off too many tiles
-        while width_tiles * height_tiles < tile_count and width_tiles < max_width_tiles:
-            width_tiles += 1
-            height_tiles = min(max_height_tiles, (tile_count + width_tiles - 1) // width_tiles)
-
-        return self.render_tiles(sprite_data, width_tiles, height_tiles, palette_index)

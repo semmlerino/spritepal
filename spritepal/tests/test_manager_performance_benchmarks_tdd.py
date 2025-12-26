@@ -31,9 +31,6 @@ pytest.importorskip("pytest_benchmark")
 from typing import TYPE_CHECKING
 
 from core.managers import ValidationError
-
-# manager_context migrated from deprecated manager_test_context to app_context_fixtures
-from tests.fixtures.app_context_fixtures import manager_context
 from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
@@ -104,7 +101,7 @@ class TestManagerPerformanceBenchmarksTDD:
         assert result is not None
 
     @pytest.mark.benchmark
-    def test_parameter_validation_performance_tdd(self, benchmark, test_data_repo, tmp_path):
+    def test_parameter_validation_performance_tdd(self, benchmark, app_context: AppContext, test_data_repo, tmp_path):
         """TDD: Parameter validation should be fast enough for real-time UI.
 
         RED: Establish validation time requirements (< 10ms per validation)
@@ -114,44 +111,42 @@ class TestManagerPerformanceBenchmarksTDD:
         output_vram_path = str(tmp_path / "perf_test.vram")
 
         def validate_parameters():
-            with manager_context("extraction", "injection") as ctx:
-                extraction_mgr = ctx.get_extraction_manager()
-                injection_mgr = ctx.get_injection_manager()
+            operations_mgr = app_context.core_operations_manager
 
-                # Get test data
-                vram_data = test_data_repo.get_vram_extraction_data("small")
-                injection_data = test_data_repo.get_injection_data("small")
+            # Get test data
+            vram_data = test_data_repo.get_vram_extraction_data("small")
+            injection_data = test_data_repo.get_injection_data("small")
 
-                # Benchmark extraction parameter validation
-                extraction_params = {"vram_path": vram_data["vram_path"], "output_base": vram_data["output_base"]}
+            # Benchmark extraction parameter validation
+            extraction_params = {"vram_path": vram_data["vram_path"], "output_base": vram_data["output_base"]}
 
-                try:
-                    extraction_mgr.validate_extraction_params(extraction_params)
-                except ValidationError:
-                    pass  # Performance test focuses on speed, not success
+            try:
+                operations_mgr.validate_extraction_params(extraction_params)
+            except ValidationError:
+                pass  # Performance test focuses on speed, not success
 
-                # Benchmark injection parameter validation
-                injection_params = {
-                    "mode": "vram",
-                    "sprite_path": injection_data["sprite_path"],
-                    "input_vram": vram_data["vram_path"],
-                    "output_vram": output_vram_path,
-                    "offset": 0x8000,
-                }
+            # Benchmark injection parameter validation
+            injection_params = {
+                "mode": "vram",
+                "sprite_path": injection_data["sprite_path"],
+                "input_vram": vram_data["vram_path"],
+                "output_vram": output_vram_path,
+                "offset": 0x8000,
+            }
 
-                try:
-                    injection_mgr.validate_injection_params(injection_params)
-                except ValidationError:
-                    pass  # Performance test focuses on speed, not success
+            try:
+                operations_mgr.validate_injection_params(injection_params)
+            except ValidationError:
+                pass  # Performance test focuses on speed, not success
 
-                return True
+            return True
 
         # Benchmark parameter validation performance
         result = benchmark(validate_parameters)
         assert result is True
 
     @pytest.mark.benchmark
-    def test_signal_emission_performance_tdd(self, benchmark, test_data_repo, qtbot):
+    def test_signal_emission_performance_tdd(self, benchmark, app_context: AppContext, test_data_repo, qtbot):
         """TDD: Qt signal emission should not create performance bottlenecks.
 
         RED: Establish signal performance requirements (< 1ms per emission)
@@ -160,32 +155,30 @@ class TestManagerPerformanceBenchmarksTDD:
         """
 
         def emit_manager_signals():
-            with manager_context("extraction", "injection") as ctx:
-                extraction_mgr = ctx.get_extraction_manager()
-                injection_mgr = ctx.get_injection_manager()
+            operations_mgr = app_context.core_operations_manager
 
-                # Track signal emissions
-                signal_count = 0
+            # Track signal emissions
+            signal_count = 0
 
-                def count_signal(*args):
-                    nonlocal signal_count
-                    signal_count += 1
+            def count_signal(*args):
+                nonlocal signal_count
+                signal_count += 1
 
-                # Connect to multiple signals
-                extraction_mgr.extraction_progress.connect(count_signal)
-                injection_mgr.injection_progress.connect(count_signal)
+            # Connect to multiple signals
+            operations_mgr.extraction_progress.connect(count_signal)
+            operations_mgr.injection_progress.connect(count_signal)
 
-                # Emit multiple signals for performance testing
-                for i in range(10):
-                    extraction_mgr.extraction_progress.emit(f"Progress {i}")
-                    injection_mgr.injection_progress.emit(f"Injection {50 + i}")
+            # Emit multiple signals for performance testing
+            for i in range(10):
+                operations_mgr.extraction_progress.emit(f"Progress {i}")
+                operations_mgr.injection_progress.emit(f"Injection {50 + i}")
 
-                # Process Qt events
-                from PySide6.QtWidgets import QApplication
+            # Process Qt events
+            from PySide6.QtWidgets import QApplication
 
-                QApplication.processEvents()
+            QApplication.processEvents()
 
-                return signal_count
+            return signal_count
 
         # Benchmark signal emission performance
         result = benchmark(emit_manager_signals)
@@ -194,7 +187,7 @@ class TestManagerPerformanceBenchmarksTDD:
         assert result >= 0  # Should emit some signals
 
     @pytest.mark.benchmark
-    def test_concurrent_operation_performance_tdd(self, benchmark, test_data_repo):
+    def test_concurrent_operation_performance_tdd(self, benchmark, app_context: AppContext, test_data_repo):
         """TDD: Concurrent operations should not degrade performance significantly.
 
         RED: Establish concurrency performance requirements
@@ -203,32 +196,30 @@ class TestManagerPerformanceBenchmarksTDD:
         """
 
         def run_concurrent_operations():
-            with manager_context("extraction", "injection") as ctx:
-                extraction_mgr = ctx.get_extraction_manager()
-                ctx.get_injection_manager()
+            operations_mgr = app_context.core_operations_manager
 
-                # Start multiple operations concurrently
-                operations = []
+            # Start multiple operations concurrently
+            operations = []
 
-                # Extraction operations
-                for i in range(3):
-                    op_name = f"vram_extraction_{i}"
-                    if extraction_mgr._start_operation(op_name):
-                        operations.append(("extraction", op_name))
+            # Extraction operations
+            for i in range(3):
+                op_name = f"vram_extraction_{i}"
+                if operations_mgr._start_operation(op_name):
+                    operations.append(("extraction", op_name))
 
-                # Verify concurrent state
-                active_count = sum(
-                    1
-                    for op_type, op_name in operations
-                    if op_type == "extraction" and extraction_mgr.is_operation_active(op_name)
-                )
+            # Verify concurrent state
+            active_count = sum(
+                1
+                for op_type, op_name in operations
+                if op_type == "extraction" and operations_mgr.is_operation_active(op_name)
+            )
 
-                # Cleanup operations
-                for op_type, op_name in operations:
-                    if op_type == "extraction":
-                        extraction_mgr._finish_operation(op_name)
+            # Cleanup operations
+            for op_type, op_name in operations:
+                if op_type == "extraction":
+                    operations_mgr._finish_operation(op_name)
 
-                return active_count
+            return active_count
 
         # Benchmark concurrent operation management
         result = benchmark(run_concurrent_operations)
@@ -237,7 +228,7 @@ class TestManagerPerformanceBenchmarksTDD:
         assert result >= 0
 
     @pytest.mark.benchmark
-    def test_resource_cleanup_performance_tdd(self, benchmark):
+    def test_resource_cleanup_performance_tdd(self, benchmark, app_context: AppContext):
         """TDD: Resource cleanup should be fast and complete.
 
         RED: Establish cleanup time requirements (< 50ms)
@@ -246,71 +237,63 @@ class TestManagerPerformanceBenchmarksTDD:
         """
 
         def create_and_cleanup_managers():
-            # Create multiple manager contexts with state
-            # Using manager_context from app_context_fixtures
-            contexts_created = 0
+            operations_mgr = app_context.core_operations_manager
+            operations_completed = 0
 
-            # Create managers with state using the new context manager pattern
+            # Create and cleanup multiple operations
             for i in range(3):
-                with manager_context("extraction", "injection") as ctx:
-                    extraction_mgr = ctx.get_extraction_manager()
-                    ctx.get_injection_manager()
+                # Set up some state
+                operations_mgr._start_operation(f"test_op_{i}")
 
-                    # Set up some state
-                    extraction_mgr._start_operation(f"test_op_{i}")
+                # Verify state was created
+                assert operations_mgr.is_operation_active(f"test_op_{i}")
 
-                    # Verify state was created
-                    assert extraction_mgr.is_operation_active(f"test_op_{i}")
+                # Cleanup operation
+                operations_mgr._finish_operation(f"test_op_{i}")
 
-                    contexts_created += 1
+                operations_completed += 1
 
-                    # Cleanup happens automatically on context exit
-                    extraction_mgr._finish_operation(f"test_op_{i}")
-
-            return contexts_created
+            return operations_completed
 
         # Benchmark resource cleanup performance
         result = benchmark(create_and_cleanup_managers)
 
-        # Should have created some contexts
+        # Should have completed some operations
         assert result > 0
 
     @pytest.mark.benchmark
-    def test_manager_context_performance_tdd(self, benchmark):
-        """TDD: Manager context creation should be lightweight.
+    def test_manager_context_performance_tdd(self, benchmark, app_context: AppContext):
+        """TDD: Manager context access should be lightweight.
 
-        RED: Establish context creation requirements (< 20ms)
+        RED: Establish context access requirements (< 20ms)
         GREEN: Optimize context initialization and lifecycle
         REFACTOR: Maintain context functionality while optimizing performance
         """
 
-        def create_manager_contexts():
-            contexts_created = 0
+        def access_managers():
+            accesses_completed = 0
 
-            # Create multiple contexts to test overhead
+            # Access managers multiple times to test overhead
             for i in range(5):
-                with manager_context("all") as ctx:
-                    extraction_mgr = ctx.get_extraction_manager()
-                    injection_mgr = ctx.get_injection_manager()
-                    session_mgr = ctx.get_session_manager()
+                operations_mgr = app_context.core_operations_manager
+                state_mgr = app_context.application_state_manager
 
-                    # Verify managers are functional
-                    assert extraction_mgr.is_initialized()
-                    assert injection_mgr.is_initialized()
-                    assert session_mgr.is_initialized()
+                # Verify managers are functional
+                assert operations_mgr.is_initialized()
+                assert state_mgr.is_initialized()
 
-                    contexts_created += 1
+                accesses_completed += 1
 
-            return contexts_created
+            return accesses_completed
 
-        # Benchmark context creation performance
-        result = benchmark(create_manager_contexts)
+        # Benchmark manager access performance
+        result = benchmark(access_managers)
 
-        # Should create all requested contexts
+        # Should complete all requested accesses
         assert result == 5
 
     @pytest.mark.benchmark
-    def test_vram_suggestion_performance_tdd(self, benchmark, test_data_repo):
+    def test_vram_suggestion_performance_tdd(self, benchmark, app_context: AppContext, test_data_repo):
         """TDD: VRAM suggestion algorithms should be fast for UI responsiveness.
 
         RED: Establish suggestion speed requirements (< 100ms)
@@ -319,21 +302,20 @@ class TestManagerPerformanceBenchmarksTDD:
         """
 
         def run_vram_suggestions():
-            with manager_context("injection") as ctx:
-                injection_mgr = ctx.get_injection_manager()
+            operations_mgr = app_context.core_operations_manager
 
-                # Get test data
-                injection_data = test_data_repo.get_injection_data("small")
-                sprite_path = injection_data["sprite_path"]
+            # Get test data
+            injection_data = test_data_repo.get_injection_data("small")
+            sprite_path = injection_data["sprite_path"]
 
-                suggestions = []
+            suggestions = []
 
-                # Run multiple suggestions to test performance consistency
-                for i in range(5):
-                    suggestion = injection_mgr.get_smart_vram_suggestion(sprite_path)
-                    suggestions.append(suggestion)
+            # Run multiple suggestions to test performance consistency
+            for i in range(5):
+                suggestion = operations_mgr.get_smart_vram_suggestion(sprite_path)
+                suggestions.append(suggestion)
 
-                return len(suggestions)
+            return len(suggestions)
 
         # Benchmark VRAM suggestion performance
         result = benchmark(run_vram_suggestions)
@@ -383,7 +365,7 @@ class TestManagerMemoryPerformanceTDD:
         assert result == 10
 
     @pytest.mark.benchmark
-    def test_signal_connection_memory_performance_tdd(self, benchmark, qtbot):
+    def test_signal_connection_memory_performance_tdd(self, benchmark, app_context: AppContext, qtbot):
         """TDD: Signal connections should not leak memory over time.
 
         RED: Establish signal memory requirements (no leaks)
@@ -392,37 +374,35 @@ class TestManagerMemoryPerformanceTDD:
         """
 
         def stress_test_signal_connections():
-            with manager_context("extraction", "injection") as ctx:
-                extraction_mgr = ctx.get_extraction_manager()
-                injection_mgr = ctx.get_injection_manager()
+            operations_mgr = app_context.core_operations_manager
 
-                connections_made = 0
+            connections_made = 0
 
-                # Create and disconnect many signal connections
-                for i in range(20):
+            # Create and disconnect many signal connections
+            for i in range(20):
 
-                    def temp_handler(*args):
-                        pass
+                def temp_handler(*args):
+                    pass
 
-                    # Connect signals
-                    extraction_mgr.extraction_progress.connect(temp_handler)
-                    injection_mgr.injection_progress.connect(temp_handler)
-                    connections_made += 2
+                # Connect signals
+                operations_mgr.extraction_progress.connect(temp_handler)
+                operations_mgr.injection_progress.connect(temp_handler)
+                connections_made += 2
 
-                    # Emit signals to test connection
-                    extraction_mgr.extraction_progress.emit(f"Test {i}")
-                    injection_mgr.injection_progress.emit(f"Test {i}")
+                # Emit signals to test connection
+                operations_mgr.extraction_progress.emit(f"Test {i}")
+                operations_mgr.injection_progress.emit(f"Test {i}")
 
-                    # Disconnect signals
-                    extraction_mgr.extraction_progress.disconnect(temp_handler)
-                    injection_mgr.injection_progress.disconnect(temp_handler)
+                # Disconnect signals
+                operations_mgr.extraction_progress.disconnect(temp_handler)
+                operations_mgr.injection_progress.disconnect(temp_handler)
 
-                # Process any pending Qt events
-                from PySide6.QtWidgets import QApplication
+            # Process any pending Qt events
+            from PySide6.QtWidgets import QApplication
 
-                QApplication.processEvents()
+            QApplication.processEvents()
 
-                return connections_made
+            return connections_made
 
         # Benchmark signal connection memory performance
         result = benchmark(stress_test_signal_connections)
@@ -435,7 +415,7 @@ class TestManagerMemoryPerformanceTDD:
 
 
 @pytest.mark.benchmark
-def test_real_vs_mock_performance_comparison_tdd(benchmark, test_data_repo):
+def test_real_vs_mock_performance_comparison_tdd(benchmark, app_context: AppContext, test_data_repo):
     """TDD: Compare real component performance vs theoretical mock performance.
 
     This test documents the performance overhead of real components vs mocks
@@ -443,30 +423,28 @@ def test_real_vs_mock_performance_comparison_tdd(benchmark, test_data_repo):
     """
 
     def run_real_component_workflow():
-        with manager_context("extraction", "injection") as ctx:
-            extraction_mgr = ctx.get_extraction_manager()
-            ctx.get_injection_manager()
+        operations_mgr = app_context.core_operations_manager
 
-            # Get real test data
-            vram_data = test_data_repo.get_vram_extraction_data("small")
+        # Get real test data
+        vram_data = test_data_repo.get_vram_extraction_data("small")
 
-            # Real parameter validation
-            extraction_params = {"vram_path": vram_data["vram_path"], "output_base": vram_data["output_base"]}
+        # Real parameter validation
+        extraction_params = {"vram_path": vram_data["vram_path"], "output_base": vram_data["output_base"]}
 
-            try:
-                extraction_mgr.validate_extraction_params(extraction_params)
+        try:
+            operations_mgr.validate_extraction_params(extraction_params)
 
-                # Real signal emission
-                extraction_mgr.extraction_progress.emit("Performance test")
+            # Real signal emission
+            operations_mgr.extraction_progress.emit("Performance test")
 
-                # Real state management
-                extraction_mgr._start_operation("perf_test")
-                extraction_mgr._finish_operation("perf_test")
+            # Real state management
+            operations_mgr._start_operation("perf_test")
+            operations_mgr._finish_operation("perf_test")
 
-                return True
+            return True
 
-            except ValidationError:
-                return False  # Still valid for performance testing
+        except ValidationError:
+            return False  # Still valid for performance testing
 
     # Benchmark real component workflow
     result = benchmark(run_real_component_workflow)

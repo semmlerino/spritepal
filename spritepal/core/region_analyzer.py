@@ -5,8 +5,6 @@ Identifies regions that can be skipped during sprite searching.
 
 from __future__ import annotations
 
-import math
-from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -20,6 +18,7 @@ from utils.constants import (
     ROM_MIN_REGION_SIZE,
 )
 from utils.logging_config import get_logger
+from utils.math_utils import calculate_entropy
 
 logger = get_logger(__name__)
 
@@ -114,26 +113,11 @@ class EmptyRegionDetector:
         return result
 
     def _calculate_entropy(self, data: bytes) -> float:
-        """
-        Calculate Shannon entropy of data.
+        """Calculate Shannon entropy of data.
 
         Returns value between 0 (uniform) and 8 (random).
         """
-        if not data:
-            return 0.0
-
-        # Count byte frequencies
-        byte_counts = Counter(data)
-        data_len = len(data)
-
-        # Calculate entropy
-        entropy = 0.0
-        for count in byte_counts.values():
-            if count > 0:
-                probability = count / data_len
-                entropy -= probability * math.log2(probability)
-
-        return entropy
+        return calculate_entropy(data)
 
     def _calculate_zero_percentage(self, data: bytes) -> float:
         """Calculate percentage of zero bytes in data."""

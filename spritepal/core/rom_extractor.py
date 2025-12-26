@@ -5,7 +5,6 @@ Extracts sprites directly from ROM files using HAL decompression
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -57,7 +56,8 @@ from utils.constants import (
 )
 from utils.logging_config import get_logger
 from utils.rom_exceptions import ROMCompressionError
-from utils.rom_utils import detect_smc_offset
+from utils.math_utils import calculate_entropy
+from utils.rom_utils import detect_smc_offset, load_rom_data_stripped
 
 logger: logging.Logger = get_logger(__name__)
 
@@ -668,17 +668,7 @@ class ROMExtractor:
         Returns:
             ROM data as bytes (with SMC header stripped so offsets are ROM addresses)
         """
-        with Path(rom_path).open("rb") as rom_file:
-            rom_data = rom_file.read()
-
-        # Detect and strip SMC header
-        smc_offset = detect_smc_offset(rom_data)
-        if smc_offset > 0:
-            logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
-            rom_data = rom_data[smc_offset:]
-
-        logger.debug(f"ROM size: {len(rom_data)} bytes (after SMC strip)")
-        return rom_data
+        return load_rom_data_stripped(rom_path)
 
     def _validate_scan_range(self, rom_data: bytes, end_offset: int) -> int:
         """Validate and adjust scan range if needed.
@@ -1108,8 +1098,7 @@ class ROMExtractor:
         return bitplane_variety >= 4
 
     def _calculate_entropy(self, data: bytes) -> float:
-        """
-        Calculate Shannon entropy of data.
+        """Calculate Shannon entropy of data.
 
         Args:
             data: Data to analyze
@@ -1117,25 +1106,7 @@ class ROMExtractor:
         Returns:
             Entropy value (0-8 for byte data)
         """
-        if not data:
-            return 0.0
-
-        # Count byte frequencies
-        byte_counts = [0] * (MAX_BYTE_VALUE + 1)
-        for byte in data:
-            byte_counts[byte] += 1
-
-        # Calculate entropy
-        entropy = 0.0
-        data_len = len(data)
-
-        for count in byte_counts:
-            if count > 0:
-                probability = count / data_len
-                # Use proper log2 calculation
-                entropy -= probability * math.log2(probability)
-
-        return entropy
+        return calculate_entropy(data)
 
     def _validate_4bpp_tile(self, tile_data: bytes) -> bool:
         """

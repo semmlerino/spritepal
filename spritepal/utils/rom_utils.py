@@ -57,3 +57,29 @@ def detect_smc_offset_from_size(file_size: int) -> int:
         512 if SMC header is present, 0 otherwise.
     """
     return 512 if file_size % 1024 == 512 else 0
+
+
+def load_rom_data_stripped(rom_path: str) -> bytes:
+    """Load ROM file and strip SMC header if present.
+
+    This consolidates the common pattern of reading a ROM file and removing
+    the optional 512-byte SMC/SWC header so offsets are ROM addresses.
+
+    Args:
+        rom_path: Path to the ROM file.
+
+    Returns:
+        ROM data with SMC header stripped (if present).
+    """
+    from pathlib import Path
+
+    with Path(rom_path).open("rb") as rom_file:
+        rom_data = rom_file.read()
+
+    smc_offset = detect_smc_offset(rom_data)
+    if smc_offset > 0:
+        logger.info(f"Stripping {smc_offset}-byte SMC header from ROM data")
+        rom_data = rom_data[smc_offset:]
+
+    logger.debug(f"ROM size: {len(rom_data)} bytes (after SMC strip)")
+    return rom_data

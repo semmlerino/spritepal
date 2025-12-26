@@ -154,11 +154,6 @@ class BaseLRUCache(Generic[T]):
         self._stats["evictions"] += 1
         self._stats[f"evictions_{reason}"] += 1
 
-    def contains(self, key: str) -> bool:
-        """Check if key exists in cache."""
-        with self._lock:
-            return key in self._cache
-
     def remove(self, key: str) -> bool:
         """Remove specific entry from cache.
 
