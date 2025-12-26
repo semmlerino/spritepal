@@ -860,6 +860,31 @@ def test_controller():
     assert result == expected
 ```
 
+### ⚠️ ROMCache Collision in Parallel Tests
+```python
+# ❌ FLAKY - Identical mock ROM content = same SHA-256 hash = cache collision
+@pytest.fixture
+def mock_rom_file(tmp_path):
+    rom_data = bytearray(128 * 1024)
+    # Static content means all parallel tests get the same cache key!
+    rom_path = tmp_path / "test.sfc"
+    rom_path.write_bytes(rom_data)
+    return rom_path
+
+# ✅ STABLE - UUID ensures unique content hash per test
+@pytest.fixture
+def mock_rom_file(tmp_path):
+    import uuid
+    rom_data = bytearray(128 * 1024)
+    # Unique ID at start ensures each test gets unique cache key
+    rom_data[0:16] = uuid.uuid4().bytes
+    rom_path = tmp_path / "test.sfc"
+    rom_path.write_bytes(rom_data)
+    return rom_path
+```
+
+> **Root cause**: ROMCache uses SHA-256 hash of file content as cache key. When multiple parallel tests create mock ROMs with identical content, they share the same cache entry. This causes intermittent failures where one test's cached results affect another test's assertions.
+
 ---
 
 ## Quick Reference
@@ -871,6 +896,7 @@ def test_controller():
 - [ ] Check `is not None` for Qt containers
 - [ ] Initialize attributes before `super().__init__()`
 - [ ] Use QSignalSpy only with real signals
+- [ ] Add UUID to mock ROM content (prevents cache collisions)
 - [ ] Clean up workers in fixtures
 - [ ] Mock dialog `exec()` methods
 - [ ] Test both success and error paths

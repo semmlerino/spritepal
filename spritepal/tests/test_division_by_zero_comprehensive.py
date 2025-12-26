@@ -15,10 +15,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-@pytest.mark.usefixtures("session_app_context")
 @pytest.mark.shared_state_safe
 class TestDivisionByZeroFixes:
     """Test all division by zero scenarios in scan workers."""
+
+    @pytest.fixture(autouse=True)
+    def setup_context(self, session_app_context):
+        """Ensure session_app_context is initialized before each test."""
+        self._context = session_app_context
 
     def test_scan_worker_zero_range(self):
         """Test SpriteScanWorker with zero scan range."""

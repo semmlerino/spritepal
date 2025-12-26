@@ -16,7 +16,7 @@ from core.rom_extractor import ROMExtractor
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.usefixtures("session_managers", "mock_hal"),
+    pytest.mark.usefixtures("session_app_context", "mock_hal"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
     pytest.mark.headless,
@@ -27,13 +27,11 @@ pytestmark = [
 class TestPNGRoundTrip:
     """Test PNG conversion accuracy for both grayscale and indexed modes"""
 
-    def setup_method(self):
-        """Set up test fixtures"""
-        # Use app context to get ROMExtractor (session_managers fixture sets up context)
-        from core.app_context import get_app_context
-
+    @pytest.fixture(autouse=True)
+    def setup_png_test(self, session_app_context):
+        """Set up test fixtures via pytest fixture."""
         self.injector = SpriteInjector()
-        self.extractor = get_app_context().rom_extractor
+        self.extractor = session_app_context.rom_extractor
 
     def create_test_tile_data(self) -> bytes:
         """Create test 4bpp tile data with known pattern"""

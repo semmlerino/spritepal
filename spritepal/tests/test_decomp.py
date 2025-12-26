@@ -4,7 +4,7 @@ import pytest
 
 pytestmark = [
     pytest.mark.headless,
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
 ]
@@ -19,11 +19,11 @@ from pathlib import Path
 from core.app_context import get_app_context
 
 
-def test_decompression():
+def test_decompression(session_app_context):
     """Test if decompression works at a known sprite offset."""
 
-    # Managers initialized by session_managers fixture
-    context = get_app_context()
+    # Managers initialized by session_app_context fixture
+    context = session_app_context
     extraction_manager = context.core_operations_manager
     rom_extractor = extraction_manager.get_rom_extractor()
 

@@ -18,6 +18,17 @@ import pytest
 # root conftest.py which imports from tests.fixtures.qt_waits
 
 
+@pytest.fixture(scope="session", autouse=True)
+def ensure_session_context(session_app_context):
+    """Ensure session_app_context is initialized before any integration test.
+
+    This autouse fixture forces the session_app_context to be created at the
+    start of the session for this worker, ensuring all integration tests
+    have access to the shared context.
+    """
+    return session_app_context
+
+
 @pytest.fixture(scope="function")
 def managers_initialized(qt_app, request, tmp_path):
     """Initialize managers for integration tests.

@@ -23,7 +23,7 @@ from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 pytestmark = [
     pytest.mark.gui,
     pytest.mark.integration,
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
 ]

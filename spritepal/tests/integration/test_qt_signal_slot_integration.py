@@ -118,7 +118,7 @@ class SignalRecorder(QObject):
 
 
 @pytest.mark.gui
-@pytest.mark.usefixtures("session_managers")
+@pytest.mark.usefixtures("session_app_context")
 @pytest.mark.shared_state_safe
 class TestDialogSignalConnections:
     """Test UnifiedManualOffsetDialog signal connections."""
@@ -211,7 +211,7 @@ class TestDialogSignalConnections:
 
 
 @pytest.mark.gui
-@pytest.mark.usefixtures("session_managers")
+@pytest.mark.usefixtures("session_app_context")
 @pytest.mark.shared_state_safe
 class TestThreadSafetyAndTiming:
     """Test thread safety and timing of signal emissions."""
@@ -352,7 +352,7 @@ class TestThreadSafetyAndTiming:
 
 
 @pytest.mark.gui
-@pytest.mark.usefixtures("session_managers")
+@pytest.mark.usefixtures("session_app_context")
 @pytest.mark.shared_state_safe
 class TestSignalBlockingAndError:
     """Test signal blocking and error conditions."""

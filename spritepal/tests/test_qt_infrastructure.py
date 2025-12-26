@@ -13,7 +13,7 @@ import pytest
 pytest_plugins = ["pytestqt"]
 
 pytestmark = [
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.parallel_unsafe,

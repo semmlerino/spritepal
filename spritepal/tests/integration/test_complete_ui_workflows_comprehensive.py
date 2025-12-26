@@ -27,7 +27,7 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 # Required for DI container setup
 pytestmark = [
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="UI workflows may spawn worker threads"),
 ]

@@ -70,11 +70,16 @@ def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
     from PySide6.QtWidgets import QApplication
 
     from core.app_context import create_app_context, reset_app_context
+    from tests.fixtures.core_fixtures import _session_state
 
     # Ensure Qt app exists
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
+
+    # Remember if session context was active
+    session_active = _session_state.is_initialized
+    session_settings_path = _session_state.settings_path
 
     # Create isolated settings
     settings_path = tmp_path / ".test_settings.json"
@@ -89,6 +94,13 @@ def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
 
     # Cleanup
     reset_app_context()
+
+    # Restore session context if one was active
+    if session_active and session_settings_path:
+        create_app_context(
+            app_name="TestApp-Session",
+            settings_path=session_settings_path,
+        )
 
     # Process events to ensure cleanup completes
     if app:
@@ -120,6 +132,7 @@ def session_app_context(
     from PySide6.QtWidgets import QApplication
 
     from core.app_context import create_app_context, reset_app_context
+    from tests.fixtures.core_fixtures import _session_state
 
     # Ensure Qt app exists
     app = QApplication.instance()
@@ -136,7 +149,14 @@ def session_app_context(
         settings_path=settings_path,
     )
 
+    # Store in session state so isolated_managers can detect and restore us
+    _session_state.settings_path = settings_path
+    _session_state.is_initialized = True
+
     yield context
+
+    # Reset session state
+    _session_state.is_initialized = False
 
     # Cleanup at end of session
     reset_app_context()

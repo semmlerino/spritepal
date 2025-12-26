@@ -28,7 +28,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 from ui.extraction_controller import ExtractionController
 
 pytestmark = [
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.parallel_unsafe,  # Uses shared managers - needs isolation
@@ -105,7 +105,7 @@ class TestQtSignalArchitecture:
         return SignalCapture()
 
     @pytest.fixture
-    def mock_factory(self, session_managers):
+    def mock_factory(self, session_app_context):
         """Get mock factory instance"""
         return RealComponentFactory()
 

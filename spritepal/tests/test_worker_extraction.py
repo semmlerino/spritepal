@@ -29,7 +29,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Extraction worker tests create background extraction threads"),
     pytest.mark.headless,
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
 ]
 
@@ -44,8 +44,8 @@ class TestVRAMExtractionWorker:
             yield factory
 
     @pytest.fixture
-    def extraction_manager(self, session_managers) -> CoreOperationsManager:
-        """Get extraction manager from session managers."""
+    def extraction_manager(self, session_app_context) -> CoreOperationsManager:
+        """Get extraction manager from session app context."""
         from typing import cast
 
         return cast(
@@ -281,8 +281,8 @@ class TestROMExtractionWorker:
     """Test the ROMExtractionWorker class with real components."""
 
     @pytest.fixture
-    def extraction_manager(self, session_managers) -> CoreOperationsManager:
-        """Get extraction manager from session managers."""
+    def extraction_manager(self, session_app_context) -> CoreOperationsManager:
+        """Get extraction manager from session app context."""
         from typing import cast
 
         return cast(

@@ -35,7 +35,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.performance,
     pytest.mark.slow,
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
 ]
 

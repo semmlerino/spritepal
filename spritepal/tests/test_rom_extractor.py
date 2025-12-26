@@ -17,10 +17,10 @@ from utils.constants import BYTES_PER_TILE, TILE_HEIGHT, TILE_WIDTH
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
+    pytest.mark.skip_thread_cleanup(reason="Uses app_context which owns worker threads"),
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.usefixtures("isolated_managers", "mock_hal"),
+    pytest.mark.usefixtures("app_context", "mock_hal"),
 ]
 
 
@@ -1107,10 +1107,20 @@ class TestROMScanningComprehensive:
 
         Each sprite offset gets a unique 4-byte signature so the mock HAL
         can distinguish between different scan positions.
+
+        IMPORTANT: Includes UUID at offset 0 to ensure unique content hash per test,
+        preventing cache collisions between parallel tests.
         """
+        import uuid
+
         rom_path = tmp_path / "test_rom.sfc"
         # Create a 128KB ROM with some test data
         rom_data = bytearray(128 * 1024)
+
+        # Add unique identifier at start to prevent cache collisions
+        # This ensures each test's ROM has a unique SHA-256 hash
+        unique_id = uuid.uuid4().bytes
+        rom_data[0:16] = unique_id
 
         # Add compressed sprite-like data at known offsets with UNIQUE signatures
         # These signatures are used by CustomMockHALCompressor to match responses
