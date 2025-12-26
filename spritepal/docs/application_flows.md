@@ -223,8 +223,8 @@ Application Launch
          │
          ▼
 ┌────────────────────────────┐
-│ ManagerRegistry            │  core/managers/registry.py
-│ initialize_managers()      │
+│ initialize_managers()      │  core/managers/__init__.py
+│                            │  Creates managers in order
 └────────────────────────────┘
          │
          ▼
@@ -376,4 +376,4 @@ User modifies sprite
 
 ---
 
-*Last updated: December 26, 2025 (Replaced inject() with get_app_context() pattern)*
+*Last updated: December 27, 2025 (Removed obsolete ManagerRegistry references)*

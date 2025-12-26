@@ -315,7 +315,6 @@ spritepal/
 | ApplicationStateManager | `core/managers/application_state_manager.py` (session, settings, state) |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
 | AppContext, `get_app_context()` | `core/app_context.py` |
-| DI container (deprecated) | `core/di_container.py` |
 | Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
 | Qt mocks | `tests/infrastructure/qt_mocks.py` |
 | Signal utilities (`safe_disconnect`, etc.) | `ui/common/signal_utils.py` |
@@ -366,4 +365,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: December 26, 2025*
+*Last updated: December 27, 2025*

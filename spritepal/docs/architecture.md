@@ -327,7 +327,6 @@ SpritePal uses multiple singleton patterns for resource management:
 | Singleton | Location | Purpose | Thread-Safe | Reset Method |
 |-----------|----------|---------|-------------|--------------|
 | `AppContext` | `core/app_context.py` | Manager access | N/A | `reset_app_context()` |
-| `ManagerRegistry` | `core/managers/registry.py` | Manager lifecycle | Yes (QMutex) | `reset_for_tests()` |
 | `HALProcessPool` | `core/hal_compression.py` | Compression workers | Yes (Lock) | `shutdown()` |
 | `PreviewGenerator` | `core/services/preview_generator.py` | Thumbnail generation | Yes (QMutex) | `cleanup()` |
 
@@ -345,8 +344,8 @@ Application Exit (QApplication.aboutToQuit signal)
        - HALProcessPool.shutdown()
        - PreviewGenerator.cleanup()
          ↓
-    3. Manager Registry
-       - ManagerRegistry().cleanup_managers()
+    3. Managers
+       - cleanup_managers()
          ↓
     4. AppContext
        - reset_app_context()
@@ -392,7 +391,6 @@ app.aboutToQuit.connect(cleanup)
 
 | Singleton | Reason |
 |-----------|--------|
-| `ManagerRegistry` | Managers are QObjects with Qt parents |
 | `PreviewGenerator` | Uses QTimer for debouncing |
 | `AppContext` | Returns QObject-based managers |
 
@@ -441,12 +439,9 @@ manager = context.core_operations_manager
 - `create_app_context(...)` - Initialize AppContext with managers (done at startup)
 - `reset_app_context()` - Clear context (for tests)
 
-### ManagerRegistry (`core/managers/registry.py`) - Lifecycle Management
+### Manager Lifecycle
 
-The ManagerRegistry is a **singleton** that:
-1. Creates all manager instances at startup
-2. Registers them with AppContext
-3. Handles cleanup at shutdown
+Managers are created at startup via `initialize_managers()`:
 
 **Initialization Flow:**
 ```
@@ -490,16 +485,6 @@ SpritePal uses concrete classes directly via DI. The `core/protocols/` directory
 - `ROMExtractor` - Low-level ROM extraction
 
 ### What NOT to Do
-
-```python
-# REMOVED - ManagerRegistry getter methods no longer exist
-# from core.managers.registry import ManagerRegistry
-# manager = ManagerRegistry().get_extraction_manager()  # Method removed
-
-# CORRECT - use get_app_context()
-from core.app_context import get_app_context
-manager = get_app_context().core_operations_manager
-```
 
 ```python
 # BAD - direct instantiation
@@ -577,4 +562,4 @@ result = manager.extract_from_rom(params)
 
 ---
 
-*Last updated: December 27, 2025 (Added Signal Disconnection Pattern section)*
+*Last updated: December 27, 2025 (Removed obsolete ManagerRegistry references)*
