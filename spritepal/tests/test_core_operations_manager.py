@@ -51,52 +51,11 @@ class TestCoreOperationsManagerInit:
         assert manager._name == "CoreOperationsManager"
 
     def test_services_initialized(self, manager):
-        """Services should be initialized after init."""
-        # These should not raise
+        """Core services should be initialized after init."""
+        # Extractors and managers should be initialized
         assert manager._sprite_extractor is not None
         assert manager._palette_manager is not None
-        assert manager._rom_service is not None
-        assert manager._vram_service is not None
-
-
-class TestServiceAccessors:
-    """Tests for service accessor properties."""
-
-    def test_rom_service_accessor(self, manager):
-        """rom_service property should return ROMService."""
-        service = manager.rom_service
-
-        assert service is not None
-        # Verify it's the expected type
-        from core.services import ROMService
-
-        assert isinstance(service, ROMService)
-
-    def test_vram_service_accessor(self, manager):
-        """vram_service property should return VRAMService."""
-        service = manager.vram_service
-
-        assert service is not None
-        from core.services import VRAMService
-
-        assert isinstance(service, VRAMService)
-
-    def test_rom_service_not_initialized_raises(self):
-        """rom_service should raise if not initialized."""
-        # Create manager without initialization
-        mgr = CoreOperationsManager.__new__(CoreOperationsManager)
-        mgr._rom_service = None
-
-        with pytest.raises(ExtractionError, match="ROM service not initialized"):
-            _ = mgr.rom_service
-
-    def test_vram_service_not_initialized_raises(self):
-        """vram_service should raise if not initialized."""
-        mgr = CoreOperationsManager.__new__(CoreOperationsManager)
-        mgr._vram_service = None
-
-        with pytest.raises(ExtractionError, match="VRAM service not initialized"):
-            _ = mgr.vram_service
+        assert manager._rom_extractor is not None
 
 
 class TestExtractionValidation:
@@ -586,12 +545,12 @@ class TestCleanup:
 
         assert len(manager._active_operations) == 0
 
-    def test_reset_state_full_clears_services(self, manager):
-        """reset_state with full_reset should clear services."""
+    def test_reset_state_full_clears_extractors(self, manager):
+        """reset_state with full_reset should clear extractors."""
         manager.reset_state(full_reset=True)
 
-        assert manager._rom_service is None
-        assert manager._vram_service is None
+        assert manager._rom_extractor is None
+        assert manager._sprite_extractor is None
         assert manager._is_initialized is False
 
 

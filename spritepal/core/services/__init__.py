@@ -6,10 +6,10 @@ used by both core and UI layers. Services in this package:
 
 - worker_lifecycle.py: WorkerManager for QThread worker lifecycle management
 - preview_generator.py: PreviewGenerator for async preview image generation
-- rom_service.py: ROMService for ROM-based sprite extraction operations
-- vram_service.py: VRAMService for VRAM-based sprite extraction operations
 - rom_cache.py: ROMCache for ROM scan result caching
 - path_suggestion_service.py: Path suggestion functions (validate_path, find_vram_path, etc.)
+- extraction_results.py: Result dataclasses for extraction operations
+- palette_utils.py: Palette extraction helper functions
 
 Settings management is now consolidated in ApplicationStateManager (core/managers/).
 
@@ -39,8 +39,6 @@ from core.services.preview_generator import (
     create_vram_preview_request,
 )
 from core.services.rom_cache import ROMCache
-from core.services.rom_service import ROMService
-from core.services.vram_service import VRAMService
 from core.services.worker_lifecycle import WorkerManager
 
 __all__ = [
@@ -50,8 +48,6 @@ __all__ = [
     "PreviewRequest",
     "PreviewResult",
     "ROMCache",
-    "ROMService",
-    "VRAMService",
     "WorkerManager",
     "create_rom_preview_request",
     "create_vram_preview_request",

@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from collections.abc import Mapping
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
@@ -24,7 +26,7 @@ from core.exceptions import (
 from core.extractor import SpriteExtractor
 from core.managers.application_state_manager import ApplicationStateManager
 from core.palette_manager import PaletteManager
-from core.services import ROMService, VRAMService
+from core.services.extraction_results import ExtractionResult
 from core.services.path_suggestion_service import (
     find_suggested_input_vram,
     get_smart_vram_suggestion,
@@ -33,6 +35,9 @@ from core.services.path_suggestion_service import (
     validate_path,
 )
 from utils.constants import (
+    BYTES_PER_TILE,
+    DEFAULT_PREVIEW_HEIGHT,
+    DEFAULT_PREVIEW_WIDTH,
     SETTINGS_KEY_FAST_COMPRESSION,
     SETTINGS_KEY_LAST_CUSTOM_OFFSET,
     SETTINGS_KEY_LAST_INPUT_ROM,
@@ -110,10 +115,6 @@ class CoreOperationsManager(BaseManager):
         self._palette_manager: PaletteManager | None = None
         self._current_worker: QThread | None = None
 
-        # Services (owned by this manager)
-        self._rom_service: ROMService | None = None
-        self._vram_service: VRAMService | None = None
-
         # DI dependencies (passed explicitly or populated in _initialize)
         self._session_manager: ApplicationStateManager | None = session_manager
         self._rom_cache: ROMCache | None = rom_cache
@@ -145,17 +146,6 @@ class CoreOperationsManager(BaseManager):
                     "Use create_app_context() or get_app_context() instead of direct instantiation."
                 )
 
-            # Initialize services (pure helpers returning results)
-            self._rom_service = ROMService(
-                rom_extractor=self._rom_extractor,
-                palette_manager=self._palette_manager,
-                rom_cache=self._rom_cache,
-            )
-            self._vram_service = VRAMService(
-                sprite_extractor=self._sprite_extractor,
-                palette_manager=self._palette_manager,
-            )
-
             self._is_initialized = True
             self._logger.info("CoreOperationsManager initialized successfully")
 
@@ -168,16 +158,12 @@ class CoreOperationsManager(BaseManager):
         """Cleanup all core operation resources."""
         # Acquire worker reference under lock to prevent race with start_injection
         worker_to_cleanup = None
-        rom_service_to_cleanup = None
-        vram_service_to_cleanup = None
 
         with self._lock:
             self._active_operations.clear()
             # Capture references and clear them under lock
             worker_to_cleanup = self._current_worker
             self._current_worker = None
-            rom_service_to_cleanup = self._rom_service
-            vram_service_to_cleanup = self._vram_service
 
         # Cleanup captured references OUTSIDE lock to avoid blocking
         if worker_to_cleanup:
@@ -185,11 +171,6 @@ class CoreOperationsManager(BaseManager):
 
             self._logger.info("Stopping active worker")
             WorkerManager.cleanup_worker(worker_to_cleanup, timeout=5000)
-
-        if rom_service_to_cleanup:
-            rom_service_to_cleanup.cleanup()
-        if vram_service_to_cleanup:
-            vram_service_to_cleanup.cleanup()
 
         # Mark injection operation as finished so new injections can start
         self._finish_operation("injection")
@@ -210,15 +191,7 @@ class CoreOperationsManager(BaseManager):
             self._active_operations.clear()
 
             if full_reset:
-                # Clear services first
-                if self._rom_service:
-                    self._rom_service.cleanup()
-                    self._rom_service = None
-                if self._vram_service:
-                    self._vram_service.cleanup()
-                    self._vram_service = None
-
-                # Clear long-lived components
+                # Clear extractors and managers
                 self._sprite_extractor = None
                 self._rom_extractor = None
                 self._palette_manager = None
@@ -238,22 +211,6 @@ class CoreOperationsManager(BaseManager):
     def _raise_extraction_failed(self, message: str) -> None:
         """Helper method to raise ExtractionError (for TRY301 compliance)."""
         raise ExtractionError(message)
-
-    # ========== Service Accessors ==========
-
-    @property
-    def rom_service(self) -> ROMService:
-        """Get ROM service."""
-        if self._rom_service is None:
-            raise ExtractionError("ROM service not initialized")
-        return self._rom_service
-
-    @property
-    def vram_service(self) -> VRAMService:
-        """Get VRAM service."""
-        if self._vram_service is None:
-            raise ExtractionError("VRAM service not initialized")
-        return self._vram_service
 
     # ========== Extraction Operations ==========
 
@@ -295,19 +252,76 @@ class CoreOperationsManager(BaseManager):
 
         try:
             self._update_progress(operation, 0, 100)
-            # Call service directly and emit signals
-            result = self.vram_service.extract_from_vram(
-                vram_path=vram_path,
-                output_base=output_base,
-                cgram_path=cgram_path,
-                oam_path=oam_path,
-                vram_offset=vram_offset,
-                create_grayscale=create_grayscale,
-                create_metadata=create_metadata,
-                grayscale_mode=grayscale_mode,
-                progress_callback=self.extraction_progress.emit,
+
+            # Validate parameters
+            if not vram_path or not output_base:
+                raise ValidationError("Missing required parameters: vram_path and output_base are required")
+            FileValidator.validate_vram_file_or_raise(vram_path)
+            if cgram_path:
+                FileValidator.validate_cgram_file_or_raise(cgram_path)
+            if oam_path:
+                FileValidator.validate_oam_file_or_raise(oam_path)
+
+            extracted_files: list[str] = []
+            warning: str | None = None
+            palettes: dict[int, list[list[int]]] = {}
+            active_palette_indices: list[int] = []
+
+            # Extract sprites
+            self.extraction_progress.emit("Extracting sprites from VRAM...")
+            output_file = f"{output_base}.png"
+            assert self._sprite_extractor is not None
+            img, num_tiles = self._sprite_extractor.extract_sprites_grayscale(
+                vram_path, output_file, offset=vram_offset
             )
-            # Emit signals from result
+            extracted_files.append(output_file)
+
+            # Generate preview
+            self.extraction_progress.emit("Creating preview...")
+
+            # Extract palettes if requested - catch errors for partial success
+            if not grayscale_mode and cgram_path:
+                try:
+                    from core.services.palette_utils import extract_palettes_and_create_files
+
+                    assert self._palette_manager is not None
+                    palette_result = extract_palettes_and_create_files(
+                        palette_manager=self._palette_manager,
+                        cgram_path=cgram_path,
+                        output_base=output_base,
+                        png_file=output_file,
+                        oam_path=oam_path,
+                        source_path=vram_path,
+                        source_offset=vram_offset,
+                        num_tiles=num_tiles,
+                        create_grayscale=create_grayscale,
+                        create_metadata=create_metadata,
+                        progress_callback=self.extraction_progress.emit,
+                    )
+                    extracted_files.extend(palette_result.files)
+                    palettes = palette_result.palettes
+                    active_palette_indices = palette_result.active_palette_indices
+                except Exception as e:
+                    # Log and track palette failure but don't fail sprite extraction
+                    warning = f"Sprites extracted but palette extraction failed: {e}"
+                    self._logger.warning(f"Palette extraction failed: {e}")
+
+            # Log completion
+            if warning:
+                self.extraction_progress.emit("Extraction complete (palettes failed)")
+            else:
+                self.extraction_progress.emit("Extraction complete!")
+
+            # Build result and emit signals
+            result = ExtractionResult(
+                files=extracted_files,
+                preview_image=img,
+                tile_count=num_tiles,
+                palettes=palettes,
+                active_palette_indices=active_palette_indices,
+                warning=warning,
+            )
+
             if result.preview_image:
                 self.preview_generated.emit(result.preview_image, result.tile_count)
             if result.palettes:
@@ -362,16 +376,82 @@ class CoreOperationsManager(BaseManager):
 
         try:
             self._update_progress(operation, 0, 100)
-            # Call service directly and emit signals
-            result = self.rom_service.extract_from_rom(
-                rom_path=rom_path,
-                offset=offset,
-                output_base=output_base,
-                sprite_name=sprite_name,
-                cgram_path=cgram_path,
-                progress_callback=self.extraction_progress.emit,
+
+            # Validate parameters
+            FileValidator.validate_rom_file_or_raise(rom_path)
+            if offset < 0:
+                raise ValidationError(f"offset must be >= 0, got {offset}")
+            if cgram_path:
+                FileValidator.validate_cgram_file_or_raise(cgram_path)
+
+            extracted_files: list[str] = []
+            warning: str | None = None
+            preview_image: Image.Image | None = None
+            tile_count = 0
+            palettes: dict[int, list[list[int]]] = {}
+            active_palette_indices: list[int] = []
+
+            # Extract from ROM
+            self.extraction_progress.emit(f"Extracting {sprite_name} from ROM...")
+            assert self._rom_extractor is not None
+            output_path, _extraction_info = self._rom_extractor.extract_sprite_from_rom(
+                rom_path, offset, output_base, sprite_name
             )
-            # Emit signals from result
+
+            if output_path:
+                # Create PIL image for preview using context manager to prevent resource leak
+                with Image.open(output_path) as img:
+                    tile_count = (img.width * img.height) // (8 * 8)
+                    # Copy image data before context exits (caller needs valid data)
+                    preview_image = img.copy()
+
+                extracted_files.append(output_path)
+
+                # Extract palettes if CGRAM provided - catch errors for partial success
+                if cgram_path:
+                    try:
+                        from core.services.palette_utils import extract_palettes_and_create_files
+
+                        assert self._palette_manager is not None
+                        palette_result = extract_palettes_and_create_files(
+                            palette_manager=self._palette_manager,
+                            cgram_path=cgram_path,
+                            output_base=output_base,
+                            png_file=output_path,
+                            oam_path=None,
+                            source_path=rom_path,
+                            source_offset=offset,
+                            num_tiles=tile_count,
+                            create_grayscale=True,
+                            create_metadata=True,
+                            progress_callback=self.extraction_progress.emit,
+                        )
+                        extracted_files.extend(palette_result.files)
+                        palettes = palette_result.palettes
+                        active_palette_indices = palette_result.active_palette_indices
+                    except Exception as e:
+                        # Log and track palette failure but don't fail sprite extraction
+                        warning = f"Sprite extracted but palette extraction failed: {e}"
+                        self._logger.warning(f"Palette extraction failed: {e}")
+            else:
+                raise ExtractionError("Failed to extract sprite from ROM")
+
+            # Log completion
+            if warning:
+                self.extraction_progress.emit("ROM extraction complete (palettes failed)")
+            else:
+                self.extraction_progress.emit("ROM extraction complete!")
+
+            # Build result and emit signals
+            result = ExtractionResult(
+                files=extracted_files,
+                preview_image=preview_image,
+                tile_count=tile_count,
+                palettes=palettes,
+                active_palette_indices=active_palette_indices,
+                warning=warning,
+            )
+
             if result.preview_image:
                 self.preview_generated.emit(result.preview_image, result.tile_count)
             if result.palettes:
@@ -419,9 +499,43 @@ class CoreOperationsManager(BaseManager):
         started = self._start_operation(operation)
 
         try:
-            # No progress updates for previews (with_progress=False)
-            result = self.rom_service.get_sprite_preview(rom_path, offset, sprite_name)
-            return result.tile_data, result.width, result.height
+            # Validate parameters
+            FileValidator.validate_rom_file_exists_or_raise(rom_path)
+            if offset < 0:
+                raise ValidationError(f"offset must be >= 0, got {offset}")
+
+            name = sprite_name or f"offset_0x{offset:X}"
+            self._logger.debug(f"Generating preview for {name} at offset 0x{offset:X}")
+
+            # Calculate preview dimensions and expected data size
+            width = DEFAULT_PREVIEW_WIDTH
+            height = DEFAULT_PREVIEW_HEIGHT
+            tile_count = (width * height) // (8 * 8)
+            expected_bytes = tile_count * BYTES_PER_TILE
+
+            # Validate offset against ROM size BEFORE reading
+            rom_size = Path(rom_path).stat().st_size
+            if offset >= rom_size:
+                raise ValueError(f"Offset 0x{offset:X} exceeds ROM size 0x{rom_size:X}")
+
+            available_bytes = rom_size - offset
+            if expected_bytes > available_bytes:
+                raise ValueError(
+                    f"Insufficient data at offset 0x{offset:X}: "
+                    f"need {expected_bytes} bytes, only {available_bytes} available"
+                )
+
+            # Read raw data from ROM with validation
+            with Path(rom_path).open("rb") as f:
+                f.seek(offset)
+                tile_data = f.read(expected_bytes)
+
+                if len(tile_data) != expected_bytes:
+                    raise OSError(
+                        f"Incomplete read at offset 0x{offset:X}: got {len(tile_data)}/{expected_bytes} bytes"
+                    )
+
+            return tile_data, width, height
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, operation, "preview generation")
             raise
@@ -501,7 +615,14 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If preview generation fails
         """
         try:
-            return self.vram_service.generate_preview(vram_path, offset)
+            assert self._sprite_extractor is not None
+            # Load VRAM
+            self._sprite_extractor.load_vram(vram_path)
+            # Extract tiles with new offset
+            tiles, num_tiles = self._sprite_extractor.extract_tiles(offset=offset)
+            # Create grayscale image
+            img = self._sprite_extractor.create_grayscale_image(tiles)
+            return img, num_tiles
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "preview_generation", "generating preview")
             raise
@@ -515,7 +636,8 @@ class CoreOperationsManager(BaseManager):
 
     def get_rom_extractor(self) -> ROMExtractor:
         """Get the ROM extractor instance for advanced operations."""
-        return self.rom_service.get_rom_extractor()
+        assert self._rom_extractor is not None
+        return self._rom_extractor
 
     def get_known_sprite_locations(self, rom_path: str) -> dict[str, object]:  # Pointer objects with .offset attribute
         """
@@ -531,19 +653,41 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If operation fails
         """
         try:
-            locations, cache_result = self.rom_service.get_known_sprite_locations(rom_path)
+            # Validate ROM file exists
+            FileValidator.validate_rom_file_exists_or_raise(rom_path)
 
-            # Emit cache signals based on result
+            # Try to load from cache first
+            start_time = time.time()
+            assert self._rom_cache is not None
+            cached_locations = self._rom_cache.get_sprite_locations(rom_path)
+
+            # Emit cache signals
             self.cache_operation_started.emit("Loading", "sprite_locations")
-            if cache_result.hit:
-                self.cache_hit.emit("sprite_locations", cache_result.time_saved)
-            else:
-                self.cache_miss.emit("sprite_locations")
-                if cache_result.items_saved > 0:
-                    self.cache_operation_started.emit("Saving", "sprite_locations")
-                    self.cache_saved.emit("sprite_locations", cache_result.items_saved)
 
-            return locations
+            if cached_locations:
+                time_saved = 2.5  # Estimated time saved by not scanning ROM
+                self._logger.debug(f"Loaded sprite locations from cache: {rom_path}")
+                self.cache_hit.emit("sprite_locations", time_saved)
+                return dict(cached_locations)
+
+            # Cache miss - scan ROM file
+            self.cache_miss.emit("sprite_locations")
+            self._logger.debug(f"Cache miss, scanning ROM for sprite locations: {rom_path}")
+            assert self._rom_extractor is not None
+            locations = self._rom_extractor.get_known_sprite_locations(rom_path)
+            scan_time = time.time() - start_time
+
+            # Save to cache for future use
+            if locations:
+                cache_success = self._rom_cache.save_sprite_locations(rom_path, locations)
+                if cache_success:
+                    self._logger.debug(
+                        f"Cached {len(locations)} sprite locations for future use (scan took {scan_time:.1f}s)"
+                    )
+                    self.cache_operation_started.emit("Saving", "sprite_locations")
+                    self.cache_saved.emit("sprite_locations", len(locations))
+
+            return dict(locations)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "get_known_sprite_locations", "getting sprite locations")
             raise
@@ -571,7 +715,12 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If operation fails
         """
         try:
-            return self.rom_service.read_rom_header(rom_path)
+            # Validate ROM file exists
+            FileValidator.validate_rom_file_exists_or_raise(rom_path)
+            # ROMExtractor has rom_injector with read_rom_header method
+            assert self._rom_extractor is not None
+            header = self._rom_extractor.rom_injector.read_rom_header(rom_path)
+            return asdict(header)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "read_rom_header", "reading ROM header")
             raise
