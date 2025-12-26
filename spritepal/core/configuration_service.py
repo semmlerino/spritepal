@@ -45,12 +45,17 @@ class ConfigurationService:
         # In launch_spritepal.py (early initialization)
         config_service = ConfigurationService()
 
-        # Pass to managers
-        initialize_managers("SpritePal", settings_path=config_service.settings_file)
+        # Pass to app context creation
+        from core.app_context import create_app_context
+        ctx = create_app_context(
+            "SpritePal",
+            settings_path=config_service.settings_file,
+            configuration_service=config_service,
+        )
 
-        # Or inject via DI container
-        from core.di_container import inject
-        config = inject(ConfigurationService)
+        # Access via app context later
+        from core.app_context import get_app_context
+        config = get_app_context().configuration_service
     """
 
     # Default subdirectory/file names

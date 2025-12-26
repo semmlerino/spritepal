@@ -2,21 +2,21 @@
 Comprehensive infrastructure verification tests.
 Run this to verify all fixes are properly applied.
 """
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
-from core.app_context import get_app_context
-
-
-def get_extraction_manager():
-    """Get extraction manager via DI."""
-    return get_app_context().core_operations_manager
+if TYPE_CHECKING:
+    from core.app_context import AppContext
 
 # Serial execution required: QApplication management, HAL process pool
 pytestmark = [
     pytest.mark.performance,
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_app_context which owns worker threads"),
 ]
 
 class TestInfrastructureVerification:
@@ -50,7 +50,7 @@ class TestInfrastructureVerification:
         # Should be properly managed
         assert widget is not None
 
-    def test_performance_benchmark(self, session_managers):
+    def test_performance_benchmark(self, session_app_context: AppContext):
         """Benchmark to ensure acceptable performance"""
         import time
 
@@ -60,7 +60,7 @@ class TestInfrastructureVerification:
         for i in range(3):
             start = time.time()
             # Access manager (should be fast with session fixture)
-            get_extraction_manager()
+            _ = session_app_context.core_operations_manager
             elapsed = time.time() - start
             times.append(elapsed)
 

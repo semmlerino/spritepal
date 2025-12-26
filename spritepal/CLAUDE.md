@@ -1,5 +1,13 @@
 # SpritePal Development Guidelines
 
+## Core Principles
+
+1. **Test logic more than widgets** - Put business logic in plain Python classes so tests stay fast and stable. Keep widget tests focused on wiring, signals, and basic interactions.
+
+2. **Parallel by default** - With 1900+ tests, serial runs take 15+ minutes. Tests run parallel via `-n auto`. Mark tests that need isolation with `@pytest.mark.parallel_unsafe` or use `app_context` fixture (which provides clean state per-test).
+
+3. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
+
 ## Critical Rules (Read First)
 
 These rules prevent crashes and test failures. Each has a solution.
@@ -13,6 +21,7 @@ These rules prevent crashes and test failures. Each has a solution.
 | **Use `with qtbot.waitSignal():`** | Context manager catches fast signals; non-context form races |
 | **Never `time.sleep()` in Qt tests** | Use `qtbot.wait(ms)` or `qtbot.waitSignal()` |
 | **Mock at import location** | `@patch('spritepal.ui.panel.Dialog')`, not `...dialogs.Dialog` |
+| **One QApplication only** | Let pytest-qt manage it via `qtbot`/`qapp` fixtures |
 
 ## Quick Reference
 
@@ -20,6 +29,20 @@ These rules prevent crashes and test failures. Each has a solution.
 - **Python**: 3.12+
 - **Package Manager**: uv
 - **Config**: `pyproject.toml` (ruff, basedpyright, pytest)
+
+## Claude Code Workflow
+
+When editing this repo, follow these rules:
+
+1. **One canonical check sequence**
+   ```bash
+   uv run ruff check .
+   uv run ruff format .
+   uv run basedpyright core ui utils
+   uv run pytest
+   ```
+
+2. **No silent behavior changes** - If a change affects threading, signals, IO, persistence, or settings: add/adjust tests.
 
 ## Running Tests
 
@@ -158,16 +181,6 @@ def test_async_op(qtbot, app_context):
         worker.start()
 ```
 
-### Critical Rules
-
-| Rule | Why |
-|------|-----|
-| Use `app_context` fixture | Clean state, always safe |
-| Use `with qtbot.waitSignal()` | Non-context form causes flaky tests |
-| Use `ThreadSafeTestImage` in workers | `QPixmap` in threads crashes Python |
-| Use `tmp_path` for files | Hardcoded paths break parallel tests |
-| Use timeout functions | Hardcoded ms values don't scale |
-
 ### Key Imports
 
 ```python
@@ -178,16 +191,21 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 ## Other Development Commands
 
+### Environment Setup
+
 ```bash
-# Dependencies
-uv sync --extra dev
+uv sync              # Sync from lockfile
+uv sync --extra dev  # Include dev dependencies
+uv lock              # Update lockfile after dependency changes
+```
 
-# Linting
-uv run ruff check .
-uv run ruff check . --fix
+### Code Quality
 
-# Type checking
-uv run basedpyright core ui utils
+```bash
+uv run ruff check .              # Lint
+uv run ruff check . --fix        # Auto-fix
+uv run ruff format .             # Format
+uv run basedpyright core ui utils  # Type check
 ```
 
 ### Environment Variables
@@ -200,20 +218,13 @@ uv run basedpyright core ui utils
 | `SPRITEPAL_LEAK_MODE` | Override leak detection | `fail` (CI), `warn` (local) |
 | `QT_QPA_PLATFORM` | Qt display platform | `offscreen` (set by conftest) |
 
-Example for slow CI:
-```bash
-export PYTEST_TIMEOUT_MULTIPLIER=2.0
-uv run pytest
-```
-
 ### Type Checking Notes
 
-The codebase passes basedpyright with zero errors. To maintain this:
+The codebase passes basedpyright with zero errors. Key rules:
 
-- Use `| None` for optional types, not `Optional`
-- Protocols live in `core/protocols/` - check there before creating new ones
-- Qt signals need type annotations: `finished = Signal(str, int)`
-- For widgets that may not exist yet: `self.widget: QWidget | None = None`
+- Use `| None` not `Optional`; Qt signals need annotations: `finished = Signal(str, int)`
+- Protocols live in `core/protocols/` - check before creating new ones
+- **Dict invariance:** Use `Mapping[str, object]` for read-only params; never replace `dict[str, Any]` with `dict[str, object]`
 
 ### Taking UI Screenshots
 
@@ -354,4 +365,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: December 25, 2025*
+*Last updated: December 26, 2025*

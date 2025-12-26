@@ -768,19 +768,19 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
     leak_mode = request.config.getoption("--leak-mode", default="fail")
     leaks_found: list[str] = []
 
-    # Check for active operations via DI
+    # Check for active operations via AppContext
     try:
-        from core.di_container import get_optional
-        from core.managers import CoreOperationsManager
+        from core.app_context import get_app_context_optional
 
-        ops_mgr = get_optional(CoreOperationsManager)
-        if ops_mgr and hasattr(ops_mgr, 'has_active_operations'):
-            if ops_mgr.has_active_operations():
+        ctx = get_app_context_optional()
+        if ctx:
+            ops_mgr = ctx.core_operations_manager
+            if hasattr(ops_mgr, 'has_active_operations') and ops_mgr.has_active_operations():
                 leaks_found.append(
                     "CoreOperationsManager has active operations (not cleaned up)"
                 )
     except ImportError:
-        pass  # DI not available
+        pass  # AppContext not available
 
     if leaks_found:
         message = (

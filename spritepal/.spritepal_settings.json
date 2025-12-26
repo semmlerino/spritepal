@@ -13,10 +13,10 @@
     "extraction_mode": 0
   },
   "ui": {
-    "window_width": 1707,
-    "window_height": 996,
-    "window_x": 0,
-    "window_y": -7,
+    "window_width": 1138,
+    "window_height": 711,
+    "window_x": 454,
+    "window_y": 230,
     "restore_position": false,
     "theme": "dark",
     "window_maximized": false,
@@ -25,8 +25,8 @@
       900
     ],
     "splitter_sizes": [
-      568,
-      1111
+      536,
+      574
     ]
   },
   "paths": {
@@ -91,7 +91,7 @@
     "x": 100,
     "y": 106,
     "width": 900,
-    "height": 594
+    "height": 600
   },
   "experimental": {
     "use_composed_dialogs": true

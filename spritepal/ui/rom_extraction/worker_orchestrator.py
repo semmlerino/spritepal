@@ -41,12 +41,6 @@ class ROMWorkerOrchestrator(QObject):
     sprite_locations_loaded = Signal(list)  # List of sprite location dicts
     sprite_locations_error = Signal(str)  # Error message
 
-    # ========== Scan Signals ==========
-    scan_progress = Signal(int, int, str)  # current, total, message
-    sprite_found = Signal(object)  # Found sprite data (use object to avoid PySide6 copy warning)
-    scan_complete = Signal(list, bool)  # sprites list, from_cache flag
-    scan_error = Signal(str)
-
     # ========== Similarity Indexing Signals ==========
     similarity_progress = Signal(str)  # Progress message
     sprite_indexed = Signal(object)  # Indexed sprite data (use object to avoid PySide6 copy warning)
@@ -191,7 +185,6 @@ class ROMWorkerOrchestrator(QObject):
         self._scan_worker.moveToThread(self._scan_thread)
 
         # Connect signals
-        self._scan_worker.progress_detailed.connect(self._on_scan_progress)
         self._scan_worker.sprite_found.connect(self._on_sprite_found)
         self._scan_worker.finished.connect(self._on_scan_finished)
         self._scan_worker.error.connect(self._on_scan_error)
@@ -206,27 +199,20 @@ class ROMWorkerOrchestrator(QObject):
             self._scan_worker.cancel()
             logger.info("Scan cancellation requested")
 
-    def _on_scan_progress(self, current: int, total: int) -> None:
-        """Handle scan progress update."""
-        percent = int((current / total) * 100) if total > 0 else 0
-        self.scan_progress.emit(current, total, f"Scanning... {percent}%")
-
     def _on_sprite_found(self, sprite_data: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
         """Handle sprite found during scan."""
         self._found_sprites.append(sprite_data)
-        self.sprite_found.emit(sprite_data)
 
     def _on_scan_finished(self, success: bool) -> None:
         """Handle scan completion."""
+        _ = success  # Not used since external signals removed
         self._is_scanning = False
-        if success:
-            self.scan_complete.emit(self._found_sprites, False)
         self._cleanup_scan_worker()
 
     def _on_scan_error(self, error_msg: str) -> None:
         """Handle scan error."""
+        logger.error(f"Scan error: {error_msg}")
         self._is_scanning = False
-        self.scan_error.emit(error_msg)
         self._cleanup_scan_worker()
 
     def _cleanup_scan_worker(self) -> None:

@@ -8,7 +8,7 @@ and dependency injection testing.
 
 MIGRATION NOTE: For new tests, prefer the simplified `app_context` fixture
 from `tests/fixtures/app_context_fixtures.py`. It provides cleaner isolation
-and direct access to managers without inject() calls.
+and direct access to managers via the AppContext object.
 
 Key fixtures:
     - session_managers: Session-scoped shared managers (fastest, state persists)
@@ -248,9 +248,10 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     Session-scoped managers for performance optimization.
 
     MIGRATION:
-        # Old pattern:
+        # Old pattern (deprecated):
         def test_something(session_managers):
-            mgr = inject(CoreOperationsManager)
+            ctx = get_app_context()
+            mgr = ctx.core_operations_manager
 
         # New pattern (preferred):
         from tests.fixtures.app_context_fixtures import session_app_context
@@ -307,9 +308,10 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
     Function-scoped managers for tests that need complete isolation.
 
     MIGRATION:
-        # Old pattern:
+        # Old pattern (deprecated):
         def test_something(isolated_managers):
-            mgr = inject(CoreOperationsManager)
+            ctx = get_app_context()
+            mgr = ctx.core_operations_manager
 
         # New pattern (preferred):
         def test_something(app_context):
@@ -457,7 +459,7 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
     """
     from PySide6.QtWidgets import QApplication
 
-    from core.di_container import reset_container
+    from core.app_context import reset_app_context
     from core.managers import (
         cleanup_managers,
         initialize_managers,
@@ -476,13 +478,13 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
         with contextlib.suppress(Exception):
             reset_for_tests()
 
-    reset_container()
+    reset_app_context()
     yield
 
     if is_initialized():
         with contextlib.suppress(Exception):
             cleanup_managers()
-    reset_container()
+    reset_app_context()
 
     if session_active and session_settings_path:
         if app is None:
@@ -526,7 +528,7 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
 
     # Reset after test to clean up any state it created
     if is_initialized():
-        _reset_manager_caches(None)  # Managers accessed via inject()
+        _reset_manager_caches(None)  # Managers accessed via AppContext
 
 
 # ============================================================================
@@ -614,12 +616,16 @@ def real_extraction_manager(
 
 
 @pytest.fixture
-def real_injection_manager(real_factory: RealComponentFactory) -> CoreOperationsManager:
+def real_injection_manager(
+    isolated_managers: None,
+) -> CoreOperationsManager:
     """Provide a fully configured real injection manager.
 
+    Depends on isolated_managers to ensure proper per-test isolation.
     NOTE: Returns the CoreOperationsManager directly.
     """
-    return real_factory.create_injection_manager()
+    _ = isolated_managers  # Ensures fixture runs first to initialize managers
+    return get_app_context().core_operations_manager
 
 
 @pytest.fixture

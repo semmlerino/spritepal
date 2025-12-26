@@ -36,7 +36,6 @@ Bugs caught by real testing that mocks miss:
 """
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -52,8 +51,6 @@ from tests.infrastructure.data_repository import (
 # manager_context migrated from deprecated manager_test_context to app_context_fixtures
 from tests.fixtures.app_context_fixtures import manager_context
 
-# Phase 2 Real Component Testing Infrastructure
-from tests.infrastructure.real_component_factory import RealComponentFactory
 from utils.constants import BYTES_PER_TILE
 
 
@@ -65,12 +62,6 @@ class TestExtractionManager:
     These tests validate actual extraction workflows using real files,
     real workers, and actual Qt signal/slot behavior.
     """
-
-    @pytest.fixture
-    def real_factory(self, isolated_managers) -> Generator[RealComponentFactory, None, None]:
-        """Provide real component factory for creating actual managers."""
-        with RealComponentFactory() as factory:
-            yield factory
 
     @pytest.fixture
     def test_data_repo(self) -> DataRepository:
@@ -114,14 +105,14 @@ class TestExtractionManager:
             "output_dir": str(tmp_path)
         }
 
-    def test_initialization_real_dependencies(self, real_factory):
+    def test_initialization_real_dependencies(self, app_context):
         """TDD: Manager should initialize with real component dependencies.
-        
+
         RED: Manager needs proper initialization with all required components
         GREEN: Verify real dependencies are available and properly configured
         REFACTOR: No mocking - test actual component integration
         """
-        manager = real_factory.create_extraction_manager(with_test_data=True)
+        manager = app_context.core_operations_manager
 
         # Verify manager is properly initialized
         assert manager.is_initialized()
@@ -691,7 +682,7 @@ class TestExtractionErrorPaths:
     - Parameter validation errors
 
     Note: Uses the adapter interface returned by ManagerRegistry.
-    For low-level manager testing, use manager_context or RealComponentFactory.
+    For low-level manager testing, use manager_context or app_context fixtures.
     """
 
     @pytest.fixture

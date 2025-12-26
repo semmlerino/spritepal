@@ -189,13 +189,12 @@ class StandaloneGalleryLauncher:
         """Create and setup the gallery window."""
         print("🗖 Creating detached gallery window...")
 
-        # Inject dependencies at app boundary
-        from core.di_container import inject
-        from core.managers import ApplicationStateManager, CoreOperationsManager
-        from core.services.rom_cache import ROMCache
-        core_ops_manager = inject(CoreOperationsManager)
-        settings_manager = inject(ApplicationStateManager)
-        rom_cache = inject(ROMCache)
+        # Get dependencies from AppContext
+        from core.app_context import get_app_context
+        ctx = get_app_context()
+        core_ops_manager = ctx.core_operations_manager
+        settings_manager = ctx.application_state_manager
+        rom_cache = ctx.rom_cache
 
         # Create the detached gallery window with dependencies
         self.gallery_window = DetachedGalleryWindow(

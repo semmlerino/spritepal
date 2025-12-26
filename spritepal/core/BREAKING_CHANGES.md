@@ -5,15 +5,14 @@ These changes have historically caused "spooky action at a distance" bugs.
 
 ## Before Changing Manager Initialization Order
 
-**Files**: `core/managers/registry.py`, `core/di_container.py`
+**Files**: `core/managers/__init__.py`, `core/app_context.py`
 
-- [ ] Update `MANAGER_DEPENDENCIES` dict with new dependency
-- [ ] Update `MANAGER_TO_PROTOCOLS` if protocols change
-- [ ] Verify `MANAGED_CLASSES` order satisfies all dependencies
+- [ ] Update manager creation order in `initialize_managers()`
+- [ ] Verify dependencies are created before dependents
 - [ ] Update `docs/initialization_flow.md`
 - [ ] Run full test suite: `uv run pytest -n 0` (serial, catches init race conditions)
 
-**Why it matters**: Managers depend on each other via DI. Wrong order = cryptic "No registration for X" errors.
+**Why it matters**: Managers depend on each other. Wrong order = cryptic "AppContext not initialized" errors.
 
 ---
 
@@ -41,9 +40,9 @@ These changes have historically caused "spooky action at a distance" bugs.
   ```bash
   rg "class.*\(.*ProtocolName" --type py
   ```
-- [ ] Find all consumers using `inject()`:
+- [ ] Find all consumers:
   ```bash
-  rg "inject\(ProtocolName" --type py
+  rg "ProtocolName" --type py
   ```
 - [ ] Update all implementations and callers
 - [ ] Run type checker: `uv run basedpyright core ui`
@@ -54,11 +53,11 @@ These changes have historically caused "spooky action at a distance" bugs.
 
 ## Before Changing Singleton Reset Methods
 
-**Files**: `core/managers/registry.py`, `tests/fixtures/core_fixtures.py`
+**Files**: `core/app_context.py`, `tests/fixtures/app_context_fixtures.py`
 
-- [ ] Check `reset_all_singletons()` in `tests/fixtures/core_fixtures.py`
+- [ ] Check `reset_app_context()` in `core/app_context.py`
 - [ ] Ensure reset order matches initialization order (reverse)
-- [ ] Test both `isolated_managers` and `session_managers` fixtures
+- [ ] Test both `app_context` and `session_app_context` fixtures
 - [ ] Run parallel tests: `uv run pytest -n auto`
 - [ ] Run serial tests: `uv run pytest -n 0`
 
@@ -114,15 +113,13 @@ These changes have historically caused "spooky action at a distance" bugs.
 ## Before Adding a New Manager
 
 1. [ ] Create manager class in `core/managers/`
-2. [ ] Add to `MANAGER_DEPENDENCIES` (document what it needs)
-3. [ ] Add to `MANAGER_TO_PROTOCOLS` (document what it provides)
-4. [ ] Add to `MANAGED_CLASSES` in correct order
-5. [ ] Register in `initialize_managers()` after dependencies
-6. [ ] Export from `core/managers/__init__.py`
-7. [ ] Update `docs/application_flows.md` initialization section
-8. [ ] Add tests using `isolated_managers` fixture
+2. [ ] Add to `initialize_managers()` in correct dependency order
+3. [ ] Add property to `AppContext` class in `core/app_context.py`
+4. [ ] Export from `core/managers/__init__.py`
+5. [ ] Update `docs/application_flows.md` initialization section
+6. [ ] Add tests using `app_context` fixture
 
-**Note**: Protocols are only needed for UI/dialog factories. Most managers use concrete classes directly via `inject()`.
+**Note**: Access managers via `get_app_context().manager_name`, not direct instantiation.
 
 ---
 
@@ -169,10 +166,12 @@ uv run pytest -n auto --tb=short
 # Find signal connections for a specific signal
 rg "extraction_progress\.connect" --type py
 
-# Find all inject() calls for a class
-rg "inject\(CoreOperationsManager" --type py
+# Find all manager accesses
+rg "get_app_context\(\)" --type py
 ```
 
 ---
 
 *When in doubt, run the full test suite both serial (`-n 0`) and parallel (`-n auto`).*
+
+*Last updated: December 26, 2025 (Replaced inject() with get_app_context() pattern)*

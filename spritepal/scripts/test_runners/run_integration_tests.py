@@ -221,13 +221,12 @@ def run_tests():
 
         try:
             print("\n📝 Testing detached window scrolling...")
-            # Inject dependencies at test boundary
-            from core.di_container import inject
-            from core.managers import ApplicationStateManager, CoreOperationsManager
-            from core.services.rom_cache import ROMCache
-            core_ops_manager = inject(CoreOperationsManager)
-            settings_manager = inject(ApplicationStateManager)
-            rom_cache = inject(ROMCache)
+            # Get dependencies from AppContext
+            from core.app_context import get_app_context
+            ctx = get_app_context()
+            core_ops_manager = ctx.core_operations_manager
+            settings_manager = ctx.application_state_manager
+            rom_cache = ctx.rom_cache
             window = DetachedGalleryWindow(
                 extraction_manager=core_ops_manager,
                 settings_manager=settings_manager,

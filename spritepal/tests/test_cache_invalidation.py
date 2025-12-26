@@ -249,7 +249,7 @@ class TestInjectionCacheIntegration:
 
             mock_cache = MagicMock()
 
-            with patch('core.di_container.inject', return_value=mock_cache):
+            with patch.object(manager, '_ensure_rom_cache', return_value=mock_cache):
                 manager._on_worker_finished(success=False, message="Error")
 
             # Verify cache invalidation was NOT called
@@ -270,7 +270,7 @@ class TestInjectionCacheIntegration:
 
             mock_cache = MagicMock()
 
-            with patch('core.di_container.inject', return_value=mock_cache):
+            with patch.object(manager, '_ensure_rom_cache', return_value=mock_cache):
                 manager._invalidate_injection_cache()
 
             # Verify cache invalidation was NOT called for VRAM

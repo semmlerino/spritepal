@@ -2,11 +2,11 @@
 Integration tests for the ExtractionController class.
 
 Tests the ExtractionController with real managers and components using
-RealComponentFactory for proper integration testing. This consolidates
+AppContext for proper integration testing. This consolidates
 coverage from previous mocked/DI/real test suites into a single coherent suite.
 
 Testing approach:
-- Real managers via RealComponentFactory with isolated_managers
+- Real managers via AppContext with isolated_managers
 - Real test files with valid data via tmp_path
 - Real Qt signal behavior via QSignalSpy
 - No mocking of core business logic
@@ -25,7 +25,6 @@ from PySide6.QtTest import QSignalSpy
 
 from core.app_context import get_app_context
 from tests.fixtures.timeouts import worker_timeout
-from tests.infrastructure.real_component_factory import RealComponentFactory
 from ui.extraction_controller import ExtractionController
 
 if TYPE_CHECKING:
@@ -163,19 +162,15 @@ class TestExtractionControllerIntegration:
     def real_managers(
         self, isolated_managers: None
     ) -> Any:
-        """Create real managers using RealComponentFactory."""
-        with RealComponentFactory() as factory:
-            extraction_manager = factory.create_extraction_manager()
-            injection_manager = factory.create_injection_manager()
-            session_manager = factory.create_session_manager("TestControllerApp")
-            settings_manager = get_app_context().application_state_manager
-
-            yield {
-                "extraction_manager": extraction_manager,
-                "injection_manager": injection_manager,
-                "session_manager": session_manager,
-                "settings_manager": settings_manager,
-            }
+        """Get real managers from AppContext."""
+        _ = isolated_managers  # Ensures fixture runs first to initialize managers
+        context = get_app_context()
+        yield {
+            "extraction_manager": context.core_operations_manager,
+            "injection_manager": context.core_operations_manager,
+            "session_manager": context.application_state_manager,
+            "settings_manager": context.application_state_manager,
+        }
 
     @pytest.fixture
     def controller(

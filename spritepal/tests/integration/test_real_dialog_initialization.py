@@ -19,20 +19,8 @@ from typing import TYPE_CHECKING
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from core.app_context import get_app_context
-
-
-def get_injection_manager():
-    """Get injection manager via app context."""
-    return get_app_context().core_operations_manager
-
-
-def get_settings_manager():
-    """Get settings manager via app context."""
-    return get_app_context().application_state_manager
-
-
 if TYPE_CHECKING:
+    from core.app_context import AppContext
     from pytestqt.qtbot import QtBot
 
 pytestmark = [pytest.mark.gui]
@@ -41,18 +29,16 @@ pytestmark = [pytest.mark.gui]
 class TestRealDialogInitialization:
     """Test actual Qt dialogs can be created without crashes."""
 
-    def test_settings_dialog_real(self, qtbot: QtBot, isolated_managers) -> None:
+    def test_settings_dialog_real(self, qtbot: QtBot, app_context: AppContext) -> None:
         """Test SettingsDialog can be created with real Qt widgets.
 
-        Requires isolated_managers because SettingsDialog uses DI.
+        Requires app_context because SettingsDialog uses DI.
         """
-        from core.app_context import get_app_context
         from ui.dialogs.settings_dialog import SettingsDialog
 
-        context = get_app_context()
         dialog = SettingsDialog(
-            settings_manager=context.application_state_manager,
-            rom_cache=context.rom_cache
+            settings_manager=app_context.application_state_manager,
+            rom_cache=app_context.rom_cache
         )
         qtbot.addWidget(dialog)
 
@@ -216,18 +202,16 @@ class TestRealDialogInitialization:
 class TestRealDialogLifecycle:
     """Test dialog show/hide/close lifecycle with real widgets."""
 
-    def test_dialog_show_close_cycle(self, qtbot: QtBot, isolated_managers) -> None:
+    def test_dialog_show_close_cycle(self, qtbot: QtBot, app_context: AppContext) -> None:
         """Test that dialogs can be shown and closed without crashes.
 
-        Requires isolated_managers because SettingsDialog uses DI.
+        Requires app_context because SettingsDialog uses DI.
         """
-        from core.app_context import get_app_context
         from ui.dialogs.settings_dialog import SettingsDialog
 
-        context = get_app_context()
         dialog = SettingsDialog(
-            settings_manager=context.application_state_manager,
-            rom_cache=context.rom_cache
+            settings_manager=app_context.application_state_manager,
+            rom_cache=app_context.rom_cache
         )
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
         from PySide6.QtCore import Qt
@@ -273,7 +257,7 @@ class TestRealDialogWithManagers:
     """Test dialogs that require manager dependencies."""
 
     def test_injection_dialog_real(
-        self, qtbot: QtBot, isolated_managers
+        self, qtbot: QtBot, app_context: AppContext
     ) -> None:
         """Test InjectionDialog can be created with real managers."""
         from PySide6.QtCore import Qt
@@ -281,8 +265,8 @@ class TestRealDialogWithManagers:
         from ui.injection_dialog import InjectionDialog
 
         dialog = InjectionDialog(
-            injection_manager=get_injection_manager(),
-            settings_manager=get_settings_manager(),
+            injection_manager=app_context.core_operations_manager,
+            settings_manager=app_context.application_state_manager,
         )
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)

@@ -1,87 +1,79 @@
 """
-DI Migration Readiness Tests.
+AppContext Access Tests.
 
-These tests validate that the codebase is ready to remove deprecated
-Service Locator functions (get_session_manager, get_extraction_manager, etc.)
-
-Run these BEFORE removing deprecated functions to ensure DI works as replacement.
+These tests validate that components can access managers via AppContext.
 """
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
-from core.app_context import get_app_context
-from core.di_container import get_container, inject
-from core.managers.application_state_manager import ApplicationStateManager
-from core.managers.core_operations_manager import CoreOperationsManager
-from core.services.rom_cache import ROMCache
+from core.app_context import get_app_context, get_app_context_optional
+
+if TYPE_CHECKING:
+    from core.app_context import AppContext
 
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.skip_thread_cleanup(reason="DI tests create real managers which may spawn threads"),
+    pytest.mark.skip_thread_cleanup(reason="Tests create real managers which may spawn threads"),
 ]
 
 
-class TestProtocolInjection:
-    """Test that all protocols can be resolved via inject()."""
+class TestAppContextAccess:
+    """Test that all managers can be accessed via AppContext."""
 
-    def test_container_is_configured(self, isolated_managers):
-        """Verify DI container is properly configured."""
-        container = get_container()
-        # Container should have at least ApplicationStateManager registered
-        assert container.has(ApplicationStateManager), "DI container should be configured after manager init"
+    def test_app_context_is_initialized(self, app_context: AppContext):
+        """Verify AppContext is properly initialized after manager init."""
+        ctx = get_app_context_optional()
+        assert ctx is not None, "AppContext should be available after manager init"
 
-    def test_inject_settings_manager_protocol(self, isolated_managers):
-        """Test ApplicationStateManager injection."""
-        settings = inject(ApplicationStateManager)
+    def test_access_application_state_manager(self, app_context: AppContext):
+        """Test ApplicationStateManager access via AppContext."""
+        settings = app_context.application_state_manager
         assert settings is not None
         assert hasattr(settings, "get")
         assert hasattr(settings, "set")
+        assert hasattr(settings, "get_session_data")
 
-    def test_inject_session_manager_protocol(self, isolated_managers):
-        """Test ApplicationStateManager injection (for session)."""
-        session = inject(ApplicationStateManager)
-        assert session is not None
-        # SessionAdapter provides get_session_data
-        assert hasattr(session, "get_session_data")
+    def test_access_core_operations_manager(self, app_context: AppContext):
+        """Test CoreOperationsManager access via AppContext."""
+        ops = app_context.core_operations_manager
+        assert ops is not None
+        assert hasattr(ops, "validate_extraction_params")
+        assert hasattr(ops, "start_injection")
 
-    def test_inject_extraction_manager_protocol(self, isolated_managers):
-        """Test CoreOperationsManager injection (extraction)."""
-        extraction = inject(CoreOperationsManager)
-        assert extraction is not None
-        assert hasattr(extraction, "validate_extraction_params")
+    def test_access_sprite_preset_manager(self, app_context: AppContext):
+        """Test SpritePresetManager access via AppContext."""
+        presets = app_context.sprite_preset_manager
+        assert presets is not None
 
-    def test_inject_injection_manager_protocol(self, isolated_managers):
-        """Test CoreOperationsManager injection (injection)."""
-        injection = inject(CoreOperationsManager)
-        assert injection is not None
-        assert hasattr(injection, "start_injection")
-
-    def test_inject_rom_cache(self, isolated_managers):
-        """Test ROMCache injection."""
-        cache = inject(ROMCache)
+    def test_access_rom_cache(self, app_context: AppContext):
+        """Test ROMCache access via AppContext."""
+        cache = app_context.rom_cache
         assert cache is not None
-        # ROMCache provides get_cache_stats
         assert hasattr(cache, "get_cache_stats")
 
+    def test_access_rom_extractor(self, app_context: AppContext):
+        """Test ROMExtractor access via AppContext."""
+        extractor = app_context.rom_extractor
+        assert extractor is not None
 
-class TestPureDIComponentInitialization:
-    """Test components can initialize with explicit DI (no fallbacks)."""
 
-    def test_extraction_controller_pure_di(self, isolated_managers):
-        """Test ExtractionController works with all deps passed explicitly."""
+class TestPureAppContextComponentInitialization:
+    """Test components can initialize with explicit AppContext deps."""
+
+    def test_extraction_controller_pure_di(self, app_context: AppContext):
+        """Test ExtractionController works with all deps from AppContext."""
         from ui.extraction_controller import ExtractionController
 
         # Get all dependencies via AppContext
-        context = get_app_context()
-        extraction_mgr = context.core_operations_manager
-        session_mgr = context.application_state_manager
-        injection_mgr = context.core_operations_manager
-        settings_mgr = context.application_state_manager
+        extraction_mgr = app_context.core_operations_manager
+        session_mgr = app_context.application_state_manager
+        injection_mgr = app_context.core_operations_manager
+        settings_mgr = app_context.application_state_manager
 
         # Create mock main window
         mock_window = Mock()
@@ -113,18 +105,17 @@ class TestPureDIComponentInitialization:
         assert controller.injection_manager is injection_mgr
         assert controller.settings_manager is settings_mgr
 
-    def test_main_window_pure_di(self, isolated_managers, qtbot):
-        """Test MainWindow works with all deps passed explicitly.
+    def test_main_window_pure_di(self, app_context: AppContext, qtbot):
+        """Test MainWindow works with all deps from AppContext.
 
-        Note: Uses isolated_managers because MainWindow saves settings on init,
+        Note: Uses app_context because MainWindow saves settings on init,
         which modifies shared state.
         """
         from ui.main_window import MainWindow
 
-        context = get_app_context()
-        settings_mgr = context.application_state_manager
-        rom_cache = context.rom_cache
-        session_mgr = context.application_state_manager
+        settings_mgr = app_context.application_state_manager
+        rom_cache = app_context.rom_cache
+        session_mgr = app_context.application_state_manager
 
         # Create window with explicit deps
         window = MainWindow(
@@ -141,14 +132,12 @@ class TestPureDIComponentInitialization:
             window.close()
             window.deleteLater()
 
-    def test_injection_dialog_pure_di(self, isolated_managers, qtbot):
-        """Test InjectionDialog works with injection_manager passed explicitly."""
-        from core.managers.application_state_manager import ApplicationStateManager
+    def test_injection_dialog_pure_di(self, app_context: AppContext, qtbot):
+        """Test InjectionDialog works with injection_manager from AppContext."""
         from ui.injection_dialog import InjectionDialog
 
-        context = get_app_context()
-        injection_mgr = context.core_operations_manager
-        settings_mgr = context.application_state_manager
+        injection_mgr = app_context.core_operations_manager
+        settings_mgr = app_context.application_state_manager
 
         # Create with explicit deps
         dialog = InjectionDialog(
@@ -162,54 +151,47 @@ class TestPureDIComponentInitialization:
             dialog.close()
             dialog.deleteLater()
 
-    def test_rom_extraction_panel_pure_di(self, isolated_managers, qtbot):
-        """Test ROMExtractionPanel works with extraction_manager passed explicitly."""
+    def test_rom_extraction_panel_pure_di(self, app_context: AppContext, qtbot):
+        """Test ROMExtractionPanel works with extraction_manager from AppContext."""
         from ui.rom_extraction_panel import ROMExtractionPanel
 
-        context = get_app_context()
-        extraction_mgr = context.core_operations_manager
+        extraction_mgr = app_context.core_operations_manager
 
         # Create with explicit dep
         panel = ROMExtractionPanel(extraction_manager=extraction_mgr)
 
         try:
-            # Public attribute name is extraction_manager
             assert panel.extraction_manager is extraction_mgr
         finally:
             panel.deleteLater()
 
 
-class TestNoFallbackScenario:
-    """Test behavior when deprecated functions would fail."""
+class TestAppContextErrorBehavior:
+    """Test behavior when AppContext is not initialized."""
 
-    def test_inject_before_container_configured_raises(self):
-        """Test that inject() raises clear error if container not configured."""
-        # This tests the error message users would see if they try to use
-        # inject() before managers are initialized
-        container = get_container()
+    def test_get_app_context_before_init_raises(self, clean_registry_state):
+        """Test that get_app_context() raises clear error if not initialized."""
+        from core.app_context import reset_app_context
 
-        # Temporarily clear the container
-        # Store current state (using internal attribute names from DIContainer)
-        original_instances = container._instances.copy()
-        original_factories = container._factories.copy()
+        reset_app_context()
 
-        try:
-            container.clear()
+        with pytest.raises(RuntimeError, match="AppContext not initialized"):
+            get_app_context()
 
-            # Try to inject - should raise ValueError
-            with pytest.raises(ValueError, match="No registration"):
-                inject(ApplicationStateManager)
-        finally:
-            # Restore
-            container._instances.update(original_instances)
-            container._factories.update(original_factories)
+    def test_get_app_context_optional_returns_none(self, clean_registry_state):
+        """Test that get_app_context_optional() returns None if not initialized."""
+        from core.app_context import reset_app_context
 
-    def test_deprecated_functions_were_removed(self, isolated_managers):
-        """Verify deprecated convenience functions have been removed from module exports and registry."""
+        reset_app_context()
+
+        ctx = get_app_context_optional()
+        assert ctx is None
+
+    def test_deprecated_functions_were_removed(self, app_context: AppContext):
+        """Verify deprecated convenience functions have been removed."""
         import core.managers
 
         # These functions should no longer exist at module level
-        # (they were removed as part of the DI migration)
         assert not hasattr(core.managers, "get_extraction_manager"), \
             "get_extraction_manager should have been removed"
         assert not hasattr(core.managers, "get_injection_manager"), \
@@ -219,33 +201,28 @@ class TestNoFallbackScenario:
         assert not hasattr(core.managers, "get_navigation_manager"), \
             "get_navigation_manager should have been removed"
 
-        # ManagerRegistry class has been removed (deprecated shim deleted)
+        # ManagerRegistry class has been removed
         assert not hasattr(core.managers, "ManagerRegistry"), \
             "ManagerRegistry class should have been removed"
 
 
-class TestInjectionManagerDI:
-    """Test InjectionManager's internal DI needs."""
+class TestManagerDependencyAccess:
+    """Test managers' internal dependency access."""
 
-    def test_injection_manager_session_access(self, isolated_managers):
-        """Test InjectionManager can access session manager via DI."""
-        context = get_app_context()
-        injection_mgr = context.core_operations_manager
+    def test_core_ops_manager_session_access(self, app_context: AppContext):
+        """Test CoreOperationsManager can access session manager."""
+        ops_mgr = app_context.core_operations_manager
 
         # CoreOperationsManager has _ensure_session_manager() - verify it works
-        # This is an internal method that uses cached DI dependencies
-        if hasattr(injection_mgr, "_ensure_session_manager"):
-            session = injection_mgr._ensure_session_manager()
+        if hasattr(ops_mgr, "_ensure_session_manager"):
+            session = ops_mgr._ensure_session_manager()
             assert session is not None
 
-    def test_injection_manager_rom_cache_access(self, isolated_managers):
-        """Test InjectionManager can access ROM cache via DI."""
-        # Use AppContext to get ROM cache (replaces deprecated get_rom_cache())
-        context = get_app_context()
-        cache = context.rom_cache
+    def test_rom_cache_has_expected_methods(self, app_context: AppContext):
+        """Test ROMCache has expected interface."""
+        cache = app_context.rom_cache
         assert cache is not None
 
-        # Verify the cache has expected methods
         assert hasattr(cache, "get_cache_stats")
         assert hasattr(cache, "cache_enabled")
 

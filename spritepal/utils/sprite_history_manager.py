@@ -85,32 +85,6 @@ class SpriteHistoryManager:
         """
         return [(s["offset"], s["quality"]) for s in self._found_sprites]
 
-    def get_sprite_info(self, offset: int) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - Sprite info dict
-        """
-        Get detailed info for a specific sprite.
-
-        Args:
-            offset: ROM offset of the sprite
-
-        Returns:
-            Sprite info dict or None if not found
-        """
-        for sprite in self._found_sprites:
-            if sprite["offset"] == offset:
-                return sprite.copy()
-        return None
-
-    def set_sprites(self, sprites: list[tuple[int, float]]):
-        """
-        Set sprites from a list, replacing existing history.
-
-        Args:
-            sprites: List of (offset, quality) tuples
-        """
-        self.clear_history()
-        for offset, quality in sprites:
-            self.add_sprite(offset, quality)
-
     def get_sprite_count(self) -> int:
         """
         Get the number of sprites in history.
@@ -161,49 +135,3 @@ class SpriteHistoryManager:
             items.append(f"0x{offset:06X} - Quality: {quality:.2f}")
         return items
 
-    def remove_sprite(self, offset: int) -> bool:
-        """
-        Remove a sprite from history.
-
-        Args:
-            offset: ROM offset of sprite to remove
-
-        Returns:
-            True if sprite was removed, False if not found
-        """
-        for i, sprite in enumerate(self._found_sprites):
-            if sprite["offset"] == offset:
-                self._found_sprites.pop(i)
-                return True
-        return False
-
-    def get_most_recent(self, count: int = 10) -> list[tuple[int, float]]:
-        """
-        Get the most recent sprites.
-
-        Args:
-            count: Number of recent sprites to return
-
-        Returns:
-            List of (offset, quality) tuples for most recent sprites
-        """
-        recent = self._found_sprites[-count:] if count > 0 else []
-        return [(s["offset"], s["quality"]) for s in reversed(recent)]
-
-    def get_highest_quality(self, count: int = 10) -> list[tuple[int, float]]:
-        """
-        Get sprites with highest quality scores.
-
-        Args:
-            count: Number of top sprites to return
-
-        Returns:
-            List of (offset, quality) tuples sorted by quality
-        """
-        sorted_sprites = sorted(
-            self._found_sprites,
-            key=lambda s: s["quality"],
-            reverse=True
-        )
-        top_sprites = sorted_sprites[:count] if count > 0 else []
-        return [(s["offset"], s["quality"]) for s in top_sprites]

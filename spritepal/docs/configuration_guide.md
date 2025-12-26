@@ -11,7 +11,7 @@ SpritePal uses JSON files for persistent settings. Three files serve different c
 | File | Purpose | When Used |
 |------|---------|-----------|
 | `.spritepal_settings.json` | Production settings | Normal app launch |
-| `.spritepal-test_settings.json` | Unit test settings | When tests use `isolated_managers` fixture |
+| `.spritepal-test_settings.json` | Unit test settings | When tests use `app_context` fixture |
 | `.spritepal-uitest_settings.json` | UI test settings | UI-specific test scenarios |
 
 **Location**: All files are in the project root (`spritepal/`).
@@ -42,21 +42,14 @@ launch_spritepal.py (Application Entry)
          │
          ▼
 ┌──────────────────────────────────────┐
-│ Step 3: ManagerRegistry Init         │  core/managers/registry.py
-│ initialize_managers(settings_path)   │
+│ Step 3: initialize_managers()        │  core/managers/__init__.py
 │ Passes settings_file to managers     │
+│ Creates AppContext with managers     │
 └──────────────────────────────────────┘
          │
          ▼
 ┌──────────────────────────────────────┐
-│ Step 4: DI Container Config          │  core/di_container.py
-│ configure_container()                │
-│ Registers protocols → implementations │
-└──────────────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────┐
-│ Step 5: ApplicationStateManager      │  core/managers/application_state_manager.py
+│ Step 4: ApplicationStateManager      │  core/managers/application_state_manager.py
 │ _load_settings()                     │
 │ Merges JSON with defaults            │
 └──────────────────────────────────────┘
@@ -88,13 +81,12 @@ config.default_dumps_directory  # ~/Documents/Mesen2/Debugger/
 
 ## 4. Accessing Settings at Runtime
 
-Settings are now managed through `ApplicationStateManager`:
+Settings are managed through `ApplicationStateManager`:
 
 ```python
-from core.managers.application_state_manager import ApplicationStateManager
-from core.di_container import inject
+from core.app_context import get_app_context
 
-app_state = inject(ApplicationStateManager)
+app_state = get_app_context().application_state_manager
 
 # Read a setting
 value = app_state.settings.get("some_key", default_value)
@@ -107,7 +99,7 @@ app_state.settings.set("some_key", new_value)
 app_state.settings.save_session()  # Persist to disk
 ```
 
-**Note:** Settings functionality is integrated into `ApplicationStateManager`. Use the concrete class directly via `inject(ApplicationStateManager)`.
+**Note:** Access settings via `get_app_context().application_state_manager`.
 
 ---
 
@@ -156,7 +148,9 @@ Feature flags for experimental functionality are in the `experimental` namespace
 
 **Checking feature flags**:
 ```python
-app_state = inject(ApplicationStateManager)
+from core.app_context import get_app_context
+
+app_state = get_app_context().application_state_manager
 use_feature = app_state.settings.get("experimental.use_feature_x", False)
 if use_feature:
     # Use new implementation
@@ -176,17 +170,17 @@ else:
 Tests use isolated settings to prevent polluting production config:
 
 ```python
-# In tests, use isolated_managers fixture
-def test_something(isolated_managers):
+# In tests, use app_context fixture
+def test_something(app_context):
     # Settings are isolated - changes don't affect production
-    app_state = inject(ApplicationStateManager)
+    app_state = app_context.application_state_manager
     app_state.settings.set("test_key", "test_value")
     # ... test code ...
     # Settings reset automatically after test
 ```
 
 **Test settings file selection**:
-- `isolated_managers` fixture uses `.spritepal-test_settings.json`
+- `app_context` fixture uses `.spritepal-test_settings.json`
 - UI tests may use `.spritepal-uitest_settings.json`
 - Both are gitignored to prevent accidental commits
 
@@ -209,8 +203,8 @@ def test_something(isolated_managers):
 - Ensure `settings_manager.save_session()` is called after changes
 
 **Test affecting production settings?**
-- Always use `isolated_managers` fixture in tests
-- Check you're not accidentally using `session_managers` without `@pytest.mark.shared_state_safe`
+- Always use `app_context` fixture in tests
+- Check you're not accidentally using `session_app_context` without `@pytest.mark.shared_state_safe`
 
 **Feature flag not taking effect?**
 - Restart app (some flags are checked only at startup)
@@ -219,4 +213,4 @@ def test_something(isolated_managers):
 
 ---
 
-*Last updated: December 25, 2025*
+*Last updated: December 26, 2025 (Replaced inject() with get_app_context() pattern)*

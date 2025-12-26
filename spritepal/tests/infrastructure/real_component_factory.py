@@ -39,9 +39,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QApplication, QWidget
 
-from core.managers import is_initialized
-from core.managers.application_state_manager import ApplicationStateManager
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import is_context_initialized
 from core.services.rom_cache import ROMCache
 from ui.common import WorkerManager
 from ui.main_window import MainWindow
@@ -92,7 +90,7 @@ class RealComponentFactory:
 
         Note:
             Managers must be initialized before using this factory.
-            Use the `isolated_managers` or `session_managers` fixture to ensure
+            Use the `app_context` or `session_app_context` fixture to ensure
             managers are properly initialized.
         """
         self._data_repo = data_repository or get_test_data_repository()
@@ -103,11 +101,11 @@ class RealComponentFactory:
         self._manage_registry = manage_registry
         self._initialized_registry = False  # Track if we initialized it
 
-        # Verify managers are initialized (done by isolated_managers/session_managers fixtures)
-        if not is_initialized():
+        # Verify managers are initialized (done by app_context or session_app_context fixtures)
+        if not is_context_initialized():
             raise ValueError(
                 "RealComponentFactory requires managers to be initialized. "
-                "Use isolated_managers or session_managers fixture."
+                "Use app_context or session_app_context fixture."
             )
         # Use UUID for guaranteed uniqueness (id() can be reused after object deletion)
         self._unique_id = str(uuid.uuid4())
@@ -141,54 +139,6 @@ class RealComponentFactory:
 
         # manager_registry is now required - no fallback to global singleton
         # This ensures proper test isolation and prevents global state pollution
-
-    def create_extraction_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
-        """
-        DEPRECATED: Use app_context.core_operations_manager instead.
-
-        Get extraction manager (CoreOperationsManager) from AppContext.
-        """
-        warnings.warn(
-            "create_extraction_manager() is deprecated. "
-            "Use app_context.core_operations_manager instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        _ = with_test_data  # Unused, kept for API compatibility
-        from core.app_context import get_app_context
-        return get_app_context().core_operations_manager
-
-    def create_injection_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
-        """
-        DEPRECATED: Use app_context.core_operations_manager instead.
-
-        Get injection manager (CoreOperationsManager) from AppContext.
-        """
-        warnings.warn(
-            "create_injection_manager() is deprecated. "
-            "Use app_context.core_operations_manager instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        _ = with_test_data  # Unused, kept for API compatibility
-        from core.app_context import get_app_context
-        return get_app_context().core_operations_manager
-
-    def create_session_manager(self, app_name: str = "TestApp") -> ApplicationStateManager:
-        """
-        DEPRECATED: Use app_context.application_state_manager instead.
-
-        Get session manager (ApplicationStateManager) from AppContext.
-        """
-        warnings.warn(
-            "create_session_manager() is deprecated. "
-            "Use app_context.application_state_manager instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        _ = app_name  # Unused, kept for API compatibility
-        from core.app_context import get_app_context
-        return get_app_context().application_state_manager
 
     def create_main_window(self, with_managers: bool = True) -> MainWindow:
         """

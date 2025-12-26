@@ -83,7 +83,7 @@ uv run pytest --cov=core --cov=ui --cov-report=html
 
 ## Manager Access Pattern
 
-**Current (recommended):**
+**Use `get_app_context()` to access managers:**
 ```python
 from core.app_context import get_app_context
 
@@ -91,18 +91,12 @@ context = get_app_context()
 manager = context.core_operations_manager
 ```
 
-**Legacy (deprecated but still works):**
-```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
-
-manager = inject(CoreOperationsManager)
-```
-
-The `get_app_context()` pattern is preferred because:
+Benefits:
 - Explicit manager access via attributes (better IDE support)
 - Clearer dependency relationships
 - No need to import manager classes for type lookup
+
+**Note:** The `inject()` pattern has been removed. Use `get_app_context()` exclusively.
 
 ---
 

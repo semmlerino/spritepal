@@ -16,7 +16,6 @@ Architecture:
 """
 from __future__ import annotations
 
-import atexit
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -53,9 +52,8 @@ if TYPE_CHECKING:
 
 _logger = get_logger("managers")
 
-# Module-level state
+# Module-level state (tracks if initialize_managers was called)
 _initialized = False
-_cleanup_registered = False
 _lock = threading.RLock()
 
 
@@ -67,112 +65,37 @@ def initialize_managers(
     """
     Initialize all managers in dependency order.
 
-    Uses the consolidated manager architecture where:
-    - ApplicationStateManager handles session, settings, state, and history
-    - CoreOperationsManager handles extraction and injection operations
+    This is a wrapper around create_app_context() for backward compatibility.
+    New code should use create_app_context() directly.
 
     Args:
         app_name: Application name for settings
         settings_path: Optional custom settings path (for testing)
         configuration_service: Optional pre-created ConfigurationService instance
     """
-    global _initialized, _cleanup_registered
+    global _initialized
 
     with _lock:
         if _initialized:
             _logger.debug("Managers already initialized, skipping")
             return
 
-        _logger.info("Initializing managers...")
+        _logger.info("Initializing managers via AppContext...")
 
-        from PySide6.QtWidgets import QApplication
-
-        from core.configuration_service import ConfigurationService as ConfigService
-        from core.di_container import register_factory, register_singleton
-        from core.rom_extractor import ROMExtractor
-        from core.services.rom_cache import ROMCache
-
-        qt_parent = QApplication.instance()
-        if not qt_parent:
-            _logger.warning("No QApplication instance found - managers will have no Qt parent")
+        from core.app_context import create_app_context
 
         try:
-            # 1. ConfigurationService
-            if configuration_service is None:
-                configuration_service = ConfigService()
-            register_singleton(ConfigService, configuration_service)
-
-            # 2. ApplicationStateManager (no deps on other managers)
-            state_mgr = ApplicationStateManager(
-                app_name,
-                settings_path,
-                parent=qt_parent,
+            create_app_context(
+                app_name=app_name,
+                settings_path=settings_path,
                 configuration_service=configuration_service,
             )
-            register_singleton(ApplicationStateManager, state_mgr)
-            _logger.debug("ApplicationStateManager created and registered")
-
-            # 3. SpritePresetManager (no deps on other managers)
-            preset_mgr = SpritePresetManager(
-                config_service=configuration_service,
-                parent=qt_parent,
-            )
-            register_singleton(SpritePresetManager, preset_mgr)
-            _logger.debug("SpritePresetManager created and registered")
-
-            # 4. Register lazy factories BEFORE CoreOperationsManager
-            # (These factories are used when inject() is called and AppContext doesn't have the instance yet)
-            def _create_rom_cache() -> ROMCache:
-                return ROMCache(state_manager=state_mgr)
-
-            register_factory(ROMCache, _create_rom_cache)
-
-            def _create_rom_extractor() -> ROMExtractor:
-                from core.di_container import get_container
-
-                # Get or create ROMCache first
-                rom_cache = get_container().get(ROMCache)
-                return ROMExtractor(rom_cache=rom_cache)
-
-            register_factory(ROMExtractor, _create_rom_extractor)
-            _logger.debug("ROMCache and ROMExtractor factories registered")
-
-            # 5. CoreOperationsManager (accesses ROMExtractor via inject internally)
-            core_ops = CoreOperationsManager(parent=qt_parent)
-            register_singleton(CoreOperationsManager, core_ops)
-            _logger.debug("CoreOperationsManager created and registered")
-
             _initialized = True
             _logger.info("All managers initialized successfully")
 
-            # Register cleanup hooks
-            if not _cleanup_registered:
-                if qt_parent is not None:
-                    qt_parent.aboutToQuit.connect(cleanup_managers)
-                atexit.register(cleanup_managers)
-                _cleanup_registered = True
-                _logger.debug("Cleanup hooks registered")
-
         except Exception as e:
             _logger.exception(f"Manager initialization failed: {e}")
-            # Cleanup any partial registrations
-            _cleanup_partial()
             raise ManagerError(f"Failed to initialize managers: {e}") from e
-
-
-def _cleanup_partial() -> None:
-    """Clean up partial registrations after failed initialization."""
-    from core.di_container import get_container, reset_container
-
-    container = get_container()
-    for mgr_type in [CoreOperationsManager, SpritePresetManager, ApplicationStateManager]:
-        mgr = container.get_optional(mgr_type)
-        if mgr is not None:
-            try:
-                mgr.cleanup()
-            except Exception:
-                pass
-    reset_container()
 
 
 def cleanup_managers() -> None:
@@ -185,26 +108,23 @@ def cleanup_managers() -> None:
 
         _logger.info("Cleaning up managers...")
 
-        from core.di_container import get_container, reset_container
+        from core.app_context import get_app_context_optional, reset_app_context
 
-        container = get_container()
-
-        # Cleanup in reverse order
-        for mgr_type in [CoreOperationsManager, SpritePresetManager, ApplicationStateManager]:
-            mgr = container.get_optional(mgr_type)
-            if mgr is not None:
+        ctx = get_app_context_optional()
+        if ctx:
+            # Cleanup in reverse order
+            for mgr in [
+                ctx.core_operations_manager,
+                ctx.sprite_preset_manager,
+                ctx.application_state_manager,
+            ]:
                 try:
                     mgr.cleanup()
-                    _logger.debug("Cleaned up %s", mgr_type.__name__)
+                    _logger.debug("Cleaned up %s", type(mgr).__name__)
                 except Exception:
-                    _logger.warning("Error cleaning up %s", mgr_type.__name__, exc_info=True)
+                    _logger.warning("Error cleaning up %s", type(mgr).__name__, exc_info=True)
 
-        reset_container()
-
-        # Also reset AppContext if it was created
-        from core.app_context import reset_app_context
         reset_app_context()
-
         _initialized = False
         _logger.info("All managers cleaned up")
 
@@ -225,17 +145,21 @@ def validate_manager_dependencies() -> bool:
         _logger.warning("Managers not initialized, cannot validate dependencies")
         return False
 
-    from core.di_container import get_container
+    from core.app_context import get_app_context_optional
 
-    container = get_container()
+    ctx = get_app_context_optional()
+    if ctx is None:
+        _logger.warning("AppContext not available")
+        return False
 
     try:
-        for mgr_type in [ApplicationStateManager, SpritePresetManager, CoreOperationsManager]:
-            mgr = container.get_optional(mgr_type)
-            if mgr is None:
-                raise ManagerError(f"{mgr_type.__name__} not registered")
+        for mgr in [
+            ctx.application_state_manager,
+            ctx.sprite_preset_manager,
+            ctx.core_operations_manager,
+        ]:
             if not mgr.is_initialized():
-                raise ManagerError(f"{mgr_type.__name__} not properly initialized")
+                raise ManagerError(f"{type(mgr).__name__} not properly initialized")
 
         _logger.debug("All manager dependencies validated successfully")
         return True
@@ -251,14 +175,13 @@ def reset_for_tests() -> None:
     WARNING: This method is for test infrastructure only.
     Do not use in production code.
     """
-    global _initialized, _cleanup_registered
+    global _initialized
 
     with _lock:
-        from core.di_container import reset_container
+        from core.app_context import reset_app_context
 
-        reset_container()
+        reset_app_context()
         _initialized = False
-        _cleanup_registered = False
 
 
 def is_clean() -> bool:

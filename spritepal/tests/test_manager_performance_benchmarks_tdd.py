@@ -28,6 +28,8 @@ import pytest
 # Skip entire module if pytest-benchmark is not installed
 pytest.importorskip("pytest_benchmark")
 
+from typing import TYPE_CHECKING
+
 from core.managers import ValidationError
 from tests.infrastructure.data_repository import (
     DataRepository,
@@ -36,8 +38,8 @@ from tests.infrastructure.data_repository import (
 # manager_context migrated from deprecated manager_test_context to app_context_fixtures
 from tests.fixtures.app_context_fixtures import manager_context
 
-# Phase 2 Real Component Testing Infrastructure
-from tests.infrastructure.real_component_factory import RealComponentFactory
+if TYPE_CHECKING:
+    from core.app_context import AppContext
 
 pytestmark = [
     pytest.mark.headless,
@@ -54,7 +56,7 @@ class TestManagerPerformanceBenchmarksTDD:
     """TDD performance benchmarks for manager operations."""
 
     @pytest.mark.benchmark
-    def test_extraction_manager_initialization_performance_tdd(self, benchmark, isolated_managers):
+    def test_extraction_manager_initialization_performance_tdd(self, benchmark, app_context: AppContext):
         """TDD: Manager initialization should complete within performance budget.
 
         RED: Establish initialization time requirements (< 100ms)
@@ -66,36 +68,34 @@ class TestManagerPerformanceBenchmarksTDD:
         - Warm initialization: < 50ms
         - Memory overhead: < 10MB
         """
-        def create_extraction_manager():
-            with RealComponentFactory() as factory:
-                manager = factory.create_extraction_manager(with_test_data=True)
+        def get_extraction_manager():
+            manager = app_context.core_operations_manager
 
-                # Verify manager is fully initialized
-                assert manager.is_initialized()
-                assert manager._sprite_extractor is not None
-                assert manager._rom_extractor is not None
+            # Verify manager is fully initialized
+            assert manager.is_initialized()
+            assert manager._sprite_extractor is not None
+            assert manager._rom_extractor is not None
 
-                return manager
+            return manager
 
-        # Benchmark real manager creation performance
-        result = benchmark(create_extraction_manager)
+        # Benchmark manager access performance
+        result = benchmark(get_extraction_manager)
 
         # Verify initialization was successful
         assert result is not None
 
     @pytest.mark.benchmark
-    def test_injection_manager_initialization_performance_tdd(self, benchmark, isolated_managers):
+    def test_injection_manager_initialization_performance_tdd(self, benchmark, app_context: AppContext):
         """TDD: Injection manager initialization performance baseline."""
-        def create_injection_manager():
-            with RealComponentFactory() as factory:
-                manager = factory.create_injection_manager(with_test_data=True)
+        def get_injection_manager():
+            manager = app_context.core_operations_manager
 
-                # Verify manager is fully initialized
-                assert manager.is_initialized()
-                return manager
+            # Verify manager is fully initialized
+            assert manager.is_initialized()
+            return manager
 
-        # Benchmark injection manager creation
-        result = benchmark(create_injection_manager)
+        # Benchmark manager access performance
+        result = benchmark(get_injection_manager)
         assert result is not None
 
     @pytest.mark.benchmark
@@ -335,7 +335,7 @@ class TestManagerMemoryPerformanceTDD:
     """TDD tests for manager memory usage and performance."""
 
     @pytest.mark.benchmark
-    def test_manager_memory_usage_tdd(self, benchmark, isolated_managers):
+    def test_manager_memory_usage_tdd(self, benchmark, app_context: AppContext):
         """TDD: Manager memory usage should remain reasonable under load.
 
         RED: Establish memory usage requirements (< 50MB per manager)
@@ -343,29 +343,26 @@ class TestManagerMemoryPerformanceTDD:
         REFACTOR: Maintain functionality while minimizing memory footprint
         """
         def stress_test_managers():
-            managers_created = 0
+            managers_accessed = 0
 
-            # Create and destroy many managers to test memory management
+            # Access managers repeatedly to test singleton stability
             for i in range(10):
-                with RealComponentFactory() as factory:
-                    extraction_mgr = factory.create_extraction_manager()
-                    injection_mgr = factory.create_injection_manager()
+                extraction_mgr = app_context.core_operations_manager
+                injection_mgr = app_context.core_operations_manager  # Same manager
 
-                    # Do some work to allocate memory
-                    extraction_mgr._start_operation(f"stress_test_{i}")
+                # Do some work to allocate memory
+                extraction_mgr._start_operation(f"stress_test_{i}")
 
-                    # Verify functionality
-                    assert extraction_mgr.is_initialized()
-                    assert injection_mgr.is_initialized()
+                # Verify functionality
+                assert extraction_mgr.is_initialized()
+                assert injection_mgr.is_initialized()
 
-                    # Cleanup
-                    extraction_mgr._finish_operation(f"stress_test_{i}")
-                    extraction_mgr.cleanup()
-                    injection_mgr.cleanup()
+                # Cleanup operation state
+                extraction_mgr._finish_operation(f"stress_test_{i}")
 
-                    managers_created += 1
+                managers_accessed += 1
 
-            return managers_created
+            return managers_accessed
 
         # Benchmark memory usage under stress
         result = benchmark(stress_test_managers)

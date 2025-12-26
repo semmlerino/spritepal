@@ -22,8 +22,8 @@ Fixture Selection:
 Migration Guide:
     Replace: isolated_managers -> app_context
     Replace: session_managers -> session_app_context
-    Replace: inject(ApplicationStateManager) -> state_manager fixture
-    Replace: inject(CoreOperationsManager) -> core_operations fixture
+    Replace: get_app_context().application_state_manager -> state_manager fixture
+    Replace: get_app_context().core_operations_manager -> core_operations fixture
 """
 from __future__ import annotations
 
@@ -150,7 +150,7 @@ def state_manager(app_context: AppContext) -> ApplicationStateManager:
     """
     Get the ApplicationStateManager from the test context.
 
-    This is a convenience fixture to avoid inject() calls in tests.
+    This is a convenience fixture for direct manager access.
 
     Usage:
         def test_settings(state_manager):
@@ -165,7 +165,7 @@ def core_operations(app_context: AppContext) -> CoreOperationsManager:
     """
     Get the CoreOperationsManager from the test context.
 
-    This is a convenience fixture to avoid inject() calls in tests.
+    This is a convenience fixture for direct manager access.
 
     Usage:
         def test_extraction(core_operations, tmp_path):
@@ -251,12 +251,12 @@ def manager_context(*_manager_types: str) -> Iterator[_ManagerContextWrapper]:
         *_manager_types: Ignored. Legacy parameter for manager types.
                         All managers are now always available via AppContext.
 
-    Usage (legacy pattern - still works):
+    Legacy usage (for backward compatibility):
         with manager_context("extraction") as ctx:
             manager = ctx.get_extraction_manager()
             # ... test code ...
 
-    Preferred (new pattern):
+    Preferred (use app_context fixture instead):
         def test_something(app_context):
             manager = app_context.core_operations_manager
             # ... test code ...

@@ -21,8 +21,6 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QObject, Signal
 
-from tests.infrastructure.real_component_factory import RealComponentFactory
-
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.headless,
@@ -30,19 +28,9 @@ pytestmark = [
 
 
 @pytest.fixture
-def real_factory(tmp_path, isolated_managers):
-    """Create RealComponentFactory for integration tests.
-
-    Uses isolated_managers for proper test isolation.
-    """
-    with RealComponentFactory() as factory:
-        yield factory
-
-
-@pytest.fixture
-def injection_manager(real_factory):
+def injection_manager(app_context):
     """Create InjectionManager with real components."""
-    return real_factory.create_injection_manager(with_test_data=True)
+    return app_context.core_operations_manager
 
 
 @pytest.fixture

@@ -13,13 +13,14 @@ Benefits of real component testing vs mocking:
 - Ensures proper signal/slot connections
 - Performance and resource management validation
 
-Uses isolated_managers fixture from core_fixtures.py for per-test isolation.
-Migrated from session_managers to enable parallel execution.
+Uses app_context fixture from app_context_fixtures.py for per-test isolation.
+Migrated from isolated_managers to enable parallel execution.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
@@ -33,25 +34,25 @@ from tests.fixtures.test_data_factory import TestDataFactory
 from tests.fixtures.timeouts import signal_timeout
 from tests.fixtures.worker_helper import WorkerHelper
 
-# Parallel-safe: Uses isolated_managers for per-test isolation
+if TYPE_CHECKING:
+    from core.app_context import AppContext
+
+# Parallel-safe: Uses app_context for per-test isolation
 pytestmark = [
-    pytest.mark.usefixtures("isolated_managers"),
-    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns worker threads"),
+    pytest.mark.skip_thread_cleanup(reason="Tests create real managers which may spawn threads"),
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.slow,
 ]
 
-# Note: Uses isolated_managers fixture for per-test isolation (parallel-safe)
 
 @pytest.fixture
-def injection_manager_real(isolated_managers):
+def injection_manager_real(app_context: AppContext):
     """Provide real injection manager for testing.
 
     Uses CoreOperationsManager which implements InjectionManagerProtocol.
     """
-    from core.app_context import get_app_context
-    return get_app_context().core_operations_manager
+    return app_context.core_operations_manager
 
 @pytest.fixture
 def temp_files_with_real_content(tmp_path):
@@ -174,18 +175,17 @@ class TestInjectionManagerParameterValidation:
 
     These tests replace FileValidator mocking with real file operations
     to test actual validation logic and edge cases.
-    Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
+    Uses app_context fixture for per-test isolation (parallel-safe).
     """
 
-    def test_validate_vram_injection_params_valid_real_files(self, temp_files_with_real_content, isolated_managers):
+    def test_validate_vram_injection_params_valid_real_files(self, temp_files_with_real_content, app_context: AppContext):
         """TDD: Validation should succeed with real valid files.
 
         RED: Validation should pass for properly formatted files
         GREEN: Real FileValidator should validate actual file content
         REFACTOR: No mocking - tests real validation logic
         """
-        from core.app_context import get_app_context
-        manager = get_app_context().core_operations_manager
+        manager = app_context.core_operations_manager
 
         params = {
             "mode": "vram",
@@ -216,14 +216,13 @@ class TestInjectionManagerParameterValidation:
             # This is acceptable as it shows real edge cases
             pass
 
-    def test_validate_rom_injection_params_valid_real_files(self, temp_files_with_real_content, isolated_managers):
+    def test_validate_rom_injection_params_valid_real_files(self, temp_files_with_real_content, app_context: AppContext):
         """TDD: ROM validation should work with real ROM file structure.
 
         Tests real ROM file validation including header checks, size validation,
         and format verification that mocks cannot test.
         """
-        from core.app_context import get_app_context
-        manager = get_app_context().core_operations_manager
+        manager = app_context.core_operations_manager
 
         params = {
             "mode": "rom",

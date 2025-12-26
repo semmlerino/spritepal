@@ -7,24 +7,20 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.app_context import get_app_context
 from core.managers.application_state_manager import ApplicationStateManager
-from core.managers.core_operations_manager import CoreOperationsManager
 from ui.extraction_controller import ExtractionController
 
-
-def get_settings_manager():
-    """Get settings manager from app context."""
-    return get_app_context().application_state_manager
+if TYPE_CHECKING:
+    from core.app_context import AppContext
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
-    pytest.mark.usefixtures("isolated_managers"),
-    pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns cleanup"),
+    pytest.mark.skip_thread_cleanup(reason="Tests create real managers which may spawn threads"),
     pytest.mark.headless,
     pytest.mark.integration,
 ]
@@ -56,7 +52,7 @@ class TestSettingsIntegration:
         mock.palette_list = MagicMock()
         return mock
 
-    def test_settings_persistence_across_sessions(self, temp_settings_dir, isolated_managers):
+    def test_settings_persistence_across_sessions(self, temp_settings_dir, app_context: AppContext):
         """Test that settings persist across application restarts"""
         # Use ApplicationStateManager directly for isolated testing
         temp_file = Path(temp_settings_dir) / "test_settings.json"
@@ -89,9 +85,9 @@ class TestSettingsIntegration:
         assert settings2.get("ui", "window_height") == 768
         assert settings2.get("custom", "last_export_dir") == "/exports"
 
-    def test_controller_settings_integration(self, temp_settings_dir, mock_main_window, isolated_managers):
+    def test_controller_settings_integration(self, temp_settings_dir, mock_main_window, app_context: AppContext):
         """Test controller interaction with settings manager"""
-        settings = get_settings_manager()
+        settings = app_context.application_state_manager
 
         # Pre-populate settings
         settings.set("session", "last_extraction_offset", 0xC000)
@@ -99,12 +95,11 @@ class TestSettingsIntegration:
         settings.save_settings()
 
         # Create controller with all required dependencies
-        context = get_app_context()
         ExtractionController(
             main_window=mock_main_window,
-            extraction_manager=context.core_operations_manager,
-            session_manager=context.application_state_manager,
-            injection_manager=context.core_operations_manager,
+            extraction_manager=app_context.core_operations_manager,
+            session_manager=app_context.application_state_manager,
+            injection_manager=app_context.core_operations_manager,
             settings_manager=settings,
         )
 
@@ -113,7 +108,7 @@ class TestSettingsIntegration:
         last_offset = settings.get("session", "last_extraction_offset", 0)
         assert last_offset == 0xC000
 
-    def test_window_geometry_persistence(self, temp_settings_dir, isolated_managers):
+    def test_window_geometry_persistence(self, temp_settings_dir, app_context: AppContext):
         """Test UI geometry settings persistence"""
         # Create ApplicationStateManager with temporary file
         temp_file = Path(temp_settings_dir) / "geometry_settings.json"
@@ -151,9 +146,9 @@ class TestSettingsIntegration:
         assert not new_settings.get("ui", "window_maximized")
         assert new_settings.get("ui", "window_splitter_sizes") == [300, 900]
 
-    def test_recent_files_management(self, temp_settings_dir, isolated_managers):
+    def test_recent_files_management(self, temp_settings_dir, app_context: AppContext):
         """Test recent files list in settings"""
-        settings = get_settings_manager()
+        settings = app_context.application_state_manager
 
         # Add recent files
         recent_files = []
@@ -180,9 +175,9 @@ class TestSettingsIntegration:
         assert final_list[0] == new_file
         assert len(final_list) == 5
 
-    def test_extraction_preferences_persistence(self, temp_settings_dir, isolated_managers):
+    def test_extraction_preferences_persistence(self, temp_settings_dir, app_context: AppContext):
         """Test extraction preference settings"""
-        settings = get_settings_manager()
+        settings = app_context.application_state_manager
 
         # Set extraction preferences
         prefs = {
@@ -199,15 +194,15 @@ class TestSettingsIntegration:
 
         settings.save_settings()
 
-        # Verify in new session
-        new_settings = get_settings_manager()
+        # Verify in new session (same manager since using app_context)
+        new_settings = app_context.application_state_manager
         for key, expected in prefs.items():
             actual = new_settings.get("extraction", key)
             assert actual == expected, f"Preference {key} not persisted"
 
-    def test_color_scheme_persistence(self, temp_settings_dir, isolated_managers):
+    def test_color_scheme_persistence(self, temp_settings_dir, app_context: AppContext):
         """Test UI color scheme settings"""
-        settings = get_settings_manager()
+        settings = app_context.application_state_manager
 
         # Save color scheme
         color_scheme = {
@@ -225,10 +220,10 @@ class TestSettingsIntegration:
         loaded_scheme = settings.get("appearance", "color_scheme", {})
         assert loaded_scheme == color_scheme
 
-    def test_concurrent_settings_access(self, temp_settings_dir, isolated_managers):
+    def test_concurrent_settings_access(self, temp_settings_dir, app_context: AppContext):
         """Test concurrent access to settings"""
-        settings1 = get_settings_manager()
-        settings2 = get_settings_manager()
+        settings1 = app_context.application_state_manager
+        settings2 = app_context.application_state_manager
 
         # Both should reference same instance
         assert settings1 is settings2
@@ -264,9 +259,9 @@ class TestSettingsIntegration:
             data = json.load(f)
             assert data["session"]["vram_path"] == "/new/path.dmp"
 
-    def test_settings_permission_handling(self, temp_settings_dir, isolated_managers):
+    def test_settings_permission_handling(self, temp_settings_dir, app_context: AppContext):
         """Test handling of permission errors"""
-        settings = get_settings_manager()
+        settings = app_context.application_state_manager
 
         # Set some data
         settings.set("test", "data", "value")
@@ -283,9 +278,9 @@ class TestSettingsIntegration:
         # Settings should still be in memory
         assert settings.get("test", "new_data") == "new_value"
 
-    def test_export_import_settings(self, temp_settings_dir, isolated_managers):
+    def test_export_import_settings(self, temp_settings_dir, app_context: AppContext):
         """Test exporting and importing settings"""
-        settings = get_settings_manager()
+        settings = app_context.application_state_manager
 
         # Configure settings
         settings.set("session", "vram_path", "/test/vram.dmp")

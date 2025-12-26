@@ -129,18 +129,19 @@ initialize_managers("AppName", settings_path=...)
        self.core_manager = core_manager
    ```
 
-3. **Protocol-Based Injection**
-   Use `inject()` for resolving managers when constructing objects:
+3. **AppContext for Manager Access**
+   Use `get_app_context()` to access managers:
    ```python
-   from core.di_container import inject
+   from core.app_context import get_app_context
    from core.managers.core_operations_manager import CoreOperationsManager
 
    # At application entry point or factory
-   core_manager = inject(CoreOperationsManager)
+   context = get_app_context()
+   core_manager = context.core_operations_manager
    panel = ROMExtractionPanel(core_manager=core_manager)
    ```
 
-   **Note:** The legacy `ManagerRegistry.get_*_manager()` methods are deprecated.
+   **Note:** The legacy `ManagerRegistry.get_*_manager()` methods have been removed.
    Module-level `get_*_manager()` convenience functions have been removed.
 
 ### Special Cases
@@ -192,11 +193,11 @@ This pattern is acceptable ONLY in `utils/` modules that need to work independen
    ```python
    # Bad - Service locator functions have been removed
    from spritepal.core.managers import get_extraction_manager  # REMOVED
-   manager = ManagerRegistry.get_extraction_manager()  # DEPRECATED
+   manager = ManagerRegistry.get_extraction_manager()  # REMOVED
 
-   # Good - Use inject() or constructor injection
-   from core.di_container import inject
-   manager = inject(CoreOperationsManager)
+   # Good - Use get_app_context() or constructor injection
+   from core.app_context import get_app_context
+   manager = get_app_context().core_operations_manager
    ```
 
 ### Testing Imports
@@ -283,8 +284,8 @@ SpritePal uses multiple singleton patterns for resource management:
 
 | Singleton | Location | Purpose | Thread-Safe | Reset Method |
 |-----------|----------|---------|-------------|--------------|
+| `AppContext` | `core/app_context.py` | Manager access | N/A | `reset_app_context()` |
 | `ManagerRegistry` | `core/managers/registry.py` | Manager lifecycle | Yes (QMutex) | `reset_for_tests()` |
-| `DIContainer` | `core/di_container.py` | Protocol bindings | No | `reset_container()` |
 | `HALProcessPool` | `core/hal_compression.py` | Compression workers | Yes (Lock) | `shutdown()` |
 | `PreviewGenerator` | `core/services/preview_generator.py` | Thumbnail generation | Yes (QMutex) | `cleanup()` |
 
@@ -305,8 +306,8 @@ Application Exit (QApplication.aboutToQuit signal)
     3. Manager Registry
        - ManagerRegistry().cleanup_managers()
          ↓
-    4. DI Container
-       - reset_container()
+    4. AppContext
+       - reset_app_context()
 ```
 
 #### Implementation
@@ -329,9 +330,9 @@ def cleanup():
     from core.managers import cleanup_managers
     cleanup_managers()
 
-    # 4. Reset DI container
-    from core.di_container import reset_container
-    reset_container()
+    # 4. Reset AppContext
+    from core.app_context import reset_app_context
+    reset_app_context()
 
 app.aboutToQuit.connect(cleanup)
 ```
@@ -341,7 +342,7 @@ app.aboutToQuit.connect(cleanup)
 1. **UI First**: Qt widgets may hold references to managers; closing UI first prevents access to cleaned-up managers.
 2. **Workers Second**: Worker threads may reference managers; stopping workers prevents race conditions.
 3. **Managers Third**: Managers may hold resources (files, caches); cleaning them releases resources.
-4. **DI Container Last**: Container holds singleton references; resetting it ensures no dangling protocol implementations.
+4. **AppContext Last**: Context holds manager references; resetting it ensures no dangling references.
 
 ### Threading Constraints
 
@@ -351,7 +352,7 @@ app.aboutToQuit.connect(cleanup)
 |-----------|--------|
 | `ManagerRegistry` | Managers are QObjects with Qt parents |
 | `PreviewGenerator` | Uses QTimer for debouncing |
-| `DIContainer` | May return QObject-based implementations |
+| `AppContext` | Returns QObject-based managers |
 
 **Signal Connection Rules** - When connecting signals from managers, use `Qt.QueuedConnection` unless you're certain both sender and receiver are on the same thread:
 
@@ -365,85 +366,75 @@ manager.operation_complete.connect(
 
 ### Test Cleanup
 
-The `isolated_managers` fixture handles all singleton cleanup automatically:
+The `app_context` fixture handles all singleton cleanup automatically:
 
 ```python
-def test_something(isolated_managers):
-    # Managers and DI container are fresh
-    manager = inject(CoreOperationsManager)
+def test_something(app_context):
+    # AppContext provides fresh managers
+    manager = app_context.core_operations_manager
     # ... test ...
     # Cleanup happens automatically after test
 ```
 
 ---
 
-## Dependency Injection
+## Manager Access
 
-SpritePal has two DI mechanisms that work **together**:
+SpritePal uses **AppContext** to provide access to managers:
 
-### The Two Systems
+### AppContext (`core/app_context.py`)
 
-#### DIContainer (`core/di_container.py`) - Preferred
-
-The DIContainer maps protocol types to implementations. Use it to obtain dependencies:
+The AppContext is the central access point for all managers:
 
 ```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
 # Get a manager instance
-manager = inject(CoreOperationsManager)
+context = get_app_context()
+manager = context.core_operations_manager
 ```
 
 **Key functions:**
-- `inject(ProtocolType)` - Get an instance for a protocol
-- `register_singleton(protocol, instance)` - Register a singleton
-- `register_factory(protocol, factory_fn)` - Register a factory function
-- `reset_container()` - Clear all bindings (for tests)
+- `get_app_context()` - Get the global AppContext (raises if not initialized)
+- `create_app_context(...)` - Initialize AppContext with managers (done at startup)
+- `reset_app_context()` - Clear context (for tests)
 
-#### ManagerRegistry (`core/managers/registry.py`) - Lifecycle Management
+### ManagerRegistry (`core/managers/registry.py`) - Lifecycle Management
 
 The ManagerRegistry is a **singleton** that:
 1. Creates all manager instances at startup
-2. Configures the DIContainer (registers services and managers)
+2. Registers them with AppContext
 3. Handles cleanup at shutdown
 
 **Initialization Flow:**
 ```
 Application Start
        ↓
-ManagerRegistry.initialize_managers()
+initialize_managers()
        ↓
-1. configure_container()           → Registers services (ConfigurationService,
-   │                                  ROMCache, etc.)
+1. Create ApplicationStateManager
    ↓
-2. Create ApplicationStateManager  → Registers as concrete class
-   │
+2. Create CoreOperationsManager
    ↓
-3. Create CoreOperationsManager    → Can now use inject(ApplicationStateManager)
-   │                                  via ROMCache chain
+3. create_app_context(...)         → Registers both managers
    ↓
-4. register_managers()             → Registers CoreOperationsManager
-   │                                  as concrete class
-   ↓
-Application Code: inject(CoreOperationsManager)
+Application Code: get_app_context().core_operations_manager
        ↓
-DIContainer returns the registered implementation
+AppContext returns the registered manager
 ```
 
 **Why this order matters:** CoreOperationsManager creates ROMExtractor, which needs
-ROMCache, which needs ApplicationStateManager. If ApplicationStateManager isn't
-registered before CoreOperationsManager is created, the DI chain fails.
+ROMCache, which needs ApplicationStateManager. Managers must be created in dependency order.
 
 ### Quick Reference
 
 | Need | Use |
 |------|-----|
-| Get a manager in application code | `inject(CoreOperationsManager)` |
+| Get a manager in application code | `get_app_context().core_operations_manager` |
 | Pass manager to a class | Constructor parameter: `def __init__(self, manager: CoreOperationsManager)` |
-| Initialize all managers | `ManagerRegistry().initialize_managers()` (done at app startup) |
-| Clean up at shutdown | `ManagerRegistry().cleanup_managers()` |
-| Reset for tests | Use `isolated_managers` fixture |
+| Initialize all managers | `initialize_managers()` (done at app startup) |
+| Clean up at shutdown | `cleanup_managers()` |
+| Reset for tests | Use `app_context` fixture |
 
 ### Available Protocols
 
@@ -463,10 +454,9 @@ SpritePal uses concrete classes directly via DI. The `core/protocols/` directory
 # from core.managers.registry import ManagerRegistry
 # manager = ManagerRegistry().get_extraction_manager()  # Method removed
 
-# CORRECT - use inject() with concrete manager class
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
-manager = inject(CoreOperationsManager)
+# CORRECT - use get_app_context()
+from core.app_context import get_app_context
+manager = get_app_context().core_operations_manager
 ```
 
 ```python
@@ -474,9 +464,9 @@ manager = inject(CoreOperationsManager)
 from core.managers.core_operations_manager import CoreOperationsManager
 manager = CoreOperationsManager()  # Missing required dependencies
 
-# GOOD - use inject() for proper initialization
-from core.di_container import inject
-manager = inject(CoreOperationsManager)
+# GOOD - use get_app_context() for proper initialization
+from core.app_context import get_app_context
+manager = get_app_context().core_operations_manager
 ```
 
 ---
@@ -490,9 +480,9 @@ that was previously used for backward compatibility has been fully removed.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│      DI Container (inject() with concrete classes)          │
-│  inject(CoreOperationsManager) → CoreOperationsManager      │
-│  inject(ApplicationStateManager) → ApplicationStateManager  │
+│      AppContext (get_app_context())                          │
+│  .core_operations_manager → CoreOperationsManager            │
+│  .application_state_manager → ApplicationStateManager        │
 └───────────────────────────┬─────────────────────────────────┘
                             │
                             ▼
@@ -501,17 +491,17 @@ that was previously used for backward compatibility has been fully removed.
 │  CoreOperationsManager:                                      │
 │    - Owns ROMService, VRAMService, ROMExtractor             │
 │    - Owns all extraction/injection business logic            │
-│    - Direct access via inject(CoreOperationsManager)         │
+│    - Access via get_app_context().core_operations_manager    │
 │                                                              │
 │  ApplicationStateManager:                                    │
 │    - Owns session, settings, state, history                  │
-│    - Direct access via inject(ApplicationStateManager)       │
+│    - Access via get_app_context().application_state_manager  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Rules
 
-1. **Use inject() for access**: Always get managers via `inject(ManagerClass)`,
+1. **Use get_app_context() for access**: Always get managers via `get_app_context()`,
    never instantiate directly.
 
 2. **Single source of truth**: All business logic lives in consolidated managers.
@@ -523,11 +513,10 @@ that was previously used for backward compatibility has been fully removed.
 ### Example: Using CoreOperationsManager
 
 ```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+from core.app_context import get_app_context
 
-# Get manager via DI
-manager = inject(CoreOperationsManager)
+# Get manager via AppContext
+manager = get_app_context().core_operations_manager
 
 # Connect to signals
 manager.extraction_progress.connect(self._on_progress)
@@ -546,4 +535,4 @@ result = manager.extract_from_rom(params)
 
 ---
 
-*Last updated: December 25, 2025 (Removed obsolete dialog protocol references)*
+*Last updated: December 26, 2025 (Replaced inject() with get_app_context() pattern)*

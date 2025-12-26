@@ -64,7 +64,7 @@ def test_worker_with_image():
 
 ## Manager Access Pattern
 
-**Current (recommended):**
+**Use `get_app_context()` to access managers:**
 ```python
 from core.app_context import get_app_context
 
@@ -73,15 +73,9 @@ manager = context.core_operations_manager
 state = context.application_state_manager
 ```
 
-**Legacy (deprecated but still works):**
-```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
+Benefits: Explicit access, better IDE support, no class imports needed.
 
-manager = inject(CoreOperationsManager)
-```
-
-The `get_app_context()` pattern is preferred for explicit access and better IDE support.
+**Note:** The `inject()` pattern has been removed. Use `get_app_context()` exclusively.
 
 ## Timeout Functions
 

@@ -41,20 +41,20 @@ Application Entry Point (launch_spritepal.py)
 
 ### Dependency Chain
 
-When you call `inject(ROMExtractor)`:
+When managers are created:
 
 ```
 ROMExtractor needs ROMCache
     └── ROMCache needs ApplicationStateManager (for settings)
-            └── ✓ Already registered (step 2)
+            └── ✓ Already created (step 2)
 ```
 
 ### Common Initialization Errors
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| "No registration for ApplicationStateManager" | CoreOperationsManager created before ApplicationStateManager | Ensure `configure_container()` runs first |
-| "Factory for X previously failed" | Factory threw exception, container cached failure | Call `reset_container()` and reinitialize |
+| "AppContext not initialized" | Accessing managers before `create_app_context()` | Ensure `initialize_managers()` runs first |
+| "ApplicationStateManager required first" | CoreOperationsManager created before ApplicationStateManager | Check manager creation order |
 
 ---
 
@@ -240,15 +240,14 @@ Application Launch
 ### 4.3 Settings Access Pattern
 
 ```python
-from core.managers.application_state_manager import ApplicationStateManager
-from core.di_container import inject
+from core.app_context import get_app_context
 
-# Settings are now part of ApplicationStateManager
-app_state = inject(ApplicationStateManager)
+# Settings are part of ApplicationStateManager
+app_state = get_app_context().application_state_manager
 value = app_state.settings.get("some_setting", default_value)
 ```
 
-**Note:** Settings functionality is integrated into `ApplicationStateManager`. Use the concrete class directly via `inject(ApplicationStateManager)`.
+**Note:** Settings functionality is integrated into `ApplicationStateManager`. Access via `get_app_context().application_state_manager`.
 
 ---
 
@@ -371,10 +370,10 @@ User modifies sprite
 | Settings load | `core/managers/application_state_manager.py` | `ApplicationStateManager._load_settings()` |
 | Error handling | `ui/common/error_handler.py` | `ErrorHandler.handle_error()` |
 | Preview generation | `core/services/preview_generator.py` | `PreviewGenerator.generate()` |
-| DI injection | `core/di_container.py` | `inject()` |
+| Manager access | `core/app_context.py` | `get_app_context()` |
 | Dump file detection | `core/services/dump_file_detection_service.py` | `detect_related_files()`, `auto_detect_all()` |
 | Extraction readiness | `core/services/extraction_readiness_service.py` | `check_vram_readiness()`, `check_rom_extraction_readiness()` |
 
 ---
 
-*Last updated: December 25, 2025 (Removed obsolete protocol references, updated DI examples)*
+*Last updated: December 26, 2025 (Replaced inject() with get_app_context() pattern)*

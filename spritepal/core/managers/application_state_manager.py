@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import json
 import threading
-from collections.abc import Generator, Mapping
-from contextlib import contextmanager
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar, cast, override
 
@@ -100,23 +99,10 @@ class ApplicationStateManager(BaseManager):
             # This ensures settings file location is relative to app root, not CWD
             config = configuration_service
             if config is None:
-                # Try DI injection first (preferred method)
-                try:
-                    from core.configuration_service import ConfigurationService
-                    from core.di_container import get_container
-                    config = get_container().get_optional(ConfigurationService)
-                except (ImportError, ValueError):
-                    config = None
-
-                # Fall back to creating a new instance if DI not available
-                # This should rarely happen in practice since AppContext
-                # creates ConfigurationService before ApplicationStateManager
-                if config is None:
-                    from core.configuration_service import ConfigurationService
-                    config = ConfigurationService()
-
-            # At this point config is guaranteed to be set (fallback always provides one)
-            assert config is not None, "ConfigurationService should always be available"
+                # Create ConfigurationService if not provided
+                # (AppContext normally provides this, but fallback is safe since it's stateless)
+                from core.configuration_service import ConfigurationService
+                config = ConfigurationService()
             self._settings_file = config.settings_file
 
         # Persistent settings (saved to disk) - JSON-serializable values
@@ -134,14 +120,6 @@ class ApplicationStateManager(BaseManager):
 
         # Forward workflow state changes to unified state_changed signal
         self._workflow_manager.workflow_state_changed.connect(self._on_workflow_state_changed)
-
-    # ========== Lock Helper Methods ==========
-
-    @contextmanager
-    def _acquire_state_lock(self) -> Generator[None, None, None]:
-        """Acquire state lock."""
-        with self._state_lock:
-            yield
 
     def _on_workflow_state_changed(
         self, old_state: ExtractionState, new_state: ExtractionState

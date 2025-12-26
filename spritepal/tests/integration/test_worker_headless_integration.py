@@ -3,10 +3,14 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from PIL import Image
+
+if TYPE_CHECKING:
+    from core.app_context import AppContext
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 from core.extractor import SpriteExtractor
@@ -89,9 +93,9 @@ class TestVRAMExtractionWorkerHeadless:
             "oam_path": None,
         }
 
-    def test_worker_logic_without_qt(self, worker_params, mock_qt_imports, isolated_managers):
+    def test_worker_logic_without_qt(self, worker_params, mock_qt_imports, app_context: AppContext):
         """Test worker logic without Qt dependencies"""
-        # Managers already initialized by isolated_managers fixture
+        # Managers already initialized by app_context fixture
 
         # Create mock manager and pass directly to worker (replaces deprecated get_extraction_manager patch)
         mock_manager = Mock()

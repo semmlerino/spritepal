@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import mmap
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager, suppress
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, PriorityQueue
@@ -340,34 +340,6 @@ class BatchThumbnailWorker(QObject):
             # Clear cache as well
             self._clear_cache_memory()
             self.finished.emit()
-
-    @contextmanager
-    def _rom_context(self):
-        """Context manager for safe ROM file and memory map handling."""
-        rom_file = None
-        rom_mmap = None
-        try:
-            rom_file = Path(self.rom_path).open('rb')
-            try:
-                # Try memory mapping first
-                rom_mmap = mmap.mmap(rom_file.fileno(), 0, access=mmap.ACCESS_READ)
-                yield rom_mmap
-            except Exception as mmap_error:
-                logger.warning(f"Failed to memory-map ROM, using fallback: {mmap_error}")
-                # Fallback to reading entire file
-                rom_file.seek(0)
-                rom_data = rom_file.read()
-
-                # Use module-level BytesMMAPWrapper for mmap-compatible interface
-                yield BytesMMAPWrapper(rom_data)
-        finally:
-            # Ensure proper cleanup in all cases
-            with suppress(Exception):
-                if rom_mmap is not None:
-                    rom_mmap.close()
-            with suppress(Exception):
-                if rom_file is not None:
-                    rom_file.close()
 
     def _load_rom_data(self):
         """Load ROM data using memory mapping for efficiency with proper resource management."""
