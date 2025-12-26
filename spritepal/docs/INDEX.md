@@ -39,6 +39,7 @@ This is the central entry point for all SpritePal documentation.
 | Add a new feature | [architecture.md](architecture.md) → Import Rules |
 | Write tests | [tests/README.md](../tests/README.md) → Fixture Quick Reference |
 | Create a dialog | [architecture.md](architecture.md) → Dialog Patterns |
+| Signal cleanup in dialogs | [architecture.md](architecture.md) → Signal Disconnection Pattern |
 | Understand DI | [architecture.md](architecture.md) → Dependency Injection |
 | Debug singletons | [architecture.md](architecture.md) → Singletons and Cleanup |
 | Trace data flows | [application_flows.md](application_flows.md) |
@@ -69,4 +70,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: December 25, 2025*
+*Last updated: December 27, 2025*

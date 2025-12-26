@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 from PIL import Image
 from PySide6.QtCore import QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QPixmap
-
-from core.services.image_utils import pil_to_qimage
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -32,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.default_palette_loader import DefaultPaletteLoader
+from core.services.image_utils import pil_to_qimage
 
 # ExtractionManager accessed via get_app_context().core_operations_manager
 from core.visual_similarity_search import VisualSimilarityEngine

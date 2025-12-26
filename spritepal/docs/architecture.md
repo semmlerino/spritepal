@@ -274,6 +274,48 @@ class SingletonDialog(BaseDialog):
 - No closeEvent override for singletons
 - Only mock-based dialog tests (no real Qt lifecycle tests)
 
+#### Signal Disconnection Pattern
+
+Dialogs and panels that connect to signals should disconnect them in `closeEvent()` to prevent memory leaks and stale callbacks. Use `safe_disconnect()` from `ui/common/signal_utils.py`:
+
+```python
+from ui.common.signal_utils import safe_disconnect
+
+class MyDialog(DialogBase):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.manager.data_changed.connect(self._on_data_changed)
+
+    def closeEvent(self, event: QCloseEvent | None) -> None:
+        # Disconnect signals to prevent memory leaks
+        safe_disconnect(self.manager.data_changed)
+        if event:
+            super().closeEvent(event)
+```
+
+**Why `safe_disconnect()`?**
+- Suppresses `RuntimeWarning` from PySide6 when signal has no connections
+- Handles `RuntimeError` and `TypeError` if already disconnected
+- Single line instead of try/except boilerplate
+
+**Available utilities in `ui/common/signal_utils.py`:**
+
+| Function | Purpose |
+|----------|---------|
+| `safe_disconnect(signal)` | Disconnect all slots from a signal safely |
+| `is_valid_qt(obj)` | Check if Qt object is still valid (not deleted) |
+| `is_valid_pixmap(pixmap)` | Check if QPixmap is valid and not null |
+| `blocked_signals(widget)` | Context manager to temporarily block signals |
+
+**Example - blocking signals during programmatic updates:**
+```python
+from ui.common.signal_utils import blocked_signals
+
+def _sync_slider_to_spinbox(self, value: int) -> None:
+    with blocked_signals(self.spinbox):
+        self.spinbox.setValue(value)  # Won't trigger valueChanged
+```
+
 ---
 
 ## Singletons and Cleanup
@@ -535,4 +577,4 @@ result = manager.extract_from_rom(params)
 
 ---
 
-*Last updated: December 26, 2025 (Replaced inject() with get_app_context() pattern)*
+*Last updated: December 27, 2025 (Added Signal Disconnection Pattern section)*

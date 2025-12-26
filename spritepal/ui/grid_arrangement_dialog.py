@@ -5,7 +5,6 @@ Flexible sprite arrangement supporting rows, columns, and custom tile groups
 
 from __future__ import annotations
 
-import warnings
 from enum import Enum
 from pathlib import Path
 from typing import Any, override
@@ -23,8 +22,6 @@ from PySide6.QtGui import (
     QPixmap,
     QWheelEvent,
 )
-
-from core.services.image_utils import pil_to_qimage
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -43,6 +40,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.services.image_utils import pil_to_qimage
+from ui.common.signal_utils import safe_disconnect
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL
 from ui.components.visualization import ScrollablePreviewGroup
 
@@ -822,24 +821,12 @@ class GridArrangementDialog(SplitterDialog):
         # Add focus indicators
         AccessibilityHelper.add_focus_indicators(self)
 
-        # Add keyboard shortcuts
+        # Add keyboard shortcuts (Ctrl+Z, Ctrl+Y, Delete handled via keyPressEvent)
         from PySide6.QtGui import QKeySequence, QShortcut
 
-        # Ctrl+E for export
+        # Ctrl+E for export (not duplicated in keyPressEvent)
         export_shortcut = QShortcut(QKeySequence("Ctrl+E"), self)
         export_shortcut.activated.connect(self._export_arrangement)
-
-        # Ctrl+Z for undo (placeholder - not yet implemented)
-        undo_shortcut = QShortcut(QKeySequence("Ctrl+Z"), self)
-        undo_shortcut.activated.connect(self._on_undo)
-
-        # Ctrl+Y for redo (placeholder - not yet implemented)
-        redo_shortcut = QShortcut(QKeySequence("Ctrl+Y"), self)
-        redo_shortcut.activated.connect(self._on_redo)
-
-        # Del for clear selection
-        delete_shortcut = QShortcut(QKeySequence("Delete"), self)
-        delete_shortcut.activated.connect(self._on_delete_selection)
 
     def _create_selection_mode_group(self, parent: QWidget) -> QGroupBox:
         """Create the selection mode controls group.
@@ -1061,11 +1048,6 @@ class GridArrangementDialog(SplitterDialog):
             self._update_displays()
             self._update_status(f"Redo: {description}")
 
-    def _on_delete_selection(self) -> None:
-        """Handle delete shortcut to clear selection."""
-        if hasattr(self, "grid_view") and self.grid_view:
-            self.grid_view.clear_selection()
-
     def _on_mode_changed(self, button: QRadioButton) -> None:
         """Handle selection mode change"""
         mode = button.property("mode")
@@ -1241,6 +1223,29 @@ class GridArrangementDialog(SplitterDialog):
         """Handle palette mode change"""
         self._update_displays()
 
+    def toggle_palette_application(self) -> None:
+        """Toggle between grayscale and colorized display."""
+        palette_enabled = self.colorizer.toggle_palette_mode()
+        # Signal handler _on_palette_mode_changed already calls _update_displays()
+
+        if palette_enabled:
+            palette_idx = self.colorizer.get_selected_palette_index()
+            self.setWindowTitle(f"Arrange Sprite Grid - Palette {palette_idx}")
+            self._update_status(
+                f"Palette mode: Palette {palette_idx} applied | Press C to toggle, P to cycle"
+            )
+        else:
+            self.setWindowTitle("Arrange Sprite Grid - Grayscale")
+            self._update_status("Grayscale mode: Original sprite colors | Press C to toggle palette")
+
+    def _cycle_palette(self) -> None:
+        """Cycle through available palettes."""
+        new_palette_idx = self.colorizer.cycle_palette()
+        self.setWindowTitle(f"Arrange Sprite Grid - Palette {new_palette_idx}")
+        self._update_status(
+            f"Palette mode: Palette {new_palette_idx} applied | Press C to toggle, P to cycle"
+        )
+
     def _update_displays(self):
         """Update all display elements"""
         # Update grid view highlights
@@ -1378,10 +1383,10 @@ class GridArrangementDialog(SplitterDialog):
             pass
         elif key == Qt.Key.Key_C:
             # Toggle palette
-            self.colorizer.toggle_palette_mode()
+            self.toggle_palette_application()
         elif key == Qt.Key.Key_P and self.colorizer.is_palette_mode():
             # Cycle palette
-            self.colorizer.cycle_palette()
+            self._cycle_palette()
         elif key == Qt.Key.Key_Delete:
             # Remove selection
             self._remove_selection()
@@ -1412,57 +1417,37 @@ class GridArrangementDialog(SplitterDialog):
 
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent memory leaks."""
-        disconnect_errors = (RuntimeError, TypeError, AttributeError)
+        # Disconnect arrangement manager signals
+        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
+            safe_disconnect(self.arrangement_manager.arrangement_changed)
 
-        # Suppress RuntimeWarning from PySide6 when disconnecting signals with no connections
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*disconnect.*")
+        # Disconnect colorizer signals
+        if hasattr(self, "colorizer"):
+            safe_disconnect(self.colorizer.palette_mode_changed)
 
-            # Disconnect arrangement manager signals
-            if hasattr(self, "arrangement_manager") and self.arrangement_manager:
-                try:
-                    self.arrangement_manager.arrangement_changed.disconnect()
-                except disconnect_errors:
-                    pass
+        # Disconnect mode button signals
+        if hasattr(self, "mode_buttons"):
+            safe_disconnect(self.mode_buttons.buttonClicked)
 
-            # Disconnect colorizer signals
-            if hasattr(self, "colorizer"):
-                try:
-                    self.colorizer.palette_mode_changed.disconnect()
-                except disconnect_errors:
-                    pass
+        # Disconnect grid view signals
+        if hasattr(self, "grid_view"):
+            safe_disconnect(self.grid_view.tile_clicked)
+            safe_disconnect(self.grid_view.tiles_selected)
+            safe_disconnect(self.grid_view.zoom_changed)
 
-            # Disconnect mode button signals
-            if hasattr(self, "mode_buttons"):
-                try:
-                    self.mode_buttons.buttonClicked.disconnect()
-                except disconnect_errors:
-                    pass
-
-            # Disconnect grid view signals
-            if hasattr(self, "grid_view"):
-                for signal_name in ("tile_clicked", "tiles_selected", "zoom_changed"):
-                    try:
-                        getattr(self.grid_view, signal_name).disconnect()
-                    except disconnect_errors:
-                        pass
-
-            # Disconnect button signals
-            for btn_name in (
-                "add_btn",
-                "remove_btn",
-                "create_group_btn",
-                "clear_btn",
-                "zoom_out_btn",
-                "zoom_in_btn",
-                "zoom_fit_btn",
-                "zoom_reset_btn",
-            ):
-                if hasattr(self, btn_name):
-                    try:
-                        getattr(self, btn_name).clicked.disconnect()
-                    except disconnect_errors:
-                        pass
+        # Disconnect button signals
+        for btn_name in (
+            "add_btn",
+            "remove_btn",
+            "create_group_btn",
+            "clear_btn",
+            "zoom_out_btn",
+            "zoom_in_btn",
+            "zoom_fit_btn",
+            "zoom_reset_btn",
+        ):
+            if hasattr(self, btn_name):
+                safe_disconnect(getattr(self, btn_name).clicked)
 
     def _cleanup_resources(self) -> None:
         """Clean up resources to prevent memory leaks"""

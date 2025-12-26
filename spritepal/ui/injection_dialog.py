@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 # CoreOperationsManager accessed via get_app_context().core_operations_manager
 from core.sprite_validator import SpriteValidator
 from ui.common import WorkerManager
+from ui.common.signal_utils import safe_disconnect
 from ui.common.spacing_constants import EXTRACTION_LABEL_MIN_WIDTH, SPACING_SMALL
 from ui.components import (
     FileSelector,
@@ -1123,12 +1124,9 @@ class InjectionDialog(TabbedDialog):
             self._rom_info_loader.blockSignals(True)
 
             # Then disconnect signals to break references
-            try:
-                self._rom_info_loader.rom_info_loaded.disconnect(self._on_rom_info_loaded)
-                self._rom_info_loader.error.disconnect(self._on_rom_info_error)
-                self._rom_info_loader.operation_finished.disconnect(self._on_rom_info_finished)
-            except (RuntimeError, TypeError):
-                pass  # Already disconnected or object deleted
+            safe_disconnect(self._rom_info_loader.rom_info_loaded)
+            safe_disconnect(self._rom_info_loader.error)
+            safe_disconnect(self._rom_info_loader.operation_finished)
 
             if self._rom_info_loader.isRunning():
                 logger.debug("Stopping ROM info loader on dialog close")

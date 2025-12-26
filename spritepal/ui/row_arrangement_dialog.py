@@ -5,7 +5,6 @@ Intuitive drag-and-drop interface for arranging sprite rows
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -17,8 +16,6 @@ from typing import override
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QKeyEvent, QPixmap
-
-from core.services.image_utils import pil_to_qimage
 from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -29,6 +26,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from core.services.image_utils import pil_to_qimage
+from ui.common.signal_utils import safe_disconnect
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL
 from ui.components.visualization import ScrollablePreviewGroup
 
@@ -714,42 +713,24 @@ class RowArrangementDialog(SplitterDialog):
 
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent memory leaks."""
-        disconnect_errors = (RuntimeError, TypeError, AttributeError)
+        # Disconnect arrangement manager signals
+        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
+            safe_disconnect(self.arrangement_manager.arrangement_changed)
 
-        # Suppress RuntimeWarning from PySide6 when disconnecting signals with no connections
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*disconnect.*")
+        # Note: palette signals are not connected (logic in toggle_palette_application/_cycle_palette)
 
-            # Disconnect arrangement manager signals
-            if hasattr(self, "arrangement_manager") and self.arrangement_manager:
-                try:
-                    self.arrangement_manager.arrangement_changed.disconnect()
-                except disconnect_errors:
-                    pass
+        # Disconnect list widget signals
+        for list_name in ("available_list", "arranged_list"):
+            if hasattr(self, list_name):
+                widget = getattr(self, list_name)
+                safe_disconnect(widget.itemDoubleClicked)
+                safe_disconnect(widget.itemSelectionChanged)
+                # Disconnect custom signals on arranged_list
+                if list_name == "arranged_list":
+                    safe_disconnect(widget.external_drop)
+                    safe_disconnect(widget.item_dropped)
 
-            # Note: palette signals are not connected (logic in toggle_palette_application/_cycle_palette)
-
-            # Disconnect list widget signals
-            for list_name in ("available_list", "arranged_list"):
-                if hasattr(self, list_name):
-                    widget = getattr(self, list_name)
-                    for signal_name in ("itemDoubleClicked", "itemSelectionChanged"):
-                        try:
-                            getattr(widget, signal_name).disconnect()
-                        except disconnect_errors:
-                            pass
-                    # Disconnect custom signals on arranged_list
-                    if list_name == "arranged_list":
-                        for signal_name in ("external_drop", "item_dropped"):
-                            try:
-                                getattr(widget, signal_name).disconnect()
-                            except disconnect_errors:
-                                pass
-
-            # Disconnect button signals
-            for btn_name in ("add_all_btn", "add_selected_btn", "clear_btn", "remove_selected_btn"):
-                if hasattr(self, btn_name):
-                    try:
-                        getattr(self, btn_name).clicked.disconnect()
-                    except disconnect_errors:
-                        pass
+        # Disconnect button signals
+        for btn_name in ("add_all_btn", "add_selected_btn", "clear_btn", "remove_selected_btn"):
+            if hasattr(self, btn_name):
+                safe_disconnect(getattr(self, btn_name).clicked)

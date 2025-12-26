@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.file_dialogs import browse_for_open_file
+from ui.common.signal_utils import safe_disconnect
 
 if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
@@ -845,43 +846,29 @@ class ROMExtractionPanel(QWidget):
 
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent stale handler calls after close."""
-        import warnings
+        # Orchestrator signals (most critical - these come from background workers)
+        orchestrator_signals = [
+            "header_loaded",
+            "header_error",
+            "sprite_locations_loaded",
+            "sprite_locations_error",
+            "similarity_progress",
+            "sprite_indexed",
+            "index_saved",
+            "index_loaded",
+            "similarity_finished",
+            "similarity_error",
+        ]
+        for signal_name in orchestrator_signals:
+            if hasattr(self._worker_orchestrator, signal_name):
+                safe_disconnect(getattr(self._worker_orchestrator, signal_name))
 
-        # Suppress PySide6 disconnect warnings (emitted before exception is raised)
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", "Failed to disconnect", RuntimeWarning)
+        # State manager signals
+        safe_disconnect(self.state_manager.workflow_state_changed)
 
-            # Orchestrator signals (most critical - these come from background workers)
-            orchestrator_signals = [
-                "header_loaded",
-                "header_error",
-                "sprite_locations_loaded",
-                "sprite_locations_error",
-                "similarity_progress",
-                "sprite_indexed",
-                "index_saved",
-                "index_loaded",
-                "similarity_finished",
-                "similarity_error",
-            ]
-            for signal_name in orchestrator_signals:
-                try:
-                    getattr(self._worker_orchestrator, signal_name).disconnect()
-                except (RuntimeError, AttributeError):
-                    pass  # Already disconnected or destroyed
-
-            # State manager signals
-            try:
-                self.state_manager.workflow_state_changed.disconnect(self._on_state_changed)
-            except (RuntimeError, AttributeError):
-                pass
-
-            # Dialog manager signals
-            try:
-                self._offset_dialog_manager.offset_changed.disconnect()
-                self._offset_dialog_manager.sprite_found.disconnect()
-            except (RuntimeError, AttributeError):
-                pass
+        # Dialog manager signals
+        safe_disconnect(self._offset_dialog_manager.offset_changed)
+        safe_disconnect(self._offset_dialog_manager.sprite_found)
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:

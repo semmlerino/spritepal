@@ -318,6 +318,7 @@ spritepal/
 | DI container (deprecated) | `core/di_container.py` |
 | Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
 | Qt mocks | `tests/infrastructure/qt_mocks.py` |
+| Signal utilities (`safe_disconnect`, etc.) | `ui/common/signal_utils.py` |
 | ThreadSafeTestImage | `tests/infrastructure/thread_safe_test_image.py` |
 | RealComponentFactory | `tests/infrastructure/real_component_factory.py` |
 | Test data repository | `tests/infrastructure/data_repository.py` |

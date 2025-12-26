@@ -131,7 +131,7 @@ def pil_to_qimage(
             image = image.convert("RGB")
             bytes_data = image.tobytes("raw", "RGB")
             qimage = QImage(bytes_data, width, height, width * 3, QImage.Format.Format_RGB888)
-    else:
+    else:  # noqa: PLR5501 - intentional nesting for fallback case
         # Fallback for other modes (LA, CMYK, etc.)
         if with_alpha:
             image = image.convert("RGBA")
