@@ -67,7 +67,6 @@ class AccessibilityHelper:
         name: str,
         description: str = "",
         shortcut: str | None = None,
-        role: str | None = None
     ) -> QWidget:
         """
         Make a widget accessible with proper naming and descriptions.
@@ -77,7 +76,6 @@ class AccessibilityHelper:
             name: Accessible name for screen readers
             description: Longer description of the widget's purpose
             shortcut: Keyboard shortcut (if applicable)
-            role: Accessibility role (if needed to override default)
 
         Returns:
             The widget with accessibility features added

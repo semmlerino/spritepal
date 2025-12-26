@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 from core.exceptions import ExtractionError, ValidationError
 from core.palette_manager import PaletteManager
-from core.services.extraction_results import ExtractionResult, PreviewResult
+from core.services.extraction_results import ExtractionResult, TilePreviewData
 from utils.constants import (
     BYTES_PER_TILE,
     DEFAULT_PREVIEW_HEIGHT,
@@ -240,7 +240,7 @@ class ROMService:
         rom_path: str,
         offset: int,
         sprite_name: str | None = None,
-    ) -> PreviewResult:
+    ) -> TilePreviewData:
         """
         Get a preview of sprite data from ROM without saving files.
 
@@ -250,7 +250,7 @@ class ROMService:
             sprite_name: Sprite name for logging
 
         Returns:
-            PreviewResult with tile_data, width, height
+            TilePreviewData with tile_data, width, height
 
         Raises:
             ExtractionError: If preview generation fails
@@ -294,7 +294,7 @@ class ROMService:
                     f"got {len(tile_data)}/{expected_bytes} bytes"
                 )
 
-        return PreviewResult(tile_data=tile_data, width=width, height=height)
+        return TilePreviewData(tile_data=tile_data, width=width, height=height)
 
     def extract_sprite_to_png(
         self,
@@ -339,14 +339,12 @@ class ROMService:
     def get_known_sprite_locations(
         self,
         rom_path: str,
-        progress_callback: Callable[[str], None] | None = None,
     ) -> tuple[dict[str, object], CacheResult]:
         """
         Get known sprite locations for a ROM with caching.
 
         Args:
             rom_path: Path to ROM file
-            progress_callback: Optional callback for progress messages
 
         Returns:
             Tuple of (locations dict, CacheResult with hit/miss info)

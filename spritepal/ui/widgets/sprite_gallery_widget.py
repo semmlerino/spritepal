@@ -417,7 +417,7 @@ class SpriteGalleryWidget(QWidget):
 
         logger.debug(f"Requested {len(offsets_needed)} thumbnails for rows {first_row}-{last_row}")
 
-    def _on_scroll(self, value: int):
+    def _on_scroll(self, _value: int) -> None:
         """Handle scroll events to trigger thumbnail loading."""
         # Use timer to debounce scroll events
         self.viewport_timer.stop()

@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
 from ui.common.file_dialogs import browse_for_open_file
 
 if TYPE_CHECKING:
-    from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.rom_extractor import ROMExtractor
     from core.rom_validator import ROMHeader

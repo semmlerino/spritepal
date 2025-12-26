@@ -56,8 +56,13 @@ class DragState(Enum):
     DRAGGING = auto()     # Actively dragging slider
     SETTLING = auto()     # Just released, waiting for final update
 
-class PreviewRequest:
-    """Represents a preview request with cancellation support."""
+class PendingPreviewRequest:
+    """Represents a pending preview request with cancellation support.
+
+    Note: This is distinct from core.services.preview_generator.PreviewRequest,
+    which is used for cache key generation. This class handles request lifecycle
+    and cancellation in the UI layer.
+    """
 
     def __init__(
         self,
@@ -352,7 +357,7 @@ class SmartPreviewCoordinator(QObject):
                 request_id = self._request_counter
 
             # Create preview request
-            request = PreviewRequest(
+            request = PendingPreviewRequest(
                 request_id=request_id,
                 offset=offset,
                 rom_path=rom_path,

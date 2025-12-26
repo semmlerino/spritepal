@@ -80,7 +80,7 @@ class ROMExtractor:
         logger.info("ROMExtractor initialized with HAL compression and palette extraction support")
 
     def extract_sprite_data(
-        self, rom_path: str, sprite_offset: int, sprite_config: Mapping[str, object] | None = None
+        self, rom_path: str, sprite_offset: int, _sprite_config: Mapping[str, object] | None = None
     ) -> bytes:
         """
         Extract raw sprite data from ROM at specified offset.
@@ -88,7 +88,7 @@ class ROMExtractor:
         Args:
             rom_path: Path to ROM file
             sprite_offset: Offset in ROM where sprite data is located
-            sprite_config: Optional sprite configuration
+            _sprite_config: Unused - kept for API compatibility
 
         Returns:
             Raw sprite data as bytes

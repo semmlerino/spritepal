@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from weakref import ReferenceType
 
     from core.rom_extractor import ROMExtractor
-    from ui.common.smart_preview_coordinator import PreviewRequest
+    from ui.common.smart_preview_coordinator import PendingPreviewRequest
 
 logger = get_logger(__name__)
 
@@ -57,7 +57,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
         self._signals_connected = False
         self._being_destroyed = False  # Flag to prevent signal processing during cleanup
 
-    def setup_request(self, request: PreviewRequest, extractor: ROMExtractor) -> None:
+    def setup_request(self, request: PendingPreviewRequest, extractor: ROMExtractor) -> None:
         """Setup worker for new request."""
         self.rom_path = request.rom_path
         self.offset = request.offset
@@ -329,7 +329,7 @@ class PreviewWorkerPool(QObject):
         # Thread-safe collections
         self._available_workers: queue.Queue[PooledPreviewWorker] = queue.Queue()
         self._active_workers: set[PooledPreviewWorker] = set()
-        self._request_queue: queue.Queue[tuple[float, PreviewRequest, ROMExtractor]] = queue.Queue()
+        self._request_queue: queue.Queue[tuple[float, PendingPreviewRequest, ROMExtractor]] = queue.Queue()
 
         # Synchronization
         self._mutex = QMutex()
@@ -346,12 +346,12 @@ class PreviewWorkerPool(QObject):
 
         logger.debug(f"PreviewWorkerPool initialized with max_workers={max_workers}")
 
-    def submit_request(self, request: PreviewRequest, extractor: ROMExtractor) -> None:
+    def submit_request(self, request: PendingPreviewRequest, extractor: ROMExtractor) -> None:
         """
         Submit a preview request to the worker pool.
 
         Args:
-            request: PreviewRequest object
+            request: PendingPreviewRequest object
             extractor: ROM extractor for sprite processing
         """
         if self._shutdown_requested.is_set():

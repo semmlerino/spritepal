@@ -491,8 +491,8 @@ class PreviewPanel(QWidget):
         elif self._grayscale_image:
             self._show_grayscale()
 
-    def _on_palette_changed(self, palette_name: str) -> None:
-        """Handle palette selection change"""
+    def _on_palette_changed(self, _palette_name: str) -> None:
+        """Handle palette selection change."""
         if (
             self.palette_toggle.isChecked()
             and self._grayscale_image

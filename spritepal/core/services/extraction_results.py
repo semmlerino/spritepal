@@ -34,8 +34,13 @@ class ExtractionResult:
 
 
 @dataclass(frozen=True)
-class PreviewResult:
-    """Result from preview generation (ROM only)."""
+class TilePreviewData:
+    """Raw tile data result from preview generation (ROM only).
+
+    Note: This is distinct from core.services.preview_generator.PreviewResult,
+    which contains rendered QPixmap and PIL.Image. This class holds the raw
+    tile bytes before rendering.
+    """
 
     tile_data: bytes
     width: int
