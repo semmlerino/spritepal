@@ -1,29 +1,29 @@
 """
 Real Component Factory for type-safe testing with actual components.
 
-This factory creates real managers and components for integration testing,
-providing proper type safety without unsafe cast() operations.
+This factory creates real Qt components for integration testing,
+providing proper lifecycle management and cleanup.
 
 USAGE:
     from tests.infrastructure.real_component_factory import RealComponentFactory
 
-    @pytest.fixture
-    def real_factory(isolated_managers, tmp_path):
-        # isolated_managers ensures managers are initialized
+    def test_with_factory(app_context):
+        # app_context fixture provides managers
         with RealComponentFactory() as factory:
-            yield factory
+            worker = factory.create_extraction_worker(params)
+            # ... test code ...
+        # cleanup happens automatically on context exit
 
-    def test_extraction(real_factory):
-        manager = real_factory.create_extraction_manager()
+For manager access, use app_context directly (preferred):
+    def test_extraction(app_context):
+        manager = app_context.core_operations_manager
         result = manager.extract_sprites(params)
 
-BENEFITS:
-- No unsafe cast() operations needed
-- Real components with actual behavior
-- Type checker can verify all operations
-- Better integration testing
-- Consistent test data from DataRepository
-- Proper test isolation (no global state pollution)
+PROVIDES:
+- Qt component creation with proper parents
+- Worker lifecycle management
+- Resource leak detection
+- Automatic cleanup on context exit
 """
 
 from __future__ import annotations
@@ -142,68 +142,53 @@ class RealComponentFactory:
         # manager_registry is now required - no fallback to global singleton
         # This ensures proper test isolation and prevents global state pollution
 
-    def _get_extraction_manager_from_registry(self) -> CoreOperationsManager:
-        """Get extraction manager (CoreOperationsManager) via AppContext."""
-        from core.app_context import get_app_context
-        return get_app_context().core_operations_manager
-
-    def _get_injection_manager_from_registry(self) -> CoreOperationsManager:
-        """Get injection manager (CoreOperationsManager) via AppContext."""
-        from core.app_context import get_app_context
-        return get_app_context().core_operations_manager
-
-    def _get_session_manager_from_registry(self) -> ApplicationStateManager:
-        """Get session manager (ApplicationStateManager) via AppContext."""
-        from core.app_context import get_app_context
-        return get_app_context().application_state_manager
-
     def create_extraction_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """
-        Get extraction manager (CoreOperationsManager) from registry.
+        DEPRECATED: Use app_context.core_operations_manager instead.
 
-        Args:
-            with_test_data: Kept for API compatibility (no-op). Tests should get
-                data from DataRepository and pass paths to manager methods directly.
-
-        Returns:
-            Real CoreOperationsManager instance from registry
+        Get extraction manager (CoreOperationsManager) from AppContext.
         """
-        # Note: with_test_data is intentionally unused. Test data injection via
-        # private fields was removed - tests should use DataRepository directly.
-        _ = with_test_data
-        return self._get_extraction_manager_from_registry()
+        warnings.warn(
+            "create_extraction_manager() is deprecated. "
+            "Use app_context.core_operations_manager instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _ = with_test_data  # Unused, kept for API compatibility
+        from core.app_context import get_app_context
+        return get_app_context().core_operations_manager
 
     def create_injection_manager(self, with_test_data: bool = True) -> CoreOperationsManager:
         """
-        Get injection manager (CoreOperationsManager) from registry.
+        DEPRECATED: Use app_context.core_operations_manager instead.
 
-        Args:
-            with_test_data: Kept for API compatibility (no-op). Tests should get
-                data from DataRepository and pass paths to manager methods directly.
-
-        Returns:
-            Real CoreOperationsManager instance from registry
+        Get injection manager (CoreOperationsManager) from AppContext.
         """
-        # Note: with_test_data is intentionally unused. Test data injection via
-        # private fields was removed - tests should use DataRepository directly.
-        _ = with_test_data
-        return self._get_injection_manager_from_registry()
+        warnings.warn(
+            "create_injection_manager() is deprecated. "
+            "Use app_context.core_operations_manager instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _ = with_test_data  # Unused, kept for API compatibility
+        from core.app_context import get_app_context
+        return get_app_context().core_operations_manager
 
     def create_session_manager(self, app_name: str = "TestApp") -> ApplicationStateManager:
         """
-        Get session manager (ApplicationStateManager) from registry.
+        DEPRECATED: Use app_context.application_state_manager instead.
 
-        Args:
-            app_name: Kept for API compatibility (no-op). Session manager is
-                pre-configured in the registry.
-
-        Returns:
-            Real ApplicationStateManager instance from registry
+        Get session manager (ApplicationStateManager) from AppContext.
         """
-        # Note: app_name is intentionally unused. Session manager is pre-configured
-        # in the registry with proper isolation settings.
-        _ = app_name
-        return self._get_session_manager_from_registry()
+        warnings.warn(
+            "create_session_manager() is deprecated. "
+            "Use app_context.application_state_manager instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _ = app_name  # Unused, kept for API compatibility
+        from core.app_context import get_app_context
+        return get_app_context().application_state_manager
 
     def create_main_window(self, with_managers: bool = True) -> MainWindow:
         """

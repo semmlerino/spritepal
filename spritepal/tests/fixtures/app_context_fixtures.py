@@ -27,7 +27,9 @@ Migration Guide:
 """
 from __future__ import annotations
 
-from collections.abc import Generator
+import contextlib
+import tempfile
+from collections.abc import Generator, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -67,7 +69,6 @@ def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
     from PySide6.QtWidgets import QApplication
 
     from core.app_context import create_app_context, reset_app_context
-    from core.configuration_service import ConfigurationService
 
     # Ensure Qt app exists
     app = QApplication.instance()
@@ -77,17 +78,10 @@ def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
     # Create isolated settings
     settings_path = tmp_path / ".test_settings.json"
 
-    # Create a minimal config service for tests
-    config_service = ConfigurationService(
-        app_name="TestApp",
-        settings_file=settings_path,
-    )
-
-    # Create the context
+    # Create the context - let create_app_context handle ConfigurationService creation
     context = create_app_context(
         app_name="TestApp",
         settings_path=settings_path,
-        configuration_service=config_service,
     )
 
     yield context
@@ -125,7 +119,6 @@ def session_app_context(
     from PySide6.QtWidgets import QApplication
 
     from core.app_context import create_app_context, reset_app_context
-    from core.configuration_service import ConfigurationService
 
     # Ensure Qt app exists
     app = QApplication.instance()
@@ -136,17 +129,10 @@ def session_app_context(
     settings_dir = tmp_path_factory.mktemp("session_settings")
     settings_path = settings_dir / ".test_settings.json"
 
-    # Create a minimal config service for tests
-    config_service = ConfigurationService(
-        app_name="TestApp-Session",
-        settings_file=settings_path,
-    )
-
-    # Create the context
+    # Create the context - let create_app_context handle ConfigurationService creation
     context = create_app_context(
         app_name="TestApp-Session",
         settings_path=settings_path,
-        configuration_service=config_service,
     )
 
     yield context
@@ -187,3 +173,116 @@ def core_operations(app_context: AppContext) -> CoreOperationsManager:
             assert result is not None
     """
     return app_context.core_operations_manager
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Compatibility shims for legacy patterns
+# These wrap the new app_context pattern to support existing test code.
+# New tests should use app_context directly.
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class _ManagerContextWrapper:
+    """
+    Wrapper that provides manager_context-style API using AppContext.
+
+    This is a compatibility shim to allow existing tests using manager_context
+    to work with the new app_context infrastructure.
+    """
+
+    def __init__(self, context: AppContext) -> None:
+        self._context = context
+
+    def get_extraction_manager(self) -> CoreOperationsManager:
+        """Get the extraction manager (CoreOperationsManager)."""
+        return self._context.core_operations_manager
+
+    def get_injection_manager(self) -> CoreOperationsManager:
+        """Get the injection manager (CoreOperationsManager)."""
+        return self._context.core_operations_manager
+
+    def get_session_manager(self) -> ApplicationStateManager:
+        """Get the session manager (ApplicationStateManager)."""
+        return self._context.application_state_manager
+
+    def get_manager(self, manager_type: str) -> CoreOperationsManager | ApplicationStateManager:
+        """Get a manager by type name (legacy API compatibility).
+
+        Args:
+            manager_type: One of "extraction", "injection", or "session"
+
+        Returns:
+            The requested manager instance
+        """
+        if manager_type in ("extraction", "injection"):
+            return self._context.core_operations_manager
+        elif manager_type == "session":
+            return self._context.application_state_manager
+        else:
+            raise ValueError(f"Unknown manager type: {manager_type}")
+
+
+@pytest.fixture
+def manager_context_wrapper(app_context: AppContext) -> _ManagerContextWrapper:
+    """
+    Compatibility fixture providing manager_context-style API.
+
+    This wraps app_context with the legacy manager_context interface.
+    Use this when migrating tests that used manager_context.
+
+    Usage:
+        def test_something(manager_context_wrapper):
+            mgr = manager_context_wrapper.get_extraction_manager()
+            # ... test code ...
+    """
+    return _ManagerContextWrapper(app_context)
+
+
+@contextlib.contextmanager
+def manager_context(*_manager_types: str) -> Iterator[_ManagerContextWrapper]:
+    """
+    Compatibility context manager for legacy manager_context usage.
+
+    This is a drop-in replacement for the deprecated manager_context from
+    tests.infrastructure.manager_test_context. It uses the new app_context
+    infrastructure internally.
+
+    Args:
+        *_manager_types: Ignored. Legacy parameter for manager types.
+                        All managers are now always available via AppContext.
+
+    Usage (legacy pattern - still works):
+        with manager_context("extraction") as ctx:
+            manager = ctx.get_extraction_manager()
+            # ... test code ...
+
+    Preferred (new pattern):
+        def test_something(app_context):
+            manager = app_context.core_operations_manager
+            # ... test code ...
+    """
+    from PySide6.QtWidgets import QApplication
+
+    from core.app_context import create_app_context, reset_app_context
+
+    # Ensure Qt app exists
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    # Create isolated settings
+    with tempfile.TemporaryDirectory(prefix="manager_context_") as tmp_dir:
+        settings_path = Path(tmp_dir) / ".test_settings.json"
+
+        # Create the context - let create_app_context handle ConfigurationService creation
+        context = create_app_context(
+            app_name="TestApp",
+            settings_path=settings_path,
+        )
+
+        try:
+            yield _ManagerContextWrapper(context)
+        finally:
+            reset_app_context()
+            if app:
+                app.processEvents()

@@ -243,31 +243,20 @@ def _should_fail_on_leaks(config: Any) -> bool:
 @pytest.fixture(scope="session")
 def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     """
+    DEPRECATED: Use session_app_context from app_context_fixtures.py instead.
+
     Session-scoped managers for performance optimization.
 
-    This fixture initializes managers once per test session and keeps them
-    alive for the entire session. Tests can use this for better performance
-    by depending on this fixture instead of setup_managers.
-
-    Uses isolated temp settings directory to avoid polluting repo root.
-    State is stored in SessionState dataclass to avoid global mutable variables.
-
-    Ordering semantics:
-        - Tests using this fixture get xdist_group("serial") marker automatically
-        - This co-locates tests on one worker but does NOT guarantee execution order
-        - Settings are fully reset between tests (via auto_reset_session_state)
-        - Services remain initialized for performance (not cleared between tests)
-        - Tests should be stateless and not rely on any particular execution order
-
-    WARNING: While settings are reset between tests, tests should still be
-    written to be order-independent. Use isolated_managers if you need
-    complete isolation or are modifying manager internals.
-
-    Usage:
+    MIGRATION:
+        # Old pattern:
         def test_something(session_managers):
-            # Managers are already initialized and shared across tests
-            # Access managers via: inject(CoreOperationsManager)
-            pass
+            mgr = inject(CoreOperationsManager)
+
+        # New pattern (preferred):
+        from tests.fixtures.app_context_fixtures import session_app_context
+        @pytest.mark.shared_state_safe
+        def test_something(session_app_context):
+            mgr = session_app_context.core_operations_manager
     """
     # Lazy import manager functions
     import os
@@ -313,24 +302,18 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
 @pytest.fixture
 def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]:
     """
+    DEPRECATED: Use app_context from app_context_fixtures.py instead.
+
     Function-scoped managers for tests that need complete isolation.
 
-    Unlike session_managers, this fixture creates fresh managers for each test
-    and cleans them up afterward. Use this for tests that:
-    - Modify manager state that could affect other tests
-    - Need to test manager initialization/cleanup behavior
-    - Can't share state with other tests
+    MIGRATION:
+        # Old pattern:
+        def test_something(isolated_managers):
+            mgr = inject(CoreOperationsManager)
 
-    Note: This is slower than session_managers but provides complete isolation.
-
-    IMPORTANT: This fixture includes an isolation guard that fails if
-    managers are already initialized (indicates test pollution).
-
-    Usage:
-        def test_something_that_modifies_state(isolated_managers):
-            # Fresh managers, isolated from other tests
-            ops_mgr = get_app_context().core_operations_manager
-            # ... test code that modifies manager state ...
+        # New pattern (preferred):
+        def test_something(app_context):
+            mgr = app_context.core_operations_manager
     """
     from PySide6.QtWidgets import QApplication
 
@@ -706,15 +689,16 @@ def manager_context_factory() -> Callable[..., ContextManager[Any]]:
                 dialog = InjectionDialog()
                 # dialog will use real managers from context
     """
-    from tests.infrastructure.manager_test_context import (
-        ManagerTestContext,
+    # Import from new location - manager_context is now in app_context_fixtures
+    from tests.fixtures.app_context_fixtures import (
+        _ManagerContextWrapper,
         manager_context,
     )
 
     def _create_context(
         managers: dict[str, Any] | list[str] | None = None,
         name: str = "test_context"
-    ) -> ContextManager[ManagerTestContext]:
+    ) -> ContextManager[_ManagerContextWrapper]:
         """
         Create a manager context for testing.
 

@@ -92,11 +92,10 @@ def create_signal_holder(**signals):
             setattr(holder, name, MockSignal())
         return holder
 
-    # For Qt environments, ensure QApplication exists via ApplicationFactory
-    from PySide6.QtCore import QCoreApplication
-    if QCoreApplication.instance() is None:
-        from .qt_application_factory import ApplicationFactory
-        ApplicationFactory.get_application()
+    # For Qt environments, ensure QApplication exists
+    from PySide6.QtWidgets import QApplication
+    if QApplication.instance() is None:
+        QApplication([])
 
     # Return pre-defined signal holder - has all common signals at class level
     return CommonSignalHolder()

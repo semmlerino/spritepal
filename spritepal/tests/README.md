@@ -10,11 +10,9 @@ This directory contains the pytest test suite for SpritePal, featuring **Real Co
 
 ### Basic Test with Managers
 ```python
-from core.app_context import get_app_context
-
-def test_extraction(isolated_managers):
-    context = get_app_context()
-    manager = context.core_operations_manager
+def test_extraction(app_context):
+    """Use app_context fixture for isolated test managers."""
+    manager = app_context.core_operations_manager
     result = manager.validate_extraction_params({"path": "/test"})
     assert isinstance(result, bool)
 ```
@@ -22,7 +20,7 @@ def test_extraction(isolated_managers):
 ### Qt Widget Test
 ```python
 @pytest.mark.gui
-def test_button_click(qtbot, isolated_managers):
+def test_button_click(qtbot, app_context):
     widget = MyWidget()
     qtbot.addWidget(widget)
     qtbot.mouseClick(widget.button, Qt.LeftButton)
@@ -32,7 +30,7 @@ def test_button_click(qtbot, isolated_managers):
 ```python
 from tests.fixtures.timeouts import worker_timeout
 
-def test_worker(qtbot, isolated_managers):
+def test_worker(qtbot, app_context):
     worker = MyWorker()
     with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
         worker.start()
@@ -46,12 +44,13 @@ def test_worker(qtbot, isolated_managers):
 tests/
 ├── infrastructure/          # Test framework components
 │   ├── real_component_factory.py    # Factory for real components
-│   ├── manager_test_context.py      # Integration test contexts
+│   ├── test_helpers.py              # Worker/window helper functions
 │   ├── data_repository.py           # Consistent test data
 │   ├── thread_safe_test_image.py    # Thread-safe QPixmap alternative
 │   └── qt_mocks.py                  # Qt test doubles
 ├── fixtures/               # Pytest fixtures
-│   ├── core_fixtures.py    # Manager fixtures (isolated_managers, etc.)
+│   ├── app_context_fixtures.py      # AppContext fixtures (canonical)
+│   ├── core_fixtures.py    # Singleton reset, autouse safety
 │   ├── qt_fixtures.py      # Qt-specific fixtures
 │   └── timeouts.py         # Semantic timeout functions
 ├── integration/            # Integration tests
@@ -111,8 +110,9 @@ The `get_app_context()` pattern is preferred because:
 
 | Fixture | When to Use |
 |---------|-------------|
-| `isolated_managers` | **Default** - clean state each test |
-| `session_managers` | Only with `@pytest.mark.shared_state_safe` |
+| `app_context` | **Preferred** - clean state each test (from `app_context_fixtures.py`) |
+| `session_app_context` | Shared state with `@pytest.mark.shared_state_safe` |
+| `isolated_managers` | Legacy (deprecated) - use `app_context` instead |
 | `hal_pool` | HAL operations (mock by default) |
 | `qtbot` | Qt widget testing |
 | `tmp_path` | Temporary files |
@@ -133,7 +133,7 @@ timeout=worker_timeout()  # ~5000ms - background workers
 |--------|--------|
 | `@pytest.mark.gui` | Qt widget test (runs in offscreen mode) |
 | `@pytest.mark.real_hal` | Use real HAL binaries (skips if unavailable) |
-| `@pytest.mark.shared_state_safe` | Required with `session_managers` |
+| `@pytest.mark.shared_state_safe` | Required with `session_app_context` |
 | `@pytest.mark.requires_display` | Skipped in offscreen mode |
 
 ---
@@ -145,7 +145,7 @@ timeout=worker_timeout()  # ~5000ms - background workers
 | `time.sleep(1)` | `qtbot.wait(1000)` |
 | `timeout=5000` | `timeout=worker_timeout()` |
 | `QPixmap` in worker thread | `ThreadSafeTestImage` |
-| `session_managers` alone | + `@pytest.mark.shared_state_safe` |
+| `session_app_context` alone | + `@pytest.mark.shared_state_safe` |
 | Hardcoded `/tmp/test.bin` | `tmp_path / "test.bin"` |
 
 ---
@@ -176,16 +176,22 @@ For integration tests with real components:
 
 ```python
 from tests.infrastructure.real_component_factory import RealComponentFactory
+from tests.infrastructure.data_repository import get_test_data_repository
 
-@pytest.fixture
-def real_factory(isolated_managers):
-    with RealComponentFactory() as factory:
-        yield factory
+def test_workflow(app_context):
+    # Access managers directly from app_context
+    manager = app_context.core_operations_manager
 
-def test_workflow(real_factory):
-    manager = real_factory.create_extraction_manager(with_test_data=True)
-    params = real_factory._data_repo.get_vram_extraction_data("small")
+    # Use DataRepository for test data
+    data_repo = get_test_data_repository()
+    params = data_repo.get_vram_extraction_data("small")
     result = manager.validate_extraction_params(params)
+
+# For Qt component creation, use RealComponentFactory
+def test_with_workers(app_context):
+    with RealComponentFactory() as factory:
+        worker = factory.create_extraction_worker(params)
+        # ... test code ...
 ```
 
 ---

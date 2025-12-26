@@ -63,10 +63,9 @@ def _create_injection_dialog(**kwargs) -> InjectionDialog:
         settings_manager=context.application_state_manager,
         **kwargs,
     )
-from tests.infrastructure import (
-    ApplicationFactory,
-    RealComponentFactory,
-)
+from PySide6.QtWidgets import QApplication
+
+from tests.infrastructure import RealComponentFactory
 from ui.dialogs import (
     SettingsDialog,
     UnifiedManualOffsetDialog as ManualOffsetDialog,
@@ -87,8 +86,8 @@ class TestRealDialogIntegration:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure for each test."""
-        # Initialize Qt application
-        self.qt_app = ApplicationFactory.get_application()
+        # Initialize Qt application (fixture ensures it exists)
+        self.qt_app = QApplication.instance()
 
         # Initialize real manager factory with isolated managers for test isolation
         self.manager_factory = RealComponentFactory()
@@ -219,7 +218,7 @@ class TestRealDialogManagerIntegration:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
-        self.qt_app = ApplicationFactory.get_application()
+        self.qt_app = QApplication.instance()
         self.manager_factory = RealComponentFactory()
 
         # Managers already initialized by isolated_managers fixture
@@ -306,7 +305,7 @@ class TestBugDiscoveryRealVsMockedDialogs:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self, isolated_managers, session_data_repository):
         """Set up real testing infrastructure."""
-        self.qt_app = ApplicationFactory.get_application()
+        self.qt_app = QApplication.instance()
         self.manager_factory = RealComponentFactory()
         self.test_data = session_data_repository
 

@@ -49,10 +49,8 @@ from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
 )
-from tests.infrastructure.manager_test_context import (
-    # Serial execution required: Thread safety concerns, Real Qt components
-    manager_context,
-)
+# manager_context migrated from deprecated manager_test_context to app_context_fixtures
+from tests.fixtures.app_context_fixtures import manager_context
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.real_component_factory import RealComponentFactory

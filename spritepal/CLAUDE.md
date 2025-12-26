@@ -8,7 +8,7 @@ These rules prevent crashes and test failures. Each has a solution.
 |------|----------|
 | **Never `QPixmap` in worker threads** | Use `ThreadSafeTestImage` from `tests/infrastructure/` |
 | **Never inherit `QDialog` in mocks** | Use `QObject` with signals (see `tests/infrastructure/qt_mocks.py`) |
-| **Use `isolated_managers` by default** | Only use `session_managers` with `@pytest.mark.shared_state_safe` |
+| **Use `app_context` fixture by default** | Use `session_app_context` only with `@pytest.mark.shared_state_safe` |
 | **Use `tmp_path` for file operations** | Never hardcode paths like `/tmp/test_output` |
 | **Use `with qtbot.waitSignal():`** | Context manager catches fast signals; non-context form races |
 | **Never `time.sleep()` in Qt tests** | Use `qtbot.wait(ms)` or `qtbot.waitSignal()` |
@@ -108,7 +108,7 @@ uv run pytest tests/test_hal_golden.py --regenerate-golden -v
 
 Tests run parallel by default (pyproject.toml sets `-n auto --dist=loadscope`).
 
-**Note:** The config uses `--dist=loadscope` (groups by module), not `--dist=loadgroup`. The conftest.py applies `xdist_group("serial")` markers to tests using `session_managers` or `@pytest.mark.parallel_unsafe`, but these only co-locate tests on one worker (not truly serial).
+**Note:** The config uses `--dist=loadscope` (groups by module), not `--dist=loadgroup`. The conftest.py applies `xdist_group("serial")` markers to tests using `session_app_context` or `@pytest.mark.parallel_unsafe`, but these only co-locate tests on one worker (not truly serial).
 
 **For truly serial execution:** Use `-n 0`.
 
@@ -142,19 +142,17 @@ Tests run parallel by default (pyproject.toml sets `-n auto --dist=loadscope`).
 ### Quick Template
 
 ```python
-from core.di_container import inject
-from core.managers.core_operations_manager import CoreOperationsManager
 from tests.fixtures.timeouts import worker_timeout
 
-def test_my_feature(isolated_managers, tmp_path):
+def test_my_feature(app_context, tmp_path):
     """One-line description."""
-    manager = inject(CoreOperationsManager)
+    manager = app_context.core_operations_manager
     output_file = tmp_path / "output.bin"
     result = manager.some_method()
     assert result is not None
 
 # Signal wait - ALWAYS use context manager
-def test_async_op(qtbot, isolated_managers):
+def test_async_op(qtbot, app_context):
     worker = MyWorker()
     with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
         worker.start()
@@ -164,7 +162,7 @@ def test_async_op(qtbot, isolated_managers):
 
 | Rule | Why |
 |------|-----|
-| Use `isolated_managers` fixture | Clean state, always safe |
+| Use `app_context` fixture | Clean state, always safe |
 | Use `with qtbot.waitSignal()` | Non-context form causes flaky tests |
 | Use `ThreadSafeTestImage` in workers | `QPixmap` in threads crashes Python |
 | Use `tmp_path` for files | Hardcoded paths break parallel tests |
@@ -331,9 +329,9 @@ context = get_app_context()
 state_mgr = context.application_state_manager
 operations_mgr = context.core_operations_manager
 
-# Tests - use fixtures
-def test_extraction(isolated_managers):
-    operations_mgr = isolated_managers.core_operations_manager
+# Tests - use app_context fixture
+def test_extraction(app_context):
+    operations_mgr = app_context.core_operations_manager
 ```
 
 Key managers: `ApplicationStateManager`, `CoreOperationsManager` (handles extraction and injection operations)

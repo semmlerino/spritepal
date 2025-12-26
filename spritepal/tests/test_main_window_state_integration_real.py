@@ -40,10 +40,9 @@ pytestmark = [
 ]
 
 # Import real testing infrastructure
-from tests.infrastructure import (
-    ApplicationFactory,
-    RealComponentFactory,
-)
+from PySide6.QtWidgets import QApplication
+
+from tests.infrastructure import RealComponentFactory
 from ui.dialogs.output_settings_dialog import OutputSettingsDialog
 
 # Import real MainWindow (not mocked!)
@@ -90,7 +89,7 @@ class TestRealMainWindowStateIntegration:
     def setup_test_infrastructure(self, isolated_managers, session_data_repository):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
-        self.qt_app = ApplicationFactory.get_application()
+        self.qt_app = QApplication.instance()
 
         # Initialize real manager factory with proper test isolation
         self.manager_factory = RealComponentFactory()
@@ -387,7 +386,7 @@ class TestRealMainWindowWorkflowIntegration:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
-        self.qt_app = ApplicationFactory.get_application()
+        self.qt_app = QApplication.instance()
         self.manager_factory = RealComponentFactory()
 
         yield
@@ -502,7 +501,7 @@ class TestBugDiscoveryRealVsMocked:
     @pytest.fixture(autouse=True)
     def setup_test_infrastructure(self, isolated_managers):
         """Set up real testing infrastructure."""
-        self.qt_app = ApplicationFactory.get_application()
+        self.qt_app = QApplication.instance()
         self.manager_factory = RealComponentFactory()
 
         yield

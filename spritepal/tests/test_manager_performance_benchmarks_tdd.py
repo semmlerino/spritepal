@@ -33,11 +33,8 @@ from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
 )
-from tests.infrastructure.manager_test_context import (
-    # Serial execution required: Thread safety concerns, Real Qt components
-    ManagerTestContext,
-    manager_context,
-)
+# manager_context migrated from deprecated manager_test_context to app_context_fixtures
+from tests.fixtures.app_context_fixtures import manager_context
 
 # Phase 2 Real Component Testing Infrastructure
 from tests.infrastructure.real_component_factory import RealComponentFactory
@@ -241,36 +238,28 @@ class TestManagerPerformanceBenchmarksTDD:
         REFACTOR: Maintain cleanup thoroughness while improving speed
         """
         def create_and_cleanup_managers():
-            # Create multiple managers with state
-            contexts = []
-            managers = []
+            # Create multiple manager contexts with state
+            # Using manager_context from app_context_fixtures
+            contexts_created = 0
 
-            try:
-                # Create managers with state
-                for i in range(3):
-                    ctx = ManagerTestContext()
-                    ctx.initialize_managers("extraction", "injection")
-
+            # Create managers with state using the new context manager pattern
+            for i in range(3):
+                with manager_context("extraction", "injection") as ctx:
                     extraction_mgr = ctx.get_extraction_manager()
-                    injection_mgr = ctx.get_injection_manager()
+                    ctx.get_injection_manager()
 
                     # Set up some state
                     extraction_mgr._start_operation(f"test_op_{i}")
 
-                    contexts.append(ctx)
-                    managers.extend([extraction_mgr, injection_mgr])
+                    # Verify state was created
+                    assert extraction_mgr.is_operation_active(f"test_op_{i}")
 
-                # Verify state was created
-                sum(1 for mgr in managers
-                                if hasattr(mgr, 'is_operation_active') and
-                                any(mgr.is_operation_active(f"test_op_{i}") for i in range(3)))
+                    contexts_created += 1
 
-                return len(contexts)
+                    # Cleanup happens automatically on context exit
+                    extraction_mgr._finish_operation(f"test_op_{i}")
 
-            finally:
-                # Cleanup all contexts (this is what we're benchmarking)
-                for ctx in contexts:
-                    ctx.cleanup()
+            return contexts_created
 
         # Benchmark resource cleanup performance
         result = benchmark(create_and_cleanup_managers)
