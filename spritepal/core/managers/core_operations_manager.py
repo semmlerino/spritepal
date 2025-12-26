@@ -39,10 +39,11 @@ from utils.constants import (
     SETTINGS_KEY_LAST_SPRITE_LOCATION,
     SETTINGS_NS_ROM_INJECTION,
 )
-from utils.file_validator import FileValidator
-from utils.validation import validate_range, validate_required_params, validate_type
 
 from .base_manager import BaseManager
+from .cache_operations import CacheOperationsManager
+from .extraction_operations import ExtractionOperationsManager
+from .injection_operations import InjectionOperationsManager
 from .operation_decorator import with_operation_handling
 
 if TYPE_CHECKING:
@@ -115,6 +116,11 @@ class CoreOperationsManager(BaseManager):
         self._rom_service: ROMService | None = None
         self._vram_service: VRAMService | None = None
 
+        # Sub-managers (initialized in _initialize, own specific operations)
+        self._extraction_ops: ExtractionOperationsManager | None = None
+        self._injection_ops: InjectionOperationsManager | None = None
+        self._cache_ops: CacheOperationsManager | None = None
+
         # DI dependencies (passed explicitly or populated in _initialize)
         self._session_manager: ApplicationStateManager | None = session_manager
         self._rom_cache: ROMCache | None = rom_cache
@@ -132,21 +138,19 @@ class CoreOperationsManager(BaseManager):
             self._sprite_extractor = SpriteExtractor()
             self._palette_manager = PaletteManager()
 
-            # Get dependencies from DI container if not passed explicitly
-            # Note: We use the container directly here (not AppContext) because this runs
-            # during manager initialization, before CoreOperationsManager is registered.
-            if self._rom_extractor is None or self._session_manager is None or self._rom_cache is None:
-                from core.di_container import get_container
-                from core.rom_extractor import ROMExtractor
-                from core.services.rom_cache import ROMCache
-
-                container = get_container()
-                if self._session_manager is None:
-                    self._session_manager = container.get(ApplicationStateManager)
-                if self._rom_cache is None:
-                    self._rom_cache = container.get(ROMCache)
-                if self._rom_extractor is None:
-                    self._rom_extractor = container.get(ROMExtractor)
+            # Validate required dependencies (must be passed via constructor)
+            missing = []
+            if self._rom_extractor is None:
+                missing.append("rom_extractor")
+            if self._session_manager is None:
+                missing.append("session_manager")
+            if self._rom_cache is None:
+                missing.append("rom_cache")
+            if missing:
+                raise RuntimeError(
+                    f"CoreOperationsManager missing dependencies: {', '.join(missing)}. "
+                    "Use create_app_context() or get_app_context() instead of direct instantiation."
+                )
 
             # Initialize services (pure helpers returning results)
             self._rom_service = ROMService(
@@ -159,12 +163,67 @@ class CoreOperationsManager(BaseManager):
                 palette_manager=self._palette_manager,
             )
 
+            # Initialize sub-managers (own specific operations, will receive methods in phases)
+            self._extraction_ops = ExtractionOperationsManager(
+                rom_extractor=self._rom_extractor,
+                palette_manager=self._palette_manager,
+                rom_cache=self._rom_cache,
+                rom_service=self._rom_service,
+                vram_service=self._vram_service,
+                parent=self,
+            )
+            self._injection_ops = InjectionOperationsManager(
+                rom_cache=self._rom_cache,
+                parent=self,
+            )
+            self._cache_ops = CacheOperationsManager(
+                rom_cache=self._rom_cache,
+                parent=self,
+            )
+
+            # Connect sub-manager signals to facade signals (forwarding pattern)
+            self._connect_submanager_signals()
+
             self._is_initialized = True
             self._logger.info("CoreOperationsManager initialized successfully")
 
         except Exception as e:
             self._handle_error(e, "initialization")
             raise
+
+    def _connect_submanager_signals(self) -> None:
+        """Connect sub-manager signals to facade signals for forwarding.
+
+        This allows callers to connect to CoreOperationsManager signals
+        while the actual work happens in focused sub-managers.
+        """
+        if self._extraction_ops:
+            # Forward extraction signals
+            self._extraction_ops.extraction_progress.connect(self.extraction_progress.emit)
+            self._extraction_ops.extraction_warning.connect(self.extraction_warning.emit)
+            self._extraction_ops.preview_generated.connect(self.preview_generated.emit)
+            self._extraction_ops.palettes_extracted.connect(self.palettes_extracted.emit)
+            self._extraction_ops.active_palettes_found.connect(self.active_palettes_found.emit)
+            self._extraction_ops.files_created.connect(self.files_created.emit)
+            # Forward cache signals from extraction ops (for sprite location caching)
+            self._extraction_ops.cache_operation_started.connect(self.cache_operation_started.emit)
+            self._extraction_ops.cache_hit.connect(self.cache_hit.emit)
+            self._extraction_ops.cache_miss.connect(self.cache_miss.emit)
+            self._extraction_ops.cache_saved.connect(self.cache_saved.emit)
+
+        if self._injection_ops:
+            # Forward injection signals
+            self._injection_ops.injection_progress.connect(self.injection_progress.emit)
+            self._injection_ops.injection_finished.connect(self.injection_finished.emit)
+            self._injection_ops.compression_info.connect(self.compression_info.emit)
+            self._injection_ops.progress_percent.connect(self.progress_percent.emit)
+
+        if self._cache_ops:
+            # Forward cache signals
+            self._cache_ops.cache_operation_started.connect(self.cache_operation_started.emit)
+            self._cache_ops.cache_hit.connect(self.cache_hit.emit)
+            self._cache_ops.cache_miss.connect(self.cache_miss.emit)
+            self._cache_ops.cache_saved.connect(self.cache_saved.emit)
 
     @override
     def cleanup(self) -> None:
@@ -209,10 +268,23 @@ class CoreOperationsManager(BaseManager):
             WorkerManager.cleanup_worker(self._current_worker, timeout=1000)
             self._current_worker = None
 
+        # Reset sub-managers
+        if self._extraction_ops:
+            self._extraction_ops.reset_state()
+        if self._injection_ops:
+            self._injection_ops.reset_state()
+        if self._cache_ops:
+            self._cache_ops.reset_state()
+
         with self._lock:
             self._active_operations.clear()
 
             if full_reset:
+                # Clear sub-managers
+                self._extraction_ops = None
+                self._injection_ops = None
+                self._cache_ops = None
+
                 # Clear services first
                 if self._rom_service:
                     self._rom_service.cleanup()
@@ -292,7 +364,9 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If extraction fails
             ValidationError: If parameters are invalid
         """
-        result = self.vram_service.extract_from_vram(
+        # Delegate to extraction sub-manager (signals are forwarded via connections)
+        assert self._extraction_ops is not None
+        return self._extraction_ops.extract_from_vram(
             vram_path=vram_path,
             output_base=output_base,
             cgram_path=cgram_path,
@@ -301,21 +375,7 @@ class CoreOperationsManager(BaseManager):
             create_grayscale=create_grayscale,
             create_metadata=create_metadata,
             grayscale_mode=grayscale_mode,
-            progress_callback=self.extraction_progress.emit,
         )
-
-        # Emit signals from result
-        if result.preview_image:
-            self.preview_generated.emit(result.preview_image, result.tile_count)
-        if result.palettes:
-            self.palettes_extracted.emit(result.palettes)
-        if result.active_palette_indices:
-            self.active_palettes_found.emit(result.active_palette_indices)
-        if result.warning:
-            self.extraction_warning.emit(result.warning)
-        self.files_created.emit(result.files)
-
-        return result.files
 
     @with_operation_handling(
         "rom_extraction", "ROM extraction", with_progress=True, exclusive=True, target_error=ExtractionError
@@ -340,27 +400,15 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If extraction fails
             ValidationError: If parameters are invalid
         """
-        result = self.rom_service.extract_from_rom(
+        # Delegate to extraction sub-manager (signals are forwarded via connections)
+        assert self._extraction_ops is not None
+        return self._extraction_ops.extract_from_rom(
             rom_path=rom_path,
             offset=offset,
             output_base=output_base,
             sprite_name=sprite_name,
             cgram_path=cgram_path,
-            progress_callback=self.extraction_progress.emit,
         )
-
-        # Emit signals from result
-        if result.preview_image:
-            self.preview_generated.emit(result.preview_image, result.tile_count)
-        if result.palettes:
-            self.palettes_extracted.emit(result.palettes)
-        if result.active_palette_indices:
-            self.active_palettes_found.emit(result.active_palette_indices)
-        if result.warning:
-            self.extraction_warning.emit(result.warning)
-        self.files_created.emit(result.files)
-
-        return result.files
 
     @with_operation_handling(
         "sprite_preview", "preview generation", with_progress=False, exclusive=False, target_error=ExtractionError
@@ -381,8 +429,9 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ExtractionError: If preview generation fails
         """
-        result = self.rom_service.get_sprite_preview(rom_path, offset, sprite_name)
-        return result.tile_data, result.width, result.height
+        # Delegate to extraction sub-manager
+        assert self._extraction_ops is not None
+        return self._extraction_ops.get_sprite_preview(rom_path, offset, sprite_name)
 
     def validate_extraction_params(
         self, params: Mapping[str, object]
@@ -399,41 +448,9 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ValidationError: If validation fails
         """
-        # Determine extraction type
-        if "vram_path" in params:
-            # VRAM extraction - check for missing VRAM file specifically
-            if not params.get("vram_path"):
-                raise ValidationError("VRAM file is required for extraction")
-            validate_required_params(params, ["output_base"])
-        elif "rom_path" in params:
-            # ROM extraction
-            validate_required_params(params, ["rom_path", "offset", "output_base"])
-            rom_path = cast(str, params["rom_path"])
-            FileValidator.validate_rom_file_exists_or_raise(rom_path)
-            validate_type(params["offset"], "offset", int)
-            offset = cast(int, params["offset"])
-            validate_range(offset, "offset", min_val=0)
-        else:
-            raise ValidationError("Must provide either vram_path or rom_path")
-
-        # Validate CGRAM requirements for VRAM extraction
-        if "vram_path" in params:
-            grayscale_mode = params.get("grayscale_mode", False)
-            cgram_path = params.get("cgram_path")
-
-            # CGRAM is required for full color mode
-            if not grayscale_mode and not cgram_path:
-                raise ValidationError(
-                    "CGRAM file is required for Full Color mode.\n"
-                    "Please provide a CGRAM file or switch to Grayscale Only mode."
-                )
-
-        # Validate output_base is provided and not empty
-        output_base = cast(str, params.get("output_base", ""))
-        if not output_base or not output_base.strip():
-            raise ValidationError("Output name is required for extraction")
-
-        return True
+        # Delegate to extraction sub-manager
+        assert self._extraction_ops is not None
+        return self._extraction_ops.validate_extraction_params(params)
 
     def generate_preview(self, vram_path: str, offset: int) -> tuple[Image.Image, int]:
         """Generate a preview image from VRAM at the specified offset.
@@ -449,7 +466,9 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If preview generation fails
         """
         try:
-            return self.vram_service.generate_preview(vram_path, offset)
+            # Delegate to extraction sub-manager
+            assert self._extraction_ops is not None
+            return self._extraction_ops.generate_preview(vram_path, offset)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "preview_generation", "generating preview")
             raise
@@ -463,7 +482,9 @@ class CoreOperationsManager(BaseManager):
 
     def get_rom_extractor(self) -> ROMExtractor:
         """Get the ROM extractor instance for advanced operations."""
-        return self.rom_service.get_rom_extractor()
+        # Delegate to extraction sub-manager
+        assert self._extraction_ops is not None
+        return self._extraction_ops.get_rom_extractor()
 
     def get_known_sprite_locations(
         self, rom_path: str
@@ -481,19 +502,9 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If operation fails
         """
         try:
-            locations, cache_result = self.rom_service.get_known_sprite_locations(rom_path)
-
-            # Emit cache signals based on result
-            self.cache_operation_started.emit("Loading", "sprite_locations")
-            if cache_result.hit:
-                self.cache_hit.emit("sprite_locations", cache_result.time_saved)
-            else:
-                self.cache_miss.emit("sprite_locations")
-                if cache_result.items_saved > 0:
-                    self.cache_operation_started.emit("Saving", "sprite_locations")
-                    self.cache_saved.emit("sprite_locations", cache_result.items_saved)
-
-            return locations
+            # Delegate to extraction sub-manager (signals are forwarded via connections)
+            assert self._extraction_ops is not None
+            return self._extraction_ops.get_known_sprite_locations(rom_path)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "get_known_sprite_locations", "getting sprite locations")
             raise
@@ -521,7 +532,9 @@ class CoreOperationsManager(BaseManager):
             ExtractionError: If operation fails
         """
         try:
-            return self.rom_service.read_rom_header(rom_path)
+            # Delegate to extraction sub-manager
+            assert self._extraction_ops is not None
+            return self._extraction_ops.read_rom_header(rom_path)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "read_rom_header", "reading ROM header")
             raise
@@ -545,28 +558,15 @@ class CoreOperationsManager(BaseManager):
         Returns:
             Error dict if validation fails, None if valid
         """
-        result = FileValidator.validate_rom_file(rom_path)
-        if result.is_valid:
-            return None
-
-        # Convert ValidationResult to legacy dict format for backward compatibility
-        error_msg = result.error_message or f"Invalid ROM file: {rom_path}"
-
-        # Determine error_type from error message
-        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
-            error_type = "FileNotFoundError"
-        elif "permission" in error_msg.lower() or "cannot read" in error_msg.lower():
-            error_type = "PermissionError"
-        else:
-            error_type = "ValueError"
-
-        return {"error": error_msg, "error_type": error_type}
+        # Delegate to extraction sub-manager
+        assert self._extraction_ops is not None
+        return self._extraction_ops.validate_rom_file(rom_path)
 
     def _validate_extraction_rom_file(self, rom_path: str) -> None:
         """Validate ROM file for extraction and raise if invalid."""
-        error_result = self._validate_rom_file(rom_path)
-        if error_result:
-            raise ValidationError(f"ROM file validation failed: {error_result['error']}")
+        # Delegate to extraction sub-manager
+        assert self._extraction_ops is not None
+        self._extraction_ops.validate_extraction_rom_file(rom_path)
 
     # ========== Injection Operations ==========
 
@@ -717,69 +717,13 @@ class CoreOperationsManager(BaseManager):
         Raises:
             ValidationError: If parameters are invalid
         """
-        # Check required common parameters
-        required = ["mode", "sprite_path", "offset"]
-        validate_required_params(params, required)
-
-        validate_type(params["mode"], "mode", str)
-        validate_type(params["sprite_path"], "sprite_path", str)
-        validate_type(params["offset"], "offset", int)
-
-        # Use FileValidator for sprite file validation
-        sprite_path = cast(str, params["sprite_path"])
-        sprite_result = FileValidator.validate_image_file(sprite_path)
-        if not sprite_result.is_valid:
-            raise ValidationError(
-                f"Sprite file validation failed: {sprite_result.error_message}"
-            )
-
-        offset = cast(int, params["offset"])
-        validate_range(offset, "offset", min_val=0)
-
-        # Check mode-specific parameters
-        mode = cast(str, params["mode"])
-        if mode == "vram":
-            vram_required = ["input_vram", "output_vram"]
-            validate_required_params(params, vram_required)
-
-            input_vram = cast(str, params["input_vram"])
-            vram_result = FileValidator.validate_vram_file(input_vram)
-            if not vram_result.is_valid:
-                raise ValidationError(
-                    f"Input VRAM file validation failed: {vram_result.error_message}"
-                )
-
-        elif mode == "rom":
-            rom_required = ["input_rom", "output_rom"]
-            validate_required_params(params, rom_required)
-
-            input_rom = cast(str, params["input_rom"])
-            rom_result = FileValidator.validate_rom_file(input_rom)
-            if not rom_result.is_valid:
-                raise ValidationError(
-                    f"Input ROM file validation failed: {rom_result.error_message}"
-                )
-
-            # Validate optional fast_compression parameter
-            if "fast_compression" in params:
-                validate_type(
-                    params["fast_compression"], "fast_compression", bool
-                )
-        else:
-            raise ValidationError(f"Invalid injection mode: {mode}")
-
-        # Validate optional metadata_path
-        metadata_path_val = params.get("metadata_path")
-        if metadata_path_val:
-            metadata_path = cast(str, metadata_path_val)
-            metadata_result = FileValidator.validate_json_file(metadata_path)
-            if not metadata_result.is_valid:
-                raise ValidationError(
-                    f"Metadata file validation failed: {metadata_result.error_message}"
-                )
+        # Delegate to injection sub-manager
+        assert self._injection_ops is not None
+        self._injection_ops.validate_injection_params(params)
 
     def is_injection_active(self) -> bool:
         """Check if injection is currently active."""
+        # Check local worker (kept in facade for backward compatibility)
         return bool(self._current_worker and self._current_worker.isRunning())
 
     def _connect_worker_signals(self) -> None:
@@ -1272,84 +1216,37 @@ class CoreOperationsManager(BaseManager):
 
         return result
 
-    # ========== Cache Management ==========
+    # ========== Cache Management (delegated to CacheOperationsManager) ==========
 
-    def get_cache_stats(self) -> dict[str, object]:  # Cache stats with mixed types
+    def get_cache_stats(self) -> dict[str, object]:
         """Get ROM cache statistics."""
-        rom_cache = self._ensure_rom_cache()
-        return dict(rom_cache.get_cache_stats())  # Convert Mapping to dict
+        return self._cache_ops.get_cache_stats()
 
     def clear_rom_cache(self, older_than_days: int | None = None) -> int:
-        """
-        Clear ROM scan cache.
-
-        Args:
-            older_than_days: If specified, only clear files older than this many days
-
-        Returns:
-            Number of cache files removed
-        """
-        rom_cache = self._ensure_rom_cache()
-        removed_count = rom_cache.clear_cache(older_than_days)
-        self._logger.info(f"ROM cache cleared: {removed_count} files removed")
-        return removed_count
+        """Clear ROM scan cache."""
+        return self._cache_ops.clear_rom_cache(older_than_days)
 
     def get_scan_progress(
         self, rom_path: str, scan_params: dict[str, int]
-    ) -> dict[str, object] | None:  # Scan progress with found sprites, current offset, completed flag
-        """
-        Get cached scan progress for resumable scanning.
-
-        Args:
-            rom_path: Path to ROM file
-            scan_params: Scan parameters (int values like start offset, end offset)
-
-        Returns:
-            Dictionary with scan progress or None if not cached
-        """
-        rom_cache = self._ensure_rom_cache()
-        result = rom_cache.get_partial_scan_results(rom_path, scan_params)
-        return dict(result) if result else None  # Convert Mapping to dict
+    ) -> dict[str, object] | None:
+        """Get cached scan progress for resumable scanning."""
+        return self._cache_ops.get_scan_progress(rom_path, scan_params)
 
     def save_scan_progress(
-        self, rom_path: str, scan_params: dict[str, int],
-        found_sprites: list[Mapping[str, object]],  # Sprite data dicts
+        self,
+        rom_path: str,
+        scan_params: dict[str, int],
+        found_sprites: list[Mapping[str, object]],
         current_offset: int,
-        completed: bool = False
+        completed: bool = False,
     ) -> bool:
-        """
-        Save partial scan results for resumable scanning.
-
-        Args:
-            rom_path: Path to ROM file
-            scan_params: Scan parameters (int values like start offset, end offset)
-            found_sprites: List of sprites found so far
-            current_offset: Current scan position
-            completed: Whether the scan is complete
-
-        Returns:
-            True if saved successfully, False otherwise
-        """
-        rom_cache = self._ensure_rom_cache()
-        return rom_cache.save_partial_scan_results(
+        """Save partial scan results for resumable scanning."""
+        return self._cache_ops.save_scan_progress(
             rom_path, scan_params, found_sprites, current_offset, completed
         )
 
     def clear_scan_progress(
-        self, rom_path: str | None = None,
-        scan_params: dict[str, int] | None = None
+        self, rom_path: str | None = None, scan_params: dict[str, int] | None = None
     ) -> int:
-        """
-        Clear scan progress caches.
-
-        Args:
-            rom_path: If specified, only clear caches for this ROM
-            scan_params: If specified, only clear cache for this specific scan
-
-        Returns:
-            Number of files removed
-        """
-        rom_cache = self._ensure_rom_cache()
-        removed_count = rom_cache.clear_scan_progress_cache(rom_path, scan_params)
-        self._logger.info(f"Scan progress cache cleared: {removed_count} files removed")
-        return removed_count
+        """Clear scan progress caches."""
+        return self._cache_ops.clear_scan_progress(rom_path, scan_params)
