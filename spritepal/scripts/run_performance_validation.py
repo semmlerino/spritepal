@@ -117,9 +117,9 @@ class PerformanceValidationRunner:
 
                 # Initialize managers if not done
                 if not self._managers_initialized:
-                    from core.managers import initialize_managers
+                    from core.app_context import create_app_context
 
-                    initialize_managers()
+                    create_app_context()
                     self._managers_initialized = True
 
                 def setup_dialog(dialog_class, parent):
@@ -172,9 +172,9 @@ class PerformanceValidationRunner:
 
                 # Initialize managers if not done
                 if not self._managers_initialized:
-                    from core.managers import initialize_managers
+                    from core.app_context import create_app_context
 
-                    initialize_managers()
+                    create_app_context()
                     self._managers_initialized = True
 
                 # Create and use dialog
@@ -234,9 +234,9 @@ class PerformanceValidationRunner:
 
                 # Initialize managers if not done
                 if not self._managers_initialized:
-                    from core.managers import initialize_managers
+                    from core.app_context import create_app_context
 
-                    initialize_managers()
+                    create_app_context()
                     self._managers_initialized = True
 
                 # Create dialog

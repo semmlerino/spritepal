@@ -153,10 +153,10 @@ class RealComponentFactory:
         """
         if with_managers:
             # Ensure managers are initialized with isolated settings
-            from core.managers import initialize_managers
+            from core.app_context import create_app_context
 
             if not is_initialized():
-                initialize_managers("TestApp", settings_path=self._settings_path)
+                create_app_context(app_name="TestApp", settings_path=self._settings_path)
 
         # B.7: Create MainWindow with explicit AppContext dependencies
         from core.app_context import get_app_context

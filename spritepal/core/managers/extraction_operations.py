@@ -16,7 +16,7 @@ from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
 from core.exceptions import ExtractionError, ValidationError
-from utils.file_validator import FileValidator
+from utils.file_validator import FileValidator, ValidationResult
 from utils.validation import validate_range, validate_required_params, validate_type
 
 if TYPE_CHECKING:
@@ -346,36 +346,21 @@ class ExtractionOperationsManager(QObject):
 
     # ========== Validation Helpers ==========
 
-    def validate_rom_file(self, rom_path: str) -> dict[str, object] | None:  # Error dict with error and error_type keys
+    def validate_rom_file(self, rom_path: str) -> ValidationResult:
         """Validate ROM file exists, is readable, and has reasonable size.
 
-        Uses FileValidator for comprehensive validation, converts result to dict format.
+        Uses FileValidator for comprehensive validation.
 
         Returns:
-            Error dict if validation fails, None if valid
+            ValidationResult with is_valid, error_message, warnings, and file_info
         """
-        result = FileValidator.validate_rom_file(rom_path)
-        if result.is_valid:
-            return None
-
-        # Convert ValidationResult to legacy dict format for backward compatibility
-        error_msg = result.error_message or f"Invalid ROM file: {rom_path}"
-
-        # Determine error_type from error message
-        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
-            error_type = "FileNotFoundError"
-        elif "permission" in error_msg.lower() or "cannot read" in error_msg.lower():
-            error_type = "PermissionError"
-        else:
-            error_type = "ValueError"
-
-        return {"error": error_msg, "error_type": error_type}
+        return FileValidator.validate_rom_file(rom_path)
 
     def validate_extraction_rom_file(self, rom_path: str) -> None:
         """Validate ROM file, raising ValidationError if invalid."""
-        error_result = self.validate_rom_file(rom_path)
-        if error_result:
-            raise ValidationError(cast(str, error_result["error"]))
+        result = self.validate_rom_file(rom_path)
+        if not result.is_valid:
+            raise ValidationError(result.error_message or f"Invalid ROM file: {rom_path}")
 
     # ========== State Management ==========
 

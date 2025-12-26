@@ -821,8 +821,8 @@ class TestHALToolDetectionRegression:
 
     def test_manager_initialization_robustness(self):
         """Test that manager initialization works regardless of working directory"""
-        from core.app_context import get_app_context
-        from core.managers import cleanup_managers, initialize_managers
+        from core.app_context import create_app_context, get_app_context
+        from core.managers import cleanup_managers
 
         # Test from different directories
         test_dirs = [
@@ -839,7 +839,7 @@ class TestHALToolDetectionRegression:
             # Actually test manager initialization from this directory
             try:
                 # Initialize managers - this is what we're testing
-                initialize_managers(app_name="SpritePal_Test")
+                create_app_context(app_name="SpritePal_Test")
 
                 # Verify initialization succeeded by getting a manager via app context
                 manager = get_app_context().core_operations_manager

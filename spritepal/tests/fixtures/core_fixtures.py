@@ -280,7 +280,8 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
 
     from PySide6.QtWidgets import QApplication
 
-    from core.managers import cleanup_managers, initialize_managers
+    from core.app_context import create_app_context
+    from core.managers import cleanup_managers
 
     # Create session-specific settings directory for isolation
     # Priority: SPRITEPAL_SETTINGS_DIR env var (xdist) > tmp_path_factory
@@ -303,7 +304,7 @@ def session_managers(tmp_path_factory: TempPathFactory) -> Iterator[None]:
     if app is None:
         app = QApplication([])
 
-    initialize_managers("TestApp", settings_path=settings_path)
+    create_app_context(app_name="TestApp", settings_path=settings_path)
 
     yield None
     cleanup_managers()
@@ -335,9 +336,9 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
     """
     from PySide6.QtWidgets import QApplication
 
+    from core.app_context import create_app_context
     from core.managers import (
         cleanup_managers,
-        initialize_managers,
         is_initialized,
         reset_for_tests,
     )
@@ -391,7 +392,7 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
         app = QApplication([])
 
     # Initialize fresh managers for this test with isolated settings
-    initialize_managers("TestApp_Isolated", settings_path=settings_path)
+    create_app_context(app_name="TestApp_Isolated", settings_path=settings_path)
 
     yield None
 
@@ -405,7 +406,7 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
         from core.managers import is_initialized as check_initialized
 
         try:
-            initialize_managers("TestApp", settings_path=session_settings_path)
+            create_app_context(app_name="TestApp", settings_path=session_settings_path)
             # Verify restoration succeeded
             if not check_initialized():
                 pytest.fail(
@@ -475,10 +476,9 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
     """
     from PySide6.QtWidgets import QApplication
 
-    from core.app_context import reset_app_context
+    from core.app_context import create_app_context, reset_app_context
     from core.managers import (
         cleanup_managers,
-        initialize_managers,
         is_initialized,
         reset_for_tests,
     )
@@ -505,7 +505,7 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
     if session_active and session_settings_path:
         if app is None:
             app = QApplication([])
-        initialize_managers("TestApp", settings_path=session_settings_path)
+        create_app_context(app_name="TestApp", settings_path=session_settings_path)
         if not is_initialized():
             test_name = request.node.name if request and hasattr(request, "node") else "<unknown>"
             pytest.fail(

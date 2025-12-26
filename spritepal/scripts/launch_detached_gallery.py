@@ -216,9 +216,9 @@ class StandaloneGalleryLauncher:
     def _initialize_managers(self):
         """Initialize SpritePal core managers."""
         try:
-            from core.managers import initialize_managers
+            from core.app_context import create_app_context
 
-            initialize_managers()
+            create_app_context()
 
             print("✅ SpritePal managers initialized successfully")
         except Exception as e:

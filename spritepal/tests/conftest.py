@@ -497,7 +497,13 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
 
     # Skip for tests that use manager fixtures (they manage lifecycle)
     fixture_names = set(getattr(item, "fixturenames", []))
-    cleanup_fixtures = {"isolated_managers", "session_managers", "managers_initialized"}
+    cleanup_fixtures = {
+        "isolated_managers",
+        "session_managers",
+        "managers_initialized",
+        "app_context",  # Function-scoped isolated context
+        "session_app_context",  # Session-scoped shared context
+    }
     if cleanup_fixtures.intersection(fixture_names):
         return  # Test uses a fixture that manages registry lifecycle
 

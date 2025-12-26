@@ -153,28 +153,29 @@ class TestROMValidation:
 
     def test_validate_valid_rom(self, injection_manager, test_rom_file):
         """Test validation of a valid ROM file."""
-        # _validate_rom_file returns None for valid files, error dict for invalid
+        # _validate_rom_file returns ValidationResult
         result = injection_manager._validate_rom_file(str(test_rom_file))
-        assert result is None  # No error means valid
+        assert result.is_valid
 
     def test_validate_nonexistent_rom(self, injection_manager, tmp_path):
         """Test validation of a non-existent ROM file."""
         fake_path = tmp_path / "nonexistent.sfc"
-        # Method returns error dict, not raises exception
+        # Method returns ValidationResult
         result = injection_manager._validate_rom_file(str(fake_path))
-        assert result is not None
-        assert result["error_type"] == "FileNotFoundError"
+        assert not result.is_valid
+        assert result.error_message is not None
+        assert "not found" in result.error_message.lower() or "exist" in result.error_message.lower()
 
     def test_validate_empty_rom(self, injection_manager, tmp_path):
         """Test validation of an empty ROM file."""
         empty_rom = tmp_path / "empty.sfc"
         empty_rom.write_bytes(b"")
 
-        # Method returns error dict, not raises exception
+        # Method returns ValidationResult
         result = injection_manager._validate_rom_file(str(empty_rom))
-        assert result is not None
-        assert "too small" in result["error"]
-        assert result["error_type"] == "ValueError"
+        assert not result.is_valid
+        assert result.error_message is not None
+        assert "too small" in result.error_message.lower() or "empty" in result.error_message.lower()
 
     def test_load_rom_info(self, injection_manager, test_rom_file):
         """Test loading ROM information."""

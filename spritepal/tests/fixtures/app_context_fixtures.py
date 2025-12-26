@@ -261,10 +261,26 @@ def manager_context(*_manager_types: str) -> Iterator[_ManagerContextWrapper]:
         def test_something(app_context):
             manager = app_context.core_operations_manager
             # ... test code ...
+
+    Note:
+        If a context already exists (e.g., from session_managers fixture),
+        this function will reuse it and NOT reset it on exit. This prevents
+        conflicts when tests use both session_managers and manager_context_factory.
     """
     from PySide6.QtWidgets import QApplication
 
-    from core.app_context import create_app_context, reset_app_context
+    from core.app_context import (
+        create_app_context,
+        get_app_context_optional,
+        reset_app_context,
+    )
+
+    # Check if a context already exists (e.g., from session_managers)
+    existing_context = get_app_context_optional()
+    if existing_context is not None:
+        # Reuse existing context - do NOT reset on exit
+        yield _ManagerContextWrapper(existing_context)
+        return
 
     # Ensure Qt app exists
     app = QApplication.instance()

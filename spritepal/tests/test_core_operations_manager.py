@@ -483,30 +483,30 @@ class TestROMValidation:
     """Tests for ROM file validation."""
 
     def test_validate_rom_file_nonexistent(self, manager, tmp_path):
-        """_validate_rom_file should return error for nonexistent."""
+        """_validate_rom_file should return ValidationResult with is_valid=False."""
         result = manager._validate_rom_file(str(tmp_path / "nonexistent.sfc"))
 
-        assert result is not None
-        assert "error" in result
+        assert not result.is_valid
+        assert result.error_message is not None
 
     def test_validate_rom_file_valid(self, manager, tmp_path):
-        """_validate_rom_file should return None for valid ROM."""
+        """_validate_rom_file should return ValidationResult with is_valid=True."""
         rom_file = tmp_path / "test.sfc"
         rom_file.write_bytes(b"\x00" * 0x100000)  # 1MB
 
         result = manager._validate_rom_file(str(rom_file))
 
-        assert result is None
+        assert result.is_valid
 
     def test_validate_rom_file_too_small(self, manager, tmp_path):
-        """_validate_rom_file should return error for tiny files."""
+        """_validate_rom_file should return ValidationResult with is_valid=False for tiny files."""
         rom_file = tmp_path / "tiny.sfc"
         rom_file.write_bytes(b"\x00" * 100)  # Too small
 
         result = manager._validate_rom_file(str(rom_file))
 
-        assert result is not None
-        assert "error" in result
+        assert not result.is_valid
+        assert result.error_message is not None
 
 
 class TestCacheIntegration:

@@ -39,6 +39,7 @@ from utils.constants import (
     SETTINGS_KEY_LAST_SPRITE_LOCATION,
     SETTINGS_NS_ROM_INJECTION,
 )
+from utils.file_validator import ValidationResult
 
 from .base_manager import BaseManager
 from .cache_operations import CacheOperationsManager
@@ -545,15 +546,13 @@ class CoreOperationsManager(BaseManager):
 
     # ========== Extraction Validation Helpers ==========
 
-    def _validate_rom_file(
-        self, rom_path: str
-    ) -> dict[str, object] | None:  # Error dict with error and error_type keys
+    def _validate_rom_file(self, rom_path: str) -> ValidationResult:
         """Validate ROM file exists, is readable, and has reasonable size.
 
-        Uses FileValidator for comprehensive validation, converts result to dict format.
+        Uses FileValidator for comprehensive validation.
 
         Returns:
-            Error dict if validation fails, None if valid
+            ValidationResult with is_valid, error_message, warnings, and file_info
         """
         # Delegate to extraction sub-manager
         assert self._extraction_ops is not None
@@ -913,9 +912,10 @@ class CoreOperationsManager(BaseManager):
             return {"error": message, "error_type": error_type}
 
         try:
-            error_result = self._validate_rom_file(rom_path)
-            if error_result:
-                return error_result
+            validation_result = self._validate_rom_file(rom_path)
+            if not validation_result.is_valid:
+                error_msg = validation_result.error_message or f"Invalid ROM file: {rom_path}"
+                return _create_error_result(error_msg, "ValidationError")
 
             # Try cache first
             rom_cache = self._ensure_rom_cache()

@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     import logging
@@ -80,16 +80,13 @@ class ROMExtractor:
         self.rom_cache = rom_cache
         logger.info("ROMExtractor initialized with HAL compression and palette extraction support")
 
-    def extract_sprite_data(
-        self, rom_path: str, sprite_offset: int, _sprite_config: Mapping[str, object] | None = None
-    ) -> bytes:
+    def extract_sprite_data(self, rom_path: str, sprite_offset: int) -> bytes:
         """
         Extract raw sprite data from ROM at specified offset.
 
         Args:
             rom_path: Path to ROM file
             sprite_offset: Offset in ROM where sprite data is located
-            _sprite_config: Unused - kept for API compatibility
 
         Returns:
             Raw sprite data as bytes
@@ -298,8 +295,8 @@ class ROMExtractor:
         # Get palette configuration
         logger.debug(f"Getting palette configuration for {sprite_name}")
         palette_offset, palette_indices = self.rom_palette_extractor.get_palette_config_from_sprite_config(
-            cast(dict[str, Any], game_config),
-            sprite_name,  # type: ignore[reportExplicitAny] - interface with palette extractor
+            cast(dict[str, object], game_config),
+            sprite_name,
         )
 
         if palette_offset and palette_indices:

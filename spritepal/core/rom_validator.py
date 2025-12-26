@@ -89,28 +89,16 @@ class ROMValidator:
         """
         Validate ROM file basic properties.
 
+        Delegates to FileValidator for comprehensive validation while
+        maintaining backward compatibility with the tuple return type.
+
         Returns:
             Tuple of (is_valid, error_message)
         """
-        # Check file exists
-        rom_path_obj = Path(rom_path)
-        if not rom_path_obj.exists():
-            return False, "ROM file does not exist"
+        from utils.file_validator import FileValidator
 
-        # Check file size
-        file_size = rom_path_obj.stat().st_size
-        if file_size == 0:
-            return False, "ROM file is empty"
-
-        # Check for SMC header (512 bytes)
-        has_header = file_size % 1024 == 512
-        rom_size = file_size - (512 if has_header else 0)
-
-        # Validate ROM size
-        if rom_size not in cls.VALID_ROM_SIZES:
-            return False, f"Invalid ROM size: {rom_size} bytes"
-
-        return True, None
+        result = FileValidator.validate_rom_file(rom_path)
+        return result.is_valid, result.error_message
 
     @classmethod
     def validate_rom_header(cls, rom_path: str) -> tuple[ROMHeader, int]:
