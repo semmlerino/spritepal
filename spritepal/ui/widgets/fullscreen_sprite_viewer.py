@@ -217,8 +217,8 @@ class FullscreenSpriteViewer(QWidget):
 
     def set_sprite_data(
         self,
-        sprites_data: list[dict[str, Any]],
-        current_offset: int,  # pyright: ignore[reportExplicitAny] - sprite metadata
+        sprites_data: list[dict[str, Any]],  # pyright: ignore[reportExplicitAny] - sprite metadata dicts
+        current_offset: int,
         rom_path: str,
         rom_extractor: ROMExtractor | None,
     ) -> bool:

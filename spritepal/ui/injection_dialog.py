@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QSplitter,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -38,9 +39,9 @@ from ui.components import (
     FileSelector,
     FormRow,
     HexOffsetInput,
-    StyledSplitter,
     TabbedDialog,
 )
+from ui.styles import get_splitter_style
 from ui.utils.accessibility import AccessibilityHelper
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 from ui.workers.rom_info_loader_worker import ROMInfoLoaderWorker
@@ -191,7 +192,9 @@ class InjectionDialog(TabbedDialog):
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
 
-        splitter = StyledSplitter(Qt.Orientation.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(8)
+        splitter.setStyleSheet(get_splitter_style(8))
 
         left_widget = QWidget(self)
         layout = QVBoxLayout(left_widget)
@@ -199,10 +202,12 @@ class InjectionDialog(TabbedDialog):
 
         add_controls_method(layout)
 
-        splitter.add_widget(left_widget, stretch_factor=30)
+        splitter.addWidget(left_widget)
+        splitter.setStretchFactor(0, 30)
 
         if self.preview_widget:
-            splitter.add_widget(self.preview_widget, stretch_factor=70)
+            splitter.addWidget(self.preview_widget)
+            splitter.setStretchFactor(1, 70)
 
         splitter.setSizes([400, 1000])
 

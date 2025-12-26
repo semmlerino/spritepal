@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
@@ -36,9 +36,9 @@ class SpritePreviewWorker(BaseWorker):
         offset: int,
         sprite_name: str,
         extractor: ROMExtractor,
-        sprite_config: Any = None,
+        sprite_config: object = None,
         parent: QObject | None = None,
-    ):  # pyright: ignore[reportExplicitAny] - Optional sprite config
+    ):
         super().__init__(parent)
         self.rom_path = rom_path
         self.offset = offset

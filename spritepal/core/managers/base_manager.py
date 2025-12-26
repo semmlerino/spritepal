@@ -265,49 +265,64 @@ class BaseManager(QObject):
 
         return ensure_component(component, name, error_type)
 
-    # Thin wrappers that delegate to error_helpers for backward compatibility
-    def _handle_categorized_error(
+    # ========== Error Handling Helpers ==========
+
+    def _create_enhanced_error(
         self,
         error: Exception,
         operation: str,
         category: str,
         context: str = "",
         error_class: type[Exception] | None = None,
-    ) -> None:
-        """Handle errors with standardized logging and re-raising.
-
-        Delegates to error_helpers.handle_categorized_error.
+    ) -> Exception:
+        """Create an enhanced exception with category and context.
 
         Args:
             error: The original exception
             operation: Operation name for context
-            category: Error category for the message (e.g., "File I/O", "Data format")
+            category: Error category (e.g., "File I/O", "Data format")
             context: Additional context for the error message
-            error_class: Exception class to raise. If None, uses original error type.
+            error_class: Exception class for wrapping. If None, uses original type.
 
-        Raises:
-            Exception: Re-raises with enhanced error message
+        Returns:
+            Enhanced exception (caller should raise)
         """
-        from .error_helpers import handle_categorized_error
+        context_suffix = f" {context}" if context else ""
+        enhanced_msg = f"{category} error during {operation}{context_suffix}: {error!s}"
 
-        enhanced = handle_categorized_error(
-            error, operation, category, context, error_class, on_error=self._handle_error
-        )
-        raise enhanced
+        exc_class = error_class if error_class is not None else type(error)
+        enhanced_error = exc_class(enhanced_msg)
+        enhanced_error.__cause__ = error
+
+        # Log and emit signal
+        self._handle_error(enhanced_error, operation)
+        return enhanced_error
 
     def _handle_file_io_error(self, error: Exception, operation: str, context: str = "") -> None:
-        """Handle file I/O errors. Delegates to error_helpers."""
-        from .error_helpers import handle_file_io_error
+        """Handle file I/O errors (OSError, PermissionError, etc.).
 
-        enhanced = handle_file_io_error(error, operation, context, on_error=self._handle_error)
-        raise enhanced
+        Args:
+            error: The original exception
+            operation: Operation name for context
+            context: Additional context for the error message
+
+        Raises:
+            Exception: Enhanced exception with "File I/O" category
+        """
+        raise self._create_enhanced_error(error, operation, "File I/O", context)
 
     def _handle_data_format_error(self, error: Exception, operation: str, context: str = "") -> None:
-        """Handle data format errors. Delegates to error_helpers."""
-        from .error_helpers import handle_data_format_error
+        """Handle data format errors (ValueError, TypeError, etc.).
 
-        enhanced = handle_data_format_error(error, operation, context, on_error=self._handle_error)
-        raise enhanced
+        Args:
+            error: The original exception
+            operation: Operation name for context
+            context: Additional context for the error message
+
+        Raises:
+            Exception: Enhanced exception with "Data format" category
+        """
+        raise self._create_enhanced_error(error, operation, "Data format", context)
 
     def _handle_operation_error(
         self,
@@ -316,8 +331,15 @@ class BaseManager(QObject):
         error_class: type[Exception],
         context: str = "",
     ) -> None:
-        """Handle operation-specific errors. Delegates to error_helpers."""
-        from .error_helpers import handle_operation_error
+        """Handle operation-specific errors with custom exception wrapping.
 
-        enhanced = handle_operation_error(error, operation, error_class, context, on_error=self._handle_error)
-        raise enhanced
+        Args:
+            error: The original exception
+            operation: Operation name (also used as category via title())
+            error_class: Exception class for wrapping
+            context: Additional context for the error message
+
+        Raises:
+            Exception: Enhanced exception with operation name as category
+        """
+        raise self._create_enhanced_error(error, operation, operation.title(), context, error_class)

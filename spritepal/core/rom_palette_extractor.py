@@ -6,6 +6,7 @@ Extracts sprite palettes directly from ROM files
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -125,8 +126,8 @@ class ROMPaletteExtractor:
 
     def get_palette_config_from_sprite_config(
         self,
-        game_config: dict[str, Any],
-        sprite_name: str,  # pyright: ignore[reportExplicitAny]  # JSON config
+        game_config: Mapping[str, Any],  # pyright: ignore[reportExplicitAny] - JSON config needs nested .get() calls
+        sprite_name: str,
     ) -> tuple[int | None, list[int] | None]:
         """
         Get palette offset and indices for a specific sprite.

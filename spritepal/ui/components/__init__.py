@@ -20,8 +20,6 @@ from .inputs.form_row import (
     create_vertical_form_row,
 )
 from .inputs.hex_offset_input import HexOffsetInput
-from .layouts.styled_group_box import StyledGroupBox
-from .layouts.styled_splitter import StyledSplitter
 
 
 class TabbedDialog(DialogBase):
@@ -302,8 +300,6 @@ __all__ = [
     "FormRow",
     "HexOffsetInput",
     "SplitterDialog",
-    "StyledGroupBox",
-    "StyledSplitter",
     "TabbedDialog",
     "create_horizontal_form_row",
     "create_vertical_form_row",

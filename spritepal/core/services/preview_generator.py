@@ -416,11 +416,9 @@ class PreviewGenerator(QObject):
             progress_callback(20, "Reading ROM data...")
 
         # Use ROM extractor to extract sprite data
-        # sprite_config is object but extract_sprite_data accepts Mapping[str, object] | None
         sprite_data = rom_extractor.extract_sprite_data(
             request.data_path,
             request.offset,
-            request.sprite_config,  # pyright: ignore[reportArgumentType] - PreviewRequest stores as object
         )
 
         if progress_callback:

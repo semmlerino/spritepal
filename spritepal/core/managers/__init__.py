@@ -34,14 +34,6 @@ from utils.logging_config import get_logger
 from .application_state_manager import ApplicationStateManager
 from .base_manager import BaseManager
 from .core_operations_manager import CoreOperationsManager
-from .error_helpers import (
-    ErrorCallback,
-    handle_categorized_error,
-    handle_data_format_error,
-    handle_file_io_error,
-    handle_operation_error,
-)
-from .operation_decorator import OperationManager, with_operation_handling
 from .sprite_preset_manager import SpritePresetManager
 from .workflow_manager import ExtractionState
 from .workflow_state_manager import WorkflowStateManager
@@ -140,27 +132,20 @@ __all__ = [
     "ApplicationStateManager",
     "BaseManager",
     "CoreOperationsManager",
-    "ErrorCallback",
     "ExtractionError",
     "ExtractionState",
     "FileOperationError",
     "InjectionError",
     "ManagerError",
     "NavigationError",
-    "OperationManager",
     "PreviewError",
     "SessionError",
     "SpritePresetManager",
     "ValidationError",
     "WorkflowStateManager",
     "cleanup_managers",
-    "handle_categorized_error",
-    "handle_data_format_error",
-    "handle_file_io_error",
-    "handle_operation_error",
     "is_clean",
     "is_initialized",
     "reset_for_tests",
     "validate_manager_dependencies",
-    "with_operation_handling",
 ]
