@@ -294,6 +294,7 @@ class PalettePreviewWidget(QWidget):
         super().__init__()
         self._expanded_index = 8  # Default to first palette (index 8)
         self._active_indices: list[int] = []  # Palettes marked as active
+        self._has_palettes = False  # Track whether any palettes are loaded
         self._setup_ui()
 
     def _setup_ui(self):
@@ -302,8 +303,15 @@ class PalettePreviewWidget(QWidget):
         self._main_layout.setSpacing(SPACING_TINY)
         self._main_layout.setContentsMargins(0, 0, 0, 0)
 
+        # Empty state label (shown when no palettes loaded)
+        self._empty_label = QLabel("No palettes loaded")
+        self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_label.setStyleSheet(f"color: {COLORS['text_muted']}; padding: 20px;")
+        self._main_layout.addWidget(self._empty_label)
+
         # Expanded palette widget (shows full grid)
         self._expanded_widget = PaletteWidget(self._expanded_index, "", self)
+        self._expanded_widget.setVisible(False)  # Hidden until palettes loaded
         self._main_layout.addWidget(self._expanded_widget)
 
         # Container for collapsed palette rows
@@ -331,6 +339,7 @@ class PalettePreviewWidget(QWidget):
             self._collapsed_rows[palette_index] = collapsed
             self._collapsed_layout.addWidget(collapsed)
 
+        self._collapsed_container.setVisible(False)  # Hidden until palettes loaded
         self._main_layout.addWidget(self._collapsed_container)
         self.setLayout(self._main_layout)
 
@@ -405,6 +414,13 @@ class PalettePreviewWidget(QWidget):
 
     def set_palette(self, palette_index: int, colors: list[tuple[int, int, int]], name: str = "") -> None:
         """Set a specific palette's colors"""
+        # Show palette widgets, hide empty state
+        if not self._has_palettes:
+            self._has_palettes = True
+            self._empty_label.setVisible(False)
+            self._expanded_widget.setVisible(True)
+            self._collapsed_container.setVisible(True)
+
         # Update the stored expanded widget
         if palette_index in self._expanded_widgets:
             self._expanded_widgets[palette_index].set_palette(colors)
@@ -426,6 +442,13 @@ class PalettePreviewWidget(QWidget):
 
     def clear(self):
         """Clear all palettes"""
+        # Reset to empty state
+        self._has_palettes = False
+        self._empty_label.setVisible(True)
+        self._expanded_widget.setVisible(False)
+        self._collapsed_container.setVisible(False)
+
+        # Clear the palette data
         for widget in self._expanded_widgets.values():
             widget.clear()
         for row in self._collapsed_rows.values():

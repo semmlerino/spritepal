@@ -388,13 +388,14 @@ class PreviewPanel(QWidget):
         )
 
         # Palette application controls
-        self.palette_toggle = QCheckBox("Apply Palette")
+        self.palette_toggle = QCheckBox("Palette")
+        self.palette_toggle.setToolTip("Apply selected palette to preview")
         if self.palette_toggle:
             self.palette_toggle.setChecked(False)
         _ = self.palette_toggle.toggled.connect(self._on_palette_toggle)
 
         # Transparency toggle
-        self.transparency_toggle = QCheckBox("Transparency")
+        self.transparency_toggle = QCheckBox("Transp.")
         if self.transparency_toggle:
             self.transparency_toggle.setChecked(True)
         self.transparency_toggle.setToolTip("Toggle transparency for palette index 0")

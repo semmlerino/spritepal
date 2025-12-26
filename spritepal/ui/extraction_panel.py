@@ -245,7 +245,7 @@ class ExtractionPanel(QGroupBox):
         layout.addWidget(self.cgram_drop)
 
         # Optional OAM section (collapsed by default)
-        self.oam_toggle = QPushButton("+ Show OAM input (optional)")
+        self.oam_toggle = QPushButton("▶ OAM input (optional)")
         self.oam_toggle.setCheckable(True)
         self.oam_toggle.setChecked(False)
         self.oam_toggle.setFlat(True)
@@ -421,9 +421,9 @@ class ExtractionPanel(QGroupBox):
         """Toggle visibility of OAM drop zone"""
         self.oam_drop.setVisible(checked)
         if checked:
-            self.oam_toggle.setText("- Hide OAM input")
+            self.oam_toggle.setText("▼ OAM input (optional)")
         else:
-            self.oam_toggle.setText("+ Show OAM input (optional)")
+            self.oam_toggle.setText("▶ OAM input (optional)")
 
     def _update_offset_display(self, value: int) -> None:
         """Update all offset display elements using controller's display info"""
