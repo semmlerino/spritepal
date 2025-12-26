@@ -1,13 +1,9 @@
 """Mode selector widget for ROM extraction"""
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QWidget
 
-# UI Spacing Constants (imported from centralized module)
-from ui.common.spacing_constants import (
-    EXTRACTION_COMBO_MIN_WIDTH as COMBO_MIN_WIDTH,
-    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
-)
+from ui.common.spacing_constants import EXTRACTION_COMBO_MIN_WIDTH as COMBO_MIN_WIDTH
 
 from .base_widget import BaseExtractionWidget
 
@@ -24,9 +20,7 @@ class ModeSelectorWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface"""
-        mode_layout = QHBoxLayout()
-        mode_layout.setSpacing(SPACING_MEDIUM)
-        mode_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
+        mode_layout = self._create_hbox_layout()
 
         mode_label = self._create_control_label("Mode:")
         mode_layout.addWidget(mode_label)

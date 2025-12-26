@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QProgressBar, QWidget
 
+from ui.common.spacing_constants import CONTROL_PANEL_LABEL_WIDTH, LOADING_PROGRESS_HEIGHT, SPACING_MEDIUM
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
@@ -16,15 +17,6 @@ if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
 
 logger = get_logger(__name__)
-
-# UI Spacing Constants (imported from centralized module)
-from ui.common.spacing_constants import (
-    CONTROL_PANEL_LABEL_WIDTH,
-    EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
-    LOADING_PROGRESS_HEIGHT,
-    PATH_EDIT_MIN_WIDTH,
-    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
-)
 
 
 class ROMFileWidget(BaseExtractionWidget):
@@ -51,29 +43,19 @@ class ROMFileWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface - flat layout without group box"""
-        rom_layout = QVBoxLayout()
-        rom_layout.setSpacing(SPACING_MEDIUM)
-        rom_layout.setContentsMargins(0, 0, 0, 0)
+        rom_layout = self._create_vbox_layout()
 
         # ROM path row: Label + Path + Browse button
-        rom_row = QHBoxLayout()
-        rom_row.setSpacing(SPACING_MEDIUM)
+        rom_row = self._create_hbox_layout()
 
         # ROM label to match other rows in the panel
         rom_label = self._create_control_label("ROM:")
         rom_row.addWidget(rom_label)
 
-        self.rom_path_edit = QLineEdit()
-        self.rom_path_edit.setPlaceholderText("Select ROM file...")
-        self.rom_path_edit.setReadOnly(True)
-        self.rom_path_edit.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
+        self.rom_path_edit = self._create_readonly_path_edit("Select ROM file...")
         rom_row.addWidget(self.rom_path_edit, 1)  # Stretch factor 1
 
-        self.browse_rom_btn = QPushButton("Browse...")
-        self.browse_rom_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.browse_rom_btn.setMinimumWidth(90)  # Fits "Browse..." text
-        self.browse_rom_btn.setMaximumWidth(120)  # Prevents over-expansion
-        _ = self.browse_rom_btn.clicked.connect(self.browse_clicked.emit)
+        self.browse_rom_btn = self._create_browse_button(signal=self.browse_clicked)
         rom_row.addWidget(self.browse_rom_btn)
 
         rom_layout.addLayout(rom_row)

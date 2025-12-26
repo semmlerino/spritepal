@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QWidget
+from PySide6.QtWidgets import QLineEdit, QWidget
 
-from ui.common.spacing_constants import (
-    PATH_EDIT_MIN_WIDTH,
-    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
-)
+from ui.common.spacing_constants import PATH_EDIT_MIN_WIDTH
 
 from .base_widget import BaseExtractionWidget
 
@@ -25,9 +22,7 @@ class OutputNameWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface"""
-        output_layout = QHBoxLayout()
-        output_layout.setSpacing(SPACING_MEDIUM)
-        output_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
+        output_layout = self._create_hbox_layout()
 
         name_label = self._create_control_label("Name:")
         output_layout.addWidget(name_label)

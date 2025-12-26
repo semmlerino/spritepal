@@ -1,14 +1,7 @@
 """CGRAM file selector widget for ROM extraction"""
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
-
-# UI Spacing Constants (imported from centralized module)
-from ui.common.spacing_constants import (
-    EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
-    PATH_EDIT_MIN_WIDTH,
-    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
-)
+from PySide6.QtWidgets import QWidget
 
 from .base_widget import BaseExtractionWidget
 
@@ -25,30 +18,22 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface - collapsible section, starts collapsed"""
-        cgram_layout = QVBoxLayout()
-        cgram_layout.setSpacing(SPACING_MEDIUM)
-        cgram_layout.setContentsMargins(0, 0, 0, 0)
+        cgram_layout = self._create_vbox_layout()
 
         # CGRAM path row
-        cgram_row = QHBoxLayout()
-        cgram_row.setSpacing(SPACING_MEDIUM)
+        cgram_row = self._create_hbox_layout()
 
-        self.cgram_path_edit = QLineEdit()
-        self.cgram_path_edit.setPlaceholderText("Select custom palette file...")
-        self.cgram_path_edit.setReadOnly(True)
-        self.cgram_path_edit.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
+        self.cgram_path_edit = self._create_readonly_path_edit("Select custom palette file...")
         cgram_row.addWidget(self.cgram_path_edit, 1)
 
-        self.browse_cgram_btn = QPushButton("Browse...")
-        self.browse_cgram_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.browse_cgram_btn.setMinimumWidth(90)  # Fits "Browse..." text
-        self.browse_cgram_btn.setMaximumWidth(120)  # Prevents over-expansion
-        self.browse_cgram_btn.setToolTip(
-            "Palettes are extracted from ROM when available.\n"
-            "Common sprites have default palette fallbacks.\n"
-            "Use this to load custom palette overrides."
+        self.browse_cgram_btn = self._create_browse_button(
+            signal=self.browse_clicked,
+            tooltip=(
+                "Palettes are extracted from ROM when available.\n"
+                "Common sprites have default palette fallbacks.\n"
+                "Use this to load custom palette overrides."
+            ),
         )
-        _ = self.browse_cgram_btn.clicked.connect(self.browse_clicked.emit)
         cgram_row.addWidget(self.browse_cgram_btn)
 
         cgram_layout.addLayout(cgram_row)

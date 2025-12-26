@@ -4,16 +4,10 @@ from typing import Any
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QWidget
 
 from core.types import SpritePreset
-
-# UI Spacing Constants (imported from centralized module)
-from ui.common.spacing_constants import (
-    EXTRACTION_ACTION_BUTTON_HEIGHT,
-    SPACING_COMPACT_MEDIUM as SPACING_MEDIUM,
-    SPRITE_COMBO_MIN_WIDTH,
-)
+from ui.common.spacing_constants import EXTRACTION_ACTION_BUTTON_HEIGHT, SPRITE_COMBO_MIN_WIDTH
 from ui.styles import get_prominent_action_button_style
 from ui.styles.theme import COLORS
 
@@ -43,13 +37,10 @@ class SpriteSelectorWidget(BaseExtractionWidget):
 
     def _setup_ui(self):
         """Initialize the user interface"""
-        sprite_layout = QVBoxLayout()
-        sprite_layout.setSpacing(SPACING_MEDIUM)  # Use consistent spacing constant
-        sprite_layout.setContentsMargins(0, 0, 0, 0)  # Group box CSS provides padding
+        sprite_layout = self._create_vbox_layout()
 
         # Sprite selection row
-        sprite_row = QHBoxLayout()
-        sprite_row.setSpacing(SPACING_MEDIUM)
+        sprite_row = self._create_hbox_layout()
 
         sprite_label = self._create_control_label("Sprite:")
         sprite_row.addWidget(sprite_label)
@@ -64,8 +55,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         sprite_layout.addLayout(sprite_row)
 
         # Offset display row (simplified - no button)
-        offset_row = QHBoxLayout()
-        offset_row.setSpacing(SPACING_MEDIUM)
+        offset_row = self._create_hbox_layout()
 
         offset_label = self._create_control_label("Offset:")
         offset_row.addWidget(offset_label)
@@ -79,8 +69,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         sprite_layout.addLayout(offset_row)
 
         # Button row with Find Sprites (prominent) and Presets (secondary)
-        button_row = QHBoxLayout()
-        button_row.setSpacing(SPACING_MEDIUM)
+        button_row = self._create_hbox_layout()
 
         # Find Sprites button - primary discovery action
         self.find_sprites_btn = QPushButton("🔍 Find Sprites in ROM (Ctrl+F)")

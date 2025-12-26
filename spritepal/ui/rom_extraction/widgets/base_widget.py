@@ -2,11 +2,27 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QGroupBox, QLabel, QLayout, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, SignalInstance
+from PySide6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLayout,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ui.common.collapsible_group_box import CollapsibleGroupBox
-from ui.common.spacing_constants import CONTROL_PANEL_LABEL_WIDTH, SPACING_COMPACT_SMALL, SPACING_MEDIUM
+from ui.common.spacing_constants import (
+    CONTROL_PANEL_LABEL_WIDTH,
+    EXTRACTION_BUTTON_MIN_HEIGHT as BUTTON_MIN_HEIGHT,
+    PATH_EDIT_MIN_WIDTH,
+    SPACING_COMPACT_SMALL,
+    SPACING_MEDIUM,
+)
 from ui.styles.theme import COLORS
 
 
@@ -39,6 +55,63 @@ class BaseExtractionWidget(QWidget):
         label.setMinimumWidth(CONTROL_PANEL_LABEL_WIDTH)
         label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return label
+
+    def _create_readonly_path_edit(self, placeholder: str) -> QLineEdit:
+        """Create read-only path edit with consistent styling.
+
+        Args:
+            placeholder: Placeholder text to display when empty
+
+        Returns:
+            QLineEdit configured as read-only with standard width
+        """
+        edit = QLineEdit()
+        edit.setPlaceholderText(placeholder)
+        edit.setReadOnly(True)
+        edit.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
+        return edit
+
+    def _create_browse_button(self, signal: SignalInstance | None = None, tooltip: str = "") -> QPushButton:
+        """Create browse button with consistent sizing.
+
+        Args:
+            signal: Optional signal to connect to clicked event
+            tooltip: Optional tooltip text
+
+        Returns:
+            QPushButton with standard sizing for browse actions
+        """
+        btn = QPushButton("Browse...")
+        btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
+        btn.setMinimumWidth(90)  # Fits "Browse..." text
+        btn.setMaximumWidth(120)  # Prevents over-expansion
+        if tooltip:
+            btn.setToolTip(tooltip)
+        if signal is not None:
+            _ = btn.clicked.connect(signal.emit)
+        return btn
+
+    def _create_vbox_layout(self) -> QVBoxLayout:
+        """Create VBoxLayout with standard spacing and margins.
+
+        Returns:
+            QVBoxLayout with SPACING_MEDIUM spacing and zero margins
+        """
+        layout = QVBoxLayout()
+        layout.setSpacing(SPACING_MEDIUM)
+        layout.setContentsMargins(0, 0, 0, 0)
+        return layout
+
+    def _create_hbox_layout(self) -> QHBoxLayout:
+        """Create HBoxLayout with standard spacing and margins.
+
+        Returns:
+            QHBoxLayout with SPACING_MEDIUM spacing and zero margins
+        """
+        layout = QHBoxLayout()
+        layout.setSpacing(SPACING_MEDIUM)
+        layout.setContentsMargins(0, 0, 0, 0)
+        return layout
 
     def _setup_widget_with_group(self, title: str, inner_layout: QLayout) -> None:
         """Set up the widget with a standard outer layout and group box.
