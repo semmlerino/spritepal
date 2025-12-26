@@ -107,14 +107,12 @@ class TestConsoleErrorHandler(unittest.TestCase):
         self.assertEqual(self.handler.get_warning_count(), 0)
 
     def test_set_show_dialogs_is_noop(self):
-        """Test that set_show_dialogs doesn't affect console handler"""
+        """Test that set_show_dialogs is a no-op for console handler."""
         # Console handler should never show dialogs
         self.assertFalse(self.handler._show_dialogs)
 
-        self.handler.set_show_dialogs(True)
-        self.assertFalse(self.handler._show_dialogs)
-
-        self.handler.set_show_dialogs(False)
+        # Method is a no-op - calling it shouldn't change anything
+        self.handler.set_show_dialogs()
         self.assertFalse(self.handler._show_dialogs)
 
     def test_repr_shows_counts(self):

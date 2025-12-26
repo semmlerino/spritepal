@@ -133,15 +133,9 @@ class ConsoleErrorHandler:
         # Print to stderr
         print(f"VALIDATION ERROR: {error_msg}", file=sys.stderr)
 
-    def set_show_dialogs(self, show: bool) -> None:
-        """
-        Set whether to show dialog boxes (no-op for console handler).
-
-        Args:
-            show: Whether to show dialogs (ignored)
-        """
-        # Console handler never shows dialogs
-        self._show_dialogs = False
+    def set_show_dialogs(self) -> None:
+        """No-op for console handler. Console never shows dialogs."""
+        pass
 
     def get_error_count(self) -> int:
         """Get the total number of errors handled."""

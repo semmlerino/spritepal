@@ -28,8 +28,7 @@ class ModeSelectorWidget(BaseExtractionWidget):
         self.mode_combo = QComboBox()
         self.mode_combo.setMinimumWidth(COMBO_MIN_WIDTH)
         self.mode_combo.addItems(["Preset Sprites", "Manual Offset Exploration"])
-        if self.mode_combo:
-            self.mode_combo.setCurrentIndex(1)  # Default to manual offset mode
+        self.mode_combo.setCurrentIndex(1)  # Default to manual offset mode
         self.mode_combo.currentIndexChanged.connect(self.mode_changed.emit)
         mode_layout.addWidget(self.mode_combo)
         mode_layout.addStretch()

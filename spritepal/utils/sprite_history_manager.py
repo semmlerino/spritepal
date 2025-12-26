@@ -91,43 +91,7 @@ class SpriteHistoryManager:
         """
         return len(self._found_sprites)
 
-    def get_max_history(self) -> int:
-        """
-        Get the maximum history limit.
-
-        Returns:
-            Maximum number of history items
-        """
-        return self._max_history
-
-    def set_max_history(self, max_history: int):
-        """
-        Set the maximum history limit.
-
-        Args:
-            max_history: New maximum (must be > 0)
-        """
-        if max_history <= 0:
-            raise ValueError("Maximum history must be positive")
-
-        self._max_history = max_history
-        self._enforce_limit()
-
     def _enforce_limit(self):
         """Enforce the maximum history limit by removing oldest items."""
         while len(self._found_sprites) > self._max_history:
             self._found_sprites.pop(0)  # Remove oldest
-
-    def get_history_items(self) -> list[str]:
-        """
-        Get formatted history items for display.
-
-        Returns:
-            List of formatted strings
-        """
-        items = []
-        for sprite in self._found_sprites:
-            offset = sprite["offset"]
-            quality = sprite["quality"]
-            items.append(f"0x{offset:06X} - Quality: {quality:.2f}")
-        return items

@@ -10,6 +10,8 @@ from typing import Any
 from PIL import Image, ImageDraw
 from PIL.ImageDraw import ImageDraw as ImageDrawType
 
+from utils.image_utils import paste_with_mode_handling
+
 from .grid_arrangement_manager import (
     ArrangementType,
     GridArrangementManager,
@@ -243,13 +245,7 @@ class GridPreviewGenerator(ArrangementPreviewGenerator):
                 display_img = tile_img
 
             if display_img:
-                if output.mode == "RGBA" and display_img.mode == "RGBA":
-                    output.paste(display_img, (x, y), display_img)
-                elif output.mode == "RGBA" and display_img.mode != "RGBA":
-                    rgba_img = display_img.convert("RGBA")
-                    output.paste(rgba_img, (x, y), rgba_img)
-                else:
-                    output.paste(display_img, (x, y))
+                paste_with_mode_handling(output, display_img, (x, y))
 
         return output
 

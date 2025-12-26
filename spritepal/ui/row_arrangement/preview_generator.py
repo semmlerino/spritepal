@@ -9,6 +9,8 @@ from typing import Any
 
 from PIL import Image
 
+from utils.image_utils import create_output_image, paste_with_mode_handling
+
 from .palette_colorizer import PaletteColorizer
 
 
@@ -56,18 +58,9 @@ class ArrangementPreviewGenerator:
             new_height = (len(arranged_indices) - 1) * row_spacing + tile_height
         new_width = original_image.width
 
-        # Determine the mode based on palette application
-        if self.colorizer and self.colorizer.is_palette_mode():
-            # Create RGBA image for colorized output
-            arranged = Image.new("RGBA", (new_width, new_height), (0, 0, 0, 0))
-        # Create grayscale image
-        elif original_image.mode == "P":
-            arranged = Image.new("P", (new_width, new_height))
-            palette = original_image.getpalette()
-            if palette is not None:
-                arranged.putpalette(palette)
-        else:
-            arranged = Image.new("L", (new_width, new_height))
+        # Create output image with appropriate mode
+        use_rgba = self.colorizer is not None and self.colorizer.is_palette_mode()
+        arranged = create_output_image(new_width, new_height, use_rgba, original_image)
 
         # Copy rows in new arrangement
         y_offset = 0
@@ -84,17 +77,7 @@ class ArrangementPreviewGenerator:
                     row_image = grayscale_image
 
                 if row_image:
-                    # Handle different modes when pasting
-                    if arranged.mode == "RGBA" and row_image.mode == "RGBA":
-                        # RGBA to RGBA - use alpha compositing
-                        arranged.paste(row_image, (0, y_offset), row_image)
-                    elif arranged.mode == "RGBA" and row_image.mode != "RGBA":
-                        # Convert row image to RGBA first
-                        rgba_row = row_image.convert("RGBA")
-                        arranged.paste(rgba_row, (0, y_offset), rgba_row)
-                    else:
-                        # Standard paste for grayscale modes
-                        arranged.paste(row_image, (0, y_offset))
+                    paste_with_mode_handling(arranged, row_image, (0, y_offset))
 
                 y_offset += row_spacing
 

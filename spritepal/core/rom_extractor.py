@@ -55,9 +55,9 @@ from utils.constants import (
     TYPICAL_SPRITE_MIN,
 )
 from utils.logging_config import get_logger
-from utils.rom_exceptions import ROMCompressionError
 from utils.math_utils import calculate_entropy
-from utils.rom_utils import detect_smc_offset, load_rom_data_stripped
+from utils.rom_exceptions import ROMCompressionError
+from utils.rom_utils import load_rom_data_stripped
 
 logger: logging.Logger = get_logger(__name__)
 
