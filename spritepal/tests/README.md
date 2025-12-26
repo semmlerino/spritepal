@@ -62,22 +62,7 @@ tests/
 
 ## Running Tests
 
-```bash
-# All tests (parallel by default)
-uv run pytest
-
-# Quick triage - pass/fail summary only
-uv run pytest --tb=no -q
-
-# Re-run only failures with details
-uv run pytest --lf -vv --tb=short
-
-# Single test with full output (serial)
-uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
-
-# Coverage report
-uv run pytest --cov=core --cov=ui --cov-report=html
-```
+See [CLAUDE.md](../CLAUDE.md#running-tests) for test commands, flags, and debugging workflows.
 
 ---
 
