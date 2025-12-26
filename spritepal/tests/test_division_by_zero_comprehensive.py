@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-@pytest.mark.usefixtures("session_managers")
+@pytest.mark.usefixtures("session_app_context")
 @pytest.mark.shared_state_safe
 class TestDivisionByZeroFixes:
     """Test all division by zero scenarios in scan workers."""

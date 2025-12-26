@@ -21,14 +21,14 @@ from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
 pytestmark = [
-    pytest.mark.usefixtures("session_managers"),
+    pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_app_context which owns worker threads"),
 ]
 
 
 @pytest.fixture
-def real_factory(tmp_path, session_managers):
+def real_factory(tmp_path, session_app_context):
     """Create RealComponentFactory for integration tests."""
     with RealComponentFactory() as factory:
         yield factory
@@ -131,7 +131,7 @@ class TestDetachedGalleryWindow:
     """Test the detached gallery window functionality."""
 
     @pytest.mark.gui
-    def test_open_detached_gallery(self, gallery_with_sprites, qtbot, managers_initialized):
+    def test_open_detached_gallery(self, gallery_with_sprites, qtbot):
         """Test opening the detached gallery window."""
         tab = gallery_with_sprites
 
@@ -153,7 +153,7 @@ class TestDetachedGalleryWindow:
 
 
     @pytest.mark.gui
-    def test_detached_window_signals(self, gallery_with_sprites, qtbot, managers_initialized):
+    def test_detached_window_signals(self, gallery_with_sprites, qtbot):
         """Test that detached window signals are connected properly."""
         tab = gallery_with_sprites
 
@@ -180,7 +180,7 @@ class TestDetachedGalleryWindow:
         tab.detached_window.close()
 
     @pytest.mark.gui
-    def test_detached_window_close_cleanup(self, gallery_with_sprites, qtbot, managers_initialized):
+    def test_detached_window_close_cleanup(self, gallery_with_sprites, qtbot):
         """Test that closing detached window cleans up properly."""
         tab = gallery_with_sprites
 

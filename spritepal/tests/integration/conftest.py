@@ -21,27 +21,39 @@ import pytest
 def managers_initialized(qt_app, request, tmp_path):
     """Initialize managers for integration tests.
 
-    If session_managers is already active, this fixture is a no-op to avoid
-    conflicting cleanup.
+    If session_app_context or session_managers is already active, this fixture
+    is a no-op to avoid conflicting cleanup.
 
+    Uses create_app_context() to ensure AppContext is properly set up.
     Uses isolated settings path to avoid polluting repository root.
     """
-    from core.managers import cleanup_managers, initialize_managers, is_initialized
+    from core.app_context import (
+        create_app_context,
+        is_context_initialized,
+        reset_app_context,
+    )
     from tests.fixtures.core_fixtures import is_session_managers_active
 
-    was_already_initialized = is_initialized()
+    was_already_initialized = is_context_initialized()
+    we_initialized = False
 
     if not was_already_initialized:
         # Use isolated temp settings path - CRITICAL for preventing repo pollution
         settings_path = tmp_path / ".test_integration_settings.json"
-        initialize_managers("TestApp_Integration", settings_path=settings_path)
+        create_app_context(
+            app_name="TestApp_Integration",
+            settings_path=settings_path,
+        )
+        we_initialized = True
 
     yield
 
-    # Only cleanup if WE initialized AND session_managers is NOT active
-    # If session_managers is active, let it own the lifecycle
-    if not was_already_initialized and not is_session_managers_active():
-        cleanup_managers()
+    # Only cleanup if WE initialized this specific instance
+    # Check both: we did the initialization AND session fixtures are NOT active
+    # (session_app_context or session_managers)
+    # Also re-check is_context_initialized to avoid double-cleanup
+    if we_initialized and not is_session_managers_active() and is_context_initialized():
+        reset_app_context()
 
 
 # NOTE: temp_dir fixture removed - use pytest's built-in tmp_path fixture instead
