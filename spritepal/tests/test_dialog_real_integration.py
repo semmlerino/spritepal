@@ -22,6 +22,7 @@ NOTE: Uses REAL dialog instantiation which can be sensitive in Qt offscreen mode
 If these tests fail in offscreen, use @pytest.mark.requires_display or adjust
 the dialog expectations to match headless behavior.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -63,6 +64,8 @@ def _create_injection_dialog(**kwargs) -> InjectionDialog:
         settings_manager=context.application_state_manager,
         **kwargs,
     )
+
+
 from PySide6.QtWidgets import QApplication
 
 from tests.infrastructure import RealComponentFactory
@@ -115,6 +118,7 @@ class TestRealDialogIntegration:
             test_file = f.name
             # Create proper minimal 16x16 PNG file for real file testing
             from PIL import Image
+
             test_image = Image.new("RGB", (16, 16), color="white")
             test_image.save(f.name)
 
@@ -172,6 +176,7 @@ class TestRealDialogIntegration:
             test_file = f.name
             # Create proper minimal 16x16 PNG file for tile extraction testing
             from PIL import Image
+
             test_image = Image.new("RGB", (16, 16), color="white")
             test_image.save(f.name)
 
@@ -209,6 +214,7 @@ class TestRealDialogIntegration:
             test_file_path = Path(test_file)
             if test_file_path.exists():
                 test_file_path.unlink()
+
 
 class TestRealDialogManagerIntegration:
     """
@@ -250,10 +256,7 @@ class TestRealDialogManagerIntegration:
 
         # Test multiple dialogs using same managers (could expose resource conflicts)
         manual_dialog = _create_manual_offset_dialog()
-        settings_dialog = SettingsDialog(
-            settings_manager=settings_manager,
-            rom_cache=rom_cache
-        )
+        settings_dialog = SettingsDialog(settings_manager=settings_manager, rom_cache=rom_cache)
 
         try:
             # Both dialogs might access same managers - test coordination
@@ -296,6 +299,7 @@ class TestRealDialogManagerIntegration:
         finally:
             manual_dialog.close()
             settings_dialog.close()
+
 
 class TestBugDiscoveryRealVsMockedDialogs:
     """
@@ -344,6 +348,7 @@ class TestBugDiscoveryRealVsMockedDialogs:
 
                 # Also test that widgets are actually Qt widgets, not placeholders
                 from PySide6.QtWidgets import QWidget
+
                 if not isinstance(widget, QWidget):
                     pytest.fail(f"REAL BUG: {widget_name} is {type(widget)}, not a QWidget")
 
@@ -435,6 +440,7 @@ class TestBugDiscoveryRealVsMockedDialogs:
         except Exception as e:
             print(f"REAL BUG: Dialog file validation failed: {e}")
             # This exposes real file validation bugs vs mocked file success
+
 
 if __name__ == "__main__":
     # Run the tests directly

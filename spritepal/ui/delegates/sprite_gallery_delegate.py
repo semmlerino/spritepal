@@ -2,6 +2,7 @@
 Sprite gallery delegate for custom rendering in QListView.
 Handles efficient painting of sprites with selection and hover effects.
 """
+
 from __future__ import annotations
 
 from typing import cast, override
@@ -30,6 +31,7 @@ from ui.models.sprite_gallery_model import SpriteGalleryModel
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class SpriteGalleryDelegate(QStyledItemDelegate):
     """Custom delegate for rendering sprites in gallery view."""
@@ -64,7 +66,9 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
         self._info_font = QFont("Arial", 9)
 
     @override
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> None:
+    def paint(
+        self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex
+    ) -> None:
         """
         Paint the sprite thumbnail.
 
@@ -90,13 +94,13 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
             item_rect.x() + self._spacing,
             item_rect.y() + self._spacing,
             item_rect.width() - 2 * self._spacing,
-            item_rect.height() - self._label_height - 2 * self._spacing
+            item_rect.height() - self._label_height - 2 * self._spacing,
         )
         label_rect = QRect(
             item_rect.x() + self._spacing,
             thumbnail_rect.bottom() + 4,
             item_rect.width() - 2 * self._spacing,
-            self._label_height - 8
+            self._label_height - 8,
         )
 
         # Determine colors based on state
@@ -131,7 +135,7 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
             scaled_pixmap = pixmap.scaled(
                 thumbnail_rect.size() - QSize(4, 4),  # Leave margin
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
+                Qt.TransformationMode.SmoothTransformation,
             )
 
             # Center the pixmap in the rectangle
@@ -159,11 +163,11 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
             info_parts = []
 
             # Add compression status
-            if sprite_info.get('compressed', False):
+            if sprite_info.get("compressed", False):
                 info_parts.append("HAL")
 
             # Add size
-            size = sprite_info.get('decompressed_size', sprite_info.get('size', 0))
+            size = sprite_info.get("decompressed_size", sprite_info.get("size", 0))
             if size > 0:
                 if size > 1024:
                     info_parts.append(f"{size / 1024:.1f}KB")
@@ -171,7 +175,7 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
                     info_parts.append(f"{size}B")
 
             # Add tile count
-            tile_count = sprite_info.get('tile_count', 0)
+            tile_count = sprite_info.get("tile_count", 0)
             if tile_count > 0:
                 info_parts.append(f"{tile_count} tiles")
 
@@ -180,12 +184,7 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
                 painter.setFont(self._info_font)
 
                 # Draw below offset with smaller font
-                info_rect = QRectF(
-                    label_rect.x(),
-                    label_rect.y() + 16,
-                    label_rect.width(),
-                    label_rect.height() - 16
-                )
+                info_rect = QRectF(label_rect.x(), label_rect.y() + 16, label_rect.width(), label_rect.height() - 16)
                 painter.setPen(QColor(150, 150, 150))
                 painter.drawText(info_rect, Qt.AlignmentFlag.AlignCenter, info_text)
 
@@ -264,7 +263,7 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
         event: QEvent,
         model: QAbstractItemModel,
         option: QStyleOptionViewItem,
-        index: QModelIndex | QPersistentModelIndex
+        index: QModelIndex | QPersistentModelIndex,
     ) -> bool:
         """
         Handle editor events for selection.

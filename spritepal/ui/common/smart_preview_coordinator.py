@@ -52,9 +52,11 @@ def _validate_tile_data(tile_data: bytes | None, sample_size: int = 100) -> bool
 
 class DragState(Enum):
     """Slider drag state for different preview strategies."""
-    IDLE = auto()         # Not dragging, normal operations
-    DRAGGING = auto()     # Actively dragging slider
-    SETTLING = auto()     # Just released, waiting for final update
+
+    IDLE = auto()  # Not dragging, normal operations
+    DRAGGING = auto()  # Actively dragging slider
+    SETTLING = auto()  # Just released, waiting for final update
+
 
 class PendingPreviewRequest:
     """Represents a pending preview request with cancellation support.
@@ -80,6 +82,7 @@ class PendingPreviewRequest:
     def cancel(self) -> None:
         """Mark this request as cancelled."""
         self.cancelled = True
+
 
 class SmartPreviewCoordinator(QObject):
     """
@@ -135,12 +138,8 @@ class SmartPreviewCoordinator(QObject):
         self._worker_pool = PreviewWorkerPool(max_workers=2)
         # Use AutoConnection to let Qt choose the best connection type
         # This avoids unnecessary queuing when already on main thread
-        self._worker_pool.preview_ready.connect(
-            self._on_worker_preview_ready
-        )
-        self._worker_pool.preview_error.connect(
-            self._on_worker_preview_error
-        )
+        self._worker_pool.preview_ready.connect(self._on_worker_preview_ready)
+        self._worker_pool.preview_error.connect(self._on_worker_preview_error)
 
         # Fast LRU memory cache
         self._cache = PreviewCache(max_size=20)  # ~2MB cache
@@ -207,7 +206,6 @@ class SmartPreviewCoordinator(QObject):
             self._schedule_drag_preview()
         else:
             self._schedule_release_preview()
-
 
     def request_manual_preview(self, offset: int) -> None:
         """
@@ -370,8 +368,9 @@ class SmartPreviewCoordinator(QObject):
             logger.exception("Error requesting worker preview")
             self.preview_error.emit(f"Preview request failed: {e}")
 
-    def _on_worker_preview_ready(self, request_id: int, tile_data: bytes,
-                                width: int, height: int, sprite_name: str) -> None:
+    def _on_worker_preview_ready(
+        self, request_id: int, tile_data: bytes, width: int, height: int, sprite_name: str
+    ) -> None:
         """Handle preview ready from worker."""
         # Check if this is still the current request
         with QMutexLocker(self._mutex):

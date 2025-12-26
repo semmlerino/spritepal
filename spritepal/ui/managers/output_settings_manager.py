@@ -1,6 +1,7 @@
 """
 Output settings management for MainWindow
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -158,16 +159,9 @@ class OutputSettingsManager(QObject):
         else:
             default_dir = str(Path.cwd())
 
-        suggested_path = str(
-            Path(default_dir) / (self.output_name_edit.text() + ".png")
-        )
+        suggested_path = str(Path(default_dir) / (self.output_name_edit.text() + ".png"))
 
-        filename = browse_for_save_file(
-            self.parent_widget,
-            "Save Sprites As",
-            "PNG Files (*.png)",
-            suggested_path
-        )
+        filename = browse_for_save_file(self.parent_widget, "Save Sprites As", "PNG Files (*.png)", suggested_path)
 
         if filename:
             # Update output name without extension
@@ -300,12 +294,10 @@ class OutputSettingsManager(QObject):
         # Update tooltips to explain why they're disabled
         if is_grayscale_mode:
             self.grayscale_check.setToolTip(
-                "Not available in Grayscale Only mode.\n"
-                "Palette files are only created with color extraction."
+                "Not available in Grayscale Only mode.\nPalette files are only created with color extraction."
             )
             self.metadata_check.setToolTip(
-                "Not available in Grayscale Only mode.\n"
-                "Metadata is only created with color extraction."
+                "Not available in Grayscale Only mode.\nMetadata is only created with color extraction."
             )
         else:
             self.grayscale_check.setToolTip(

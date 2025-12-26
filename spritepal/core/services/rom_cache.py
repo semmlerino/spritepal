@@ -17,13 +17,16 @@ try:
 except ImportError:
     # Fallback logger
     import logging
+
     def get_logger(module_name: str) -> logging.Logger:
         return logging.getLogger(module_name)
+
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
 
 logger = get_logger(__name__)
+
 
 class ROMCache:
     """Manages caching of ROM scan results for performance optimization."""
@@ -73,8 +76,7 @@ class ROMCache:
                         logger.info(f"Using fallback cache directory: {self.cache_dir}")
                     else:
                         logger.warning(
-                            f"Fallback cache directory {fallback_dir} is not writable. "
-                            "ROM caching disabled."
+                            f"Fallback cache directory {fallback_dir} is not writable. ROM caching disabled."
                         )
                         self._cache_enabled = False
                 except (OSError, PermissionError):
@@ -251,9 +253,7 @@ class ROMCache:
 
         return rom_mtime <= cache_mtime
 
-    def _save_cache_data(
-        self, cache_file: Path, cache_data: Mapping[str, object]
-    ) -> bool:
+    def _save_cache_data(self, cache_file: Path, cache_data: Mapping[str, object]) -> bool:
         """Safely save cache data with error handling and unique temp files."""
         if not self._cache_enabled:
             return False
@@ -295,9 +295,7 @@ class ROMCache:
         except (OSError, FileNotFoundError):
             pass  # Ignore cleanup errors
 
-    def _load_cache_data(
-        self, cache_file: Path, max_retries: int = 3
-    ) -> dict[str, object] | None:
+    def _load_cache_data(self, cache_file: Path, max_retries: int = 3) -> dict[str, object] | None:
         """Safely load cache data with error handling and retry logic."""
         for attempt in range(max_retries):
             try:
@@ -308,7 +306,7 @@ class ROMCache:
                     logger.warning(f"Failed to load cache file {cache_file} after {max_retries} attempts: {e}")
                     return None
                 # Exponential backoff for retry
-                time.sleep(0.01 * (2 ** attempt))
+                time.sleep(0.01 * (2**attempt))
             except Exception as e:
                 # For other errors, don't retry
                 logger.warning(f"Failed to load cache file {cache_file}: {e}")
@@ -360,9 +358,7 @@ class ROMCache:
             logger.warning(f"Failed to save scan progress: {e}")
             return False
 
-    def get_partial_scan_results(
-        self, rom_path: str, scan_params: dict[str, int]
-    ) -> dict[str, object] | None:
+    def get_partial_scan_results(self, rom_path: str, scan_params: dict[str, int]) -> dict[str, object] | None:
         """Get partial scan results for resuming."""
         if not self._cache_enabled:
             return None
@@ -380,8 +376,7 @@ class ROMCache:
                 return None
 
             # Validate cache format
-            if (cache_data.get("version") != self.CACHE_VERSION or
-                "scan_progress" not in cache_data):
+            if cache_data.get("version") != self.CACHE_VERSION or "scan_progress" not in cache_data:
                 return None
 
             scan_progress = cache_data["scan_progress"]
@@ -472,9 +467,7 @@ class ROMCache:
 
         return removed_count
 
-    def get_sprite_locations(
-        self, rom_path: str
-    ) -> dict[str, object] | None:
+    def get_sprite_locations(self, rom_path: str) -> dict[str, object] | None:
         """Get cached sprite locations for ROM.
 
         Args:
@@ -499,8 +492,7 @@ class ROMCache:
                 return None
 
             # Validate cache format
-            if (cache_data.get("version") != self.CACHE_VERSION or
-                "sprite_locations" not in cache_data):
+            if cache_data.get("version") != self.CACHE_VERSION or "sprite_locations" not in cache_data:
                 return None
 
             # Restore SpritePointer objects from cached dictionaries
@@ -520,6 +512,7 @@ class ROMCache:
                         from core.rom_injector import (
                             SpritePointer,
                         )
+
                         # Restore SpritePointer object from cached data
                         restored_locations[name] = SpritePointer(
                             offset=location_data["offset"],
@@ -602,9 +595,7 @@ class ROMCache:
             logger.warning(f"Failed to save sprite locations to cache: {e}")
             return False
 
-    def get_rom_info(
-        self, rom_path: str
-    ) -> dict[str, object] | None:
+    def get_rom_info(self, rom_path: str) -> dict[str, object] | None:
         """Get cached ROM information (header, etc.).
 
         Args:
@@ -629,8 +620,7 @@ class ROMCache:
                 return None
 
             # Validate cache format
-            if (cache_data.get("version") != self.CACHE_VERSION or
-                "rom_info" not in cache_data):
+            if cache_data.get("version") != self.CACHE_VERSION or "rom_info" not in cache_data:
                 return None
 
             rom_info = cache_data["rom_info"]
@@ -640,9 +630,7 @@ class ROMCache:
             logger.warning(f"Failed to load ROM info from cache: {e}")
             return None
 
-    def save_rom_info(
-        self, rom_path: str, rom_info: Mapping[str, object]
-    ) -> bool:
+    def save_rom_info(self, rom_path: str, rom_info: Mapping[str, object]) -> bool:
         """Save ROM information to cache.
 
         Args:
@@ -738,29 +726,21 @@ class ROMCache:
             # Clear in-memory hash cache entries for this ROM path
             # This ensures next access recomputes the hash after modification
             with self._hash_cache_lock:
-                keys_to_remove = [
-                    key for key in self._hash_cache
-                    if key.startswith(f"{rom_path}_")
-                ]
+                keys_to_remove = [key for key in self._hash_cache if key.startswith(f"{rom_path}_")]
                 for key in keys_to_remove:
                     del self._hash_cache[key]
                 if keys_to_remove:
-                    logger.debug(
-                        f"Cleared {len(keys_to_remove)} hash cache entries for {rom_name}"
-                    )
+                    logger.debug(f"Cleared {len(keys_to_remove)} hash cache entries for {rom_name}")
 
             if removed_count > 0:
-                logger.info(
-                    f"Invalidated {removed_count} cache files for ROM: {rom_name}"
-                )
+                logger.info(f"Invalidated {removed_count} cache files for ROM: {rom_name}")
 
         except (OSError, PermissionError) as e:
             logger.warning(f"Error during cache invalidation for {rom_name}: {e}")
 
         return removed_count
 
-    def clear_scan_progress_cache(self, rom_path: str | None = None,
-                                 scan_params: dict[str, int] | None = None) -> int:
+    def clear_scan_progress_cache(self, rom_path: str | None = None, scan_params: dict[str, int] | None = None) -> int:
         """Clear scan progress caches."""
         if not self._cache_enabled:
             return 0
@@ -843,9 +823,7 @@ class ROMCache:
 
         return removed_count
 
-    def _get_cache_key(
-        self, rom_hash: str, offset: int, params: Mapping[str, object] | None = None
-    ) -> str:
+    def _get_cache_key(self, rom_hash: str, offset: int, params: Mapping[str, object] | None = None) -> str:
         """Generate consistent cache key for preview data.
 
         Args:
@@ -912,13 +890,15 @@ class ROMCache:
                     "params": params,
                     "timestamp": time.time(),
                     "compression_ratio": len(compressed_data) / len(tile_data) if tile_data else 0.0,
-                }
+                },
             }
 
             success = self._save_cache_data(cache_file, cache_data)
             if success:
-                logger.debug(f"Saved preview data for offset {offset:08X} "
-                           f"(compressed {len(tile_data)} -> {len(compressed_data)} bytes)")
+                logger.debug(
+                    f"Saved preview data for offset {offset:08X} "
+                    f"(compressed {len(tile_data)} -> {len(compressed_data)} bytes)"
+                )
             return success
 
         except Exception as e:
@@ -954,8 +934,7 @@ class ROMCache:
                 return None
 
             # Validate cache format
-            if (cache_data.get("version") != self.CACHE_VERSION or
-                "preview_data" not in cache_data):
+            if cache_data.get("version") != self.CACHE_VERSION or "preview_data" not in cache_data:
                 return None
 
             preview_data = cache_data["preview_data"]
@@ -989,9 +968,7 @@ class ROMCache:
             logger.warning(f"Failed to load preview data: {e}")
             return None
 
-    def save_preview_batch(
-        self, rom_path: str, preview_data_dict: Mapping[int, Mapping[str, object]]
-    ) -> bool:
+    def save_preview_batch(self, rom_path: str, preview_data_dict: Mapping[int, Mapping[str, object]]) -> bool:
         """Save multiple preview data entries in batch for efficiency.
 
         Args:
@@ -1047,14 +1024,18 @@ class ROMCache:
                     "entry_count": len(batch_data),
                     "total_original_size": total_original_size,
                     "total_compressed_size": total_compressed_size,
-                    "overall_compression_ratio": total_compressed_size / total_original_size if total_original_size > 0 else 0.0,
-                }
+                    "overall_compression_ratio": total_compressed_size / total_original_size
+                    if total_original_size > 0
+                    else 0.0,
+                },
             }
 
             success = self._save_cache_data(cache_file, cache_data)
             if success:
-                logger.debug(f"Saved batch preview data: {len(batch_data)} entries, "
-                           f"compressed {total_original_size} -> {total_compressed_size} bytes")
+                logger.debug(
+                    f"Saved batch preview data: {len(batch_data)} entries, "
+                    f"compressed {total_original_size} -> {total_compressed_size} bytes"
+                )
             return success
 
         except Exception as e:
@@ -1081,4 +1062,3 @@ class ROMCache:
                     logger.info(f"Cache directory changed from {self.cache_dir} to {new_dir}")
                     self.cache_dir = new_dir
                     self._cache_enabled = self._setup_cache_directory()
-

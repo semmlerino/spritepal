@@ -11,6 +11,7 @@ Base Classes:
 
 Workers receive their manager via constructor (dependency injection pattern).
 """
+
 from __future__ import annotations
 
 from .base import BaseWorker, ManagedWorker

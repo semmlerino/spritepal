@@ -7,6 +7,7 @@ of creating/destroying threads for each preview request. Features:
 - Cancellation support for stale requests
 - Automatic cleanup of idle workers
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
     from ui.common.smart_preview_coordinator import PendingPreviewRequest
 
 logger = get_logger(__name__)
+
 
 class PooledPreviewWorker(SpritePreviewWorker):
     """
@@ -202,15 +204,15 @@ class PooledPreviewWorker(SpritePreviewWorker):
                     return
 
                 if try_offset != self.offset:
-                    logger.debug(f"[TRACE] Trying adjusted offset 0x{try_offset:X} (delta: {try_offset - self.offset:+d})")
+                    logger.debug(
+                        f"[TRACE] Trying adjusted offset 0x{try_offset:X} (delta: {try_offset - self.offset:+d})"
+                    )
                 else:
                     logger.debug(f"[TRACE] Attempting HAL decompression at offset 0x{try_offset:X}")
 
                 # Try to extract as compressed sprite
                 rom_injector = self.extractor.rom_injector
-                compressed_size, tile_data = rom_injector.find_compressed_sprite(
-                    rom_data, try_offset, expected_size
-                )
+                compressed_size, tile_data = rom_injector.find_compressed_sprite(rom_data, try_offset, expected_size)
 
                 if tile_data and len(tile_data) > 0:
                     # Validate that it's reasonable sprite data
@@ -221,14 +223,26 @@ class PooledPreviewWorker(SpritePreviewWorker):
                     if non_zero_count > 10:  # At least 10% non-zero in sample
                         decompression_succeeded = True
                         if try_offset != self.offset:
-                            logger.info(f"[TRACE] Successfully decompressed using adjusted offset 0x{try_offset:X} (delta: {try_offset - self.offset:+d})")
-                        logger.debug(f"[TRACE] Successfully decompressed {len(tile_data)} bytes from offset 0x{try_offset:X}")
-                        logger.debug(f"[TRACE] Compressed size: {compressed_size} bytes, Compression ratio: {len(tile_data)/compressed_size:.2f}x" if compressed_size > 0 else "[TRACE] No compression size info")
-                        logger.debug(f"[TRACE] First 20 bytes of decompressed data: {tile_data[:20].hex() if tile_data else 'None'}")
+                            logger.info(
+                                f"[TRACE] Successfully decompressed using adjusted offset 0x{try_offset:X} (delta: {try_offset - self.offset:+d})"
+                            )
+                        logger.debug(
+                            f"[TRACE] Successfully decompressed {len(tile_data)} bytes from offset 0x{try_offset:X}"
+                        )
+                        logger.debug(
+                            f"[TRACE] Compressed size: {compressed_size} bytes, Compression ratio: {len(tile_data) / compressed_size:.2f}x"
+                            if compressed_size > 0
+                            else "[TRACE] No compression size info"
+                        )
+                        logger.debug(
+                            f"[TRACE] First 20 bytes of decompressed data: {tile_data[:20].hex() if tile_data else 'None'}"
+                        )
                         # Update the actual offset used for display purposes
                         self.offset = try_offset
                         break
-                    logger.debug(f"[TRACE] HAL decompression at 0x{try_offset:X} returned mostly zeros, trying next offset")
+                    logger.debug(
+                        f"[TRACE] HAL decompression at 0x{try_offset:X} returned mostly zeros, trying next offset"
+                    )
                 else:
                     logger.debug(f"[TRACE] HAL decompression returned empty data at offset 0x{try_offset:X}")
 
@@ -240,7 +254,9 @@ class PooledPreviewWorker(SpritePreviewWorker):
             except Exception as decomp_error:
                 # HAL decompression failed - this is normal for non-compressed offsets
                 if try_offset == self.offset:
-                    logger.debug(f"[TRACE] HAL decompression failed at offset 0x{try_offset:X}: {decomp_error.__class__.__name__}: {decomp_error}")
+                    logger.debug(
+                        f"[TRACE] HAL decompression failed at offset 0x{try_offset:X}: {decomp_error.__class__.__name__}: {decomp_error}"
+                    )
                 continue
 
         if not decompression_succeeded:
@@ -259,11 +275,13 @@ class PooledPreviewWorker(SpritePreviewWorker):
                 # Read raw bytes from ROM at the offset
                 # This is for manual browsing of non-compressed areas
                 if self.offset + expected_size <= len(rom_data):
-                    tile_data = rom_data[self.offset:self.offset + expected_size]
-                    logger.debug(f"[TRACE] Extracted {len(tile_data)} bytes of raw tile data from offset 0x{self.offset:X}")
+                    tile_data = rom_data[self.offset : self.offset + expected_size]
+                    logger.debug(
+                        f"[TRACE] Extracted {len(tile_data)} bytes of raw tile data from offset 0x{self.offset:X}"
+                    )
                 else:
                     # Read what's available up to end of ROM
-                    tile_data = rom_data[self.offset:]
+                    tile_data = rom_data[self.offset :]
                     logger.debug(f"[TRACE] Extracted {len(tile_data)} bytes (to EOF) from offset 0x{self.offset:X}")
 
                 logger.debug(f"[TRACE] First 20 bytes of raw data: {tile_data[:20].hex() if tile_data else 'None'}")
@@ -299,11 +317,14 @@ class PooledPreviewWorker(SpritePreviewWorker):
             return
 
         # Emit success
-        logger.debug(f"[TRACE] PoolWorker emitting preview_ready: request_id={request_id}, "
-                    f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, sprite_name={self.sprite_name}")
+        logger.debug(
+            f"[TRACE] PoolWorker emitting preview_ready: request_id={request_id}, "
+            f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, sprite_name={self.sprite_name}"
+        )
         logger.debug(f"[TRACE] Preview data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}")
         self.preview_ready.emit(request_id, tile_data, width, height, self.sprite_name)
         logger.debug("[TRACE] PoolWorker emitted preview_ready signal")
+
 
 class PreviewWorkerPool(QObject):
     """
@@ -376,15 +397,9 @@ class PreviewWorkerPool(QObject):
             worker.setup_request(request, extractor)
 
             # Connect signals only if not already connected
-            if not hasattr(worker, '_signals_connected') or not worker._signals_connected:
-                worker.preview_ready.connect(
-                    self._on_worker_ready,
-                    Qt.ConnectionType.QueuedConnection
-                )
-                worker.preview_error.connect(
-                    self._on_worker_error,
-                    Qt.ConnectionType.QueuedConnection
-                )
+            if not hasattr(worker, "_signals_connected") or not worker._signals_connected:
+                worker.preview_ready.connect(self._on_worker_ready, Qt.ConnectionType.QueuedConnection)
+                worker.preview_error.connect(self._on_worker_error, Qt.ConnectionType.QueuedConnection)
                 worker._signals_connected = True
 
             # Move to active set
@@ -467,15 +482,9 @@ class PreviewWorkerPool(QObject):
                         worker.setup_request(request, extractor)
 
                         # Connect signals only if not already connected
-                        if not hasattr(worker, '_signals_connected') or not worker._signals_connected:
-                            worker.preview_ready.connect(
-                                self._on_worker_ready,
-                                Qt.ConnectionType.QueuedConnection
-                            )
-                            worker.preview_error.connect(
-                                self._on_worker_error,
-                                Qt.ConnectionType.QueuedConnection
-                            )
+                        if not hasattr(worker, "_signals_connected") or not worker._signals_connected:
+                            worker.preview_ready.connect(self._on_worker_ready, Qt.ConnectionType.QueuedConnection)
+                            worker.preview_error.connect(self._on_worker_error, Qt.ConnectionType.QueuedConnection)
                             worker._signals_connected = True
                         self._active_workers.add(worker)
                         self._last_activity = time.time()
@@ -492,11 +501,12 @@ class PreviewWorkerPool(QObject):
         except Exception as e:
             logger.warning(f"Error processing queued request: {e}")
 
-    def _on_worker_ready(self, request_id: int, tile_data: bytes,
-                        width: int, height: int, sprite_name: str) -> None:
+    def _on_worker_ready(self, request_id: int, tile_data: bytes, width: int, height: int, sprite_name: str) -> None:
         """Handle worker preview ready."""
-        logger.debug(f"[TRACE] Worker pool received preview: request_id={request_id}, "
-                    f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}")
+        logger.debug(
+            f"[TRACE] Worker pool received preview: request_id={request_id}, "
+            f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}"
+        )
         self.preview_ready.emit(request_id, tile_data, width, height, sprite_name)
         logger.debug("[TRACE] Worker pool emitted preview_ready signal")
 
@@ -530,7 +540,6 @@ class PreviewWorkerPool(QObject):
                 if workers_to_cleanup:
                     logger.debug(f"Cleaned up {len(workers_to_cleanup)} idle workers")
 
-
     def _cleanup_worker(self, worker: PooledPreviewWorker) -> None:
         """Clean up a single worker safely using WorkerManager.
 
@@ -548,7 +557,7 @@ class PreviewWorkerPool(QObject):
             worker.blockSignals(True)
 
             # Disconnect signals safely now that they're blocked
-            if hasattr(worker, '_signals_connected') and worker._signals_connected:
+            if hasattr(worker, "_signals_connected") and worker._signals_connected:
                 try:
                     worker.preview_ready.disconnect(self._on_worker_ready)
                 except (TypeError, RuntimeError):
@@ -614,7 +623,7 @@ class PreviewWorkerPool(QObject):
                     worker.blockSignals(True)
 
                     # Disconnect signals safely now that they're blocked
-                    if hasattr(worker, '_signals_connected') and worker._signals_connected:
+                    if hasattr(worker, "_signals_connected") and worker._signals_connected:
                         with contextlib.suppress(TypeError):
                             worker.preview_ready.disconnect()
                         with contextlib.suppress(TypeError):

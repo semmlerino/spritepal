@@ -7,6 +7,7 @@ like button boxes, status bars, tabs, and splitters.
 IMPORTANT: Subclasses MUST declare instance variables BEFORE calling super().__init__()
 to avoid overwriting widgets created in _setup_ui(). See CLAUDE.md for details.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -275,5 +276,3 @@ class DialogBase(QDialog):
         if self._tab_widget is not None:
             return self._tab_widget.currentIndex()
         return -1
-
-

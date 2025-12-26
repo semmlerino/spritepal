@@ -1,6 +1,7 @@
 """
 Input components for SpritePal UI architecture
 """
+
 from __future__ import annotations
 
 from .file_selector import FileSelector

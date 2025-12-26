@@ -1,6 +1,7 @@
 """
 Row-related widgets for SpritePal row arrangement dialog
 """
+
 from __future__ import annotations
 
 from typing import override
@@ -70,9 +71,7 @@ class RowPreviewWidget(QWidget):
 
         # Draw prominent selection border
         if self.is_selected:
-            painter.setPen(
-                QPen(QColor(70, 140, 200), 4)
-            )  # Thicker blue selection border
+            painter.setPen(QPen(QColor(70, 140, 200), 4))  # Thicker blue selection border
             painter.drawRect(self.rect().adjusted(1, 1, -2, -2))
         elif self.is_hovered:
             painter.setPen(QPen(QColor(100, 100, 100), 2))  # More visible hover border
@@ -84,9 +83,7 @@ class RowPreviewWidget(QWidget):
         # Create light image background well
         image_well_rect = self.rect().adjusted(6, 6, -6, -6)
         image_well_rect.setHeight(72)  # Increased to match new widget height
-        painter.fillRect(
-            image_well_rect, QColor(30, 30, 30)
-        )  # Dark background for enhanced sprites
+        painter.fillRect(image_well_rect, QColor(30, 30, 30))  # Dark background for enhanced sprites
 
         # Draw subtle inset border for image well
         painter.setPen(QPen(QColor(20, 20, 20), 1))
@@ -114,9 +111,7 @@ class RowPreviewWidget(QWidget):
             scaled_width = self.row_image.width * scale_factor
             scaled_height = self.row_image.height * scale_factor
 
-            scaled_image = self.row_image.resize(
-                (scaled_width, scaled_height), Image.Resampling.NEAREST
-            )
+            scaled_image = self.row_image.resize((scaled_width, scaled_height), Image.Resampling.NEAREST)
 
             # Handle different image modes
             if scaled_image.mode == "RGBA":
@@ -176,6 +171,7 @@ class RowPreviewWidget(QWidget):
         """Set selection state"""
         self.is_selected = selected
         self.update()
+
 
 class DragDropListWidget(QListWidget):
     """List widget with enhanced drag-and-drop support"""

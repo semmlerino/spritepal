@@ -5,6 +5,7 @@ This module provides Qt-dependent image conversion utilities.
 Moved from utils/image_utils.py to fix layer boundary violations
 (utils should be stdlib-only per docs/architecture.md).
 """
+
 from __future__ import annotations
 
 import io
@@ -33,9 +34,7 @@ def pil_to_qpixmap(pil_image: Image.Image | None) -> QPixmap | None:
 
     try:
         # Log image details for debugging
-        logger.debug(
-            f"Converting PIL image: size={pil_image.size}, mode={pil_image.mode}, format={pil_image.format}"
-        )
+        logger.debug(f"Converting PIL image: size={pil_image.size}, mode={pil_image.mode}, format={pil_image.format}")
 
         # Convert PIL image to QPixmap through bytes buffer
         buffer = io.BytesIO()
@@ -55,21 +54,15 @@ def pil_to_qpixmap(pil_image: Image.Image | None) -> QPixmap | None:
 
         # Check PNG header
         if not buffer_data.startswith(b"\x89PNG\r\n\x1a\n"):
-            logger.error(
-                f"Buffer data doesn't start with PNG header. First 16 bytes: {buffer_data[:16]}"
-            )
+            logger.error(f"Buffer data doesn't start with PNG header. First 16 bytes: {buffer_data[:16]}")
             return None
 
         logger.debug(f"Loading {len(buffer_data)} bytes into QPixmap")
         if pixmap.loadFromData(buffer_data):
-            logger.debug(
-                f"Successfully created QPixmap: {pixmap.size().width()}x{pixmap.size().height()}"
-            )
+            logger.debug(f"Successfully created QPixmap: {pixmap.size().width()}x{pixmap.size().height()}")
             return pixmap
         logger.error(f"QPixmap.loadFromData() failed. Data size: {len(buffer_data)} bytes")
-        logger.error(
-            f"PNG header check: {buffer_data[:16].hex() if len(buffer_data) >= 16 else 'too short'}"
-        )
+        logger.error(f"PNG header check: {buffer_data[:16].hex() if len(buffer_data) >= 16 else 'too short'}")
         return None
 
     except Exception:

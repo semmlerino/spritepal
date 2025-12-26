@@ -1,6 +1,7 @@
 """
 Palette management for SpritePal
 """
+
 from __future__ import annotations
 
 import json
@@ -86,9 +87,7 @@ class PaletteManager:
     def get_sprite_palettes(self) -> dict[int, list[list[int]]]:
         """Get only the sprite palettes (8-15)"""
         return {
-            idx: self.palettes[idx]
-            for idx in range(SPRITE_PALETTE_START, SPRITE_PALETTE_END)
-            if idx in self.palettes
+            idx: self.palettes[idx] for idx in range(SPRITE_PALETTE_START, SPRITE_PALETTE_END) if idx in self.palettes
         }
 
     def create_palette_json(
@@ -99,9 +98,7 @@ class PaletteManager:
     ) -> str:
         """Create a .pal.json file for a specific palette"""
         colors = self.get_palette(palette_index)
-        palette_name, description = PALETTE_INFO.get(
-            palette_index, (f"Palette {palette_index}", "Sprite palette")
-        )
+        palette_name, description = PALETTE_INFO.get(palette_index, (f"Palette {palette_index}", "Sprite palette"))
 
         palette_data = {
             "format_version": "1.0",
@@ -171,9 +168,7 @@ class PaletteManager:
                     "extraction_size": extraction_params.get("extraction_size", 0),
                     "rom_title": extraction_params.get("rom_title", ""),
                     "rom_checksum": extraction_params.get("rom_checksum", ""),
-                    "extraction_date": extraction_params.get(
-                        "extraction_date", datetime.now(UTC).isoformat()
-                    ),
+                    "extraction_date": extraction_params.get("extraction_date", datetime.now(UTC).isoformat()),
                 }
             else:
                 # VRAM extraction metadata (existing format)
@@ -183,9 +178,7 @@ class PaletteManager:
                     "vram_offset": f"0x{extraction_params.get('vram_offset', 0):04X}",
                     "tile_count": extraction_params.get("tile_count", 0),
                     "extraction_size": extraction_params.get("extraction_size", 0),
-                    "extraction_date": extraction_params.get(
-                        "extraction_date", datetime.now(UTC).isoformat()
-                    ),
+                    "extraction_date": extraction_params.get("extraction_date", datetime.now(UTC).isoformat()),
                 }
 
         # Add palette references
@@ -194,9 +187,7 @@ class PaletteManager:
                 metadata["palettes"][str(pal_idx)] = Path(palette_files[pal_idx]).name
 
                 # Add palette info
-                _, description = PALETTE_INFO.get(
-                    pal_idx, (f"Palette {pal_idx}", "Sprite palette")
-                )
+                _, description = PALETTE_INFO.get(pal_idx, (f"Palette {pal_idx}", "Sprite palette"))
                 metadata["palette_info"][str(pal_idx)] = description
 
         # Save metadata file atomically with fsync to prevent data loss on crash

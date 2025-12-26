@@ -4,6 +4,7 @@ Thumbnail cache for QImage thumbnails.
 Extends BaseLRUCache to provide thread-safe caching of QImage thumbnails
 with both count-based and memory-based eviction.
 """
+
 from __future__ import annotations
 
 from PySide6.QtGui import QImage

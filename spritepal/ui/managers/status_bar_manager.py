@@ -1,6 +1,7 @@
 """
 Status bar management for MainWindow
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,12 +20,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class StatusBarManager:
     """Manages status bar and cache indicators for MainWindow"""
 
-    def __init__(self, status_bar: QStatusBar,
-                 settings_manager: ApplicationStateManager,
-                 rom_cache: ROMCache) -> None:
+    def __init__(self, status_bar: QStatusBar, settings_manager: ApplicationStateManager, rom_cache: ROMCache) -> None:
         """Initialize status bar manager
 
         Args:
@@ -72,9 +72,9 @@ class StatusBarManager:
         self.cache_operation_badge = QLabel()
         if self.cache_operation_badge:
             self.cache_operation_badge.setStyleSheet(
-            f"background-color: {COLORS['info']}; color: {COLORS['text_primary']}; padding: 2px 6px; "
-            "border-radius: 3px; font-size: 10px; font-weight: bold;"
-        )
+                f"background-color: {COLORS['info']}; color: {COLORS['text_primary']}; padding: 2px 6px; "
+                "border-radius: 3px; font-size: 10px; font-weight: bold;"
+            )
         self.cache_operation_badge.setVisible(False)
         cache_layout.addWidget(self.cache_operation_badge)
 
@@ -92,8 +92,7 @@ class StatusBarManager:
         settings_manager = self.settings_manager
 
         # Check if indicators are enabled and created
-        if (not self.cache_status_widget or
-            not settings_manager.get("cache", "show_indicators", True)):
+        if not self.cache_status_widget or not settings_manager.get("cache", "show_indicators", True):
             return
 
         # Check if cache is enabled

@@ -28,6 +28,7 @@ MAX_SPRITES_IN_MAP = 10000  # Maximum sprites to keep in memory
 SPRITE_CLEANUP_THRESHOLD = 12000  # Start cleanup when we exceed this
 SPRITE_CLEANUP_TARGET = 8000  # Clean down to this many sprites
 
+
 class ROMMapWidget(QWidget):
     """Visual representation of ROM with sprite locations"""
 
@@ -89,8 +90,7 @@ class ROMMapWidget(QWidget):
         existing_offsets = {offset for offset, _ in self.found_sprites}
 
         # Filter out duplicates and add new sprites
-        new_sprites = [(offset, quality) for offset, quality in sprites
-                      if offset not in existing_offsets]
+        new_sprites = [(offset, quality) for offset, quality in sprites if offset not in existing_offsets]
 
         if new_sprites:
             self.found_sprites.extend(new_sprites)
@@ -195,13 +195,15 @@ class ROMMapWidget(QWidget):
                         # Different colors for current/other regions
                         if i == self.current_region_index:
                             # Highlighted current region
-                            painter.fillRect(x_start, 10, x_end - x_start, height - 20,
-                                           QColor(100, 150, 255, 60))  # Highlighted blue
+                            painter.fillRect(
+                                x_start, 10, x_end - x_start, height - 20, QColor(100, 150, 255, 60)
+                            )  # Highlighted blue
                             painter.setPen(QPen(QColor(100, 150, 255), 2))
                         else:
                             # Other regions
-                            painter.fillRect(x_start, 10, x_end - x_start, height - 20,
-                                           QColor(80, 80, 80, 40))  # Subtle gray
+                            painter.fillRect(
+                                x_start, 10, x_end - x_start, height - 20, QColor(80, 80, 80, 40)
+                            )  # Subtle gray
                             painter.setPen(QPen(QColor(120, 120, 120), 1))
 
                         # Draw region boundaries
@@ -211,7 +213,7 @@ class ROMMapWidget(QWidget):
                         if x_end - x_start > 20:
                             painter.setPen(Qt.GlobalColor.white)
                             painter.setFont(QFont("Arial", 8))
-                            painter.drawText(x_start + 2, 25, f"R{i+1}")
+                            painter.drawText(x_start + 2, 25, f"R{i + 1}")
 
             # Draw found sprites with bounds checking
             painter.setPen(Qt.PenStyle.NoPen)

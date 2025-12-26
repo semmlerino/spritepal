@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import pytest
@@ -42,12 +41,14 @@ def test_decompression():
     print(f"\nTesting at offset 0x{test_offset:06X}...")
 
     # First, show raw data
-    raw_data = rom_data[test_offset:test_offset + 32]
+    raw_data = rom_data[test_offset : test_offset + 32]
     print(f"Raw data (first 32 bytes): {raw_data.hex()}")
 
     # Try decompression
     compressed_size, decompressed_data = rom_extractor.rom_injector.find_compressed_sprite(
-        rom_data, test_offset, 8192  # Expected size
+        rom_data,
+        test_offset,
+        8192,  # Expected size
     )
     print("\nDecompression successful!")
     print(f"Compressed size: {compressed_size} bytes")
@@ -64,6 +65,7 @@ def test_decompression():
     assert num_tiles > 0, "Should have at least one tile"
 
     print("\nTest complete!")
+
 
 if __name__ == "__main__":
     try:

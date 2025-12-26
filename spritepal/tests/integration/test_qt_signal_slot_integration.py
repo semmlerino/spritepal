@@ -9,6 +9,7 @@ and ROMExtractionPanel, ensuring proper:
 - Thread safety
 - Connection lifecycle management
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -46,9 +47,9 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
 @pytest.fixture
 def temp_rom_file():
     """Create a temporary ROM file for testing."""
-    with tempfile.NamedTemporaryFile(suffix='.sfc', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".sfc", delete=False) as f:
         # Write minimal ROM header
-        f.write(b'\x00' * 0x8000)  # 32KB of zeros
+        f.write(b"\x00" * 0x8000)  # 32KB of zeros
         temp_path = f.name
 
     yield temp_path
@@ -59,6 +60,8 @@ def temp_rom_file():
     except Exception:
         # Caught exception during operation
         pass
+
+
 @pytest.fixture
 def real_extraction_manager():
     """Create a mock extraction manager."""
@@ -66,6 +69,7 @@ def real_extraction_manager():
     manager.extract_sprite = MagicMock(return_value=(None, None))
     manager.get_sprite_at_offset = MagicMock(return_value=None)
     return manager
+
 
 class SignalRecorder(QObject):
     """Helper class to record signal emissions with parameters."""
@@ -78,12 +82,12 @@ class SignalRecorder(QObject):
     @Slot(int)
     def record_offset_changed(self, offset: int):
         """Record offset_changed signal."""
-        self._record_signal('offset_changed', (offset,))
+        self._record_signal("offset_changed", (offset,))
 
     @Slot(int, str)
     def record_sprite_found(self, offset: int, name: str):
         """Record sprite_found signal."""
-        self._record_signal('sprite_found', (offset, name))
+        self._record_signal("sprite_found", (offset, name))
 
     def _record_signal(self, signal_name: str, args: tuple):
         """Record a signal emission with timestamp."""
@@ -112,6 +116,7 @@ class SignalRecorder(QObject):
             return sum(1 for name, _, _ in self.emissions if name == signal_name)
         return len(self.emissions)
 
+
 @pytest.mark.gui
 @pytest.mark.usefixtures("session_managers")
 @pytest.mark.shared_state_safe
@@ -124,8 +129,8 @@ class TestDialogSignalConnections:
         qtbot.addWidget(dialog)
 
         # Check signals exist
-        assert hasattr(dialog, 'offset_changed')
-        assert hasattr(dialog, 'sprite_found')
+        assert hasattr(dialog, "offset_changed")
+        assert hasattr(dialog, "sprite_found")
 
         # Check they are Qt signals
         assert isinstance(dialog.offset_changed, Signal)
@@ -173,10 +178,10 @@ class TestDialogSignalConnections:
             dialog.set_offset(offset)
 
         # Wait for all signals to be processed
-        qtbot.waitUntil(lambda: recorder.count('offset_changed') == len(offsets), timeout=signal_timeout())
+        qtbot.waitUntil(lambda: recorder.count("offset_changed") == len(offsets), timeout=signal_timeout())
 
         # Verify all signals were received
-        emissions = recorder.get_emissions('offset_changed')
+        emissions = recorder.get_emissions("offset_changed")
         received_offsets = [args[0] for args, _ in emissions]
         assert received_offsets == offsets
 
@@ -191,10 +196,7 @@ class TestDialogSignalConnections:
         dialog.offset_changed.connect(recorder.record_offset_changed)
 
         # Test QueuedConnection (for cross-thread)
-        dialog.sprite_found.connect(
-            recorder.record_sprite_found,
-            Qt.ConnectionType.QueuedConnection
-        )
+        dialog.sprite_found.connect(recorder.record_sprite_found, Qt.ConnectionType.QueuedConnection)
 
         # Emit signals
         dialog.set_offset(0x1000)
@@ -204,8 +206,9 @@ class TestDialogSignalConnections:
         qtbot.waitUntil(lambda: recorder.count() == 2, timeout=signal_timeout())
 
         # Verify both signals received
-        assert recorder.count('offset_changed') == 1
-        assert recorder.count('sprite_found') == 1
+        assert recorder.count("offset_changed") == 1
+        assert recorder.count("sprite_found") == 1
+
 
 @pytest.mark.gui
 @pytest.mark.usefixtures("session_managers")
@@ -286,7 +289,7 @@ class TestThreadSafetyAndTiming:
         assert len(worker_emissions) == 1
         assert len(main_receptions) == 1
         assert worker_emissions[0] != main_thread  # Emitted from worker
-        assert main_receptions[0] == main_thread   # Received in main
+        assert main_receptions[0] == main_thread  # Received in main
 
     def test_signal_emission_timing(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test timing and order of signal emissions."""
@@ -314,13 +317,13 @@ class TestThreadSafetyAndTiming:
         assert len(emissions) == 3
 
         # Check order
-        assert emissions[0][0] == 'offset_changed'
-        assert emissions[1][0] == 'offset_changed'
-        assert emissions[2][0] == 'sprite_found'
+        assert emissions[0][0] == "offset_changed"
+        assert emissions[1][0] == "offset_changed"
+        assert emissions[2][0] == "sprite_found"
 
         # Check timing (should be sequential)
         for i in range(1, len(emissions)):
-            assert emissions[i][2] > emissions[i-1][2]  # Later timestamp
+            assert emissions[i][2] > emissions[i - 1][2]  # Later timestamp
 
     def test_high_frequency_emissions(self, qtbot, managers_initialized, wait_for_signal_processed):
         """Test handling of high-frequency signal emissions."""
@@ -346,6 +349,7 @@ class TestThreadSafetyAndTiming:
 
         # All signals should be received
         assert received_count == emission_count
+
 
 @pytest.mark.gui
 @pytest.mark.usefixtures("session_managers")
@@ -462,6 +466,7 @@ class TestSignalBlockingAndError:
 
         # Should not have been received (receiver was deleted)
         assert receptions == [0x1000]
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

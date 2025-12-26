@@ -34,21 +34,15 @@ from pathlib import Path
 
 def run_command(cmd: list[str], description: str, timeout: int = 300) -> tuple[bool, str]:
     """Run a command and return success status and output."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Running: {description}")
     print(f"Command: {' '.join(cmd)}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     start_time = time.time()
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=Path.cwd()
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=Path.cwd())
 
         duration = time.time() - start_time
         success = result.returncode == 0
@@ -74,32 +68,36 @@ def run_command(cmd: list[str], description: str, timeout: int = 300) -> tuple[b
         print(f"\n{description} ERROR after {duration:.1f}s: {e}")
         return False, str(e)
 
+
 def get_test_counts() -> tuple[int | str, int | str]:
     """Get counts of parallel_safe vs other tests."""
     try:
         # Count all tests
-        result = subprocess.run([
-            "pytest", "--collect-only", "-q", "tests/"
-        ], capture_output=True, text=True, timeout=60)
+        result = subprocess.run(
+            ["pytest", "--collect-only", "-q", "tests/"], capture_output=True, text=True, timeout=60
+        )
 
         total_tests: int | str = "unknown"
         if result.returncode == 0:
-            lines = result.stdout.split('\n')
+            lines = result.stdout.split("\n")
             for line in lines:
-                if 'tests collected' in line or 'test collected' in line:
+                if "tests collected" in line or "test collected" in line:
                     total_tests = int(line.split()[0])
                     break
 
         # Count parallel_safe tests (these will run in parallel)
-        result = subprocess.run([
-            "pytest", "--collect-only", "-q", "-m", "parallel_safe", "tests/"
-        ], capture_output=True, text=True, timeout=60)
+        result = subprocess.run(
+            ["pytest", "--collect-only", "-q", "-m", "parallel_safe", "tests/"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
 
         parallel_tests: int | str = 0
         if result.returncode == 0:
-            lines = result.stdout.split('\n')
+            lines = result.stdout.split("\n")
             for line in lines:
-                if 'tests collected' in line or 'test collected' in line:
+                if "tests collected" in line or "test collected" in line:
                     parallel_tests = int(line.split()[0])
                     break
 
@@ -115,23 +113,18 @@ def get_test_counts() -> tuple[int | str, int | str]:
         print(f"Warning: Error counting tests: {e}")
         return "unknown", "unknown"
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run SpritePal tests with conservative parallel execution",
-        epilog="Uses opt-in approach: only @pytest.mark.parallel_safe tests run in parallel."
+        epilog="Uses opt-in approach: only @pytest.mark.parallel_safe tests run in parallel.",
     )
-    parser.add_argument("--parallel-only", action="store_true",
-                        help="Run only parallel-safe tests (with xdist)")
-    parser.add_argument("--serial-only", action="store_true",
-                        help="Run only serial tests (not parallel_safe)")
-    parser.add_argument("--workers", "-n", type=str, default="auto",
-                        help="Number of parallel workers (default: auto)")
-    parser.add_argument("--timeout", type=int, default=600,
-                        help="Timeout per test phase in seconds (default: 600)")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Verbose output")
-    parser.add_argument("--maxfail", type=int, default=5,
-                        help="Stop after N failures (default: 5)")
+    parser.add_argument("--parallel-only", action="store_true", help="Run only parallel-safe tests (with xdist)")
+    parser.add_argument("--serial-only", action="store_true", help="Run only serial tests (not parallel_safe)")
+    parser.add_argument("--workers", "-n", type=str, default="auto", help="Number of parallel workers (default: auto)")
+    parser.add_argument("--timeout", type=int, default=600, help="Timeout per test phase in seconds (default: 600)")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--maxfail", type=int, default=5, help="Stop after N failures (default: 5)")
     parser.add_argument("tests", nargs="*", help="Specific test files to run")
 
     args = parser.parse_args()
@@ -154,10 +147,12 @@ def main():
     else:
         base_pytest.append("-q")
 
-    base_pytest.extend([
-        "--tb=short",
-        f"--maxfail={args.maxfail}",
-    ])
+    base_pytest.extend(
+        [
+            "--tb=short",
+            f"--maxfail={args.maxfail}",
+        ]
+    )
 
     # Determine test paths
     test_paths = args.tests if args.tests else ["tests/"]
@@ -169,9 +164,7 @@ def main():
         serial_cmd = [*base_pytest, "-m", "not parallel_safe", *test_paths]
 
         serial_success, serial_output = run_command(
-            serial_cmd,
-            f"Serial tests ({serial_count} tests, not parallel_safe)",
-            args.timeout
+            serial_cmd, f"Serial tests ({serial_count} tests, not parallel_safe)", args.timeout
         )
         results.append(("Serial", serial_success, serial_output))
 
@@ -180,25 +173,17 @@ def main():
 
     # Then run parallel_safe tests with xdist
     if not args.serial_only:
-        parallel_cmd = [
-            *base_pytest,
-            f"-n{args.workers}",
-            "--dist=worksteal",
-            "-m", "parallel_safe",
-            *test_paths
-        ]
+        parallel_cmd = [*base_pytest, f"-n{args.workers}", "--dist=worksteal", "-m", "parallel_safe", *test_paths]
 
         parallel_success, parallel_output = run_command(
-            parallel_cmd,
-            f"Parallel tests ({parallel_count} tests, {args.workers} workers)",
-            args.timeout
+            parallel_cmd, f"Parallel tests ({parallel_count} tests, {args.workers} workers)", args.timeout
         )
         results.append(("Parallel", parallel_success, parallel_output))
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     all_passed = True
     for phase, success, output in results:
@@ -213,6 +198,7 @@ def main():
     else:
         print("\n❌ Some test phases failed!")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -3,7 +3,7 @@ TDD tests for ExtractionManager with real component integration.
 
 This test suite applies Test-Driven Development methodology with real components:
 - RED: Write failing tests that specify desired behavior
-- GREEN: Implement minimal code to make tests pass  
+- GREEN: Implement minimal code to make tests pass
 - REFACTOR: Improve code while keeping all tests green
 
 Enhanced with Phase 2 Real Component Testing Infrastructure:
@@ -13,9 +13,9 @@ Enhanced with Phase 2 Real Component Testing Infrastructure:
 - Validates actual file I/O, threading, and signal behavior
 
 Performance Note: This test file uses session-scoped managers for performance.
-- Current fixtures work as-is (no change needed)  
+- Current fixtures work as-is (no change needed)
 - For new tests, consider using `managers` fixture directly:
-  
+
 
 pytestmark = [
     pytest.mark.headless,
@@ -34,6 +34,7 @@ Bugs caught by real testing that mocks miss:
 - Qt signal/slot connection failures
 - Resource cleanup race conditions
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,14 +44,14 @@ from PIL import Image
 
 from core.managers import ExtractionError, ValidationError
 from core.managers.core_operations_manager import CoreOperationsManager
+
+# manager_context migrated from deprecated manager_test_context to app_context_fixtures
+from tests.fixtures.app_context_fixtures import manager_context
 from tests.fixtures.timeouts import signal_timeout, worker_timeout
 from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
 )
-# manager_context migrated from deprecated manager_test_context to app_context_fixtures
-from tests.fixtures.app_context_fixtures import manager_context
-
 from utils.constants import BYTES_PER_TILE
 
 
@@ -58,7 +59,7 @@ from utils.constants import BYTES_PER_TILE
 @pytest.mark.allows_registry_state(reason="Uses manager_context for own lifecycle")
 class TestExtractionManager:
     """TDD tests for ExtractionManager with real component integration.
-    
+
     These tests validate actual extraction workflows using real files,
     real workers, and actual Qt signal/slot behavior.
     """
@@ -102,7 +103,7 @@ class TestExtractionManager:
             "cgram": str(cgram_file),
             "oam": str(oam_file),
             "rom": str(rom_file),
-            "output_dir": str(tmp_path)
+            "output_dir": str(tmp_path),
         }
 
     def test_initialization_real_dependencies(self, app_context):
@@ -146,7 +147,7 @@ class TestExtractionManager:
 
     def test_validate_extraction_params_vram_real_files_tdd(self, test_data_repo):
         """TDD: VRAM parameter validation should work with real file structures.
-        
+
         RED: Test parameter validation with actual VRAM/CGRAM/OAM files
         GREEN: Verify validation logic handles real file formats correctly
         REFACTOR: Use consistent test data instead of temporary fake files
@@ -162,7 +163,7 @@ class TestExtractionManager:
                 "vram_path": vram_data["vram_path"],
                 "output_base": vram_data["output_base"],
                 "cgram_path": vram_data["cgram_path"],
-                "oam_path": vram_data["oam_path"]
+                "oam_path": vram_data["oam_path"],
             }
 
             try:
@@ -180,8 +181,8 @@ class TestExtractionManager:
                 oam_size = Path(params["oam_path"]).stat().st_size
 
                 assert vram_size >= 0x8000  # At least 32KB VRAM
-                assert cgram_size >= 512    # At least 512 bytes CGRAM
-                assert oam_size >= 544      # At least 544 bytes OAM
+                assert cgram_size >= 512  # At least 512 bytes CGRAM
+                assert oam_size >= 544  # At least 544 bytes OAM
 
             except ValidationError as e:
                 # Real validation may be stricter - this is valuable test feedback
@@ -203,7 +204,7 @@ class TestExtractionManager:
         params = {
             "rom_path": temp_files["rom"],
             "offset": 0x1000,
-            "output_base": str(Path(temp_files["output_dir"]) / "test")
+            "output_base": str(Path(temp_files["output_dir"]) / "test"),
         }
         manager.validate_extraction_params(params)
 
@@ -221,7 +222,7 @@ class TestExtractionManager:
 
     def test_extract_from_vram_real_workflow_tdd(self, test_data_repo, qtbot):
         """TDD: VRAM extraction should create real image files from VRAM data.
-        
+
         RED: Test complete VRAM extraction workflow with real files
         GREEN: Verify real image generation with proper format and dimensions
         REFACTOR: Use test data repository for consistent, realistic test data
@@ -237,7 +238,7 @@ class TestExtractionManager:
                 files = manager.extract_from_vram(
                     vram_data["vram_path"],
                     vram_data["output_base"],
-                    grayscale_mode=True  # Simplified for reliable testing
+                    grayscale_mode=True,  # Simplified for reliable testing
                 )
 
                 # Verify real extraction created actual files
@@ -271,10 +272,7 @@ class TestExtractionManager:
     def test_extract_from_vram_validation_error(self, manager):
         """Test VRAM extraction with validation error"""
         with pytest.raises(ValidationError):
-            manager.extract_from_vram(
-                "/non/existent/file.vram",
-                "/output/test"
-            )
+            manager.extract_from_vram("/non/existent/file.vram", "/output/test")
 
     def test_extract_from_vram_already_running(self, manager, temp_files):
         """Test preventing concurrent VRAM extractions"""
@@ -285,17 +283,14 @@ class TestExtractionManager:
 
         # Try to start another
         with pytest.raises(ExtractionError, match="already in progress"):
-            manager.extract_from_vram(
-                temp_files["vram"],
-                output_base
-            )
+            manager.extract_from_vram(temp_files["vram"], output_base)
 
         # Clean up
         manager._finish_operation("vram_extraction")
 
     def test_extract_from_rom_real_workflow_validation_tdd(self, test_data_repo):
         """TDD: ROM extraction should validate complete workflow parameters.
-        
+
         RED: Test ROM extraction parameter validation with real ROM structure
         GREEN: Verify parameters are properly validated for real ROM files
         REFACTOR: Use test data repository instead of fixtures for consistency
@@ -339,16 +334,11 @@ class TestExtractionManager:
     def test_extract_from_rom_validation_error(self, manager):
         """Test ROM extraction with validation error"""
         with pytest.raises(ValidationError):
-            manager.extract_from_rom(
-                "/non/existent/rom.sfc",
-                0x1000,
-                "/output/test",
-                "sprite"
-            )
+            manager.extract_from_rom("/non/existent/rom.sfc", 0x1000, "/output/test", "sprite")
 
     def test_get_sprite_preview_real_rom_data_tdd(self, test_data_repo):
         """TDD: Sprite preview should generate real tile data from ROM files.
-        
+
         RED: Test sprite preview generation with real ROM file structure
         GREEN: Verify preview produces reasonable tile data dimensions
         REFACTOR: Use test data repository for consistent ROM test files
@@ -361,11 +351,7 @@ class TestExtractionManager:
 
             try:
                 # Test real sprite preview generation
-                tile_data, width, height = manager.get_sprite_preview(
-                    rom_data["rom_path"],
-                    0x1000,
-                    "test_sprite"
-                )
+                tile_data, width, height = manager.get_sprite_preview(rom_data["rom_path"], 0x1000, "test_sprite")
 
                 # Verify real tile data structure
                 assert isinstance(tile_data, bytes)
@@ -378,7 +364,7 @@ class TestExtractionManager:
 
                 # Note: Synthetic test data may be all zeros - this is expected
                 # The key verification is that the API returns proper structure
-                if all(b == 0 for b in tile_data[:min(64, len(tile_data))]):
+                if all(b == 0 for b in tile_data[: min(64, len(tile_data))]):
                     # This is fine for synthetic test data
                     pass
 
@@ -397,14 +383,11 @@ class TestExtractionManager:
     def test_get_sprite_preview_validation_error(self, manager):
         """Test sprite preview with validation error"""
         with pytest.raises(ValidationError):
-            manager.get_sprite_preview(
-                "/non/existent/rom.sfc",
-                0x1000
-            )
+            manager.get_sprite_preview("/non/existent/rom.sfc", 0x1000)
 
     def test_concurrent_operations_real_state_management_tdd(self):
         """TDD: Manager should handle concurrent operation state correctly.
-        
+
         RED: Test real operation tracking and thread safety
         GREEN: Verify actual state management without mocking
         REFACTOR: Test real concurrency scenarios that could occur in practice
@@ -440,9 +423,9 @@ class TestExtractionManager:
 
     def test_signal_emissions_real_qt_signals_tdd(self, test_data_repo, qtbot):
         """TDD: Extraction should emit real Qt signals during processing.
-        
+
         RED: Test real signal emission during extraction workflow
-        GREEN: Verify actual Qt signal/slot connections work correctly  
+        GREEN: Verify actual Qt signal/slot connections work correctly
         REFACTOR: Use real Qt event processing without mocking signals
         """
         with manager_context("extraction") as ctx:
@@ -468,11 +451,7 @@ class TestExtractionManager:
             try:
                 # Run real extraction with Qt signal monitoring
                 with qtbot.waitSignal(manager.files_created, timeout=worker_timeout()):
-                    manager.extract_from_vram(
-                        vram_data["vram_path"],
-                        vram_data["output_base"],
-                        grayscale_mode=True
-                    )
+                    manager.extract_from_vram(vram_data["vram_path"], vram_data["output_base"], grayscale_mode=True)
 
                 # Wait for all Qt events to process
                 qtbot.waitUntil(lambda: len(progress_messages) > 0, timeout=signal_timeout())
@@ -497,7 +476,7 @@ class TestExtractionManager:
 
     def test_cleanup_real_resource_management_tdd(self):
         """TDD: Cleanup should properly manage real resources and state.
-        
+
         RED: Test that cleanup handles real manager state and resources
         GREEN: Verify cleanup works with actual operations and workers
         REFACTOR: Test real resource management scenarios
@@ -537,6 +516,7 @@ class TestExtractionParameterValidation:
     def mgr(self, isolated_managers):
         """Create ExtractionManager instance with proper DI setup."""
         from core.app_context import get_app_context
+
         return get_app_context().core_operations_manager
 
     @pytest.fixture
@@ -549,92 +529,81 @@ class TestExtractionParameterValidation:
 
     # ── ROM Offset Validation Tests ─────────────────────────────────────────────
 
-    @pytest.mark.parametrize("offset,should_pass", [
-        # Note: offset=0 is treated as "missing" due to falsy check in validate_required_params
-        # This is arguably a bug but documenting current behavior
-        (0x1, True),           # Near start of ROM (valid)
-        (0x1000, True),        # Typical sprite offset
-        (0x200000, True),      # Standard sprite bank
-        (0x280000, True),      # Large sprite bank
-        (0x3FFFF0, True),      # Near end of 4MB ROM (valid if within bounds)
-    ])
-    def test_rom_offset_validation_valid_offsets(
-        self, mgr, valid_rom_file, tmp_path, offset, should_pass
-    ):
+    @pytest.mark.parametrize(
+        "offset,should_pass",
+        [
+            # Note: offset=0 is treated as "missing" due to falsy check in validate_required_params
+            # This is arguably a bug but documenting current behavior
+            (0x1, True),  # Near start of ROM (valid)
+            (0x1000, True),  # Typical sprite offset
+            (0x200000, True),  # Standard sprite bank
+            (0x280000, True),  # Large sprite bank
+            (0x3FFFF0, True),  # Near end of 4MB ROM (valid if within bounds)
+        ],
+    )
+    def test_rom_offset_validation_valid_offsets(self, mgr, valid_rom_file, tmp_path, offset, should_pass):
         """Test ROM extraction accepts valid offsets."""
-        params = {
-            "rom_path": valid_rom_file,
-            "offset": offset,
-            "output_base": str(tmp_path / "output")
-        }
+        params = {"rom_path": valid_rom_file, "offset": offset, "output_base": str(tmp_path / "output")}
         if should_pass:
             # Should not raise
             result = mgr.validate_extraction_params(params)
             assert result is True
 
-    @pytest.mark.parametrize("offset,error_match", [
-        (-1, "offset must be >= 0"),           # Negative offset
-        (-0x1000, "offset must be >= 0"),      # Larger negative offset
-    ])
-    def test_rom_offset_validation_negative_offsets(
-        self, mgr, valid_rom_file, tmp_path, offset, error_match
-    ):
+    @pytest.mark.parametrize(
+        "offset,error_match",
+        [
+            (-1, "offset must be >= 0"),  # Negative offset
+            (-0x1000, "offset must be >= 0"),  # Larger negative offset
+        ],
+    )
+    def test_rom_offset_validation_negative_offsets(self, mgr, valid_rom_file, tmp_path, offset, error_match):
         """Test ROM extraction rejects negative offsets."""
-        params = {
-            "rom_path": valid_rom_file,
-            "offset": offset,
-            "output_base": str(tmp_path / "output")
-        }
+        params = {"rom_path": valid_rom_file, "offset": offset, "output_base": str(tmp_path / "output")}
         with pytest.raises(ValidationError, match=error_match):
             mgr.validate_extraction_params(params)
 
-    @pytest.mark.parametrize("offset_value,error_match", [
-        ("not_an_int", "Invalid type for 'offset'"),
-        (3.14, "Invalid type for 'offset'"),
-        # Note: None is caught as "missing" before type check due to falsy handling
-        ([0x1000], "Invalid type for 'offset'"),
-        ({"value": 0x1000}, "Invalid type for 'offset'"),
-    ])
-    def test_rom_offset_validation_invalid_types(
-        self, mgr, valid_rom_file, tmp_path, offset_value, error_match
-    ):
+    @pytest.mark.parametrize(
+        "offset_value,error_match",
+        [
+            ("not_an_int", "Invalid type for 'offset'"),
+            (3.14, "Invalid type for 'offset'"),
+            # Note: None is caught as "missing" before type check due to falsy handling
+            ([0x1000], "Invalid type for 'offset'"),
+            ({"value": 0x1000}, "Invalid type for 'offset'"),
+        ],
+    )
+    def test_rom_offset_validation_invalid_types(self, mgr, valid_rom_file, tmp_path, offset_value, error_match):
         """Test ROM extraction rejects non-integer offsets."""
-        params = {
-            "rom_path": valid_rom_file,
-            "offset": offset_value,
-            "output_base": str(tmp_path / "output")
-        }
+        params = {"rom_path": valid_rom_file, "offset": offset_value, "output_base": str(tmp_path / "output")}
         with pytest.raises(ValidationError, match=error_match):
             mgr.validate_extraction_params(params)
 
     # ── Required Parameter Validation Tests ─────────────────────────────────────
 
-    @pytest.mark.parametrize("missing_param,error_match", [
-        ("rom_path", "Must provide either vram_path or rom_path"),
-        ("offset", "Missing required parameters"),
-        ("output_base", "Missing required parameters|Output name is required"),
-    ])
-    def test_rom_extraction_missing_required_params(
-        self, mgr, valid_rom_file, tmp_path, missing_param, error_match
-    ):
+    @pytest.mark.parametrize(
+        "missing_param,error_match",
+        [
+            ("rom_path", "Must provide either vram_path or rom_path"),
+            ("offset", "Missing required parameters"),
+            ("output_base", "Missing required parameters|Output name is required"),
+        ],
+    )
+    def test_rom_extraction_missing_required_params(self, mgr, valid_rom_file, tmp_path, missing_param, error_match):
         """Test ROM extraction requires all mandatory parameters."""
-        params = {
-            "rom_path": valid_rom_file,
-            "offset": 0x1000,
-            "output_base": str(tmp_path / "output")
-        }
+        params = {"rom_path": valid_rom_file, "offset": 0x1000, "output_base": str(tmp_path / "output")}
         del params[missing_param]
         with pytest.raises(ValidationError, match=error_match):
             mgr.validate_extraction_params(params)
 
-    @pytest.mark.parametrize("output_base_value,error_match", [
-        # Note: empty string is caught as "missing" before checking emptiness
-        ("   ", "Output name is required"),
-        (None, "Missing required parameters"),
-    ])
-    def test_output_base_validation(
-        self, mgr, valid_rom_file, tmp_path, output_base_value, error_match
-    ):
+    @pytest.mark.parametrize(
+        "output_base_value,error_match",
+        [
+            # Note: empty string is caught as "missing" before checking emptiness
+            ("   ", "Output name is required"),
+            (None, "Missing required parameters"),
+        ],
+    )
+    def test_output_base_validation(self, mgr, valid_rom_file, tmp_path, output_base_value, error_match):
         """Test output_base must be non-empty."""
         params = {
             "rom_path": valid_rom_file,
@@ -647,13 +616,14 @@ class TestExtractionParameterValidation:
 
     # ── VRAM Extraction Parameter Tests ─────────────────────────────────────────
 
-    @pytest.mark.parametrize("grayscale_mode,cgram_required", [
-        (True, False),   # Grayscale mode doesn't need CGRAM
-        (False, True),   # Full color mode requires CGRAM
-    ])
-    def test_vram_cgram_requirement(
-        self, mgr, tmp_path, grayscale_mode, cgram_required
-    ):
+    @pytest.mark.parametrize(
+        "grayscale_mode,cgram_required",
+        [
+            (True, False),  # Grayscale mode doesn't need CGRAM
+            (False, True),  # Full color mode requires CGRAM
+        ],
+    )
+    def test_vram_cgram_requirement(self, mgr, tmp_path, grayscale_mode, cgram_required):
         """Test CGRAM file requirement based on extraction mode."""
         vram_file = tmp_path / "test.vram"
         vram_file.write_bytes(b"\x00" * 0x10000)
@@ -689,13 +659,12 @@ class TestExtractionErrorPaths:
     def mgr(self, isolated_managers):
         """Create ExtractionManager via DI."""
         from core.app_context import get_app_context
+
         return get_app_context().core_operations_manager
 
     # ── Invalid Input Validation Errors ─────────────────────────────────────────
 
-    def test_validate_rom_extraction_nonexistent_file_raises(
-        self, mgr, tmp_path
-    ):
+    def test_validate_rom_extraction_nonexistent_file_raises(self, mgr, tmp_path):
         """ROM extraction params with nonexistent file should raise ValidationError."""
         params = {
             "rom_path": "/nonexistent/path/rom.sfc",
@@ -705,9 +674,7 @@ class TestExtractionErrorPaths:
         with pytest.raises(ValidationError, match="does not exist|not found|No such file"):
             mgr.validate_extraction_params(params)
 
-    def test_validate_vram_extraction_nonexistent_file_raises(
-        self, mgr, tmp_path
-    ):
+    def test_validate_vram_extraction_nonexistent_file_raises(self, mgr, tmp_path):
         """VRAM extraction params with nonexistent file should raise ValidationError."""
         params = {
             "vram_path": "/nonexistent/path/file.vram",
@@ -720,9 +687,7 @@ class TestExtractionErrorPaths:
         result = mgr.validate_extraction_params(params)
         assert result is True  # Params are valid, file check is deferred
 
-    def test_validate_params_missing_extraction_type_raises(
-        self, mgr, tmp_path
-    ):
+    def test_validate_params_missing_extraction_type_raises(self, mgr, tmp_path):
         """Params without rom_path or vram_path should raise ValidationError."""
         params = {
             "offset": 0x1000,

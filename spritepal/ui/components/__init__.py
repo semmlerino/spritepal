@@ -3,6 +3,7 @@ SpritePal UI Components
 
 Reusable dialog architecture components for consistent UI development.
 """
+
 from __future__ import annotations
 
 from typing import Any, override
@@ -41,7 +42,7 @@ class TabbedDialog(DialogBase):
         with_status_bar: bool = False,
         with_button_box: bool = True,
         tab_position: QTabWidget.TabPosition = QTabWidget.TabPosition.North,
-        **kwargs: Any  # pyright: ignore[reportExplicitAny] - compatibility kwargs
+        **kwargs: Any,  # pyright: ignore[reportExplicitAny] - compatibility kwargs
     ) -> None:
         """
         Initialize tabbed dialog.
@@ -70,7 +71,7 @@ class TabbedDialog(DialogBase):
             size=size,
             with_status_bar=with_status_bar,
             with_button_box=with_button_box,
-            **kwargs
+            **kwargs,
         )
 
     @override
@@ -163,6 +164,7 @@ class TabbedDialog(DialogBase):
             return self._main_tab_widget.currentIndex()
         return -1
 
+
 class SplitterDialog(DialogBase):
     """
     Dialog with a QSplitter as main content area.
@@ -182,7 +184,7 @@ class SplitterDialog(DialogBase):
         with_button_box: bool = True,
         orientation: Qt.Orientation = Qt.Orientation.Horizontal,
         splitter_handle_width: int = 8,
-        **kwargs: Any  # pyright: ignore[reportExplicitAny] - compatibility kwargs
+        **kwargs: Any,  # pyright: ignore[reportExplicitAny] - compatibility kwargs
     ) -> None:
         """
         Initialize splitter dialog.
@@ -215,7 +217,7 @@ class SplitterDialog(DialogBase):
             with_button_box=with_button_box,
             orientation=None,  # Don't auto-create, we'll create our own
             splitter_handle_width=splitter_handle_width,
-            **kwargs
+            **kwargs,
         )
 
     @override
@@ -292,6 +294,7 @@ class SplitterDialog(DialogBase):
         pane_index = self.add_pane(widget)
         if self._main_splitter is not None:
             self._main_splitter.setStretchFactor(pane_index, stretch_factor)
+
 
 __all__ = [
     "DialogBase",

@@ -5,6 +5,7 @@ NOTE: Animation-related tests have been removed due to Qt segfault issues
 during animation cleanup. Only basic initialization and collapse/expand
 functionality is tested here.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -17,6 +18,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
 ]
+
 
 class TestCollapsibleGroupBox:
     """Test CollapsibleGroupBox widget - basic functionality"""

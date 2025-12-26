@@ -41,13 +41,10 @@ def complete_test_rom(tmp_path) -> str:
     rom_data = bytearray(rom_size)
 
     # Add header
-    rom_data[0:4] = b'SNES'
+    rom_data[0:4] = b"SNES"
 
     # Add sprite data at various locations
-    sprite_offsets = [
-        0x10000, 0x15000, 0x20000, 0x25000, 0x30000,
-        0x40000, 0x50000, 0x60000, 0x70000, 0x80000
-    ]
+    sprite_offsets = [0x10000, 0x15000, 0x20000, 0x25000, 0x30000, 0x40000, 0x50000, 0x60000, 0x70000, 0x80000]
 
     for i, offset in enumerate(sprite_offsets):
         # Add tile data (32 bytes per tile, 16 tiles per sprite)
@@ -56,10 +53,11 @@ def complete_test_rom(tmp_path) -> str:
             if tile_offset + 32 <= len(rom_data):
                 # Create recognizable pattern
                 pattern = bytes([(i + tile + j) % 256 for j in range(32)])
-                rom_data[tile_offset:tile_offset + 32] = pattern
+                rom_data[tile_offset : tile_offset + 32] = pattern
 
     rom_path.write_bytes(rom_data)
     return str(rom_path)
+
 
 @pytest.fixture
 def mock_settings_manager():
@@ -85,46 +83,47 @@ def realistic_sprite_data() -> list[dict[str, Any]]:
     """Create realistic sprite data matching what a ROM scan would find."""
     return [
         {
-            'offset': 0x10000,
-            'name': 'Player_Idle',
-            'decompressed_size': 512,
-            'tile_count': 16,
-            'compressed': False,
-            'quality': 0.9,
+            "offset": 0x10000,
+            "name": "Player_Idle",
+            "decompressed_size": 512,
+            "tile_count": 16,
+            "compressed": False,
+            "quality": 0.9,
         },
         {
-            'offset': 0x15000,
-            'name': 'Player_Run',
-            'decompressed_size': 768,
-            'tile_count': 24,
-            'compressed': True,
-            'quality': 0.85,
+            "offset": 0x15000,
+            "name": "Player_Run",
+            "decompressed_size": 768,
+            "tile_count": 24,
+            "compressed": True,
+            "quality": 0.85,
         },
         {
-            'offset': 0x20000,
-            'name': 'Enemy_Goomba',
-            'decompressed_size': 256,
-            'tile_count': 8,
-            'compressed': False,
-            'quality': 0.8,
+            "offset": 0x20000,
+            "name": "Enemy_Goomba",
+            "decompressed_size": 256,
+            "tile_count": 8,
+            "compressed": False,
+            "quality": 0.8,
         },
         {
-            'offset': 0x25000,
-            'name': 'Power_Up_Mushroom',
-            'decompressed_size': 128,
-            'tile_count': 4,
-            'compressed': False,
-            'quality': 0.95,
+            "offset": 0x25000,
+            "name": "Power_Up_Mushroom",
+            "decompressed_size": 128,
+            "tile_count": 4,
+            "compressed": False,
+            "quality": 0.95,
         },
         {
-            'offset': 0x30000,
-            'name': 'Background_Tile_Set',
-            'decompressed_size': 2048,
-            'tile_count': 64,
-            'compressed': True,
-            'quality': 0.7,
+            "offset": 0x30000,
+            "name": "Background_Tile_Set",
+            "decompressed_size": 2048,
+            "tile_count": 64,
+            "compressed": True,
+            "quality": 0.7,
         },
     ]
+
 
 @pytest.mark.gui
 @pytest.mark.integration
@@ -150,8 +149,8 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
 
         super().teardown_method()
 
-    @patch('ui.windows.detached_gallery_window.SpriteScanWorker')
-    @patch('ui.workers.batch_thumbnail_worker.BatchThumbnailWorker')
+    @patch("ui.windows.detached_gallery_window.SpriteScanWorker")
+    @patch("ui.workers.batch_thumbnail_worker.BatchThumbnailWorker")
     def test_complete_rom_to_fullscreen_workflow(
         self,
         mock_thumbnail_worker_class,
@@ -246,15 +245,15 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         for sprite in realistic_sprite_data:
             image = ThreadSafeTestImage(64, 64)
             image.fill()
-            self.gallery_window._on_thumbnail_ready(sprite['offset'], image)
+            self.gallery_window._on_thumbnail_ready(sprite["offset"], image)
         workflow_steps.append("thumbnails_completed")
 
         # Step 8: Open fullscreen viewer
         self.gallery_window.gallery_widget.get_selected_sprite_offset = Mock(
-            return_value=realistic_sprite_data[0]['offset']
+            return_value=realistic_sprite_data[0]["offset"]
         )
 
-        with patch('ui.windows.detached_gallery_window.FullscreenSpriteViewer') as mock_viewer_class:
+        with patch("ui.windows.detached_gallery_window.FullscreenSpriteViewer") as mock_viewer_class:
             mock_viewer = Mock()
             mock_viewer.set_sprite_data.return_value = True
             mock_viewer_class.return_value = mock_viewer
@@ -275,7 +274,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
             "scan_completed",
             "thumbnails_started",
             "thumbnails_completed",
-            "fullscreen_opened"
+            "fullscreen_opened",
         ]
 
         assert workflow_steps == expected_steps
@@ -344,10 +343,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
 
         # Set sprite data
         success = self.fullscreen_viewer.set_sprite_data(
-            realistic_sprite_data,
-            realistic_sprite_data[0]['offset'],
-            "test_rom.sfc",
-            Mock()
+            realistic_sprite_data, realistic_sprite_data[0]["offset"], "test_rom.sfc", Mock()
         )
 
         assert success
@@ -362,19 +358,15 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
 
         # Test navigation sequence: right, right, left, ESC
         test_keys = [
-            ('right', Qt.Key.Key_Right),
-            ('right', Qt.Key.Key_Right),
-            ('left', Qt.Key.Key_Left),
-            ('info_toggle', Qt.Key.Key_I),
-            ('smooth_toggle', Qt.Key.Key_S),
+            ("right", Qt.Key.Key_Right),
+            ("right", Qt.Key.Key_Right),
+            ("left", Qt.Key.Key_Left),
+            ("info_toggle", Qt.Key.Key_I),
+            ("smooth_toggle", Qt.Key.Key_S),
         ]
 
         for action, key in test_keys:
-            key_event = QKeyEvent(
-                QKeyEvent.Type.KeyPress,
-                key,
-                Qt.KeyboardModifier.NoModifier
-            )
+            key_event = QKeyEvent(QKeyEvent.Type.KeyPress, key, Qt.KeyboardModifier.NoModifier)
             self.fullscreen_viewer.keyPressEvent(key_event)
             EventLoopHelper.process_events(100)
 
@@ -388,7 +380,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         assert not self.fullscreen_viewer.smooth_scaling  # Should be False after toggle
 
     @pytest.mark.perf
-    @patch('ui.workers.batch_thumbnail_worker.BatchThumbnailWorker')
+    @patch("ui.workers.batch_thumbnail_worker.BatchThumbnailWorker")
     def test_large_rom_performance_workflow(
         self,
         mock_thumbnail_worker_class,
@@ -406,19 +398,19 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
 
         # Add patterns throughout
         for i in range(0, rom_size, 1024):
-            rom_data[i:i+4] = (i // 1024).to_bytes(4, 'little')
+            rom_data[i : i + 4] = (i // 1024).to_bytes(4, "little")
 
         large_rom.write_bytes(rom_data)
 
         # Create large sprite dataset
         large_sprite_set = [
             {
-                'offset': 0x10000 + i * 0x800,
-                'name': f'Sprite_{i:04d}',
-                'decompressed_size': 512 + (i % 512),
-                'tile_count': 16 + (i % 32),
-                'compressed': i % 4 == 0,
-                'quality': 0.5 + (i % 50) / 100.0,
+                "offset": 0x10000 + i * 0x800,
+                "name": f"Sprite_{i:04d}",
+                "decompressed_size": 512 + (i % 512),
+                "tile_count": 16 + (i % 32),
+                "compressed": i % 4 == 0,
+                "quality": 0.5 + (i % 50) / 100.0,
             }
             for i in range(1000)  # 1000 sprites
         ]
@@ -516,8 +508,8 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_scan_worker.requestInterruption.assert_called()
         mock_thumbnail_controller.cleanup.assert_called()
 
-    @patch('ui.windows.detached_gallery_window.QMessageBox.critical')
-    @patch('ui.dialogs.UserErrorDialog.display_error')  # Patched at definition since lazy import
+    @patch("ui.windows.detached_gallery_window.QMessageBox.critical")
+    @patch("ui.dialogs.UserErrorDialog.display_error")  # Patched at definition since lazy import
     def test_error_recovery_workflow(
         self,
         mock_show_error,
@@ -563,6 +555,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         assert not self.gallery_window.scanning
         assert self.gallery_window.scan_worker is None
 
+
 @pytest.mark.gui
 @pytest.mark.integration
 @pytest.mark.performance
@@ -587,7 +580,7 @@ class TestUIWorkflowPerformanceIntegration(QtTestCase):
 
             # Add unique patterns
             for j in range(0, len(rom_data), 4):
-                rom_data[j:j+4] = (i * 1000 + j // 4).to_bytes(4, 'little')
+                rom_data[j : j + 4] = (i * 1000 + j // 4).to_bytes(4, "little")
 
             rom_path.write_bytes(rom_data)
             rom_files.append(str(rom_path))
@@ -620,10 +613,7 @@ class TestUIWorkflowPerformanceIntegration(QtTestCase):
         from ui.widgets.fullscreen_sprite_viewer import FullscreenSpriteViewer
 
         # Create large sprite dataset
-        large_sprite_set = [
-            {'offset': 0x10000 + i * 0x100, 'name': f'S{i}'}
-            for i in range(2000)
-        ]
+        large_sprite_set = [{"offset": 0x10000 + i * 0x100, "name": f"S{i}"} for i in range(2000)]
 
         # Note: FullscreenSpriteViewer expects QWidget|None as parent, not Mock
         # Pass None and test without parent-dependent gallery features
@@ -631,12 +621,7 @@ class TestUIWorkflowPerformanceIntegration(QtTestCase):
 
         # Set large dataset
         start_time = time.time()
-        success = viewer.set_sprite_data(
-            large_sprite_set,
-            large_sprite_set[0]['offset'],
-            "test_rom.sfc",
-            Mock()
-        )
+        success = viewer.set_sprite_data(large_sprite_set, large_sprite_set[0]["offset"], "test_rom.sfc", Mock())
         setup_time = time.time() - start_time
 
         assert success
@@ -648,11 +633,7 @@ class TestUIWorkflowPerformanceIntegration(QtTestCase):
         for _ in range(20):  # Test 20 rapid navigations
             start_nav = time.time()
 
-            key_event = QKeyEvent(
-                QKeyEvent.Type.KeyPress,
-                Qt.Key.Key_Right,
-                Qt.KeyboardModifier.NoModifier
-            )
+            key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
             viewer.keyPressEvent(key_event)
             EventLoopHelper.process_events(10)
 

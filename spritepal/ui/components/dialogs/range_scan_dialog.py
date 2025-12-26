@@ -3,6 +3,7 @@ Range Scan Configuration Dialog
 
 Dialog for selecting range scanning parameters for ROM sprite exploration.
 """
+
 from __future__ import annotations
 
 from typing import override
@@ -48,13 +49,9 @@ class RangeScanDialog(DialogBase):
 
         # Range size selection
         self.range_combo = QComboBox()
-        self.range_combo.addItems([
-            "±1 KB (±0x400)",
-            "±4 KB (±0x1000)",
-            "±16 KB (±0x4000)",
-            "±64 KB (±0x10000)",
-            "±256 KB (±0x40000)"
-        ])
+        self.range_combo.addItems(
+            ["±1 KB (±0x400)", "±4 KB (±0x1000)", "±16 KB (±0x4000)", "±64 KB (±0x10000)", "±256 KB (±0x40000)"]
+        )
         self.range_combo.setCurrentIndex(2)  # Default to ±16KB
         form_layout.addRow("Scan Range:", self.range_combo)
 
@@ -126,9 +123,8 @@ class RangeScanDialog(DialogBase):
             _ = QMessageBox.warning(
                 self,
                 "Invalid Range",
-                f"Scan range too small ({scan_size} bytes).\n\n"
-                f"Minimum range is {MIN_SCAN_SIZE} bytes.",
-                QMessageBox.StandardButton.Ok
+                f"Scan range too small ({scan_size} bytes).\n\nMinimum range is {MIN_SCAN_SIZE} bytes.",
+                QMessageBox.StandardButton.Ok,
             )
             return False
 
@@ -136,11 +132,11 @@ class RangeScanDialog(DialogBase):
             result = _ = QMessageBox.question(
                 self,
                 "Large Range Warning",
-                f"Scan range is very large ({scan_size / (1024*1024):.1f} MB).\n\n"
+                f"Scan range is very large ({scan_size / (1024 * 1024):.1f} MB).\n\n"
                 f"This may take a long time and use significant memory.\n"
                 f"Continue anyway?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.No,
             )
             if result != QMessageBox.StandardButton.Yes:
                 return False
@@ -153,16 +149,13 @@ class RangeScanDialog(DialogBase):
                 f"Scan range extends outside ROM bounds.\n\n"
                 f"ROM size: 0x{self.rom_size:06X}\n"
                 f"Range: 0x{start_offset:06X} - 0x{end_offset:06X}",
-                QMessageBox.StandardButton.Ok
+                QMessageBox.StandardButton.Ok,
             )
             return False
 
         if start_offset >= end_offset:
             _ = QMessageBox.warning(
-                self,
-                "Invalid Range",
-                "Start offset must be less than end offset.",
-                QMessageBox.StandardButton.Ok
+                self, "Invalid Range", "Start offset must be less than end offset.", QMessageBox.StandardButton.Ok
             )
             return False
 

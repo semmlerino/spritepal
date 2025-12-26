@@ -2,6 +2,7 @@
 
 Individual exception type tests removed as they just verify Python's exception mechanism.
 """
+
 from __future__ import annotations
 
 import pytest

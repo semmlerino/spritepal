@@ -4,6 +4,7 @@ These tests mock Qt components to test business logic without requiring a displa
 
 MODERNIZED: Uses consolidated mock infrastructure from conftest.py
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -65,9 +66,7 @@ class TestBusinessLogicOnly:
         # Test extraction using centralized test files
         extractor = SpriteExtractor()
         output_png = standard_test_params["output_base"] + ".png"
-        img, num_tiles = extractor.extract_sprites_grayscale(
-            standard_test_params["vram_path"], output_png
-        )
+        img, num_tiles = extractor.extract_sprites_grayscale(standard_test_params["vram_path"], output_png)
 
         assert Path(output_png).exists()
         assert num_tiles > 0

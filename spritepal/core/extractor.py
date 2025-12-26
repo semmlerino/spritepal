@@ -1,6 +1,7 @@
 """
 Core sprite extraction functionality
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -25,6 +26,7 @@ from utils.logging_config import get_logger
 
 logger: logging.Logger = get_logger(__name__)
 
+
 class SpriteExtractor:
     """Handles sprite extraction from VRAM dumps"""
 
@@ -33,7 +35,9 @@ class SpriteExtractor:
         self.offset: int = VRAM_SPRITE_OFFSET
         self.size: int = VRAM_SPRITE_SIZE
         self.tiles_per_row: int = DEFAULT_TILES_PER_ROW
-        logger.debug(f"SpriteExtractor initialized: offset=0x{self.offset:04X}, size={self.size}, tiles_per_row={self.tiles_per_row}")
+        logger.debug(
+            f"SpriteExtractor initialized: offset=0x{self.offset:04X}, size={self.size}, tiles_per_row={self.tiles_per_row}"
+        )
 
     def load_vram(self, vram_path: str) -> None:
         """Load VRAM dump file with validation"""
@@ -53,11 +57,11 @@ class SpriteExtractor:
         if len(self.vram_data) == expected_size:
             logger.info(f"Loaded standard 64KB VRAM dump from {vram_path}")
         else:
-            logger.warning(f"Loaded non-standard VRAM dump: {len(self.vram_data)} bytes (expected {expected_size} bytes)")
+            logger.warning(
+                f"Loaded non-standard VRAM dump: {len(self.vram_data)} bytes (expected {expected_size} bytes)"
+            )
 
-    def extract_tiles(
-        self, offset: int | None = None, size: int | None = None
-    ) -> tuple[list[list[list[int]]], int]:
+    def extract_tiles(self, offset: int | None = None, size: int | None = None) -> tuple[list[list[list[int]]], int]:
         """Extract tiles from VRAM data"""
         if self.vram_data is None:
             logger.error("Attempted to extract tiles without loading VRAM data")
@@ -109,9 +113,7 @@ class SpriteExtractor:
         logger.info(f"Successfully extracted {num_tiles} tiles")
         return tiles, num_tiles
 
-    def create_grayscale_image(
-        self, tiles: list[list[list[int]]], tiles_per_row: int | None = None
-    ) -> Image.Image:
+    def create_grayscale_image(self, tiles: list[list[list[int]]], tiles_per_row: int | None = None) -> Image.Image:
         """Create a grayscale image from tiles"""
         if tiles_per_row is None:
             tiles_per_row = self.tiles_per_row
@@ -123,7 +125,9 @@ class SpriteExtractor:
         img_width = tiles_per_row * TILE_WIDTH
         img_height = rows * TILE_HEIGHT
 
-        logger.info(f"Creating grayscale image: {img_width}x{img_height} pixels ({num_tiles} tiles in {rows} rows, {tiles_per_row} tiles/row)")
+        logger.info(
+            f"Creating grayscale image: {img_width}x{img_height} pixels ({num_tiles} tiles in {rows} rows, {tiles_per_row} tiles/row)"
+        )
 
         # Create image data as bytes for efficient processing
         img_data = bytearray(img_width * img_height)
@@ -181,7 +185,9 @@ class SpriteExtractor:
 
         # Save
         img.save(output_path)
-        logger.info(f"Saved grayscale sprite image to {output_path} ({img.size[0]}x{img.size[1]} pixels, {num_tiles} tiles)")
+        logger.info(
+            f"Saved grayscale sprite image to {output_path} ({img.size[0]}x{img.size[1]} pixels, {num_tiles} tiles)"
+        )
         logger.info("=" * 60)
 
         return img, num_tiles

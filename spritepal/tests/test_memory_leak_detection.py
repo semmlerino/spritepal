@@ -1,4 +1,3 @@
-
 """
 Comprehensive memory leak detection tests.
 
@@ -78,6 +77,7 @@ class MemoryMonitor:
             f"(initial: {self.initial_memory:.2f}MB, current: {self.measurements[-1]:.2f}MB)"
         )
 
+
 class WeakrefTracker:
     """Track object lifecycle using weakrefs."""
 
@@ -101,15 +101,18 @@ class WeakrefTracker:
         gc.collect()
         return sum(1 for ref in self.refs if ref() is not None)
 
+
 @pytest.fixture
 def memory_monitor():
     """Create a memory monitor."""
     return MemoryMonitor()
 
+
 @pytest.fixture
 def weakref_tracker():
     """Create a weakref tracker."""
     return WeakrefTracker()
+
 
 @pytest.fixture
 def large_rom_file(tmp_path) -> str:
@@ -120,7 +123,7 @@ def large_rom_file(tmp_path) -> str:
 
     # Add some patterns
     for i in range(0, len(rom_data), 1024):
-        rom_data[i:i+32] = b'\x00\x01\x02\x03' * 8
+        rom_data[i : i + 32] = b"\x00\x01\x02\x03" * 8
 
     rom_path.write_bytes(rom_data)
     return str(rom_path)
@@ -131,8 +134,9 @@ def mock_rom_extractor() -> Mock:
     """Create a mock ROMExtractor to avoid DI container dependency."""
     extractor = Mock()
     extractor.extract_sprite.return_value = None
-    extractor.decompress.return_value = b'\x00' * 1024
+    extractor.decompress.return_value = b"\x00" * 1024
     return extractor
+
 
 class TestThumbnailCacheMemoryManagement:
     """Test memory management in ThumbnailCache."""
@@ -176,10 +180,11 @@ class TestThumbnailCacheMemoryManagement:
         # Repeatedly get stats
         for _ in range(10000):
             stats = cache.get_stats()
-            assert 'hit_rate' in stats
+            assert "hit_rate" in stats
 
         # Should not leak memory
         memory_monitor.assert_no_leak(max_increase_mb=5)
+
 
 class TestBatchThumbnailWorkerMemoryLeaks:
     """Test memory leak prevention in BatchThumbnailWorker."""
@@ -228,14 +233,14 @@ class TestBatchThumbnailWorkerMemoryLeaks:
         """Test memory is cleaned up after thumbnail generation."""
         memory_monitor.start()
 
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer') as mock_renderer:
+        with patch("ui.workers.batch_thumbnail_worker.TileRenderer") as mock_renderer:
             # Mock renderer to return images
             def create_image(*args, **kwargs):
-                img = Mock(spec=['size', 'mode', 'convert', 'tobytes'])
+                img = Mock(spec=["size", "mode", "convert", "tobytes"])
                 img.size = (64, 64)
-                img.mode = 'RGBA'
+                img.mode = "RGBA"
                 img.convert.return_value = img
-                img.tobytes.return_value = b'\x00' * (64 * 64 * 4)
+                img.tobytes.return_value = b"\x00" * (64 * 64 * 4)
                 return img
 
             mock_renderer.return_value.render_tiles = create_image
@@ -257,6 +262,7 @@ class TestBatchThumbnailWorkerMemoryLeaks:
 
         # Memory should not grow significantly
         memory_monitor.assert_no_leak(max_increase_mb=20)
+
 
 @pytest.mark.usefixtures("qapp")  # QPixmap requires QApplication
 @pytest.mark.parallel_unsafe  # Heavy Qt operations crash in parallel
@@ -304,6 +310,7 @@ class TestQImageQPixmapMemoryManagement:
         # Should not leak
         memory_monitor.assert_no_leak(max_increase_mb=5)
 
+
 class TestLargeDataProcessingMemoryLeaks:
     """Test memory leaks when processing large amounts of data."""
 
@@ -311,7 +318,7 @@ class TestLargeDataProcessingMemoryLeaks:
         """Test processing many sprites doesn't leak memory."""
         memory_monitor.start()
 
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
+        with patch("ui.workers.batch_thumbnail_worker.TileRenderer"):
             worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
 
             # Process many sprite offsets
@@ -341,7 +348,7 @@ class TestLargeDataProcessingMemoryLeaks:
         memory_monitor.start()
 
         # Force fallback by mocking mmap to fail
-        with patch('mmap.mmap', side_effect=Exception("mmap failed")):
+        with patch("mmap.mmap", side_effect=Exception("mmap failed")):
             worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
 
             # This should use BytesMMAPWrapper fallback
@@ -349,7 +356,7 @@ class TestLargeDataProcessingMemoryLeaks:
 
             # ROM should be loaded via fallback
             assert worker._rom_mmap is not None
-            assert hasattr(worker._rom_mmap, '_data')  # BytesMMAPWrapper
+            assert hasattr(worker._rom_mmap, "_data")  # BytesMMAPWrapper
 
             # Use the ROM data
             for i in range(100):
@@ -364,9 +371,8 @@ class TestLargeDataProcessingMemoryLeaks:
         # Memory should be released
         memory_monitor.assert_no_leak(max_increase_mb=30)  # Allow for 16MB ROM
 
-@pytest.mark.skip_thread_cleanup(
-    reason="ThreadPoolExecutor Dummy threads require OS-level cleanup time after shutdown"
-)
+
+@pytest.mark.skip_thread_cleanup(reason="ThreadPoolExecutor Dummy threads require OS-level cleanup time after shutdown")
 class TestMemoryLeakIntegration:
     """Integration tests for memory leak detection."""
 
@@ -387,6 +393,7 @@ class TestMemoryLeakIntegration:
 
             # Allow worker to start processing
             from PySide6.QtWidgets import QApplication
+
             QApplication.processEvents()
 
             # Stop and cleanup
@@ -398,6 +405,7 @@ class TestMemoryLeakIntegration:
 
         # Memory should not accumulate across iterations
         memory_monitor.assert_no_leak(max_increase_mb=20)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

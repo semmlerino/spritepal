@@ -1,6 +1,7 @@
 """
 Tests for sprite region detection and management functionality.
 """
+
 from __future__ import annotations
 
 import time
@@ -21,6 +22,8 @@ pytestmark = [
     pytest.mark.performance,
     pytest.mark.slow,
 ]
+
+
 class TestSpriteRegion:
     """Test SpriteRegion data class functionality"""
 
@@ -35,7 +38,7 @@ class TestSpriteRegion:
             average_quality=0.85,
             sprite_count=3,
             size_bytes=0x10000,
-            density=0.1875  # 3 sprites / 64KB
+            density=0.1875,  # 3 sprites / 64KB
         )
 
         assert region.region_id == 0
@@ -56,7 +59,7 @@ class TestSpriteRegion:
             average_quality=0.8,
             sprite_count=5,
             size_bytes=0x10000,
-            density=0.3
+            density=0.3,
         )
 
         # Default description
@@ -77,7 +80,7 @@ class TestSpriteRegion:
             average_quality=0.8,
             sprite_count=1,
             size_bytes=0x10000,
-            density=0.1
+            density=0.1,
         )
 
         assert region.center_offset == 0x208000  # (0x200000 + 0x210000) // 2
@@ -94,7 +97,7 @@ class TestSpriteRegion:
             average_quality=0.9,
             sprite_count=1,
             size_bytes=0x1000,
-            density=1.0
+            density=1.0,
         )
         assert region.quality_category == "high"
 
@@ -105,6 +108,7 @@ class TestSpriteRegion:
         # Low quality
         region.average_quality = 0.3
         assert region.quality_category == "low"
+
 
 class TestSpriteRegionDetector:
     """Test SpriteRegionDetector functionality"""
@@ -157,10 +161,7 @@ class TestSpriteRegionDetector:
 
     def test_minimum_sprites_per_region(self):
         """Test minimum sprites per region filter"""
-        detector = SpriteRegionDetector(
-            gap_threshold=0x1000,
-            min_sprites_per_region=3
-        )
+        detector = SpriteRegionDetector(gap_threshold=0x1000, min_sprites_per_region=3)
         sprites = [
             # Region 1 - will be kept (3 sprites)
             (0x100000, 0.8),
@@ -180,7 +181,7 @@ class TestSpriteRegionDetector:
         """Test minimum region size filter"""
         detector = SpriteRegionDetector(
             gap_threshold=0x10000,
-            min_region_size=0x2000  # 8KB minimum
+            min_region_size=0x2000,  # 8KB minimum
         )
         sprites = [
             # Small region - will be filtered out
@@ -198,11 +199,7 @@ class TestSpriteRegionDetector:
 
     def test_region_merging(self):
         """Test small region merging"""
-        detector = SpriteRegionDetector(
-            gap_threshold=0x1000,
-            min_region_size=0x1000,
-            merge_small_regions=True
-        )
+        detector = SpriteRegionDetector(gap_threshold=0x1000, min_region_size=0x1000, merge_small_regions=True)
         sprites = [
             # Small region 1
             (0x100000, 0.8),
@@ -262,7 +259,7 @@ class TestSpriteRegionDetector:
         """Test that regions are ordered by start offset"""
         detector = SpriteRegionDetector(
             gap_threshold=0x80000,  # Gap threshold smaller than 0x100000 to ensure 3 separate regions
-            min_sprites_per_region=1  # Allow single-sprite regions for this test
+            min_sprites_per_region=1,  # Allow single-sprite regions for this test
         )
         # Provide sprites out of order
         sprites = [
@@ -280,6 +277,7 @@ class TestSpriteRegionDetector:
         # Check region IDs are sequential
         for i, region in enumerate(regions):
             assert region.region_id == i
+
 
 class TestSpriteRegionClassifier:
     """Test region classification functionality"""
@@ -299,7 +297,7 @@ class TestSpriteRegionClassifier:
             average_quality=0.85,
             sprite_count=12,
             size_bytes=0x4000,  # 16KB
-            density=0.75  # 12 sprites / 16KB = 0.75 sprites/KB (within character range)
+            density=0.75,  # 12 sprites / 16KB = 0.75 sprites/KB (within character range)
         )
 
         region_type, confidence = classifier.classify_region(region)
@@ -320,7 +318,7 @@ class TestSpriteRegionClassifier:
             average_quality=0.8,
             sprite_count=64,
             size_bytes=0x10000,  # 64KB
-            density=1.0  # 64 sprites / 64KB
+            density=1.0,  # 64 sprites / 64KB
         )
 
         region_type, confidence = classifier.classify_region(region)
@@ -341,7 +339,7 @@ class TestSpriteRegionClassifier:
             average_quality=0.725,
             sprite_count=2,
             size_bytes=0x2000,  # 8KB
-            density=0.25  # 2 sprites / 8KB
+            density=0.25,  # 2 sprites / 8KB
         )
 
         region_type, confidence = classifier.classify_region(region)
@@ -362,12 +360,13 @@ class TestSpriteRegionClassifier:
             average_quality=0.5,
             sprite_count=1,
             size_bytes=0x100000,  # 1MB
-            density=0.001  # Very low density
+            density=0.001,  # Very low density
         )
 
         region_type, confidence = classifier.classify_region(region)
         # This region is so unusual it should either be unknown or have very low confidence
         assert region_type == "unknown" or confidence <= 0.3, f"Got {region_type} with confidence {confidence}"
+
 
 class TestRegionUpdateManager:
     """Test dynamic region update functionality"""
@@ -442,6 +441,7 @@ class TestRegionUpdateManager:
 
         # Set up callback tracking
         callback_count = 0
+
         def callback():
             nonlocal callback_count
             callback_count += 1
@@ -452,12 +452,14 @@ class TestRegionUpdateManager:
         manager.add_discovered_sprite(0x300000, 0.9)
         assert callback_count == 1
 
+
 class TestPerformance:
     """Test performance with large sprite counts"""
 
     def test_large_sprite_count_performance(self):
         """Test performance with many sprites"""
         import random
+
         random.seed(42)  # Seed for reproducibility
 
         # Generate 10,000 sprites
@@ -506,6 +508,7 @@ class TestPerformance:
 
         # Should be very fast
         assert elapsed < 0.1  # 100ms for 1000 lookups
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

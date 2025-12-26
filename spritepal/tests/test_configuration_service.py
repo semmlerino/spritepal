@@ -3,6 +3,7 @@
 This module tests the centralized configuration service that provides
 all application paths.
 """
+
 from __future__ import annotations
 
 import os

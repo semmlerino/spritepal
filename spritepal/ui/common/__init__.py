@@ -1,6 +1,7 @@
 """
 Common UI utilities and helpers.
 """
+
 from __future__ import annotations
 
 # WorkerManager moved to core/services for proper layer boundaries

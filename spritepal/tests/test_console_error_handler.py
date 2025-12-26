@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import pytest
@@ -23,6 +22,7 @@ pytestmark = [
     pytest.mark.allows_registry_state(reason="Pure unit test, no managers used"),
 ]
 
+
 class TestConsoleErrorHandler(unittest.TestCase):
     """Test the ConsoleErrorHandler implementation"""
 
@@ -32,7 +32,7 @@ class TestConsoleErrorHandler(unittest.TestCase):
 
     def test_handle_exception_logs_to_stderr(self):
         """Test that exceptions are properly logged to stderr"""
-        with patch('sys.stderr', new_callable=io.StringIO) as mock_stderr:
+        with patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:
             test_exception = ValueError("Test exception")
             self.handler.handle_exception(test_exception, "test context")
 
@@ -42,18 +42,18 @@ class TestConsoleErrorHandler(unittest.TestCase):
 
     def test_handle_critical_error_logs_prominently(self):
         """Test that critical errors are logged with emphasis"""
-        with patch('sys.stderr', new_callable=io.StringIO) as mock_stderr:
+        with patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:
             self.handler.handle_critical_error("Critical Title", "Critical message")
 
             stderr_output = mock_stderr.getvalue()
             self.assertIn("CRITICAL ERROR", stderr_output)
             self.assertIn("Critical Title", stderr_output)
             self.assertIn("Critical message", stderr_output)
-            self.assertIn("="*60, stderr_output)  # Check for emphasis
+            self.assertIn("=" * 60, stderr_output)  # Check for emphasis
 
     def test_handle_warning_logs_to_stderr(self):
         """Test that warnings are logged to stderr"""
-        with patch('sys.stderr', new_callable=io.StringIO) as mock_stderr:
+        with patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:
             self.handler.handle_warning("Warning Title", "Warning message")
 
             stderr_output = mock_stderr.getvalue()
@@ -63,7 +63,7 @@ class TestConsoleErrorHandler(unittest.TestCase):
 
     def test_handle_info_logs_to_stdout(self):
         """Test that info messages are logged to stdout"""
-        with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
             self.handler.handle_info("Info Title", "Info message")
 
             stdout_output = mock_stdout.getvalue()
@@ -73,13 +73,10 @@ class TestConsoleErrorHandler(unittest.TestCase):
 
     def test_handle_validation_error_includes_context(self):
         """Test that validation errors include all context information"""
-        with patch('sys.stderr', new_callable=io.StringIO) as mock_stderr:
+        with patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:
             test_error = ValueError("Invalid input")
             self.handler.handle_validation_error(
-                test_error,
-                "input validation",
-                user_input="bad_value",
-                field="test_field"
+                test_error, "input validation", user_input="bad_value", field="test_field"
             )
 
             stderr_output = mock_stderr.getvalue()
@@ -135,7 +132,7 @@ class TestConsoleErrorHandler(unittest.TestCase):
         # This is the key difference from MockErrorHandler
         # All errors should produce output
 
-        with patch('sys.stderr', new_callable=io.StringIO) as mock_stderr:
+        with patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:
             # Test various error types
             self.handler.handle_exception(RuntimeError("Runtime error"), "runtime")
             self.handler.handle_critical_error("Critical", "Very bad")
@@ -149,6 +146,7 @@ class TestConsoleErrorHandler(unittest.TestCase):
             self.assertIn("Very bad", stderr_output)
             self.assertIn("Bad value", stderr_output)
 
+
 class TestControllerErrorHandlerFallback(unittest.TestCase):
     """Test that the controller properly uses ConsoleErrorHandler as fallback"""
 
@@ -157,17 +155,18 @@ class TestControllerErrorHandlerFallback(unittest.TestCase):
         handler = ConsoleErrorHandler()
 
         # Verify all required methods exist
-        self.assertTrue(hasattr(handler, 'handle_exception'))
-        self.assertTrue(hasattr(handler, 'handle_critical_error'))
-        self.assertTrue(hasattr(handler, 'handle_warning'))
-        self.assertTrue(hasattr(handler, 'handle_info'))
-        self.assertTrue(hasattr(handler, 'handle_validation_error'))
-        self.assertTrue(hasattr(handler, 'set_show_dialogs'))
+        self.assertTrue(hasattr(handler, "handle_exception"))
+        self.assertTrue(hasattr(handler, "handle_critical_error"))
+        self.assertTrue(hasattr(handler, "handle_warning"))
+        self.assertTrue(hasattr(handler, "handle_info"))
+        self.assertTrue(hasattr(handler, "handle_validation_error"))
+        self.assertTrue(hasattr(handler, "set_show_dialogs"))
 
         # Verify they actually log errors (not silently swallow them)
-        with patch('sys.stderr', new_callable=io.StringIO) as mock_stderr:
+        with patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:
             handler.handle_exception(Exception("Test"), "context")
             self.assertIn("Test", mock_stderr.getvalue())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

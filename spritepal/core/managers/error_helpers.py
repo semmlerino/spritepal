@@ -3,6 +3,7 @@
 These functions can be used independently or integrated with BaseManager
 via the on_error callback parameter.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -70,9 +71,7 @@ def handle_file_io_error(
     Returns:
         The enhanced exception with "File I/O" category
     """
-    return handle_categorized_error(
-        error, operation, "File I/O", context, on_error=on_error
-    )
+    return handle_categorized_error(error, operation, "File I/O", context, on_error=on_error)
 
 
 def handle_data_format_error(
@@ -93,9 +92,7 @@ def handle_data_format_error(
     Returns:
         The enhanced exception with "Data format" category
     """
-    return handle_categorized_error(
-        error, operation, "Data format", context, on_error=on_error
-    )
+    return handle_categorized_error(error, operation, "Data format", context, on_error=on_error)
 
 
 def handle_operation_error(
@@ -118,6 +115,4 @@ def handle_operation_error(
     Returns:
         The enhanced exception with operation name as category
     """
-    return handle_categorized_error(
-        error, operation, operation.title(), context, error_class, on_error=on_error
-    )
+    return handle_categorized_error(error, operation, operation.title(), context, error_class, on_error=on_error)

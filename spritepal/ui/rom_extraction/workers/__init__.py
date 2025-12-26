@@ -1,4 +1,5 @@
 """Worker threads for ROM extraction operations"""
+
 from __future__ import annotations
 
 from .preview_worker import SpritePreviewWorker

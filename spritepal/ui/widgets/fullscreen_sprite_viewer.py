@@ -60,6 +60,7 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 class FullscreenSpriteViewer(QWidget):
     """Fullscreen sprite viewer with keyboard navigation."""
 
@@ -106,10 +107,7 @@ class FullscreenSpriteViewer(QWidget):
         """Setup the fullscreen viewer UI."""
         # Main layout - center everything
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(
-            FULLSCREEN_MARGINS, FULLSCREEN_MARGINS,
-            FULLSCREEN_MARGINS, FULLSCREEN_MARGINS
-        )
+        main_layout.setContentsMargins(FULLSCREEN_MARGINS, FULLSCREEN_MARGINS, FULLSCREEN_MARGINS, FULLSCREEN_MARGINS)
         main_layout.setSpacing(0)
 
         # Sprite display area (centered)
@@ -190,10 +188,7 @@ class FullscreenSpriteViewer(QWidget):
         """Configure widget for fullscreen display."""
         # Use clean, minimal window flags to avoid conflicts with window managers
         # Removed WindowStaysOnTopHint and WindowMaximizeButtonHint that can interfere
-        self.setWindowFlags(
-            Qt.WindowType.Window |
-            Qt.WindowType.FramelessWindowHint
-        )
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
 
         # Ensure window can expand to full screen on any monitor
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
@@ -220,8 +215,13 @@ class FullscreenSpriteViewer(QWidget):
         self.cursor_timer.timeout.connect(hide_cursor)
         self.cursor_timer.start(3000)
 
-    def set_sprite_data(self, sprites_data: list[dict[str, Any]], current_offset: int,  # pyright: ignore[reportExplicitAny] - sprite metadata
-                       rom_path: str, rom_extractor: ROMExtractor | None) -> bool:
+    def set_sprite_data(
+        self,
+        sprites_data: list[dict[str, Any]],
+        current_offset: int,  # pyright: ignore[reportExplicitAny] - sprite metadata
+        rom_path: str,
+        rom_extractor: ROMExtractor | None,
+    ) -> bool:
         """
         Set the sprite data for the viewer.
 
@@ -245,12 +245,13 @@ class FullscreenSpriteViewer(QWidget):
         # Find current sprite index
         self.current_index = 0
         for i, sprite in enumerate(sprites_data):
-            if sprite.get('offset', 0) == current_offset:
+            if sprite.get("offset", 0) == current_offset:
                 self.current_index = i
                 break
 
-        logger.info(f"Fullscreen viewer initialized with {len(sprites_data)} sprites, "
-                   f"starting at index {self.current_index}")
+        logger.info(
+            f"Fullscreen viewer initialized with {len(sprites_data)} sprites, starting at index {self.current_index}"
+        )
 
         # Load current sprite
         self._update_sprite_display()
@@ -264,7 +265,7 @@ class FullscreenSpriteViewer(QWidget):
             return
 
         current_sprite = self.sprites_data[self.current_index]
-        offset = current_sprite.get('offset', 0)
+        offset = current_sprite.get("offset", 0)
 
         logger.debug(f"Displaying sprite at offset 0x{offset:06X}")
 
@@ -310,18 +311,17 @@ class FullscreenSpriteViewer(QWidget):
         # Try to get from parent gallery if available
         if self.parent():
             gallery_window = self.parent()
-            if (hasattr(gallery_window, "gallery_widget") and
-                    gallery_window.gallery_widget):  # type: ignore[attr-defined]
+            if hasattr(gallery_window, "gallery_widget") and gallery_window.gallery_widget:  # type: ignore[attr-defined]
                 gallery = gallery_window.gallery_widget  # type: ignore[attr-defined]
 
                 # New API - check if gallery has get_sprite_pixmap method
-                if hasattr(gallery, 'get_sprite_pixmap'):
+                if hasattr(gallery, "get_sprite_pixmap"):
                     return gallery.get_sprite_pixmap(offset)
 
                 # Old API - check thumbnails dict
-                if hasattr(gallery, 'thumbnails') and offset in gallery.thumbnails:
+                if hasattr(gallery, "thumbnails") and offset in gallery.thumbnails:
                     thumbnail = gallery.thumbnails[offset]
-                    if hasattr(thumbnail, 'sprite_pixmap'):
+                    if hasattr(thumbnail, "sprite_pixmap"):
                         return thumbnail.sprite_pixmap
 
         # If no pixmap found, could implement direct extraction here
@@ -336,7 +336,7 @@ class FullscreenSpriteViewer(QWidget):
             QScreen: The screen to use for fullscreen display
         """
         # Try to get screen based on parent window position
-        if self.parent() and hasattr(self.parent(), 'geometry'):
+        if self.parent() and hasattr(self.parent(), "geometry"):
             parent_center = self.parent().geometry().center()  # type: ignore[union-attr]
             logger.debug(f"Parent window center: {parent_center}")
 
@@ -378,15 +378,11 @@ class FullscreenSpriteViewer(QWidget):
         # Scale maintaining aspect ratio
         if self.smooth_scaling:
             scaled = pixmap.scaled(
-                max_width, max_height,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
+                max_width, max_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
             )
         else:
             scaled = pixmap.scaled(
-                max_width, max_height,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation
+                max_width, max_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation
             )
 
         return scaled
@@ -397,10 +393,10 @@ class FullscreenSpriteViewer(QWidget):
             return
 
         current_sprite = self.sprites_data[self.current_index]
-        offset = current_sprite.get('offset', 0)
-        name = current_sprite.get('name', f"Sprite_0x{offset:06X}")
-        size = current_sprite.get('decompressed_size', 0)
-        tiles = current_sprite.get('tile_count', 0)
+        offset = current_sprite.get("offset", 0)
+        name = current_sprite.get("name", f"Sprite_0x{offset:06X}")
+        size = current_sprite.get("decompressed_size", 0)
+        tiles = current_sprite.get("tile_count", 0)
 
         info_text = f"{name}\n"
         info_text += f"Offset: 0x{offset:06X}\n"
@@ -480,7 +476,7 @@ class FullscreenSpriteViewer(QWidget):
         self.setFocus()
         self.setCursor(Qt.CursorShape.ArrowCursor)
         # Reuse the cursor timer if it exists
-        if hasattr(self, 'cursor_timer'):
+        if hasattr(self, "cursor_timer"):
             self.cursor_timer.stop()
             self.cursor_timer.start(3000)
 
@@ -577,8 +573,8 @@ class FullscreenSpriteViewer(QWidget):
             # Check if we actually cover the full screen
             if expected_geometry and actual_geometry:
                 covers_full_screen = (
-                    actual_geometry.width() >= expected_geometry.width() and
-                    actual_geometry.height() >= expected_geometry.height()
+                    actual_geometry.width() >= expected_geometry.width()
+                    and actual_geometry.height() >= expected_geometry.height()
                 )
                 logger.info(f"  Covers full screen: {covers_full_screen}")
 
@@ -610,10 +606,12 @@ class FullscreenSpriteViewer(QWidget):
                 self.setWindowState(Qt.WindowState.WindowNoState)
                 # Use a safer timer with weakref to avoid use-after-free
                 weak_self = weakref.ref(self)
+
                 def set_fullscreen() -> None:
                     widget = weak_self()
                     if widget is not None:
                         widget.setWindowState(Qt.WindowState.WindowFullScreen)
+
                 QTimer.singleShot(50, set_fullscreen)
 
             elif system == "linux":
@@ -622,10 +620,12 @@ class FullscreenSpriteViewer(QWidget):
                 self.showNormal()
                 # Use a safer timer with weakref to avoid use-after-free
                 weak_self = weakref.ref(self)
+
                 def show_fullscreen() -> None:
                     widget = weak_self()
                     if widget is not None:
                         widget.showFullScreen()
+
                 QTimer.singleShot(50, show_fullscreen)
 
             else:
@@ -644,9 +644,9 @@ class FullscreenSpriteViewer(QWidget):
         logger.info("Fullscreen sprite viewer closing")
 
         # Stop all timers to prevent accessing deleted object
-        if hasattr(self, 'cursor_timer'):
+        if hasattr(self, "cursor_timer"):
             self.cursor_timer.stop()
-        if hasattr(self, 'transition_timer'):
+        if hasattr(self, "transition_timer"):
             self.transition_timer.stop()
 
         # Show cursor again
@@ -663,9 +663,8 @@ class FullscreenSpriteViewer(QWidget):
         self.setCursor(Qt.CursorShape.ArrowCursor)
 
         # Hide cursor again after delay
-        if hasattr(self, 'cursor_timer'):
+        if hasattr(self, "cursor_timer"):
             self.cursor_timer.stop()
             self.cursor_timer.start(3000)
 
         super().mousePressEvent(event)
-

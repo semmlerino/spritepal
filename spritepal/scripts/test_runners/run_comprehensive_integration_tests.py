@@ -40,47 +40,48 @@ def setup_environment():
     sys.path.insert(0, str(project_root))
 
     # Set environment variables for testing
-    os.environ['PYTEST_CURRENT_TEST'] = 'integration'
+    os.environ["PYTEST_CURRENT_TEST"] = "integration"
 
     # Ensure virtual environment is used
-    if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+    if hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix):
         print("✓ Running in virtual environment")
     else:
         print("⚠ Warning: Not running in virtual environment")
         print("  Consider activating venv with: source venv/bin/activate")
 
+
 def get_pytest_command(args):
     """Build the pytest command based on arguments."""
-    cmd = [sys.executable, '-m', 'pytest']
+    cmd = [sys.executable, "-m", "pytest"]
 
     # Test selection based on markers and arguments
     test_markers = []
 
     if args.gui and not args.headless:
-        test_markers.append('gui')
+        test_markers.append("gui")
     elif args.headless and not args.gui:
-        test_markers.append('headless')
+        test_markers.append("headless")
     # If neither specified, run both
 
     if args.performance:
-        test_markers.append('performance')
+        test_markers.append("performance")
 
     if args.memory:
-        test_markers.append('not slow')  # Memory tests tend to be slow, so include fast ones
+        test_markers.append("not slow")  # Memory tests tend to be slow, so include fast ones
 
     # Build marker expression
     if test_markers:
-        marker_expr = ' or '.join(test_markers)
-        cmd.extend(['-m', marker_expr])
+        marker_expr = " or ".join(test_markers)
+        cmd.extend(["-m", marker_expr])
 
     # Test paths
     integration_test_paths = [
-        'tests/integration/test_fullscreen_sprite_viewer_integration.py',
-        'tests/integration/test_gallery_window_integration.py',
-        'tests/integration/test_batch_thumbnail_worker_integration.py',
-        'tests/integration/test_worker_lifecycle_management_integration.py',
-        'tests/integration/test_memory_management_integration.py',
-        'tests/integration/test_complete_ui_workflows_comprehensive.py',
+        "tests/integration/test_fullscreen_sprite_viewer_integration.py",
+        "tests/integration/test_gallery_window_integration.py",
+        "tests/integration/test_batch_thumbnail_worker_integration.py",
+        "tests/integration/test_worker_lifecycle_management_integration.py",
+        "tests/integration/test_memory_management_integration.py",
+        "tests/integration/test_complete_ui_workflows_comprehensive.py",
     ]
 
     # Filter paths that exist
@@ -89,36 +90,39 @@ def get_pytest_command(args):
 
     # Coverage reporting
     if args.coverage:
-        cmd.extend([
-            '--cov=ui.widgets.fullscreen_sprite_viewer',
-            '--cov=ui.windows.detached_gallery_window',
-            '--cov=ui.workers.batch_thumbnail_worker',
-            '--cov=ui.common.worker_manager',
-            '--cov-report=html:htmlcov/integration',
-            '--cov-report=term-missing',
-        ])
+        cmd.extend(
+            [
+                "--cov=ui.widgets.fullscreen_sprite_viewer",
+                "--cov=ui.windows.detached_gallery_window",
+                "--cov=ui.workers.batch_thumbnail_worker",
+                "--cov=ui.common.worker_manager",
+                "--cov-report=html:htmlcov/integration",
+                "--cov-report=term-missing",
+            ]
+        )
 
     # Parallel execution
     if args.parallel:
         # Use pytest-xdist for parallel execution
-        cmd.extend(['-n', 'auto'])
+        cmd.extend(["-n", "auto"])
 
     # Output options
     if args.verbose:
-        cmd.extend(['-v', '-s'])
+        cmd.extend(["-v", "-s"])
     else:
-        cmd.append('-v')
+        cmd.append("-v")
 
     # Timeout for hanging tests
-    cmd.extend(['--timeout=300'])  # 5 minute timeout per test
+    cmd.extend(["--timeout=300"])  # 5 minute timeout per test
 
     # Show local variables on failures
-    cmd.append('--tb=short')
+    cmd.append("--tb=short")
 
     # Disable warnings for cleaner output
-    cmd.append('--disable-warnings')
+    cmd.append("--disable-warnings")
 
     return cmd
+
 
 def show_available_markers():
     """Show available test markers."""
@@ -146,23 +150,24 @@ def show_available_markers():
     print("  python3 run_comprehensive_integration_tests.py --headless --memory")
     print("  python3 run_comprehensive_integration_tests.py --coverage --verbose")
 
+
 def check_dependencies():
     """Check that required dependencies are installed."""
     required_packages = [
-        'pytest',
-        'pytest-qt',
-        'pytest-cov',
-        'pytest-xdist',
-        'pytest-timeout',
-        'PySide6',
-        'Pillow',
+        "pytest",
+        "pytest-qt",
+        "pytest-cov",
+        "pytest-xdist",
+        "pytest-timeout",
+        "PySide6",
+        "Pillow",
     ]
 
     missing_packages = []
 
     for package in required_packages:
         try:
-            __import__(package.replace('-', '_').lower())
+            __import__(package.replace("-", "_").lower())
         except ImportError:
             missing_packages.append(package)
 
@@ -177,6 +182,7 @@ def check_dependencies():
     print("✓ All required packages are installed")
     return True
 
+
 def dry_run_info(cmd):
     """Show what would be executed in dry run mode."""
     print("\nDry run - would execute:")
@@ -184,7 +190,7 @@ def dry_run_info(cmd):
     print(" ".join(cmd))
 
     print("\nTest files that would be included:")
-    test_files = [arg for arg in cmd if arg.endswith('.py')]
+    test_files = [arg for arg in cmd if arg.endswith(".py")]
     for test_file in test_files:
         if Path(test_file).exists():
             print(f"  ✓ {test_file}")
@@ -192,6 +198,7 @@ def dry_run_info(cmd):
             print(f"  ❌ {test_file} (not found)")
 
     print(f"\nTotal test files: {len([f for f in test_files if Path(f).exists()])}")
+
 
 def main():
     """Main entry point."""
@@ -206,27 +213,18 @@ Examples:
   %(prog)s --coverage --verbose    # With coverage and verbose output
   %(prog)s --parallel --gui        # Parallel GUI tests
   %(prog)s --dry-run --memory      # Show what memory tests would run
-        """
+        """,
     )
 
-    parser.add_argument('--gui', action='store_true',
-                       help='Run GUI tests (requires display)')
-    parser.add_argument('--headless', action='store_true',
-                       help='Run headless tests only')
-    parser.add_argument('--performance', action='store_true',
-                       help='Include performance tests')
-    parser.add_argument('--memory', action='store_true',
-                       help='Include memory leak tests')
-    parser.add_argument('--coverage', action='store_true',
-                       help='Run with coverage reporting')
-    parser.add_argument('--parallel', action='store_true',
-                       help='Run tests in parallel')
-    parser.add_argument('--verbose', action='store_true',
-                       help='Verbose output')
-    parser.add_argument('--markers', action='store_true',
-                       help='Show available test markers')
-    parser.add_argument('--dry-run', action='store_true',
-                       help='Show which tests would run without executing')
+    parser.add_argument("--gui", action="store_true", help="Run GUI tests (requires display)")
+    parser.add_argument("--headless", action="store_true", help="Run headless tests only")
+    parser.add_argument("--performance", action="store_true", help="Include performance tests")
+    parser.add_argument("--memory", action="store_true", help="Include memory leak tests")
+    parser.add_argument("--coverage", action="store_true", help="Run with coverage reporting")
+    parser.add_argument("--parallel", action="store_true", help="Run tests in parallel")
+    parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--markers", action="store_true", help="Show available test markers")
+    parser.add_argument("--dry-run", action="store_true", help="Show which tests would run without executing")
 
     args = parser.parse_args()
 
@@ -275,5 +273,6 @@ Examples:
         print(f"\n❌ Error running tests: {e}")
         return 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())

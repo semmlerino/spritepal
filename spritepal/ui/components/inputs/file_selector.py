@@ -4,6 +4,7 @@ File selector component with browse functionality
 Provides a standardized file selection widget with path input and browse button,
 exactly replicating the file selection patterns from InjectionDialog.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -47,8 +48,8 @@ class FileSelector(QWidget):
     """
 
     # Signals
-    file_selected = Signal(str)     # Emits selected file path
-    path_changed = Signal(str)      # Emits when path text changes
+    file_selected = Signal(str)  # Emits selected file path
+    path_changed = Signal(str)  # Emits when path text changes
 
     def __init__(
         self,
@@ -120,7 +121,7 @@ class FileSelector(QWidget):
                 self._file_filter,
                 current_path,
                 self._settings_key,
-                self._settings_namespace or "file_selector"
+                self._settings_namespace or "file_selector",
             )
         elif self._mode == "save":
             filename = FileDialogHelper.browse_save_file(
@@ -129,7 +130,7 @@ class FileSelector(QWidget):
                 self._file_filter,
                 current_path,
                 self._settings_key,
-                self._settings_namespace or "file_selector"
+                self._settings_namespace or "file_selector",
             )
 
         if filename:

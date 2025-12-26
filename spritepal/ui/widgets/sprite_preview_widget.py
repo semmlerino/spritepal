@@ -2,6 +2,7 @@
 Sprite preview widget for SpritePal
 Shows visual preview of sprites with optional palette support
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, override
@@ -44,6 +45,7 @@ from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class SpritePreviewWidget(QWidget):
     """Widget for displaying sprite previews with palette selection"""
@@ -93,7 +95,8 @@ class SpritePreviewWidget(QWidget):
             self.preview_label.setMinimumSize(100, 100)  # UX-validated minimum
             self.preview_label.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)  # Use all available space
             self.preview_label.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding  # Use ALL available space
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Expanding,  # Use ALL available space
             )
             self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -124,7 +127,7 @@ class SpritePreviewWidget(QWidget):
         self.controls_group = CollapsibleGroupBox(
             title="Controls",
             collapsed=True,  # Default to collapsed for maximum preview space
-            parent=self
+            parent=self,
         )
 
         # Palette selector in horizontal layout for space efficiency
@@ -227,9 +230,7 @@ class SpritePreviewWidget(QWidget):
 
             # Update info
             if self.info_label:
-                self.info_label.setText(
-                f"Size: {img.size[0]}x{img.size[1]} | Mode: {img.mode}"
-            )
+                self.info_label.setText(f"Size: {img.size[0]}x{img.size[1]} | Mode: {img.mode}")
 
         except (OSError, PermissionError) as e:
             logger.exception("File I/O error loading sprite preview")
@@ -244,11 +245,11 @@ class SpritePreviewWidget(QWidget):
             if self.info_label:
                 self.info_label.setText(f"Error loading sprite: {e}")
 
-    def _load_grayscale_sprite(
-        self, img: Image.Image, sprite_name: str | None = None
-    ) -> None:
+    def _load_grayscale_sprite(self, img: Image.Image, sprite_name: str | None = None) -> None:
         """Load grayscale sprite and apply palettes"""
-        logger.debug(f"[DEBUG_SPRITE] _load_grayscale_sprite called: size={img.size}, mode={img.mode}, name={sprite_name}")
+        logger.debug(
+            f"[DEBUG_SPRITE] _load_grayscale_sprite called: size={img.size}, mode={img.mode}, name={sprite_name}"
+        )
 
         # NOTE: Thread safety is handled by Qt signals with QueuedConnection
         # This method should only be called from main thread via signals
@@ -316,7 +317,9 @@ class SpritePreviewWidget(QWidget):
         # Get byte data and verify
         img_bytes = img_rgba.tobytes()
         logger.debug(f"[DEBUG_SPRITE] Image byte data: {len(img_bytes)} bytes")
-        logger.debug(f"[DEBUG_SPRITE] First 100 bytes (hex): {img_bytes[:100].hex() if len(img_bytes) > 0 else 'EMPTY'}")
+        logger.debug(
+            f"[DEBUG_SPRITE] First 100 bytes (hex): {img_bytes[:100].hex() if len(img_bytes) > 0 else 'EMPTY'}"
+        )
 
         qimg = QImage(
             img_bytes,
@@ -355,11 +358,15 @@ class SpritePreviewWidget(QWidget):
 
         thread_id = threading.get_ident()
         logger.debug(f"[DEBUG_SPRITE] _update_preview_with_palette START - Thread {thread_id}")
-        logger.debug(f"[DEBUG_SPRITE] palette_idx={self.current_palette_index}, has_palettes={bool(self.palettes)}, num_palettes={len(self.palettes)}")
+        logger.debug(
+            f"[DEBUG_SPRITE] palette_idx={self.current_palette_index}, has_palettes={bool(self.palettes)}, num_palettes={len(self.palettes)}"
+        )
 
         # CRITICAL: Prevent concurrent pixmap updates which can crash Qt
         if self._update_in_progress:
-            logger.warning(f"[DEBUG_SPRITE] Update already in progress - skipping to prevent crash (Thread {thread_id})")
+            logger.warning(
+                f"[DEBUG_SPRITE] Update already in progress - skipping to prevent crash (Thread {thread_id})"
+            )
             return
 
         self._update_in_progress = True
@@ -386,11 +393,12 @@ class SpritePreviewWidget(QWidget):
                 logger.debug("[DEBUG_SPRITE] Showing grayscale with scaling")
                 # Scale 4-bit values (0-15) to 8-bit (0-255)
                 import numpy as np
+
                 img_array = np.array(grayscale_img)
                 # Detect if values are in 4-bit range and scale them
                 if img_array.max() <= 15:
                     img_array = img_array * 17  # Scale 0-15 to 0-255
-                    grayscale_img = Image.fromarray(img_array.astype(np.uint8), mode='L')
+                    grayscale_img = Image.fromarray(img_array.astype(np.uint8), mode="L")
                 img_rgba = grayscale_img.convert("RGBA")
             else:
                 # Apply palette
@@ -424,7 +432,9 @@ class SpritePreviewWidget(QWidget):
             # Get byte data and verify
             img_bytes = img_rgba.tobytes()
             logger.debug(f"[DEBUG_SPRITE] Image byte data: {len(img_bytes)} bytes")
-            logger.debug(f"[DEBUG_SPRITE] First 100 bytes (hex): {img_bytes[:100].hex() if len(img_bytes) > 0 else 'EMPTY'}")
+            logger.debug(
+                f"[DEBUG_SPRITE] First 100 bytes (hex): {img_bytes[:100].hex() if len(img_bytes) > 0 else 'EMPTY'}"
+            )
 
             qimg = QImage(
                 img_bytes,
@@ -443,8 +453,12 @@ class SpritePreviewWidget(QWidget):
             scaled = self._scale_pixmap_efficiently(pixmap)
             logger.debug(f"[DEBUG_SPRITE] Scaled pixmap: {scaled.width()}x{scaled.height()}, null={scaled.isNull()}")
 
-            logger.info(f"[DEBUG_SPRITE] Setting pixmap on preview_label: original={pixmap.width()}x{pixmap.height()}, scaled={scaled.width()}x{scaled.height()}")
-            logger.info(f"[DEBUG_SPRITE] Widget visibility state: widget={self.isVisible()}, label={self.preview_label.isVisible() if self.preview_label else 'N/A'}")
+            logger.info(
+                f"[DEBUG_SPRITE] Setting pixmap on preview_label: original={pixmap.width()}x{pixmap.height()}, scaled={scaled.width()}x{scaled.height()}"
+            )
+            logger.info(
+                f"[DEBUG_SPRITE] Widget visibility state: widget={self.isVisible()}, label={self.preview_label.isVisible() if self.preview_label else 'N/A'}"
+            )
 
             # Check label state before setting pixmap
             logger.debug("[DEBUG_SPRITE] preview_label state BEFORE setPixmap:")
@@ -467,8 +481,12 @@ class SpritePreviewWidget(QWidget):
             actual_pixmap = self.preview_label.pixmap() if self.preview_label else None
             if actual_pixmap is None:
                 logger.error("[DEBUG_SPRITE] CRITICAL: Pixmap was NOT set on preview_label!")
-                logger.error(f"[DEBUG_SPRITE] Label text after failed setPixmap: '{self.preview_label.text() if self.preview_label else 'N/A'}'")
-                logger.error(f"[DEBUG_SPRITE] Label stylesheet: {self.preview_label.styleSheet()[:200] if self.preview_label and self.preview_label.styleSheet() else '[DEBUG_SPRITE] No stylesheet'}...")
+                logger.error(
+                    f"[DEBUG_SPRITE] Label text after failed setPixmap: '{self.preview_label.text() if self.preview_label else 'N/A'}'"
+                )
+                logger.error(
+                    f"[DEBUG_SPRITE] Label stylesheet: {self.preview_label.styleSheet()[:200] if self.preview_label and self.preview_label.styleSheet() else '[DEBUG_SPRITE] No stylesheet'}..."
+                )
                 # Try to understand why
                 logger.error(f"[DEBUG_SPRITE] QApplication instance: {QApplication.instance()}")
                 logger.error(f"[DEBUG_SPRITE] Current thread: {QThread.currentThread()}")
@@ -476,7 +494,9 @@ class SpritePreviewWidget(QWidget):
                 logger.error(f"[DEBUG_SPRITE] Main thread: {app.thread() if app else 'NO APP'}")
             else:
                 logger.info(f"[DEBUG_SPRITE] Pixmap successfully set: {actual_pixmap.width()}x{actual_pixmap.height()}")
-                logger.info(f"[DEBUG_SPRITE] Label size after setting pixmap: {self.preview_label.size() if self.preview_label else 'N/A'}")
+                logger.info(
+                    f"[DEBUG_SPRITE] Label size after setting pixmap: {self.preview_label.size() if self.preview_label else 'N/A'}"
+                )
                 logger.debug("[DEBUG_SPRITE] Actual pixmap properties:")
                 logger.debug(f"  - size: {actual_pixmap.size()}")
                 logger.debug(f"  - depth: {actual_pixmap.depth()}")
@@ -493,7 +513,9 @@ class SpritePreviewWidget(QWidget):
             # Final check
             final_pixmap = self.preview_label.pixmap() if self.preview_label else None
             if final_pixmap and not final_pixmap.isNull():
-                logger.info(f"[DEBUG_SPRITE] SUCCESS: Final pixmap is displayed: {final_pixmap.width()}x{final_pixmap.height()}")
+                logger.info(
+                    f"[DEBUG_SPRITE] SUCCESS: Final pixmap is displayed: {final_pixmap.width()}x{final_pixmap.height()}"
+                )
             else:
                 logger.error("[DEBUG_SPRITE] FAILURE: No pixmap displayed after all attempts")
                 self.diagnose_display_issue()
@@ -530,7 +552,9 @@ class SpritePreviewWidget(QWidget):
         # so it's guaranteed to run on the main thread. No additional thread
         # safety checks needed here.
 
-        logger.debug(f"[SPRITE_DISPLAY] load_sprite_from_4bpp called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}")
+        logger.debug(
+            f"[SPRITE_DISPLAY] load_sprite_from_4bpp called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}"
+        )
         try:
             # Validate tile data with detailed logging
             if not tile_data:
@@ -568,7 +592,9 @@ class SpritePreviewWidget(QWidget):
                         logger.debug("[SPRITE_DISPLAY] Loaded Kirby Pink palette (was index 8)")
                     else:
                         # Fallback to all palettes - filter out None entries
-                        filtered_palette_list: list[list[tuple[int, int, int]]] = [p for p in palette_list if p is not None]
+                        filtered_palette_list: list[list[tuple[int, int, int]]] = [
+                            p for p in palette_list if p is not None
+                        ]
                         self.palettes = filtered_palette_list if filtered_palette_list else []
                         logger.debug(f"[SPRITE_DISPLAY] Loaded {len(self.palettes)} default palettes")
                         # Ensure palette index is valid
@@ -578,20 +604,21 @@ class SpritePreviewWidget(QWidget):
             bytes_per_tile = 32
             extra_bytes = len(tile_data) % bytes_per_tile
             if extra_bytes > bytes_per_tile // 2:  # More than half a tile of extra data
-                logger.warning(f"[SPRITE_DISPLAY] Possible corrupted data: {extra_bytes} extra bytes (>{bytes_per_tile//2})")
+                logger.warning(
+                    f"[SPRITE_DISPLAY] Possible corrupted data: {extra_bytes} extra bytes (>{bytes_per_tile // 2})"
+                )
                 # Don't clear() - try to display what we can to prevent flashing
                 if self.essential_info_label:
                     self.essential_info_label.setText("Warning: Partial data")
                 if self.info_label:
-                    self.info_label.setText(
-                    "Unable to display sprite - data appears corrupted"
-                )
+                    self.info_label.setText("Unable to display sprite - data appears corrupted")
                 return
 
             # Try to get ROM extractor - handle case where it's not available
             extractor: ROMExtractor | None
             try:
                 from core.app_context import get_app_context
+
                 extraction_manager = get_app_context().core_operations_manager
                 extractor = extraction_manager.get_rom_extractor()
                 logger.debug(f"[SPRITE_DISPLAY] Got extractor: {bool(extractor)}")
@@ -604,7 +631,9 @@ class SpritePreviewWidget(QWidget):
             logger.debug(f"[SPRITE_DISPLAY] Created PIL image: {width}x{height}")
 
             # Log first 200 bytes of tile data for debugging
-            logger.debug(f"[DEBUG_SPRITE] First 200 bytes of tile_data (hex): {tile_data[:200].hex() if len(tile_data) >= 200 else tile_data.hex()}")
+            logger.debug(
+                f"[DEBUG_SPRITE] First 200 bytes of tile_data (hex): {tile_data[:200].hex() if len(tile_data) >= 200 else tile_data.hex()}"
+            )
 
             # Process tiles (simplified - assumes data is already in correct format)
             tiles_per_row = width // 8
@@ -625,7 +654,7 @@ class SpritePreviewWidget(QWidget):
             non_zero_pixels = 0
 
             # Choose decoding method based on extractor availability
-            if extractor is not None and hasattr(extractor, '_get_4bpp_pixel'):
+            if extractor is not None and hasattr(extractor, "_get_4bpp_pixel"):
                 logger.debug("[SPRITE_DISPLAY] Using ROM extractor for 4bpp decoding")
                 decode_method = "rom_extractor"
             else:
@@ -658,8 +687,10 @@ class SpritePreviewWidget(QWidget):
                         if tile_x + x < width and tile_y + y < height:
                             img.putpixel((tile_x + x, tile_y + y), gray_value)
 
-            percent = (non_zero_pixels/pixel_count)*100 if pixel_count > 0 else 0
-            logger.debug(f"[DEBUG_SPRITE] Pixel analysis: {non_zero_pixels}/{pixel_count} non-zero pixels ({percent:.1f}%)")
+            percent = (non_zero_pixels / pixel_count) * 100 if pixel_count > 0 else 0
+            logger.debug(
+                f"[DEBUG_SPRITE] Pixel analysis: {non_zero_pixels}/{pixel_count} non-zero pixels ({percent:.1f}%)"
+            )
 
             # Sample unique pixel values to verify sprite data (debug only)
             if pixel_count > 0 and img:
@@ -720,12 +751,16 @@ class SpritePreviewWidget(QWidget):
 
         # Only clear if there's actually content to clear
         # This prevents unnecessary flashing during rapid updates
-        preview_pixmap = self.preview_label.pixmap() if self.preview_label is not None and is_valid_qt(self.preview_label) else None
+        preview_pixmap = (
+            self.preview_label.pixmap() if self.preview_label is not None and is_valid_qt(self.preview_label) else None
+        )
         if self.sprite_pixmap is not None or preview_pixmap is not None:
             if self.preview_label is not None and is_valid_qt(self.preview_label):
                 self.preview_label.clear()
             if self.preview_label is not None and is_valid_qt(self.preview_label):
-                self.preview_label.setText("No preview available\n\nLoad a ROM and select an offset\nto view sprite data")
+                self.preview_label.setText(
+                    "No preview available\n\nLoad a ROM and select an offset\nto view sprite data"
+                )
             # Reset to minimum size for visibility when empty
             if self.preview_label is not None and is_valid_qt(self.preview_label):
                 self.preview_label.setMinimumSize(100, 100)  # Space-efficient minimum
@@ -751,6 +786,7 @@ class SpritePreviewWidget(QWidget):
         if self.preview_label:
             try:
                 from shiboken6 import isValid
+
                 if not isValid(self.preview_label):
                     return
             except Exception:
@@ -945,30 +981,23 @@ class SpritePreviewWidget(QWidget):
     def _find_similar_sprites(self) -> None:
         """Handle similarity search request."""
         if self.sprite_pixmap is None or self.sprite_pixmap.isNull():
-            QMessageBox.information(
-                self,
-                "No Sprite",
-                "Please load a sprite first before searching for similar ones."
-            )
+            QMessageBox.information(self, "No Sprite", "Please load a sprite first before searching for similar ones.")
             return
 
         try:
             # Convert QPixmap to PIL Image for similarity search
             image = self._qpixmap_to_pil_image(self.sprite_pixmap)
             if image is None:
-                QMessageBox.warning(
-                    self,
-                    "Conversion Error",
-                    "Could not convert sprite image for similarity search."
-                )
+                QMessageBox.warning(self, "Conversion Error", "Could not convert sprite image for similarity search.")
                 return
 
             # Show progress dialog for indexing
             progress_dialog = QProgressDialog(
                 "Indexing sprites for similarity search...",
                 "Cancel",
-                0, 0,  # Indeterminate progress
-                self
+                0,
+                0,  # Indeterminate progress
+                self,
             )
             progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
             progress_dialog.setMinimumDuration(500)  # Show after 500ms
@@ -979,11 +1008,7 @@ class SpritePreviewWidget(QWidget):
 
         except Exception as e:
             logger.exception("Error starting similarity search")
-            QMessageBox.critical(
-                self,
-                "Search Error",
-                f"Failed to start similarity search: {e!s}"
-            )
+            QMessageBox.critical(self, "Search Error", f"Failed to start similarity search: {e!s}")
 
     def _qpixmap_to_pil_image(self, pixmap: QPixmap) -> Image.Image | None:
         """Convert QPixmap to PIL Image."""
@@ -1016,13 +1041,12 @@ class SpritePreviewWidget(QWidget):
         try:
             # Get extraction manager for ROM access
             from core.app_context import get_app_context
+
             extraction_manager = get_app_context().core_operations_manager
             if not extraction_manager:
                 progress_dialog.close()
                 QMessageBox.warning(
-                    self,
-                    "No ROM Data",
-                    "ROM extraction manager not available. Please load a ROM first."
+                    self, "No ROM Data", "ROM extraction manager not available. Please load a ROM first."
                 )
                 return
 
@@ -1031,11 +1055,7 @@ class SpritePreviewWidget(QWidget):
                 self.similarity_engine = VisualSimilarityEngine()
 
             # Index current sprite
-            self.similarity_engine.index_sprite(
-                self.current_offset,
-                target_image,
-                {"source": "preview_widget"}
-            )
+            self.similarity_engine.index_sprite(self.current_offset, target_image, {"source": "preview_widget"})
 
             # TODO: Index other sprites from ROM
             # This would require accessing sprite data from the ROM
@@ -1044,11 +1064,7 @@ class SpritePreviewWidget(QWidget):
             progress_dialog.close()
 
             # Perform similarity search
-            matches = self.similarity_engine.find_similar(
-                target_image,
-                max_results=10,
-                similarity_threshold=0.7
-            )
+            matches = self.similarity_engine.find_similar(target_image, max_results=10, similarity_threshold=0.7)
 
             # Show results
             self._show_similarity_results(matches)
@@ -1056,11 +1072,7 @@ class SpritePreviewWidget(QWidget):
         except Exception as e:
             progress_dialog.close()
             logger.exception("Error during similarity search")
-            QMessageBox.critical(
-                self,
-                "Search Error",
-                f"Similarity search failed: {e!s}"
-            )
+            QMessageBox.critical(self, "Search Error", f"Similarity search failed: {e!s}")
 
     def _show_similarity_results(self, matches: list[SimilarityMatch]) -> None:
         """Show similarity search results."""
@@ -1072,7 +1084,7 @@ class SpritePreviewWidget(QWidget):
                 "No similar sprites found.\n\n"
                 "Note: Similarity search requires indexing sprites from the ROM, "
                 "which is not fully implemented yet. Currently only the current "
-                "sprite is indexed for demonstration purposes."
+                "sprite is indexed for demonstration purposes.",
             )
             return
 
@@ -1098,8 +1110,8 @@ class SpritePreviewWidget(QWidget):
         """Force complete widget update using Qt-specific methods."""
         if self.preview_label is not None:
             # Progressive Qt update strategy for guaranteed visibility
-            self.preview_label.update()           # Schedule paint event
-            self.preview_label.repaint()          # Force immediate repaint
+            self.preview_label.update()  # Schedule paint event
+            self.preview_label.repaint()  # Force immediate repaint
             # Note: repaint() already forces synchronous paint; processEvents() removed
             # to prevent reentrancy bugs
 
@@ -1108,7 +1120,7 @@ class SpritePreviewWidget(QWidget):
         logger.debug(f"[SPRITE_DISPLAY] Showing no data pattern for {width}x{height}")
 
         # Create a checkerboard pattern to clearly indicate "no data"
-        img = Image.new('L', (width, height), 0)
+        img = Image.new("L", (width, height), 0)
 
         # Draw checkerboard pattern
         square_size = 8
@@ -1217,7 +1229,9 @@ class SpritePreviewWidget(QWidget):
                     sample_pixels.append(pixel_value)
 
             unique_values = set(sample_pixels)
-            logger.debug(f"[SPRITE_DISPLAY] Image sample: {len(unique_values)} unique pixel values: {sorted(unique_values)[:10]}")
+            logger.debug(
+                f"[SPRITE_DISPLAY] Image sample: {len(unique_values)} unique pixel values: {sorted(unique_values)[:10]}"
+            )
 
             # Use original method for core functionality
             self._load_grayscale_sprite(img, sprite_name)
@@ -1288,16 +1302,20 @@ class SpritePreviewWidget(QWidget):
         Args:
             pixmap: The pixmap being displayed.
         """
-        logger.debug(f"[DEBUG_SPRITE] Pixmap: {pixmap.width()}x{pixmap.height()}, visible={self.preview_label.isVisible() if self.preview_label else False}")
+        logger.debug(
+            f"[DEBUG_SPRITE] Pixmap: {pixmap.width()}x{pixmap.height()}, visible={self.preview_label.isVisible() if self.preview_label else False}"
+        )
 
         # Thread context
         app = QApplication.instance()
         if app and self.preview_label is not None:
-            logger.debug(f"[DEBUG_SPRITE] Threads: app={app.thread()}, current={QThread.currentThread()}, label={self.preview_label.thread()}")
+            logger.debug(
+                f"[DEBUG_SPRITE] Threads: app={app.thread()}, current={QThread.currentThread()}, label={self.preview_label.thread()}"
+            )
 
         # Widget hierarchy visibility
         parent = self.parent()
-        parent_visible = parent.isVisible() if isinstance(parent, QWidget) else 'N/A'
+        parent_visible = parent.isVisible() if isinstance(parent, QWidget) else "N/A"
         logger.debug(f"[DEBUG_SPRITE] Visibility: widget={self.isVisible()}, parent={parent_visible}")
 
         # Parent chain (brief)
@@ -1307,7 +1325,7 @@ class SpritePreviewWidget(QWidget):
             while chain_parent and len(chain_info) < 5:
                 if isinstance(chain_parent, QWidget):
                     chain_info.append(f"{chain_parent.__class__.__name__}(vis={chain_parent.isVisible()})")
-                chain_parent = chain_parent.parent() if hasattr(chain_parent, 'parent') else None
+                chain_parent = chain_parent.parent() if hasattr(chain_parent, "parent") else None
             if chain_info:
                 logger.debug(f"[DEBUG_SPRITE] Parent chain: {' -> '.join(chain_info)}")
 
@@ -1328,7 +1346,11 @@ class SpritePreviewWidget(QWidget):
             report.append(f"  - maximumSize: {self.preview_label.maximumSize()}")
             report.append(f"  - sizePolicy: {self.preview_label.sizePolicy()}")
             report.append(f"  - text: '{self.preview_label.text()}'")
-            report.append(f"  - stylesheet: '{self.preview_label.styleSheet()[:100]}...'" if self.preview_label.styleSheet() else "  - stylesheet: None")
+            report.append(
+                f"  - stylesheet: '{self.preview_label.styleSheet()[:100]}...'"
+                if self.preview_label.styleSheet()
+                else "  - stylesheet: None"
+            )
 
             pixmap = self.preview_label.pixmap()
             # QLabel.pixmap() always returns a QPixmap, check if it's null
@@ -1358,7 +1380,7 @@ class SpritePreviewWidget(QWidget):
             report.append(f"  {'  ' * level}Parent {level}: {parent.__class__.__name__}")
             if isinstance(parent, QWidget):
                 report.append(f"  {'  ' * level}  - visible: {parent.isVisible()}")
-            parent = parent.parent() if hasattr(parent, 'parent') else None
+            parent = parent.parent() if hasattr(parent, "parent") else None
             level += 1
 
         # Check Qt application

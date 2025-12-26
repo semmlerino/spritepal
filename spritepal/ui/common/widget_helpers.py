@@ -42,9 +42,7 @@ def create_styled_label(
         title_font.setBold(True)
         title_font.setPointSize(11)
         label.setFont(title_font)
-        label.setStyleSheet(
-            f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;"
-        )
+        label.setStyleSheet(f"color: {COLORS['highlight']}; padding: 2px 4px; border-radius: 3px;")
     else:  # "section"
         label.setStyleSheet(get_section_label_style())
 

@@ -1,4 +1,5 @@
 """Unit tests for extraction readiness service."""
+
 from __future__ import annotations
 
 import pytest
@@ -167,28 +168,34 @@ class TestCheckGenericReadiness:
 
     def test_all_met_is_ready(self) -> None:
         """Should be ready when all requirements are met."""
-        result = check_generic_readiness({
-            "req1": (True, "Requirement 1 not met"),
-            "req2": (True, "Requirement 2 not met"),
-        })
+        result = check_generic_readiness(
+            {
+                "req1": (True, "Requirement 1 not met"),
+                "req2": (True, "Requirement 2 not met"),
+            }
+        )
         assert result.ready is True
 
     def test_some_not_met_is_not_ready(self) -> None:
         """Should not be ready when some requirements are not met."""
-        result = check_generic_readiness({
-            "req1": (True, "Requirement 1 not met"),
-            "req2": (False, "Requirement 2 not met"),
-        })
+        result = check_generic_readiness(
+            {
+                "req1": (True, "Requirement 1 not met"),
+                "req2": (False, "Requirement 2 not met"),
+            }
+        )
         assert result.ready is False
         assert "Requirement 2 not met" in result.reasons
 
     def test_reports_all_unmet_requirements(self) -> None:
         """Should report all unmet requirements."""
-        result = check_generic_readiness({
-            "req1": (False, "Missing 1"),
-            "req2": (False, "Missing 2"),
-            "req3": (True, "Not missing"),
-        })
+        result = check_generic_readiness(
+            {
+                "req1": (False, "Missing 1"),
+                "req2": (False, "Missing 2"),
+                "req3": (True, "Not missing"),
+            }
+        )
         assert result.ready is False
         assert len(result.reasons) == 2
         assert "Missing 1" in result.reasons

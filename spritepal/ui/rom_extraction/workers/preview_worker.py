@@ -19,6 +19,7 @@ from utils.rom_utils import detect_smc_offset
 
 logger = get_logger(__name__)
 
+
 class SpritePreviewWorker(BaseWorker):
     """Worker thread for loading sprite previews"""
 
@@ -29,7 +30,15 @@ class SpritePreviewWorker(BaseWorker):
     preview_error = Signal(str)
     """Emitted on preview error. Args: error_message."""
 
-    def __init__(self, rom_path: str, offset: int, sprite_name: str, extractor: ROMExtractor, sprite_config: Any = None, parent: QObject | None = None):  # pyright: ignore[reportExplicitAny] - Optional sprite config
+    def __init__(
+        self,
+        rom_path: str,
+        offset: int,
+        sprite_name: str,
+        extractor: ROMExtractor,
+        sprite_config: Any = None,
+        parent: QObject | None = None,
+    ):  # pyright: ignore[reportExplicitAny] - Optional sprite config
         super().__init__(parent)
         self.rom_path = rom_path
         self.offset = offset
@@ -42,7 +51,9 @@ class SpritePreviewWorker(BaseWorker):
     def run(self):
         """Load sprite preview in background"""
 
-        logger.info(f"[PREVIEW_WORKER] Starting preview for sprite_name='{self.sprite_name}' at offset=0x{self.offset:06X}")
+        logger.info(
+            f"[PREVIEW_WORKER] Starting preview for sprite_name='{self.sprite_name}' at offset=0x{self.offset:06X}"
+        )
         logger.debug(f"[PREVIEW_WORKER] ROM path: {self.rom_path}")
 
         def _validate_rom_path(rom_path: str) -> None:
@@ -70,9 +81,7 @@ class SpritePreviewWorker(BaseWorker):
         def _validate_offset_bounds(offset: int, rom_size: int) -> None:
             """Validate offset is within ROM bounds"""
             if offset >= rom_size:
-                raise ValueError(
-                    f"Offset 0x{offset:X} is beyond ROM size (0x{rom_size:X})"
-                )
+                raise ValueError(f"Offset 0x{offset:X} is beyond ROM size (0x{rom_size:X})")
 
         def _validate_sprite_data(tile_data: bytes, offset: int) -> None:
             """Validate extracted sprite data"""
@@ -97,12 +106,9 @@ class SpritePreviewWorker(BaseWorker):
             """Handle decompression errors with appropriate messages"""
             if "decompression" in str(error).lower():
                 raise ValueError(
-                    f"Failed to decompress sprite at 0x{offset:X}: "
-                    f"Invalid compressed data format"
+                    f"Failed to decompress sprite at 0x{offset:X}: Invalid compressed data format"
                 ) from error
-            raise ValueError(
-                f"Error extracting sprite at 0x{offset:X}: {error}"
-            ) from error
+            raise ValueError(f"Error extracting sprite at 0x{offset:X}: {error}") from error
 
         try:
             # Validate inputs
@@ -162,41 +168,49 @@ class SpritePreviewWorker(BaseWorker):
                 # Try to decompress
                 rom_injector = self.extractor.rom_injector
                 if offset_variants:
-                    compressed_size, tile_data, successful_offset = (
-                        rom_injector.find_compressed_sprite_with_fallback(
-                            rom_data, self.offset, offset_variants, expected_size
-                        )
+                    compressed_size, tile_data, successful_offset = rom_injector.find_compressed_sprite_with_fallback(
+                        rom_data, self.offset, offset_variants, expected_size
                     )
                     if successful_offset != self.offset:
                         logger.info(f"Used alternate offset 0x{successful_offset:X} for {self.sprite_name}")
                 else:
-                    compressed_size, tile_data = (
-                        rom_injector.find_compressed_sprite(
-                            rom_data, self.offset, expected_size
-                        )
+                    compressed_size, tile_data = rom_injector.find_compressed_sprite(
+                        rom_data, self.offset, expected_size
                     )
 
                 decompression_time = (time.time() - decompression_start) * 1000
-                logger.info(f"[PREVIEW_WORKER] Successfully decompressed {len(tile_data)} bytes from offset 0x{self.offset:06X} in {decompression_time:.1f}ms")
-                logger.debug(f"[PREVIEW_WORKER] Compressed size: {compressed_size} bytes, Compression ratio: {len(tile_data)/compressed_size:.2f}x" if compressed_size > 0 else "[PREVIEW_WORKER] No compression size info")
+                logger.info(
+                    f"[PREVIEW_WORKER] Successfully decompressed {len(tile_data)} bytes from offset 0x{self.offset:06X} in {decompression_time:.1f}ms"
+                )
+                logger.debug(
+                    f"[PREVIEW_WORKER] Compressed size: {compressed_size} bytes, Compression ratio: {len(tile_data) / compressed_size:.2f}x"
+                    if compressed_size > 0
+                    else "[PREVIEW_WORKER] No compression size info"
+                )
 
             except Exception as decomp_error:
                 # Decompression failed - fall back to raw tile extraction for manual browsing
                 decompression_time = (time.time() - decompression_start) * 1000
-                logger.warning(f"[PREVIEW_WORKER] HAL decompression failed at 0x{self.offset:06X} after {decompression_time:.1f}ms: {decomp_error.__class__.__name__}: {decomp_error}")
+                logger.warning(
+                    f"[PREVIEW_WORKER] HAL decompression failed at 0x{self.offset:06X} after {decompression_time:.1f}ms: {decomp_error.__class__.__name__}: {decomp_error}"
+                )
 
                 if self.sprite_name.startswith("manual_"):
                     # Manual offset browsing - extract raw 4bpp tile data as fallback
-                    logger.info(f"[PREVIEW_WORKER] Falling back to raw tile extraction for manual offset 0x{self.offset:06X}")
+                    logger.info(
+                        f"[PREVIEW_WORKER] Falling back to raw tile extraction for manual offset 0x{self.offset:06X}"
+                    )
                     expected_size = 4096  # 4KB for fast preview
 
                     if self.offset + expected_size <= len(rom_data):
-                        tile_data = rom_data[self.offset:self.offset + expected_size]
+                        tile_data = rom_data[self.offset : self.offset + expected_size]
                     else:
-                        tile_data = rom_data[self.offset:]
+                        tile_data = rom_data[self.offset :]
 
                     compressed_size = 0
-                    logger.info(f"[PREVIEW_WORKER] Extracted {len(tile_data)} bytes of raw tile data from 0x{self.offset:06X}")
+                    logger.info(
+                        f"[PREVIEW_WORKER] Extracted {len(tile_data)} bytes of raw tile data from 0x{self.offset:06X}"
+                    )
                 else:
                     # For non-manual sprites, decompression failure is an error
                     _handle_decompression_error(decomp_error, self.offset)

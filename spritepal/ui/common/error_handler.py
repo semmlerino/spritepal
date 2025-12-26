@@ -17,6 +17,7 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 class ErrorHandler(QObject):
     """
     Centralized error handler that emits signals for errors instead of showing dialogs directly.
@@ -25,8 +26,8 @@ class ErrorHandler(QObject):
 
     # Signals for different error types
     critical_error = Signal(str, str)  # title, message
-    warning_error = Signal(str, str)   # title, message
-    info_message = Signal(str, str)    # title, message
+    warning_error = Signal(str, str)  # title, message
+    info_message = Signal(str, str)  # title, message
 
     def __init__(self, parent: QWidget | None = None):
         """Initialize the error handler"""

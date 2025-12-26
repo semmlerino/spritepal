@@ -2,6 +2,7 @@
 Dialog for resuming interrupted sprite scans
 Provides options to resume from cached progress or start fresh
 """
+
 from __future__ import annotations
 
 from typing import Any, cast
@@ -64,13 +65,9 @@ class ResumeScanDialog(DialogBase):
         icon_label = QLabel()
         style = self.style()
         if style:
-            pixmap = style.standardPixmap(
-                style.StandardPixmap.SP_MessageBoxInformation
-            )
+            pixmap = style.standardPixmap(style.StandardPixmap.SP_MessageBoxInformation)
             if pixmap:
-                icon_label.setPixmap(
-                    pixmap.scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio)
-                )
+                icon_label.setPixmap(pixmap.scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignTop)
         header_layout.addWidget(icon_label)
 
@@ -91,9 +88,7 @@ class ResumeScanDialog(DialogBase):
         message_layout.addWidget(progress_label)
 
         # Options
-        options_label = QLabel(
-            "Would you like to resume from where you left off, or start a fresh scan?"
-        )
+        options_label = QLabel("Would you like to resume from where you left off, or start a fresh scan?")
         options_label.setWordWrap(True)
         message_layout.addWidget(options_label)
 

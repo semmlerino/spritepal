@@ -29,6 +29,7 @@ pytestmark = [
     pytest.mark.headless,
 ]
 
+
 class TestBaseWorker:
     """Test the BaseWorker base class."""
 
@@ -180,6 +181,7 @@ class TestBaseWorker:
         worker.wait_if_paused()  # Should exit immediately
 
         # Test passed if we reach here without hanging
+
 
 class TestManagedWorker:
     """Test the ManagedWorker base class."""
@@ -381,6 +383,7 @@ class TestManagedWorker:
 
         # Verify cleanup was called despite exception
         assert worker.cleanup_called
+
 
 @pytest.fixture
 def qtbot():

@@ -1,4 +1,5 @@
 """Base UI components for SpritePal"""
+
 from __future__ import annotations
 
 from .dialog_base import DialogBase

@@ -3,6 +3,7 @@ Tests for ROM injection settings persistence
 
 This file creates ApplicationStateManager instances directly for testing with isolated sessions.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -31,6 +32,8 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
 ]
+
+
 class TestROMInjectionSettingsPersistence:
     """Test ROM injection settings persistence functionality"""
 
@@ -89,101 +92,62 @@ class TestROMInjectionSettingsPersistence:
         dialog.rom_offset_input = Mock()
 
         # Add the actual method from the class
-        dialog.save_rom_injection_parameters = (
-            InjectionDialog.save_rom_injection_parameters.__get__(dialog)
-        )
-        dialog._set_rom_injection_defaults = (
-            InjectionDialog._set_rom_injection_defaults.__get__(dialog)
-        )
-        dialog._restore_saved_sprite_location = (
-            InjectionDialog._restore_saved_sprite_location.__get__(dialog)
-        )
+        dialog.save_rom_injection_parameters = InjectionDialog.save_rom_injection_parameters.__get__(dialog)
+        dialog._set_rom_injection_defaults = InjectionDialog._set_rom_injection_defaults.__get__(dialog)
+        dialog._restore_saved_sprite_location = InjectionDialog._restore_saved_sprite_location.__get__(dialog)
         dialog._load_rom_info = Mock()
 
         return dialog
 
     @pytest.mark.shared_state_safe
-    def test_save_rom_injection_parameters(
-        self, mock_dialog, settings_manager, session_app_context: AppContext
-    ):
+    def test_save_rom_injection_parameters(self, mock_dialog, settings_manager, session_app_context: AppContext):
         """Test saving ROM injection parameters"""
         # Set up mock values
         mock_dialog.input_rom_selector.get_path.return_value = "/path/to/test.sfc"
-        mock_dialog.sprite_location_combo.currentText.return_value = (
-            "Kirby Sprite (0x123456)"
-        )
+        mock_dialog.sprite_location_combo.currentText.return_value = "Kirby Sprite (0x123456)"
         mock_dialog.rom_offset_input.get_text.return_value = "0x123456"
         mock_dialog.fast_compression_check.isChecked.return_value = True
 
         # Get injection manager from session_app_context
         injection_manager = session_app_context.core_operations_manager
-        with patch.object(
-            injection_manager, "_ensure_session_manager", return_value=settings_manager
-        ):
+        with patch.object(injection_manager, "_ensure_session_manager", return_value=settings_manager):
             mock_dialog.injection_manager = injection_manager
 
             # Save parameters
             mock_dialog.save_rom_injection_parameters()
 
         # Verify saved values in the actual settings manager
+        assert settings_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM) == "/path/to/test.sfc"
         assert (
-            settings_manager.get(
-                SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM
-            )
-            == "/path/to/test.sfc"
-        )
-        assert (
-            settings_manager.get(
-                SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_SPRITE_LOCATION
-            )
+            settings_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_SPRITE_LOCATION)
             == "Kirby Sprite (0x123456)"
         )
-        assert (
-            settings_manager.get(
-                SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET
-            )
-            == "0x123456"
-        )
-        assert (
-            settings_manager.get(
-                SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION
-            )
-            is True
-        )
+        assert settings_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET) == "0x123456"
+        assert settings_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION) is True
 
     @pytest.mark.shared_state_safe
-    def test_save_empty_rom_injection_parameters(
-        self, mock_dialog, settings_manager, session_app_context: AppContext
-    ):
+    def test_save_empty_rom_injection_parameters(self, mock_dialog, settings_manager, session_app_context: AppContext):
         """Test saving when fields are empty"""
         # Set up empty values
         mock_dialog.input_rom_selector.get_path.return_value = ""
-        mock_dialog.sprite_location_combo.currentText.return_value = (
-            "Select sprite location..."
-        )
+        mock_dialog.sprite_location_combo.currentText.return_value = "Select sprite location..."
         mock_dialog.rom_offset_input.get_text.return_value = ""
         mock_dialog.fast_compression_check.isChecked.return_value = False
 
         # Get injection manager from session_app_context
         injection_manager = session_app_context.core_operations_manager
-        with patch.object(
-            injection_manager, "_ensure_session_manager", return_value=settings_manager
-        ):
+        with patch.object(injection_manager, "_ensure_session_manager", return_value=settings_manager):
             mock_dialog.injection_manager = injection_manager
 
             # Save parameters
             mock_dialog.save_rom_injection_parameters()
 
         # Verify empty custom offset is saved as empty string
-        value = settings_manager.get(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET, None
-        )
+        value = settings_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET, None)
         assert value == ""  # Empty string is saved
 
         # Verify fast compression is saved as False
-        value = settings_manager.get(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION, None
-        )
+        value = settings_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION, None)
         assert value is False
 
     def test_save_vram_injection_paths(self, settings_manager):
@@ -198,41 +162,26 @@ class TestROMInjectionSettingsPersistence:
 
         # Create a new settings manager to verify persistence
         # The settings should persist through the ApplicationStateManager
-        assert (
-            settings_manager.get(
-                SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM
-            )
-            == "/path/to/input.dmp"
-        )
+        assert settings_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM) == "/path/to/input.dmp"
 
     @pytest.mark.shared_state_safe
-    def test_load_rom_injection_defaults(
-        self, mock_dialog, settings_manager, session_app_context: AppContext
-    ):
+    def test_load_rom_injection_defaults(self, mock_dialog, settings_manager, session_app_context: AppContext):
         """Test loading ROM injection defaults"""
         # Pre-populate settings
-        settings_manager.set(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "/test/rom.sfc"
-        )
+        settings_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "/test/rom.sfc")
         settings_manager.set(
             SETTINGS_NS_ROM_INJECTION,
             SETTINGS_KEY_LAST_SPRITE_LOCATION,
             "Kirby Sprite (0x123456)",
         )
-        settings_manager.set(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET, "0x789ABC"
-        )
-        settings_manager.set(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION, True
-        )
+        settings_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_CUSTOM_OFFSET, "0x789ABC")
+        settings_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_FAST_COMPRESSION, True)
 
         # Get injection manager from session_app_context
         injection_manager = session_app_context.core_operations_manager
         with (
             patch("pathlib.Path.exists", return_value=True),  # Path().exists() not os.path.exists
-            patch.object(
-                injection_manager, "_ensure_session_manager", return_value=settings_manager
-            ),
+            patch.object(injection_manager, "_ensure_session_manager", return_value=settings_manager),
         ):
             mock_dialog.injection_manager = injection_manager
             mock_dialog.sprite_path = "/test/sprite.png"
@@ -253,9 +202,7 @@ class TestROMInjectionSettingsPersistence:
         mock_dialog.fast_compression_check.setChecked.assert_called_with(True)
 
     @pytest.mark.shared_state_safe
-    def test_settings_save_error_handling(
-        self, mock_dialog, settings_manager, session_app_context: AppContext, caplog
-    ):
+    def test_settings_save_error_handling(self, mock_dialog, settings_manager, session_app_context: AppContext, caplog):
         """Test error handling when saving settings fails"""
         import logging
 
@@ -263,21 +210,15 @@ class TestROMInjectionSettingsPersistence:
 
         # Set up mock values
         mock_dialog.input_rom_selector.get_path.return_value = "/path/to/test.sfc"
-        mock_dialog.sprite_location_combo.currentText.return_value = (
-            "Select sprite location..."
-        )
+        mock_dialog.sprite_location_combo.currentText.return_value = "Select sprite location..."
         mock_dialog.rom_offset_input.get_text.return_value = ""
         mock_dialog.fast_compression_check.isChecked.return_value = False
 
         # Get injection manager from session_app_context
         injection_manager = session_app_context.core_operations_manager
         with (
-            patch.object(
-                injection_manager, "_ensure_session_manager", return_value=settings_manager
-            ),
-            patch.object(
-                settings_manager, "save_session", side_effect=OSError("Permission denied")
-            ),
+            patch.object(injection_manager, "_ensure_session_manager", return_value=settings_manager),
+            patch.object(settings_manager, "save_session", side_effect=OSError("Permission denied")),
         ):
             mock_dialog.injection_manager = injection_manager
 
@@ -311,17 +252,11 @@ class TestROMInjectionSettingsPersistence:
 
         # Mock settings with saved sprite location
         # Note: The saved value includes the full text with offset, as saved by the dialog
-        settings_manager.set(
-            SETTINGS_NS_ROM_INJECTION,
-            SETTINGS_KEY_LAST_SPRITE_LOCATION,
-            "Helper Sprite (0x234567)"
-        )
+        settings_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_SPRITE_LOCATION, "Helper Sprite (0x234567)")
 
         # Get injection manager from session_app_context
         injection_manager = session_app_context.core_operations_manager
-        with patch.object(
-            injection_manager, "_ensure_session_manager", return_value=settings_manager
-        ):
+        with patch.object(injection_manager, "_ensure_session_manager", return_value=settings_manager):
             mock_dialog.injection_manager = injection_manager
             mock_dialog.extraction_vram_offset = None
 
@@ -333,12 +268,8 @@ class TestROMInjectionSettingsPersistence:
     def test_settings_namespace_consistency(self, settings_manager):
         """Test that all ROM injection settings use consistent namespace"""
         # Save various settings
-        settings_manager.set(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "/test.sfc"
-        )
-        settings_manager.set(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, "/test.dmp"
-        )
+        settings_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "/test.sfc")
+        settings_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, "/test.dmp")
         settings_manager.save_session()
 
         # Verify namespace structure in raw settings
@@ -350,7 +281,4 @@ class TestROMInjectionSettingsPersistence:
         assert SETTINGS_KEY_LAST_INPUT_VRAM in rom_injection_settings
 
         # Verify old namespace is not used
-        assert (
-            "injection" not in raw_settings
-            or SETTINGS_KEY_LAST_INPUT_ROM not in raw_settings.get("injection", {})
-        )
+        assert "injection" not in raw_settings or SETTINGS_KEY_LAST_INPUT_ROM not in raw_settings.get("injection", {})

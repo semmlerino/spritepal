@@ -1,4 +1,5 @@
 """Unit tests for SessionFileController."""
+
 from __future__ import annotations
 
 from pathlib import Path

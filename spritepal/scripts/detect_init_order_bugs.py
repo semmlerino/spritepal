@@ -56,18 +56,19 @@ class InitOrderDetector(ast.NodeVisitor):
         """Visit expression statement."""
         if self.in_init and isinstance(node.value, ast.Call):
             # Check if it's a method call like self._setup_ui()
-            if (isinstance(node.value.func, ast.Attribute) and
-                isinstance(node.value.func.value, ast.Name) and
-                node.value.func.value.id == "self" and
-                node.value.func.attr.startswith("_setup")):
+            if (
+                isinstance(node.value.func, ast.Attribute)
+                and isinstance(node.value.func.value, ast.Name)
+                and node.value.func.value.id == "self"
+                and node.value.func.attr.startswith("_setup")
+            ):
                 self.setup_methods_called.append((node.value.func.attr, node.lineno))
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         """Visit annotated assignment (e.g., self.foo: Type = value)."""
         if self.in_init and isinstance(node.target, ast.Attribute):
-            if (isinstance(node.target.value, ast.Name) and
-                node.target.value.id == "self"):
+            if isinstance(node.target.value, ast.Name) and node.target.value.id == "self":
                 value = None
                 if node.value:
                     if isinstance(node.value, ast.Constant) and node.value.value is None:
@@ -82,8 +83,7 @@ class InitOrderDetector(ast.NodeVisitor):
         if self.in_init:
             for target in node.targets:
                 if isinstance(target, ast.Attribute):
-                    if (isinstance(target.value, ast.Name) and
-                        target.value.id == "self"):
+                    if isinstance(target.value, ast.Name) and target.value.id == "self":
                         value = None
                         if isinstance(node.value, ast.Constant) and node.value.value is None:
                             value = "None"
@@ -103,14 +103,16 @@ class InitOrderDetector(ast.NodeVisitor):
         # Check for None assignments after setup methods
         for attr, line, value in self.attribute_assignments:
             if line > last_setup_line and value == "None":
-                self.issues.append({
-                    "file": self.filename,
-                    "class": self.current_class,
-                    "line": line,
-                    "attribute": attr,
-                    "issue": f"Instance variable 'self.{attr}' assigned None after setup methods called",
-                    "setup_methods": [m for m, _ in self.setup_methods_called]
-                })
+                self.issues.append(
+                    {
+                        "file": self.filename,
+                        "class": self.current_class,
+                        "line": line,
+                        "attribute": attr,
+                        "issue": f"Instance variable 'self.{attr}' assigned None after setup methods called",
+                        "setup_methods": [m for m, _ in self.setup_methods_called],
+                    }
+                )
 
         # Also check for any attribute assignments after setup that might overwrite
         suspicious_attrs = []
@@ -120,14 +122,17 @@ class InitOrderDetector(ast.NodeVisitor):
 
         if suspicious_attrs:
             for attr, line, value in suspicious_attrs:
-                self.issues.append({
-                    "file": self.filename,
-                    "class": self.current_class,
-                    "line": line,
-                    "attribute": attr,
-                    "issue": f"Instance variable 'self.{attr}' assigned after setup methods (value: {value})",
-                    "severity": "warning"
-                })
+                self.issues.append(
+                    {
+                        "file": self.filename,
+                        "class": self.current_class,
+                        "line": line,
+                        "attribute": attr,
+                        "issue": f"Instance variable 'self.{attr}' assigned after setup methods (value: {value})",
+                        "severity": "warning",
+                    }
+                )
+
 
 def analyze_file(filepath: Path) -> list[dict[str, Any]]:
     """Analyze a single Python file for initialization order issues."""
@@ -142,6 +147,7 @@ def analyze_file(filepath: Path) -> list[dict[str, Any]]:
     except Exception as e:
         print(f"Error analyzing {filepath}: {e}")
         return []
+
 
 def main():
     """Main function to scan the project."""
@@ -206,6 +212,7 @@ def main():
         print(f"\nDetailed report saved to: {report_path}")
 
     return len(errors) if all_issues else 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

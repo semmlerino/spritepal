@@ -1,6 +1,7 @@
 """
 Grid-based preview generation for flexible sprite arrangements
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -329,8 +330,7 @@ class GridPreviewGenerator(ArrangementPreviewGenerator):
                 "tile_height": processor.tile_height,
             },
             "arrangement_order": [
-                {"type": arr_type.value, "key": key}
-                for arr_type, key in manager.get_arrangement_order()
+                {"type": arr_type.value, "key": key} for arr_type, key in manager.get_arrangement_order()
             ],
             "groups": [
                 {

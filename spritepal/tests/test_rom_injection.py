@@ -1,6 +1,7 @@
 """
 Tests for ROM injection functionality
 """
+
 from __future__ import annotations
 
 import os
@@ -23,6 +24,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.usefixtures("mock_hal"),
 ]
+
 
 class TestHALCompression(unittest.TestCase):
     """Test HAL compression/decompression"""
@@ -47,6 +49,7 @@ class TestHALCompression(unittest.TestCase):
 
             assert "too large" in str(cm.value)
 
+
 class TestROMInjector(unittest.TestCase):
     """Test ROM injection functionality"""
 
@@ -70,12 +73,8 @@ class TestROMInjector(unittest.TestCase):
         # Checksum and complement (must XOR to 0xFFFF)
         checksum = 0x1234
         complement = checksum ^ 0xFFFF
-        self.test_rom[header_offset + 28 : header_offset + 30] = complement.to_bytes(
-            2, "little"
-        )
-        self.test_rom[header_offset + 30 : header_offset + 32] = checksum.to_bytes(
-            2, "little"
-        )
+        self.test_rom[header_offset + 28 : header_offset + 30] = complement.to_bytes(2, "little")
+        self.test_rom[header_offset + 30 : header_offset + 32] = checksum.to_bytes(2, "little")
 
     def test_read_rom_header(self):
         """Test reading ROM header"""
@@ -192,6 +191,7 @@ class TestROMInjector(unittest.TestCase):
             assert pointer.bank is not None
             assert pointer.address is not None
 
+
 @pytest.mark.gui
 @pytest.mark.usefixtures("isolated_managers")
 @pytest.mark.skip_thread_cleanup(reason="InjectionDialog may spawn background threads")
@@ -226,6 +226,7 @@ class TestROMInjectionDialog(unittest.TestCase):
         assert hasattr(dialog, "output_rom_selector")
         assert hasattr(dialog, "sprite_location_combo")
         assert hasattr(dialog, "fast_compression_check")
+
 
 if __name__ == "__main__":
     unittest.main()

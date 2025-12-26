@@ -4,6 +4,7 @@ Styled group box component with consistent theming
 Provides a standardized group box widget with consistent styling and behavior,
 exactly replicating the group box patterns from existing dialogs.
 """
+
 from __future__ import annotations
 
 from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QLayout, QVBoxLayout, QWidget

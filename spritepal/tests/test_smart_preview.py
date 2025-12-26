@@ -4,6 +4,7 @@ Tests for SmartPreviewCoordinator memory cache functionality.
 Tests that the smart preview coordinator properly stores and retrieves preview data
 using the memory LRU cache.
 """
+
 from __future__ import annotations
 
 import weakref
@@ -16,6 +17,7 @@ pytestmark = pytest.mark.no_manager_setup
 try:
     from PySide6.QtCore import QObject, QTimer, Signal
     from PySide6.QtWidgets import QApplication, QSlider
+
     QT_AVAILABLE = True
 except ImportError:
     QApplication = Mock
@@ -56,9 +58,10 @@ class TestSmartPreviewMemoryCache:
     @pytest.fixture
     def coordinator(self, mock_slider):
         """Create SmartPreviewCoordinator."""
-        with patch('ui.common.smart_preview_coordinator.PreviewWorkerPool') as mock_pool_class, \
-             patch('ui.common.smart_preview_coordinator.PreviewCache') as mock_cache_class:
-
+        with (
+            patch("ui.common.smart_preview_coordinator.PreviewWorkerPool") as mock_pool_class,
+            patch("ui.common.smart_preview_coordinator.PreviewCache") as mock_cache_class,
+        ):
             # Setup mock worker pool
             mock_pool = Mock()
             mock_pool_class.return_value = mock_pool
@@ -75,6 +78,7 @@ class TestSmartPreviewMemoryCache:
             # Set up ROM data provider
             def mock_rom_data_provider():
                 return "/test/rom.sfc", Mock()  # rom_path, extractor
+
             coordinator._rom_data_provider = mock_rom_data_provider
 
             # Attach mocks for easier access in tests
@@ -84,9 +88,10 @@ class TestSmartPreviewMemoryCache:
 
     def test_initialization(self):
         """Test that coordinator is properly initialized."""
-        with patch('ui.common.smart_preview_coordinator.PreviewWorkerPool'), \
-             patch('ui.common.smart_preview_coordinator.PreviewCache'):
-
+        with (
+            patch("ui.common.smart_preview_coordinator.PreviewWorkerPool"),
+            patch("ui.common.smart_preview_coordinator.PreviewCache"),
+        ):
             coordinator = SmartPreviewCoordinator()
 
             assert coordinator._drag_state is not None

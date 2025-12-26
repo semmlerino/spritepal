@@ -29,6 +29,9 @@ import pytest
 from PIL import Image
 
 from core.exceptions import ValidationError
+
+# manager_context migrated from deprecated manager_test_context to app_context_fixtures
+from tests.fixtures.app_context_fixtures import manager_context
 from tests.fixtures.timeouts import LONG, signal_timeout, worker_timeout
 
 # Phase 2 Real Component Testing Infrastructure
@@ -36,14 +39,14 @@ from tests.infrastructure.data_repository import (
     DataRepository,
     get_test_data_repository,
 )
-# manager_context migrated from deprecated manager_test_context to app_context_fixtures
-from tests.fixtures.app_context_fixtures import manager_context
 
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.performance,
     pytest.mark.slow,
 ]
+
+
 class TestManagerIntegrationTDD:
     """TDD tests for cross-manager integration with real components."""
 
@@ -54,11 +57,11 @@ class TestManagerIntegrationTDD:
 
     def test_extraction_to_injection_workflow_tdd(self, test_data_repo, qtbot):
         """TDD: Complete sprite round-trip through extraction and injection managers.
-        
+
         RED: Test full workflow from VRAM extraction to sprite injection
         GREEN: Verify real data flows correctly between managers
         REFACTOR: Optimize workflow coordination and error handling
-        
+
         This test catches integration bugs that isolated manager tests miss:
         - File format compatibility between extraction and injection
         - Resource sharing and temporary file management
@@ -89,16 +92,14 @@ class TestManagerIntegrationTDD:
             # Phase 1: Extract sprite from VRAM (real extraction)
             with qtbot.waitSignal(extraction_mgr.files_created, timeout=worker_timeout(LONG)):
                 extracted_files = extraction_mgr.extract_from_vram(
-                    vram_data["vram_path"],
-                    vram_data["output_base"],
-                    grayscale_mode=True
+                    vram_data["vram_path"], vram_data["output_base"], grayscale_mode=True
                 )
 
             # Verify extraction produced real files
             assert len(extracted_files) > 0, "Extraction should create files"
             sprite_file = None
             for file_path in extracted_files:
-                if file_path.endswith('.png'):
+                if file_path.endswith(".png"):
                     sprite_file = file_path
                     break
 
@@ -176,7 +177,7 @@ class TestManagerIntegrationTDD:
 
     def test_error_propagation_between_managers_tdd(self, test_data_repo):
         """TDD: Errors should propagate correctly between integrated managers.
-        
+
         RED: Test error handling in manager interaction scenarios
         GREEN: Verify proper error propagation without state corruption
         REFACTOR: Improve error handling robustness
@@ -186,10 +187,7 @@ class TestManagerIntegrationTDD:
             injection_mgr = ctx.get_injection_manager()
 
             # Test invalid file propagation between managers
-            invalid_params = {
-                "vram_path": "/nonexistent/file.vram",
-                "output_base": "/invalid/path/sprite"
-            }
+            invalid_params = {"vram_path": "/nonexistent/file.vram", "output_base": "/invalid/path/sprite"}
 
             # Extraction manager should reject invalid parameters
             with pytest.raises(ValidationError):
@@ -201,7 +199,7 @@ class TestManagerIntegrationTDD:
                 "sprite_path": "/nonexistent/sprite.png",
                 "input_vram": "/nonexistent/file.vram",
                 "output_vram": "/invalid/output.vram",
-                "offset": 0x8000
+                "offset": 0x8000,
             }
 
             with pytest.raises(ValidationError):
@@ -243,7 +241,7 @@ class TestManagerIntegrationTDD:
                 "sprite_path": injection_data["sprite_path"],
                 "input_vram": vram_input,
                 "output_vram": injection_data["vram_output"],
-                "offset": 0x8000
+                "offset": 0x8000,
             }
 
             # Both managers should handle concurrent validation
@@ -268,7 +266,7 @@ class TestManagerIntegrationTDD:
 
     def test_resource_sharing_between_managers_tdd(self, test_data_repo):
         """TDD: Managers should properly share and manage shared resources.
-        
+
         RED: Test resource sharing scenarios between managers
         GREEN: Verify proper resource lifecycle management
         REFACTOR: Optimize resource sharing patterns
@@ -297,12 +295,13 @@ class TestManagerIntegrationTDD:
             injection_mgr.cleanup()
             assert extraction_mgr.is_initialized()
 
+
 class TestManagerLifecycleIntegrationTDD:
     """TDD tests for manager lifecycle integration scenarios."""
 
     def test_manager_initialization_order_tdd(self):
         """TDD: Manager initialization should work in any order.
-        
+
         RED: Test different manager initialization sequences
         GREEN: Verify proper initialization regardless of order
         REFACTOR: Remove order dependencies
@@ -333,7 +332,7 @@ class TestManagerLifecycleIntegrationTDD:
 
     def test_manager_cleanup_coordination_tdd(self):
         """TDD: Manager cleanup should coordinate properly across managers.
-        
+
         RED: Test cleanup coordination and resource release
         GREEN: Verify clean shutdown without resource leaks
         REFACTOR: Optimize cleanup ordering and coordination
@@ -358,6 +357,7 @@ class TestManagerLifecycleIntegrationTDD:
 
             # Context cleanup should handle all managers
             # (cleanup happens automatically when exiting context)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

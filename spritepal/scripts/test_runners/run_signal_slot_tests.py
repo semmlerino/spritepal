@@ -31,12 +31,14 @@ def run_tests():
     # Run with verbose output and capture
     cmd = [
         sys.executable,
-        "-m", "pytest",
+        "-m",
+        "pytest",
         str(test_file),
         "-v",  # Verbose
         "-s",  # Show output
         "--tb=short",  # Short traceback
-        "-m", "gui",  # Run GUI tests
+        "-m",
+        "gui",  # Run GUI tests
         "--color=yes",
     ]
 
@@ -58,6 +60,7 @@ def run_tests():
         print("=" * 80)
 
     return result.returncode
+
 
 if __name__ == "__main__":
     sys.exit(run_tests())

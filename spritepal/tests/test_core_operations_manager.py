@@ -8,6 +8,7 @@ This module tests the consolidated core operations manager including:
 - Cache integration
 - Cleanup and reset
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -68,6 +69,7 @@ class TestServiceAccessors:
         assert service is not None
         # Verify it's the expected type
         from core.services import ROMService
+
         assert isinstance(service, ROMService)
 
     def test_vram_service_accessor(self, manager):
@@ -76,6 +78,7 @@ class TestServiceAccessors:
 
         assert service is not None
         from core.services import VRAMService
+
         assert isinstance(service, VRAMService)
 
     def test_rom_service_not_initialized_raises(self):
@@ -533,10 +536,7 @@ class TestScanProgress:
         rom_file = tmp_path / "test.sfc"
         rom_file.write_bytes(b"\x00" * 0x100000)
 
-        result = manager.get_scan_progress(
-            str(rom_file),
-            {"start_offset": 0, "end_offset": 0x10000}
-        )
+        result = manager.get_scan_progress(str(rom_file), {"start_offset": 0, "end_offset": 0x10000})
 
         # May be None or empty depending on cache state
         assert result is None or isinstance(result, dict)

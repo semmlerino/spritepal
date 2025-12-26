@@ -9,6 +9,7 @@ Handles all VRAM-based sprite extraction operations:
 This service was extracted from ExtractionManager to provide
 better separation of concerns between ROM and VRAM operations.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -96,9 +97,7 @@ class VRAMService:
         """
         # Validate parameters
         if not vram_path or not output_base:
-            raise ValidationError(
-                "Missing required parameters: vram_path and output_base are required"
-            )
+            raise ValidationError("Missing required parameters: vram_path and output_base are required")
 
         FileValidator.validate_vram_file_or_raise(vram_path)
 
@@ -121,9 +120,7 @@ class VRAMService:
         _progress("Extracting sprites from VRAM...")
 
         output_file = f"{output_base}.png"
-        img, num_tiles = self._sprite_extractor.extract_sprites_grayscale(
-            vram_path, output_file, offset=vram_offset
-        )
+        img, num_tiles = self._sprite_extractor.extract_sprites_grayscale(vram_path, output_file, offset=vram_offset)
         extracted_files.append(output_file)
 
         # Generate preview

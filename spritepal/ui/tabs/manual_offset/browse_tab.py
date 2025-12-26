@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+
 class SimpleBrowseTab(QWidget):
     """
     Browse tab with essential navigation controls for ROM exploration.
@@ -84,7 +85,9 @@ class SimpleBrowseTab(QWidget):
         """Set up the browse tab UI with improved layout and spacing."""
         layout = QVBoxLayout(self)
         layout.setSpacing(SPACING_SMALL)  # Better spacing between sections
-        layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)  # More comfortable margins
+        layout.setContentsMargins(
+            SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD
+        )  # More comfortable margins
 
         # Main control section with improved styling
         controls_frame = QFrame()
@@ -98,7 +101,9 @@ class SimpleBrowseTab(QWidget):
         """)
         controls_layout = QVBoxLayout(controls_frame)
         controls_layout.setSpacing(SPACING_STANDARD)  # Better spacing between controls
-        controls_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)  # Comfortable padding
+        controls_layout.setContentsMargins(
+            SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM
+        )  # Comfortable padding
 
         # Section title with better styling
         title = create_styled_label("ROM Offset Control", style="title")

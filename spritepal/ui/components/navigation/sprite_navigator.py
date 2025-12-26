@@ -53,6 +53,7 @@ NAVIGATION_STEP_SMALL = 0x100
 NAVIGATION_STEP_MEDIUM = 0x1000
 NAVIGATION_STEP_LARGE = 0x10000
 
+
 class SpriteThumbnail(QWidget):
     """A small preview widget for nearby sprites"""
 
@@ -106,7 +107,7 @@ class SpriteThumbnail(QWidget):
             scaled = pixmap.scaled(
                 self.preview_label.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
+                Qt.TransformationMode.SmoothTransformation,
             )
             self.preview_label.setPixmap(scaled)
         else:
@@ -148,6 +149,7 @@ class SpriteThumbnail(QWidget):
             }}
         """)
         self.offset_label.setText("--")
+
 
 class SpriteNavigator(QWidget):
     """
@@ -553,7 +555,7 @@ class SpriteNavigator(QWidget):
             if self.navigation_mode == "smart":
                 for i, region in enumerate(self.sprite_regions):
                     if region.start_offset <= self.current_offset <= region.end_offset:
-                        context = f"Region {i+1}: {region.description}"
+                        context = f"Region {i + 1}: {region.description}"
                         break
 
             context += f" ({mb_position:.1f}MB)"
@@ -619,15 +621,11 @@ class SpriteNavigator(QWidget):
             rom_extractor = self.extraction_manager.get_rom_extractor()
             sprite_name = f"thumb_0x{offset:X}"
 
-            worker = SpritePreviewWorker(
-                self.rom_path, offset, sprite_name, rom_extractor, None, parent=self
-            )
+            worker = SpritePreviewWorker(self.rom_path, offset, sprite_name, rom_extractor, None, parent=self)
 
             # Connect completion signal
             worker.preview_ready.connect(
-                lambda data, w, h, name: self._on_thumbnail_ready(
-                    offset, quality, thumbnail_index, data, w, h
-                )
+                lambda data, w, h, name: self._on_thumbnail_ready(offset, quality, thumbnail_index, data, w, h)
             )
 
             # Track and start worker
@@ -637,8 +635,7 @@ class SpriteNavigator(QWidget):
         except Exception as e:
             logger.warning(f"Failed to request thumbnail preview: {e}")
 
-    def _on_thumbnail_ready(self, offset: int, quality: float, index: int,
-                          tile_data: bytes, width: int, height: int):
+    def _on_thumbnail_ready(self, offset: int, quality: float, index: int, tile_data: bytes, width: int, height: int):
         """Handle thumbnail preview ready"""
         try:
             # Convert to QPixmap
@@ -651,9 +648,10 @@ class SpriteNavigator(QWidget):
             if temp_widget.sprite_pixmap:
                 # Scale to thumbnail size
                 pixmap = temp_widget.sprite_pixmap.scaled(
-                    THUMBNAIL_SIZE, THUMBNAIL_SIZE,
+                    THUMBNAIL_SIZE,
+                    THUMBNAIL_SIZE,
                     Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
+                    Qt.TransformationMode.SmoothTransformation,
                 )
 
                 # Cache it
@@ -679,7 +677,7 @@ class SpriteNavigator(QWidget):
         """Add offset to navigation history"""
         # Remove any forward history if we're not at the end
         if self.history_index < len(self.navigation_history) - 1:
-            self.navigation_history = self.navigation_history[:self.history_index + 1]
+            self.navigation_history = self.navigation_history[: self.history_index + 1]
 
         # Add new offset
         self.navigation_history.append(offset)

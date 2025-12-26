@@ -74,13 +74,7 @@ class CITypeCheckAnalyzer:
         print(f"   Command: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(
-                cmd,
-                check=False,
-                capture_output=True,
-                text=True,
-                cwd=self.project_path
-            )
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True, cwd=self.project_path)
 
             # Try to parse JSON output
             if result.stdout.strip():
@@ -117,7 +111,7 @@ class CITypeCheckAnalyzer:
                 "severity": severity,
                 "message": message,
                 "type": rule,
-                "full_diagnostic": diagnostic
+                "full_diagnostic": diagnostic,
             }
 
             if severity == "error":
@@ -129,12 +123,7 @@ class CITypeCheckAnalyzer:
 
     def categorize_errors(self) -> dict[str, int]:
         """Categorize errors by priority level."""
-        categories = {
-            "critical": 0,
-            "important": 0,
-            "low_priority": 0,
-            "unknown": 0
-        }
+        categories = {"critical": 0, "important": 0, "low_priority": 0, "unknown": 0}
 
         for error_type, errors in self.error_groups.items():
             count = len(errors)
@@ -149,27 +138,19 @@ class CITypeCheckAnalyzer:
 
         return categories
 
-    def generate_ci_report(self,
-                          threshold_critical: int = 20,
-                          threshold_total: int = 150) -> dict[str, Any]:
+    def generate_ci_report(self, threshold_critical: int = 20, threshold_total: int = 150) -> dict[str, Any]:
         """Generate a comprehensive report for CI/CD usage."""
         categories = self.categorize_errors()
 
         # Calculate file-based metrics
         files_with_errors = len(self.file_errors)
         worst_files = sorted(
-            [(f, len(errs)) for f, errs in self.file_errors.items()],
-            key=lambda x: x[1],
-            reverse=True
+            [(f, len(errs)) for f, errs in self.file_errors.items()], key=lambda x: x[1], reverse=True
         )[:10]
 
         # Error type breakdown
         error_type_counts = {k: len(v) for k, v in self.error_groups.items()}
-        top_error_types = sorted(
-            error_type_counts.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:10]
+        top_error_types = sorted(error_type_counts.items(), key=lambda x: x[1], reverse=True)[:10]
 
         return {
             "timestamp": datetime.now(UTC).isoformat(),
@@ -183,8 +164,9 @@ class CITypeCheckAnalyzer:
                 "total_threshold": threshold_total,
                 "critical_passed": categories["critical"] <= threshold_critical,
                 "total_passed": len(self.errors) <= threshold_total,
-                "overall_passed": (categories["critical"] <= threshold_critical and
-                                 len(self.errors) <= threshold_total)
+                "overall_passed": (
+                    categories["critical"] <= threshold_critical and len(self.errors) <= threshold_total
+                ),
             },
             "categories": categories,
             "critical_errors": categories["critical"],
@@ -194,8 +176,8 @@ class CITypeCheckAnalyzer:
             "critical_examples": self._get_critical_examples(),
             "trend_data": {
                 "errors_per_file": len(self.errors) / max(files_with_errors, 1),
-                "critical_ratio": categories["critical"] / max(len(self.errors), 1)
-            }
+                "critical_ratio": categories["critical"] / max(len(self.errors), 1),
+            },
         }
 
     def _get_critical_examples(self, max_examples: int = 5) -> list[dict[str, Any]]:
@@ -206,12 +188,9 @@ class CITypeCheckAnalyzer:
         for error_type in self.CRITICAL_ERRORS:
             if error_type in self.error_groups and shown < max_examples:
                 for error in self.error_groups[error_type][:2]:  # Max 2 per type
-                    examples.append({
-                        "type": error_type,
-                        "file": error["file"],
-                        "line": error["line"],
-                        "message": error["message"]
-                    })
+                    examples.append(
+                        {"type": error_type, "file": error["file"], "line": error["line"], "message": error["message"]}
+                    )
                     shown += 1
                     if shown >= max_examples:
                         break
@@ -231,10 +210,14 @@ class CITypeCheckAnalyzer:
             print(f"::notice::Files with errors: {summary['files_with_errors']}")
 
             if not thresholds["critical_passed"]:
-                print(f"::error::Critical errors ({categories['critical']}) exceed threshold ({thresholds['critical_threshold']})")
+                print(
+                    f"::error::Critical errors ({categories['critical']}) exceed threshold ({thresholds['critical_threshold']})"
+                )
 
             if not thresholds["total_passed"]:
-                print(f"::error::Total errors ({summary['total_errors']}) exceed threshold ({thresholds['total_threshold']})")
+                print(
+                    f"::error::Total errors ({summary['total_errors']}) exceed threshold ({thresholds['total_threshold']})"
+                )
 
             # Show critical examples
             for example in report["critical_examples"]:
@@ -264,40 +247,17 @@ class CITypeCheckAnalyzer:
                     print(f"   {example['file']}:{example['line']} - {example['type']}")
                     print(f"      {example['message']}")
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="CI/CD Type checking analyzer with threshold enforcement"
-    )
+    parser = argparse.ArgumentParser(description="CI/CD Type checking analyzer with threshold enforcement")
+    parser.add_argument("--input", "-i", help="Input JSON file from basedpyright (if not provided, runs basedpyright)")
+    parser.add_argument("--output", "-o", help="Output JSON report file")
     parser.add_argument(
-        "--input", "-i",
-        help="Input JSON file from basedpyright (if not provided, runs basedpyright)"
+        "--threshold-critical", type=int, default=20, help="Maximum allowed critical errors (default: 20)"
     )
-    parser.add_argument(
-        "--output", "-o",
-        help="Output JSON report file"
-    )
-    parser.add_argument(
-        "--threshold-critical",
-        type=int,
-        default=20,
-        help="Maximum allowed critical errors (default: 20)"
-    )
-    parser.add_argument(
-        "--threshold-total",
-        type=int,
-        default=150,
-        help="Maximum allowed total errors (default: 150)"
-    )
-    parser.add_argument(
-        "--github-actions",
-        action="store_true",
-        help="Format output for GitHub Actions"
-    )
-    parser.add_argument(
-        "files",
-        nargs="*",
-        help="Specific files to check (default: entire project)"
-    )
+    parser.add_argument("--threshold-total", type=int, default=150, help="Maximum allowed total errors (default: 150)")
+    parser.add_argument("--github-actions", action="store_true", help="Format output for GitHub Actions")
+    parser.add_argument("files", nargs="*", help="Specific files to check (default: entire project)")
 
     args = parser.parse_args()
 
@@ -317,8 +277,7 @@ def main():
 
     # Generate report
     report = analyzer.generate_ci_report(
-        threshold_critical=args.threshold_critical,
-        threshold_total=args.threshold_total
+        threshold_critical=args.threshold_critical, threshold_total=args.threshold_total
     )
 
     # Print summary
@@ -326,7 +285,7 @@ def main():
 
     # Save report if requested
     if args.output:
-        with Path(args.output).open('w') as f:
+        with Path(args.output).open("w") as f:
             json.dump(report, f, indent=2)
         print(f"\n💾 Report saved to: {args.output}")
 
@@ -334,6 +293,7 @@ def main():
     if not report["thresholds"]["overall_passed"]:
         return 1
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

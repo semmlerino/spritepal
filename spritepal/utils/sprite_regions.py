@@ -4,6 +4,7 @@ Sprite region detection and management for smart ROM navigation.
 This module provides intelligent grouping of sprites into navigable regions,
 enabling efficient ROM exploration by filtering out empty areas.
 """
+
 from __future__ import annotations
 
 import statistics
@@ -21,6 +22,7 @@ from utils.constants import (
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 @dataclass
 class SpriteRegion:
@@ -66,14 +68,17 @@ class SpriteRegion:
             return "medium"
         return "low"
 
+
 class SpriteRegionDetector:
     """Detects and manages sprite regions from scan results"""
 
-    def __init__(self,
-                 gap_threshold: int = ROM_ALIGNMENT_GAP_THRESHOLD,
-                 min_sprites_per_region: int = 2,
-                 min_region_size: int = ROM_MIN_REGION_SIZE,
-                 merge_small_regions: bool = True):
+    def __init__(
+        self,
+        gap_threshold: int = ROM_ALIGNMENT_GAP_THRESHOLD,
+        min_sprites_per_region: int = 2,
+        min_region_size: int = ROM_MIN_REGION_SIZE,
+        merge_small_regions: bool = True,
+    ):
         self.gap_threshold: int = gap_threshold
         self.min_sprites_per_region: int = min_sprites_per_region
         self.min_region_size: int = min_region_size
@@ -95,7 +100,7 @@ class SpriteRegionDetector:
 
         for i in range(1, len(sorted_sprites)):
             offset, quality = sorted_sprites[i]
-            prev_offset = sorted_sprites[i-1][0]
+            prev_offset = sorted_sprites[i - 1][0]
 
             # Check if this sprite belongs to current region
             if offset - prev_offset <= self.gap_threshold:
@@ -148,13 +153,12 @@ class SpriteRegionDetector:
             average_quality=statistics.mean(qualities) if qualities else 0,
             sprite_count=len(sprites),
             size_bytes=size_bytes,
-            density=density
+            density=density,
         )
 
     def _is_valid_region(self, region: SpriteRegion) -> bool:
         """Check if region meets minimum requirements"""
-        return (region.sprite_count >= self.min_sprites_per_region and
-                region.size_bytes >= self.min_region_size)
+        return region.sprite_count >= self.min_sprites_per_region and region.size_bytes >= self.min_region_size
 
     def _merge_small_regions(self, regions: list[SpriteRegion]) -> list[SpriteRegion]:
         """Merge small adjacent regions"""
@@ -167,20 +171,21 @@ class SpriteRegionDetector:
             current = regions[i]
 
             # Check if should merge with next region
-            if (i + 1 < len(regions) and
-                current.size_bytes < self.min_region_size * 2 and
-                regions[i + 1].start_offset - current.end_offset < self.gap_threshold):
+            if (
+                i + 1 < len(regions)
+                and current.size_bytes < self.min_region_size * 2
+                and regions[i + 1].start_offset - current.end_offset < self.gap_threshold
+            ):
                 # Merge with next region
                 next_region = regions[i + 1]
-                merged_sprites = list(zip(
-                    current.sprite_offsets + next_region.sprite_offsets,
-                    current.sprite_qualities + next_region.sprite_qualities, strict=False
-                ))
-                merged_region = self._create_region(
-                    current.start_offset,
-                    merged_sprites,
-                    len(merged)
+                merged_sprites = list(
+                    zip(
+                        current.sprite_offsets + next_region.sprite_offsets,
+                        current.sprite_qualities + next_region.sprite_qualities,
+                        strict=False,
+                    )
                 )
+                merged_region = self._create_region(current.start_offset, merged_sprites, len(merged))
                 if merged_region:
                     merged.append(merged_region)
                 i += 2  # Skip next region
@@ -221,12 +226,15 @@ class SpriteRegionDetector:
 
         return None
 
+
 class ClassificationRules(TypedDict):
     """Type definition for classification rules structure"""
+
     min_sprite_count: int
     max_sprite_count: int
     typical_density: tuple[float, float]  # (min, max) sprites per KB
-    typical_sizes: tuple[int, int]        # (min, max) bytes
+    typical_sizes: tuple[int, int]  # (min, max) bytes
+
 
 class SpriteRegionClassifier:
     """Classifies sprite regions by type based on patterns"""
@@ -237,20 +245,20 @@ class SpriteRegionClassifier:
                 "min_sprite_count": 4,
                 "max_sprite_count": MAX_SPRITE_COUNT_HEADER,
                 "typical_density": (0.5, 2.0),  # sprites per KB
-                "typical_sizes": (0x2000, ROM_ALIGNMENT_GAP_THRESHOLD)  # 8KB to 64KB
+                "typical_sizes": (0x2000, ROM_ALIGNMENT_GAP_THRESHOLD),  # 8KB to 64KB
             },
             "backgrounds": {
                 "min_sprite_count": 10,
                 "max_sprite_count": MAX_SPRITE_COUNT_MAIN,
                 "typical_density": (1.0, 5.0),
-                "typical_sizes": (ROM_MIN_REGION_SIZE * 4, ROM_SIZE_512KB // 4)  # 16KB to 128KB
+                "typical_sizes": (ROM_MIN_REGION_SIZE * 4, ROM_SIZE_512KB // 4),  # 16KB to 128KB
             },
             "effects": {
                 "min_sprite_count": 1,
                 "max_sprite_count": 20,
                 "typical_density": (0.1, 1.0),
-                "typical_sizes": (ROM_MIN_REGION_SIZE, ROM_MIN_REGION_SIZE * 8)  # 4KB to 32KB
-            }
+                "typical_sizes": (ROM_MIN_REGION_SIZE, ROM_MIN_REGION_SIZE * 8),  # 4KB to 32KB
+            },
         }
 
     def classify_region(self, region: SpriteRegion) -> tuple[str, float]:
@@ -293,6 +301,7 @@ class SpriteRegionClassifier:
 
         return best_match, best_confidence
 
+
 class RegionUpdateManager:
     """Manages dynamic region updates as new sprites are discovered"""
 
@@ -334,10 +343,7 @@ class RegionUpdateManager:
         min_distance = float("inf")
 
         for region in self.detector.regions:
-            distance = min(
-                abs(offset - region.start_offset),
-                abs(offset - region.end_offset)
-            )
+            distance = min(abs(offset - region.start_offset), abs(offset - region.end_offset))
             if distance < min_distance:
                 min_distance = distance
                 nearest_region = region
@@ -366,7 +372,7 @@ class RegionUpdateManager:
                 sprite_count=1,
                 size_bytes=ROM_MIN_REGION_SIZE,
                 density=1.0,
-                region_type="discovered"
+                region_type="discovered",
             )
             self.detector.regions.append(new_region)
             self.detector.regions.sort(key=lambda r: r.start_offset)

@@ -4,6 +4,7 @@ Visual similarity search for sprites using perceptual hashing.
 This module enables finding visually similar sprites across ROMs,
 useful for finding variations, palette swaps, or related graphics.
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,22 +20,27 @@ from utils.constants import ROM_ALIGNMENT_GAP_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class SpriteHash:
     """Container for sprite perceptual hash data."""
+
     offset: int
     phash: np.ndarray
     dhash: np.ndarray
     histogram: np.ndarray
     metadata: dict[str, Any]  # pyright: ignore[reportExplicitAny] - sprite metadata can contain various types
 
+
 @dataclass
 class SimilarityMatch:
     """Result of similarity search."""
+
     offset: int
     similarity_score: float
     hash_distance: int
     metadata: dict[str, Any]  # pyright: ignore[reportExplicitAny] - sprite metadata can contain various types
+
 
 class VisualSimilarityEngine:
     """
@@ -74,13 +80,7 @@ class VisualSimilarityEngine:
         dhash = self._calculate_dhash(image)
         histogram = self._calculate_color_histogram(image)
 
-        sprite_hash = SpriteHash(
-            offset=offset,
-            phash=phash,
-            dhash=dhash,
-            histogram=histogram,
-            metadata=metadata or {}
-        )
+        sprite_hash = SpriteHash(offset=offset, phash=phash, dhash=dhash, histogram=histogram, metadata=metadata or {})
 
         self.sprite_database[offset] = sprite_hash
         logger.debug(f"Indexed sprite at offset 0x{offset:X}")
@@ -88,10 +88,7 @@ class VisualSimilarityEngine:
         return sprite_hash
 
     def find_similar(
-        self,
-        target: Image.Image | int,
-        max_results: int = 10,
-        similarity_threshold: float = 0.8
+        self, target: Image.Image | int, max_results: int = 10, similarity_threshold: float = 0.8
     ) -> list[SimilarityMatch]:
         """
         Find sprites similar to target.
@@ -117,7 +114,7 @@ class VisualSimilarityEngine:
                 phash=self._calculate_phash(target),
                 dhash=self._calculate_dhash(target),
                 histogram=self._calculate_color_histogram(target),
-                metadata={}
+                metadata={},
             )
 
         # Search database
@@ -135,11 +132,8 @@ class VisualSimilarityEngine:
                 match = SimilarityMatch(
                     offset=offset,
                     similarity_score=similarity,
-                    hash_distance=self._hamming_distance(
-                        target_hash.phash,
-                        sprite_hash.phash
-                    ),
-                    metadata=sprite_hash.metadata
+                    hash_distance=self._hamming_distance(target_hash.phash, sprite_hash.phash),
+                    metadata=sprite_hash.metadata,
                 )
                 matches.append(match)
 
@@ -155,10 +149,7 @@ class VisualSimilarityEngine:
         Uses average hash instead of DCT for simplicity.
         """
         # Convert to grayscale and resize
-        img = image.convert("L").resize(
-            (self.hash_size, self.hash_size),
-            Image.Resampling.LANCZOS
-        )
+        img = image.convert("L").resize((self.hash_size, self.hash_size), Image.Resampling.LANCZOS)
 
         # Convert to numpy array
         pixels = np.array(img, dtype=np.float32)
@@ -176,10 +167,7 @@ class VisualSimilarityEngine:
         Good for detecting similar structures.
         """
         # Resize to hash_size + 1 width
-        img = image.convert("L").resize(
-            (self.hash_size + 1, self.hash_size),
-            Image.Resampling.LANCZOS
-        )
+        img = image.convert("L").resize((self.hash_size + 1, self.hash_size), Image.Resampling.LANCZOS)
 
         pixels = np.array(img, dtype=np.float32)
 
@@ -210,11 +198,7 @@ class VisualSimilarityEngine:
 
         return histogram
 
-    def _calculate_similarity(
-        self,
-        hash1: SpriteHash,
-        hash2: SpriteHash
-    ) -> float:
+    def _calculate_similarity(self, hash1: SpriteHash, hash2: SpriteHash) -> float:
         """
         Calculate overall similarity score between two sprites.
 
@@ -232,11 +216,7 @@ class VisualSimilarityEngine:
         hist_similarity = self._histogram_similarity(hash1.histogram, hash2.histogram)
 
         # Weighted combination
-        return (
-            phash_similarity * 0.4 +
-            dhash_similarity * 0.3 +
-            hist_similarity * 0.3
-        )
+        return phash_similarity * 0.4 + dhash_similarity * 0.3 + hist_similarity * 0.3
 
     def _hamming_distance(self, hash1: np.ndarray, hash2: np.ndarray) -> int:
         """Calculate Hamming distance between two hashes."""
@@ -270,11 +250,7 @@ class VisualSimilarityEngine:
     def export_index(self, path: Path):
         """Export similarity index to file for persistence."""
 
-        export_data = {
-            "hash_size": self.hash_size,
-            "database": self.sprite_database,
-            "index_built": self.index_built
-        }
+        export_data = {"hash_size": self.hash_size, "database": self.sprite_database, "index_built": self.index_built}
 
         with Path(path).open("wb") as f:
             pickle.dump(export_data, f)
@@ -293,6 +269,7 @@ class VisualSimilarityEngine:
 
         logger.info(f"Imported similarity index with {len(self.sprite_database)} sprites")
 
+
 class SpriteGroupFinder:
     """
     Find groups of related sprites (animations, variations).
@@ -304,11 +281,7 @@ class SpriteGroupFinder:
         self.engine = similarity_engine
         self.groups: list[list[int]] = []  # List of sprite groups
 
-    def find_sprite_groups(
-        self,
-        similarity_threshold: float = 0.85,
-        min_group_size: int = 2
-    ) -> list[list[int]]:
+    def find_sprite_groups(self, similarity_threshold: float = 0.85, min_group_size: int = 2) -> list[list[int]]:
         """
         Find groups of similar sprites.
 
@@ -323,11 +296,7 @@ class SpriteGroupFinder:
                 continue
 
             # Find all sprites similar to this one
-            similar = self.engine.find_similar(
-                offset,
-                max_results=50,
-                similarity_threshold=similarity_threshold
-            )
+            similar = self.engine.find_similar(offset, max_results=50, similarity_threshold=similarity_threshold)
 
             if len(similar) >= min_group_size - 1:
                 group = [offset] + [match.offset for match in similar]
@@ -341,9 +310,7 @@ class SpriteGroupFinder:
         return groups
 
     def find_animations(
-        self,
-        offset_proximity: int = ROM_ALIGNMENT_GAP_THRESHOLD,
-        similarity_threshold: float = 0.9
+        self, offset_proximity: int = ROM_ALIGNMENT_GAP_THRESHOLD, similarity_threshold: float = 0.9
     ) -> list[list[int]]:
         """
         Find animation sequences based on proximity and similarity.
@@ -378,9 +345,7 @@ class SpriteGroupFinder:
 
                 # Check similarity
                 similar = self.engine.find_similar(
-                    current_offset,
-                    max_results=10,
-                    similarity_threshold=similarity_threshold
+                    current_offset, max_results=10, similarity_threshold=similarity_threshold
                 )
 
                 if any(match.offset == next_offset for match in similar):

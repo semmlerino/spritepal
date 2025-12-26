@@ -92,9 +92,7 @@ class InjectionOperationsManager(QObject):
         sprite_path = cast(str, params["sprite_path"])
         sprite_result = FileValidator.validate_image_file(sprite_path)
         if not sprite_result.is_valid:
-            raise ValidationError(
-                f"Sprite file validation failed: {sprite_result.error_message}"
-            )
+            raise ValidationError(f"Sprite file validation failed: {sprite_result.error_message}")
 
         offset = cast(int, params["offset"])
         validate_range(offset, "offset", min_val=0)
@@ -108,9 +106,7 @@ class InjectionOperationsManager(QObject):
             input_vram = cast(str, params["input_vram"])
             vram_result = FileValidator.validate_vram_file(input_vram)
             if not vram_result.is_valid:
-                raise ValidationError(
-                    f"Input VRAM file validation failed: {vram_result.error_message}"
-                )
+                raise ValidationError(f"Input VRAM file validation failed: {vram_result.error_message}")
 
         elif mode == "rom":
             rom_required = ["input_rom", "output_rom"]
@@ -119,15 +115,11 @@ class InjectionOperationsManager(QObject):
             input_rom = cast(str, params["input_rom"])
             rom_result = FileValidator.validate_rom_file(input_rom)
             if not rom_result.is_valid:
-                raise ValidationError(
-                    f"Input ROM file validation failed: {rom_result.error_message}"
-                )
+                raise ValidationError(f"Input ROM file validation failed: {rom_result.error_message}")
 
             # Validate optional fast_compression parameter
             if "fast_compression" in params:
-                validate_type(
-                    params["fast_compression"], "fast_compression", bool
-                )
+                validate_type(params["fast_compression"], "fast_compression", bool)
         else:
             raise ValidationError(f"Invalid injection mode: {mode}")
 
@@ -137,9 +129,7 @@ class InjectionOperationsManager(QObject):
             metadata_path = cast(str, metadata_path_val)
             metadata_result = FileValidator.validate_json_file(metadata_path)
             if not metadata_result.is_valid:
-                raise ValidationError(
-                    f"Metadata file validation failed: {metadata_result.error_message}"
-                )
+                raise ValidationError(f"Metadata file validation failed: {metadata_result.error_message}")
 
     # ========== Status ==========
 

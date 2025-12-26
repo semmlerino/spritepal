@@ -104,6 +104,7 @@ class VRAMExtractionWorker(ManagedWorker):
 
         logger.info(f"{self._operation_name}: Extraction completed successfully")
 
+
 class ROMExtractionWorker(ManagedWorker):
     """
     Worker for ROM extraction operations.
@@ -173,4 +174,3 @@ class ROMExtractionWorker(ManagedWorker):
         self.operation_finished.emit(True, f"Successfully extracted {len(extracted_files)} files")
 
         logger.info(f"{self._operation_name}: ROM extraction completed successfully")
-

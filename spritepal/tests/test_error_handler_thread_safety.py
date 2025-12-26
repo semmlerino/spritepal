@@ -30,9 +30,7 @@ class TestErrorHandlerThreadSafety:
 
         # Track signal emissions
         received_errors = []
-        handler.critical_error.connect(
-            lambda title, msg: received_errors.append((title, msg))
-        )
+        handler.critical_error.connect(lambda title, msg: received_errors.append((title, msg)))
 
         errors = []
 

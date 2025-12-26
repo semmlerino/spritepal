@@ -4,6 +4,7 @@ Background worker for loading ROM information without blocking the UI.
 This worker moves file I/O operations (reading ROM headers, loading sprite locations)
 off the main thread to prevent UI freezes, especially on slow storage.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -166,9 +167,7 @@ class ROMHeaderLoaderWorker(BaseWorker):
         sprite_configs = None
         if self.sprite_config_loader is not None:
             self.emit_progress(70, "Loading sprite configurations...")
-            sprite_configs = self.sprite_config_loader.get_game_sprites(
-                header.title, header.checksum
-            )
+            sprite_configs = self.sprite_config_loader.get_game_sprites(header.title, header.checksum)
 
         self.emit_progress(100, "Header loading complete")
 

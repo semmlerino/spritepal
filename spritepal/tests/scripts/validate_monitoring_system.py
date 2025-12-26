@@ -17,11 +17,7 @@ def run_command(cmd: list[str], description: str, timeout: int = 30) -> tuple[bo
     """Run a command and return success status and output."""
     try:
         result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=Path(__file__).parent.parent.parent
+            cmd, capture_output=True, text=True, timeout=timeout, cwd=Path(__file__).parent.parent.parent
         )
         return result.returncode == 0, result.stdout + result.stderr
     except subprocess.TimeoutExpired:
@@ -29,18 +25,18 @@ def run_command(cmd: list[str], description: str, timeout: int = 30) -> tuple[bo
     except Exception as e:
         return False, f"Error running command: {e}"
 
+
 def validate_system():
     """Validate that the monitoring system is properly set up."""
 
     print("🔍 Validating Test Monitoring System")
     print("=" * 50)
 
-
     # Test 1: Progressive Test Runner - List Stages
     print("\n1. Testing Progressive Test Runner...")
-    success, output = run_command([
-        sys.executable, "tests/scripts/progressive_test_runner.py", "--list-stages"
-    ], "List test stages")
+    success, output = run_command(
+        [sys.executable, "tests/scripts/progressive_test_runner.py", "--list-stages"], "List test stages"
+    )
 
     if success and "Available test stages" in output:
         print("   ✅ Progressive test runner working")
@@ -52,9 +48,9 @@ def validate_system():
 
     # Test 2: Fix Verification Orchestrator - List Categories
     print("\n2. Testing Fix Verification Orchestrator...")
-    success, output = run_command([
-        sys.executable, "tests/scripts/fix_verification_orchestrator.py"
-    ], "List fix categories")
+    success, output = run_command(
+        [sys.executable, "tests/scripts/fix_verification_orchestrator.py"], "List fix categories"
+    )
 
     if success and "Available Fix Categories" in output:
         print("   ✅ Fix verification orchestrator working")
@@ -66,10 +62,15 @@ def validate_system():
 
     # Test 3: Test Health Dashboard - Import Check
     print("\n3. Testing Test Health Dashboard...")
-    success, output = run_command([
-        sys.executable, "-c",
-        "from tests.scripts.test_health_dashboard import TestHealthMonitor; print('Import successful')"
-    ], "Import health dashboard", timeout=10)
+    success, output = run_command(
+        [
+            sys.executable,
+            "-c",
+            "from tests.scripts.test_health_dashboard import TestHealthMonitor; print('Import successful')",
+        ],
+        "Import health dashboard",
+        timeout=10,
+    )
 
     if success and "Import successful" in output:
         print("   ✅ Test health dashboard imports working")
@@ -79,9 +80,9 @@ def validate_system():
 
     # Test 4: Regression Detector - Help
     print("\n4. Testing Regression Detector...")
-    success, output = run_command([
-        sys.executable, "tests/scripts/regression_detector.py", "--help"
-    ], "Show regression detector help", timeout=10)
+    success, output = run_command(
+        [sys.executable, "tests/scripts/regression_detector.py", "--help"], "Show regression detector help", timeout=10
+    )
 
     if success and "Regression Detection System" in output:
         print("   ✅ Regression detector working")
@@ -108,15 +109,18 @@ def validate_system():
 
     # Test 6: Basic pytest functionality
     print("\n6. Testing Basic Pytest Integration...")
-    success, output = run_command([
-        "bash", "-c", "source venv/bin/activate && python -m pytest tests/test_constants.py --collect-only -q"
-    ], "Collect constants tests", timeout=30)
+    success, output = run_command(
+        ["bash", "-c", "source venv/bin/activate && python -m pytest tests/test_constants.py --collect-only -q"],
+        "Collect constants tests",
+        timeout=30,
+    )
 
     if success:
         print("   ✅ Pytest integration working")
         if "collected" in output:
             import re
-            match = re.search(r'(\d+) items? collected', output)
+
+            match = re.search(r"(\d+) items? collected", output)
             if match:
                 print(f"   📊 Successfully collected {match.group(1)} tests from constants")
     else:
@@ -127,6 +131,7 @@ def validate_system():
     print("✅ Monitoring System Validation Complete!")
 
     return True
+
 
 def show_usage_examples():
     """Show practical usage examples."""
@@ -172,12 +177,14 @@ def show_usage_examples():
     print("5. Finalize session when satisfied with results")
     print("6. Use regression detector to compare with previous state")
 
+
 def main():
     """Main validation function."""
 
     # Change to project root
     project_root = Path(__file__).parent.parent.parent
     import os
+
     os.chdir(project_root)
 
     print(f"Working directory: {Path.cwd()}")
@@ -199,6 +206,7 @@ def main():
         print("\n❌ System validation failed!")
         print("Please check error messages above and fix issues before proceeding.")
         return False
+
 
 if __name__ == "__main__":
     success = main()

@@ -2,6 +2,7 @@
 Default palette loader for SpritePal
 Provides default palettes for sprites when CGRAM data is not available
 """
+
 from __future__ import annotations
 
 import json
@@ -12,12 +13,11 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 class DefaultPaletteLoader:
     """Loads and manages default sprite palettes"""
 
-    DEFAULT_PALETTE_PATH: str = str(
-        Path(__file__).parent.parent / "config" / "default_palettes.json"
-    )
+    DEFAULT_PALETTE_PATH: str = str(Path(__file__).parent.parent / "config" / "default_palettes.json")
 
     # Mapping of ROM titles (or substrings) to palette category names.
     # Keys are checked as substrings of the normalized ROM title (uppercase, stripped).
@@ -109,9 +109,7 @@ class DefaultPaletteLoader:
                 with Path(palette_path).open("w") as f:
                     json.dump(palette_json, f, indent=2)
                 created_files.append(palette_path)
-                logger.info(
-                    f"Created default palette: {palette_name} -> {Path(palette_path).name}"
-                )
+                logger.info(f"Created default palette: {palette_name} -> {Path(palette_path).name}")
             except OSError as e:
                 logger.warning(f"Failed to create palette file {palette_name}: {e}")
 
@@ -149,9 +147,7 @@ class DefaultPaletteLoader:
         """
         return len(self.get_sprite_palettes(sprite_name)) > 0
 
-    def get_palettes_by_rom_title(
-        self, rom_title: str
-    ) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - palette data from JSON
+    def get_palettes_by_rom_title(self, rom_title: str) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - palette data from JSON
         """
         Get default palettes based on ROM title.
 
@@ -177,8 +173,7 @@ class DefaultPaletteLoader:
                 palettes = self.get_sprite_palettes(palette_key)
                 if palettes:
                     logger.info(
-                        f"Found palettes for ROM title '{rom_title}' "
-                        f"via pattern '{title_pattern}' -> '{palette_key}'"
+                        f"Found palettes for ROM title '{rom_title}' via pattern '{title_pattern}' -> '{palette_key}'"
                     )
                     return palettes
 

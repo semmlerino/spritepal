@@ -6,6 +6,7 @@ REAL COMPONENT TESTING:
 - Uses RealComponentFactory for ROMExtractor with MockHAL
 - Tests actual component behavior, not mock behavior
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -52,18 +53,22 @@ def gallery_tab(qtbot, real_factory):
     # Cleanup worker threads before widget destruction
     tab.cleanup()
 
+
 @pytest.fixture
 def test_sprites():
     """Create test sprite data."""
     sprites = []
     for i in range(17):
-        sprites.append({
-            'offset': i * 0x1000,
-            'decompressed_size': 2048,
-            'tile_count': 64,
-            'compressed': i % 3 == 0,
-        })
+        sprites.append(
+            {
+                "offset": i * 0x1000,
+                "decompressed_size": 2048,
+                "tile_count": 64,
+                "compressed": i % 3 == 0,
+            }
+        )
     return sprites
+
 
 @pytest.fixture
 def gallery_with_sprites(gallery_tab, test_sprites):
@@ -73,7 +78,7 @@ def gallery_with_sprites(gallery_tab, test_sprites):
 
     # Generate mock thumbnails using the gallery widget's API
     for sprite in test_sprites:
-        offset = sprite['offset']
+        offset = sprite["offset"]
         # Using ThreadSafeTestImage instead of QPixmap for thread safety
         pixmap = ThreadSafeTestImage(128, 128)
         pixmap.fill(Qt.GlobalColor.darkGray)
@@ -84,6 +89,7 @@ def gallery_with_sprites(gallery_tab, test_sprites):
 
     # Cleanup worker threads before widget destruction
     gallery_tab.cleanup()
+
 
 class TestSpriteGalleryTab:
     """Test the main sprite gallery tab."""
@@ -151,7 +157,6 @@ class TestDetachedGalleryWindow:
         # Close window
         tab.detached_window.close()
 
-
     @pytest.mark.gui
     def test_detached_window_signals(self, gallery_with_sprites, qtbot):
         """Test that detached window signals are connected properly."""
@@ -193,6 +198,7 @@ class TestDetachedGalleryWindow:
         # Close window
         tab.detached_window.close()
         from PySide6.QtWidgets import QApplication
+
         QApplication.processEvents()
 
         # Trigger the close handler
@@ -200,6 +206,7 @@ class TestDetachedGalleryWindow:
 
         # Check cleanup
         assert tab.detached_window is None
+
 
 class TestGalleryCaching:
     """Test gallery scan result caching."""
@@ -213,7 +220,7 @@ class TestGalleryCaching:
         def mock_cache_path(self, rom_path=None):
             return tmp_path / "test_cache.json"
 
-        monkeypatch.setattr(SpriteGalleryTab, '_get_cache_path', mock_cache_path)
+        monkeypatch.setattr(SpriteGalleryTab, "_get_cache_path", mock_cache_path)
 
         # Save cache
         tab._save_scan_cache()
@@ -224,36 +231,39 @@ class TestGalleryCaching:
 
         # Load and verify cache content
         import json
+
         with cache_file.open() as f:
             cache_data = json.load(f)
 
-        assert cache_data['sprite_count'] == 17
-        assert len(cache_data['sprites']) == 17
-        assert cache_data['rom_path'] == "test_rom.smc"
+        assert cache_data["sprite_count"] == 17
+        assert len(cache_data["sprites"]) == 17
+        assert cache_data["rom_path"] == "test_rom.smc"
 
     @pytest.mark.gui
     def test_cache_load(self, gallery_tab, test_sprites, tmp_path, monkeypatch):
         """Test loading scan results from cache."""
+
         # Mock cache path
         def mock_cache_path(self, rom_path=None):
             return tmp_path / "test_cache.json"
 
-        monkeypatch.setattr(SpriteGalleryTab, '_get_cache_path', mock_cache_path)
+        monkeypatch.setattr(SpriteGalleryTab, "_get_cache_path", mock_cache_path)
 
         # Create cache file
         import json
+
         cache_data = {
-            'version': 2,
-            'rom_path': "test_rom.smc",
-            'rom_size': 4 * 1024 * 1024,
-            'sprite_count': len(test_sprites),
-            'sprites': test_sprites,
-            'scan_mode': 'quick',
-            'timestamp': 0
+            "version": 2,
+            "rom_path": "test_rom.smc",
+            "rom_size": 4 * 1024 * 1024,
+            "sprite_count": len(test_sprites),
+            "sprites": test_sprites,
+            "scan_mode": "quick",
+            "timestamp": 0,
         }
 
         cache_file = tmp_path / "test_cache.json"
-        with cache_file.open('w') as f:
+        with cache_file.open("w") as f:
             json.dump(cache_data, f)
 
         # Load cache
@@ -262,6 +272,7 @@ class TestGalleryCaching:
         assert result == True
         assert len(gallery_tab.sprites_data) == 17
         assert len(gallery_tab.gallery_widget.thumbnails) == 17
+
 
 @pytest.mark.gui
 class TestGalleryIntegration:
@@ -280,19 +291,21 @@ class TestGalleryIntegration:
         # Create and set sprites
         sprites = []
         for i in range(10):
-            sprites.append({
-                'offset': i * 0x1000,
-                'decompressed_size': 1024,
-                'tile_count': 32,
-                'compressed': i % 2 == 0,
-            })
+            sprites.append(
+                {
+                    "offset": i * 0x1000,
+                    "decompressed_size": 1024,
+                    "tile_count": 32,
+                    "compressed": i % 2 == 0,
+                }
+            )
 
         tab.sprites_data = sprites
         tab.gallery_widget.set_sprites(sprites)
 
         # Generate thumbnails using the gallery widget's API
         for sprite in sprites:
-            offset = sprite['offset']
+            offset = sprite["offset"]
             # Using ThreadSafeTestImage instead of QPixmap for thread safety
             pixmap = ThreadSafeTestImage(128, 128)
             pixmap.fill(Qt.GlobalColor.darkCyan)
@@ -318,4 +331,5 @@ class TestGalleryIntegration:
         tab.cleanup()
         # Process any pending events synchronously to prevent segfaults from dangling references
         from PySide6.QtWidgets import QApplication
+
         QApplication.processEvents()

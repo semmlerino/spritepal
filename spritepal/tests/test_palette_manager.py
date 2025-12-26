@@ -1,4 +1,5 @@
 """Tests for PaletteManager class"""
+
 from __future__ import annotations
 
 import json
@@ -21,6 +22,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
 ]
+
 
 class TestPaletteManager:
     """Test the PaletteManager functionality"""
@@ -135,10 +137,7 @@ class TestPaletteManager:
 
         # Should only have palettes 8-15
         assert len(sprite_pals) == 8
-        assert all(
-            idx in range(SPRITE_PALETTE_START, SPRITE_PALETTE_END)
-            for idx in sprite_pals
-        )
+        assert all(idx in range(SPRITE_PALETTE_START, SPRITE_PALETTE_END) for idx in sprite_pals)
 
     def test_create_palette_json(self, palette_manager, sample_cgram_data):
         """Test creating palette JSON file"""
@@ -178,9 +177,7 @@ class TestPaletteManager:
             (99, "Palette 99"),  # Unknown palette
         ],
     )
-    def test_palette_info(
-        self, palette_manager, sample_cgram_data, pal_idx, expected_name
-    ):
+    def test_palette_info(self, palette_manager, sample_cgram_data, pal_idx, expected_name):
         """Test palette naming from PALETTE_INFO"""
         palette_manager.cgram_data = sample_cgram_data
         palette_manager._extract_palettes()
@@ -255,9 +252,7 @@ class TestPaletteManagerExtended:
                 Path(pal_file).touch()  # Create empty file
 
             # Create metadata
-            metadata_path = palette_manager.create_metadata_json(
-                str(output_base), palette_files
-            )
+            metadata_path = palette_manager.create_metadata_json(str(output_base), palette_files)
 
             # Verify metadata file exists
             assert Path(metadata_path).exists()
@@ -342,9 +337,7 @@ class TestPaletteManagerExtended:
             finally:
                 Path(f.name).unlink()
 
-    def test_create_palette_json_without_companion_image(
-        self, palette_manager, sample_cgram_data
-    ):
+    def test_create_palette_json_without_companion_image(self, palette_manager, sample_cgram_data):
         """Test creating palette JSON without companion image"""
         palette_manager.cgram_data = sample_cgram_data
         palette_manager._extract_palettes()

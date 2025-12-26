@@ -2,6 +2,7 @@
 Comprehensive infrastructure verification tests.
 Run this to verify all fixes are properly applied.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -19,8 +20,8 @@ pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Uses session_app_context which owns worker threads"),
 ]
 
-class TestInfrastructureVerification:
 
+class TestInfrastructureVerification:
     def test_circular_import_fixed(self):
         """Verify circular import is resolved"""
         try:

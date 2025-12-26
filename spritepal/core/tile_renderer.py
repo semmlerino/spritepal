@@ -1,6 +1,7 @@
 """
 Tile renderer for converting 4bpp SNES tile data to images.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -11,6 +12,7 @@ from core.tile_utils import decode_4bpp_tile
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class TileRenderer:
     """Renders 4bpp SNES tile data to images."""
@@ -24,16 +26,10 @@ class TileRenderer:
         if not self.default_palettes:
             logger.warning("No default palettes found, using grayscale")
             # Create a simple grayscale palette as fallback
-            self.default_palettes = {
-                8: [[i * 16, i * 16, i * 16] for i in range(16)]
-            }
+            self.default_palettes = {8: [[i * 16, i * 16, i * 16] for i in range(16)]}
 
     def render_tiles(
-        self,
-        tile_data: bytes,
-        width_tiles: int,
-        height_tiles: int,
-        palette_index: int | None = None
+        self, tile_data: bytes, width_tiles: int, height_tiles: int, palette_index: int | None = None
     ) -> Image.Image | None:
         """
         Render 4bpp tile data to an image.
@@ -47,7 +43,9 @@ class TileRenderer:
         Returns:
             PIL Image or None if rendering fails
         """
-        logger.debug(f"render_tiles called: data_len={len(tile_data)}, dims={width_tiles}x{height_tiles}, palette={palette_index}")
+        logger.debug(
+            f"render_tiles called: data_len={len(tile_data)}, dims={width_tiles}x{height_tiles}, palette={palette_index}"
+        )
         try:
             # Validate input
             bytes_per_tile = 32
@@ -55,8 +53,10 @@ class TileRenderer:
 
             if len(tile_data) < expected_size:
                 # Pad with zeros if needed
-                tile_data = tile_data + b'\x00' * (expected_size - len(tile_data))
-                logger.debug(f"Padded tile data from {len(tile_data) - (expected_size - len(tile_data))} to {expected_size} bytes")
+                tile_data = tile_data + b"\x00" * (expected_size - len(tile_data))
+                logger.debug(
+                    f"Padded tile data from {len(tile_data) - (expected_size - len(tile_data))} to {expected_size} bytes"
+                )
 
             # Get palette
             if palette_index is None:
@@ -80,7 +80,7 @@ class TileRenderer:
             # Create output image
             width_pixels = width_tiles * 8
             height_pixels = height_tiles * 8
-            image = Image.new('RGBA', (width_pixels, height_pixels), (0, 0, 0, 0))
+            image = Image.new("RGBA", (width_pixels, height_pixels), (0, 0, 0, 0))
             pixels = image.load()
 
             # Check if pixels is None (can happen if image.load() fails)
@@ -97,9 +97,7 @@ class TileRenderer:
                         continue
 
                     # Decode the tile
-                    tile_pixels = decode_4bpp_tile(
-                        tile_data[tile_offset:tile_offset + bytes_per_tile]
-                    )
+                    tile_pixels = decode_4bpp_tile(tile_data[tile_offset : tile_offset + bytes_per_tile])
 
                     # Apply palette and draw to image
                     for y in range(8):
@@ -128,11 +126,7 @@ class TileRenderer:
             return None
 
     def render_sprite_preview(
-        self,
-        sprite_data: bytes,
-        palette_index: int = 8,
-        max_width: int = 256,
-        max_height: int = 256
+        self, sprite_data: bytes, palette_index: int = 8, max_width: int = 256, max_height: int = 256
     ) -> Image.Image | None:
         """
         Render a sprite preview with automatic layout.

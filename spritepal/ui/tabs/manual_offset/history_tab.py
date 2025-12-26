@@ -29,6 +29,7 @@ from utils.sprite_history_manager import SpriteHistoryManager
 
 logger = get_logger(__name__)
 
+
 class SimpleHistoryTab(QWidget):
     """
     History tab for tracking and navigating to previously found sprites.

@@ -1,6 +1,7 @@
 """
 Dialog components for SpritePal UI
 """
+
 from __future__ import annotations
 
 # Import dialog components
@@ -15,11 +16,11 @@ from .user_error_dialog import UserErrorDialog
 ManualOffsetDialog = UnifiedManualOffsetDialog
 
 __all__ = [
-    "ManualOffsetDialog",           # Primary interface (unified dialog)
-    "OutputSettings",               # Output settings namedtuple
-    "OutputSettingsDialog",         # Output settings dialog
+    "ManualOffsetDialog",  # Primary interface (unified dialog)
+    "OutputSettings",  # Output settings namedtuple
+    "OutputSettingsDialog",  # Output settings dialog
     "ResumeScanDialog",
     "SettingsDialog",
-    "UnifiedManualOffsetDialog",    # Explicit new dialog name
-    "UserErrorDialog"
+    "UnifiedManualOffsetDialog",  # Explicit new dialog name
+    "UserErrorDialog",
 ]

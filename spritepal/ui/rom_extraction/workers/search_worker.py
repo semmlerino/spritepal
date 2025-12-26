@@ -1,4 +1,5 @@
 """Worker thread for searching next/previous valid sprite"""
+
 from __future__ import annotations
 
 import threading
@@ -17,6 +18,7 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 class SpriteSearchWorker(BaseWorker):
     """Worker thread for searching next/previous valid sprite.
 
@@ -34,8 +36,15 @@ class SpriteSearchWorker(BaseWorker):
     progress = Signal(int, int)
     """Emitted with search progress. Args: current_offset, total_offsets."""
 
-    def __init__(self, rom_path: str, start_offset: int, end_offset: int,
-                 direction: int, extractor: ROMExtractor, parent: QObject | None = None):
+    def __init__(
+        self,
+        rom_path: str,
+        start_offset: int,
+        end_offset: int,
+        direction: int,
+        extractor: ROMExtractor,
+        parent: QObject | None = None,
+    ):
         super().__init__(parent)
         self.rom_path = rom_path
         self.start_offset = start_offset
@@ -51,7 +60,7 @@ class SpriteSearchWorker(BaseWorker):
         self._parallel_finder = ParallelSpriteFinder(
             num_workers=2,  # Use fewer workers for single direction search
             chunk_size=0x20000,  # 128KB chunks for smaller search areas
-            step_size=self.step
+            step_size=self.step,
         )
         # Note: BaseWorker handles WorkerManager registration automatically
 
@@ -67,7 +76,7 @@ class SpriteSearchWorker(BaseWorker):
             if rom_size > MAX_ROM_SIZE:
                 self.error.emit(
                     f"ROM file too large: {rom_size:,} bytes (max: {MAX_ROM_SIZE:,})",
-                    ValueError(f"ROM exceeds max size of {MAX_ROM_SIZE}")
+                    ValueError(f"ROM exceeds max size of {MAX_ROM_SIZE}"),
                 )
                 return
 
@@ -115,7 +124,7 @@ class SpriteSearchWorker(BaseWorker):
                 start_offset=search_start,
                 end_offset=search_end,
                 progress_callback=progress_callback,
-                cancellation_token=self._cancellation_token
+                cancellation_token=self._cancellation_token,
             )
 
             # Filter results by quality threshold and find the best match

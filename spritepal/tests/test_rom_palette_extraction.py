@@ -1,6 +1,7 @@
 """
 Test ROM palette extraction functionality
 """
+
 from __future__ import annotations
 
 import json
@@ -17,6 +18,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
 ]
+
 
 class TestROMPaletteExtraction:
     """Test ROM palette extraction"""
@@ -64,9 +66,7 @@ class TestROMPaletteExtraction:
             output_base = str(Path(tmpdir) / "test_sprite")
 
             # Extract palette 8
-            files = self.extractor.extract_palettes_from_rom(
-                rom_path, palette_offset, [8], output_base
-            )
+            files = self.extractor.extract_palettes_from_rom(rom_path, palette_offset, [8], output_base)
 
             assert len(files) == 1
             assert Path(files[0]).exists()
@@ -91,16 +91,14 @@ class TestROMPaletteExtraction:
             output_base = str(Path(tmpdir) / "test_sprite")
 
             # Extract palettes 8-11 (typical Kirby palettes)
-            files = self.extractor.extract_palettes_from_rom(
-                rom_path, palette_offset, [8, 9, 10, 11], output_base
-            )
+            files = self.extractor.extract_palettes_from_rom(rom_path, palette_offset, [8, 9, 10, 11], output_base)
 
             assert len(files) == 4
 
             # Verify all files exist and have correct names
             for idx, pal_file in enumerate(files):
                 assert Path(pal_file).exists()
-                assert f"_pal{8+idx}.pal.json" in pal_file
+                assert f"_pal{8 + idx}.pal.json" in pal_file
 
     def test_palette_bgr555_conversion(self):
         """Test BGR555 to RGB888 conversion"""
@@ -128,9 +126,7 @@ class TestROMPaletteExtraction:
 
             # Extract palette
             output_base = str(Path(tmpdir) / "test")
-            files = self.extractor.extract_palettes_from_rom(
-                str(rom_path), palette_offset, [0], output_base
-            )
+            files = self.extractor.extract_palettes_from_rom(str(rom_path), palette_offset, [0], output_base)
 
             # Load and verify colors
             with Path(files[0]).open() as f:
@@ -154,9 +150,7 @@ class TestROMPaletteExtraction:
             "sprites": {"kirby_normal": {"palette_indices": [8, 9, 10, 11]}},
         }
 
-        offset, indices = self.extractor.get_palette_config_from_sprite_config(
-            game_config, "kirby_normal"
-        )
+        offset, indices = self.extractor.get_palette_config_from_sprite_config(game_config, "kirby_normal")
 
         assert offset == 0x288000
         assert indices == [8, 9, 10, 11]
@@ -167,9 +161,7 @@ class TestROMPaletteExtraction:
             rom_path, palette_offset = self.create_test_rom_with_palettes(tmpdir)
 
             # Extract palettes 8-11
-            palettes = self.extractor.extract_palette_range(
-                rom_path, palette_offset, 8, 11
-            )
+            palettes = self.extractor.extract_palette_range(rom_path, palette_offset, 8, 11)
 
             assert len(palettes) == 4
             assert 8 in palettes
@@ -179,6 +171,7 @@ class TestROMPaletteExtraction:
             for idx in range(8, 12):
                 assert len(palettes[idx]) == 16
                 assert all(len(color) == 3 for color in palettes[idx])
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

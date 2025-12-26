@@ -37,11 +37,11 @@ if TYPE_CHECKING:
 
 # ROM size presets
 ROM_SIZES = {
-    "tiny": 13 * 1024,       # 13KB - minimal for quick tests
-    "small": 32 * 1024,      # 32KB
-    "medium": 512 * 1024,    # 512KB (LoROM)
+    "tiny": 13 * 1024,  # 13KB - minimal for quick tests
+    "small": 32 * 1024,  # 32KB
+    "medium": 512 * 1024,  # 512KB (LoROM)
     "default": 1024 * 1024,  # 1MB - most common
-    "large": 2 * 1024 * 1024, # 2MB
+    "large": 2 * 1024 * 1024,  # 2MB
 }
 
 
@@ -59,7 +59,7 @@ def _create_snes_header(data: bytearray, is_lorom: bool = True) -> None:
 
     # Game title (21 bytes, ASCII padded with spaces)
     title = b"TEST ROM DATA        "[:21]
-    data[header_offset:header_offset + 21] = title
+    data[header_offset : header_offset + 21] = title
 
     # Map mode (byte 21): 0x20 = LoROM, 0x21 = HiROM
     data[header_offset + 21] = 0x20 if is_lorom else 0x21
@@ -86,7 +86,7 @@ def _create_snes_header(data: bytearray, is_lorom: bool = True) -> None:
 
     # Checksum complement and checksum (bytes 28-31)
     # Simple placeholder values
-    data[header_offset + 28:header_offset + 32] = b'\xFF\xFF\x00\x00'
+    data[header_offset + 28 : header_offset + 32] = b"\xff\xff\x00\x00"
 
 
 def _add_sprite_patterns(data: bytearray, offsets: list[int] | None = None) -> None:

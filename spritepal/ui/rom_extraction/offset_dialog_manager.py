@@ -4,6 +4,7 @@ Offset dialog manager for ROM extraction panel.
 This module manages the ManualOffsetDialog lifecycle per-manager instance,
 providing a clean interface for opening, closing, and tracking the dialog state.
 """
+
 from __future__ import annotations
 
 import threading

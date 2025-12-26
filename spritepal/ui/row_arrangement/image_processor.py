@@ -1,6 +1,7 @@
 """
 Image processing for sprite row extraction
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -46,9 +47,7 @@ class RowImageProcessor:
         else:
             return image
 
-    def calculate_tile_dimensions(
-        self, image: Image.Image, tiles_per_row: int
-    ) -> tuple[int, int]:
+    def calculate_tile_dimensions(self, image: Image.Image, tiles_per_row: int) -> tuple[int, int]:
         """Calculate tile dimensions based on image width and tiles per row
 
         Args:
@@ -113,9 +112,7 @@ class RowImageProcessor:
 
         return tile_rows
 
-    def process_sprite_sheet(
-        self, sprite_path: str, tiles_per_row: int
-    ) -> tuple[Image.Image, list[dict[str, Any]]]:  # pyright: ignore[reportExplicitAny] - Row metadata
+    def process_sprite_sheet(self, sprite_path: str, tiles_per_row: int) -> tuple[Image.Image, list[dict[str, Any]]]:  # pyright: ignore[reportExplicitAny] - Row metadata
         """Complete sprite processing pipeline
 
         Args:

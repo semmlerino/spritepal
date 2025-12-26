@@ -66,6 +66,7 @@ def get_main_thread():
     app = QApplication.instance()
     return app.thread() if app else None
 
+
 from ui.components.base.cleanup_dialog import CleanupDialog
 from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
@@ -113,7 +114,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         rom_extractor: ROMExtractor | None = None,
     ) -> None:
         # Debug logging for singleton tracking
-        logger.debug(f"Creating UnifiedManualOffsetDialog instance (parent: {parent.__class__.__name__ if parent else 'None'})")
+        logger.debug(
+            f"Creating UnifiedManualOffsetDialog instance (parent: {parent.__class__.__name__ if parent else 'None'})"
+        )
 
         # UI Components - declare BEFORE super().__init__()
         self.tab_widget: QTabWidget | None = None
@@ -145,7 +148,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # rom_extractor can be obtained from extraction_manager if not provided
         if rom_extractor is None:
-            self.rom_extractor: ROMExtractor | None = cast('ROMExtractor | None', self.extraction_manager.get_rom_extractor())
+            self.rom_extractor: ROMExtractor | None = cast(
+                "ROMExtractor | None", self.extraction_manager.get_rom_extractor()
+            )
         else:
             self.rom_extractor = rom_extractor
 
@@ -162,7 +167,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._preview_timer: QTimer | None = None
 
         # Debug ID for tracking
-        self._debug_id = f"dialog_{int(time.time()*1000)}"
+        self._debug_id = f"dialog_{int(time.time() * 1000)}"
         logger.debug(f"Dialog debug ID: {self._debug_id}")
 
         super().__init__(
@@ -173,7 +178,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             min_size=(800, 500),  # Smaller minimum
             with_status_bar=False,
             orientation=Qt.Orientation.Horizontal,
-            splitter_handle_width=8  # Thinner splitter handle
+            splitter_handle_width=8,  # Thinner splitter handle
         )
 
         # Initialize view state manager with injected settings_manager
@@ -220,6 +225,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         except Exception as e:
             logger.error(f"Error in _setup_ui: {e}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             # Don't re-raise - this might be causing the dialog deletion
             logger.error("Continuing despite _setup_ui error to avoid dialog deletion")
@@ -255,10 +261,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Status panel - expanded by default for better visibility
         self.status_collapsible = CollapsibleGroupBox("Status", collapsed=False)
-        self.status_panel = StatusPanel(
-            settings_manager=self.settings_manager,
-            rom_cache=self.rom_cache
-        )
+        self.status_panel = StatusPanel(settings_manager=self.settings_manager, rom_cache=self.rom_cache)
         self.status_collapsible.add_widget(self.status_panel)
 
         # Add context menu for cache management
@@ -330,7 +333,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Bookmark management buttons (center)
         bookmark_btn = QPushButton("Add Bookmark")
         bookmark_btn.setToolTip("Save current offset to bookmarks (Ctrl+D)")
-        bookmark_btn.clicked.connect(lambda: self._bookmark_manager.add_bookmark(self.get_current_offset()) if self._bookmark_manager else None)
+        bookmark_btn.clicked.connect(
+            lambda: self._bookmark_manager.add_bookmark(self.get_current_offset()) if self._bookmark_manager else None
+        )
         self.button_box.addButton(bookmark_btn, self.button_box.ButtonRole.ActionRole)
 
         bookmarks_menu_btn = QPushButton("Bookmarks ▼")
@@ -364,15 +369,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         assert self._smart_preview_coordinator is not None  # Just assigned
 
         # Use AutoConnection (default) to let Qt choose the best connection type
-        coordinator.preview_ready.connect(
-            self._on_smart_preview_ready
-        )
-        coordinator.preview_cached.connect(
-            self._on_smart_preview_cached
-        )
-        coordinator.preview_error.connect(
-            self._on_smart_preview_error
-        )
+        coordinator.preview_ready.connect(self._on_smart_preview_ready)
+        coordinator.preview_cached.connect(self._on_smart_preview_cached)
+        coordinator.preview_error.connect(self._on_smart_preview_error)
 
         # Setup ROM data provider
         coordinator.set_rom_data_provider(self._get_rom_data_for_preview)
@@ -418,7 +417,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     def _on_offset_changed(self, offset: int) -> None:
         """Handle offset changes from browse tab."""
         # Prevent re-entrant calls for the same offset
-        if hasattr(self, '_last_offset_processed') and self._last_offset_processed == offset:
+        if hasattr(self, "_last_offset_processed") and self._last_offset_processed == offset:
             return
         self._last_offset_processed = offset
 
@@ -702,7 +701,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             self.rom_path = rom_path
             self.rom_size = rom_size
             self.extraction_manager = extraction_manager
-            self.rom_extractor = cast('ROMExtractor | None', extraction_manager.get_rom_extractor())
+            self.rom_extractor = cast("ROMExtractor | None", extraction_manager.get_rom_extractor())
 
         # Update tabs with new ROM data
         if self.browse_tab is not None:
@@ -759,13 +758,17 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     def _on_smart_preview_ready(self, tile_data: bytes, width: int, height: int, sprite_name: str):
         """Handle preview ready from smart coordinator with guaranteed UI updates."""
         logger.info("[PREVIEW_READY] ========== START ===========")
-        logger.info(f"[PREVIEW_READY] data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}")
+        logger.info(
+            f"[PREVIEW_READY] data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}"
+        )
         logger.debug(f"[PREVIEW_READY] tile_data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}")
 
         # CRITICAL: Verify we're on main thread before calling widget methods
         current_thread = QThread.currentThread()
         main_thread = get_main_thread()
-        logger.debug(f"[THREAD_CHECK] Current thread: {current_thread}, Main thread: {main_thread}, Same: {current_thread == main_thread}")
+        logger.debug(
+            f"[THREAD_CHECK] Current thread: {current_thread}, Main thread: {main_thread}, Same: {current_thread == main_thread}"
+        )
 
         if current_thread != main_thread:
             logger.error("[THREAD_SAFETY] _on_smart_preview_ready called from worker thread!")
@@ -796,7 +799,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
             # Log pixmap state after loading for debugging
             try:
-                if hasattr(self.preview_widget, 'preview_label') and self.preview_widget.preview_label:
+                if hasattr(self.preview_widget, "preview_label") and self.preview_widget.preview_label:
                     pixmap = self.preview_widget.preview_label.pixmap()
                     # QLabel.pixmap() always returns a QPixmap, check if it's null/empty instead
                     logger.info(f"[PREVIEW_READY] Final pixmap state: null={pixmap.isNull()}")
@@ -818,8 +821,12 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def _on_smart_preview_cached(self, tile_data: bytes, width: int, height: int, sprite_name: str):
         """Handle cached preview from smart coordinator."""
-        logger.debug(f"[SIGNAL_RECEIVED] _on_smart_preview_cached called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}")
-        logger.debug(f"[SIGNAL_RECEIVED] cached tile_data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}")
+        logger.debug(
+            f"[SIGNAL_RECEIVED] _on_smart_preview_cached called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}"
+        )
+        logger.debug(
+            f"[SIGNAL_RECEIVED] cached tile_data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}"
+        )
 
         # CRITICAL: Verify we're on main thread before calling widget methods
         if QThread.currentThread() != get_main_thread():
@@ -859,7 +866,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # CRITICAL: Verify we're on main thread before calling widget methods
         current_thread = QThread.currentThread()
         main_thread = get_main_thread()
-        logger.debug(f"[THREAD_CHECK] Current thread: {current_thread}, Main thread: {main_thread}, Same: {current_thread == main_thread}")
+        logger.debug(
+            f"[THREAD_CHECK] Current thread: {current_thread}, Main thread: {main_thread}, Same: {current_thread == main_thread}"
+        )
 
         if current_thread != main_thread:
             logger.error("[THREAD_SAFETY] _on_smart_preview_error called from worker thread!")
@@ -958,7 +967,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             return
 
         # Check if we have ROM data available
-        if not hasattr(self, '_get_rom_data_for_preview'):
+        if not hasattr(self, "_get_rom_data_for_preview"):
             return
 
         rom_data = self._get_rom_data_for_preview()
@@ -1153,11 +1162,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """Show go to offset dialog"""
 
         current = self.get_current_offset()
-        text, ok = QInputDialog.getText(
-            self, "Go to Offset",
-            "Enter offset (hex or decimal):",
-            text=f"0x{current:06X}"
-        )
+        text, ok = QInputDialog.getText(self, "Go to Offset", "Enter offset (hex or decimal):", text=f"0x{current:06X}")
 
         if ok and text:
             try:

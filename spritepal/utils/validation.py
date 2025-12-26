@@ -5,6 +5,7 @@ These functions provide common validation patterns used throughout
 the codebase. They were extracted from BaseManager to enable reuse
 without requiring inheritance.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeVar
@@ -18,9 +19,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-def validate_required_params(
-    params: Mapping[str, object], required: list[str]
-) -> None:
+def validate_required_params(params: Mapping[str, object], required: list[str]) -> None:
     """
     Validate that required parameters are present and not None.
 
@@ -36,9 +35,7 @@ def validate_required_params(
         raise ValidationError(f"Missing required parameters: {', '.join(missing)}")
 
 
-def validate_type(
-    value: object, name: str, expected_type: type[object]
-) -> None:
+def validate_type(value: object, name: str, expected_type: type[object]) -> None:
     """
     Validate that a value has the expected type.
 
@@ -52,8 +49,7 @@ def validate_type(
     """
     if not isinstance(value, expected_type):
         raise ValidationError(
-            f"Invalid type for '{name}': expected {expected_type.__name__}, "
-            f"got {type(value).__name__}"
+            f"Invalid type for '{name}': expected {expected_type.__name__}, got {type(value).__name__}"
         )
 
 

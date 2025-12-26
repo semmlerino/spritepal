@@ -3,6 +3,7 @@ Unit tests for refactored UI components
 
 Uses isolated_managers fixture from core_fixtures.py for test isolation.
 """
+
 from __future__ import annotations
 
 import sys
@@ -116,6 +117,7 @@ class TestROMMapWidget:
         # Verify resources cleared
         assert len(widget.found_sprites) == 0
 
+
 @pytest.mark.usefixtures("isolated_managers")
 class TestScanControlsPanel:
     """Test ScanControlsPanel functionality"""
@@ -136,7 +138,6 @@ class TestScanControlsPanel:
 
         panel = ScanControlsPanel(parent_widget, rom_cache=get_app_context().rom_cache)
         qtbot.addWidget(panel)
-
 
     def test_scan_parameters_validation(self, qtbot):
         """Test scan parameter validation"""
@@ -161,6 +162,7 @@ class TestScanControlsPanel:
         assert is_valid is True, "Valid scan parameters should pass validation"
         assert end_offset > start_offset, "End offset should be greater than start offset"
 
+
 @pytest.mark.usefixtures("isolated_managers")
 class TestImportExportPanel:
     """Test ImportExportPanel functionality"""
@@ -180,7 +182,6 @@ class TestImportExportPanel:
 
         panel = ImportExportPanel(parent_widget)
         qtbot.addWidget(panel)
-
 
     def test_file_operations(self, qtbot):
         """Test file import/export operations"""
@@ -204,6 +205,7 @@ class TestImportExportPanel:
         panel.set_found_sprites(test_sprites)
         assert panel.found_sprites == test_sprites
 
+
 @pytest.mark.usefixtures("isolated_managers")
 class TestStatusPanel:
     """Test StatusPanel functionality"""
@@ -224,12 +226,9 @@ class TestStatusPanel:
 
         context = get_app_context()
         panel = StatusPanel(
-            parent_widget,
-            settings_manager=context.application_state_manager,
-            rom_cache=context.rom_cache
+            parent_widget, settings_manager=context.application_state_manager, rom_cache=context.rom_cache
         )
         qtbot.addWidget(panel)
-
 
     def test_status_updates(self, qtbot):
         """Test status message updates"""
@@ -243,9 +242,7 @@ class TestStatusPanel:
 
         context = get_app_context()
         panel = StatusPanel(
-            parent_widget,
-            settings_manager=context.application_state_manager,
-            rom_cache=context.rom_cache
+            parent_widget, settings_manager=context.application_state_manager, rom_cache=context.rom_cache
         )
         qtbot.addWidget(panel)
 

@@ -21,7 +21,7 @@ class FileDialogHelper:
         title: str = "Select Directory",
         initial_dir: str = "",
         settings_key: str | None = None,
-        settings_namespace: str = "file_dialogs"
+        settings_namespace: str = "file_dialogs",
     ) -> str:
         """
         Browse for directory with standardized behavior
@@ -50,10 +50,7 @@ class FileDialogHelper:
 
         # Show directory dialog
         directory = QFileDialog.getExistingDirectory(
-            parent,
-            title,
-            str(start_dir),
-            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks
+            parent, title, str(start_dir), QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks
         )
 
         if directory:
@@ -71,7 +68,7 @@ class FileDialogHelper:
         file_filter: str = "All Files (*.*)",
         initial_path: str = "",
         settings_key: str | None = None,
-        settings_namespace: str = "file_dialogs"
+        settings_namespace: str = "file_dialogs",
     ) -> str:
         """
         Returns:
@@ -93,12 +90,7 @@ class FileDialogHelper:
             start_path = settings.get_default_directory()
 
         # Show open file dialog
-        filename, _ = QFileDialog.getOpenFileName(
-            parent,
-            title,
-            str(start_path),
-            file_filter
-        )
+        filename, _ = QFileDialog.getOpenFileName(parent, title, str(start_path), file_filter)
 
         if filename:
             # Save to settings for future use
@@ -115,7 +107,7 @@ class FileDialogHelper:
         file_filter: str = "All Files (*.*)",
         initial_path: str = "",
         settings_key: str | None = None,
-        settings_namespace: str = "file_dialogs"
+        settings_namespace: str = "file_dialogs",
     ) -> str:
         """
         Browse for file to save with standardized behavior
@@ -147,12 +139,7 @@ class FileDialogHelper:
             start_path = settings.get_default_directory()
 
         # Show save file dialog
-        filename, _ = QFileDialog.getSaveFileName(
-            parent,
-            title,
-            str(start_path),
-            file_filter
-        )
+        filename, _ = QFileDialog.getSaveFileName(parent, title, str(start_path), file_filter)
 
         if filename:
             # Save to settings for future use
@@ -164,9 +151,7 @@ class FileDialogHelper:
 
     @staticmethod
     def get_smart_initial_directory(
-        current_path: str = "",
-        fallback_setting: str | None = None,
-        fallback_namespace: str = "file_dialogs"
+        current_path: str = "", fallback_setting: str | None = None, fallback_namespace: str = "file_dialogs"
     ) -> str:
         """
         Get smart initial directory for file dialogs
@@ -200,29 +185,28 @@ class FileDialogHelper:
         # Use default directory
         return settings.get_default_directory()
 
+
 # Convenience functions for common dialog patterns
-def browse_for_directory(
-    parent: QWidget | None = None,
-    title: str = "Select Directory",
-    initial_dir: str = ""
-) -> str:
+def browse_for_directory(parent: QWidget | None = None, title: str = "Select Directory", initial_dir: str = "") -> str:
     """Convenience function for simple directory browsing"""
     return FileDialogHelper.browse_directory(parent, title, initial_dir)
+
 
 def browse_for_open_file(
     parent: QWidget | None = None,
     title: str = "Open File",
     file_filter: str = "All Files (*.*)",
-    initial_path: str = ""
+    initial_path: str = "",
 ) -> str:
     """Convenience function for simple file opening"""
     return FileDialogHelper.browse_open_file(parent, title, file_filter, initial_path)
+
 
 def browse_for_save_file(
     parent: QWidget | None = None,
     title: str = "Save File",
     file_filter: str = "All Files (*.*)",
-    initial_path: str = ""
+    initial_path: str = "",
 ) -> str:
     """Convenience function for simple file saving"""
     return FileDialogHelper.browse_save_file(parent, title, file_filter, initial_path)

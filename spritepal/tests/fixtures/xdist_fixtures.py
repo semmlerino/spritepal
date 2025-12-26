@@ -124,4 +124,3 @@ def configure_worker_environment(worker_temp_root: Path) -> Iterator[None]:
         os.environ.pop("SPRITEPAL_CACHE_DIR", None)
         os.environ.pop("SPRITEPAL_LOG_DIR", None)
         os.environ.pop("SPRITEPAL_WORKER_ID", None)
-

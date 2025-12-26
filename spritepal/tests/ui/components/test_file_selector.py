@@ -65,31 +65,21 @@ class TestFileSelectorInit:
         assert hasattr(w, "label")
         assert w.label.text() == "ROM File:"
 
-    def test_init_with_placeholder(
-        self, qtbot: QtBot, mock_settings: Mock
-    ) -> None:
+    def test_init_with_placeholder(self, qtbot: QtBot, mock_settings: Mock) -> None:
         """Verify custom placeholder text."""
-        w = FileSelector(
-            placeholder="Select a file...", settings_manager=mock_settings
-        )
+        w = FileSelector(placeholder="Select a file...", settings_manager=mock_settings)
         qtbot.addWidget(w)
         assert w.path_edit.placeholderText() == "Select a file..."
 
-    def test_init_with_browse_text(
-        self, qtbot: QtBot, mock_settings: Mock
-    ) -> None:
+    def test_init_with_browse_text(self, qtbot: QtBot, mock_settings: Mock) -> None:
         """Verify custom browse button text."""
         w = FileSelector(browse_text="Open...", settings_manager=mock_settings)
         qtbot.addWidget(w)
         assert w.browse_button.text() == "Open..."
 
-    def test_init_with_initial_path(
-        self, qtbot: QtBot, mock_settings: Mock
-    ) -> None:
+    def test_init_with_initial_path(self, qtbot: QtBot, mock_settings: Mock) -> None:
         """Verify initial path is set."""
-        w = FileSelector(
-            initial_path="/path/to/file.rom", settings_manager=mock_settings
-        )
+        w = FileSelector(initial_path="/path/to/file.rom", settings_manager=mock_settings)
         qtbot.addWidget(w)
         assert w.get_path() == "/path/to/file.rom"
 
@@ -133,9 +123,7 @@ class TestFileSelectorPathOperations:
 class TestFileSelectorSignals:
     """Tests for signal emission."""
 
-    def test_path_changed_emits_on_text_change(
-        self, qtbot: QtBot, widget: FileSelector
-    ) -> None:
+    def test_path_changed_emits_on_text_change(self, qtbot: QtBot, widget: FileSelector) -> None:
         """path_changed emits when text changes."""
         received_paths: list[str] = []
 
@@ -149,9 +137,7 @@ class TestFileSelectorSignals:
         assert len(received_paths) == 1
         assert received_paths[0] == "/new/path.rom"
 
-    def test_file_selected_emits_on_browse(
-        self, qtbot: QtBot, widget: FileSelector
-    ) -> None:
+    def test_file_selected_emits_on_browse(self, qtbot: QtBot, widget: FileSelector) -> None:
         """file_selected emits when file is selected via browse."""
         received_files: list[str] = []
 
@@ -161,9 +147,7 @@ class TestFileSelectorSignals:
         _ = widget.file_selected.connect(capture)
 
         # Mock the file dialog helper to return a file
-        with patch(
-            "ui.components.inputs.file_selector.FileDialogHelper"
-        ) as mock_helper:
+        with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = "/selected/file.rom"
 
             widget._browse_file()
@@ -180,67 +164,47 @@ class TestFileSelectorValidation:
         widget.set_path("")
         assert widget.is_valid() is True
 
-    def test_is_valid_existing_file_open_mode(
-        self, widget: FileSelector, existing_file: Path
-    ) -> None:
+    def test_is_valid_existing_file_open_mode(self, widget: FileSelector, existing_file: Path) -> None:
         """Existing file is valid in open mode."""
         widget.set_path(str(existing_file))
         assert widget.is_valid() is True
 
-    def test_is_valid_nonexistent_file_open_mode(
-        self, widget: FileSelector, tmp_path: Path
-    ) -> None:
+    def test_is_valid_nonexistent_file_open_mode(self, widget: FileSelector, tmp_path: Path) -> None:
         """Non-existent file is invalid in open mode."""
         widget.set_path(str(tmp_path / "nonexistent.rom"))
         assert widget.is_valid() is False
 
-    def test_is_valid_directory_open_mode(
-        self, widget: FileSelector, tmp_path: Path
-    ) -> None:
+    def test_is_valid_directory_open_mode(self, widget: FileSelector, tmp_path: Path) -> None:
         """Directory is invalid in open mode (expects file)."""
         widget.set_path(str(tmp_path))
         assert widget.is_valid() is False
 
-    def test_is_valid_existing_parent_save_mode(
-        self, widget_save_mode: FileSelector, tmp_path: Path
-    ) -> None:
+    def test_is_valid_existing_parent_save_mode(self, widget_save_mode: FileSelector, tmp_path: Path) -> None:
         """File with existing parent directory is valid in save mode."""
         widget_save_mode.set_path(str(tmp_path / "newfile.rom"))
         assert widget_save_mode.is_valid() is True
 
-    def test_is_valid_nonexistent_parent_save_mode(
-        self, widget_save_mode: FileSelector, tmp_path: Path
-    ) -> None:
+    def test_is_valid_nonexistent_parent_save_mode(self, widget_save_mode: FileSelector, tmp_path: Path) -> None:
         """File with non-existent parent directory is invalid in save mode."""
-        widget_save_mode.set_path(
-            str(tmp_path / "nonexistent_dir" / "newfile.rom")
-        )
+        widget_save_mode.set_path(str(tmp_path / "nonexistent_dir" / "newfile.rom"))
         assert widget_save_mode.is_valid() is False
 
 
 class TestFileSelectorBrowse:
     """Tests for browse functionality."""
 
-    def test_browse_open_mode_calls_helper(
-        self, widget: FileSelector
-    ) -> None:
+    def test_browse_open_mode_calls_helper(self, widget: FileSelector) -> None:
         """Browse in open mode calls browse_open_file."""
-        with patch(
-            "ui.components.inputs.file_selector.FileDialogHelper"
-        ) as mock_helper:
+        with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = None
 
             widget._browse_file()
 
             mock_helper.browse_open_file.assert_called_once()
 
-    def test_browse_save_mode_calls_helper(
-        self, widget_save_mode: FileSelector
-    ) -> None:
+    def test_browse_save_mode_calls_helper(self, widget_save_mode: FileSelector) -> None:
         """Browse in save mode calls browse_save_file."""
-        with patch(
-            "ui.components.inputs.file_selector.FileDialogHelper"
-        ) as mock_helper:
+        with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_save_file.return_value = None
 
             widget_save_mode._browse_file()
@@ -249,62 +213,44 @@ class TestFileSelectorBrowse:
 
     def test_browse_updates_path(self, widget: FileSelector) -> None:
         """Browse updates path on selection."""
-        with patch(
-            "ui.components.inputs.file_selector.FileDialogHelper"
-        ) as mock_helper:
+        with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = "/selected/file.rom"
 
             widget._browse_file()
 
             assert widget.get_path() == "/selected/file.rom"
 
-    def test_browse_no_selection_keeps_path(
-        self, widget: FileSelector
-    ) -> None:
+    def test_browse_no_selection_keeps_path(self, widget: FileSelector) -> None:
         """Browse with no selection keeps current path."""
         widget.set_path("/original/path.rom")
 
-        with patch(
-            "ui.components.inputs.file_selector.FileDialogHelper"
-        ) as mock_helper:
+        with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = None  # No selection
 
             widget._browse_file()
 
             assert widget.get_path() == "/original/path.rom"
 
-    def test_browse_calls_selection_callback(
-        self, qtbot: QtBot, mock_settings: Mock
-    ) -> None:
+    def test_browse_calls_selection_callback(self, qtbot: QtBot, mock_settings: Mock) -> None:
         """Browse calls selection callback on file selection."""
         callback = Mock()
-        w = FileSelector(
-            selection_callback=callback, settings_manager=mock_settings
-        )
+        w = FileSelector(selection_callback=callback, settings_manager=mock_settings)
         qtbot.addWidget(w)
 
-        with patch(
-            "ui.components.inputs.file_selector.FileDialogHelper"
-        ) as mock_helper:
+        with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = "/selected/file.rom"
 
             w._browse_file()
 
             callback.assert_called_once_with("/selected/file.rom")
 
-    def test_browse_callback_exception_handled(
-        self, qtbot: QtBot, mock_settings: Mock
-    ) -> None:
+    def test_browse_callback_exception_handled(self, qtbot: QtBot, mock_settings: Mock) -> None:
         """Browse handles callback exceptions gracefully."""
         callback = Mock(side_effect=RuntimeError("callback error"))
-        w = FileSelector(
-            selection_callback=callback, settings_manager=mock_settings
-        )
+        w = FileSelector(selection_callback=callback, settings_manager=mock_settings)
         qtbot.addWidget(w)
 
-        with patch(
-            "ui.components.inputs.file_selector.FileDialogHelper"
-        ) as mock_helper:
+        with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = "/selected/file.rom"
 
             # Should not raise
@@ -343,9 +289,7 @@ class TestFileSelectorUI:
         widget.set_browse_enabled(True)
         assert widget.browse_button.isEnabled() is True
 
-    def test_setFocus_without_reason(
-        self, qtbot: QtBot, widget: FileSelector
-    ) -> None:
+    def test_setFocus_without_reason(self, qtbot: QtBot, widget: FileSelector) -> None:
         """setFocus without reason sets focus on path_edit."""
         widget.show()
         QApplication.processEvents()
@@ -355,9 +299,7 @@ class TestFileSelectorUI:
 
         assert widget.path_edit.hasFocus()
 
-    def test_setFocus_with_reason(
-        self, qtbot: QtBot, widget: FileSelector
-    ) -> None:
+    def test_setFocus_with_reason(self, qtbot: QtBot, widget: FileSelector) -> None:
         """setFocus with reason sets focus on path_edit."""
         widget.show()
         QApplication.processEvents()

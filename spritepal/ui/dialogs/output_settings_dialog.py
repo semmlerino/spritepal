@@ -4,6 +4,7 @@ Output settings dialog for extraction configuration.
 This dialog is shown before extraction to configure output name and options,
 removing the need for a permanent output settings panel in the main window.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -174,12 +175,7 @@ class OutputSettingsDialog(DialogBase):
         current_name = self.output_name_edit.text()
         suggested_path = str(Path(self._default_directory) / f"{current_name}.png")
 
-        filename = browse_for_save_file(
-            self,
-            "Save Sprites As",
-            "PNG Files (*.png)",
-            suggested_path
-        )
+        filename = browse_for_save_file(self, "Save Sprites As", "PNG Files (*.png)", suggested_path)
 
         if filename:
             # Update output name without extension

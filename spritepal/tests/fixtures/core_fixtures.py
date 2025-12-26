@@ -30,6 +30,7 @@ Escape hatches:
     - @pytest.mark.allows_registry_state: Skip pollution detection
     - @pytest.mark.no_manager_setup: Skip manager initialization
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -77,12 +78,14 @@ _logger = logging.getLogger(__name__)
 
 # Fixtures that depend on session_managers (directly or transitively).
 # Tests using these fixtures are auto-serialized under xdist.
-SESSION_DEPENDENT_FIXTURES: frozenset[str] = frozenset({
-    'session_managers',      # Direct session-scoped fixture
-    'managers_initialized',  # Integration test fixture that modifies DI container
-    'extraction_manager',    # Uses session_managers for extraction operations
-    'mock_factory',          # Uses session_managers for mock factory setup
-})
+SESSION_DEPENDENT_FIXTURES: frozenset[str] = frozenset(
+    {
+        "session_managers",  # Direct session-scoped fixture
+        "managers_initialized",  # Integration test fixture that modifies DI container
+        "extraction_manager",  # Uses session_managers for extraction operations
+        "mock_factory",  # Uses session_managers for mock factory setup
+    }
+)
 
 
 @dataclass
@@ -99,6 +102,7 @@ class SessionState:
     If you need to check whether session managers are active, read `is_initialized`.
     Never set `is_initialized = True` outside of `session_managers` fixture.
     """
+
     settings_path: Path | None = None
     temp_dir: Path | None = None
     is_initialized: bool = False
@@ -145,6 +149,7 @@ def reset_all_singletons() -> None:
     not imported in non-mock tests).
     """
     import logging
+
     logger = logging.getLogger(__name__)
 
     def _try_reset(name: str, action: Callable[[], None]) -> None:
@@ -157,25 +162,33 @@ def reset_all_singletons() -> None:
     # Reset manager state
     def reset_manager_state() -> None:
         from core.managers import reset_for_tests
+
         reset_for_tests()
+
     _try_reset("managers", reset_manager_state)
 
     # Reset real HAL process pool
     def reset_hal_pool() -> None:
         from core.hal_compression import HALProcessPool
+
         HALProcessPool.reset_for_tests()
+
     _try_reset("HALProcessPool", reset_hal_pool)
 
     # Reset mock HAL process pool
     def reset_mock_hal() -> None:
         from tests.infrastructure.mock_hal import MockHALProcessPool
+
         MockHALProcessPool.reset_singleton()
+
     _try_reset("MockHALProcessPool", reset_mock_hal)
 
     # Clean up DataRepository
     def cleanup_data_repo() -> None:
         from tests.infrastructure.data_repository import cleanup_test_data_repository
+
         cleanup_test_data_repository()
+
     _try_reset("DataRepository", cleanup_data_repo)
 
     # NOTE: PreviewGenerator is now handled by AppContext cleanup (reset via reset_app_context)
@@ -183,9 +196,10 @@ def reset_all_singletons() -> None:
     # Cleanup all workers and clear registry (waits for thread termination)
     def cleanup_worker_registry() -> None:
         from core.services.worker_lifecycle import WorkerManager
-        WorkerManager.cleanup_all(timeout=500)  # Wait up to 500ms for each worker
-    _try_reset("WorkerManager", cleanup_worker_registry)
 
+        WorkerManager.cleanup_all(timeout=500)  # Wait up to 500ms for each worker
+
+    _try_reset("WorkerManager", cleanup_worker_registry)
 
 
 def reset_hal_singletons_only() -> None:
@@ -195,10 +209,12 @@ def reset_hal_singletons_only() -> None:
     """
     with contextlib.suppress(Exception):
         from core.hal_compression import HALProcessPool
+
         HALProcessPool.reset_singleton()
 
     with contextlib.suppress(Exception):
         from tests.infrastructure.mock_hal import MockHALProcessPool
+
         MockHALProcessPool.reset_singleton()
 
 
@@ -221,13 +237,13 @@ def _reset_manager_caches(_unused: Any = None) -> None:
 
     # Reset ApplicationStateManager with full_reset to clear settings
     state_mgr = ctx.application_state_manager
-    if hasattr(state_mgr, 'reset_state'):
+    if hasattr(state_mgr, "reset_state"):
         with contextlib.suppress(Exception):
             state_mgr.reset_state(full_reset=True)
 
     # Reset CoreOperationsManager without full_reset (preserves services)
     ops_mgr = ctx.core_operations_manager
-    if hasattr(ops_mgr, 'reset_state'):
+    if hasattr(ops_mgr, "reset_state"):
         with contextlib.suppress(Exception):
             ops_mgr.reset_state()
 
@@ -326,7 +342,7 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
         reset_for_tests,
     )
 
-    test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
+    test_name = request.node.name if request and hasattr(request, "node") else "<unknown>"
     session_active = _session_state.is_initialized
     session_settings_path = _session_state.settings_path
 
@@ -346,7 +362,8 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
                 _logger.warning(
                     "isolated_managers: Failed to cleanup session managers for test '%s': %s. "
                     "Subsequent tests may have corrupted state.",
-                    test_name, e
+                    test_name,
+                    e,
                 )
         else:
             # Managers initialized without session - likely test pollution
@@ -355,8 +372,7 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
                 cleanup_managers()
             except Exception as e:
                 _logger.warning(
-                    "isolated_managers: Failed to cleanup polluted managers for test '%s': %s",
-                    test_name, e
+                    "isolated_managers: Failed to cleanup polluted managers for test '%s': %s", test_name, e
                 )
             # If still initialized, fail with clear message
             if is_initialized():
@@ -395,7 +411,7 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
                 pytest.fail(
                     f"CRITICAL: Session managers restoration verification failed after '{test_name}'.\n"
                     "Managers are not initialized after restore attempt.",
-                    pytrace=False
+                    pytrace=False,
                 )
         except Exception as e:
             # Fail hard - silent restoration failures cause mysterious downstream failures
@@ -403,7 +419,7 @@ def isolated_managers(tmp_path: Path, request: FixtureRequest) -> Iterator[None]
                 f"CRITICAL: Failed to restore session managers after test '{test_name}': {e}\n"
                 "This will cause subsequent session_managers tests to fail.\n"
                 "Fix: Mark module with @pytest.mark.parallel_unsafe or convert to session_managers.",
-                pytrace=False
+                pytrace=False,
             )
 
     # Process events to ensure cleanup completes
@@ -434,13 +450,13 @@ def detect_session_manager_cleanup(request: FixtureRequest) -> Generator[None, N
         return
 
     # Check if test uses session_managers fixture (directly or via managers)
-    fixture_names = getattr(request, 'fixturenames', [])
-    uses_session_managers = 'session_managers' in fixture_names or 'managers' in fixture_names
+    fixture_names = getattr(request, "fixturenames", [])
+    uses_session_managers = "session_managers" in fixture_names or "managers" in fixture_names
 
     if uses_session_managers and _session_state.is_initialized:
         # Check if managers got cleaned up mid-session
         if not is_initialized() and _session_state.settings_path:
-            test_name = request.node.name if hasattr(request, 'node') else "<unknown>"
+            test_name = request.node.name if hasattr(request, "node") else "<unknown>"
             pytest.fail(
                 f"Test '{test_name}': Session managers were cleaned up mid-session. "
                 "A prior test using session_managers called cleanup_managers() directly. "
@@ -491,11 +507,11 @@ def clean_registry_state(request: FixtureRequest) -> Generator[None, None, None]
             app = QApplication([])
         initialize_managers("TestApp", settings_path=session_settings_path)
         if not is_initialized():
-            test_name = request.node.name if request and hasattr(request, 'node') else "<unknown>"
+            test_name = request.node.name if request and hasattr(request, "node") else "<unknown>"
             pytest.fail(
                 f"CRITICAL: Failed to restore session managers after test '{test_name}'.\n"
                 "Managers are not initialized after restore attempt.",
-                pytrace=False
+                pytrace=False,
             )
 
     if app and not IS_HEADLESS:
@@ -517,8 +533,8 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
     """
     from core.managers import is_initialized
 
-    fixture_names = getattr(request, 'fixturenames', [])
-    uses_session = 'session_managers' in fixture_names
+    fixture_names = getattr(request, "fixturenames", [])
+    uses_session = "session_managers" in fixture_names
 
     if not uses_session or not _session_state.is_initialized:
         yield
@@ -534,6 +550,7 @@ def auto_reset_session_state(request: FixtureRequest) -> Generator[None, None, N
 # ============================================================================
 # Real Component Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def isolated_data_repository(tmp_path: Path) -> Generator[Any, None, None]:
@@ -596,7 +613,7 @@ def real_factory(
     )
     yield factory
     # Cleanup will be handled by factory's cleanup method if needed
-    if hasattr(factory, 'cleanup'):
+    if hasattr(factory, "cleanup"):
         factory.cleanup()
 
 
@@ -671,6 +688,7 @@ def rom_cache(
 # Mock Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def mock_main_window(real_factory: RealComponentFactory) -> MainWindow:
     """Provide a fully configured mock main window using real components."""
@@ -680,6 +698,7 @@ def mock_main_window(real_factory: RealComponentFactory) -> MainWindow:
 # ============================================================================
 # Dependency Injection Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def manager_context_factory() -> Callable[..., ContextManager[Any]]:
@@ -702,8 +721,7 @@ def manager_context_factory() -> Callable[..., ContextManager[Any]]:
     )
 
     def _create_context(
-        managers: dict[str, Any] | list[str] | None = None,
-        name: str = "test_context"
+        managers: dict[str, Any] | list[str] | None = None, name: str = "test_context"
     ) -> ContextManager[_ManagerContextWrapper]:
         """
         Create a manager context for testing.

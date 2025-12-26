@@ -1,4 +1,5 @@
 """Integration tests adapted for headless environments"""
+
 from __future__ import annotations
 
 import sys
@@ -31,6 +32,7 @@ pytestmark = [
     pytest.mark.no_manager_setup,
 ]
 
+
 class TestVRAMExtractionWorkerHeadless:
     """Test VRAMExtractionWorker in headless environment"""
 
@@ -49,9 +51,7 @@ class TestVRAMExtractionWorkerHeadless:
         with patch.dict(
             "sys.modules",
             {
-                "PySide6.QtCore": MagicMock(
-                    QObject=mock_qobject, QThread=mock_qthread, Signal=mock_signal
-                ),
+                "PySide6.QtCore": MagicMock(QObject=mock_qobject, QThread=mock_qthread, Signal=mock_signal),
                 "PySide6.QtGui": MagicMock(QPixmap=mock_qpixmap),
             },
         ):
@@ -173,6 +173,7 @@ class TestVRAMExtractionWorkerHeadless:
         # 3. No error was emitted
         assert not error_mock.emit.called
 
+
 class TestWorkerBusinessLogic:
     """Test worker business logic extracted from Qt dependencies"""
 
@@ -210,9 +211,7 @@ class TestWorkerBusinessLogic:
 
         # Extract sprites
         output_file = f"{output_base}.png"
-        img, num_tiles = extractor.extract_sprites_grayscale(
-            str(vram_path), output_file
-        )
+        img, num_tiles = extractor.extract_sprites_grayscale(str(vram_path), output_file)
 
         assert Path(output_file).exists()
         # Default extraction uses VRAM_SPRITE_SIZE (0x4000 bytes = 512 tiles)

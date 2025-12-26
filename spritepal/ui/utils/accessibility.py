@@ -2,6 +2,7 @@
 Accessibility utilities for SpritePal UI components.
 Provides helpers for keyboard navigation, screen reader support, and focus management.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -34,31 +35,31 @@ class AccessibilityHelper:
 
     # Standard keyboard shortcuts for common actions
     STANDARD_SHORTCUTS = {
-        'open': QKeySequence.StandardKey.Open,
-        'save': QKeySequence.StandardKey.Save,
-        'save_as': QKeySequence.StandardKey.SaveAs,
-        'close': QKeySequence.StandardKey.Close,
-        'quit': QKeySequence.StandardKey.Quit,
-        'undo': QKeySequence.StandardKey.Undo,
-        'redo': QKeySequence.StandardKey.Redo,
-        'cut': QKeySequence.StandardKey.Cut,
-        'copy': QKeySequence.StandardKey.Copy,
-        'paste': QKeySequence.StandardKey.Paste,
-        'find': QKeySequence.StandardKey.Find,
-        'refresh': QKeySequence.StandardKey.Refresh,
-        'help': QKeySequence.StandardKey.HelpContents,
-        'fullscreen': 'F11',
-        'escape': 'Escape',
-        'extract': 'Ctrl+E',
-        'inject': 'Ctrl+I',
-        'scan': 'Ctrl+Shift+S',
-        'export': 'Ctrl+Shift+E',
-        'goto': 'Ctrl+G',
-        'preview': 'Ctrl+P',
-        'settings': 'Ctrl+,',
-        'zoom_in': 'Ctrl++',
-        'zoom_out': 'Ctrl+-',
-        'zoom_reset': 'Ctrl+0',
+        "open": QKeySequence.StandardKey.Open,
+        "save": QKeySequence.StandardKey.Save,
+        "save_as": QKeySequence.StandardKey.SaveAs,
+        "close": QKeySequence.StandardKey.Close,
+        "quit": QKeySequence.StandardKey.Quit,
+        "undo": QKeySequence.StandardKey.Undo,
+        "redo": QKeySequence.StandardKey.Redo,
+        "cut": QKeySequence.StandardKey.Cut,
+        "copy": QKeySequence.StandardKey.Copy,
+        "paste": QKeySequence.StandardKey.Paste,
+        "find": QKeySequence.StandardKey.Find,
+        "refresh": QKeySequence.StandardKey.Refresh,
+        "help": QKeySequence.StandardKey.HelpContents,
+        "fullscreen": "F11",
+        "escape": "Escape",
+        "extract": "Ctrl+E",
+        "inject": "Ctrl+I",
+        "scan": "Ctrl+Shift+S",
+        "export": "Ctrl+Shift+E",
+        "goto": "Ctrl+G",
+        "preview": "Ctrl+P",
+        "settings": "Ctrl+,",
+        "zoom_in": "Ctrl++",
+        "zoom_out": "Ctrl+-",
+        "zoom_reset": "Ctrl+0",
     }
 
     @staticmethod
@@ -88,9 +89,10 @@ class AccessibilityHelper:
             widget.setAccessibleDescription(f"{name} ({shortcut})")
 
         # Enable keyboard focus for interactive widgets
-        if isinstance(widget, (QPushButton, QLineEdit, QSpinBox, QComboBox,
-                               QSlider, QCheckBox, QRadioButton, QTextEdit,
-                               QPlainTextEdit)):
+        if isinstance(
+            widget,
+            (QPushButton, QLineEdit, QSpinBox, QComboBox, QSlider, QCheckBox, QRadioButton, QTextEdit, QPlainTextEdit),
+        ):
             widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         # Add keyboard shortcut if provided
@@ -112,10 +114,7 @@ class AccessibilityHelper:
 
     @staticmethod
     def create_label_input_pair(
-        label_text: str,
-        input_widget: QWidget,
-        description: str = "",
-        mnemonic_char: str | None = None
+        label_text: str, input_widget: QWidget, description: str = "", mnemonic_char: str | None = None
     ) -> tuple[QLabel, QWidget]:
         """
         Create a properly linked label-input pair for accessibility.
@@ -130,12 +129,12 @@ class AccessibilityHelper:
             Tuple of (label, input_widget) with accessibility features
         """
         # Add mnemonic if not present
-        if '&' not in label_text:
+        if "&" not in label_text:
             if mnemonic_char:
                 # Use specified character
                 idx = label_text.lower().find(mnemonic_char.lower())
                 if idx >= 0:
-                    label_text = label_text[:idx] + '&' + label_text[idx:]
+                    label_text = label_text[:idx] + "&" + label_text[idx:]
                 else:
                     label_text = f"&{label_text}"
             else:
@@ -146,12 +145,8 @@ class AccessibilityHelper:
         label.setBuddy(input_widget)
 
         # Make input accessible
-        clean_name = label_text.replace('&', '').replace(':', '').strip()
-        AccessibilityHelper.make_accessible(
-            input_widget,
-            clean_name,
-            description or f"Enter {clean_name.lower()}"
-        )
+        clean_name = label_text.replace("&", "").replace(":", "").strip()
+        AccessibilityHelper.make_accessible(input_widget, clean_name, description or f"Enter {clean_name.lower()}")
 
         return label, input_widget
 
@@ -205,7 +200,7 @@ class AccessibilityHelper:
         callback: Callable[..., None],
         description: str = "",
         icon: QIcon | None = None,
-        checkable: bool = False
+        checkable: bool = False,
     ) -> QAction:
         """
         Add an action with keyboard shortcut and accessibility info.
@@ -258,7 +253,7 @@ class AccessibilityHelper:
         accept_text: str = "&OK",
         reject_text: str = "&Cancel",
         accept_shortcut: str = "Return",
-        reject_shortcut: str = "Escape"
+        reject_shortcut: str = "Escape",
     ):
         """
         Set up standard dialog buttons with proper keyboard shortcuts.
@@ -281,9 +276,7 @@ class AccessibilityHelper:
                 ok_button.setText(accept_text)
                 ok_button.setShortcut(accept_shortcut)
                 AccessibilityHelper.make_accessible(
-                    ok_button,
-                    accept_text.replace('&', ''),
-                    "Accept changes and close dialog"
+                    ok_button, accept_text.replace("&", ""), "Accept changes and close dialog"
                 )
 
             cancel_button = button_box.button(QDialogButtonBox.StandardButton.Cancel)
@@ -291,9 +284,7 @@ class AccessibilityHelper:
                 cancel_button.setText(reject_text)
                 cancel_button.setShortcut(reject_shortcut)
                 AccessibilityHelper.make_accessible(
-                    cancel_button,
-                    reject_text.replace('&', ''),
-                    "Cancel changes and close dialog"
+                    cancel_button, reject_text.replace("&", ""), "Cancel changes and close dialog"
                 )
 
     @staticmethod
@@ -308,7 +299,7 @@ class AccessibilityHelper:
         group_box.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         # Set accessible name from title
-        title = group_box.title().replace('&', '')
+        title = group_box.title().replace("&", "")
         group_box.setAccessibleName(title)
         group_box.setAccessibleDescription(f"Group: {title}")
 
@@ -329,12 +320,12 @@ class AccessibilityHelper:
             if action.text() and not action.shortcut():
                 # Add default shortcuts for common actions
                 text_lower = action.text().lower()
-                if 'open' in text_lower:
-                    action.setShortcut('Ctrl+O')
-                elif 'save' in text_lower:
-                    action.setShortcut('Ctrl+S')
-                elif 'export' in text_lower:
-                    action.setShortcut('Ctrl+E')
+                if "open" in text_lower:
+                    action.setShortcut("Ctrl+O")
+                elif "save" in text_lower:
+                    action.setShortcut("Ctrl+S")
+                elif "export" in text_lower:
+                    action.setShortcut("Ctrl+E")
 
     @staticmethod
     def announce_to_screen_reader(widget: QWidget, message: str):

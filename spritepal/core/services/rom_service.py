@@ -11,6 +11,7 @@ Handles all ROM-based sprite extraction operations:
 This service was extracted from ExtractionManager to provide
 better separation of concerns between ROM and VRAM operations.
 """
+
 from __future__ import annotations
 
 import time
@@ -289,10 +290,7 @@ class ROMService:
 
             # Verify we got the expected amount of data
             if len(tile_data) != expected_bytes:
-                raise OSError(
-                    f"Incomplete read at offset 0x{offset:X}: "
-                    f"got {len(tile_data)}/{expected_bytes} bytes"
-                )
+                raise OSError(f"Incomplete read at offset 0x{offset:X}: got {len(tile_data)}/{expected_bytes} bytes")
 
         return TilePreviewData(tile_data=tile_data, width=width, height=height)
 
@@ -377,8 +375,7 @@ class ROMService:
             cache_success = self._rom_cache.save_sprite_locations(rom_path, locations)
             if cache_success:
                 self._logger.debug(
-                    f"Cached {len(locations)} sprite locations for future use "
-                    f"(scan took {scan_time:.1f}s)"
+                    f"Cached {len(locations)} sprite locations for future use (scan took {scan_time:.1f}s)"
                 )
                 cache_result.items_saved = len(locations)
 

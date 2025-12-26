@@ -5,6 +5,7 @@ This file contains:
 - TestPilToQPixmapMocked: Mocked Qt tests for error paths (headless)
 - TestCreateCheckerboardPattern: Pure PIL tests (headless)
 """
+
 from __future__ import annotations
 
 import logging
@@ -49,9 +50,7 @@ def is_headless_environment():
 @pytest.mark.gui
 @pytest.mark.allows_registry_state(reason="Pure unit test, Qt import triggers registry")
 @pytest.mark.skipif(not QT_AVAILABLE, reason="Qt not available")
-@pytest.mark.skipif(
-    is_headless_environment(), reason="GUI tests skipped in headless environment"
-)
+@pytest.mark.skipif(is_headless_environment(), reason="GUI tests skipped in headless environment")
 class TestPilToQPixmap:
     """Test PIL to QPixmap conversion with real Qt.
 
@@ -363,9 +362,7 @@ class TestCreateCheckerboardPattern:
         color1 = (100, 100, 100)
         color2 = (50, 50, 50)
 
-        img = create_checkerboard_pattern(
-            32, 32, tile_size=8, color1=color1, color2=color2
-        )
+        img = create_checkerboard_pattern(32, 32, tile_size=8, color1=color1, color2=color2)
 
         assert img.getpixel((0, 0)) == color1
         assert img.getpixel((8, 0)) == color2
@@ -436,9 +433,7 @@ class TestCreateCheckerboardPattern:
             for x in range(0, 100, 10):
                 tile_x = x // 10
                 tile_y = y // 10
-                expected_color = (
-                    (200, 200, 200) if (tile_x + tile_y) % 2 == 0 else (255, 255, 255)
-                )
+                expected_color = (200, 200, 200) if (tile_x + tile_y) % 2 == 0 else (255, 255, 255)
                 assert img.getpixel((x, y)) == expected_color
 
     def test_edge_pixels(self):

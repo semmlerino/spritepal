@@ -43,15 +43,19 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 @dataclass
 class PaletteData:
     """Palette data for sprite preview generation."""
+
     data: bytes
     format: str = "snes_cgram"  # Format identifier
+
 
 @dataclass
 class PreviewRequest:
     """Unified preview request structure for all preview types."""
+
     source_type: str  # 'vram' or 'rom'
     data_path: str  # Path to data file (VRAM dump or ROM file)
     offset: int  # Offset within the data
@@ -71,13 +75,15 @@ class PreviewRequest:
             # Include palette data hash if present
             hashlib.md5(self.palette.data).hexdigest() if self.palette else None,
             # Include sprite config hash if present
-            str(hash(str(self.sprite_config))) if self.sprite_config else None
+            str(hash(str(self.sprite_config))) if self.sprite_config else None,
         )
         return hashlib.md5(str(key_data).encode()).hexdigest()
+
 
 @dataclass
 class PreviewResult:
     """Result of preview generation."""
+
     pixmap: QPixmap
     pil_image: Image.Image
     tile_count: int
@@ -103,6 +109,7 @@ class PreviewResult:
 
         metadata_size = 100  # Approximate overhead for strings/floats
         return pixmap_size + pil_size + metadata_size  # Whether this result came from cache
+
 
 class PreviewCache(BaseLRUCache[PreviewResult]):
     """LRU cache specialized for preview results.
@@ -198,7 +205,7 @@ class PreviewGenerator(QObject):
 
         logger.debug(
             f"PreviewGenerator initialized with cache_size={cache_size}, "
-            f"cache_max_bytes={cache_max_bytes // (1024*1024)}MB, debounce={debounce_delay_ms}ms"
+            f"cache_max_bytes={cache_max_bytes // (1024 * 1024)}MB, debounce={debounce_delay_ms}ms"
         )
 
     def _setup_debounce_timer(self) -> None:
@@ -207,9 +214,9 @@ class PreviewGenerator(QObject):
         self._debounce_timer.setSingleShot(True)
         self._debounce_timer.timeout.connect(self._process_pending_request)
 
-    def set_managers(self,
-                    extraction_manager: CoreOperationsManager | None = None,
-                    rom_extractor: ROMExtractor | None = None) -> None:
+    def set_managers(
+        self, extraction_manager: CoreOperationsManager | None = None, rom_extractor: ROMExtractor | None = None
+    ) -> None:
         """Set manager references for preview generation.
 
         Args:
@@ -222,9 +229,9 @@ class PreviewGenerator(QObject):
 
         logger.debug("PreviewGenerator manager references updated")
 
-    def generate_preview(self,
-                        request: PreviewRequest,
-                        progress_callback: Callable[[int, str], None] | None = None) -> PreviewResult | None:
+    def generate_preview(
+        self, request: PreviewRequest, progress_callback: Callable[[int, str], None] | None = None
+    ) -> PreviewResult | None:
         """Generate preview synchronously.
 
         Args:
@@ -237,9 +244,7 @@ class PreviewGenerator(QObject):
         with QMutexLocker(self._generation_mutex):
             return self._generate_preview_impl(request, progress_callback)
 
-    def generate_preview_async(self,
-                              request: PreviewRequest,
-                              use_debounce: bool = True) -> None:
+    def generate_preview_async(self, request: PreviewRequest, use_debounce: bool = True) -> None:
         """Generate preview asynchronously with optional debouncing.
 
         Args:
@@ -288,9 +293,9 @@ class PreviewGenerator(QObject):
         """Emit progress signal."""
         self.preview_progress.emit(percent, message)
 
-    def _generate_preview_impl(self,
-                              request: PreviewRequest,
-                              progress_callback: Callable[[int, str], None] | None = None) -> PreviewResult | None:
+    def _generate_preview_impl(
+        self, request: PreviewRequest, progress_callback: Callable[[int, str], None] | None = None
+    ) -> PreviewResult | None:
         """Internal preview generation implementation.
 
         Args:
@@ -332,7 +337,9 @@ class PreviewGenerator(QObject):
                 if progress_callback:
                     progress_callback(100, f"Preview ready: {result.sprite_name}")
 
-                logger.debug(f"Generated preview in {result.generation_time:.3f}s for {request.source_type}:{request.offset:06X}")
+                logger.debug(
+                    f"Generated preview in {result.generation_time:.3f}s for {request.source_type}:{request.offset:06X}"
+                )
                 return result
 
         except Exception as e:
@@ -343,9 +350,9 @@ class PreviewGenerator(QObject):
 
         return None
 
-    def _generate_vram_preview(self,
-                              request: PreviewRequest,
-                              progress_callback: Callable[[int, str], None] | None = None) -> PreviewResult | None:
+    def _generate_vram_preview(
+        self, request: PreviewRequest, progress_callback: Callable[[int, str], None] | None = None
+    ) -> PreviewResult | None:
         """Generate preview from VRAM data.
 
         Args:
@@ -385,12 +392,12 @@ class PreviewGenerator(QObject):
             pil_image=pil_image,
             tile_count=tile_count,
             sprite_name=sprite_name,
-            generation_time=0.0  # Will be set by caller
+            generation_time=0.0,  # Will be set by caller
         )
 
-    def _generate_rom_preview(self,
-                             request: PreviewRequest,
-                             progress_callback: Callable[[int, str], None] | None = None) -> PreviewResult | None:
+    def _generate_rom_preview(
+        self, request: PreviewRequest, progress_callback: Callable[[int, str], None] | None = None
+    ) -> PreviewResult | None:
         """Generate preview from ROM data.
 
         Args:
@@ -413,7 +420,7 @@ class PreviewGenerator(QObject):
         sprite_data = rom_extractor.extract_sprite_data(
             request.data_path,
             request.offset,
-            request.sprite_config  # pyright: ignore[reportArgumentType] - PreviewRequest stores as object
+            request.sprite_config,  # pyright: ignore[reportArgumentType] - PreviewRequest stores as object
         )
 
         if progress_callback:
@@ -444,7 +451,7 @@ class PreviewGenerator(QObject):
             pil_image=pil_image,
             tile_count=tile_count,
             sprite_name=sprite_name,
-            generation_time=0.0  # Will be set by caller
+            generation_time=0.0,  # Will be set by caller
         )
 
     def _convert_sprite_data_to_image(self, sprite_data: bytes, request: PreviewRequest) -> Image.Image:
@@ -469,7 +476,7 @@ class PreviewGenerator(QObject):
         # Handle empty sprite data
         if len(sprite_data) == 0:
             # Create error image
-            img = Image.fromarray(pixel_array, mode='P')
+            img = Image.fromarray(pixel_array, mode="P")
             error_palette = [255, 0, 0] + [0, 0, 0] * 255  # Red for index 0
             img.putpalette(error_palette)
             logger.debug(f"Empty sprite data at offset {request.offset:06X}, returning error image")
@@ -487,20 +494,20 @@ class PreviewGenerator(QObject):
         palette: list[int] = []
 
         # Apply palette if available
-        if request.palette and hasattr(request.palette, 'data'):
+        if request.palette and hasattr(request.palette, "data"):
             palette_data = request.palette.data
 
             # Convert SNES BGR555 palette to RGB888
             for i in range(0, min(len(palette_data), 32), 2):
                 if i + 1 < len(palette_data):
-                    color = struct.unpack('<H', palette_data[i:i+2])[0]
+                    color = struct.unpack("<H", palette_data[i : i + 2])[0]
                     r = ((color & 0x001F) << 3) | ((color & 0x001F) >> 2)
                     g = ((color & 0x03E0) >> 2) | ((color & 0x03E0) >> 7)
                     b = ((color & 0x7C00) >> 7) | ((color & 0x7C00) >> 12)
                     palette.extend([r, g, b])
 
             thread_id = threading.current_thread().ident
-            logger.debug(f"Created palette with {len(palette)//3} colors [thread={thread_id}]")
+            logger.debug(f"Created palette with {len(palette) // 3} colors [thread={thread_id}]")
         else:
             # Default grayscale palette for 4bpp (16 shades)
             for i in range(16):
@@ -516,10 +523,10 @@ class PreviewGenerator(QObject):
 
         for tile_idx in range(tile_count):
             tile_offset = tile_idx * BYTES_PER_TILE
-            tile_data = sprite_data[tile_offset:tile_offset + BYTES_PER_TILE]
+            tile_data = sprite_data[tile_offset : tile_offset + BYTES_PER_TILE]
 
             if len(tile_data) < BYTES_PER_TILE:
-                tile_data += b'\x00' * (BYTES_PER_TILE - len(tile_data))
+                tile_data += b"\x00" * (BYTES_PER_TILE - len(tile_data))
 
             # Decode 4bpp planar format into an 8x8 NumPy array
             tile_pixels = np.zeros((TILE_SIZE, TILE_SIZE), dtype=np.uint8)
@@ -532,10 +539,12 @@ class PreviewGenerator(QObject):
 
                 for bit in range(7, -1, -1):
                     col = 7 - bit
-                    pixel = ((plane0 >> bit) & 1) | \
-                           (((plane1 >> bit) & 1) << 1) | \
-                           (((plane2 >> bit) & 1) << 2) | \
-                           (((plane3 >> bit) & 1) << 3)
+                    pixel = (
+                        ((plane0 >> bit) & 1)
+                        | (((plane1 >> bit) & 1) << 1)
+                        | (((plane2 >> bit) & 1) << 2)
+                        | (((plane3 >> bit) & 1) << 3)
+                    )
                     tile_pixels[row, col] = pixel
 
             # Place tile in image using NumPy slicing (much faster than putpixel)
@@ -553,11 +562,10 @@ class PreviewGenerator(QObject):
             src_x_end = dest_x_end - dest_x_start
 
             # Copy tile to pixel array
-            pixel_array[dest_y_start:dest_y_end, dest_x_start:dest_x_end] = \
-                tile_pixels[:src_y_end, :src_x_end]
+            pixel_array[dest_y_start:dest_y_end, dest_x_start:dest_x_end] = tile_pixels[:src_y_end, :src_x_end]
 
         # Create PIL Image from NumPy array and apply palette
-        img = Image.fromarray(pixel_array, mode='P')
+        img = Image.fromarray(pixel_array, mode="P")
         img.putpalette(palette)
 
         return img
@@ -588,26 +596,17 @@ class PreviewGenerator(QObject):
         """Get current cache statistics."""
         return self._cache.get_stats()
 
-    def create_preview_request(self,
-                                 data_path: str,
-                                 offset: int,
-                                 width: int,
-                                 height: int,
-                                 sprite_name: str = "") -> PreviewRequest:
+    def create_preview_request(
+        self, data_path: str, offset: int, width: int, height: int, sprite_name: str = ""
+    ) -> PreviewRequest:
         """Create a preview request with the given parameters."""
         return create_rom_preview_request(
-            rom_path=data_path,
-            offset=offset,
-            sprite_name=sprite_name,
-            size=(width, height)
+            rom_path=data_path, offset=offset, sprite_name=sprite_name, size=(width, height)
         )
 
-    def generate_preview_sync(self,
-                             data_path: str,
-                             offset: int,
-                             width: int = 128,
-                             height: int = 128,
-                             sprite_name: str = "") -> QPixmap | None:
+    def generate_preview_sync(
+        self, data_path: str, offset: int, width: int = 128, height: int = 128, sprite_name: str = ""
+    ) -> QPixmap | None:
         """Generate preview synchronously and return QPixmap directly."""
         request = self.create_preview_request(data_path, offset, width, height, sprite_name)
         result = self.generate_preview(request)
@@ -642,25 +641,22 @@ class PreviewGenerator(QObject):
             self.cleanup()
 
 
-def create_vram_preview_request(vram_path: str,
-                               offset: int,
-                               sprite_name: str = "",
-                               size: tuple[int, int] = (128, 128)) -> PreviewRequest:
+def create_vram_preview_request(
+    vram_path: str, offset: int, sprite_name: str = "", size: tuple[int, int] = (128, 128)
+) -> PreviewRequest:
     """Create a VRAM preview request."""
     return PreviewRequest(
         source_type="vram",
         data_path=vram_path,
         offset=offset,
         sprite_name=sprite_name or f"vram_0x{offset:06X}",
-        size=size
+        size=size,
     )
 
 
-def create_rom_preview_request(rom_path: str,
-                              offset: int,
-                              sprite_name: str = "",
-                              sprite_config: object = None,
-                              size: tuple[int, int] = (128, 128)) -> PreviewRequest:
+def create_rom_preview_request(
+    rom_path: str, offset: int, sprite_name: str = "", sprite_config: object = None, size: tuple[int, int] = (128, 128)
+) -> PreviewRequest:
     """Create a ROM preview request."""
     return PreviewRequest(
         source_type="rom",
@@ -668,5 +664,5 @@ def create_rom_preview_request(rom_path: str,
         offset=offset,
         sprite_name=sprite_name or f"rom_0x{offset:06X}",
         sprite_config=sprite_config,
-        size=size
+        size=size,
     )

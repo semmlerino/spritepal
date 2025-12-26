@@ -1,4 +1,5 @@
 """Integration tests for SpritePal - testing components working together"""
+
 from __future__ import annotations
 
 import json
@@ -80,9 +81,7 @@ class TestEndToEndWorkflow:
         # Extract sprites
         extractor = SpriteExtractor()
         sprite_path = output_dir / "sprites.png"
-        img, num_tiles = extractor.extract_sprites_grayscale(
-            sample_files["vram_path"], str(sprite_path)
-        )
+        img, num_tiles = extractor.extract_sprites_grayscale(sample_files["vram_path"], str(sprite_path))
 
         assert sprite_path.exists()
         assert num_tiles > 0
@@ -190,9 +189,7 @@ class TestRealFilePatterns:
 
         # Extract sprites
         sprite_path = f"{output_base}.png"
-        img, num_tiles = extractor.extract_sprites_grayscale(
-            str(vram_path), sprite_path
-        )
+        img, num_tiles = extractor.extract_sprites_grayscale(str(vram_path), sprite_path)
 
         # Extract palettes
         palette_manager.load_cgram(str(cgram_path))

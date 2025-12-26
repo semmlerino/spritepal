@@ -25,6 +25,7 @@ Migration Guide:
     Replace: get_app_context().application_state_manager -> state_manager fixture
     Replace: get_app_context().core_operations_manager -> core_operations fixture
 """
+
 from __future__ import annotations
 
 import contextlib

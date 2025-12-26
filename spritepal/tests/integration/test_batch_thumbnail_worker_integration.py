@@ -47,7 +47,10 @@ from ui.workers.batch_thumbnail_worker import BatchThumbnailWorker
 # Configure Qt for the detected environment to prevent crashes
 configure_qt_for_environment()
 
-pytestmark = [pytest.mark.skip_thread_cleanup(reason="BatchThumbnailWorker tests create worker threads that need cleanup time")]
+pytestmark = [
+    pytest.mark.skip_thread_cleanup(reason="BatchThumbnailWorker tests create worker threads that need cleanup time")
+]
+
 
 class WorkerThreadWrapper:
     """Wrapper to make BatchThumbnailWorker behave like a QThread for tests."""
@@ -94,7 +97,7 @@ class WorkerThreadWrapper:
                 self.thread.wait(1000)
 
         # Now safe to clean up resources after thread has stopped
-        if hasattr(self.worker, 'cleanup'):
+        if hasattr(self.worker, "cleanup"):
             self.worker.cleanup()
 
     def queue_thumbnail(self, *args, **kwargs):
@@ -133,6 +136,7 @@ class WorkerThreadWrapper:
         """Forward any other attribute access to the worker."""
         return getattr(self.worker, name)
 
+
 @pytest.fixture
 def test_rom_file(tmp_path) -> str:
     """Create a test ROM file with some sprite data."""
@@ -148,6 +152,7 @@ def test_rom_file(tmp_path) -> str:
 
     rom_path.write_bytes(rom_data)
     return str(rom_path)
+
 
 @pytest.fixture
 def real_component_factory(tmp_path, isolated_managers):
@@ -177,7 +182,7 @@ def mock_rom_extractor():
     # Mock decompression to return reasonable data
     def mock_find_compressed_sprite(rom_data, offset, expected_size=None):
         # Return some tile data
-        return offset, b'\x00\x01\x02\x03' * 256  # 1KB of tile data
+        return offset, b"\x00\x01\x02\x03" * 256  # 1KB of tile data
 
     extractor.rom_injector.find_compressed_sprite = mock_find_compressed_sprite
     return extractor
@@ -190,10 +195,12 @@ def mock_tile_renderer():
 
     # Mock render_tiles to return a simple image
     from PIL import Image
-    mock_image = Image.new('RGBA', (64, 64), color=(128, 128, 128, 255))
+
+    mock_image = Image.new("RGBA", (64, 64), color=(128, 128, 128, 255))
     renderer.render_tiles.return_value = mock_image
 
     return renderer
+
 
 @pytest.mark.gui
 @pytest.mark.integration
@@ -249,9 +256,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
 
             # Track results
             thumbnails_received = []
-            controller.thumbnail_ready.connect(
-                lambda offset, pixmap: thumbnails_received.append((offset, pixmap))
-            )
+            controller.thumbnail_ready.connect(lambda offset, pixmap: thumbnails_received.append((offset, pixmap)))
 
             # Queue some thumbnails
             controller.queue_thumbnail(0x10000, 64)
@@ -271,13 +276,9 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
             controller.cleanup()
 
     @skip_if_wsl("Timing-sensitive test: expects 8-20s execution time")
-    @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
+    @patch("ui.workers.batch_thumbnail_worker.TileRenderer")
     def test_idle_detection_prevents_infinite_loop(
-        self,
-        mock_tile_renderer_class,
-        test_rom_file,
-        mock_rom_extractor,
-        mock_tile_renderer
+        self, mock_tile_renderer_class, test_rom_file, mock_rom_extractor, mock_tile_renderer
     ):
         """Test that idle detection prevents infinite loops."""
         mock_tile_renderer_class.return_value = mock_tile_renderer
@@ -297,17 +298,15 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
 
         # Should stop within reasonable time (observed ~16-17s with overhead, but much less than infinite loop)
         assert execution_time < 20.0, f"Worker took {execution_time:.2f}s to auto-stop, may indicate infinite loop"
-        assert execution_time > 8.0, f"Worker stopped too quickly ({execution_time:.2f}s), idle detection may not be working"
+        assert execution_time > 8.0, (
+            f"Worker stopped too quickly ({execution_time:.2f}s), idle detection may not be working"
+        )
         assert not worker.isRunning()
 
     @skip_if_wsl("Timing-sensitive test: expects <8s execution time")
-    @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
+    @patch("ui.workers.batch_thumbnail_worker.TileRenderer")
     def test_processing_with_auto_stop(
-        self,
-        mock_tile_renderer_class,
-        test_rom_file,
-        mock_rom_extractor,
-        mock_tile_renderer
+        self, mock_tile_renderer_class, test_rom_file, mock_rom_extractor, mock_tile_renderer
     ):
         """Test processing requests followed by auto-stop."""
         mock_tile_renderer_class.return_value = mock_tile_renderer
@@ -316,9 +315,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
 
         # Track thumbnail emissions
         thumbnails_received = []
-        worker.thumbnail_ready.connect(
-            lambda offset, pixmap: thumbnails_received.append((offset, pixmap))
-        )
+        worker.thumbnail_ready.connect(lambda offset, pixmap: thumbnails_received.append((offset, pixmap)))
 
         # Queue a few thumbnails
         offsets = [0x10000, 0x20000, 0x30000]
@@ -343,10 +340,13 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
 
     def test_memory_cleanup_after_processing(self, test_rom_file, real_rom_extractor):
         """Test that worker properly cleans up memory after processing with real components."""
-        initial_rom_data_count = len([
-            obj for obj in gc.get_objects()
-            if isinstance(obj, bytes) and len(obj) > 100000  # Large byte objects (ROM data)
-        ])
+        initial_rom_data_count = len(
+            [
+                obj
+                for obj in gc.get_objects()
+                if isinstance(obj, bytes) and len(obj) > 100000  # Large byte objects (ROM data)
+            ]
+        )
 
         worker = self.create_worker(test_rom_file, real_rom_extractor)
 
@@ -367,23 +367,16 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         EventLoopHelper.process_events(100)
         gc.collect()
 
-        final_rom_data_count = len([
-            obj for obj in gc.get_objects()
-            if isinstance(obj, bytes) and len(obj) > 100000
-        ])
+        final_rom_data_count = len([obj for obj in gc.get_objects() if isinstance(obj, bytes) and len(obj) > 100000])
 
         # Should not leak large byte objects
         leaked_objects = final_rom_data_count - initial_rom_data_count
         assert leaked_objects <= 1, f"Leaked {leaked_objects} large byte objects"
 
     @skip_if_wsl("Timing-sensitive test: depends on 10s auto-stop")
-    @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
+    @patch("ui.workers.batch_thumbnail_worker.TileRenderer")
     def test_concurrent_queue_operations(
-        self,
-        mock_tile_renderer_class,
-        test_rom_file,
-        mock_rom_extractor,
-        mock_tile_renderer
+        self, mock_tile_renderer_class, test_rom_file, mock_rom_extractor, mock_tile_renderer
     ):
         """Test concurrent queue operations don't cause issues."""
         mock_tile_renderer_class.return_value = mock_tile_renderer
@@ -444,9 +437,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         worker._cache_size_limit = 5  # Small cache for testing
 
         thumbnails_received = []
-        worker.thumbnail_ready.connect(
-            lambda offset, pixmap: thumbnails_received.append((offset, pixmap))
-        )
+        worker.thumbnail_ready.connect(lambda offset, pixmap: thumbnails_received.append((offset, pixmap)))
 
         # Queue same thumbnail multiple times
         for _ in range(3):
@@ -481,13 +472,8 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         assert worker.get_cache_size() == 0
 
     @skip_if_wsl("Timing-sensitive test: depends on worker stop timing")
-    @patch('ui.workers.batch_thumbnail_worker.TileRenderer')
-    def test_error_handling_during_processing(
-        self,
-        mock_tile_renderer_class,
-        test_rom_file,
-        mock_rom_extractor
-    ):
+    @patch("ui.workers.batch_thumbnail_worker.TileRenderer")
+    def test_error_handling_during_processing(self, mock_tile_renderer_class, test_rom_file, mock_rom_extractor):
         """Test error handling during thumbnail processing."""
         # Mock tile renderer to raise errors occasionally
         mock_renderer = Mock()
@@ -515,6 +501,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
         assert not worker.isRunning()
         # May have received error signals but should not crash
 
+
 @pytest.mark.gui
 @pytest.mark.integration
 @pytest.mark.performance
@@ -526,11 +513,12 @@ class TestBatchThumbnailWorkerPerformance(QtTestCase):
 
     def test_throughput_performance(self, test_rom_file, mock_rom_extractor):
         """Test thumbnail generation throughput."""
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer') as mock_renderer_class:
+        with patch("ui.workers.batch_thumbnail_worker.TileRenderer") as mock_renderer_class:
             # Fast mock renderer
             mock_renderer = Mock()
             from PIL import Image
-            mock_image = Image.new('RGBA', (32, 32), color=(100, 100, 100, 255))
+
+            mock_image = Image.new("RGBA", (32, 32), color=(100, 100, 100, 255))
             mock_renderer.render_tiles.return_value = mock_image
             mock_renderer_class.return_value = mock_renderer
 
@@ -563,7 +551,7 @@ class TestBatchThumbnailWorkerPerformance(QtTestCase):
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
+        with patch("ui.workers.batch_thumbnail_worker.TileRenderer"):
             # Use WorkerThreadWrapper for consistent threading behavior
             base_worker = BatchThumbnailWorker(test_rom_file, mock_rom_extractor)
             base_worker._cache_size_limit = 200  # Large cache
@@ -591,6 +579,7 @@ class TestBatchThumbnailWorkerPerformance(QtTestCase):
 
             # Should clean up most memory
             assert memory_after_cleanup < memory_increase * 0.5, "Poor memory cleanup"
+
 
 @pytest.mark.gui
 @pytest.mark.integration
@@ -662,6 +651,7 @@ class TestBatchThumbnailWorkerThreadSafety(QtTestCase):
 
         worker.cleanup()
 
+
 @pytest.mark.headless
 @pytest.mark.integration
 class TestBatchThumbnailWorkerHeadlessIntegration:
@@ -669,6 +659,7 @@ class TestBatchThumbnailWorkerHeadlessIntegration:
 
     def test_headless_idle_detection_logic(self):
         """Test idle detection logic without Qt dependencies."""
+
         class MockWorkerLogic:
             def __init__(self):
                 self.idle_iterations = 0
@@ -731,6 +722,7 @@ class TestBatchThumbnailWorkerHeadlessIntegration:
 
     def test_headless_cache_management_logic(self):
         """Test cache management logic without Qt objects."""
+
         class MockCache:
             def __init__(self, size_limit=5):
                 self.cache = {}
@@ -784,6 +776,7 @@ class TestBatchThumbnailWorkerHeadlessIntegration:
 
     def test_headless_memory_cleanup_logic(self):
         """Test memory cleanup logic patterns."""
+
         class MockResourceManager:
             def __init__(self):
                 self.rom_data = None
@@ -792,7 +785,7 @@ class TestBatchThumbnailWorkerHeadlessIntegration:
 
             def load_rom_data(self, rom_path):
                 # Simulate loading ROM data
-                self.rom_data = b'\x00' * 1024000  # 1MB
+                self.rom_data = b"\x00" * 1024000  # 1MB
 
             def clear_rom_data(self):
                 if self.rom_data is not None:

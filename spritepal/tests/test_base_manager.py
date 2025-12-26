@@ -1,6 +1,7 @@
 """
 Tests for BaseManager abstract class
 """
+
 from __future__ import annotations
 
 import gc
@@ -21,6 +22,7 @@ pytestmark = [
     pytest.mark.slow,
 ]
 
+
 class ConcreteManager(BaseManager):
     """Concrete implementation for testing"""
 
@@ -33,6 +35,7 @@ class ConcreteManager(BaseManager):
 
     def cleanup(self) -> None:
         """Cleanup test resources"""
+
 
 class TestBaseManager:
     """Test BaseManager functionality"""

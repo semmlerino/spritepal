@@ -7,6 +7,7 @@ This module consolidates tests from:
 
 All tests in this module are headless (no Qt required).
 """
+
 from __future__ import annotations
 
 import re
@@ -40,12 +41,13 @@ class ContrastCalculator:
     @staticmethod
     def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
         """Convert hex color to RGB tuple."""
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        hex_color = hex_color.lstrip("#")
+        return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
     @staticmethod
     def relative_luminance(r: int, g: int, b: int) -> float:
         """Calculate relative luminance according to WCAG 2.1."""
+
         def gamma_correct(c: float) -> float:
             c = c / 255.0
             if c <= 0.03928:
@@ -98,7 +100,7 @@ class TestColorConstants:
 
     def test_all_colors_are_valid_hex(self) -> None:
         """All color constants should be valid hex color codes."""
-        hex_pattern = re.compile(r'^#[0-9A-Fa-f]{6}$')
+        hex_pattern = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
         for color_name, color_value in COLORS.items():
             assert isinstance(color_value, str), f"Color {color_name} should be string"
@@ -107,12 +109,25 @@ class TestColorConstants:
     def test_required_colors_exist(self) -> None:
         """Essential colors for dark theme should be defined."""
         required_colors = [
-            "primary", "secondary", "accent",
-            "background", "panel_background", "input_background", "preview_background",
-            "text_primary", "text_secondary", "text_muted",
-            "border", "border_focus", "border_error",
-            "success", "warning", "danger", "info",
-            "disabled", "disabled_text"
+            "primary",
+            "secondary",
+            "accent",
+            "background",
+            "panel_background",
+            "input_background",
+            "preview_background",
+            "text_primary",
+            "text_secondary",
+            "text_muted",
+            "border",
+            "border_focus",
+            "border_error",
+            "success",
+            "warning",
+            "danger",
+            "info",
+            "disabled",
+            "disabled_text",
         ]
 
         for color in required_colors:
@@ -130,23 +145,24 @@ class TestColorConstants:
                 assert hover_key in COLORS, f"Missing hover variant for {base_color}"
                 assert pressed_key in COLORS, f"Missing pressed variant for {base_color}"
 
-    @pytest.mark.parametrize("color_key,expected_darkness", [
-        ("background", True),
-        ("panel_background", True),
-        ("preview_background", True),
-        ("text_primary", False),
-        ("text_secondary", False),
-    ])
-    def test_color_darkness_appropriate_for_theme(
-        self, color_key: str, expected_darkness: bool
-    ) -> None:
+    @pytest.mark.parametrize(
+        "color_key,expected_darkness",
+        [
+            ("background", True),
+            ("panel_background", True),
+            ("preview_background", True),
+            ("text_primary", False),
+            ("text_secondary", False),
+        ],
+    )
+    def test_color_darkness_appropriate_for_theme(self, color_key: str, expected_darkness: bool) -> None:
         """Colors should have appropriate lightness for dark theme."""
         color_hex = COLORS[color_key]
         r = int(color_hex[1:3], 16)
         g = int(color_hex[3:5], 16)
         b = int(color_hex[5:7], 16)
 
-        brightness = (r * 0.299 + g * 0.587 + b * 0.114)
+        brightness = r * 0.299 + g * 0.587 + b * 0.114
         is_dark = brightness < 128
 
         assert is_dark == expected_darkness, (
@@ -300,8 +316,8 @@ class TestColorUtilities:
 
     def _hex_to_rgb(self, hex_color: str) -> tuple[int, int, int]:
         """Convert hex color to RGB tuple."""
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        hex_color = hex_color.lstrip("#")
+        return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
     def test_color_parsing_utility(self) -> None:
         """Utility function for parsing colors works correctly."""
@@ -333,10 +349,7 @@ class TestColorConstantsHeadless:
 
     def test_theme_constants_are_strings(self) -> None:
         """All theme constants should be strings for CSS compatibility."""
-        test_constants = [
-            Theme.PRIMARY, Theme.BACKGROUND, Theme.TEXT,
-            Theme.BORDER, Theme.SUCCESS
-        ]
+        test_constants = [Theme.PRIMARY, Theme.BACKGROUND, Theme.TEXT, Theme.BORDER, Theme.SUCCESS]
 
         for constant in test_constants:
             assert isinstance(constant, str)
@@ -353,26 +366,17 @@ class TestWCAGContrast:
 
     def test_primary_text_on_background_meets_wcag_aa(self) -> None:
         """Primary text on main background should meet WCAG AA standards."""
-        ratio = ContrastCalculator.contrast_ratio(
-            COLORS["text_primary"],
-            COLORS["background"]
-        )
+        ratio = ContrastCalculator.contrast_ratio(COLORS["text_primary"], COLORS["background"])
 
         assert ratio >= 4.5, (
             f"Primary text contrast ratio {ratio:.2f} should be >= 4.5 "
             f"({COLORS['text_primary']} on {COLORS['background']})"
         )
-        assert ContrastCalculator.meets_wcag_aa(
-            COLORS["text_primary"],
-            COLORS["background"]
-        )
+        assert ContrastCalculator.meets_wcag_aa(COLORS["text_primary"], COLORS["background"])
 
     def test_secondary_text_on_background_meets_wcag_aa(self) -> None:
         """Secondary text on main background should meet WCAG AA standards."""
-        ratio = ContrastCalculator.contrast_ratio(
-            COLORS["text_secondary"],
-            COLORS["background"]
-        )
+        ratio = ContrastCalculator.contrast_ratio(COLORS["text_secondary"], COLORS["background"])
 
         assert ratio >= 4.5, (
             f"Secondary text contrast ratio {ratio:.2f} should be >= 4.5 "
@@ -381,10 +385,7 @@ class TestWCAGContrast:
 
     def test_muted_text_visibility(self) -> None:
         """Muted text should still be readable, though may not meet full WCAG AA."""
-        ratio = ContrastCalculator.contrast_ratio(
-            COLORS["text_muted"],
-            COLORS["background"]
-        )
+        ratio = ContrastCalculator.contrast_ratio(COLORS["text_muted"], COLORS["background"])
 
         assert ratio >= 3.0, (
             f"Muted text contrast ratio {ratio:.2f} should be >= 3.0 for readability "
@@ -393,45 +394,34 @@ class TestWCAGContrast:
 
     def test_disabled_text_distinguishable(self) -> None:
         """Disabled text should be visually distinguishable but intentionally lower contrast."""
-        disabled_ratio = ContrastCalculator.contrast_ratio(
-            COLORS["disabled_text"],
-            COLORS["background"]
-        )
+        disabled_ratio = ContrastCalculator.contrast_ratio(COLORS["disabled_text"], COLORS["background"])
 
-        normal_ratio = ContrastCalculator.contrast_ratio(
-            COLORS["text_primary"],
-            COLORS["background"]
-        )
+        normal_ratio = ContrastCalculator.contrast_ratio(COLORS["text_primary"], COLORS["background"])
 
         assert disabled_ratio < normal_ratio, "Disabled text should have lower contrast than normal text"
         assert disabled_ratio >= 2.0, "Disabled text should still be somewhat visible"
 
-    @pytest.mark.parametrize("text_color,background_color", [
-        ("text_primary", "panel_background"),
-        ("text_primary", "input_background"),
-        ("text_secondary", "panel_background"),
-    ])
-    def test_text_on_various_backgrounds_readable(
-        self, text_color: str, background_color: str
-    ) -> None:
+    @pytest.mark.parametrize(
+        "text_color,background_color",
+        [
+            ("text_primary", "panel_background"),
+            ("text_primary", "input_background"),
+            ("text_secondary", "panel_background"),
+        ],
+    )
+    def test_text_on_various_backgrounds_readable(self, text_color: str, background_color: str) -> None:
         """Text should be readable on various dark theme backgrounds."""
-        ratio = ContrastCalculator.contrast_ratio(
-            COLORS[text_color],
-            COLORS[background_color]
-        )
+        ratio = ContrastCalculator.contrast_ratio(COLORS[text_color], COLORS[background_color])
 
         assert ratio >= 3.0, (
-            f"Text {text_color} on {background_color} contrast ratio {ratio:.2f} "
-            f"should be >= 3.0 for readability"
+            f"Text {text_color} on {background_color} contrast ratio {ratio:.2f} should be >= 3.0 for readability"
         )
 
 
 class TestButtonContrast:
     """Test contrast ratios for button color combinations."""
 
-    @pytest.mark.parametrize("button_type", [
-        "primary", "secondary", "accent", "extract", "editor"
-    ])
+    @pytest.mark.parametrize("button_type", ["primary", "secondary", "accent", "extract", "editor"])
     def test_button_text_contrast_on_button_background(self, button_type: str) -> None:
         """Button text should have good contrast on button backgrounds."""
         button_bg = COLORS[button_type]
@@ -456,9 +446,7 @@ class TestButtonContrast:
             f"({text_color} on {button_bg})"
         )
 
-    @pytest.mark.parametrize("button_type", [
-        "primary", "secondary", "accent", "extract", "editor"
-    ])
+    @pytest.mark.parametrize("button_type", ["primary", "secondary", "accent", "extract", "editor"])
     def test_button_hover_state_contrast(self, button_type: str) -> None:
         """Button hover states should maintain good contrast."""
         hover_bg = COLORS[f"{button_type}_hover"]
@@ -475,9 +463,7 @@ class TestButtonContrast:
 class TestStatusColorContrast:
     """Test contrast ratios for status indicator colors."""
 
-    @pytest.mark.parametrize("status_type", [
-        "success", "warning", "danger", "info"
-    ])
+    @pytest.mark.parametrize("status_type", ["success", "warning", "danger", "info"])
     def test_status_colors_visible_on_dark_background(self, status_type: str) -> None:
         """Status colors should be highly visible on dark backgrounds."""
         status_color = COLORS[status_type]
@@ -518,8 +504,7 @@ class TestBorderContrast:
             ratio = ContrastCalculator.contrast_ratio(border_color, bg_color)
 
             assert ratio >= 1.5, (
-                f"Border on {bg_key} contrast {ratio:.2f} should be >= 1.5 "
-                f"({border_color} on {bg_color})"
+                f"Border on {bg_key} contrast {ratio:.2f} should be >= 1.5 ({border_color} on {bg_color})"
             )
 
     def test_focus_border_highly_visible(self) -> None:
@@ -532,8 +517,7 @@ class TestBorderContrast:
             ratio = ContrastCalculator.contrast_ratio(focus_border, bg_color)
 
             assert ratio >= 2.5, (
-                f"Focus border on {bg_key} contrast {ratio:.2f} should be >= 2.5 "
-                f"({focus_border} on {bg_color})"
+                f"Focus border on {bg_key} contrast {ratio:.2f} should be >= 2.5 ({focus_border} on {bg_color})"
             )
 
     def test_error_border_highly_visible(self) -> None:
@@ -546,8 +530,7 @@ class TestBorderContrast:
             ratio = ContrastCalculator.contrast_ratio(error_border, bg_color)
 
             assert ratio >= 3.0, (
-                f"Error border on {bg_key} contrast {ratio:.2f} should be >= 3.0 "
-                f"({error_border} on {bg_color})"
+                f"Error border on {bg_key} contrast {ratio:.2f} should be >= 3.0 ({error_border} on {bg_color})"
             )
 
 
@@ -559,9 +542,7 @@ class TestPreviewBackgroundContrast:
         preview_lum = ContrastCalculator.relative_luminance(
             *ContrastCalculator.hex_to_rgb(COLORS["preview_background"])
         )
-        main_lum = ContrastCalculator.relative_luminance(
-            *ContrastCalculator.hex_to_rgb(COLORS["background"])
-        )
+        main_lum = ContrastCalculator.relative_luminance(*ContrastCalculator.hex_to_rgb(COLORS["background"]))
 
         assert preview_lum < main_lum, (
             "Preview background should be darker than main background "
@@ -570,10 +551,7 @@ class TestPreviewBackgroundContrast:
 
     def test_preview_text_readable_on_preview_background(self) -> None:
         """Text should be readable on preview backgrounds when needed."""
-        ratio = ContrastCalculator.contrast_ratio(
-            COLORS["text_primary"],
-            COLORS["preview_background"]
-        )
+        ratio = ContrastCalculator.contrast_ratio(COLORS["text_primary"], COLORS["preview_background"])
 
         assert ratio >= 4.5, (
             f"Text on preview background contrast {ratio:.2f} should be >= 4.5 "
@@ -589,7 +567,7 @@ class TestColorDistinguishability:
         action_colors = ["primary", "secondary", "accent", "extract", "editor"]
 
         for i, color1_key in enumerate(action_colors):
-            for color2_key in action_colors[i+1:]:
+            for color2_key in action_colors[i + 1 :]:
                 color1 = COLORS[color1_key]
                 color2 = COLORS[color2_key]
 
@@ -604,14 +582,13 @@ class TestColorDistinguishability:
         text_colors = ["text_primary", "text_secondary", "text_muted"]
 
         for i, color1_key in enumerate(text_colors):
-            for color2_key in text_colors[i+1:]:
+            for color2_key in text_colors[i + 1 :]:
                 color1 = COLORS[color1_key]
                 color2 = COLORS[color2_key]
 
                 ratio = ContrastCalculator.contrast_ratio(color1, color2)
                 assert ratio >= 1.1, (
-                    f"Text colors {color1_key} and {color2_key} should be distinguishable "
-                    f"(contrast ratio: {ratio:.2f})"
+                    f"Text colors {color1_key} and {color2_key} should be distinguishable (contrast ratio: {ratio:.2f})"
                 )
 
     def test_background_colors_distinguishable(self) -> None:
@@ -624,8 +601,7 @@ class TestColorDistinguishability:
             ratio = ContrastCalculator.contrast_ratio(main_bg, bg_color)
 
             assert ratio >= 1.03, (
-                f"Background colors should be distinguishable: "
-                f"background vs {bg_key} (contrast: {ratio:.2f})"
+                f"Background colors should be distinguishable: background vs {bg_key} (contrast: {ratio:.2f})"
             )
 
 

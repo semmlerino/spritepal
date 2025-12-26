@@ -6,6 +6,7 @@ actual widget rendering, pixmap handling, and Qt-specific behavior.
 
 Uses session_managers fixture from core_fixtures.py with shared_state_safe marker.
 """
+
 from __future__ import annotations
 
 import os
@@ -119,16 +120,42 @@ class TestSpritePreviewWidget:
         # Create test 4bpp data (single tile with actual content)
         # 4bpp tile is 32 bytes: 8 rows * 4 bytes per row (2 bitplanes interleaved)
         # Non-zero data ensures the widget displays it as a real sprite
-        tile_data = bytes([
-            0xFF, 0x00, 0x81, 0x7E,  # Row 0-1: solid line with gap
-            0xFF, 0x00, 0x81, 0x7E,  # Row 2-3
-            0xFF, 0x00, 0x81, 0x7E,  # Row 4-5
-            0xFF, 0x00, 0x81, 0x7E,  # Row 6-7
-            0x00, 0xFF, 0x7E, 0x81,  # Bitplanes 2-3 rows 0-1
-            0x00, 0xFF, 0x7E, 0x81,  # Bitplanes 2-3 rows 2-3
-            0x00, 0xFF, 0x7E, 0x81,  # Bitplanes 2-3 rows 4-5
-            0x00, 0xFF, 0x7E, 0x81,  # Bitplanes 2-3 rows 6-7
-        ])
+        tile_data = bytes(
+            [
+                0xFF,
+                0x00,
+                0x81,
+                0x7E,  # Row 0-1: solid line with gap
+                0xFF,
+                0x00,
+                0x81,
+                0x7E,  # Row 2-3
+                0xFF,
+                0x00,
+                0x81,
+                0x7E,  # Row 4-5
+                0xFF,
+                0x00,
+                0x81,
+                0x7E,  # Row 6-7
+                0x00,
+                0xFF,
+                0x7E,
+                0x81,  # Bitplanes 2-3 rows 0-1
+                0x00,
+                0xFF,
+                0x7E,
+                0x81,  # Bitplanes 2-3 rows 2-3
+                0x00,
+                0xFF,
+                0x7E,
+                0x81,  # Bitplanes 2-3 rows 4-5
+                0x00,
+                0xFF,
+                0x7E,
+                0x81,  # Bitplanes 2-3 rows 6-7
+            ]
+        )
 
         # Load it
         widget.load_sprite_from_4bpp(tile_data, 8, 8, "test_sprite")
@@ -136,6 +163,7 @@ class TestSpritePreviewWidget:
         # Check that info label was updated (regardless of pixmap state)
         # The widget may or may not set pixmap depending on rendering path
         assert "8x8" in widget.info_label.text() or widget.sprite_pixmap is not None
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

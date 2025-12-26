@@ -2,6 +2,7 @@
 Sprite configuration loader for SpritePal
 Loads sprite locations from external configuration files
 """
+
 from __future__ import annotations
 
 import json
@@ -13,6 +14,7 @@ from typing import Any
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 @dataclass
 class SpriteConfig:
@@ -26,12 +28,11 @@ class SpriteConfig:
     palette_indices: list[int] | None = None
     offset_variants: list[int] | None = None
 
+
 class SpriteConfigLoader:
     """Loads and manages sprite location configurations"""
 
-    DEFAULT_CONFIG_PATH: str = str(
-        Path(__file__).parent.parent / "config" / "sprite_locations.json"
-    )
+    DEFAULT_CONFIG_PATH: str = str(Path(__file__).parent.parent / "config" / "sprite_locations.json")
 
     def __init__(self, config_path: str | None = None) -> None:
         """
@@ -78,9 +79,7 @@ class SpriteConfigLoader:
             return int(sprite_data["expected_size"])
         return default
 
-    def find_game_config(
-        self, rom_title: str, rom_checksum: int
-    ) -> tuple[str | None, Mapping[str, object] | None]:
+    def find_game_config(self, rom_title: str, rom_checksum: int) -> tuple[str | None, Mapping[str, object] | None]:
         """
         Find game configuration by checksum (preferred) or flexible title matching.
 
@@ -109,9 +108,7 @@ class SpriteConfigLoader:
                 # Parse checksum
                 if isinstance(expected_checksum, str):
                     expected = (
-                        int(expected_checksum, 16)
-                        if expected_checksum.startswith("0x")
-                        else int(expected_checksum)
+                        int(expected_checksum, 16) if expected_checksum.startswith("0x") else int(expected_checksum)
                     )
                 else:
                     expected = expected_checksum
@@ -143,20 +140,14 @@ class SpriteConfigLoader:
                 )
         elif title_matched_games:
             selected_game = title_matched_games[0]
-            logger.warning(
-                f"No checksum match for {checksum_hex}, using title match: '{selected_game}'"
-            )
+            logger.warning(f"No checksum match for {checksum_hex}, using title match: '{selected_game}'")
         else:
-            logger.debug(
-                f"No game configuration found for ROM: title='{rom_title}', checksum={checksum_hex}"
-            )
+            logger.debug(f"No game configuration found for ROM: title='{rom_title}', checksum={checksum_hex}")
             return None, None
 
         return selected_game, self.config_data["games"][selected_game]
 
-    def get_game_sprites(
-        self, rom_title: str, rom_checksum: int
-    ) -> dict[str, SpriteConfig]:
+    def get_game_sprites(self, rom_title: str, rom_checksum: int) -> dict[str, SpriteConfig]:
         """
         Get sprite configurations for a specific game.
 
@@ -186,9 +177,7 @@ class SpriteConfigLoader:
                 # Parse checksum
                 if isinstance(expected_checksum, str):
                     expected = (
-                        int(expected_checksum, 16)
-                        if expected_checksum.startswith("0x")
-                        else int(expected_checksum)
+                        int(expected_checksum, 16) if expected_checksum.startswith("0x") else int(expected_checksum)
                     )
                 else:
                     expected = expected_checksum
@@ -228,9 +217,7 @@ class SpriteConfigLoader:
         elif title_matched_games:
             # Use title match if no checksum match
             selected_game = title_matched_games[0]
-            logger.warning(
-                f"No checksum match for {checksum_hex}, using title match: '{selected_game}'"
-            )
+            logger.warning(f"No checksum match for {checksum_hex}, using title match: '{selected_game}'")
 
             # Log all known checksums for this game
             game_data = self.config_data["games"][selected_game]
@@ -240,9 +227,7 @@ class SpriteConfigLoader:
                 for version, cs in checksums.items():
                     logger.info(f"  {version}: {cs}")
         else:
-            logger.error(
-                f"No configuration found for ROM: title='{rom_title}', checksum={checksum_hex}"
-            )
+            logger.error(f"No configuration found for ROM: title='{rom_title}', checksum={checksum_hex}")
             return sprites
 
         # Load sprite configurations
@@ -258,11 +243,7 @@ class SpriteConfigLoader:
                 continue
 
             offset_str = sprite_data.get("offset", "0x0")
-            offset = (
-                int(offset_str, 16)
-                if offset_str.startswith("0x")
-                else int(offset_str)
-            )
+            offset = int(offset_str, 16) if offset_str.startswith("0x") else int(offset_str)
 
             # Get offset variants if available (sprite-level first, then game-level fallback)
             offset_variants = None
@@ -281,17 +262,14 @@ class SpriteConfigLoader:
                     offset_variants = []
                     for variant in version_variants:
                         try:
-                            variant_offset = (
-                                int(variant, 16) if variant.startswith("0x") else int(variant)
-                            )
+                            variant_offset = int(variant, 16) if variant.startswith("0x") else int(variant)
                             offset_variants.append(variant_offset)
                         except (ValueError, TypeError):
                             logger.warning(f"Invalid offset variant: {variant}")
 
                     if offset_variants:
                         logger.debug(
-                            f"Found {len(offset_variants)} offset variants for "
-                            f"{sprite_name} ({selected_version})"
+                            f"Found {len(offset_variants)} offset variants for {sprite_name} ({selected_version})"
                         )
 
             sprites[sprite_name] = SpriteConfig(
@@ -335,8 +313,7 @@ class SpriteConfigLoader:
             ]
 
             for equiv1, equiv2 in equivalents:
-                if (equiv1 in game_upper and equiv2 in title_upper) or \
-                   (equiv2 in game_upper and equiv1 in title_upper):
+                if (equiv1 in game_upper and equiv2 in title_upper) or (equiv2 in game_upper and equiv1 in title_upper):
                     return True
 
         return False
@@ -358,11 +335,7 @@ class SpriteConfigLoader:
 
             for sprite_name, sprite_data in game_data.get("sprites", {}).items():
                 offset_str = sprite_data.get("offset", "0x0")
-                offset = (
-                    int(offset_str, 16)
-                    if offset_str.startswith("0x")
-                    else int(offset_str)
-                )
+                offset = int(offset_str, 16) if offset_str.startswith("0x") else int(offset_str)
 
                 sprites[sprite_name] = SpriteConfig(
                     name=sprite_name,

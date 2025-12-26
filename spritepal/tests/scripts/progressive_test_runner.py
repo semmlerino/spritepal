@@ -26,6 +26,7 @@ from pathlib import Path
 @dataclass
 class StageResult:
     """Results from running a single test stage."""
+
     name: str
     start_time: datetime
     duration: float
@@ -39,6 +40,7 @@ class StageResult:
     output: str
     critical_failures: list[str]
     should_continue: bool
+
 
 class ProgressiveTestRunner:
     """Orchestrates progressive test execution with intelligent stopping."""
@@ -178,10 +180,9 @@ class ProgressiveTestRunner:
         self.results: list[StageResult] = []
         self.total_start_time = datetime.now()
 
-    def run_all_stages(self,
-                      continue_on_failure: bool = False,
-                      max_stage: str | None = None,
-                      start_stage: str | None = None) -> list[StageResult]:
+    def run_all_stages(
+        self, continue_on_failure: bool = False, max_stage: str | None = None, start_stage: str | None = None
+    ) -> list[StageResult]:
         """Run all test stages progressively."""
 
         print("🚀 Starting Progressive Test Run")
@@ -257,7 +258,9 @@ class ProgressiveTestRunner:
 
         # Build pytest command
         cmd = [
-            sys.executable, "-m", "pytest",
+            sys.executable,
+            "-m",
+            "pytest",
             "--tb=short",
             "--quiet",
             "--disable-warnings",
@@ -268,18 +271,17 @@ class ProgressiveTestRunner:
         try:
             result = subprocess.run(
                 cmd,
-                check=False, cwd=self.project_root,
+                check=False,
+                cwd=self.project_root,
                 capture_output=True,
                 text=True,
-                timeout=600  # 10 minute timeout for entire stage
+                timeout=600,  # 10 minute timeout for entire stage
             )
 
             duration = (datetime.now() - start_time).total_seconds()
 
             # Parse output
-            return self._parse_stage_output(
-                stage_name, start_time, duration, cmd, result, stage_config
-            )
+            return self._parse_stage_output(stage_name, start_time, duration, cmd, result, stage_config)
 
         except subprocess.TimeoutExpired:
             duration = 600  # Max timeout
@@ -317,13 +319,15 @@ class ProgressiveTestRunner:
                 should_continue=False,
             )
 
-    def _parse_stage_output(self,
-                           stage_name: str,
-                           start_time: datetime,
-                           duration: float,
-                           cmd: list[str],
-                           result: subprocess.CompletedProcess,
-                           stage_config: dict) -> StageResult:
+    def _parse_stage_output(
+        self,
+        stage_name: str,
+        start_time: datetime,
+        duration: float,
+        cmd: list[str],
+        result: subprocess.CompletedProcess,
+        stage_config: dict,
+    ) -> StageResult:
         """Parse pytest output to extract test results."""
 
         output = result.stdout + result.stderr
@@ -341,23 +345,23 @@ class ProgressiveTestRunner:
 
         # Look for final summary
         summary_patterns = [
-            (r'(\d+) passed', 'passed'),
-            (r'(\d+) failed', 'failed'),
-            (r'(\d+) error', 'errors'),
-            (r'(\d+) skipped', 'skipped'),
+            (r"(\d+) passed", "passed"),
+            (r"(\d+) failed", "failed"),
+            (r"(\d+) error", "errors"),
+            (r"(\d+) skipped", "skipped"),
         ]
 
         for pattern, result_type in summary_patterns:
             matches = re.findall(pattern, output, re.IGNORECASE)
             if matches:
                 count = int(matches[-1])  # Take last match
-                if result_type == 'passed':
+                if result_type == "passed":
                     passed = count
-                elif result_type == 'failed':
+                elif result_type == "failed":
                     failed = count
-                elif result_type == 'errors':
+                elif result_type == "errors":
                     errors = count
-                elif result_type == 'skipped':
+                elif result_type == "skipped":
                     skipped = count
 
         total_tests = passed + failed + errors + skipped
@@ -435,7 +439,9 @@ class ProgressiveTestRunner:
 
         for result in self.results:
             status_icon = "✅" if result.pass_rate >= 0.9 else "⚠️" if result.pass_rate >= 0.7 else "❌"
-            print(f"{status_icon} {result.name:20} {result.passed:>4}/{result.total_tests:<4} ({result.pass_rate:>5.1%}) {result.duration:>6.1f}s")
+            print(
+                f"{status_icon} {result.name:20} {result.passed:>4}/{result.total_tests:<4} ({result.pass_rate:>5.1%}) {result.duration:>6.1f}s"
+            )
 
             total_tests_all += result.total_tests
             total_passed_all += result.passed
@@ -444,7 +450,9 @@ class ProgressiveTestRunner:
         overall_pass_rate = total_passed_all / total_tests_all if total_tests_all > 0 else 0.0
 
         print("-" * 40)
-        print(f"{'Overall':20} {total_passed_all:>4}/{total_tests_all:<4} ({overall_pass_rate:>5.1%}) {total_duration:>6.1f}s")
+        print(
+            f"{'Overall':20} {total_passed_all:>4}/{total_tests_all:<4} ({overall_pass_rate:>5.1%}) {total_duration:>6.1f}s"
+        )
         print()
 
         # Health assessment
@@ -503,7 +511,7 @@ class ProgressiveTestRunner:
         data = {
             "start_time": self.total_start_time.isoformat(),
             "total_duration": (datetime.now() - self.total_start_time).total_seconds(),
-            "stages": []
+            "stages": [],
         }
 
         for result in self.results:
@@ -525,10 +533,11 @@ class ProgressiveTestRunner:
             data["stages"].append(stage_data)
 
         filepath.parent.mkdir(parents=True, exist_ok=True)
-        with Path(filepath).open('w') as f:
+        with Path(filepath).open("w") as f:
             json.dump(data, f, indent=2)
 
         return filepath
+
 
 def main():
     """Main entry point for progressive test runner."""
@@ -536,14 +545,12 @@ def main():
     parser.add_argument("--stage", help="Run only specified stage")
     parser.add_argument("--start-stage", help="Start from specified stage")
     parser.add_argument("--max-stage", help="Stop at specified stage")
-    parser.add_argument("--continue-on-failure", action="store_true",
-                       help="Continue even if failure threshold exceeded")
-    parser.add_argument("--verify-fixes", action="store_true",
-                       help="Run in fix verification mode (lower thresholds)")
-    parser.add_argument("--save-results", action="store_true",
-                       help="Save results to JSON file")
-    parser.add_argument("--list-stages", action="store_true",
-                       help="List available stages")
+    parser.add_argument(
+        "--continue-on-failure", action="store_true", help="Continue even if failure threshold exceeded"
+    )
+    parser.add_argument("--verify-fixes", action="store_true", help="Run in fix verification mode (lower thresholds)")
+    parser.add_argument("--save-results", action="store_true", help="Save results to JSON file")
+    parser.add_argument("--list-stages", action="store_true", help="List available stages")
 
     args = parser.parse_args()
 
@@ -585,15 +592,14 @@ def main():
     else:
         # Run progressive stages
         runner.run_all_stages(
-            continue_on_failure=args.continue_on_failure,
-            max_stage=args.max_stage,
-            start_stage=args.start_stage
+            continue_on_failure=args.continue_on_failure, max_stage=args.max_stage, start_stage=args.start_stage
         )
 
     # Save results if requested
     if args.save_results:
         filepath = runner.save_results()
         print(f"Results saved to: {filepath}")
+
 
 if __name__ == "__main__":
     main()

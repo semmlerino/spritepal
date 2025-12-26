@@ -116,9 +116,7 @@ class TestDataFactory:
         )
 
     @classmethod
-    def create_vram_file(
-        cls, path: Path, *, minimal: bool = False, size: int | None = None
-    ) -> Path:
+    def create_vram_file(cls, path: Path, *, minimal: bool = False, size: int | None = None) -> Path:
         """
         Create a test VRAM file with sprite-like data pattern.
 
@@ -226,7 +224,7 @@ class TestDataFactory:
             for offset in test_sprite_offsets:
                 if offset + 0x800 < size:
                     for i in range(0x800):  # 2KB of sprite data
-                        rom_data[offset + i] = ((i * 7) % 256)
+                        rom_data[offset + i] = (i * 7) % 256
         else:
             # Add data at beginning for minimal file
             for i in range(min(0x1000, size)):

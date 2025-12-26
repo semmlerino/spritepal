@@ -5,6 +5,7 @@ Automatically indexes sprites as they're found during ROM scanning,
 building a searchable index for visual similarity queries.
 Now accepts `ApplicationStateManager` via dependency injection.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
 
 logger = get_logger(__name__)
+
 
 class SimilarityIndexingWorker(BaseWorker):
     """
@@ -176,12 +178,14 @@ class SimilarityIndexingWorker(BaseWorker):
                 "rom_path": str(self.rom_path),
                 "created_at": str(Path(self.rom_path).stat().st_mtime),
                 "sprite_count": len(self.similarity_engine.sprite_database),
-                "sprite_hashes": sprite_hashes
+                "sprite_hashes": sprite_hashes,
             }
 
             self._save_index_json(index_data)
 
-            logger.info(f"Saved similarity index with {len(self.similarity_engine.sprite_database)} sprites to {self.index_file}")
+            logger.info(
+                f"Saved similarity index with {len(self.similarity_engine.sprite_database)} sprites to {self.index_file}"
+            )
             self.index_saved.emit(str(self.index_file))
 
         except Exception as e:
@@ -251,6 +255,7 @@ class SimilarityIndexingWorker(BaseWorker):
         """Background indexing of pending sprites."""
         try:
             from core.app_context import get_app_context
+
             extraction_manager = get_app_context().core_operations_manager
             indexed_count = 0
 
@@ -279,11 +284,7 @@ class SimilarityIndexingWorker(BaseWorker):
                         continue
 
                     # Index the sprite
-                    self.similarity_engine.index_sprite(
-                        offset=offset,
-                        image=sprite_image,
-                        metadata=sprite_info
-                    )
+                    self.similarity_engine.index_sprite(offset=offset, image=sprite_image, metadata=sprite_info)
 
                     indexed_count += 1
                     self.sprite_indexed.emit(offset)

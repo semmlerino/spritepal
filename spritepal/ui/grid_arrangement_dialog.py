@@ -75,6 +75,7 @@ class SelectionMode(Enum):
     COLUMN = "column"
     RECTANGLE = "rectangle"
 
+
 class GridGraphicsView(QGraphicsView):
     """Custom graphics view for grid-based sprite selection"""
 
@@ -132,9 +133,7 @@ class GridGraphicsView(QGraphicsView):
         # Enable keyboard focus
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-    def set_grid_dimensions(
-        self, cols: int, rows: int, tile_width: int, tile_height: int
-    ):
+    def set_grid_dimensions(self, cols: int, rows: int, tile_width: int, tile_height: int):
         """Set the grid dimensions"""
         self.grid_cols = cols
         self.grid_rows = rows
@@ -158,9 +157,7 @@ class GridGraphicsView(QGraphicsView):
         if self.selection_rects:
             self.selection_rects.clear()
 
-    def highlight_arranged_tiles(
-        self, tiles: list[TilePosition], color: QColor | None = None
-    ):
+    def highlight_arranged_tiles(self, tiles: list[TilePosition], color: QColor | None = None):
         """Highlight arranged tiles"""
         if color is None:
             color = self.arranged_color
@@ -232,8 +229,13 @@ class GridGraphicsView(QGraphicsView):
                 self._update_hover(tile_pos)
 
             # Update rectangle selection
-            if (self.selecting and self.selection_mode == SelectionMode.RECTANGLE and
-                tile_pos and self._is_valid_tile(tile_pos) and self.selection_start):
+            if (
+                self.selecting
+                and self.selection_mode == SelectionMode.RECTANGLE
+                and tile_pos
+                and self._is_valid_tile(tile_pos)
+                and self.selection_start
+            ):
                 self._update_rectangle_selection(self.selection_start, tile_pos)
 
         if event:
@@ -360,9 +362,7 @@ class GridGraphicsView(QGraphicsView):
             # Fit the scene in view
             scene = self.scene()
             if scene:
-                self.fitInView(
-                    scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio
-                )
+                self.fitInView(scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
             # Calculate the actual zoom level
             transform = self.transform()
@@ -418,9 +418,7 @@ class GridGraphicsView(QGraphicsView):
         """Check if tile position is valid"""
         return 0 <= tile_pos.row < self.grid_rows and 0 <= tile_pos.col < self.grid_cols
 
-    def _create_tile_rect(
-        self, tile_pos: TilePosition, color: QColor
-    ) -> QGraphicsRectItem:
+    def _create_tile_rect(self, tile_pos: TilePosition, color: QColor) -> QGraphicsRectItem:
         """Create a rectangle for a tile"""
         x = tile_pos.col * self.tile_width
         y = tile_pos.row * self.tile_height
@@ -460,13 +458,9 @@ class GridGraphicsView(QGraphicsView):
 
             # Calculate selection based on mode
             if self.selection_mode == SelectionMode.ROW:
-                self.current_selection = {
-                    TilePosition(new_pos.row, c) for c in range(self.grid_cols)
-                }
+                self.current_selection = {TilePosition(new_pos.row, c) for c in range(self.grid_cols)}
             elif self.selection_mode == SelectionMode.COLUMN:
-                self.current_selection = {
-                    TilePosition(r, new_pos.col) for r in range(self.grid_rows)
-                }
+                self.current_selection = {TilePosition(r, new_pos.col) for r in range(self.grid_rows)}
             elif self.selection_mode == SelectionMode.RECTANGLE:
                 # Select rectangle from start to new position
                 min_row = min(self.selection_start.row, new_pos.row)
@@ -475,9 +469,7 @@ class GridGraphicsView(QGraphicsView):
                 max_col = max(self.selection_start.col, new_pos.col)
 
                 self.current_selection = {
-                    TilePosition(r, c)
-                    for r in range(min_row, max_row + 1)
-                    for c in range(min_col, max_col + 1)
+                    TilePosition(r, c) for r in range(min_row, max_row + 1) for c in range(min_col, max_col + 1)
                 }
 
             self._update_selection_display()
@@ -546,9 +538,7 @@ class GridGraphicsView(QGraphicsView):
         x = self.keyboard_focus_pos.col * self.tile_width
         y = self.keyboard_focus_pos.row * self.tile_height
 
-        self.keyboard_focus_rect = QGraphicsRectItem(
-            x, y, self.tile_width, self.tile_height
-        )
+        self.keyboard_focus_rect = QGraphicsRectItem(x, y, self.tile_width, self.tile_height)
         self.keyboard_focus_rect.setPen(QPen(self.keyboard_focus_color, 2))  # 2px blue border
         self.keyboard_focus_rect.setBrush(QBrush(Qt.BrushStyle.NoBrush))  # Transparent fill
         self.keyboard_focus_rect.setZValue(10)  # Above other elements
@@ -633,15 +623,11 @@ class GridGraphicsView(QGraphicsView):
 
     def _select_row(self, row: int):
         """Select an entire row"""
-        self.current_selection = {
-            TilePosition(row, col) for col in range(self.grid_cols)
-        }
+        self.current_selection = {TilePosition(row, col) for col in range(self.grid_cols)}
 
     def _select_column(self, col: int):
         """Select an entire column"""
-        self.current_selection = {
-            TilePosition(row, col) for row in range(self.grid_rows)
-        }
+        self.current_selection = {TilePosition(row, col) for row in range(self.grid_rows)}
 
     def _update_rectangle_selection(self, start: TilePosition, end: TilePosition):
         """Update rectangle selection"""
@@ -651,9 +637,7 @@ class GridGraphicsView(QGraphicsView):
         max_col = max(start.col, end.col)
 
         self.current_selection = {
-            TilePosition(row, col)
-            for row in range(min_row, max_row + 1)
-            for col in range(min_col, max_col + 1)
+            TilePosition(row, col) for row in range(min_row, max_row + 1) for col in range(min_col, max_col + 1)
         }
         self._update_selection_display()
 
@@ -688,6 +672,7 @@ class GridGraphicsView(QGraphicsView):
             self.hover_rect.setZValue(0.5)  # Below selection
             scene.addItem(self.hover_rect)
 
+
 class GridArrangementDialog(SplitterDialog):
     """Dialog for grid-based sprite arrangement with row and column support"""
 
@@ -710,14 +695,10 @@ class GridArrangementDialog(SplitterDialog):
 
         # Load and process sprite before UI setup
         try:
-            self.original_image, self.tiles = (
-                self.processor.process_sprite_sheet_as_grid(sprite_path, tiles_per_row)
-            )
+            self.original_image, self.tiles = self.processor.process_sprite_sheet_as_grid(sprite_path, tiles_per_row)
         except (OSError, ValueError, RuntimeError) as e:
             # Show error dialog and close
-            _ = QMessageBox.critical(
-                parent, "Error Loading Sprite", f"Failed to load sprite file:\n{e!s}"
-            )
+            _ = QMessageBox.critical(parent, "Error Loading Sprite", f"Failed to load sprite file:\n{e!s}")
             # Set up minimal state to prevent crashes
             self.original_image = None
             self.tiles = {}
@@ -726,9 +707,7 @@ class GridArrangementDialog(SplitterDialog):
             # Don't return here - continue with dialog setup but in error state
 
         # Create arrangement manager
-        self.arrangement_manager = GridArrangementManager(
-            self.processor.grid_rows, self.processor.grid_cols
-        )
+        self.arrangement_manager = GridArrangementManager(self.processor.grid_rows, self.processor.grid_cols)
 
         # Create undo/redo stack
         self.undo_stack = UndoRedoStack()
@@ -746,17 +725,13 @@ class GridArrangementDialog(SplitterDialog):
         )
 
         # Connect signals after UI is created
-        self.arrangement_manager.arrangement_changed.connect(
-            self._on_arrangement_changed
-        )
+        self.arrangement_manager.arrangement_changed.connect(self._on_arrangement_changed)
         self.colorizer.palette_mode_changed.connect(self._on_palette_mode_changed)
 
         # Initial update (only if we have valid data)
         if self.original_image is not None:
             self._update_displays()
-            self.update_status(
-                "Select tiles, rows, or columns to arrange. Ctrl+Wheel or F to zoom."
-            )
+            self.update_status("Select tiles, rows, or columns to arrange. Ctrl+Wheel or F to zoom.")
         else:
             self.update_status("Error: Unable to load sprite file")
 
@@ -778,19 +753,16 @@ class GridArrangementDialog(SplitterDialog):
 
         # Add panels to main horizontal splitter
         self.main_splitter.addWidget(left_widget)
-        self.main_splitter.setStretchFactor(0, 2)    # 67% for left panel
+        self.main_splitter.setStretchFactor(0, 2)  # 67% for left panel
         self.main_splitter.addWidget(right_widget)
-        self.main_splitter.setStretchFactor(1, 1)   # 33% for right panel
+        self.main_splitter.setStretchFactor(1, 1)  # 33% for right panel
 
         # Add custom buttons using SplitterDialog's button system
         self.export_btn = self.add_button("&Export Arrangement", callback=self._export_arrangement)
         if self.export_btn:
             self.export_btn.setEnabled(False)
         AccessibilityHelper.make_accessible(
-            self.export_btn,
-            "Export Arrangement",
-            "Export the arranged sprites to a new file",
-            "Ctrl+E"
+            self.export_btn, "Export Arrangement", "Export the arranged sprites to a new file", "Ctrl+E"
         )
 
     def _create_left_panel(self) -> QWidget:
@@ -843,9 +815,7 @@ class GridArrangementDialog(SplitterDialog):
         """Apply comprehensive accessibility enhancements to the dialog"""
         # Set dialog accessible name and description
         AccessibilityHelper.make_accessible(
-            self,
-            "Grid Arrangement Dialog",
-            "Arrange sprites in a grid layout with row and column support"
+            self, "Grid Arrangement Dialog", "Arrange sprites in a grid layout with row and column support"
         )
 
         # Add focus indicators
@@ -890,7 +860,7 @@ class GridArrangementDialog(SplitterDialog):
             SelectionMode.TILE: ("&Tile", "T", "Select individual tiles"),
             SelectionMode.ROW: ("&Row", "R", "Select entire rows"),
             SelectionMode.COLUMN: ("&Column", "C", "Select entire columns"),
-            SelectionMode.RECTANGLE: ("Rectan&gle", "G", "Select rectangular regions")
+            SelectionMode.RECTANGLE: ("Rectan&gle", "G", "Select rectangular regions"),
         }
 
         for mode in SelectionMode:
@@ -901,7 +871,7 @@ class GridArrangementDialog(SplitterDialog):
                 btn,
                 f"{mode.value.capitalize()} Selection",
                 description,
-                f"Alt+{shortcut_key}" if shortcut_key else None
+                f"Alt+{shortcut_key}" if shortcut_key else None,
             )
             self.mode_buttons.addButton(btn)
             mode_layout.addWidget(btn)
@@ -1155,10 +1125,7 @@ class GridArrangementDialog(SplitterDialog):
 
         else:
             # Add individual tiles - filter out already arranged ones
-            tiles_to_add = [
-                tile for tile in selection
-                if not self.arrangement_manager.is_tile_arranged(tile)
-            ]
+            tiles_to_add = [tile for tile in selection if not self.arrangement_manager.is_tile_arranged(tile)]
             if tiles_to_add:
                 command = AddMultipleTilesCommand(
                     manager=self.arrangement_manager,
@@ -1392,9 +1359,7 @@ class GridArrangementDialog(SplitterDialog):
 
         try:
             # Create arranged image
-            arranged_image = self.preview_generator.create_grid_arranged_image(
-                self.processor, self.arrangement_manager
-            )
+            arranged_image = self.preview_generator.create_grid_arranged_image(self.processor, self.arrangement_manager)
 
             if arranged_image:
                 self.output_path = self.preview_generator.export_grid_arrangement(
@@ -1402,9 +1367,7 @@ class GridArrangementDialog(SplitterDialog):
                 )
 
                 # Save arrangement data
-                self.preview_generator.create_arrangement_preview_data(
-                    self.arrangement_manager, self.processor
-                )
+                self.preview_generator.create_arrangement_preview_data(self.arrangement_manager, self.processor)
 
                 self._update_status(f"Exported to {Path(self.output_path).name}")
                 self.accept()
@@ -1413,9 +1376,7 @@ class GridArrangementDialog(SplitterDialog):
 
         except (OSError, ValueError, RuntimeError) as e:
             self._update_status(f"Export failed: {e!s}")
-            _ = QMessageBox.warning(
-                self, "Export Error", f"Failed to export arrangement:\n{e!s}"
-            )
+            _ = QMessageBox.warning(self, "Export Error", f"Failed to export arrangement:\n{e!s}")
 
     def _update_status(self, message: str):
         """Update status bar message"""
@@ -1530,8 +1491,16 @@ class GridArrangementDialog(SplitterDialog):
                         pass
 
             # Disconnect button signals
-            for btn_name in ("add_btn", "remove_btn", "create_group_btn", "clear_btn",
-                             "zoom_out_btn", "zoom_in_btn", "zoom_fit_btn", "zoom_reset_btn"):
+            for btn_name in (
+                "add_btn",
+                "remove_btn",
+                "create_group_btn",
+                "clear_btn",
+                "zoom_out_btn",
+                "zoom_in_btn",
+                "zoom_fit_btn",
+                "zoom_reset_btn",
+            ):
                 if hasattr(self, btn_name):
                     try:
                         getattr(self, btn_name).clicked.disconnect()

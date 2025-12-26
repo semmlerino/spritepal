@@ -1,6 +1,7 @@
 """
 Panel components for SpritePal UI.
 """
+
 from __future__ import annotations
 
 from .import_export_panel import ImportExportPanel

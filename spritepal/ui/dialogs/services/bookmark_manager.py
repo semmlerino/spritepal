@@ -2,6 +2,7 @@
 
 Handles bookmark storage, menu management, and navigation requests.
 """
+
 from __future__ import annotations
 
 import logging

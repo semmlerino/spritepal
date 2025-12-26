@@ -4,6 +4,7 @@ Scan Controls Panel for Manual Offset Dialog
 Handles all scanning functionality including range scanning, full ROM scanning,
 pause/stop controls, and worker management.
 """
+
 from __future__ import annotations
 
 import os
@@ -45,6 +46,7 @@ from utils.constants import (
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class ScanControlsPanel(QWidget):
     """Panel for controlling ROM scanning operations"""
@@ -170,7 +172,9 @@ class ScanControlsPanel(QWidget):
         with QMutexLocker(self._manager_mutex):
             return self.extraction_manager, self.rom_extractor
 
-    def _with_managers_safely(self, operation: Callable[[CoreOperationsManager | None, ROMExtractor | None], object]) -> Any:  # pyright: ignore[reportExplicitAny] - Generic operation return type
+    def _with_managers_safely(
+        self, operation: Callable[[CoreOperationsManager | None, ROMExtractor | None], object]
+    ) -> Any:  # pyright: ignore[reportExplicitAny] - Generic operation return type
         """Execute an operation with manager references under mutex protection.
 
         This prevents TOCTOU race conditions by holding the lock during the entire
@@ -232,7 +236,7 @@ class ScanControlsPanel(QWidget):
             f"Scan range 0x{start_offset:06X} - 0x{end_offset:06X} ({range_kb} KB)?\n\n"
             f"This may take a few moments depending on the range size.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
+            QMessageBox.StandardButton.Yes,
         )
 
         if result != QMessageBox.StandardButton.Yes:
@@ -262,7 +266,7 @@ class ScanControlsPanel(QWidget):
             f"The UI will remain responsive during scanning.\n\n"
             f"Continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No  # Default to No for safety
+            QMessageBox.StandardButton.No,  # Default to No for safety
         )
 
         if result != QMessageBox.StandardButton.Yes:
@@ -343,8 +347,7 @@ class ScanControlsPanel(QWidget):
         try:
             step_size = MIN_SPRITE_SIZE  # 256 byte steps for comprehensive scanning
             self.range_scan_worker = RangeScanWorker(
-                self.rom_path, start_offset, end_offset, step_size, rom_extractor,
-                rom_cache=self.rom_cache
+                self.rom_path, start_offset, end_offset, step_size, rom_extractor, rom_cache=self.rom_cache
             )
         except Exception as e:
             logger.exception("Failed to create range scan worker")
@@ -506,7 +509,7 @@ class ScanControlsPanel(QWidget):
 
         if scan_size > max_scan_size:
             self.scan_status_changed.emit(
-                f"Scan range too large: {scan_size / (1024*1024):.1f} MB (maximum {max_scan_size / (1024*1024):.0f} MB)"
+                f"Scan range too large: {scan_size / (1024 * 1024):.1f} MB (maximum {max_scan_size / (1024 * 1024):.0f} MB)"
             )
             return False
 
@@ -520,7 +523,7 @@ class ScanControlsPanel(QWidget):
                 f"Large scans can impact system performance.\n"
                 f"Continue with scan?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.No,
             )
             if result != QMessageBox.StandardButton.Yes:
                 self.scan_status_changed.emit("Large scan cancelled by user")
@@ -551,7 +554,7 @@ class ScanControlsPanel(QWidget):
                     "step": MIN_SPRITE_SIZE,
                     "quality_threshold": 0.5,
                     "min_sprite_size": 512,
-                    "max_sprite_size": 65536
+                    "max_sprite_size": 65536,
                 },
                 # Full ROM scan parameters
                 {
@@ -560,8 +563,8 @@ class ScanControlsPanel(QWidget):
                     "step": MIN_SPRITE_SIZE,
                     "quality_threshold": 0.5,
                     "min_sprite_size": 512,
-                    "max_sprite_size": 65536
-                }
+                    "max_sprite_size": 65536,
+                },
             ]
 
             # Check each parameter set for cached results
@@ -570,7 +573,7 @@ class ScanControlsPanel(QWidget):
                 if cached_progress and not cached_progress.get("completed", False):
                     # Found incomplete cached scan - emit signal for parent to handle
                     logger.info(f"Found cached partial scan for ROM: {Path(self.rom_path).name}")
-                    found_sprites = cast(list[Any], cached_progress.get('found_sprites', []))  # pyright: ignore[reportExplicitAny] - Sprite data from cache
+                    found_sprites = cast(list[Any], cached_progress.get("found_sprites", []))  # pyright: ignore[reportExplicitAny] - Sprite data from cache
                     self._update_cache_status(f"Found cached scan with {len(found_sprites)} sprites")
                     self.partial_scan_detected.emit(cached_progress)
                     return
@@ -685,7 +688,7 @@ class ScanControlsPanel(QWidget):
                 "step": MIN_SPRITE_SIZE,
                 "quality_threshold": 0.5,
                 "min_sprite_size": 512,
-                "max_sprite_size": 65536
+                "max_sprite_size": 65536,
             }
 
             # Check for cached partial scan
@@ -722,4 +725,6 @@ class ScanControlsPanel(QWidget):
         """Handle cache progress save notifications from worker"""
         cache_message = f"Progress saved: {progress_pct}% complete, {sprites_found} sprites found"
         self._update_cache_status(cache_message)
-        logger.debug(f"Cache progress saved at offset 0x{current_offset:06X}: {sprites_found} sprites ({progress_pct}%)")
+        logger.debug(
+            f"Cache progress saved at offset 0x{current_offset:06X}: {sprites_found} sprites ({progress_pct}%)"
+        )

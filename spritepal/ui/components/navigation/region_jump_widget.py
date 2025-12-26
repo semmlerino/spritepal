@@ -8,6 +8,7 @@ Features:
 - Direct offset jumping
 - Smart mode integration
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
@@ -29,6 +30,7 @@ from utils.logging_config import get_logger
 from utils.sprite_regions import SpriteRegion
 
 logger = get_logger(__name__)
+
 
 class RegionJumpWidget(QWidget):
     """
@@ -242,9 +244,7 @@ class RegionJumpWidget(QWidget):
             region = self.regions[self.current_region_index]
             quality_text = self._get_quality_text(region.average_quality)
             if self.stats_label:
-                self.stats_label.setText(
-                f"{region.sprite_count} sprites, {quality_text} quality"
-            )
+                self.stats_label.setText(f"{region.sprite_count} sprites, {quality_text} quality")
         else:
             total_sprites = sum(r.sprite_count for r in self.regions)
             if self.stats_label:

@@ -4,6 +4,7 @@ Parallel sprite finder for improved search performance.
 This module implements concurrent sprite searching across ROM regions,
 providing 3-4x speedup on multi-core systems.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,9 +26,11 @@ from utils.rom_utils import detect_smc_offset
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class SearchChunk:
     """Represents a ROM region to search."""
+
     start: int
     end: int
     chunk_id: int
@@ -36,15 +39,18 @@ class SearchChunk:
     def size(self) -> int:
         return self.end - self.start
 
+
 @dataclass
 class SearchResult:
     """Container for sprite search results."""
+
     offset: int
     size: int
     tile_count: int
     compressed_size: int
     confidence: float
     metadata: dict[str, object]
+
 
 class ParallelSpriteFinder:
     """
@@ -54,12 +60,7 @@ class ParallelSpriteFinder:
     providing significant speedup on multi-core systems.
     """
 
-    def __init__(
-        self,
-        num_workers: int = 4,
-        chunk_size: int = CHUNK_SIZE_PARALLEL,
-        step_size: int = DEFAULT_SCAN_STEP
-    ):
+    def __init__(self, num_workers: int = 4, chunk_size: int = CHUNK_SIZE_PARALLEL, step_size: int = DEFAULT_SCAN_STEP):
         """
         Initialize parallel sprite finder.
 
@@ -100,7 +101,7 @@ class ParallelSpriteFinder:
         start_offset: int = 0,
         end_offset: int | None = None,
         progress_callback: Callable[[int, int], None] | None = None,
-        cancellation_token: threading.Event | None = None
+        cancellation_token: threading.Event | None = None,
     ) -> list[SearchResult]:
         """
         Search for sprites in parallel across ROM regions.
@@ -151,13 +152,7 @@ class ParallelSpriteFinder:
             # Use worker-specific sprite finder
             finder = self.sprite_finders[i % self.num_workers]
 
-            future = self.executor.submit(
-                self._search_chunk,
-                finder,
-                rom_data,
-                chunk,
-                cancellation_token
-            )
+            future = self.executor.submit(self._search_chunk, finder, rom_data, chunk, cancellation_token)
             futures[future] = chunk
 
         # Collect results
@@ -177,10 +172,7 @@ class ParallelSpriteFinder:
                     progress = int((completed_chunks / total_chunks) * 100)
                     progress_callback(progress, 100)
 
-                logger.debug(
-                    f"Chunk {chunk.chunk_id} complete: "
-                    f"found {len(results)} sprites"
-                )
+                logger.debug(f"Chunk {chunk.chunk_id} complete: found {len(results)} sprites")
 
             except Exception as e:
                 logger.exception(f"Error searching chunk {chunk.chunk_id}: {e}")
@@ -191,8 +183,7 @@ class ParallelSpriteFinder:
         elapsed = time.time() - start_time
         rate = len(all_results) / elapsed if elapsed > 0 else 0.0
         logger.info(
-            f"Parallel search complete: found {len(all_results)} sprites "
-            f"in {elapsed:.2f}s ({rate:.1f} sprites/sec)"
+            f"Parallel search complete: found {len(all_results)} sprites in {elapsed:.2f}s ({rate:.1f} sprites/sec)"
         )
 
         return all_results
@@ -203,11 +194,7 @@ class ParallelSpriteFinder:
 
         for chunk_id, offset in enumerate(range(start, end, self.chunk_size)):
             chunk_end = min(offset + self.chunk_size, end)
-            chunk = SearchChunk(
-                start=offset,
-                end=chunk_end,
-                chunk_id=chunk_id
-            )
+            chunk = SearchChunk(start=offset, end=chunk_end, chunk_id=chunk_id)
             chunks.append(chunk)
 
         return chunks
@@ -217,7 +204,7 @@ class ParallelSpriteFinder:
         finder: SpriteFinder,
         rom_data: bytes,
         chunk: SearchChunk,
-        cancellation_token: threading.Event | None = None
+        cancellation_token: threading.Event | None = None,
     ) -> list[SearchResult]:
         """Search a single chunk for sprites.
 
@@ -241,12 +228,7 @@ class ParallelSpriteFinder:
                 break
 
             # Use SpriteFinder's unified scan_offset (includes quick_check)
-            scan_result = finder.scan_offset(
-                rom_data,
-                offset,
-                quick_check=True,
-                full_visual_validation=False
-            )
+            scan_result = finder.scan_offset(rom_data, offset, quick_check=True, full_visual_validation=False)
 
             if scan_result:
                 result = SearchResult(
@@ -255,7 +237,7 @@ class ParallelSpriteFinder:
                     tile_count=scan_result.tile_count,
                     compressed_size=scan_result.compressed_size,
                     confidence=scan_result.confidence,
-                    metadata=scan_result.to_dict()
+                    metadata=scan_result.to_dict(),
                 )
                 results.append(result)
 
@@ -268,10 +250,7 @@ class ParallelSpriteFinder:
                 else:
                     # Low confidence - cap skip distance to avoid missing sprites
                     # when HAL parsing might have overestimated compressed_size
-                    skip_distance = min(
-                        max(scan_result.compressed_size, self.step_size),
-                        self.step_size * 2
-                    )
+                    skip_distance = min(max(scan_result.compressed_size, self.step_size), self.step_size * 2)
                 offset += skip_distance
             else:
                 # Move to next offset
@@ -279,12 +258,7 @@ class ParallelSpriteFinder:
 
         return results
 
-    def _calculate_adaptive_step(
-        self,
-        finder: SpriteFinder,
-        rom_data: bytes,
-        chunk: SearchChunk
-    ) -> int:
+    def _calculate_adaptive_step(self, finder: SpriteFinder, rom_data: bytes, chunk: SearchChunk) -> int:
         """
         Calculate adaptive step size based on chunk characteristics.
 

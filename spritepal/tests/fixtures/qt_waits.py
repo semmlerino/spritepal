@@ -10,6 +10,7 @@ Usage:
 
     Or import specific fixtures directly in conftest.py and re-export.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -23,10 +24,7 @@ if TYPE_CHECKING:
 
 
 def wait_for_condition(
-    qtbot: QtBot,
-    condition_func: Callable[[], bool],
-    timeout: int = 5000,
-    message: str = "Condition not met"
+    qtbot: QtBot, condition_func: Callable[[], bool], timeout: int = 5000, message: str = "Condition not met"
 ) -> bool:
     """
     Wait for a condition to become true using proper Qt event loop handling.
@@ -56,21 +54,22 @@ def wait_for_condition(
 @pytest.fixture
 def wait_for(qtbot: QtBot) -> Callable[..., bool]:
     """Provide the wait_for_condition function as a fixture."""
-    def _wait_for(
-        condition_func: Callable[[], bool],
-        timeout: int = 5000,
-        message: str = "Condition not met"
-    ) -> bool:
+
+    def _wait_for(condition_func: Callable[[], bool], timeout: int = 5000, message: str = "Condition not met") -> bool:
         return wait_for_condition(qtbot, condition_func, timeout, message)
+
     return _wait_for
 
 
 @pytest.fixture
 def process_events(qtbot: QtBot) -> Callable[[], None]:
     """Process Qt events to ensure UI updates."""
+
     def _process() -> None:
         from PySide6.QtWidgets import QApplication
+
         QApplication.processEvents()
+
     return _process
 
 
@@ -86,6 +85,7 @@ def wait_for_widget_ready(qtbot: QtBot) -> Callable[..., bool]:
         wait_for_widget_ready(dialog, timeout=1000)
         # Instead of: dialog.show(); qtbot.wait(100)
     """
+
     def _wait(widget: QWidget, timeout: int = 1000) -> bool:
         """
         Wait for widget to be visible and enabled.
@@ -101,15 +101,11 @@ def wait_for_widget_ready(qtbot: QtBot) -> Callable[..., bool]:
             TimeoutError: If widget not ready within timeout
         """
         try:
-            qtbot.waitUntil(
-                lambda: widget.isVisible() and widget.isEnabled(),
-                timeout=timeout
-            )
+            qtbot.waitUntil(lambda: widget.isVisible() and widget.isEnabled(), timeout=timeout)
             return True
         except AssertionError as e:
-            raise TimeoutError(
-                f"Widget {widget.__class__.__name__} not ready within {timeout}ms"
-            ) from e
+            raise TimeoutError(f"Widget {widget.__class__.__name__} not ready within {timeout}ms") from e
+
     return _wait
 
 
@@ -125,6 +121,7 @@ def wait_for_signal_processed(qtbot: QtBot) -> Callable[[], None]:
         wait_for_signal_processed()
         # Instead of: slider.setValue(100); qtbot.wait(50)
     """
+
     def _wait() -> None:
         """
         Wait for pending signals to be processed.
@@ -132,6 +129,7 @@ def wait_for_signal_processed(qtbot: QtBot) -> Callable[[], None]:
         Uses processEvents() to ensure all queued signals have been delivered.
         """
         from PySide6.QtWidgets import QApplication
+
         QApplication.processEvents()
 
     return _wait
@@ -149,11 +147,9 @@ def wait_for_layout_update(qtbot: QtBot) -> Callable[..., bool]:
         wait_for_layout_update(window, expected_width=1024)
         # Instead of: window.resize(...); qtbot.wait(100)
     """
+
     def _wait(
-        widget: QWidget,
-        expected_width: int | None = None,
-        expected_height: int | None = None,
-        timeout: int = 500
+        widget: QWidget, expected_width: int | None = None, expected_height: int | None = None, timeout: int = 500
     ) -> bool:
         """
         Wait for widget layout to update.
@@ -164,6 +160,7 @@ def wait_for_layout_update(qtbot: QtBot) -> Callable[..., bool]:
             expected_height: Expected height (None to skip check)
             timeout: Maximum wait time in milliseconds
         """
+
         def layout_updated() -> bool:
             size = widget.size()
             if expected_width is not None and size.width() != expected_width:

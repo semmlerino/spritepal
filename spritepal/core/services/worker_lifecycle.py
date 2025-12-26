@@ -11,6 +11,7 @@ used throughout the SpritePal codebase:
 Note: This module was moved from ui/common/worker_manager.py to core/services/
 to fix layer boundary violations (core was importing from ui).
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -34,11 +35,13 @@ def _is_cancellable(worker: QThread) -> bool:
     """Check if a worker has a cancel() method (BaseWorker pattern)."""
     return isinstance(worker, CancellableWorker)
 
+
 logger = get_logger(__name__)
 
 # Timeout constants for worker cleanup
 DEFAULT_CLEANUP_TIMEOUT = 1000  # 1 second - reasonable for most workers
 QUICK_CLEANUP_TIMEOUT = 100  # 100ms - for application shutdown scenarios
+
 
 class WorkerManager:
     """
@@ -78,7 +81,9 @@ class WorkerManager:
         """
         # Add worker to registry
         WorkerManager._worker_registry.add(worker)
-        logger.debug(f"Registered worker {worker.__class__.__name__} (registry size: {len(WorkerManager._worker_registry)})")
+        logger.debug(
+            f"Registered worker {worker.__class__.__name__} (registry size: {len(WorkerManager._worker_registry)})"
+        )
 
     @staticmethod
     def cleanup_worker(
@@ -212,9 +217,7 @@ class WorkerManager:
 
     @staticmethod
     def start_worker(
-        worker: QThread,
-        cleanup_existing: QThread | None = None,
-        cleanup_timeout: int = DEFAULT_CLEANUP_TIMEOUT
+        worker: QThread, cleanup_existing: QThread | None = None, cleanup_timeout: int = DEFAULT_CLEANUP_TIMEOUT
     ) -> None:
         """
         Start a new worker, optionally cleaning up an existing one first.
@@ -242,7 +245,7 @@ class WorkerManager:
         *args: object,
         cleanup_existing: QThread | None = None,
         cleanup_timeout: int = DEFAULT_CLEANUP_TIMEOUT,
-        **kwargs: object
+        **kwargs: object,
     ) -> QThread:
         """
         Create and start a worker in one call.
@@ -367,8 +370,9 @@ class WorkerManager:
             # This prevents "Internal C++ object already deleted" errors
             try:
                 from shiboken6 import isValid
+
                 if not isValid(worker):
-                    worker_name = getattr(worker, '__class__', type(worker)).__name__
+                    worker_name = getattr(worker, "__class__", type(worker)).__name__
                     logger.debug(f"cleanup_all: Skipping already-deleted worker {worker_name}")
                     continue
             except (ImportError, RuntimeError):
@@ -412,6 +416,7 @@ class WorkerManager:
         # This helps ensure threads are fully cleaned up before returning
         try:
             from PySide6.QtCore import QCoreApplication
+
             app = QCoreApplication.instance()
             if app:
                 # Process events multiple times to ensure cleanup
@@ -433,6 +438,7 @@ class WorkerManager:
         # see threads that are in the process of being destroyed
         try:
             import time
+
             time.sleep(0.05)  # 50ms should be enough for OS thread cleanup
             logger.debug("cleanup_all: Waited for OS thread cleanup")
         except Exception as e:
@@ -452,7 +458,7 @@ class WorkerManager:
                 # Check if this is an explicitly named QThread
                 # Skip 'Dummy-N' threads - they're Python's internal representation
                 # of non-Python threads and produce false positives in parallel tests
-                if 'QThread' in t.name and t.name not in ('MainThread', 'QThread'):
+                if "QThread" in t.name and t.name not in ("MainThread", "QThread"):
                     unknown_workers.append(t.name)
             if unknown_workers:
                 logger.warning(
@@ -494,10 +500,7 @@ class WorkerManager:
         Returns:
             list[str]: List of worker class names and their running status
         """
-        return [
-            f"{w.__class__.__name__} (running={w.isRunning()})"
-            for w in WorkerManager._worker_registry
-        ]
+        return [f"{w.__class__.__name__} (running={w.isRunning()})" for w in WorkerManager._worker_registry]
 
     @staticmethod
     def assert_no_active_workers(message: str = "") -> None:

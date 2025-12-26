@@ -1,6 +1,7 @@
 """
 Simple test for SearchWorker without importing the dialog.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -16,6 +17,7 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
+
 @pytest.fixture
 def temp_rom_file() -> Generator[str, None, None]:
     """Create temporary ROM file for testing."""
@@ -29,6 +31,7 @@ def temp_rom_file() -> Generator[str, None, None]:
 
     # Cleanup
     Path(temp_path).unlink(missing_ok=True)
+
 
 class TestSearchWorkerSimple:
     """Test SearchWorker without importing the actual dialog."""
@@ -44,7 +47,7 @@ class TestSearchWorkerSimple:
             "start_offset": 0x0,
             "end_offset": 0x1000,
             "num_workers": 2,
-            "step_size": 0x100
+            "step_size": 0x100,
         }
 
         # Mock signals
@@ -60,11 +63,7 @@ class TestSearchWorkerSimple:
 
         # Simulate the search
         mock_worker.finder = mock_finder
-        results = mock_finder.search_parallel(
-            rom_path=temp_rom_file,
-            start_offset=0x0,
-            end_offset=0x1000
-        )
+        results = mock_finder.search_parallel(rom_path=temp_rom_file, start_offset=0x0, end_offset=0x1000)
 
         # Verify behavior
         assert results == []

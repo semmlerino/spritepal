@@ -1,4 +1,5 @@
 """Tests for SpriteExtractor class"""
+
 from __future__ import annotations
 
 import sys
@@ -120,9 +121,7 @@ class TestSpriteExtractor:
             (32, 256),  # 32 tiles * 8 pixels
         ],
     )
-    def test_create_grayscale_image_dimensions(
-        self, extractor, tiles_per_row, expected_width
-    ):
+    def test_create_grayscale_image_dimensions(self, extractor, tiles_per_row, expected_width):
         """Test grayscale image creation with different layouts"""
         # Create some test tiles
         test_tiles = [[[0] * 8 for _ in range(8)] for _ in range(tiles_per_row * 2)]
@@ -142,9 +141,7 @@ class TestSpriteExtractor:
             output_path = output_file.name
 
         try:
-            img, num_tiles = extractor.extract_sprites_grayscale(
-                vram_file.name, output_path
-            )
+            img, num_tiles = extractor.extract_sprites_grayscale(vram_file.name, output_path)
 
             assert img is not None
             assert num_tiles >= 1

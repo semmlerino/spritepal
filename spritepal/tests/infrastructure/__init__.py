@@ -8,6 +8,7 @@ This module provides testing infrastructure including:
 - ThreadSafeTestImage: Thread-safe QImage for worker tests
 - test_helpers: Simple helper functions for common test needs
 """
+
 from __future__ import annotations
 
 from .data_repository import DataRepository
@@ -36,19 +37,19 @@ if is_pyside6_available():
         from .thread_safe_test_image import ThreadSafeTestImage
 
         # Add Qt-dependent exports
-        __all__.extend([
-            "RealComponentFactory",
-            "ThreadSafeTestImage",
-            "create_main_window",
-            "create_extraction_worker",
-            "create_injection_worker",
-            "create_tile_renderer",
-        ])
+        __all__.extend(
+            [
+                "RealComponentFactory",
+                "ThreadSafeTestImage",
+                "create_main_window",
+                "create_extraction_worker",
+                "create_injection_worker",
+                "create_tile_renderer",
+            ]
+        )
 
     except ImportError as e:
         # PySide6 is available but Qt modules failed to import
         import warnings
-        warnings.warn(
-            f"PySide6 is available but Qt modules failed to import: {e}.",
-            RuntimeWarning, stacklevel=2
-        )
+
+        warnings.warn(f"PySide6 is available but Qt modules failed to import: {e}.", RuntimeWarning, stacklevel=2)

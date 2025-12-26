@@ -47,7 +47,7 @@ class QualityReportGenerator:
             "grade": "F",
             "trend": "unknown",
             "areas_for_improvement": [],
-            "strengths": []
+            "strengths": [],
         }
 
         # Type Safety Score (40% weight)
@@ -67,12 +67,7 @@ class QualityReportGenerator:
         metrics["maintainability_score"] = maintainability_score
 
         # Overall weighted score
-        overall = (
-            type_score * 0.4 +
-            test_score * 0.3 +
-            code_score * 0.2 +
-            maintainability_score * 0.1
-        )
+        overall = type_score * 0.4 + test_score * 0.3 + code_score * 0.2 + maintainability_score * 0.1
         metrics["overall_score"] = round(overall, 1)
 
         # Assign grade
@@ -145,10 +140,7 @@ class QualityReportGenerator:
         score -= avg_density * 200  # Convert to percentage impact
 
         # Bonus for good test coverage patterns
-        deprecated_count = sum(
-            len(v.get("deprecated_patterns", []))
-            for v in violations
-        )
+        deprecated_count = sum(len(v.get("deprecated_patterns", [])) for v in violations)
         if deprecated_count == 0:
             score += 10.0  # Bonus for no deprecated patterns
         else:
@@ -176,7 +168,7 @@ class QualityReportGenerator:
                 if errors_per_file > 5:
                     score -= 10  # Many errors concentrated in few files is bad
                 elif errors_per_file < 2:
-                    score += 5   # Errors spread across many files is better
+                    score += 5  # Errors spread across many files is better
 
         return max(0.0, min(100.0, score))
 
@@ -201,8 +193,7 @@ class QualityReportGenerator:
                 improvements.append("High mock density - consider migrating to RealComponentFactory")
 
             deprecated_patterns = sum(
-                len(v.get("deprecated_patterns", []))
-                for v in self.mock_density_data.get("violations", [])
+                len(v.get("deprecated_patterns", [])) for v in self.mock_density_data.get("violations", [])
             )
             if deprecated_patterns > 0:
                 improvements.append("Deprecated MockFactory patterns found")
@@ -226,15 +217,15 @@ class QualityReportGenerator:
             "metadata": {
                 "generated_at": datetime.now().isoformat(),
                 "generator_version": "1.0.0",
-                "report_type": "comprehensive_quality"
+                "report_type": "comprehensive_quality",
             },
             "quality_metrics": metrics,
             "summary": {
                 "overall_grade": metrics["grade"],
                 "overall_score": metrics["overall_score"],
                 "passing_threshold": metrics["overall_score"] >= 70,
-                "recommendations_count": len(metrics["areas_for_improvement"])
-            }
+                "recommendations_count": len(metrics["areas_for_improvement"]),
+            },
         }
 
         # Add summaries of each check type
@@ -242,14 +233,14 @@ class QualityReportGenerator:
             report["type_checking"] = {
                 "summary": self.type_check_data.get("summary", {}),
                 "critical_errors": self.type_check_data.get("critical_errors", 0),
-                "thresholds_passed": self.type_check_data.get("thresholds", {}).get("overall_passed", False)
+                "thresholds_passed": self.type_check_data.get("thresholds", {}).get("overall_passed", False),
             }
 
         if self.mock_density_data:
             report["test_quality"] = {
                 "total_files": self.mock_density_data.get("total_files", 0),
                 "violations": len(self.mock_density_data.get("violations", [])),
-                "avg_density": self.mock_density_data.get("summary", {}).get("avg_density", 0)
+                "avg_density": self.mock_density_data.get("summary", {}).get("avg_density", 0),
             }
 
         # Include raw data if requested (for debugging)
@@ -258,7 +249,7 @@ class QualityReportGenerator:
                 "type_check": self.type_check_data,
                 "mock_density": self.mock_density_data,
                 "lint": self.lint_data,
-                "test": self.test_data
+                "test": self.test_data,
             }
 
         return report
@@ -275,10 +266,16 @@ class QualityReportGenerator:
 
         # Quality Score Summary
         grade_emoji = {
-            "A+": "🌟", "A": "🟢", "A-": "🟢",
-            "B+": "🟡", "B": "🟡", "B-": "🟡",
-            "C+": "🟠", "C": "🟠",
-            "D": "🔴", "F": "🔴"
+            "A+": "🌟",
+            "A": "🟢",
+            "A-": "🟢",
+            "B+": "🟡",
+            "B": "🟡",
+            "B-": "🟡",
+            "C+": "🟠",
+            "C": "🟠",
+            "D": "🔴",
+            "F": "🔴",
         }
 
         emoji = grade_emoji.get(metrics["grade"], "⚪")
@@ -344,9 +341,11 @@ class QualityReportGenerator:
                 report.append("")
                 report.append("**Files needing attention:**")
                 for v in violations[:5]:  # Show top 5
-                    icon = "🔴" if v.get('type') == 'new_file' else "🟡"
-                    file_name = Path(v['file']).name  # Just filename for readability
-                    report.append(f"- {icon} `{file_name}`: {v['density']:.4f} (threshold: {v.get('threshold', 'N/A')})")
+                    icon = "🔴" if v.get("type") == "new_file" else "🟡"
+                    file_name = Path(v["file"]).name  # Just filename for readability
+                    report.append(
+                        f"- {icon} `{file_name}`: {v['density']:.4f} (threshold: {v.get('threshold', 'N/A')})"
+                    )
 
             report.append("")
 
@@ -360,13 +359,11 @@ class QualityReportGenerator:
         if metrics["areas_for_improvement"]:
             report.append("## 🎯 Areas for Improvement")
             priority_items = [
-                item for item in metrics["areas_for_improvement"]
+                item
+                for item in metrics["areas_for_improvement"]
                 if "critical" in item.lower() or "immediate" in item.lower()
             ]
-            other_items = [
-                item for item in metrics["areas_for_improvement"]
-                if item not in priority_items
-            ]
+            other_items = [item for item in metrics["areas_for_improvement"] if item not in priority_items]
 
             if priority_items:
                 report.append("### 🚨 High Priority")
@@ -403,11 +400,13 @@ class QualityReportGenerator:
 
         return "\n".join(report)
 
-    def load_all_data(self,
-                     type_check_file: str | None = None,
-                     mock_density_file: str | None = None,
-                     lint_file: str | None = None,
-                     test_file: str | None = None) -> None:
+    def load_all_data(
+        self,
+        type_check_file: str | None = None,
+        mock_density_file: str | None = None,
+        lint_file: str | None = None,
+        test_file: str | None = None,
+    ) -> None:
         """Load all available quality check data."""
         if type_check_file:
             self.type_check_data = self.load_json_report(type_check_file)
@@ -421,35 +420,32 @@ class QualityReportGenerator:
         if test_file:
             self.test_data = self.load_json_report(test_file)
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description='Generate comprehensive quality report from multiple check results'
+    parser = argparse.ArgumentParser(description="Generate comprehensive quality report from multiple check results")
+    parser.add_argument("--type-check", help="Type check results JSON file")
+    parser.add_argument("--mock-density", help="Mock density results JSON file")
+    parser.add_argument("--lint", help="Lint results JSON file")
+    parser.add_argument("--test", help="Test results JSON file")
+    parser.add_argument("--output", "-o", help="Output file path")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser.add_argument(
+        "--include-raw-data", action="store_true", help="Include raw data in JSON output (for debugging)"
     )
-    parser.add_argument('--type-check', help='Type check results JSON file')
-    parser.add_argument('--mock-density', help='Mock density results JSON file')
-    parser.add_argument('--lint', help='Lint results JSON file')
-    parser.add_argument('--test', help='Test results JSON file')
-    parser.add_argument('--output', '-o', help='Output file path')
-    parser.add_argument('--format', choices=['json', 'markdown'], default='json',
-                       help='Output format (default: json)')
-    parser.add_argument('--include-raw-data', action='store_true',
-                       help='Include raw data in JSON output (for debugging)')
-    parser.add_argument('--threshold', type=float, default=70.0,
-                       help='Quality score threshold for passing (default: 70)')
+    parser.add_argument(
+        "--threshold", type=float, default=70.0, help="Quality score threshold for passing (default: 70)"
+    )
 
     args = parser.parse_args()
 
     # Create generator and load data
     generator = QualityReportGenerator()
     generator.load_all_data(
-        type_check_file=args.type_check,
-        mock_density_file=args.mock_density,
-        lint_file=args.lint,
-        test_file=args.test
+        type_check_file=args.type_check, mock_density_file=args.mock_density, lint_file=args.lint, test_file=args.test
     )
 
     # Generate report in requested format
-    if args.format == 'markdown':
+    if args.format == "markdown":
         report_content = generator.generate_markdown_report()
     else:
         report_data = generator.generate_json_report(include_raw_data=args.include_raw_data)
@@ -457,18 +453,19 @@ def main():
 
     # Save or print report
     if args.output:
-        with Path(args.output).open('w') as f:
+        with Path(args.output).open("w") as f:
             f.write(report_content)
         print(f"Quality report saved to {args.output}")
     else:
         print(report_content)
 
     # Exit with appropriate code based on quality score
-    if args.format == 'json':
+    if args.format == "json":
         quality_score = generator.calculate_quality_metrics()["overall_score"]
         return 0 if quality_score >= args.threshold else 1
 
     return 0
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())

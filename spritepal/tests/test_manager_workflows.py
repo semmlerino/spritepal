@@ -3,6 +3,7 @@ Integration tests for complete UI → Manager workflows
 
 Uses isolated_managers fixture from core_fixtures.py for test isolation.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -106,6 +107,7 @@ class TestManagerCommunication:
         assert rom_injection_params["offset"] == 0x8000
         assert rom_injection_params["mode"] == "rom"
         assert rom_injection_params["fast_compression"] is True
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

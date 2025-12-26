@@ -34,16 +34,14 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         cgram_row.setSpacing(SPACING_MEDIUM)
 
         self.cgram_path_edit = QLineEdit()
-        self.cgram_path_edit.setPlaceholderText(
-            "Select custom palette file..."
-        )
+        self.cgram_path_edit.setPlaceholderText("Select custom palette file...")
         self.cgram_path_edit.setReadOnly(True)
         self.cgram_path_edit.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
         cgram_row.addWidget(self.cgram_path_edit, 1)
 
         self.browse_cgram_btn = QPushButton("Browse...")
         self.browse_cgram_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.browse_cgram_btn.setMinimumWidth(90)   # Fits "Browse..." text
+        self.browse_cgram_btn.setMinimumWidth(90)  # Fits "Browse..." text
         self.browse_cgram_btn.setMaximumWidth(120)  # Prevents over-expansion
         self.browse_cgram_btn.setToolTip(
             "Palettes are extracted from ROM when available.\n"

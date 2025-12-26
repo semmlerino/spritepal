@@ -1,6 +1,7 @@
 """
 Preview generation for arranged sprite rows
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,7 +29,7 @@ class ArrangementPreviewGenerator:
         tile_rows: list[dict[str, Any]],  # pyright: ignore[reportExplicitAny] - Row metadata
         arranged_indices: list[int],
         tile_height: int,
-        row_spacing_ratio: float = 0.75
+        row_spacing_ratio: float = 0.75,
     ) -> Image.Image | None:
         """Create image with arranged rows
 
@@ -78,9 +79,7 @@ class ArrangementPreviewGenerator:
 
                 # Get the appropriate display image (grayscale or colorized)
                 if self.colorizer:
-                    row_image = self.colorizer.get_display_image(
-                        row_idx, grayscale_image
-                    )
+                    row_image = self.colorizer.get_display_image(row_idx, grayscale_image)
                 else:
                     row_image = grayscale_image
 
@@ -116,9 +115,7 @@ class ArrangementPreviewGenerator:
         # Use a special index (-1) to indicate full image colorization
         return self.colorizer.get_display_image(-1, image)
 
-    def export_arranged_image(
-        self, sprite_path: str, arranged_image: Image.Image, num_rows: int
-    ) -> str:
+    def export_arranged_image(self, sprite_path: str, arranged_image: Image.Image, num_rows: int) -> str:
         """Export the arranged sprite sheet to a file
 
         Args:
@@ -138,9 +135,7 @@ class ArrangementPreviewGenerator:
 
         return output_path
 
-    def generate_output_filename(
-        self, sprite_path: str, suffix: str = "_arranged"
-    ) -> str:
+    def generate_output_filename(self, sprite_path: str, suffix: str = "_arranged") -> str:
         """Generate output filename based on input path
 
         Args:

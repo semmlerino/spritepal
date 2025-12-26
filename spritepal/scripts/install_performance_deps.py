@@ -21,6 +21,7 @@ def install_package(package):
         print(f"❌ Failed to install {package}: {e}")
         return False
 
+
 def check_package(package):
     """Check if a package is already installed."""
     try:
@@ -31,6 +32,7 @@ def check_package(package):
         print(f"⚠️  {package} not found, installing...")
         return False
 
+
 def main():
     """Install performance validation dependencies."""
     print("🔧 Installing Performance Validation Dependencies")
@@ -38,8 +40,8 @@ def main():
 
     # Core dependencies for performance testing
     dependencies = [
-        "psutil",           # System/process monitoring
-        "pytest-benchmark", # Precise benchmarking
+        "psutil",  # System/process monitoring
+        "pytest-benchmark",  # Precise benchmarking
         "memory-profiler",  # Memory usage profiling
     ]
 
@@ -59,6 +61,7 @@ def main():
         print("❌ Some dependencies failed to install")
         print("Please install manually or check your environment")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -3,6 +3,7 @@ Simple real integration test to validate testing infrastructure with pytest.
 
 This test validates the core functionality without complex dialogs that might hang.
 """
+
 from __future__ import annotations
 
 import sys
@@ -56,7 +57,7 @@ class TestSimpleRealIntegration:
         # Test validation with invalid parameters (should raise ValidationError)
         invalid_params = {
             "vram_path": "/nonexistent/file.dmp",  # Non-existent file
-            "output_base": "test_output"
+            "output_base": "test_output",
         }
 
         # This tests our bug fix - validation should raise ValidationError, not return None
@@ -93,21 +94,9 @@ class TestSimpleRealIntegration:
 
         # Test cases that reveal real behavior vs mock behavior
         test_cases = [
-            {
-                "name": "Empty VRAM path",
-                "params": {"vram_path": "", "output_base": "test"},
-                "should_fail": True
-            },
-            {
-                "name": "Missing output_base",
-                "params": {"vram_path": "/tmp/test.dmp"},
-                "should_fail": True
-            },
-            {
-                "name": "None values",
-                "params": {"vram_path": None, "output_base": None},
-                "should_fail": True
-            }
+            {"name": "Empty VRAM path", "params": {"vram_path": "", "output_base": "test"}, "should_fail": True},
+            {"name": "Missing output_base", "params": {"vram_path": "/tmp/test.dmp"}, "should_fail": True},
+            {"name": "None values", "params": {"vram_path": None, "output_base": None}, "should_fail": True},
         ]
 
         for case in test_cases:
@@ -139,6 +128,7 @@ class TestSimpleRealIntegration:
         state2 = manager2._active_operations
 
         assert state1 is not state2, "Isolated managers should have separate state"
+
 
 if __name__ == "__main__":
     # Run the simple tests directly

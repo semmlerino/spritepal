@@ -1,6 +1,7 @@
 """
 Tests for sprite visual validator
 """
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -18,14 +19,17 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
+
 @pytest.fixture
 def validator():
     """Create a validator instance"""
     return SpriteVisualValidator()
 
+
 @pytest.fixture
 def create_test_image():
     """Factory fixture to create test images"""
+
     def _create_image(width=128, height=128, pattern="sprite"):
         """Create a test image with specified pattern"""
         img = Image.new("L", (width, height), 0)
@@ -69,6 +73,7 @@ def create_test_image():
         return img
 
     return _create_image
+
 
 class TestSpriteVisualValidator:
     """Test sprite visual validation functionality"""
@@ -161,10 +166,10 @@ class TestSpriteVisualValidator:
         img_array = np.zeros((32, 32), dtype=np.uint8)
 
         # Make 4 different tile patterns
-        img_array[0:8, 0:8] = 50    # Tile 1
+        img_array[0:8, 0:8] = 50  # Tile 1
         img_array[0:8, 8:16] = 100  # Tile 2
         img_array[8:16, 0:8] = 150  # Tile 3
-        img_array[8:16, 8:16] = 200 # Tile 4
+        img_array[8:16, 8:16] = 200  # Tile 4
         # Rest are empty (0)
 
         score = validator._calculate_tile_diversity(img_array)
@@ -198,7 +203,7 @@ class TestSpriteVisualValidator:
             for x in range(16):
                 val = (x + y) % 256
                 img_array[y, x] = val
-                img_array[y, 31-x] = val  # Mirror
+                img_array[y, 31 - x] = val  # Mirror
 
         score = validator._calculate_symmetry_score(img_array)
 
@@ -224,8 +229,8 @@ class TestSpriteVisualValidator:
             # Fill alternating tiles
             for y in range(0, 32, 8):
                 for x in range(0, 32, 8):
-                    if ((x//8) + (y//8)) % 2 == 0:
-                        img_array[y:y+8, x:x+8] = 128
+                    if ((x // 8) + (y // 8)) % 2 == 0:
+                        img_array[y : y + 8, x : x + 8] = 128
 
             score = validator._calculate_pattern_regularity(img_array)
 
@@ -239,7 +244,7 @@ class TestSpriteVisualValidator:
             "edge_score": 0.6,
             "symmetry": 0.5,
             "empty_space": 0.9,
-            "pattern_regularity": 0.7
+            "pattern_regularity": 0.7,
         }
 
         confidence = validator._calculate_overall_confidence(metrics)

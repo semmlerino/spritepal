@@ -81,9 +81,7 @@ class ROMExtractionPanel(QWidget):
     # Signals
     files_changed = Signal()
     extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
-    rom_extraction_requested = Signal(
-        str, int, str, str
-    )  # rom_path, offset, output_base, sprite_name
+    rom_extraction_requested = Signal(str, int, str, str)  # rom_path, offset, output_base, sprite_name
     output_name_changed = Signal(str)  # Emit when output name changes in ROM panel
 
     def __init__(
@@ -108,6 +106,7 @@ class ROMExtractionPanel(QWidget):
 
         # State manager for coordinating operations (ApplicationStateManager)
         from core.app_context import get_app_context
+
         context = get_app_context()
         self.state_manager = context.application_state_manager
         self.state_manager.workflow_state_changed.connect(self._on_state_changed)
@@ -119,9 +118,7 @@ class ROMExtractionPanel(QWidget):
             settings_manager=self.state_manager,
         )
         self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
-        self._scan_controller = ScanController(
-            state_manager=self.state_manager, parent=self
-        )
+        self._scan_controller = ScanController(state_manager=self.state_manager, parent=self)
         self._scan_controller.sprite_selected.connect(self._add_selected_sprite)
         self.scan_worker = None
 
@@ -148,12 +145,8 @@ class ROMExtractionPanel(QWidget):
         self._worker_orchestrator.header_error.connect(self._on_header_load_error)
 
         # Sprite locations
-        self._worker_orchestrator.sprite_locations_loaded.connect(
-            self._on_sprite_locations_loaded
-        )
-        self._worker_orchestrator.sprite_locations_error.connect(
-            self._on_sprite_locations_error
-        )
+        self._worker_orchestrator.sprite_locations_loaded.connect(self._on_sprite_locations_loaded)
+        self._worker_orchestrator.sprite_locations_error.connect(self._on_sprite_locations_error)
 
         # Similarity indexing (logging only)
         self._worker_orchestrator.similarity_progress.connect(self._on_similarity_progress)
@@ -199,8 +192,7 @@ class ROMExtractionPanel(QWidget):
         layout = QVBoxLayout()
         layout.setSpacing(SPACING_COMPACT_MEDIUM)  # 10px between sections
         layout.setContentsMargins(
-            SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL,
-            SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL
+            SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL
         )
 
         # Add all widget groups
@@ -229,9 +221,7 @@ class ROMExtractionPanel(QWidget):
         # Hint label - shown when ROM loaded but auto-fill failed (rare edge case)
         # Most times, output name is auto-filled from ROM filename
         self.output_hint_label = QLabel("↓ Enter output name in the Output Settings section below")
-        self.output_hint_label.setStyleSheet(
-            f"color: {COLORS['warning']}; font-size: 11px; font-style: italic;"
-        )
+        self.output_hint_label.setStyleSheet(f"color: {COLORS['warning']}; font-size: 11px; font-style: italic;")
         self.output_hint_label.setVisible(False)
         layout.addWidget(self.output_hint_label)
 
@@ -265,8 +255,7 @@ class ROMExtractionPanel(QWidget):
         self.advanced_toggle.setArrowType(Qt.ArrowType.RightArrow)
         self.advanced_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.advanced_toggle.setToolTip(
-            "Manually browse sprites at any ROM offset\n"
-            "instead of using the preset sprite list above"
+            "Manually browse sprites at any ROM offset\ninstead of using the preset sprite list above"
         )
         self.advanced_toggle.setStyleSheet(
             "QToolButton { border: none; padding: 4px; font-weight: bold; }"
@@ -295,10 +284,7 @@ class ROMExtractionPanel(QWidget):
         button.setMinimumHeight(BUTTON_HEIGHT)  # Standard button height
         _ = button.clicked.connect(self._open_manual_offset_dialog)
         button.setVisible(True)  # Always visible (enabled/disabled based on mode)
-        button.setToolTip(
-            "Open advanced sprite browser to explore ROM offsets manually\n"
-            "Keyboard shortcut: Ctrl+M"
-        )
+        button.setToolTip("Open advanced sprite browser to explore ROM offsets manually\nKeyboard shortcut: Ctrl+M")
         button.setStyleSheet(get_manual_offset_button_style())
         return button
 
@@ -317,11 +303,7 @@ class ROMExtractionPanel(QWidget):
 
     def _browse_rom(self):
         """Browse for ROM file"""
-        filename = browse_for_open_file(
-            self,
-            "Select ROM File",
-            "SNES ROM Files (*.sfc *.smc);;All Files (*.*)"
-        )
+        filename = browse_for_open_file(self, "Select ROM File", "SNES ROM Files (*.sfc *.smc);;All Files (*.*)")
 
         if filename:
             self._load_rom_file(filename)
@@ -342,8 +324,7 @@ class ROMExtractionPanel(QWidget):
             QMessageBox.information(
                 self,
                 "Fresh Scan",
-                "The partial scan cache will be ignored. \n"
-                "Click 'Find Sprites' to start a fresh scan."
+                "The partial scan cache will be ignored. \nClick 'Find Sprites' to start a fresh scan.",
             )
         # If CANCEL, do nothing
 
@@ -379,6 +360,7 @@ class ROMExtractionPanel(QWidget):
 
             # Save to settings
             from core.app_context import get_app_context
+
             settings = get_app_context().application_state_manager
             settings.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
             settings.set_last_used_directory(str(Path(filename).parent))
@@ -461,9 +443,7 @@ class ROMExtractionPanel(QWidget):
 
         if not self.rom_path:
             UserErrorDialog.display_error(
-                self,
-                "Please load a ROM file first",
-                "A ROM must be loaded before using manual offset control."
+                self, "Please load a ROM file first", "A ROM must be loaded before using manual offset control."
             )
             return
 
@@ -536,10 +516,7 @@ class ROMExtractionPanel(QWidget):
         initial_path = str(Path(self.rom_path).parent) if self.rom_path else ""
 
         filename = browse_for_open_file(
-            self,
-            "Select CGRAM File",
-            "CGRAM Files (*.dmp *.bin);;All Files (*.*)",
-            initial_path
+            self, "Select CGRAM File", "CGRAM Files (*.dmp *.bin);;All Files (*.*)", initial_path
         )
 
         if filename:
@@ -558,6 +535,7 @@ class ROMExtractionPanel(QWidget):
         # Check cache status first (fast operation)
         try:
             from core.app_context import get_app_context
+
             rom_cache = get_app_context().rom_cache
             cached_locations = rom_cache.get_sprite_locations(self.rom_path)
             self._is_sprites_from_cache = bool(cached_locations)
@@ -576,7 +554,7 @@ class ROMExtractionPanel(QWidget):
         if self.sprite_selector_widget:
             self.sprite_selector_widget.clear()
 
-        is_from_cache = getattr(self, '_is_sprites_from_cache', False)
+        is_from_cache = getattr(self, "_is_sprites_from_cache", False)
 
         # Use formatter to get display items
         formatted = format_sprite_list(locations, is_from_cache=is_from_cache)
@@ -590,9 +568,7 @@ class ROMExtractionPanel(QWidget):
         # Populate sprite selector with formatted items
         for item in formatted.items:
             if item.is_separator:
-                self.sprite_selector_widget.insert_separator(
-                    self.sprite_selector_widget.count()
-                )
+                self.sprite_selector_widget.insert_separator(self.sprite_selector_widget.count())
             else:
                 self.sprite_selector_widget.add_sprite(item.display_text, item.data)
 
@@ -779,7 +755,7 @@ class ROMExtractionPanel(QWidget):
         self._add_scanner_section_separator()
 
         # Add new sprite with cache indicator
-        self.sprite_selector_widget.add_sprite(f"{display_name} \U0001F4BE", (sprite_name, offset))
+        self.sprite_selector_widget.add_sprite(f"{display_name} \U0001f4be", (sprite_name, offset))
         self.sprite_selector_widget.set_current_index(self.sprite_selector_widget.count() - 1)
 
         logger.info(f"User selected custom sprite offset: 0x{offset:X}")
@@ -855,9 +831,10 @@ class ROMExtractionPanel(QWidget):
 
         # Clean up scan worker (still managed locally)
         from ui.common import WorkerManager
+
         if self.scan_worker is not None:
             try:
-                if hasattr(self.scan_worker, 'cancel'):
+                if hasattr(self.scan_worker, "cancel"):
                     self.scan_worker.cancel()
             except Exception as e:
                 logger.warning(f"Error cancelling scan_worker: {e}")

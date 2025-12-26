@@ -5,6 +5,7 @@ Handles validation and organization of session file paths without
 owning any Qt widgets. Panels use this to validate and prepare
 session data for save/restore operations.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping

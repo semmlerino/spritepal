@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     from core.tile_renderer import TileRenderer
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 
+
 class RealComponentFactory:
     """
     Factory for creating real components for testing.
@@ -182,7 +183,9 @@ class RealComponentFactory:
 
         return window
 
-    def create_extraction_worker(self, params: dict[str, Any] | None = None, worker_type: str = "vram") -> VRAMExtractionWorker | ROMExtractionWorker:
+    def create_extraction_worker(
+        self, params: dict[str, Any] | None = None, worker_type: str = "vram"
+    ) -> VRAMExtractionWorker | ROMExtractionWorker:
         """
         Create a real extraction worker for testing.
 
@@ -236,6 +239,7 @@ class RealComponentFactory:
 
         # Create mock settings manager that returns appropriate values
         from unittest.mock import MagicMock
+
         mock_settings = MagicMock()
         mock_settings.get_cache_enabled.return_value = True
         mock_settings.get_cache_location.return_value = str(cache_dir)
@@ -259,7 +263,9 @@ class RealComponentFactory:
 
         return {
             "getOpenFileName": Mock(return_value=(vram_data["vram_path"], "Memory dump (*.dmp)")),
-            "getSaveFileName": Mock(return_value=(str(Path(tempfile.gettempdir()) / "output.png"), "PNG files (*.png)")),
+            "getSaveFileName": Mock(
+                return_value=(str(Path(tempfile.gettempdir()) / "output.png"), "PNG files (*.png)")
+            ),
             "getExistingDirectory": Mock(return_value=str(Path(tempfile.gettempdir()))),
         }
 
@@ -389,6 +395,7 @@ class RealComponentFactory:
 
         # Step 6: Clean up temp directories
         import shutil
+
         for temp_dir in self._temp_dirs:
             if temp_dir.exists():
                 with contextlib.suppress(Exception):
@@ -441,4 +448,3 @@ class RealComponentFactory:
             # Test already failed - log leaks as warnings instead
             for leak in self._leaked_resources:
                 warnings.warn(leak, ResourceWarning, stacklevel=2)
-

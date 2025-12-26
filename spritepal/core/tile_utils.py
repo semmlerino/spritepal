@@ -4,6 +4,7 @@ Shared tile decoding utilities for SNES sprite formats.
 This module provides common tile decoding functions used by multiple
 sprite extraction and rendering components.
 """
+
 from __future__ import annotations
 
 from utils.constants import BYTES_PER_TILE
@@ -28,7 +29,7 @@ def decode_4bpp_tile(tile_bytes: bytes) -> list[list[int]]:
     """
     # Pad if needed
     if len(tile_bytes) < BYTES_PER_TILE:
-        tile_bytes = tile_bytes + b'\x00' * (BYTES_PER_TILE - len(tile_bytes))
+        tile_bytes = tile_bytes + b"\x00" * (BYTES_PER_TILE - len(tile_bytes))
 
     pixels: list[list[int]] = []
 

@@ -1,6 +1,7 @@
 """
 Enhanced tests for PaletteColorizer
 """
+
 from __future__ import annotations
 
 from unittest.mock import Mock
@@ -18,6 +19,7 @@ pytestmark = [
     pytest.mark.performance,
     pytest.mark.slow,
 ]
+
 
 class TestPaletteColorizerEnhanced:
     """Enhanced tests for PaletteColorizer functionality"""

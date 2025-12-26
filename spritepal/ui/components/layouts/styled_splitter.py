@@ -4,6 +4,7 @@ Styled splitter component with consistent configuration
 Provides a standardized splitter widget with consistent styling and behavior,
 exactly replicating the splitter patterns from existing dialogs.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -30,7 +31,7 @@ class StyledSplitter(QSplitter):
         self,
         orientation: Qt.Orientation = Qt.Orientation.Horizontal,
         handle_width: int = 8,
-        parent: QWidget | None = None
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(orientation, parent)
 
@@ -86,10 +87,7 @@ class StyledSplitter(QSplitter):
             self.setStretchFactor(i, ratio)
 
     def create_nested_splitter(
-        self,
-        orientation: Qt.Orientation,
-        handle_width: int | None = None,
-        stretch_factor: int = 1
+        self, orientation: Qt.Orientation, handle_width: int | None = None, stretch_factor: int = 1
     ) -> StyledSplitter:
         """
         Create and add a nested splitter.

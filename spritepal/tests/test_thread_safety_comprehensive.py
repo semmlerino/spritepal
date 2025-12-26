@@ -1,4 +1,3 @@
-
 """
 Comprehensive thread safety tests for BatchThumbnailWorker and LRU cache.
 
@@ -55,13 +54,12 @@ class ThreadSafetyValidator:
 
             # Check for concurrent access patterns
             if len(self.thread_ids) > 1:
-                self.violations.append(
-                    f"Concurrent access detected: {operation} from thread {thread_id}"
-                )
+                self.violations.append(f"Concurrent access detected: {operation} from thread {thread_id}")
 
     def assert_thread_safe(self):
         """Assert no thread safety violations occurred."""
         assert not self.violations, f"Thread safety violations: {self.violations}"
+
 
 class ConcurrencyTester(QObject):
     """Helper to test concurrent signal emissions."""
@@ -82,10 +80,12 @@ class ConcurrencyTester(QObject):
         with QMutexLocker(self.mutex):
             self.received_values.append(value)
 
+
 @pytest.fixture
 def test_rom_data():
     """Create test ROM data."""
-    return bytearray(b'\x00\x01\x02\x03' * 256 * 32)  # 32KB of test data
+    return bytearray(b"\x00\x01\x02\x03" * 256 * 32)  # 32KB of test data
+
 
 @pytest.fixture
 def mock_qimage():
@@ -94,6 +94,7 @@ def mock_qimage():
     image = QImage(32, 32, QImage.Format.Format_RGBA8888)
     image.fill(0)  # Fill with transparent black
     return image
+
 
 class TestThumbnailCacheThreadSafety:
     """Test thread safety of LRU cache implementation."""
@@ -119,10 +120,7 @@ class TestThumbnailCacheThreadSafety:
 
         # Run concurrent get operations
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [
-                executor.submit(get_operation, i)
-                for i in range(100)
-            ]
+            futures = [executor.submit(get_operation, i) for i in range(100)]
             for future in futures:
                 future.result()
 
@@ -130,8 +128,8 @@ class TestThumbnailCacheThreadSafety:
 
         # Verify cache statistics are reasonable
         stats = cache.get_stats()
-        assert stats['hits'] > 0
-        assert stats['size'] <= 100
+        assert stats["hits"] > 0
+        assert stats["size"] <= 100
 
     def test_concurrent_put_operations(self, mock_qimage):
         """Test concurrent put operations maintain cache integrity."""
@@ -147,10 +145,7 @@ class TestThumbnailCacheThreadSafety:
 
         # Run concurrent put operations
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [
-                executor.submit(put_operation, i * 20)
-                for i in range(5)
-            ]
+            futures = [executor.submit(put_operation, i * 20) for i in range(5)]
             for future in futures:
                 future.result()
 
@@ -215,10 +210,7 @@ class TestThumbnailCacheThreadSafety:
 
         # Run concurrent access patterns
         with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [
-                executor.submit(access_pattern, i)
-                for i in range(3)
-            ]
+            futures = [executor.submit(access_pattern, i) for i in range(3)]
             for future in futures:
                 future.result()
 
@@ -229,8 +221,9 @@ class TestThumbnailCacheThreadSafety:
         # Minimum expected: 3 threads × 5 rounds × 5 misses = 75 misses
         # Minimum expected: 3 threads × 5 rounds × 5 hits = 75 hits (from own keys 10-14)
         stats = cache.get_stats()
-        assert stats['hits'] > 0
-        assert stats['misses'] > 0
+        assert stats["hits"] > 0
+        assert stats["misses"] > 0
+
 
 class TestBatchThumbnailWorkerThreadSafety:
     """Test thread safety of BatchThumbnailWorker."""
@@ -243,20 +236,17 @@ class TestBatchThumbnailWorkerThreadSafety:
         so we just create mocks directly rather than patching imports.
         """
         mock_extractor = Mock()
-        mock_extractor.extract_sprite.return_value = b'\x00' * 64
+        mock_extractor.extract_sprite.return_value = b"\x00" * 64
 
         mock_renderer = Mock()
         mock_renderer.render_tiles.return_value = Mock()
 
-        yield {
-            'extractor': mock_extractor,
-            'renderer': mock_renderer
-        }
+        yield {"extractor": mock_extractor, "renderer": mock_renderer}
 
     def test_concurrent_queue_operations(self, test_rom_data, mock_worker_dependencies):
         """Test concurrent queue operations are thread-safe."""
-        with patch('builtins.open', Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
-            worker = BatchThumbnailWorker('/fake/rom.sfc', mock_worker_dependencies['extractor'])
+        with patch("builtins.open", Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
+            worker = BatchThumbnailWorker("/fake/rom.sfc", mock_worker_dependencies["extractor"])
 
             errors = []
 
@@ -270,10 +260,7 @@ class TestBatchThumbnailWorkerThreadSafety:
             # Queue from multiple threads simultaneously
             threads = []
             for i in range(5):
-                thread = threading.Thread(
-                    target=queue_operations,
-                    args=(i * 0x10000,)
-                )
+                thread = threading.Thread(target=queue_operations, args=(i * 0x10000,))
                 threads.append(thread)
                 thread.start()
 
@@ -285,8 +272,8 @@ class TestBatchThumbnailWorkerThreadSafety:
 
     def test_concurrent_cache_access(self, test_rom_data, mock_worker_dependencies, mock_qimage):
         """Test concurrent cache access during processing."""
-        with patch('builtins.open', Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
-            worker = BatchThumbnailWorker('/fake/rom.sfc', mock_worker_dependencies['extractor'])
+        with patch("builtins.open", Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
+            worker = BatchThumbnailWorker("/fake/rom.sfc", mock_worker_dependencies["extractor"])
 
             # Pre-populate cache
             for i in range(20):
@@ -327,8 +314,8 @@ class TestBatchThumbnailWorkerThreadSafety:
 
     def test_stop_request_thread_safety(self, test_rom_data, mock_worker_dependencies):
         """Test stop request from multiple threads is safe."""
-        with patch('builtins.open', Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
-            worker = BatchThumbnailWorker('/fake/rom.sfc', mock_worker_dependencies['extractor'])
+        with patch("builtins.open", Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
+            worker = BatchThumbnailWorker("/fake/rom.sfc", mock_worker_dependencies["extractor"])
 
             stop_errors = []
 
@@ -370,6 +357,7 @@ class TestBatchThumbnailWorkerThreadSafety:
         # Note: Full thread boundary testing requires actual Qt event loop
         # which is complex to test in unit tests. This is a basic check.
 
+
 class TestWorkerControllerThreadSafety:
     """Test thread safety of ThumbnailWorkerController."""
 
@@ -404,11 +392,7 @@ class TestWorkerControllerThreadSafety:
                 controller.queue_thumbnail(i * 0x1000, 128, 1)
 
         def ui_component_2():
-            controller.queue_batch(
-                [i * 0x1000 for i in range(50, 100)],
-                128,
-                2
-            )
+            controller.queue_batch([i * 0x1000 for i in range(50, 100)], 128, 2)
 
         # These would typically be called from the same thread (main)
         # but we test concurrent access patterns
@@ -417,6 +401,7 @@ class TestWorkerControllerThreadSafety:
 
         # Should handle without errors
         controller.cleanup()
+
 
 class TestRaceConditionPrevention:
     """Test prevention of specific race conditions."""
@@ -429,15 +414,12 @@ class TestRaceConditionPrevention:
         so we just create mocks directly rather than patching imports.
         """
         mock_extractor = Mock()
-        mock_extractor.extract_sprite.return_value = b'\x00' * 64
+        mock_extractor.extract_sprite.return_value = b"\x00" * 64
 
         mock_renderer = Mock()
         mock_renderer.render_tiles.return_value = Mock()
 
-        yield {
-            'extractor': mock_extractor,
-            'renderer': mock_renderer
-        }
+        yield {"extractor": mock_extractor, "renderer": mock_renderer}
 
     def test_cache_clear_during_access_race(self, mock_qimage):
         """Test cache.clear() during concurrent get/put doesn't crash."""
@@ -482,8 +464,8 @@ class TestRaceConditionPrevention:
 
     def test_worker_cleanup_during_processing_race(self, test_rom_data, mock_worker_dependencies):
         """Test cleanup during active processing doesn't crash."""
-        with patch('builtins.open', Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
-            worker = BatchThumbnailWorker('/fake/rom.sfc', mock_worker_dependencies['extractor'])
+        with patch("builtins.open", Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
+            worker = BatchThumbnailWorker("/fake/rom.sfc", mock_worker_dependencies["extractor"])
 
             # Queue work
             for i in range(100):
@@ -509,9 +491,8 @@ class TestRaceConditionPrevention:
             cleanup_thread.join()
 
             # Should handle gracefully
-            assert len(cleanup_errors) == 0 or all(
-                "already stopped" in str(e).lower() for e in cleanup_errors
-            )
+            assert len(cleanup_errors) == 0 or all("already stopped" in str(e).lower() for e in cleanup_errors)
+
 
 class TestDeadlockPrevention:
     """Test prevention of deadlock scenarios."""
@@ -524,15 +505,12 @@ class TestDeadlockPrevention:
         so we just create mocks directly rather than patching imports.
         """
         mock_extractor = Mock()
-        mock_extractor.extract_sprite.return_value = b'\x00' * 64
+        mock_extractor.extract_sprite.return_value = b"\x00" * 64
 
         mock_renderer = Mock()
         mock_renderer.render_tiles.return_value = Mock()
 
-        yield {
-            'extractor': mock_extractor,
-            'renderer': mock_renderer
-        }
+        yield {"extractor": mock_extractor, "renderer": mock_renderer}
 
     def test_no_deadlock_in_nested_mutex_operations(self, mock_qimage):
         """Test nested mutex operations don't cause deadlock."""
@@ -546,7 +524,7 @@ class TestDeadlockPrevention:
             cache.put(ThumbnailCache.make_key(i, i), mock_qimage)
             cache.get_stats()  # Nested mutex lock
             if i > 0:
-                cache.get(ThumbnailCache.make_key(i-1, i-1))  # Another nested lock
+                cache.get(ThumbnailCache.make_key(i - 1, i - 1))  # Another nested lock
 
         elapsed = time.time() - start_time
 
@@ -555,8 +533,8 @@ class TestDeadlockPrevention:
 
     def test_no_circular_wait_in_worker(self, test_rom_data, mock_worker_dependencies):
         """Test worker doesn't create circular wait conditions."""
-        with patch('builtins.open', Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
-            worker = BatchThumbnailWorker('/fake/rom.sfc', mock_worker_dependencies['extractor'])
+        with patch("builtins.open", Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
+            worker = BatchThumbnailWorker("/fake/rom.sfc", mock_worker_dependencies["extractor"])
 
             start_time = time.time()
 
@@ -572,6 +550,7 @@ class TestDeadlockPrevention:
 
             # Should complete without deadlock
             assert elapsed < 0.5, f"Operations took {elapsed:.2f}s, possible deadlock"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -2,6 +2,7 @@
 
 Provides utilities for detecting memory leaks in Qt applications.
 """
+
 from __future__ import annotations
 
 import gc
@@ -20,25 +21,17 @@ class MemoryHelper:
     def get_widget_count() -> int:
         """Get count of all QWidget instances."""
         from PySide6.QtWidgets import QWidget
-        return len([
-            obj for obj in gc.get_objects()
-            if isinstance(obj, QWidget)
-        ])
+
+        return len([obj for obj in gc.get_objects() if isinstance(obj, QWidget)])
 
     @staticmethod
     def get_object_count(obj_type: type) -> int:
         """Get count of objects of specific type."""
-        return len([
-            obj for obj in gc.get_objects()
-            if isinstance(obj, obj_type)
-        ])
+        return len([obj for obj in gc.get_objects() if isinstance(obj, obj_type)])
 
     @staticmethod
     @contextmanager
-    def assert_no_leak(
-        obj_type: type,
-        max_increase: int = 0
-    ) -> Generator[None, None, None]:
+    def assert_no_leak(obj_type: type, max_increase: int = 0) -> Generator[None, None, None]:
         """Context manager to assert no memory leak of specific object type.
 
         Args:
@@ -51,6 +44,7 @@ class MemoryHelper:
                 widget.deleteLater()
         """
         from PySide6.QtWidgets import QApplication
+
         gc.collect()
         initial_count = MemoryHelper.get_object_count(obj_type)
 
@@ -67,6 +61,5 @@ class MemoryHelper:
             increase = final_count - initial_count
 
             assert increase <= max_increase, (
-                f"Memory leak detected: {increase} {obj_type.__name__} "
-                f"objects leaked (max allowed: {max_increase})"
+                f"Memory leak detected: {increase} {obj_type.__name__} objects leaked (max allowed: {max_increase})"
             )

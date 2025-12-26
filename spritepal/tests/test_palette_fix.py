@@ -39,22 +39,22 @@ def test_palette_application():
 
     # Define test palette (Kirby Pink)
     palette_colors = [
-        [0, 0, 0],        # 0 - Black (transparent)
+        [0, 0, 0],  # 0 - Black (transparent)
         [255, 192, 192],  # 1 - Light pink
         [255, 128, 128],  # 2 - Pink
-        [224, 64, 64],    # 3 - Dark pink
+        [224, 64, 64],  # 3 - Dark pink
         [255, 255, 255],  # 4 - White
         [255, 224, 224],  # 5 - Light white
-        [192, 0, 0],      # 6 - Dark red
-        [128, 0, 0],      # 7 - Darker red
-        [255, 128, 0],    # 8 - Orange
-        [192, 64, 0],     # 9 - Dark orange
-        [128, 32, 0],     # 10 - Brown
+        [192, 0, 0],  # 6 - Dark red
+        [128, 0, 0],  # 7 - Darker red
+        [255, 128, 0],  # 8 - Orange
+        [192, 64, 0],  # 9 - Dark orange
+        [128, 32, 0],  # 10 - Brown
         [255, 255, 128],  # 11 - Light yellow
-        [255, 224, 64],   # 12 - Yellow
-        [224, 192, 0],    # 13 - Dark yellow
-        [160, 128, 0],    # 14 - Olive
-        [96, 64, 0]       # 15 - Dark olive
+        [255, 224, 64],  # 12 - Yellow
+        [224, 192, 0],  # 13 - Dark yellow
+        [160, 128, 0],  # 14 - Olive
+        [96, 64, 0],  # 15 - Dark olive
     ]
 
     print(f"\nApplying palette with {len(palette_colors)} colors...")
@@ -100,7 +100,7 @@ def test_palette_application():
             rgb_array[mask] = palette_colors[i]
 
     # Convert to PIL Image
-    img_rgb = Image.fromarray(rgb_array, 'RGB')
+    img_rgb = Image.fromarray(rgb_array, "RGB")
 
     # Check result
     rgb_pixels = list(img_rgb.getdata())

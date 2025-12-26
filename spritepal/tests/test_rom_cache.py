@@ -1,4 +1,5 @@
 """Comprehensive tests for ROM cache functionality."""
+
 from __future__ import annotations
 
 import json
@@ -19,6 +20,7 @@ def get_rom_cache():
     """Get ROM cache from app context."""
     return get_app_context().rom_cache
 
+
 # Serial execution required: Thread safety concerns
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Cache tests use managers that may spawn async I/O threads"),
@@ -28,6 +30,7 @@ pytestmark = [
     pytest.mark.slow,
     pytest.mark.usefixtures("isolated_managers"),
 ]
+
 
 class TestROMCacheCore:
     """Test core ROMCache functionality."""
@@ -54,6 +57,7 @@ class TestROMCacheCore:
     @pytest.fixture
     def mock_settings_manager(self, temp_cache_dir):
         """Create a mock settings manager that returns cache settings."""
+
         class MockSettingsManager:
             def get_cache_enabled(self) -> bool:
                 return True
@@ -81,6 +85,7 @@ class TestROMCacheCore:
 
     def test_initialization_disabled_cache(self, temp_cache_dir) -> None:
         """Test cache initialization when caching is disabled."""
+
         class MockDisabledSettings:
             def get_cache_enabled(self) -> bool:
                 return False
@@ -115,7 +120,7 @@ class TestROMCacheCore:
         assert len(rom_cache._hash_cache) > 0
 
         # Second call should use cached hash
-        with patch.object(rom_cache, '_compute_full_hash') as mock_compute:
+        with patch.object(rom_cache, "_compute_full_hash") as mock_compute:
             hash2 = rom_cache._get_rom_hash_cached(test_rom_file)
             assert hash1 == hash2
             # Should not compute hash again
@@ -197,7 +202,7 @@ class TestROMCacheCore:
         test_file.write_bytes(b"PROTECTED_ROM_DATA" * 100)
 
         # Simulate permission error - patch Path.open to raise permission error
-        with patch('pathlib.Path.open', side_effect=PermissionError("Access denied")):
+        with patch("pathlib.Path.open", side_effect=PermissionError("Access denied")):
             # Should fall back to path-based hash
             hash_result = rom_cache._get_rom_hash_cached(str(test_file))
             assert isinstance(hash_result, str)
@@ -248,7 +253,7 @@ class TestROMCacheCore:
         assert len(rom_cache._hash_cache) == 0
 
         # Next call should recompute hash
-        with patch.object(rom_cache, '_compute_full_hash', return_value="new_hash") as mock_compute:
+        with patch.object(rom_cache, "_compute_full_hash", return_value="new_hash") as mock_compute:
             rom_cache._get_rom_hash_cached(test_rom_file)
             mock_compute.assert_called_once()
 
@@ -265,7 +270,7 @@ class TestROMCacheCore:
         rom_cache._hash_cache.copy()
 
         # Mock the cache to have only 2 entries max for testing
-        with patch.object(rom_cache, '_hash_cache', {}) as mock_cache:
+        with patch.object(rom_cache, "_hash_cache", {}) as mock_cache:
             # Add first file
             rom_cache._get_rom_hash_cached(test_files[0])
             assert len(mock_cache) == 1
@@ -415,8 +420,11 @@ class TestROMCacheCore:
 
         # Save partial results
         success = rom_cache.save_partial_scan_results(
-            test_rom_file, scan_params, found_sprites,
-            current_offset=0xC3000, completed=False,
+            test_rom_file,
+            scan_params,
+            found_sprites,
+            current_offset=0xC3000,
+            completed=False,
         )
         assert success is True
 
@@ -444,8 +452,11 @@ class TestROMCacheCore:
 
         # Save completed scan
         success = rom_cache.save_partial_scan_results(
-            test_rom_file, scan_params, found_sprites,
-            current_offset=0xF0000, completed=True,
+            test_rom_file,
+            scan_params,
+            found_sprites,
+            current_offset=0xF0000,
+            completed=True,
         )
         assert success is True
 
@@ -480,7 +491,9 @@ class TestROMCacheCore:
         assert stats["cache_dir_exists"] is True
 
         # Add some cache entries
-        rom_cache.save_sprite_locations(test_rom_file, {"test": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)})
+        rom_cache.save_sprite_locations(
+            test_rom_file, {"test": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)}
+        )
         rom_cache.save_rom_info(test_rom_file, {"title": "TEST ROM"})
         rom_cache.save_partial_scan_results(
             test_rom_file,
@@ -500,7 +513,9 @@ class TestROMCacheCore:
     def test_clear_cache_all(self, rom_cache, test_rom_file) -> None:
         """Test clearing all cache files."""
         # Add cache entries
-        rom_cache.save_sprite_locations(test_rom_file, {"test": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)})
+        rom_cache.save_sprite_locations(
+            test_rom_file, {"test": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)}
+        )
         rom_cache.save_rom_info(test_rom_file, {"title": "TEST"})
 
         # Clear all
@@ -514,7 +529,9 @@ class TestROMCacheCore:
     def test_clear_cache_by_age(self, rom_cache, test_rom_file) -> None:
         """Test clearing old cache files only."""
         # Create two cache files
-        rom_cache.save_sprite_locations(test_rom_file, {"test1": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)})
+        rom_cache.save_sprite_locations(
+            test_rom_file, {"test1": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)}
+        )
         rom_cache.save_rom_info(test_rom_file, {"title": "TEST"})
 
         # Make one file old
@@ -571,6 +588,7 @@ class TestROMCacheCore:
 
     def test_cache_disabled_operations(self, temp_cache_dir) -> None:
         """Test operations when cache is disabled."""
+
         # Create cache with disabled setting (DI pattern)
         class MockDisabledSettings:
             def get_cache_enabled(self) -> bool:
@@ -589,6 +607,7 @@ class TestROMCacheCore:
 
     def test_refresh_settings(self, rom_cache) -> None:
         """Test refreshing cache settings."""
+
         # Create mock settings that can change
         class ChangingSettings:
             def __init__(self) -> None:
@@ -627,6 +646,7 @@ class TestROMCacheCore:
         _original_mkdir = Path.mkdir
 
         mkdir_calls = 0
+
         def mock_mkdir(self, *args, **kwargs) -> None:
             nonlocal mkdir_calls
             mkdir_calls += 1
@@ -642,8 +662,10 @@ class TestROMCacheCore:
         class MockSettings:
             def get_cache_enabled(self) -> bool:
                 return True
+
             def get_cache_location(self):
                 return None
+
             def get_cache_expiration_days(self) -> int:
                 return 30
 
@@ -653,6 +675,7 @@ class TestROMCacheCore:
             assert "spritepal_rom_cache" in str(cache.cache_dir)
             assert str(cache.cache_dir).startswith(tempfile.gettempdir())
             assert cache.cache_enabled is True
+
 
 @pytest.mark.usefixtures("isolated_managers")
 class TestROMCacheSingleton:
@@ -669,6 +692,7 @@ class TestROMCacheSingleton:
         """Test that get_rom_cache returns singleton."""
         # Reset global instance
         import core.services.rom_cache
+
         core.services.rom_cache._rom_cache_instance = None
 
         # Get instance twice
@@ -681,6 +705,7 @@ class TestROMCacheSingleton:
     def test_singleton_preserves_state(self, test_rom_file) -> None:
         """Test that singleton preserves state across calls."""
         import core.services.rom_cache
+
         core.services.rom_cache._rom_cache_instance = None
 
         cache1 = get_rom_cache()
@@ -692,6 +717,7 @@ class TestROMCacheSingleton:
         loaded = cache2.get_sprite_locations(test_rom_file)
         assert loaded is not None
         assert "test" in loaded
+
 
 @pytest.mark.usefixtures("isolated_managers")
 class TestROMCacheIntegration:
@@ -721,10 +747,13 @@ class TestROMCacheIntegration:
 
         # Add cache data
         cache = get_rom_cache()
-        cache.save_sprite_locations(test_rom_file, {
-            "kirby_idle": SpritePointer(offset=0x12345, bank=0x20, address=0x8000),
-            "kirby_walk": SpritePointer(offset=0x23456, bank=0x21, address=0x8100),
-        })
+        cache.save_sprite_locations(
+            test_rom_file,
+            {
+                "kirby_idle": SpritePointer(offset=0x12345, bank=0x20, address=0x8000),
+                "kirby_walk": SpritePointer(offset=0x23456, bank=0x21, address=0x8100),
+            },
+        )
 
         # Re-check cache status
         widget._check_cache_status()
@@ -753,13 +782,17 @@ class TestROMCacheIntegration:
         ]
 
         cache.save_partial_scan_results(
-            test_rom_file, scan_params, found_sprites,
-            current_offset=0xC3000, completed=False,
+            test_rom_file,
+            scan_params,
+            found_sprites,
+            current_offset=0xC3000,
+            completed=False,
         )
 
         # Create worker that should resume from cache
         # Get extractor and rom_cache from app context
         from core.rom_extractor import ROMExtractor
+
         context = get_app_context()
 
         worker = SpriteScanWorker(
@@ -768,7 +801,7 @@ class TestROMCacheIntegration:
             scan_params["end_offset"],
             step_size=scan_params["alignment"],
             extractor=context.rom_extractor,
-            rom_cache=context.rom_cache
+            rom_cache=context.rom_cache,
         )
 
         # Collect signals
@@ -790,19 +823,24 @@ class TestROMCacheIntegration:
         assert len(progress["found_sprites"]) == 2
         assert progress["current_offset"] == 0xC3000
 
+
 class TestROMCacheErrorHandling:
     """Test error handling in ROM cache."""
 
     @pytest.fixture
     def mock_settings_manager(self, tmp_path):
         """Create a mock settings manager for error handling tests."""
+
         class MockSettingsManager:
             def get_cache_enabled(self) -> bool:
                 return True
+
             def get_cache_location(self):
                 return str(tmp_path)
+
             def get_cache_expiration_days(self) -> int:
                 return 30
+
         return MockSettingsManager()
 
     @pytest.fixture
@@ -820,7 +858,9 @@ class TestROMCacheErrorHandling:
     def test_corrupted_cache_file(self, rom_cache, test_rom_file, tmp_path) -> None:
         """Test handling of corrupted cache files."""
         # Save valid cache
-        rom_cache.save_sprite_locations(test_rom_file, {"test": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)})
+        rom_cache.save_sprite_locations(
+            test_rom_file, {"test": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)}
+        )
 
         # Corrupt the cache file
         rom_hash = rom_cache._get_rom_hash(test_rom_file)
@@ -840,7 +880,9 @@ class TestROMCacheErrorHandling:
 
         try:
             # Should return False instead of crashing
-            success = rom_cache.save_sprite_locations(test_rom_file, {"test": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)})
+            success = rom_cache.save_sprite_locations(
+                test_rom_file, {"test": SpritePointer(offset=0x1000, bank=0x20, address=0x8000)}
+            )
             assert success is False
         finally:
             # Restore permissions
@@ -863,6 +905,7 @@ class TestROMCacheErrorHandling:
         # Should return None for incompatible version
         loaded = rom_cache.get_sprite_locations(test_rom_file)
         assert loaded is None
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

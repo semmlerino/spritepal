@@ -1,6 +1,7 @@
 """
 Integration tests for manual offset dialog using real components.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -36,10 +37,10 @@ class TestManualOffsetDialog:
         assert dialog.preview_widget is not None
 
         # Verify browse tab components
-        assert hasattr(dialog.browse_tab, 'position_slider')
-        assert hasattr(dialog.browse_tab, 'find_sprites_button')
-        assert hasattr(dialog.browse_tab, 'next_button')
-        assert hasattr(dialog.browse_tab, 'prev_button')
+        assert hasattr(dialog.browse_tab, "position_slider")
+        assert hasattr(dialog.browse_tab, "find_sprites_button")
+        assert hasattr(dialog.browse_tab, "next_button")
+        assert hasattr(dialog.browse_tab, "prev_button")
 
     def test_slider_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
         """Test that slider navigation updates offset correctly."""
@@ -48,11 +49,7 @@ class TestManualOffsetDialog:
 
         # Set ROM data
         extraction_manager = get_extraction_manager()
-        dialog.set_rom_data(
-            str(rom_info['path']),
-            rom_info['path'].stat().st_size,
-            extraction_manager
-        )
+        dialog.set_rom_data(str(rom_info["path"]), rom_info["path"].stat().st_size, extraction_manager)
 
         with qtbot.waitExposed(dialog):
             dialog.show()
@@ -81,11 +78,7 @@ class TestManualOffsetDialog:
 
         # Set ROM data
         extraction_manager = get_extraction_manager()
-        dialog.set_rom_data(
-            str(rom_info['path']),
-            rom_info['path'].stat().st_size,
-            extraction_manager
-        )
+        dialog.set_rom_data(str(rom_info["path"]), rom_info["path"].stat().st_size, extraction_manager)
 
         with qtbot.waitExposed(dialog):
             dialog.show()
@@ -102,24 +95,22 @@ class TestManualOffsetDialog:
         assert dialog.get_current_offset() == target_offset
         assert dialog.browse_tab.position_slider.value() == target_offset
 
-    def test_find_sprites_button_click(self, manual_offset_dialog, test_rom_with_sprites, qtbot, mocker, wait_for_signal_processed):
+    def test_find_sprites_button_click(
+        self, manual_offset_dialog, test_rom_with_sprites, qtbot, mocker, wait_for_signal_processed
+    ):
         """Test that Find Sprites button triggers sprite scanning."""
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
 
         # Set ROM data
         extraction_manager = get_extraction_manager()
-        dialog.set_rom_data(
-            str(rom_info['path']),
-            rom_info['path'].stat().st_size,
-            extraction_manager
-        )
+        dialog.set_rom_data(str(rom_info["path"]), rom_info["path"].stat().st_size, extraction_manager)
 
         with qtbot.waitExposed(dialog):
             dialog.show()
 
         # Mock the scan method to avoid actual slow scanning (we just want to verify it's called)
-        scan_mock = mocker.patch.object(dialog, '_scan_for_sprites')
+        scan_mock = mocker.patch.object(dialog, "_scan_for_sprites")
 
         # Click Find Sprites button
         find_button = dialog.browse_tab.find_sprites_button
@@ -142,11 +133,7 @@ class TestManualOffsetDialog:
 
         # Set ROM data
         extraction_manager = get_extraction_manager()
-        dialog.set_rom_data(
-            str(rom_info['path']),
-            rom_info['path'].stat().st_size,
-            extraction_manager
-        )
+        dialog.set_rom_data(str(rom_info["path"]), rom_info["path"].stat().st_size, extraction_manager)
 
         with qtbot.waitExposed(dialog):
             dialog.show()
@@ -185,11 +172,7 @@ class TestManualOffsetDialog:
 
         # Set ROM data
         extraction_manager = get_extraction_manager()
-        dialog.set_rom_data(
-            str(rom_info['path']),
-            rom_info['path'].stat().st_size,
-            extraction_manager
-        )
+        dialog.set_rom_data(str(rom_info["path"]), rom_info["path"].stat().st_size, extraction_manager)
 
         with qtbot.waitExposed(dialog):
             dialog.show()
@@ -211,7 +194,7 @@ class TestManualOffsetDialog:
 
         # Verify offset is within bounds
         offset_after_next = dialog.get_current_offset()
-        assert 0 <= offset_after_next < rom_info['path'].stat().st_size
+        assert 0 <= offset_after_next < rom_info["path"].stat().st_size
 
         # Click Prev button - just verify no crash
         qtbot.mouseClick(prev_button, Qt.MouseButton.LeftButton)
@@ -219,7 +202,8 @@ class TestManualOffsetDialog:
 
         # Verify offset is within bounds
         offset_after_prev = dialog.get_current_offset()
-        assert 0 <= offset_after_prev < rom_info['path'].stat().st_size
+        assert 0 <= offset_after_prev < rom_info["path"].stat().st_size
+
 
 @pytest.mark.integration
 @pytest.mark.gui
@@ -228,7 +212,9 @@ class TestSpriteScanDialog:
 
     @pytest.mark.slow
     @pytest.mark.timeout(120)  # This test does real ROM scanning which is slow
-    def test_sprite_scan_with_results(self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, mocker, wait_for_signal_processed):
+    def test_sprite_scan_with_results(
+        self, manual_offset_dialog, test_rom_with_sprites, qtbot, wait_for, mocker, wait_for_signal_processed
+    ):
         """Test full sprite scan workflow with results dialog."""
         from PySide6.QtWidgets import QDialog, QMessageBox
 
@@ -236,20 +222,16 @@ class TestSpriteScanDialog:
         rom_info = test_rom_with_sprites
 
         # Mock QDialog.exec to prevent blocking - return Accepted immediately
-        mocker.patch.object(QDialog, 'exec', return_value=QDialog.DialogCode.Accepted)
+        mocker.patch.object(QDialog, "exec", return_value=QDialog.DialogCode.Accepted)
 
         # Mock QMessageBox static methods to prevent blocking
-        mocker.patch.object(QMessageBox, 'information', return_value=QMessageBox.StandardButton.Ok)
-        mocker.patch.object(QMessageBox, 'warning', return_value=QMessageBox.StandardButton.Ok)
-        mocker.patch.object(QMessageBox, 'critical', return_value=QMessageBox.StandardButton.Ok)
+        mocker.patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
+        mocker.patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok)
+        mocker.patch.object(QMessageBox, "critical", return_value=QMessageBox.StandardButton.Ok)
 
         # Set ROM data
         extraction_manager = get_extraction_manager()
-        dialog.set_rom_data(
-            str(rom_info['path']),
-            rom_info['path'].stat().st_size,
-            extraction_manager
-        )
+        dialog.set_rom_data(str(rom_info["path"]), rom_info["path"].stat().st_size, extraction_manager)
 
         with qtbot.waitExposed(dialog):
             dialog.show()
@@ -261,7 +243,7 @@ class TestSpriteScanDialog:
         wait_for_signal_processed()
 
         # If we have test sprites, verify some were found
-        if rom_info['sprites']:
+        if rom_info["sprites"]:
             # The scan should have completed
             # Check if a results dialog was shown
             pass  # Results depend on implementation
@@ -272,6 +254,7 @@ class TestSpriteScanDialog:
 
         # Give the worker time to clean up
         from PySide6.QtWidgets import QApplication
+
         QApplication.processEvents()
 
     def test_sprite_selection_navigation(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
@@ -279,22 +262,18 @@ class TestSpriteScanDialog:
         dialog = manual_offset_dialog
         rom_info = test_rom_with_sprites
 
-        if not rom_info['sprites']:
+        if not rom_info["sprites"]:
             pytest.skip("No test sprites to select")
 
         # Set ROM data
         extraction_manager = get_extraction_manager()
-        dialog.set_rom_data(
-            str(rom_info['path']),
-            rom_info['path'].stat().st_size,
-            extraction_manager
-        )
+        dialog.set_rom_data(str(rom_info["path"]), rom_info["path"].stat().st_size, extraction_manager)
 
         with qtbot.waitExposed(dialog):
             dialog.show()
 
         # Directly test jumping to a known sprite
-        sprite_offset = rom_info['sprites'][0]['offset']
+        sprite_offset = rom_info["sprites"][0]["offset"]
 
         # Use the jump method
         dialog._jump_to_sprite(sprite_offset)
@@ -302,6 +281,7 @@ class TestSpriteScanDialog:
 
         # Verify we navigated to the sprite
         assert dialog.get_current_offset() == sprite_offset
+
 
 @pytest.mark.integration
 @pytest.mark.gui
@@ -322,7 +302,7 @@ class TestDialogIntegrationWithPanel:
         assert dialog is not None
 
         # Verify dialog has ROM data
-        assert dialog.rom_path == str(rom_info['path'])
+        assert dialog.rom_path == str(rom_info["path"])
         assert dialog.rom_size > 0
 
     def test_dialog_offset_sync_with_panel(self, loaded_rom_panel, qtbot):
@@ -378,4 +358,4 @@ class TestDialogIntegrationWithPanel:
         dialog3 = panel._offset_dialog_manager.get_current_dialog()
         # New instance should still be valid and functional
         assert dialog3 is not None
-        assert dialog3.rom_path == str(rom_info['path'])
+        assert dialog3.rom_path == str(rom_info["path"])

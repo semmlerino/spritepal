@@ -7,6 +7,7 @@ When one dump file is loaded (e.g., VRAM), this service finds related files
 
 This module uses pure functions instead of a stateless service class.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

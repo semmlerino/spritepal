@@ -3,6 +3,7 @@ Extraction panel with drag & drop zones for dump files.
 
 Uses DropZone widget for file input with visual state feedback.
 """
+
 from __future__ import annotations
 
 import builtins
@@ -188,12 +189,7 @@ class ExtractionPanel(QGroupBox):
         # Step size selector
         advanced_layout.addWidget(QLabel("Step:"))
         self.step_combo = QComboBox(self)
-        self.step_combo.addItems([
-            "0x20 (1 tile)",
-            "0x100 (8 tiles)",
-            "0x1000 (128 tiles)",
-            "0x4000 (512 tiles)"
-        ])
+        self.step_combo.addItems(["0x20 (1 tile)", "0x100 (8 tiles)", "0x1000 (128 tiles)", "0x4000 (512 tiles)"])
         if self.step_combo:
             self.step_combo.setCurrentIndex(0)  # Default to tile-aligned
         _ = self.step_combo.currentIndexChanged.connect(self._on_step_changed)
@@ -205,14 +201,16 @@ class ExtractionPanel(QGroupBox):
         # Quick jump dropdown
         advanced_layout.addWidget(QLabel("Quick Jump:"))
         self.jump_combo = QComboBox(self)
-        self.jump_combo.addItems([
-            "Select...",
-            "0x0000 - Start",
-            "0x4000 - Lower sprites",
-            "0x8000 - Alt sprites",
-            "0xC000 - Kirby sprites",
-            "0x10000 - End"
-        ])
+        self.jump_combo.addItems(
+            [
+                "Select...",
+                "0x0000 - Start",
+                "0x4000 - Lower sprites",
+                "0x8000 - Alt sprites",
+                "0xC000 - Kirby sprites",
+                "0x10000 - End",
+            ]
+        )
         _ = self.jump_combo.currentIndexChanged.connect(self._on_jump_selected)
         self.jump_combo.setMinimumWidth(COMBO_BOX_MIN_WIDTH)
         advanced_layout.addWidget(self.jump_combo)
@@ -237,16 +235,12 @@ class ExtractionPanel(QGroupBox):
         layout.addLayout(mode_layout)
 
         # Drop zones - with clear required/optional states
-        self.vram_drop = DropZone(
-            "VRAM", settings_manager=self.settings_manager, required=True
-        )
+        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)
         self.vram_drop.setToolTip("Contains sprite graphics data (required for any extraction)")
         layout.addWidget(self.vram_drop)
 
         # CGRAM required in Full Color mode, optional in Grayscale mode
-        self.cgram_drop = DropZone(
-            "CGRAM", settings_manager=self.settings_manager, required=True
-        )
+        self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager, required=True)
         self.cgram_drop.setToolTip("Contains color palette data (required for full color, optional for grayscale)")
         layout.addWidget(self.cgram_drop)
 
@@ -261,9 +255,7 @@ class ExtractionPanel(QGroupBox):
         self.oam_toggle.setToolTip("OAM improves palette selection but is not required")
         layout.addWidget(self.oam_toggle)
 
-        self.oam_drop = DropZone(
-            "OAM", settings_manager=self.settings_manager, required=False
-        )
+        self.oam_drop = DropZone("OAM", settings_manager=self.settings_manager, required=False)
         self.oam_drop.setToolTip("Shows active sprites and palettes (optional - improves palette selection)")
         self.oam_drop.setVisible(False)
         layout.addWidget(self.oam_drop)
@@ -350,10 +342,7 @@ class ExtractionPanel(QGroupBox):
             settings.get("paths", "last_used_dir", ""),
             str(Path.cwd()),
         ]
-        search_dirs = [
-            Path(d) for d in directories_to_try_raw
-            if isinstance(d, str) and d and Path(d).exists()
-        ]
+        search_dirs = [Path(d) for d in directories_to_try_raw if isinstance(d, str) and d and Path(d).exists()]
 
         existing = self._get_existing_files()
         detected = auto_detect_all(

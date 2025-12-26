@@ -4,6 +4,7 @@ Collapsible Group Box for Progressive Disclosure.
 Implements a group box that can be collapsed/expanded to hide advanced options,
 following the principle of progressive disclosure to reduce UI complexity.
 """
+
 from __future__ import annotations
 
 import os
@@ -78,11 +79,7 @@ class CollapsibleGroupBox(QFrame):
     collapsed: Signal = Signal(bool)  # Emitted when collapse state changes
 
     def __init__(
-        self,
-        title: str = "",
-        collapsed: bool = False,
-        muted: bool = False,
-        parent: QWidget | None = None
+        self, title: str = "", collapsed: bool = False, muted: bool = False, parent: QWidget | None = None
     ) -> None:
         super().__init__(parent)
 
@@ -140,7 +137,7 @@ class CollapsibleGroupBox(QFrame):
         title_font.setPointSize(int(FONT_SIZE_MEDIUM.replace("px", "")))
         title_font.setBold(True)
         self._title_label.setFont(title_font)
-        title_color = COLORS['text_muted'] if self._muted else COLORS['highlight']
+        title_color = COLORS["text_muted"] if self._muted else COLORS["highlight"]
         self._title_label.setStyleSheet(f"color: {title_color};")
         header_layout.addWidget(self._title_label)
 

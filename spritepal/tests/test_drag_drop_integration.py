@@ -4,6 +4,7 @@ Integration tests for drag & drop functionality using real Qt components.
 Tests file drop handling across UI components with real DropZone widgets.
 Uses programmatic file setting (set_file()) and verifies signal emissions.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -171,9 +172,7 @@ class TestDropZoneIntegration:
         # File path should NOT be set for non-existent files
         assert not vram_drop_zone.has_file()
 
-    def test_multiple_drop_zones_independent(
-        self, qtbot, vram_drop_zone, cgram_drop_zone, sample_files
-    ):
+    def test_multiple_drop_zones_independent(self, qtbot, vram_drop_zone, cgram_drop_zone, sample_files):
         """Test that multiple drop zones are independent."""
         vram_spy = QSignalSpy(vram_drop_zone.file_dropped)
         cgram_spy = QSignalSpy(cgram_drop_zone.file_dropped)

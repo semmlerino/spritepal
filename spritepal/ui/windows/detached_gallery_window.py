@@ -2,6 +2,7 @@
 Detached gallery window for displaying sprites without layout constraints.
 Opens in a separate window to avoid parent layout stretch issues.
 """
+
 from __future__ import annotations
 
 import warnings
@@ -49,6 +50,7 @@ from utils.constants import SETTINGS_KEY_LAST_INPUT_ROM, SETTINGS_NS_ROM_INJECTI
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class DetachedGalleryWindow(QMainWindow):
     """Standalone window for sprite gallery display."""
@@ -130,7 +132,7 @@ class DetachedGalleryWindow(QMainWindow):
         # and handle scrolling properly (uses QListView with virtual scrolling)
         self.gallery_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding,  # Fill horizontal space
-            QSizePolicy.Policy.Expanding   # Fill vertical space too
+            QSizePolicy.Policy.Expanding,  # Fill vertical space too
         )
 
         # Connect signals
@@ -433,9 +435,9 @@ class DetachedGalleryWindow(QMainWindow):
         for i in range(source_gallery.model.rowCount()):
             sprite = source_gallery.model.get_sprite_at_row(i)
             if sprite:
-                offset = sprite.get('offset', 0)
+                offset = sprite.get("offset", 0)
                 if isinstance(offset, str):
-                    offset = int(offset, 16) if offset.startswith('0x') else int(offset)
+                    offset = int(offset, 16) if offset.startswith("0x") else int(offset)
 
                 # Get cached thumbnail from source
                 pixmap = source_gallery.model.get_sprite_pixmap(offset)
@@ -508,11 +510,7 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _load_rom(self):
         """Load a ROM file."""
-        filename = browse_for_open_file(
-            self,
-            "Select ROM File",
-            "SNES ROM Files (*.sfc *.smc);;All Files (*.*)"
-        )
+        filename = browse_for_open_file(self, "Select ROM File", "SNES ROM Files (*.sfc *.smc);;All Files (*.*)")
 
         if filename:
             self._set_rom_file(filename)
@@ -523,11 +521,7 @@ class DetachedGalleryWindow(QMainWindow):
         """Load the last selected ROM if available."""
         try:
             settings = self.settings_manager
-            last_rom = settings.get(
-                SETTINGS_NS_ROM_INJECTION,
-                SETTINGS_KEY_LAST_INPUT_ROM,
-                ""
-            )
+            last_rom = settings.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "")
 
             if last_rom and isinstance(last_rom, str) and Path(last_rom).exists():
                 logger.info(f"Auto-loading last ROM: {last_rom}")
@@ -548,11 +542,7 @@ class DetachedGalleryWindow(QMainWindow):
         """Save the ROM path as the last used ROM."""
         try:
             settings = self.settings_manager
-            settings.set(
-                SETTINGS_NS_ROM_INJECTION,
-                SETTINGS_KEY_LAST_INPUT_ROM,
-                rom_path
-            )
+            settings.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, rom_path)
             settings.set_last_used_directory(str(Path(rom_path).parent))
 
             # Also update recent ROMs list
@@ -593,7 +583,7 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _update_recent_roms_menu(self):
         """Update the recent ROMs menu."""
-        if not hasattr(self, 'recent_roms_menu'):
+        if not hasattr(self, "recent_roms_menu"):
             return
 
         if self.recent_roms_menu:
@@ -637,11 +627,7 @@ class DetachedGalleryWindow(QMainWindow):
             self._set_rom_file(rom_path)
             self._save_last_rom(rom_path)
         else:
-            QMessageBox.warning(
-                self,
-                "ROM Not Found",
-                f"The ROM file no longer exists:\n{rom_path}"
-            )
+            QMessageBox.warning(self, "ROM Not Found", f"The ROM file no longer exists:\n{rom_path}")
 
     def _set_rom_file(self, filename: str):
         """Set the ROM file and update UI."""
@@ -669,11 +655,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         except Exception as e:
             logger.error(f"Error loading ROM: {e}")
-            UserErrorDialog.display_error(
-                self,
-                "Error Loading ROM",
-                f"Could not load ROM file: {e}"
-            )
+            UserErrorDialog.display_error(self, "Error Loading ROM", f"Could not load ROM file: {e}")
 
     def _load_cached_sprites(self):
         """Load cached sprites for the current ROM if available."""
@@ -693,11 +675,11 @@ class DetachedGalleryWindow(QMainWindow):
                     # Cast to SpritePointer for proper type checking
                     pointer = cast("SpritePointer", pointer_obj)
                     sprite = {
-                        'offset': pointer.offset,
-                        'decompressed_size': 0,  # Will be determined during thumbnail generation
-                        'tile_count': 0,
-                        'compressed': False,
-                        'name': name.replace("_", " ").title()
+                        "offset": pointer.offset,
+                        "decompressed_size": 0,  # Will be determined during thumbnail generation
+                        "tile_count": 0,
+                        "compressed": False,
+                        "name": name.replace("_", " ").title(),
                     }
                     self.sprites_data.append(sprite)
 
@@ -725,18 +707,12 @@ class DetachedGalleryWindow(QMainWindow):
     def _scan_rom(self):
         """Scan the ROM for sprites."""
         if not self.rom_path:
-            QMessageBox.information(
-                self,
-                "No ROM Loaded",
-                "Please load a ROM file first using File > Load ROM."
-            )
+            QMessageBox.information(self, "No ROM Loaded", "Please load a ROM file first using File > Load ROM.")
             return
 
         if self.scanning:
             QMessageBox.information(
-                self,
-                "Scan in Progress",
-                "A ROM scan is already in progress. Please wait for it to complete."
+                self, "Scan in Progress", "A ROM scan is already in progress. Please wait for it to complete."
             )
             return
 
@@ -745,18 +721,12 @@ class DetachedGalleryWindow(QMainWindow):
     def _scan_custom_range(self):
         """Scan a custom range of the ROM for sprites."""
         if not self.rom_path:
-            QMessageBox.information(
-                self,
-                "No ROM Loaded",
-                "Please load a ROM file first using File > Load ROM."
-            )
+            QMessageBox.information(self, "No ROM Loaded", "Please load a ROM file first using File > Load ROM.")
             return
 
         if self.scanning:
             QMessageBox.information(
-                self,
-                "Scan in Progress",
-                "A ROM scan is already in progress. Please wait for it to complete."
+                self, "Scan in Progress", "A ROM scan is already in progress. Please wait for it to complete."
             )
             return
 
@@ -812,7 +782,7 @@ class DetachedGalleryWindow(QMainWindow):
             start_offset=start_offset,
             end_offset=end_offset,
             parent=self,
-            rom_cache=self.rom_cache
+            rom_cache=self.rom_cache,
         )
 
         # Connect signals with proper error handling
@@ -851,12 +821,12 @@ class DetachedGalleryWindow(QMainWindow):
         """Handle sprite found during scan."""
         # Convert to the format expected by gallery
         sprite = {
-            'offset': sprite_info['offset'],
-            'decompressed_size': 0,  # Will be determined during thumbnail generation
-            'tile_count': 0,
-            'compressed': False,  # Will be determined later
-            'name': f"Sprite_0x{sprite_info['offset']:06X}",
-            'quality': sprite_info.get('quality', 1.0)
+            "offset": sprite_info["offset"],
+            "decompressed_size": 0,  # Will be determined during thumbnail generation
+            "tile_count": 0,
+            "compressed": False,  # Will be determined later
+            "name": f"Sprite_0x{sprite_info['offset']:06X}",
+            "quality": sprite_info.get("quality", 1.0),
         }
 
         # Add to sprites data
@@ -888,11 +858,7 @@ class DetachedGalleryWindow(QMainWindow):
         self.status_bar.showMessage(f"Scan error: {error_message}")
 
         # Show error dialog
-        QMessageBox.critical(
-            self,
-            "ROM Scan Error",
-            f"An error occurred while scanning the ROM:\n\n{error_message}"
-        )
+        QMessageBox.critical(self, "ROM Scan Error", f"An error occurred while scanning the ROM:\n\n{error_message}")
 
         # Clean up timeout timer
         if self.scan_timeout_timer:
@@ -956,7 +922,7 @@ class DetachedGalleryWindow(QMainWindow):
             "Scan Timeout",
             "The ROM scan took longer than 5 minutes and was stopped.\n\n"
             "This may indicate a very large ROM or system performance issues.\n"
-            "Try scanning a smaller ROM or restart the application."
+            "Try scanning a smaller ROM or restart the application.",
         )
 
         # Clean up worker with proper signal disconnection
@@ -987,7 +953,7 @@ class DetachedGalleryWindow(QMainWindow):
                 self._disconnect_scan_worker_signals()
 
                 # Now safe to stop the worker
-                if hasattr(self.scan_worker, 'isRunning') and self.scan_worker.isRunning():
+                if hasattr(self.scan_worker, "isRunning") and self.scan_worker.isRunning():
                     logger.debug("Requesting scan worker interruption")
                     self.scan_worker.requestInterruption()
                     if not self.scan_worker.wait(3000):  # Wait up to 3 seconds
@@ -1009,7 +975,7 @@ class DetachedGalleryWindow(QMainWindow):
 
                 # Now safe to clean up the worker
                 # The ThumbnailWorkerController has its own cleanup method that handles stopping and waiting
-                if hasattr(self.thumbnail_controller, 'cleanup'):
+                if hasattr(self.thumbnail_controller, "cleanup"):
                     self.thumbnail_controller.cleanup()
                 else:
                     logger.warning("Thumbnail controller does not have cleanup method")
@@ -1055,12 +1021,12 @@ class DetachedGalleryWindow(QMainWindow):
 
         # List of signals and their connected slots
         signals_to_disconnect = [
-            ('sprite_found', self._on_sprite_found),
-            ('progress', self._on_scan_progress),
-            ('finished', self._on_scan_finished),
-            ('error', self._on_scan_error),
-            ('cache_status', self._on_cache_status),
-            ('operation_finished', self._on_scan_finished),
+            ("sprite_found", self._on_sprite_found),
+            ("progress", self._on_scan_progress),
+            ("finished", self._on_scan_finished),
+            ("error", self._on_scan_error),
+            ("cache_status", self._on_cache_status),
+            ("operation_finished", self._on_scan_finished),
         ]
 
         for signal_name, slot in signals_to_disconnect:
@@ -1075,9 +1041,9 @@ class DetachedGalleryWindow(QMainWindow):
 
         # Also try to disconnect status_update if it exists (no specific slot)
         try:
-            if hasattr(self.scan_worker, 'status_update'):
+            if hasattr(self.scan_worker, "status_update"):
                 # Use getattr to satisfy type checker
-                status_update_signal = getattr(self.scan_worker, 'status_update', None)
+                status_update_signal = getattr(self.scan_worker, "status_update", None)
                 if status_update_signal is not None:
                     status_update_signal.disconnect()
                     logger.debug("Disconnected status_update signal")
@@ -1093,8 +1059,8 @@ class DetachedGalleryWindow(QMainWindow):
 
         # List of signals and their connected slots
         signals_to_disconnect = [
-            ('thumbnail_ready', self._on_thumbnail_ready),
-            ('progress', self._on_thumbnail_progress),
+            ("thumbnail_ready", self._on_thumbnail_ready),
+            ("progress", self._on_thumbnail_progress),
         ]
 
         for signal_name, slot in signals_to_disconnect:
@@ -1109,13 +1075,13 @@ class DetachedGalleryWindow(QMainWindow):
 
         # Try to disconnect finished and error signals (from BaseWorker)
         # These might not have specific slots connected
-        for signal_name in ['finished', 'error', 'operation_finished']:
+        for signal_name in ["finished", "error", "operation_finished"]:
             try:
                 signal = getattr(self.thumbnail_controller, signal_name, None)
                 if signal is not None:
                     # Suppress RuntimeWarning when disconnecting signals with no connections
                     with warnings.catch_warnings():
-                        warnings.filterwarnings('ignore', category=RuntimeWarning)
+                        warnings.filterwarnings("ignore", category=RuntimeWarning)
                         signal.disconnect()  # Disconnect all connections
                     logger.debug(f"Disconnected {signal_name} signal")
             except (RuntimeError, TypeError):
@@ -1128,6 +1094,7 @@ class DetachedGalleryWindow(QMainWindow):
         # and the window is closed before the timer fires
         try:
             from shiboken6 import isValid
+
             if not isValid(self):
                 logger.debug("Skipping thumbnail generation - window already destroyed")
                 return
@@ -1161,9 +1128,9 @@ class DetachedGalleryWindow(QMainWindow):
         # Queue all sprites for thumbnail generation
         logger.info(f"Queueing {len(self.sprites_data)} sprites for thumbnail generation")
         for sprite_info in self.sprites_data:
-            offset = sprite_info.get('offset', 0)
+            offset = sprite_info.get("offset", 0)
             if isinstance(offset, str):
-                offset = int(offset, 16) if offset.startswith('0x') else int(offset)
+                offset = int(offset, 16) if offset.startswith("0x") else int(offset)
             # Queue with size 256 for better visibility
             self.thumbnail_controller.queue_thumbnail(offset, 256)
 
@@ -1189,11 +1156,7 @@ class DetachedGalleryWindow(QMainWindow):
     def _refresh_thumbnails(self):
         """Refresh all thumbnail images."""
         if not self.sprites_data or not self.rom_path:
-            QMessageBox.information(
-                self,
-                "No Sprites",
-                "No sprites to refresh. Load a ROM and scan for sprites first."
-            )
+            QMessageBox.information(self, "No Sprites", "No sprites to refresh. Load a ROM and scan for sprites first.")
             return
 
         logger.info("Refreshing thumbnails")
@@ -1208,21 +1171,13 @@ class DetachedGalleryWindow(QMainWindow):
     def _extract_selected_sprite(self):
         """Extract the currently selected sprite."""
         if not self.gallery_widget:
-            QMessageBox.information(
-                self,
-                "No Gallery",
-                "Gallery is not initialized."
-            )
+            QMessageBox.information(self, "No Gallery", "Gallery is not initialized.")
             return
 
         # Get selected sprite
         selected_offset = self.gallery_widget.get_selected_sprite_offset()
         if selected_offset is None:
-            QMessageBox.information(
-                self,
-                "No Sprite Selected",
-                "Please select a sprite to extract by clicking on it."
-            )
+            QMessageBox.information(self, "No Sprite Selected", "Please select a sprite to extract by clicking on it.")
             return
 
         # Get output filename
@@ -1230,10 +1185,7 @@ class DetachedGalleryWindow(QMainWindow):
         default_name = f"{rom_name}_0x{selected_offset:06X}"
 
         filename = browse_for_save_file(
-            self,
-            "Save Extracted Sprite",
-            "PNG Files (*.png);;All Files (*.*)",
-            default_name
+            self, "Save Extracted Sprite", "PNG Files (*.png);;All Files (*.*)", default_name
         )
 
         if not filename:
@@ -1257,16 +1209,14 @@ class DetachedGalleryWindow(QMainWindow):
                 self.rom_path,
                 offset,
                 output_path,
-                None  # cgram_path - could add CGRAM selection later
+                None,  # cgram_path - could add CGRAM selection later
             )
 
             if result:
                 self.status_bar.showMessage(f"Sprite extracted to {output_path}")
 
                 QMessageBox.information(
-                    self,
-                    "Extraction Complete",
-                    f"Sprite successfully extracted to:\n{output_path}"
+                    self, "Extraction Complete", f"Sprite successfully extracted to:\n{output_path}"
                 )
 
                 # Emit signal for successful extraction
@@ -1276,27 +1226,19 @@ class DetachedGalleryWindow(QMainWindow):
             else:
                 self.status_bar.showMessage("Extraction failed")
                 QMessageBox.warning(
-                    self,
-                    "Extraction Failed",
-                    "Could not extract the sprite. Check the ROM and offset."
+                    self, "Extraction Failed", "Could not extract the sprite. Check the ROM and offset."
                 )
 
         except Exception as e:
             logger.error(f"Error extracting sprite: {e}")
             self.status_bar.showMessage("Extraction error")
-            UserErrorDialog.display_error(
-                self,
-                "Extraction Error",
-                f"Could not extract sprite: {e}"
-            )
+            UserErrorDialog.display_error(self, "Extraction Error", f"Could not extract sprite: {e}")
 
     def _show_scan_results(self):
         """Show detailed scan results in a dialog."""
         if not self.sprites_data:
             QMessageBox.information(
-                self,
-                "No Scan Results",
-                "No sprites have been found yet. Load a ROM and scan for sprites first."
+                self, "No Scan Results", "No sprites have been found yet. Load a ROM and scan for sprites first."
             )
             return
 
@@ -1324,7 +1266,7 @@ class DetachedGalleryWindow(QMainWindow):
             text += f"   Name: {sprite['name']}\n"
             text += f"   Size: {sprite['decompressed_size']} bytes\n"
             text += f"   Tiles: {sprite['tile_count']}\n"
-            if 'quality' in sprite:
+            if "quality" in sprite:
                 text += f"   Quality: {sprite['quality']:.2f}\n"
             text += "\n"
 
@@ -1365,7 +1307,7 @@ class DetachedGalleryWindow(QMainWindow):
             logger.info("No sprite selected for fullscreen view")
             # If no selection, use first sprite
             if self.sprites_data:
-                selected_offset = self.sprites_data[0].get('offset', 0)
+                selected_offset = self.sprites_data[0].get("offset", 0)
             else:
                 return
 
@@ -1381,10 +1323,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         # Set sprite data and show
         if self.fullscreen_viewer.set_sprite_data(
-            self.sprites_data,
-            selected_offset,
-            self.rom_path or "",
-            self.rom_extractor
+            self.sprites_data, selected_offset, self.rom_path or "", self.rom_extractor
         ):
             self.fullscreen_viewer.show()
         else:
@@ -1427,4 +1366,3 @@ class DetachedGalleryWindow(QMainWindow):
         # Force layout update when window is shown
         if self.gallery_widget:
             self.gallery_widget.force_layout_update()
-

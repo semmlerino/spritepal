@@ -4,6 +4,7 @@ Comprehensive tests for parallel sprite finder functionality.
 Tests both parallel vs linear performance, result accuracy, cancellation handling,
 adaptive step sizing, and proper mocking for unit tests.
 """
+
 from __future__ import annotations
 
 import logging
@@ -32,6 +33,8 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.performance,
 ]
+
+
 @pytest.fixture
 def sample_rom_data():
     """Create sample ROM data for testing."""
@@ -42,15 +45,16 @@ def sample_rom_data():
     # Add some sprite-like patterns at known offsets
     sprite_patterns = [
         (0x1000, b"\x01\x02\x03\x04" * 64),  # Simple pattern
-        (0x5000, b"\x00\xFF\x80\x7F" * 32),  # High contrast
-        (0xA000, bytes(range(256))),           # Sequential data
-        (0xF000, b"\xAA\x55" * 128),         # Alternating pattern
+        (0x5000, b"\x00\xff\x80\x7f" * 32),  # High contrast
+        (0xA000, bytes(range(256))),  # Sequential data
+        (0xF000, b"\xaa\x55" * 128),  # Alternating pattern
     ]
 
     for offset, pattern in sprite_patterns:
-        rom_data[offset:offset + len(pattern)] = pattern
+        rom_data[offset : offset + len(pattern)] = pattern
 
     return bytes(rom_data)
+
 
 @pytest.fixture
 def temp_rom_file(sample_rom_data):
@@ -63,6 +67,7 @@ def temp_rom_file(sample_rom_data):
 
     # Cleanup
     Path(temp_path).unlink(missing_ok=True)
+
 
 @pytest.fixture
 def mock_sprite_finder():
@@ -77,25 +82,26 @@ def mock_sprite_finder():
                 "decompressed_size": 2048,
                 "compressed_size": 1024,
                 "tile_count": 32,
-                "visual_validation": {"passed": True}
+                "visual_validation": {"passed": True},
             },
             0x5000: {
                 "decompressed_size": 1024,
                 "compressed_size": 512,
                 "tile_count": 16,
-                "visual_validation": {"passed": True}
+                "visual_validation": {"passed": True},
             },
             0xA000: {
                 "decompressed_size": 256,
                 "compressed_size": 200,
                 "tile_count": 4,
-                "visual_validation": {"passed": False}
-            }
+                "visual_validation": {"passed": False},
+            },
         }
         return test_sprites.get(offset)
 
     finder.find_sprite_at_offset.side_effect = mock_find_sprite
     return finder
+
 
 class TestSearchChunk:
     """Test SearchChunk data class."""
@@ -114,6 +120,7 @@ class TestSearchChunk:
         chunk = SearchChunk(start=0x1000, end=0x1500, chunk_id=0)
         assert chunk.size == 0x500
 
+
 class TestSearchResult:
     """Test SearchResult data class."""
 
@@ -121,12 +128,7 @@ class TestSearchResult:
         """Test SearchResult creation with all fields."""
         metadata = {"test": "data"}
         result = SearchResult(
-            offset=0x1000,
-            size=2048,
-            tile_count=32,
-            compressed_size=1024,
-            confidence=0.85,
-            metadata=metadata
+            offset=0x1000, size=2048, tile_count=32, compressed_size=1024, confidence=0.85, metadata=metadata
         )
 
         assert result.offset == 0x1000
@@ -136,16 +138,13 @@ class TestSearchResult:
         assert result.confidence == 0.85
         assert result.metadata == metadata
 
+
 class TestParallelSpriteFinder:
     """Test ParallelSpriteFinder class."""
 
     def test_parallel_finder_initialization(self):
         """Test proper initialization of ParallelSpriteFinder."""
-        finder = ParallelSpriteFinder(
-            num_workers=2,
-            chunk_size=0x20000,
-            step_size=0x200
-        )
+        finder = ParallelSpriteFinder(num_workers=2, chunk_size=0x20000, step_size=0x200)
 
         assert finder.num_workers == 2
         assert finder.chunk_size == 0x20000
@@ -218,16 +217,16 @@ class TestParallelSpriteFinder:
         assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
 
         # Starts with 0xFF - rejected (HAL terminator can't be first)
-        invalid_data = b"\xFF" * 16
+        invalid_data = b"\xff" * 16
         assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
 
         # Starts with 0xFF followed by other bytes - still rejected
-        invalid_data = b"\xFF\x01\x02\x03" + b"\x00" * 12
+        invalid_data = b"\xff\x01\x02\x03" + b"\x00" * 12
         assert sprite_finder._quick_sprite_check(invalid_data, 0) is False
 
         # Alternating pattern - now PASSES (let decompression validate)
         # This is intentional: we're less aggressive to avoid missing sprites
-        alternating_data = b"\x00\xFF" * 8
+        alternating_data = b"\x00\xff" * 8
         assert sprite_finder._quick_sprite_check(alternating_data, 0) is True
 
     def test_calculate_confidence_high_score(self):
@@ -238,9 +237,9 @@ class TestParallelSpriteFinder:
         # Test the new _calculate_quick_confidence method
         confidence = sprite_finder._calculate_quick_confidence(
             decompressed_size=2048,  # Good size
-            compressed_size=1024,    # Good compression ratio (0.5)
-            tile_count=32,           # Good tile count
-            tile_validation_score=0.9  # High tile validation score
+            compressed_size=1024,  # Good compression ratio (0.5)
+            tile_count=32,  # Good tile count
+            tile_validation_score=0.9,  # High tile validation score
         )
         assert confidence >= 0.8  # Should be high confidence
 
@@ -251,10 +250,10 @@ class TestParallelSpriteFinder:
 
         # Test the new _calculate_quick_confidence method
         confidence = sprite_finder._calculate_quick_confidence(
-            decompressed_size=50,    # Too small
-            compressed_size=200,     # Bad compression ratio (4.0)
-            tile_count=1,            # Too few tiles
-            tile_validation_score=0.1  # Low tile validation score
+            decompressed_size=50,  # Too small
+            compressed_size=200,  # Bad compression ratio (4.0)
+            tile_count=1,  # Too few tiles
+            tile_validation_score=0.1,  # Low tile validation score
         )
         assert confidence <= 0.3  # Should be low confidence
 
@@ -307,7 +306,7 @@ class TestParallelSpriteFinder:
                     tile_count=16,
                     confidence=0.9,
                     tile_validation_score=0.8,
-                    visual_metrics=None
+                    visual_metrics=None,
                 )
             return None
 
@@ -340,9 +339,7 @@ class TestParallelSpriteFinder:
         mock_finder.scan_offset = Mock(return_value=None)
         mock_finder._quick_sprite_check = Mock(return_value=True)
 
-        results = finder._search_chunk(
-            mock_finder, rom_data, chunk, cancellation_token
-        )
+        results = finder._search_chunk(mock_finder, rom_data, chunk, cancellation_token)
 
         # Should return empty results due to cancellation
         assert len(results) == 0
@@ -363,18 +360,14 @@ class TestParallelSpriteFinder:
                     tile_count=16,
                     confidence=0.9,
                     tile_validation_score=0.8,
-                    visual_metrics=None
+                    visual_metrics=None,
                 )
             return None
 
         for sprite_finder in finder.sprite_finders:
             sprite_finder.scan_offset = Mock(side_effect=mock_scan_offset)
 
-        results = finder.search_parallel(
-            temp_rom_file,
-            start_offset=0x0,
-            end_offset=0x10000
-        )
+        results = finder.search_parallel(temp_rom_file, start_offset=0x0, end_offset=0x10000)
 
         # Should return results sorted by offset
         assert isinstance(results, list)
@@ -396,12 +389,7 @@ class TestParallelSpriteFinder:
         for sprite_finder in finder.sprite_finders:
             sprite_finder.scan_offset = Mock(return_value=None)
 
-        finder.search_parallel(
-            temp_rom_file,
-            start_offset=0x0,
-            end_offset=0x10000,
-            progress_callback=progress_callback
-        )
+        finder.search_parallel(temp_rom_file, start_offset=0x0, end_offset=0x10000, progress_callback=progress_callback)
 
         # Should have called progress callback
         assert len(progress_calls) > 0
@@ -420,10 +408,7 @@ class TestParallelSpriteFinder:
         cancellation_token.set()  # Cancel immediately
 
         results = finder.search_parallel(
-            temp_rom_file,
-            start_offset=0x0,
-            end_offset=0x10000,
-            cancellation_token=cancellation_token
+            temp_rom_file, start_offset=0x0, end_offset=0x10000, cancellation_token=cancellation_token
         )
 
         # Search should be cancelled, so no results
@@ -472,7 +457,7 @@ class TestParallelPerformance:
         parallel_results = parallel_finder.search_parallel(
             temp_rom_file,
             start_offset=0x0,
-            end_offset=0x40000  # Smaller range for test
+            end_offset=0x40000,  # Smaller range for test
         )
         parallel_time = time.time() - start_time
 

@@ -6,11 +6,12 @@ to QPixmap and prevents Qt threading violations that cause crashes.
 
 Test Categories:
 1. Basic functionality tests
-2. Thread safety verification tests  
+2. Thread safety verification tests
 3. Pool performance tests
 4. Error handling tests
 5. Qt compatibility tests
 """
+
 from __future__ import annotations
 
 import threading
@@ -27,6 +28,7 @@ pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.headless,
 ]
+
 
 class TestThreadSafeTestImageBasic:
     """Test basic functionality of ThreadSafeTestImage."""
@@ -99,6 +101,7 @@ class TestThreadSafeTestImageBasic:
         assert "ThreadSafeTestImage(width=80, height=60" in repr_str
         assert "bytes=" in repr_str
 
+
 class TestThreadSafeTestImageThreadSafety:
     """Test thread safety of ThreadSafeTestImage."""
 
@@ -114,14 +117,16 @@ class TestThreadSafeTestImageThreadSafety:
                 image = ThreadSafeTestImage(100, 100)
                 image.fill(QColor(thread_id % 255, 0, 0))
 
-                results.append({
-                    'thread_id': thread_id,
-                    'image_width': image.width(),
-                    'image_height': image.height(),
-                    'is_null': image.isNull(),
-                    'size_bytes': image.sizeInBytes(),
-                    'created_thread_id': image.created_in_thread()
-                })
+                results.append(
+                    {
+                        "thread_id": thread_id,
+                        "image_width": image.width(),
+                        "image_height": image.height(),
+                        "is_null": image.isNull(),
+                        "size_bytes": image.sizeInBytes(),
+                        "created_thread_id": image.created_in_thread(),
+                    }
+                )
 
             except Exception as e:
                 errors.append((thread_id, str(e)))
@@ -143,11 +148,11 @@ class TestThreadSafeTestImageThreadSafety:
 
         # Verify all images were created successfully
         for result in results:
-            assert result['image_width'] == 100
-            assert result['image_height'] == 100
-            assert not result['is_null']
-            assert result['size_bytes'] > 0
-            assert result['created_thread_id'] > 0
+            assert result["image_width"] == 100
+            assert result["image_height"] == 100
+            assert not result["is_null"]
+            assert result["size_bytes"] > 0
+            assert result["created_thread_id"] > 0
 
     def test_concurrent_image_operations(self):
         """Test concurrent image operations without crashes."""
@@ -162,9 +167,9 @@ class TestThreadSafeTestImageThreadSafety:
 
                 # Perform multiple operations
                 image.fill(QColor(255, 255, 255))  # White
-                image.fill(QColor(255, 0, 0))      # Red
-                image.fill(QColor(0, 255, 0))      # Green
-                image.fill(QColor(0, 0, 255))      # Blue
+                image.fill(QColor(255, 0, 0))  # Red
+                image.fill(QColor(0, 255, 0))  # Green
+                image.fill(QColor(0, 0, 255))  # Blue
 
                 # Verify final state
                 assert not image.isNull()
@@ -215,6 +220,7 @@ class TestThreadSafeTestImageThreadSafety:
         # Verify different thread IDs
         assert worker_image.created_in_thread() == worker_thread_id
         assert main_image.created_in_thread() != worker_image.created_in_thread()
+
 
 class TestTestImagePool:
     """Test TestImagePool functionality."""
@@ -325,6 +331,7 @@ class TestTestImagePool:
         # We can't directly check color, but we can verify it was reset
         assert not retrieved.isNull()
 
+
 class TestQtCompatibility:
     """Test Qt compatibility and interface matching."""
 
@@ -333,11 +340,11 @@ class TestQtCompatibility:
         image = ThreadSafeTestImage(120, 80)
 
         # Test QPixmap-like methods exist and work
-        assert hasattr(image, 'fill')
-        assert hasattr(image, 'isNull')
-        assert hasattr(image, 'size')
-        assert hasattr(image, 'width')
-        assert hasattr(image, 'height')
+        assert hasattr(image, "fill")
+        assert hasattr(image, "isNull")
+        assert hasattr(image, "size")
+        assert hasattr(image, "width")
+        assert hasattr(image, "height")
 
         # Test method return types match expectations
         assert isinstance(image.size(), QSize)
@@ -367,6 +374,7 @@ class TestQtCompatibility:
 
         # Verify image is properly initialized (not null)
         assert not qimage.isNull()
+
 
 class TestErrorHandling:
     """Test error handling and edge cases."""
@@ -417,7 +425,7 @@ class TestErrorHandling:
         # Start threads, some with errors
         threads = []
         for i in range(6):
-            should_error = (i % 2 == 0)  # Error in even-numbered threads
+            should_error = i % 2 == 0  # Error in even-numbered threads
             t = threading.Thread(target=worker_with_error, args=(i, should_error))
             threads.append(t)
             t.start()
@@ -428,7 +436,8 @@ class TestErrorHandling:
 
         # Verify that successful threads completed despite errors in others
         assert len(successful_threads) == 3  # Odd-numbered threads (1, 3, 5)
-        assert len(failed_threads) == 3     # Even-numbered threads (0, 2, 4)
+        assert len(failed_threads) == 3  # Even-numbered threads (0, 2, 4)
+
 
 class TestPerformance:
     """Performance and optimization tests."""
@@ -478,9 +487,12 @@ class TestPerformance:
 
 if __name__ == "__main__":
     # Run specific test categories
-    pytest.main([
-        __file__,
-        "-v",
-        "--tb=short",
-        "-m", "not slow"  # Skip slow tests by default
-    ])
+    pytest.main(
+        [
+            __file__,
+            "-v",
+            "--tb=short",
+            "-m",
+            "not slow",  # Skip slow tests by default
+        ]
+    )

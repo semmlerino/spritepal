@@ -3,6 +3,7 @@ AppContext Access Tests.
 
 These tests validate that components can access managers via AppContext.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -87,6 +88,7 @@ class TestPureAppContextComponentInitialization:
 
         # Suppress deprecation warnings - we're passing all required params
         import warnings
+
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -192,18 +194,13 @@ class TestAppContextErrorBehavior:
         import core.managers
 
         # These functions should no longer exist at module level
-        assert not hasattr(core.managers, "get_extraction_manager"), \
-            "get_extraction_manager should have been removed"
-        assert not hasattr(core.managers, "get_injection_manager"), \
-            "get_injection_manager should have been removed"
-        assert not hasattr(core.managers, "get_session_manager"), \
-            "get_session_manager should have been removed"
-        assert not hasattr(core.managers, "get_navigation_manager"), \
-            "get_navigation_manager should have been removed"
+        assert not hasattr(core.managers, "get_extraction_manager"), "get_extraction_manager should have been removed"
+        assert not hasattr(core.managers, "get_injection_manager"), "get_injection_manager should have been removed"
+        assert not hasattr(core.managers, "get_session_manager"), "get_session_manager should have been removed"
+        assert not hasattr(core.managers, "get_navigation_manager"), "get_navigation_manager should have been removed"
 
         # ManagerRegistry class has been removed
-        assert not hasattr(core.managers, "ManagerRegistry"), \
-            "ManagerRegistry class should have been removed"
+        assert not hasattr(core.managers, "ManagerRegistry"), "ManagerRegistry class should have been removed"
 
 
 class TestManagerDependencyAccess:

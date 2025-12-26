@@ -2,6 +2,7 @@
 Settings dialog for SpritePal application
 Provides user interface for configuring application preferences
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -40,9 +41,7 @@ class SettingsDialog(DialogBase):
     settings_changed = Signal()
     cache_cleared = Signal()
 
-    def __init__(self, parent: WidgetParent = None, *,
-                 settings_manager: ApplicationStateManager,
-                 rom_cache: ROMCache):
+    def __init__(self, parent: WidgetParent = None, *, settings_manager: ApplicationStateManager, rom_cache: ROMCache):
         # Store original settings to detect changes
         self._original_settings: dict[str, object] = {}
 
@@ -139,9 +138,7 @@ class SettingsDialog(DialogBase):
 
         # Enable cache checkbox
         self.cache_enabled_check = QCheckBox("Enable ROM scan caching", self)
-        self.cache_enabled_check.setToolTip(
-            "Cache ROM scan results to speed up subsequent operations"
-        )
+        self.cache_enabled_check.setToolTip("Cache ROM scan results to speed up subsequent operations")
         self.cache_enabled_check.toggled.connect(self._on_cache_enabled_changed)
         cache_layout.addRow(self.cache_enabled_check)  # Label removed - checkbox text is descriptive
 
@@ -252,27 +249,17 @@ class SettingsDialog(DialogBase):
     def _load_settings(self):
         """Load current settings into UI"""
         # General settings
-        self.restore_window_check.setChecked(
-            bool(self.settings_manager.get("ui", "restore_position", True))
-        )
-        self.auto_save_session_check.setChecked(
-            bool(self.settings_manager.get("session", "auto_save", True))
-        )
-        self.dumps_dir_edit.setText(
-            str(self.settings_manager.get("paths", "default_dumps_dir", ""))
-        )
+        self.restore_window_check.setChecked(bool(self.settings_manager.get("ui", "restore_position", True)))
+        self.auto_save_session_check.setChecked(bool(self.settings_manager.get("session", "auto_save", True)))
+        self.dumps_dir_edit.setText(str(self.settings_manager.get("paths", "default_dumps_dir", "")))
 
         # Cache settings
         self.cache_enabled_check.setChecked(self.settings_manager.get_cache_enabled())
         self.cache_location_edit.setText(self.settings_manager.get_cache_location())
         self.cache_size_spin.setValue(self.settings_manager.get_cache_max_size_mb())
         self.cache_expiry_spin.setValue(self.settings_manager.get_cache_expiration_days())
-        self.auto_cleanup_check.setChecked(
-            bool(self.settings_manager.get("cache", "auto_cleanup", True))
-        )
-        self.show_indicators_check.setChecked(
-            bool(self.settings_manager.get("cache", "show_indicators", True))
-        )
+        self.auto_cleanup_check.setChecked(bool(self.settings_manager.get("cache", "auto_cleanup", True)))
+        self.show_indicators_check.setChecked(bool(self.settings_manager.get("cache", "show_indicators", True)))
 
         # Update original settings to reflect what was just loaded
         self._load_original_settings()
@@ -365,11 +352,7 @@ class SettingsDialog(DialogBase):
         """Browse for default dumps directory"""
         current_dir = self.dumps_dir_edit.text() or str(Path.home())
 
-        dir_path = browse_for_directory(
-            self,
-            "Select Default Dumps Directory",
-            current_dir
-        )
+        dir_path = browse_for_directory(self, "Select Default Dumps Directory", current_dir)
 
         if dir_path:
             self.dumps_dir_edit.setText(dir_path)
@@ -378,11 +361,7 @@ class SettingsDialog(DialogBase):
         """Browse for cache directory"""
         current_dir = self.cache_location_edit.text() or str(Path.home())
 
-        dir_path = browse_for_directory(
-            self,
-            "Select Cache Directory",
-            current_dir
-        )
+        dir_path = browse_for_directory(self, "Select Cache Directory", current_dir)
 
         if dir_path:
             self.cache_location_edit.setText(dir_path)
@@ -397,7 +376,7 @@ class SettingsDialog(DialogBase):
             "This will remove all cached scan results and you'll need to "
             "rescan ROMs to rebuild the cache.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
@@ -414,17 +393,9 @@ class SettingsDialog(DialogBase):
                 # Emit signal
                 self.cache_cleared.emit()
 
-                QMessageBox.information(
-                    self,
-                    "Cache Cleared",
-                    f"Successfully removed {removed_count} cache files."
-                )
+                QMessageBox.information(self, "Cache Cleared", f"Successfully removed {removed_count} cache files.")
             except Exception as e:
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    f"Failed to clear cache: {e!s}"
-                )
+                QMessageBox.critical(self, "Error", f"Failed to clear cache: {e!s}")
 
     @override
     def accept(self):

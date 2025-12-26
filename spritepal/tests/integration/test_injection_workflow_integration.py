@@ -13,6 +13,7 @@ REAL COMPONENT TESTING:
 - MockHALProcessPool provides fast but realistic HAL responses
 - Tests actual component behavior with real file I/O
 """
+
 from __future__ import annotations
 
 import json
@@ -37,6 +38,7 @@ def injection_manager(app_context):
 def test_rom_file(tmp_path) -> Path:
     """Create a test ROM file with realistic data."""
     import struct
+
     rom_path = tmp_path / "test_rom.sfc"
     # Create a 2MB ROM with some sprite-like data
     rom_data = bytearray(2 * 1024 * 1024)
@@ -44,7 +46,7 @@ def test_rom_file(tmp_path) -> Path:
     # Add ROM header info (SNES LoROM header at 0x7FC0)
     header_offset = 0x7FC0
     title = b"TEST ROM DATA      "[:21]
-    rom_data[header_offset:header_offset + 21] = title
+    rom_data[header_offset : header_offset + 21] = title
 
     # ROM makeup byte at offset 21
     rom_data[header_offset + 21] = 0x20  # LoROM, no FastROM
@@ -76,7 +78,7 @@ def test_rom_file(tmp_path) -> Path:
     # Add some compressed sprite-like data at known offset
     sprite_offset = 0x100000
     # Fake HAL-compressed data signature
-    rom_data[sprite_offset:sprite_offset + 4] = b'\x00\x10\x00\x00'
+    rom_data[sprite_offset : sprite_offset + 4] = b"\x00\x10\x00\x00"
 
     rom_path.write_bytes(rom_data)
     return rom_path
@@ -105,7 +107,7 @@ def test_sprite_png(tmp_path) -> Path:
     from PIL import Image
 
     # Create a small test sprite (32x32 pixels)
-    sprite = Image.new('RGBA', (32, 32), color=(128, 64, 32, 255))
+    sprite = Image.new("RGBA", (32, 32), color=(128, 64, 32, 255))
 
     sprite_path = tmp_path / "test_sprite.png"
     sprite.save(sprite_path)
@@ -119,7 +121,7 @@ def test_sprite_png(tmp_path) -> Path:
         "palette_index": 8,
         "format": "4bpp",
         "compressed": True,
-        "original_rom": "test_rom.sfc"
+        "original_rom": "test_rom.sfc",
     }
     metadata_path = tmp_path / "test_sprite.pal.json"
     metadata_path.write_text(json.dumps(metadata, indent=2))
@@ -193,7 +195,7 @@ class TestVRAMSuggestion:
         """Test VRAM suggestion from sprite PNG with metadata."""
         # Create VRAM file with expected name
         expected_vram = tmp_path / "test_vram.dmp"
-        expected_vram.write_bytes(b'\x00' * 64 * 1024)
+        expected_vram.write_bytes(b"\x00" * 64 * 1024)
 
         suggestion = injection_manager.find_suggested_input_vram(str(test_sprite_png))
 
@@ -233,7 +235,8 @@ class TestMetadataHandling:
         sprite_without_meta = tmp_path / "no_meta.png"
 
         from PIL import Image
-        Image.new('RGBA', (16, 16)).save(sprite_without_meta)
+
+        Image.new("RGBA", (16, 16)).save(sprite_without_meta)
 
         metadata = injection_manager.load_metadata(str(sprite_without_meta))
 
@@ -340,12 +343,7 @@ class TestROMInjectionSettings:
         """Test saving and loading ROM injection settings."""
         # save_rom_injection_settings takes 4 arguments:
         # input_rom, sprite_location_text, custom_offset, fast_compression
-        injection_manager.save_rom_injection_settings(
-            str(test_rom_file),
-            "Kirby Normal",
-            "0x100000",
-            True
-        )
+        injection_manager.save_rom_injection_settings(str(test_rom_file), "Kirby Normal", "0x100000", True)
 
         # Load settings back - check that load_rom_injection_defaults works
         loaded = injection_manager.load_rom_injection_defaults(str(test_rom_file))
@@ -378,11 +376,7 @@ class TestCacheOperations:
 
         # Save progress
         result = injection_manager.save_scan_progress(
-            str(test_rom_file),
-            scan_params,
-            found_sprites,
-            current_offset,
-            False
+            str(test_rom_file), scan_params, found_sprites, current_offset, False
         )
         assert isinstance(result, bool)
 
@@ -401,13 +395,7 @@ class TestInjectionWorkflowEndToEnd:
     """End-to-end injection workflow tests."""
 
     @pytest.mark.slow
-    def test_complete_injection_preparation(
-        self,
-        injection_manager,
-        test_rom_file,
-        test_vram_file,
-        test_sprite_png
-    ):
+    def test_complete_injection_preparation(self, injection_manager, test_rom_file, test_vram_file, test_sprite_png):
         """Test complete preparation for injection (without actual injection)."""
         from core.exceptions import ValidationError
 

@@ -44,11 +44,13 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 # Qt imports with proper handling
 try:
     from PySide6.QtWidgets import QApplication, QWidget
+
     QT_AVAILABLE = True
 except ImportError:
     # Fallback for testing without Qt
     QT_AVAILABLE = False
     from unittest.mock import Mock
+
     QApplication = QWidget = Mock
 
 # Performance validation imports
@@ -65,6 +67,7 @@ except ImportError as e:
     print(f"❌ Error importing performance tests: {e}")
     print("Please run from the spritepal root directory")
     sys.exit(1)
+
 
 def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
     """Create UnifiedManualOffsetDialog with AppContext dependencies."""
@@ -115,6 +118,7 @@ class PerformanceValidationRunner:
                 # Initialize managers if not done
                 if not self._managers_initialized:
                     from core.managers import initialize_managers
+
                     initialize_managers()
                     self._managers_initialized = True
 
@@ -124,9 +128,7 @@ class PerformanceValidationRunner:
                     dialog.setup_ui()
                     return dialog
 
-                startup_metrics = StartupBenchmark.measure_dialog_startup(
-                    UnifiedManualOffsetDialog, setup_dialog
-                )
+                startup_metrics = StartupBenchmark.measure_dialog_startup(UnifiedManualOffsetDialog, setup_dialog)
 
             # Evaluate results
             startup_time_ms = startup_metrics.get("total_startup_time_ms", 999)
@@ -144,7 +146,9 @@ class PerformanceValidationRunner:
             return {
                 "metrics": startup_metrics,
                 "target_met": target_met,
-                "performance_score": 100 if target_met else max(0, 100 - (startup_time_ms - PerformanceTargets.STARTUP_TIME_MS) / 10)
+                "performance_score": 100
+                if target_met
+                else max(0, 100 - (startup_time_ms - PerformanceTargets.STARTUP_TIME_MS) / 10),
             }
 
         except Exception as e:
@@ -169,6 +173,7 @@ class PerformanceValidationRunner:
                 # Initialize managers if not done
                 if not self._managers_initialized:
                     from core.managers import initialize_managers
+
                     initialize_managers()
                     self._managers_initialized = True
 
@@ -206,7 +211,9 @@ class PerformanceValidationRunner:
             return {
                 "metrics": memory_metrics,
                 "target_met": target_met,
-                "performance_score": 100 if target_met else max(0, 100 - (memory_mb - PerformanceTargets.MEMORY_LIMIT_MB) * 25)
+                "performance_score": 100
+                if target_met
+                else max(0, 100 - (memory_mb - PerformanceTargets.MEMORY_LIMIT_MB) * 25),
             }
 
         except Exception as e:
@@ -228,6 +235,7 @@ class PerformanceValidationRunner:
                 # Initialize managers if not done
                 if not self._managers_initialized:
                     from core.managers import initialize_managers
+
                     initialize_managers()
                     self._managers_initialized = True
 
@@ -238,9 +246,7 @@ class PerformanceValidationRunner:
                 dialog.set_rom_data("test.smc", 0x400000)
 
                 # Measure preview performance
-                preview_metrics = PreviewPerformanceBenchmark.measure_preview_performance(
-                    dialog, iterations=30
-                )
+                preview_metrics = PreviewPerformanceBenchmark.measure_preview_performance(dialog, iterations=30)
 
                 # Cleanup
                 dialog.deleteLater()
@@ -256,13 +262,17 @@ class PerformanceValidationRunner:
             print(f"  Target Met: {'✅ YES' if target_met else '❌ NO'}")
 
             if self.verbose:
-                print(f"  Min/Max Time: {preview_metrics.get('min_time_ms', 0):.1f}/{preview_metrics.get('max_time_ms', 0):.1f}ms")
+                print(
+                    f"  Min/Max Time: {preview_metrics.get('min_time_ms', 0):.1f}/{preview_metrics.get('max_time_ms', 0):.1f}ms"
+                )
                 print(f"  Total Iterations: {preview_metrics.get('iterations', 0)}")
 
             return {
                 "metrics": preview_metrics,
                 "target_met": target_met,
-                "performance_score": 100 if target_met else max(0, 100 - (avg_time_ms - PerformanceTargets.PREVIEW_TIME_MS) * 5)
+                "performance_score": 100
+                if target_met
+                else max(0, 100 - (avg_time_ms - PerformanceTargets.PREVIEW_TIME_MS) * 5),
             }
 
         except Exception as e:
@@ -286,12 +296,14 @@ class PerformanceValidationRunner:
 
             if self.verbose:
                 print(f"  Preview Overhead: {adapter_metrics.get('preview_adapter_overhead_ms', 0):.3f}ms per call")
-                print(f"  Validation Overhead: {adapter_metrics.get('validation_adapter_overhead_ms', 0):.3f}ms per call")
+                print(
+                    f"  Validation Overhead: {adapter_metrics.get('validation_adapter_overhead_ms', 0):.3f}ms per call"
+                )
 
             return {
                 "metrics": adapter_metrics,
                 "target_met": overhead_reasonable,
-                "performance_score": 100 if overhead_reasonable else max(0, 100 - creation_time_ms)
+                "performance_score": 100 if overhead_reasonable else max(0, 100 - creation_time_ms),
             }
 
         except Exception as e:
@@ -310,23 +322,21 @@ class PerformanceValidationRunner:
         adapter_results = self.run_adapter_validation()
 
         # Compile comprehensive report
-        all_targets_met = all([
-            startup_results["target_met"],
-            memory_results["target_met"],
-            preview_results["target_met"]
-        ])
+        all_targets_met = all(
+            [startup_results["target_met"], memory_results["target_met"], preview_results["target_met"]]
+        )
 
         overall_score = (
-            startup_results["performance_score"] * 0.3 +
-            memory_results["performance_score"] * 0.3 +
-            preview_results["performance_score"] * 0.4
+            startup_results["performance_score"] * 0.3
+            + memory_results["performance_score"] * 0.3
+            + preview_results["performance_score"] * 0.4
         )
 
         report = PerformanceReportGenerator.generate_validation_report(
             startup_results["metrics"],
             memory_results["metrics"],
             preview_results["metrics"],
-            adapter_results["metrics"]
+            adapter_results["metrics"],
         )
 
         # Print summary
@@ -336,9 +346,15 @@ class PerformanceValidationRunner:
         print(f"All Critical Targets Met: {'✅ YES' if all_targets_met else '❌ NO'}")
         print()
         print("TARGET VALIDATION RESULTS:")
-        print(f"  ✓ Startup < {PerformanceTargets.STARTUP_TIME_MS}ms: {'✅ PASS' if startup_results['target_met'] else '❌ FAIL'}")
-        print(f"  ✓ Memory < {PerformanceTargets.MEMORY_LIMIT_MB}MB: {'✅ PASS' if memory_results['target_met'] else '❌ FAIL'}")
-        print(f"  ✓ Preview @ {PerformanceTargets.PREVIEW_FPS_TARGET} FPS: {'✅ PASS' if preview_results['target_met'] else '❌ FAIL'}")
+        print(
+            f"  ✓ Startup < {PerformanceTargets.STARTUP_TIME_MS}ms: {'✅ PASS' if startup_results['target_met'] else '❌ FAIL'}"
+        )
+        print(
+            f"  ✓ Memory < {PerformanceTargets.MEMORY_LIMIT_MB}MB: {'✅ PASS' if memory_results['target_met'] else '❌ FAIL'}"
+        )
+        print(
+            f"  ✓ Preview @ {PerformanceTargets.PREVIEW_FPS_TARGET} FPS: {'✅ PASS' if preview_results['target_met'] else '❌ FAIL'}"
+        )
         print(f"  ✓ Adapter Overhead: {'✅ PASS' if adapter_results['target_met'] else '⚠️  WARNING'}")
 
         if report.get("bottlenecks"):
@@ -373,7 +389,7 @@ class PerformanceValidationRunner:
             "memory": memory_results,
             "preview": preview_results,
             "adapters": adapter_results,
-            "comprehensive_report": report
+            "comprehensive_report": report,
         }
 
         return self.results
@@ -392,6 +408,7 @@ class PerformanceValidationRunner:
         except Exception as e:
             print(f"❌ Failed to export results: {e}")
 
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Unified Manual Offset Dialog Performance Validation")
@@ -405,9 +422,13 @@ def main():
     if args.benchmark:
         # Run with pytest-benchmark for more precise measurements
         cmd = [
-            sys.executable, "-m", "pytest",
+            sys.executable,
+            "-m",
+            "pytest",
             "tests/test_unified_manual_offset_performance.py",
-            "-v", "--tb=short", "--benchmark-only"
+            "-v",
+            "--tb=short",
+            "--benchmark-only",
         ]
         result = subprocess.run(cmd, check=False, cwd=project_root)
         sys.exit(result.returncode)
@@ -435,6 +456,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Validation failed with error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

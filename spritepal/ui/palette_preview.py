@@ -27,9 +27,7 @@ COLLAPSED_SWATCH_SIZE = 12  # Smaller swatches for collapsed rows
 EXPANDED_SWATCH_SIZE = PALETTE_PREVIEW_SIZE  # Full size for expanded palette
 
 
-def _update_color_widgets(
-    color_widgets: list[PaletteColorWidget], colors: list[tuple[int, int, int]]
-) -> None:
+def _update_color_widgets(color_widgets: list[PaletteColorWidget], colors: list[tuple[int, int, int]]) -> None:
     """Update color widgets with the given colors.
 
     Args:
@@ -58,7 +56,9 @@ class PaletteColorWidget(QWidget):
     # Default placeholder color (dark gray instead of black for uninitialized state)
     DEFAULT_COLOR = (64, 64, 64)
 
-    def __init__(self, index: int, color: tuple[int, int, int] = DEFAULT_COLOR, size: int = PALETTE_PREVIEW_SIZE) -> None:
+    def __init__(
+        self, index: int, color: tuple[int, int, int] = DEFAULT_COLOR, size: int = PALETTE_PREVIEW_SIZE
+    ) -> None:
         super().__init__()
         self.index = index
         self.color = QColor(*color)
@@ -78,6 +78,7 @@ class PaletteColorWidget(QWidget):
 
         try:
             import shiboken6
+
             if not shiboken6.isValid(self):
                 return
         except ImportError:
@@ -100,13 +101,9 @@ class PaletteColorWidget(QWidget):
                 for y in range(0, self.height(), checker_size):
                     for x in range(0, self.width(), checker_size):
                         if (x // checker_size + y // checker_size) % 2:
-                            painter.fillRect(
-                                x, y, checker_size, checker_size, QColor(80, 80, 80)
-                            )
+                            painter.fillRect(x, y, checker_size, checker_size, QColor(80, 80, 80))
                         else:
-                            painter.fillRect(
-                                x, y, checker_size, checker_size, QColor(100, 100, 100)
-                            )
+                            painter.fillRect(x, y, checker_size, checker_size, QColor(100, 100, 100))
 
             # Draw color
             painter.fillRect(self.rect(), self.color)
@@ -119,11 +116,7 @@ class PaletteColorWidget(QWidget):
             if self._size >= 20:
                 painter.setPen(
                     QPen(
-                        (
-                            Qt.GlobalColor.white
-                            if self.color.lightness() < 128
-                            else Qt.GlobalColor.black
-                        ),
+                        (Qt.GlobalColor.white if self.color.lightness() < 128 else Qt.GlobalColor.black),
                         1,
                     )
                 )
@@ -377,8 +370,7 @@ class PalettePreviewWidget(QWidget):
             # Update label
             if self._expanded_widget.label:
                 self._expanded_widget.label.setText(
-                    f"Palette {self._expanded_index}" +
-                    (f": {source.name}" if source.name else "")
+                    f"Palette {self._expanded_index}" + (f": {source.name}" if source.name else "")
                 )
 
         # Update highlight on expanded widget
@@ -469,4 +461,3 @@ class PalettePreviewWidget(QWidget):
         # Auto-expand the first active palette if available
         if active_indices and active_indices[0] != self._expanded_index:
             self._set_expanded(active_indices[0])
-

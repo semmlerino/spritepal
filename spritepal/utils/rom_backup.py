@@ -1,6 +1,7 @@
 """
 ROM backup utilities for SpritePal
 """
+
 from __future__ import annotations
 
 import os
@@ -13,6 +14,7 @@ from utils.logging_config import get_logger
 from utils.rom_exceptions import ROMBackupError
 
 logger = get_logger(__name__)
+
 
 class ROMBackupManager:
     """Manages ROM backups before modifications"""
@@ -91,9 +93,7 @@ class ROMBackupManager:
             logger.warning(f"Failed to cleanup old backups: {e}")
 
     @classmethod
-    def get_latest_backup(
-        cls, rom_path: str, backup_dir: str | None = None
-    ) -> str | None:
+    def get_latest_backup(cls, rom_path: str, backup_dir: str | None = None) -> str | None:
         """
         Get the most recent backup for a ROM.
 
@@ -163,9 +163,7 @@ class ROMBackupManager:
             raise ROMBackupError(f"Failed to restore backup: {e}") from e
 
     @classmethod
-    def list_backups(
-        cls, rom_path: str, backup_dir: str | None = None
-    ) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Backup metadata
+    def list_backups(cls, rom_path: str, backup_dir: str | None = None) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Backup metadata
         """
         List all backups for a ROM.
 
@@ -201,9 +199,7 @@ class ROMBackupManager:
                             "size": stat.st_size,
                             "mtime": stat.st_mtime,
                             "timestamp_str": timestamp_str,
-                            "date": datetime.fromtimestamp(stat.st_mtime, UTC).strftime(
-                                "%Y-%m-%d %H:%M:%S"
-                            ),
+                            "date": datetime.fromtimestamp(stat.st_mtime, UTC).strftime("%Y-%m-%d %H:%M:%S"),
                         }
                     )
         except (OSError, PermissionError) as e:

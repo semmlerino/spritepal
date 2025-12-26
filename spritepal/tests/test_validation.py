@@ -1,4 +1,5 @@
 """Tests for validation utilities (FileValidator)"""
+
 from __future__ import annotations
 
 import tempfile
@@ -107,9 +108,7 @@ class TestFileValidation:
 
     def test_validate_vram_file_nonexistent_allowed(self):
         """Test validation with allow_nonexistent=True for legacy compatibility"""
-        result = FileValidator.validate_vram_file(
-            "/nonexistent/file.dmp", allow_nonexistent=True
-        )
+        result = FileValidator.validate_vram_file("/nonexistent/file.dmp", allow_nonexistent=True)
         assert result.is_valid is True  # Legacy behavior: non-existent files OK
         assert result.error_message is None
 

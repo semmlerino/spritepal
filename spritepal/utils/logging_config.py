@@ -1,4 +1,5 @@
 """Logging configuration for SpritePal"""
+
 from __future__ import annotations
 
 import logging
@@ -8,9 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 
-def setup_logging(
-    log_dir: Path | None = None, log_level: str = "INFO"
-) -> logging.Logger:
+def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> logging.Logger:
     """
     Configure application-wide logging.
 
@@ -58,7 +57,9 @@ def setup_logging(
     # File handler with rotating logs
     try:
         file_handler = logging.handlers.RotatingFileHandler(
-            log_file, maxBytes=5_000_000, backupCount=3  # 5MB
+            log_file,
+            maxBytes=5_000_000,
+            backupCount=3,  # 5MB
         )
         file_handler.setLevel(logging.DEBUG)
         file_formatter = logging.Formatter(
@@ -85,6 +86,7 @@ def setup_logging(
         logger.debug("Debug mode enabled via SPRITEPAL_DEBUG environment variable")
 
     return logger
+
 
 def get_logger(module_name: str) -> logging.Logger:
     """

@@ -11,6 +11,7 @@ This validates:
 - No InitializationOrderError from attribute access before super().__init__()
 - Dialogs have expected child widgets
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -20,8 +21,9 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 if TYPE_CHECKING:
-    from core.app_context import AppContext
     from pytestqt.qtbot import QtBot
+
+    from core.app_context import AppContext
 
 pytestmark = [pytest.mark.gui]
 
@@ -36,10 +38,7 @@ class TestRealDialogInitialization:
         """
         from ui.dialogs.settings_dialog import SettingsDialog
 
-        dialog = SettingsDialog(
-            settings_manager=app_context.application_state_manager,
-            rom_cache=app_context.rom_cache
-        )
+        dialog = SettingsDialog(settings_manager=app_context.application_state_manager, rom_cache=app_context.rom_cache)
         qtbot.addWidget(dialog)
 
         # Verify real Qt widgets exist
@@ -114,9 +113,7 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_manual_offset_dialog_real(
-        self, qtbot: QtBot, isolated_managers
-    ) -> None:
+    def test_manual_offset_dialog_real(self, qtbot: QtBot, isolated_managers) -> None:
         """Test UnifiedManualOffsetDialog can be created with real Qt widgets.
 
         This dialog requires managers to be initialized.
@@ -136,7 +133,7 @@ class TestRealDialogInitialization:
         assert dialog is not None
 
         # Check for expected child widgets (tab widget is a key component)
-        if hasattr(dialog, 'tab_widget'):
+        if hasattr(dialog, "tab_widget"):
             assert dialog.tab_widget is not None
             # Should have tabs
             assert dialog.tab_widget.count() >= 0
@@ -209,12 +206,10 @@ class TestRealDialogLifecycle:
         """
         from ui.dialogs.settings_dialog import SettingsDialog
 
-        dialog = SettingsDialog(
-            settings_manager=app_context.application_state_manager,
-            rom_cache=app_context.rom_cache
-        )
+        dialog = SettingsDialog(settings_manager=app_context.application_state_manager, rom_cache=app_context.rom_cache)
         # Disable WA_DeleteOnClose so qtbot.addWidget cleanup doesn't fail
         from PySide6.QtCore import Qt
+
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         qtbot.addWidget(dialog)
 
@@ -256,9 +251,7 @@ class TestRealDialogLifecycle:
 class TestRealDialogWithManagers:
     """Test dialogs that require manager dependencies."""
 
-    def test_injection_dialog_real(
-        self, qtbot: QtBot, app_context: AppContext
-    ) -> None:
+    def test_injection_dialog_real(self, qtbot: QtBot, app_context: AppContext) -> None:
         """Test InjectionDialog can be created with real managers."""
         from PySide6.QtCore import Qt
 
@@ -276,7 +269,7 @@ class TestRealDialogWithManagers:
         assert dialog is not None
 
         # Check for key child widgets
-        if hasattr(dialog, 'sprite_file_selector'):
+        if hasattr(dialog, "sprite_file_selector"):
             assert dialog.sprite_file_selector is not None
 
         dialog.close()

@@ -71,9 +71,7 @@ class UndoRedoStack(QObject):
 
     DEFAULT_MAX_HISTORY = 50
 
-    def __init__(
-        self, max_history: int = DEFAULT_MAX_HISTORY, parent: QObject | None = None
-    ) -> None:
+    def __init__(self, max_history: int = DEFAULT_MAX_HISTORY, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._undo_stack: list[ArrangementCommand] = []
         self._redo_stack: list[ArrangementCommand] = []

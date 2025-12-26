@@ -11,6 +11,7 @@ Qt Threading Safety Rules:
 
 This implementation follows Qt's canonical threading pattern for image operations.
 """
+
 from __future__ import annotations
 
 import threading
@@ -22,6 +23,7 @@ from PySide6.QtGui import QColor, QImage
 DEFAULT_WIDTH = 100
 DEFAULT_HEIGHT = 100
 DEFAULT_COLOR = QColor(255, 255, 255)  # White
+
 
 class ThreadSafeTestImage:
     """Thread-safe test double for QPixmap using QImage internally.
@@ -176,6 +178,7 @@ class ThreadSafeTestImage:
             provides a more convenient interface for test code.
         """
         from PySide6.QtGui import QPixmap
+
         return QPixmap.fromImage(self._image)
 
     def scaled(self, width: int, height: int, aspectMode=None, transformMode=None):
@@ -217,9 +220,7 @@ class ThreadSafeTestImage:
         Returns:
             Human-readable description of the image.
         """
-        return (f"ThreadSafeTestImage({self._width}x{self._height}, "
-                f"thread_id={self._thread_id}, "
-                f"null={self.isNull()})")
+        return f"ThreadSafeTestImage({self._width}x{self._height}, thread_id={self._thread_id}, null={self.isNull()})"
 
     def __repr__(self) -> str:
         """Developer representation for debugging.
@@ -227,8 +228,11 @@ class ThreadSafeTestImage:
         Returns:
             Detailed representation suitable for debugging.
         """
-        return (f"ThreadSafeTestImage(width={self._width}, height={self._height}, "
-                f"format={self._image.format()}, bytes={self.sizeInBytes()})")
+        return (
+            f"ThreadSafeTestImage(width={self._width}, height={self._height}, "
+            f"format={self._image.format()}, bytes={self.sizeInBytes()})"
+        )
+
 
 class ImagePool:
     """Reuse ThreadSafeTestImage instances for performance.

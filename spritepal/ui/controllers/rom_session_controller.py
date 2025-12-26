@@ -4,6 +4,7 @@ Controller for ROM session lifecycle and settings.
 Manages ROM file loading, settings persistence, and header formatting.
 Does not directly interact with UI - emits signals for panel to handle.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -275,8 +276,7 @@ class ROMSessionController(QObject):
             html_parts.append('<span style="color: green;"><b>Status:</b> Configuration found</span>')
         else:
             html_parts.append(
-                '<span style="color: orange;"><b>Status:</b> Unknown ROM version - '
-                'use "Find Sprites" to scan</span>'
+                '<span style="color: orange;"><b>Status:</b> Unknown ROM version - use "Find Sprites" to scan</span>'
             )
 
         html = "".join(html_parts)

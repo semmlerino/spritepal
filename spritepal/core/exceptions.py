@@ -4,6 +4,7 @@ Custom exceptions for SpritePal.
 This module contains all exceptions that can be raised throughout the application.
 All exception classes are defined here to maintain a single source of truth.
 """
+
 from __future__ import annotations
 
 

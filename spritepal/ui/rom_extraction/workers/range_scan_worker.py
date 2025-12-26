@@ -1,4 +1,5 @@
 """Worker thread for comprehensive range scanning of ROM data"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +19,7 @@ from utils.logging_config import get_logger
 from utils.rom_utils import detect_smc_offset
 
 logger = get_logger(__name__)
+
 
 class RangeScanWorker(BaseWorker):
     """Worker thread for comprehensive scanning of ROM ranges to find all sprites"""
@@ -47,9 +49,17 @@ class RangeScanWorker(BaseWorker):
     cache_progress_saved = Signal(int, int, int)
     """Emitted when cache progress is saved. Args: current_offset, sprites_found, progress_percent."""
 
-    def __init__(self, rom_path: str, start_offset: int, end_offset: int,
-                 step_size: int, extractor: ROMExtractor, parent: QObject | None = None, *,
-                 rom_cache: ROMCache):
+    def __init__(
+        self,
+        rom_path: str,
+        start_offset: int,
+        end_offset: int,
+        step_size: int,
+        extractor: ROMExtractor,
+        parent: QObject | None = None,
+        *,
+        rom_cache: ROMCache,
+    ):
         """
         Initialize range scan worker
 
@@ -111,7 +121,7 @@ class RangeScanWorker(BaseWorker):
                 "step": self.step_size,
                 "quality_threshold": self.quality_threshold,
                 "min_sprite_size": self.min_sprite_size,
-                "max_sprite_size": self.max_sprite_size
+                "max_sprite_size": self.max_sprite_size,
             }
 
             cached_progress_raw = self.rom_cache.get_partial_scan_results(self.rom_path, self.scan_params)
@@ -122,9 +132,15 @@ class RangeScanWorker(BaseWorker):
                 self.current_offset = cached_progress.get("current_offset", self.start_offset)
                 # Prevent division by zero
                 scan_range = self.end_offset - self.start_offset
-                progress_pct = int(((self.current_offset - self.start_offset) / scan_range) * 100) if scan_range > 0 else 0
-                self.cache_status.emit(f"Resumed from cache: {progress_pct}% complete, {len(self.found_sprites)} sprites found")
-                logger.info(f"Resuming scan from cached progress: 0x{self.current_offset:06X}, {len(self.found_sprites)} sprites found")
+                progress_pct = (
+                    int(((self.current_offset - self.start_offset) / scan_range) * 100) if scan_range > 0 else 0
+                )
+                self.cache_status.emit(
+                    f"Resumed from cache: {progress_pct}% complete, {len(self.found_sprites)} sprites found"
+                )
+                logger.info(
+                    f"Resuming scan from cached progress: 0x{self.current_offset:06X}, {len(self.found_sprites)} sprites found"
+                )
             else:
                 self.current_offset = self.start_offset
                 self.found_sprites = []
@@ -204,11 +220,7 @@ class RangeScanWorker(BaseWorker):
                             self.sprite_found.emit(offset, quality)
                             sprites_found += 1
                             # Add to cached sprites list
-                            sprite_info = {
-                                "offset": offset,
-                                "quality": quality,
-                                "size": len(sprite_data)
-                            }
+                            sprite_info = {"offset": offset, "quality": quality, "size": len(sprite_data)}
                             self.found_sprites.append(sprite_info)
                             logger.debug(f"Found sprite at 0x{offset:06X} with quality {quality:.2f}")
 
@@ -227,8 +239,10 @@ class RangeScanWorker(BaseWorker):
             # Final progress update
             self.progress_update.emit(self.end_offset, 100)
 
-            logger.info(f"Range scan complete. Found {sprites_found} sprites in range "
-                       f"0x{self.start_offset:06X} to 0x{self.end_offset:06X}")
+            logger.info(
+                f"Range scan complete. Found {sprites_found} sprites in range "
+                f"0x{self.start_offset:06X} to 0x{self.end_offset:06X}"
+            )
 
             # Save completed scan to cache
             if self._save_progress(self.scan_params, completed=True):
@@ -285,12 +299,13 @@ class RangeScanWorker(BaseWorker):
         try:
             from collections.abc import Mapping
             from typing import cast
+
             return self.rom_cache.save_partial_scan_results(
                 self.rom_path,
                 cast(dict[str, int], scan_params),
                 cast(list[Mapping[str, object]], self.found_sprites),
                 self.current_offset,
-                completed
+                completed,
             )
         except Exception as e:
             logger.warning(f"Failed to save scan progress to cache: {e}")

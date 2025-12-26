@@ -1,4 +1,5 @@
 """Unit tests for OffsetController."""
+
 from __future__ import annotations
 
 import pytest

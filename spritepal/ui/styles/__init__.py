@@ -3,6 +3,7 @@ SpritePal UI Styling System
 
 Centralized styling system for consistent UI appearance and maintainability.
 """
+
 from __future__ import annotations
 
 from .components import (

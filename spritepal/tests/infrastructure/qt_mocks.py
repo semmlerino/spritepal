@@ -4,6 +4,7 @@ Modernized Qt mock components for SpritePal tests.
 This module provides realistic Qt mock implementations that behave consistently
 across all test environments, including headless setups.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -13,6 +14,7 @@ from unittest.mock import Mock
 try:
     from PySide6.QtCore import QObject, Signal
     from PySide6.QtWidgets import QApplication  # noqa: F401
+
     QT_AVAILABLE = True
 except ImportError:
     # Fallback for environments where Qt is not available
@@ -55,6 +57,7 @@ else:
                     # In real Qt, signal emission doesn't crash on callback errors
                     pass
 
+
 class SignalHolder(QObject):
     """
     Helper class to hold Qt signals for mock objects.
@@ -66,6 +69,7 @@ class SignalHolder(QObject):
     # Common signals used across tests - defined at class level
     # These will be overridden with specific signal types as needed
     pass
+
 
 def create_signal_holder(**signals):
     """
@@ -94,11 +98,13 @@ def create_signal_holder(**signals):
 
     # For Qt environments, ensure QApplication exists
     from PySide6.QtWidgets import QApplication
+
     if QApplication.instance() is None:
         QApplication([])
 
     # Return pre-defined signal holder - has all common signals at class level
     return CommonSignalHolder()
+
 
 class CommonSignalHolder(QObject):
     """
@@ -107,6 +113,7 @@ class CommonSignalHolder(QObject):
     This avoids runtime signal creation issues by defining all signals
     at class definition time.
     """
+
     # Main window signals
     extract_requested = Signal()
     open_in_editor_requested = Signal(str)
@@ -177,6 +184,7 @@ class CommonSignalHolder(QObject):
     started = Signal()
     finished = Signal()
 
+
 class PureMockMainWindow:
     """
     Pure Python test double for MainWindow.
@@ -200,14 +208,16 @@ class PureMockMainWindow:
         self.close = Mock()
         self.extraction_complete = Mock()
         self.extraction_failed = Mock()
-        self.get_extraction_params = Mock(return_value={
-            "vram_path": "/test/vram.dmp",
-            "cgram_path": "/test/cgram.dmp",
-            "output_base": "/test/output",
-            "create_grayscale": True,
-            "create_metadata": True,
-            "oam_path": None,
-        })
+        self.get_extraction_params = Mock(
+            return_value={
+                "vram_path": "/test/vram.dmp",
+                "cgram_path": "/test/cgram.dmp",
+                "output_base": "/test/output",
+                "create_grayscale": True,
+                "create_metadata": True,
+                "oam_path": None,
+            }
+        )
 
         # Mock UI components
         self.status_bar = Mock()
@@ -232,27 +242,33 @@ class PureMockMainWindow:
     @property
     def extract_requested(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.extract_requested_callbacks)
 
     @property
     def open_in_editor_requested(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.open_in_editor_requested_callbacks)
 
     @property
     def arrange_rows_requested(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.arrange_rows_requested_callbacks)
 
     @property
     def arrange_grid_requested(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.arrange_grid_requested_callbacks)
 
     @property
     def inject_requested(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.inject_requested_callbacks)
+
 
 # Keep the original Qt-based version for integration tests that need real Qt signals
 class RealTestMainWindow(QObject):
@@ -279,14 +295,16 @@ class RealTestMainWindow(QObject):
         self.close = Mock()
         self.extraction_complete = Mock()
         self.extraction_failed = Mock()
-        self.get_extraction_params = Mock(return_value={
-            "vram_path": "/test/vram.dmp",
-            "cgram_path": "/test/cgram.dmp",
-            "output_base": "/test/output",
-            "create_grayscale": True,
-            "create_metadata": True,
-            "oam_path": None,
-        })
+        self.get_extraction_params = Mock(
+            return_value={
+                "vram_path": "/test/vram.dmp",
+                "cgram_path": "/test/cgram.dmp",
+                "output_base": "/test/output",
+                "create_grayscale": True,
+                "create_metadata": True,
+                "oam_path": None,
+            }
+        )
 
         # Mock UI components
         self.status_bar = Mock()
@@ -306,6 +324,7 @@ class RealTestMainWindow(QObject):
 
         # Add get_output_path method (needed by injection tests)
         self.get_output_path = Mock(return_value="/test/output")
+
 
 class PureMockExtractionPanel:
     """
@@ -336,27 +355,33 @@ class PureMockExtractionPanel:
     @property
     def file_dropped(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.file_dropped_callbacks)
 
     @property
     def files_changed(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.files_changed_callbacks)
 
     @property
     def extraction_ready(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.extraction_ready_callbacks)
 
     @property
     def offset_changed(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.offset_changed_callbacks)
 
     @property
     def mode_changed(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.mode_changed_callbacks)
+
 
 # Keep Qt-based version for integration tests
 class RealTestExtractionPanel(QObject):
@@ -385,6 +410,7 @@ class RealTestExtractionPanel(QObject):
         self.get_vram_offset = Mock(return_value=0xC000)
         self.set_vram_offset = Mock()
 
+
 class PureMockROMExtractionPanel:
     """
     Pure Python test double for ROMExtractionPanel.
@@ -411,22 +437,27 @@ class PureMockROMExtractionPanel:
     @property
     def files_changed(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.files_changed_callbacks)
 
     @property
     def extraction_ready(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.extraction_ready_callbacks)
 
     @property
     def rom_extraction_requested(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.rom_extraction_requested_callbacks)
 
     @property
     def output_name_changed(self):
         from .mock_dialogs_base import CallbackSignal
+
         return CallbackSignal(self.output_name_changed_callbacks)
+
 
 # Keep Qt-based version for integration tests
 class RealTestROMExtractionPanel(QObject):
@@ -451,6 +482,7 @@ class RealTestROMExtractionPanel(QObject):
         self.get_sprite_offset = Mock(return_value=0x8000)
         self.get_output_base = Mock(return_value="/test/output")
         self.get_sprite_name = Mock(return_value="TestSprite")
+
 
 class MockQWidget:
     """Comprehensive mock implementation of QWidget."""
@@ -478,6 +510,7 @@ class MockQWidget:
         self.setLayout = Mock()
         self.layout = Mock(return_value=None)
 
+
 class MockQDialog(MockQWidget):
     """Mock implementation of QDialog extending QWidget."""
 
@@ -487,6 +520,7 @@ class MockQDialog(MockQWidget):
         self.reject = Mock()
         self.exec = Mock(return_value=0)
         self.result = Mock(return_value=0)
+
 
 class MockQPixmap:
     """Mock implementation of QPixmap for image handling tests."""
@@ -500,6 +534,7 @@ class MockQPixmap:
         self.save = Mock(return_value=True)
         self.isNull = Mock(return_value=False)
         self.scaled = Mock(return_value=self)
+
 
 class MockQLabel(MockQWidget):
     """Mock implementation of QLabel."""
@@ -519,6 +554,7 @@ class MockQLabel(MockQWidget):
     def _get_text(self) -> str:
         return self._text
 
+
 class MockQThread:
     """Mock implementation of QThread for worker thread tests."""
 
@@ -531,15 +567,13 @@ class MockQThread:
 
         # Create a signal holder for thread signals
         if QT_AVAILABLE:
-            signal_holder = create_signal_holder(
-                finished=Signal(),
-                started=Signal()
-            )
+            signal_holder = create_signal_holder(finished=Signal(), started=Signal())
             self.finished = signal_holder.finished
             self.started = signal_holder.started
         else:
             self.finished = MockSignal()
             self.started = MockSignal()
+
 
 class MockQApplication:
     """Mock implementation of QApplication."""
@@ -553,6 +587,7 @@ class MockQApplication:
     def instance(cls):
         """Mock class method that returns a mock app instance."""
         return cls()
+
 
 def create_mock_signals() -> dict[str, Any]:
     """
@@ -612,6 +647,7 @@ def create_mock_signals() -> dict[str, Any]:
         "injection_failed": MockSignal(),
     }
 
+
 def create_qt_mock_context():
     """
     Create a complete Qt mock context for headless testing.
@@ -644,6 +680,7 @@ def create_qt_mock_context():
 
     return mock_modules
 
+
 def create_test_main_window(**kwargs):
     """
     Create a test main window for testing.
@@ -653,6 +690,7 @@ def create_test_main_window(**kwargs):
     """
     return PureMockMainWindow(**kwargs)
 
+
 def create_real_test_main_window(**kwargs):
     """
     Create a real Qt-based test main window for integration testing.
@@ -660,6 +698,7 @@ def create_real_test_main_window(**kwargs):
     Use this ONLY when you need real Qt signal behavior for integration tests.
     """
     return RealTestMainWindow(**kwargs)
+
 
 # Backward compatibility function
 def create_mock_main_window(**kwargs):
@@ -669,6 +708,7 @@ def create_mock_main_window(**kwargs):
     For real component testing, use RealComponentFactory with proper manager_registry.
     """
     return PureMockMainWindow(**kwargs)
+
 
 # Backward compatibility aliases - point to pure Python versions by default
 TestMainWindow = PureMockMainWindow

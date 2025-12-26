@@ -3,6 +3,7 @@ Reusable search filter controls for sprite searching.
 
 Consolidates filter controls that were duplicated across search tabs.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -146,9 +147,7 @@ class SearchFiltersWidget(QWidget):
         self.max_size_spin.setToolTip("Maximum sprite data size in bytes")
 
         size_label = QLabel("Size Range:")
-        size_label.setToolTip(
-            "Filter by sprite data size. 16x16 sprites are typically 128-512 bytes."
-        )
+        size_label.setToolTip("Filter by sprite data size. 16x16 sprites are typically 128-512 bytes.")
         layout.addWidget(size_label, 0, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.min_size_spin, 0, 1)
         layout.addWidget(QLabel("-"), 0, 2)
@@ -166,9 +165,7 @@ class SearchFiltersWidget(QWidget):
         self.max_tiles_spin.setToolTip("Maximum number of 8x8 tiles")
 
         tile_label = QLabel("Tile Count:")
-        tile_label.setToolTip(
-            "SNES sprites are made of 8x8 tiles. A 16x16 sprite uses 4 tiles."
-        )
+        tile_label.setToolTip("SNES sprites are made of 8x8 tiles. A 16x16 sprite uses 4 tiles.")
         layout.addWidget(tile_label, 1, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.min_tiles_spin, 1, 1)
         layout.addWidget(QLabel("-"), 1, 2)
@@ -189,14 +186,10 @@ class SearchFiltersWidget(QWidget):
         # Alignment filter
         self.alignment_combo = QComboBox()
         self.alignment_combo.addItems(list(ALIGNMENT_VALUES.keys()))
-        self.alignment_combo.setToolTip(
-            "Required offset alignment. 0x100 means offset ends in 00."
-        )
+        self.alignment_combo.setToolTip("Required offset alignment. 0x100 means offset ends in 00.")
 
         alignment_label = QLabel("Alignment:")
-        alignment_label.setToolTip(
-            "Some ROMs store sprites at aligned addresses for faster access."
-        )
+        alignment_label.setToolTip("Some ROMs store sprites at aligned addresses for faster access.")
         layout.addWidget(alignment_label, 3, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.alignment_combo, 3, 1, 1, 3)
 

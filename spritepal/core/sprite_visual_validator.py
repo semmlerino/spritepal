@@ -1,6 +1,7 @@
 """
 Visual sprite validation to distinguish real character sprites from garbage data
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -20,6 +21,7 @@ else:
         cv2 = None
 
 logger = get_logger(__name__)
+
 
 class SpriteVisualValidator:
     """Validates if image data contains actual character sprites vs garbage pixels"""
@@ -129,7 +131,7 @@ class SpriteVisualValidator:
         tiles = []
         for y in range(0, height - tile_size + 1, tile_size):
             for x in range(0, width - tile_size + 1, tile_size):
-                tile = img_array[y:y+tile_size, x:x+tile_size]
+                tile = img_array[y : y + tile_size, x : x + tile_size]
                 tiles.append(tile.flatten())
 
         if not tiles:
@@ -196,8 +198,8 @@ class SpriteVisualValidator:
         _height, width = img_array.shape
 
         # Check vertical symmetry
-        left_half = img_array[:, :width//2]
-        right_half = img_array[:, width//2:]
+        left_half = img_array[:, : width // 2]
+        right_half = img_array[:, width // 2 :]
         right_half_flipped = np.fliplr(right_half)
 
         # Resize to same size if needed
@@ -236,9 +238,9 @@ class SpriteVisualValidator:
             # Fallback: simple tile-based analysis
             h, w = img_array.shape
             tile_scores = []
-            for y in range(0, h-8, 8):
-                for x in range(0, w-8, 8):
-                    tile = img_array[y:y+8, x:x+8]
+            for y in range(0, h - 8, 8):
+                for x in range(0, w - 8, 8):
+                    tile = img_array[y : y + 8, x : x + 8]
                     # Check if tile has structure
                     if np.std(tile) > 10:
                         tile_scores.append(1)
@@ -262,7 +264,7 @@ class SpriteVisualValidator:
 
         # Look for regular peaks (excluding center)
         center = autocorr.shape[0] // 2
-        autocorr[center-2:center+2, center-2:center+2] = 0
+        autocorr[center - 2 : center + 2, center - 2 : center + 2] = 0
 
         # Find peaks
         peaks = autocorr > 0.3
@@ -284,7 +286,7 @@ class SpriteVisualValidator:
             "edge_score": 0.20,
             "symmetry": 0.10,
             "empty_space": 0.15,
-            "pattern_regularity": 0.10
+            "pattern_regularity": 0.10,
         }
 
         total_score = 0.0
@@ -314,7 +316,7 @@ class SpriteVisualValidator:
 
         # Check for reasonable byte distribution
         byte_counts = np.bincount(np.frombuffer(tile_data, dtype=np.uint8), minlength=256)
-        entropy = -np.sum((byte_counts/len(tile_data)) * np.log2(byte_counts/len(tile_data) + 1e-10))
+        entropy = -np.sum((byte_counts / len(tile_data)) * np.log2(byte_counts / len(tile_data) + 1e-10))
 
         # Sprite data typically has moderate entropy (unified thresholds from constants)
         if entropy < SPRITE_ENTROPY_MIN or entropy > SPRITE_ENTROPY_MAX:

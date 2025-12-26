@@ -1,6 +1,7 @@
 """
 Style mixins and utility functions for SpritePal UI
 """
+
 from __future__ import annotations
 
 from .theme import COLORS, DIMENSIONS
@@ -18,11 +19,8 @@ def combine_styles(*styles: str) -> str:
     """
     return "\n".join(style.strip() for style in styles if style.strip())
 
-def create_hover_effect(
-    base_color: str,
-    hover_color: str,
-    property_name: str = "background-color"
-) -> str:
+
+def create_hover_effect(base_color: str, hover_color: str, property_name: str = "background-color") -> str:
     """
     Create a CSS hover effect
 
@@ -41,10 +39,8 @@ def create_hover_effect(
     }}
     """
 
-def create_focus_effect(
-    border_color: str = COLORS["border_focus"],
-    outline: str = "none"
-) -> str:
+
+def create_focus_effect(border_color: str = COLORS["border_focus"], outline: str = "none") -> str:
     """
     Create a CSS focus effect
 
@@ -62,10 +58,8 @@ def create_focus_effect(
     }}
     """
 
-def create_shadow(
-    shadow_type: str = "default",
-    color: str = "rgba(0, 0, 0, 0.15)"
-) -> str:
+
+def create_shadow(shadow_type: str = "default", color: str = "rgba(0, 0, 0, 0.15)") -> str:
     """
     Create a box shadow effect
 
@@ -85,11 +79,8 @@ def create_shadow(
 
     return f"box-shadow: {shadows.get(shadow_type, shadows['default'])};"
 
-def create_transition(
-    properties: str = "all",
-    duration: str = "0.2s",
-    timing: str = "ease-in-out"
-) -> str:
+
+def create_transition(properties: str = "all", duration: str = "0.2s", timing: str = "ease-in-out") -> str:
     """
     Create a CSS transition effect
 
@@ -103,6 +94,7 @@ def create_transition(
     """
     return f"transition: {properties} {duration} {timing};"
 
+
 def apply_spacing(
     margin: int | None = None,
     padding: int | None = None,
@@ -113,7 +105,7 @@ def apply_spacing(
     padding_top: int | None = None,
     padding_bottom: int | None = None,
     padding_left: int | None = None,
-    padding_right: int | None = None
+    padding_right: int | None = None,
 ) -> str:
     """
     Apply spacing CSS properties
@@ -155,10 +147,8 @@ def apply_spacing(
 
     return "\n".join(styles)
 
-def create_layout_grid(
-    columns: int = 2,
-    gap: int = DIMENSIONS["spacing_md"]
-) -> str:
+
+def create_layout_grid(columns: int = 2, gap: int = DIMENSIONS["spacing_md"]) -> str:
     """
     Create CSS for grid layout
 
@@ -175,11 +165,9 @@ def create_layout_grid(
     gap: {gap}px;
     """
 
+
 def create_flex_layout(
-    direction: str = "row",
-    justify: str = "flex-start",
-    align: str = "stretch",
-    gap: int = DIMENSIONS["spacing_md"]
+    direction: str = "row", justify: str = "flex-start", align: str = "stretch", gap: int = DIMENSIONS["spacing_md"]
 ) -> str:
     """
     Create CSS for flex layout
@@ -201,6 +189,7 @@ def create_flex_layout(
     gap: {gap}px;
     """
 
+
 def create_responsive_breakpoints() -> dict[str, str]:
     """
     Create responsive design breakpoints
@@ -214,6 +203,7 @@ def create_responsive_breakpoints() -> dict[str, str]:
         "desktop": "@media (min-width: 1025px)",
         "large": "@media (min-width: 1440px)",
     }
+
 
 def create_animation_keyframes(name: str, keyframes: dict[str, str]) -> str:
     """
@@ -236,13 +226,14 @@ def create_animation_keyframes(name: str, keyframes: dict[str, str]) -> str:
 }}
 """
 
+
 def apply_typography(
     font_size: str | None = None,
     font_weight: str | None = None,
     font_family: str | None = None,
     color: str | None = None,
     line_height: str | None = None,
-    text_align: str | None = None
+    text_align: str | None = None,
 ) -> str:
     """
     Apply typography CSS properties

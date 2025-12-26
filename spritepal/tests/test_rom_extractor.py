@@ -2,6 +2,7 @@
 Comprehensive tests for ROM sprite extraction functionality.
 Tests both unit functionality and integration across multiple modules.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -22,6 +23,7 @@ pytestmark = [
     pytest.mark.usefixtures("isolated_managers", "mock_hal"),
 ]
 
+
 class TestROMExtractorInit:
     """Test ROM extractor initialization"""
 
@@ -29,6 +31,7 @@ class TestROMExtractorInit:
         """Test that initialization creates all required components"""
         # Use AppContext to get ROMExtractor (session_managers fixture sets up context)
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
 
         # Verify all components are created
@@ -53,6 +56,7 @@ class TestROMExtractorInit:
         assert isinstance(extractor.rom_palette_extractor, ROMPaletteExtractor)
         assert isinstance(extractor.sprite_config_loader, SpriteConfigLoader)
 
+
 class TestROMExtractor4bppConversion:
     """Test 4bpp to PNG conversion functionality"""
 
@@ -60,6 +64,7 @@ class TestROMExtractor4bppConversion:
     def extractor(self):
         """Create ROM extractor for testing via AppContext."""
         from core.app_context import get_app_context
+
         return get_app_context().rom_extractor
 
     def test_get_4bpp_pixel_basic(self, extractor):
@@ -188,6 +193,7 @@ class TestROMExtractor4bppConversion:
                 assert img.size[0] > 0  # Width should be positive
                 assert img.size[1] >= 0  # Height should be non-negative
 
+
 class TestROMExtractorSpriteLocations:
     """Test sprite location discovery functionality"""
 
@@ -195,6 +201,7 @@ class TestROMExtractorSpriteLocations:
     def mock_extractor(self):
         """Create ROM extractor with mocked dependencies via AppContext."""
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
         extractor.rom_injector = Mock()
         return extractor
@@ -207,10 +214,7 @@ class TestROMExtractorSpriteLocations:
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
         # Mock sprite locations
-        expected_locations = {
-            "kirby_normal": Mock(),
-            "waddle_dee": Mock()
-        }
+        expected_locations = {"kirby_normal": Mock(), "waddle_dee": Mock()}
         mock_extractor.rom_injector.find_sprite_locations.return_value = expected_locations
 
         locations = mock_extractor.get_known_sprite_locations("/path/to/kirby.sfc")
@@ -240,6 +244,7 @@ class TestROMExtractorSpriteLocations:
 
         assert locations == {}
 
+
 class TestROMExtractorMainExtraction:
     """Test main sprite extraction functionality"""
 
@@ -247,6 +252,7 @@ class TestROMExtractorMainExtraction:
     def mock_extractor(self):
         """Create ROM extractor with mocked dependencies via AppContext."""
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
 
         # Mock all dependencies
@@ -326,23 +332,15 @@ class TestROMExtractorMainExtraction:
         # Mock sprite config loader to return config for test_sprite
         mock_sprite_config = Mock()
         mock_sprite_config.estimated_size = None  # No specific size
-        mock_extractor.sprite_config_loader.get_game_sprites.return_value = {
-            "test_sprite": mock_sprite_config
-        }
+        mock_extractor.sprite_config_loader.get_game_sprites.return_value = {"test_sprite": mock_sprite_config}
 
         # Mock game configuration
         mock_game_config = {"palette_offset": 0x10000, "sprites": {"test_sprite": {}}}
-        mock_extractor.sprite_config_loader.config_data = {
-            "games": {"KIRBY SUPER STAR": mock_game_config}
-        }
-        mock_extractor.sprite_config_loader.find_game_config.return_value = (
-            "KIRBY SUPER STAR", mock_game_config
-        )
+        mock_extractor.sprite_config_loader.config_data = {"games": {"KIRBY SUPER STAR": mock_game_config}}
+        mock_extractor.sprite_config_loader.find_game_config.return_value = ("KIRBY SUPER STAR", mock_game_config)
 
         # Mock palette extraction
-        mock_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (
-            0x10000, [8, 9, 10]
-        )
+        mock_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (0x10000, [8, 9, 10])
         mock_palette_files = ["sprite_pal8.pal.json", "sprite_pal9.pal.json"]
         mock_extractor.rom_palette_extractor.extract_palettes_from_rom.return_value = mock_palette_files
 
@@ -419,7 +417,9 @@ class TestROMExtractorMainExtraction:
         mock_extractor.rom_injector.find_compressed_sprite.return_value = (25, test_sprite_data)
 
         output_path, extraction_info = mock_extractor.extract_sprite_from_rom(
-            str(rom_path), 0x8000, str(output_base)  # No sprite_name
+            str(rom_path),
+            0x8000,
+            str(output_base),  # No sprite_name
         )
 
         # Verify no palette extraction was attempted
@@ -454,9 +454,7 @@ class TestROMExtractorMainExtraction:
         )
 
         with pytest.raises(Exception, match="Failed to decompress sprite") as exc_info:
-            mock_extractor.extract_sprite_from_rom(
-                str(rom_path), 0x8000, str(output_base), "test_sprite"
-            )
+            mock_extractor.extract_sprite_from_rom(str(rom_path), 0x8000, str(output_base), "test_sprite")
 
         assert "Failed to decompress sprite" in str(exc_info.value)
 
@@ -470,9 +468,8 @@ class TestROMExtractorMainExtraction:
         mock_extractor.rom_injector.read_rom_header.side_effect = Exception("Invalid ROM format")
 
         with pytest.raises(Exception, match="Invalid ROM format"):
-            mock_extractor.extract_sprite_from_rom(
-                str(rom_path), 0x8000, str(output_base), "test_sprite"
-            )
+            mock_extractor.extract_sprite_from_rom(str(rom_path), 0x8000, str(output_base), "test_sprite")
+
 
 class TestROMExtractorIntegration:
     """Integration tests with real file operations"""
@@ -480,6 +477,7 @@ class TestROMExtractorIntegration:
     def test_4bpp_conversion_integration(self, tmp_path):
         """Test 4bpp conversion with real data and file operations"""
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
 
         # Create realistic 4bpp test data (2 tiles)
@@ -489,7 +487,7 @@ class TestROMExtractorIntegration:
         for row in range(8):
             for plane in range(4):
                 base_offset = plane * 16 if plane >= 2 else 0
-                plane_offset = (plane % 2)
+                plane_offset = plane % 2
                 tile_data[base_offset + row * 2 + plane_offset] = row * 16  # Gradient
 
         # Second tile: create a checkerboard pattern
@@ -520,6 +518,7 @@ class TestROMExtractorIntegration:
     def test_error_recovery_file_cleanup(self, tmp_path):
         """Test that failed extractions don't leave partial files"""
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
 
         # Mock dependencies to cause error after PNG creation starts
@@ -532,9 +531,7 @@ class TestROMExtractorIntegration:
         expected_png = Path(f"{output_base}.png")
 
         with pytest.raises(Exception, match="Simulated error"):
-            extractor.extract_sprite_from_rom(
-                str(rom_path), 0x8000, str(output_base), "test_sprite"
-            )
+            extractor.extract_sprite_from_rom(str(rom_path), 0x8000, str(output_base), "test_sprite")
 
         # Verify no partial files were left behind
         # (In this case, the error happens before PNG creation, so no cleanup needed)
@@ -543,6 +540,7 @@ class TestROMExtractorIntegration:
     def test_large_sprite_processing(self, tmp_path):
         """Test processing of large sprite data"""
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
 
         # Create data for 64 tiles (realistic sprite size)
@@ -564,6 +562,7 @@ class TestROMExtractorIntegration:
     def test_boundary_conditions(self, tmp_path):
         """Test boundary conditions and edge cases"""
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
 
         # Test with exactly 16 tiles (one full row)
@@ -599,12 +598,14 @@ class TestROMExtractorScanMethods:
     def seed_random(self):
         """Seed random for reproducible test data."""
         import random
+
         random.seed(42)
 
     @pytest.fixture
     def extractor(self):
         """Create ROM extractor with mocked dependencies via AppContext."""
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
         extractor.rom_injector = Mock()
         return extractor
@@ -619,13 +620,11 @@ class TestROMExtractorScanMethods:
         test_sprite_data = b"\x00" * (32 * BYTES_PER_TILE)  # 32 tiles
         extractor.rom_injector.find_compressed_sprite.side_effect = [
             (256, test_sprite_data),  # First offset - valid
-            Exception("No sprite"),   # Second offset - invalid
+            Exception("No sprite"),  # Second offset - invalid
             (512, test_sprite_data),  # Third offset - valid
         ]
 
-        found_sprites = extractor.scan_for_sprites(
-            str(rom_path), 0x1000, 0x1300, step=0x100
-        )
+        found_sprites = extractor.scan_for_sprites(str(rom_path), 0x1000, 0x1300, step=0x100)
 
         assert len(found_sprites) == 2
         assert found_sprites[0]["offset"] == 0x1000
@@ -644,7 +643,10 @@ class TestROMExtractorScanMethods:
         extractor.rom_injector.find_compressed_sprite.side_effect = Exception("No sprite")
 
         found_sprites = extractor.scan_for_sprites(
-            str(rom_path), 0x100, 0x5000, step=0x100  # End offset > ROM size
+            str(rom_path),
+            0x100,
+            0x5000,
+            step=0x100,  # End offset > ROM size
         )
 
         # Should adjust end offset and still work
@@ -665,9 +667,7 @@ class TestROMExtractorScanMethods:
             (50, bad_sprite),  # Should be rejected
         ]
 
-        found_sprites = extractor.scan_for_sprites(
-            str(rom_path), 0x0, 0x200, step=0x100
-        )
+        found_sprites = extractor.scan_for_sprites(str(rom_path), 0x0, 0x200, step=0x100)
 
         # Only good sprite should be found
         assert len(found_sprites) == 1
@@ -744,11 +744,13 @@ class TestROMExtractorQualityAssessment:
     def extractor(self):
         """Create ROM extractor for testing via AppContext."""
         from core.app_context import get_app_context
+
         return get_app_context().rom_extractor
 
     def test_assess_sprite_quality_perfect_sprite(self, extractor):
         """Test quality assessment with perfect sprite data"""
         import random
+
         random.seed(42)
         # Create well-formed sprite data
         sprite_data = self._create_perfect_sprite_data(64)  # 64 tiles
@@ -786,6 +788,7 @@ class TestROMExtractorQualityAssessment:
     def test_assess_sprite_quality_high_entropy(self, extractor):
         """Test quality assessment with high entropy (random) data"""
         import random
+
         random.seed(42)
         random_data = bytes(random.randint(0, 255) for _ in range(BYTES_PER_TILE * 32))
         score = extractor._assess_sprite_quality(random_data)
@@ -795,9 +798,9 @@ class TestROMExtractorQualityAssessment:
         """Test quality assessment with embedded sprite data"""
         # Create data with sprite embedded at one of the checked offsets
         # The implementation checks offsets: 512, 1024, 2048, 4096
-        padding = b"\xFF" * 1024  # 1024 bytes of padding
+        padding = b"\xff" * 1024  # 1024 bytes of padding
         good_sprite = self._create_perfect_sprite_data(256)  # 256 tiles = 8192 bytes
-        embedded_data = padding + good_sprite + (b"\xFF" * 1024)
+        embedded_data = padding + good_sprite + (b"\xff" * 1024)
 
         score = extractor._assess_sprite_quality(embedded_data, check_embedded=True)
 
@@ -888,6 +891,7 @@ class TestROMExtractorValidationMethods:
     def extractor(self):
         """Create ROM extractor for testing via AppContext."""
         from core.app_context import get_app_context
+
         return get_app_context().rom_extractor
 
     def test_has_4bpp_characteristics_valid(self, extractor):
@@ -965,7 +969,7 @@ class TestROMExtractorValidationMethods:
 
     def test_validate_4bpp_tile_full(self, extractor):
         """Test tile validation with full tile"""
-        full_tile = b"\xFF" * 32
+        full_tile = b"\xff" * 32
         assert extractor._validate_4bpp_tile(full_tile) is False
 
     def test_validate_4bpp_tile_no_correlation(self, extractor):
@@ -983,6 +987,7 @@ class TestROMExtractorValidationMethods:
     def test_has_graphics_patterns_valid(self, extractor):
         """Test graphics pattern detection with valid sprite data"""
         import random
+
         random.seed(42)
         # Create tiles with some similarity (sharing some bytes)
         tile1 = bytearray(32)
@@ -1013,6 +1018,7 @@ class TestROMExtractorValidationMethods:
     def test_has_graphics_patterns_random(self, extractor):
         """Test graphics pattern detection with random data"""
         import random
+
         random.seed(42)
         random_data = bytes(random.randint(0, 255) for _ in range(256))
         assert extractor._has_graphics_patterns(random_data) is False
@@ -1039,6 +1045,7 @@ class CustomMockHALCompressor:
 
     def __init__(self):
         from tests.infrastructure.mock_hal import MockHALCompressor
+
         self._base = MockHALCompressor()
         self._sprite_responses: dict[bytes, tuple[int, bytes]] = {}  # signature -> (compressed_size, decompressed_data)
         self._default_response: tuple[int, bytes] | None = None
@@ -1091,6 +1098,7 @@ class TestROMScanningComprehensive:
     def rom_extractor(self):
         """Create a ROM extractor instance via AppContext."""
         from core.app_context import get_app_context
+
         return get_app_context().rom_extractor
 
     @pytest.fixture
@@ -1111,9 +1119,9 @@ class TestROMScanningComprehensive:
 
         for i, (offset, sig) in enumerate(zip(test_offsets, signatures, strict=True)):
             # Add unique signature at start of each sprite location
-            rom_data[offset:offset+4] = sig
+            rom_data[offset : offset + 4] = sig
             # Add some tile-like data
-            for j in range(offset+4, offset+100):
+            for j in range(offset + 4, offset + 100):
                 rom_data[j] = (i * 16 + j % 16) & 0xFF
 
         rom_path.write_bytes(rom_data)
@@ -1135,12 +1143,7 @@ class TestROMScanningComprehensive:
         rom_extractor.rom_injector.hal_compressor = mock_hal
 
         # Run the scan
-        results = rom_extractor.scan_for_sprites(
-            mock_rom_file,
-            start_offset=0x8000,
-            end_offset=0x20000,
-            step=0x1000
-        )
+        results = rom_extractor.scan_for_sprites(mock_rom_file, start_offset=0x8000, end_offset=0x20000, step=0x1000)
 
         # Verify results
         assert len(results) == 3
@@ -1166,7 +1169,7 @@ class TestROMScanningComprehensive:
             mock_rom_file,
             start_offset=0x10000,
             end_offset=0x100000,  # Way beyond 128KB ROM
-            step=0x1000
+            step=0x1000,
         )
 
         # Should complete without error and return empty results
@@ -1187,6 +1190,7 @@ class TestROMScanningComprehensive:
 
         # Mock quality assessment (still need this since it's on rom_extractor)
         with patch.object(rom_extractor, "_assess_sprite_quality") as mock_quality:
+
             def mock_assess_quality(sprite_data):
                 if sprite_data == b"\x11" * 512:
                     return 95.0  # Highest quality
@@ -1199,10 +1203,7 @@ class TestROMScanningComprehensive:
             mock_quality.side_effect = mock_assess_quality
 
             results = rom_extractor.scan_for_sprites(
-                mock_rom_file,
-                start_offset=0x8000,
-                end_offset=0x20000,
-                step=0x1000
+                mock_rom_file, start_offset=0x8000, end_offset=0x20000, step=0x1000
             )
 
             # Verify results are sorted by quality (highest first)
@@ -1219,17 +1220,16 @@ class TestROMScanningComprehensive:
         # Signatures match mock_rom_file: 0x8000=\x01..., 0x10000=\x02..., 0x18000=\x03...
         mock_hal = CustomMockHALCompressor()
         mock_hal.configure_sprite_response(b"\x01\x01\x01\x01", 64, b"\x00" * 512)  # Perfect alignment (16 tiles)
-        mock_hal.configure_sprite_response(b"\x02\x02\x02\x02", 68, b"\x11" * 520)  # Minor misalignment (16 tiles + 8 extra)
-        mock_hal.configure_sprite_response(b"\x03\x03\x03\x03", 16, b"\x22" * 32)   # Too small (1 tile)
+        mock_hal.configure_sprite_response(
+            b"\x02\x02\x02\x02", 68, b"\x11" * 520
+        )  # Minor misalignment (16 tiles + 8 extra)
+        mock_hal.configure_sprite_response(b"\x03\x03\x03\x03", 16, b"\x22" * 32)  # Too small (1 tile)
 
         rom_extractor.rom_injector.hal_compressor = mock_hal
 
         with patch.object(rom_extractor, "_assess_sprite_quality", return_value=80.0):
             results = rom_extractor.scan_for_sprites(
-                mock_rom_file,
-                start_offset=0x8000,
-                end_offset=0x20000,
-                step=0x1000
+                mock_rom_file, start_offset=0x8000, end_offset=0x20000, step=0x1000
             )
 
             # Should only find 2 sprites (16+ tiles), not the 1-tile sprite
@@ -1258,7 +1258,7 @@ class TestROMScanningComprehensive:
             mock_rom_file,
             start_offset=0x0,
             end_offset=0x20000,  # Large range
-            step=0x1000  # Reasonable step size
+            step=0x1000,  # Reasonable step size
         )
 
         # Should complete and return empty list (no sprites found)
@@ -1269,10 +1269,7 @@ class TestROMScanningComprehensive:
         """Test scanning with invalid ROM file"""
         # Try to scan non-existent file
         results = rom_extractor.scan_for_sprites(
-            "/nonexistent/rom.sfc",
-            start_offset=0x8000,
-            end_offset=0x10000,
-            step=0x1000
+            "/nonexistent/rom.sfc", start_offset=0x8000, end_offset=0x10000, step=0x1000
         )
 
         # Should return empty list, not crash
@@ -1284,12 +1281,7 @@ class TestROMScanningComprehensive:
         mock_hal = CustomMockHALCompressor()
         rom_extractor.rom_injector.hal_compressor = mock_hal
 
-        results = rom_extractor.scan_for_sprites(
-            mock_rom_file,
-            start_offset=0x8000,
-            end_offset=0x10000,
-            step=0x1000
-        )
+        results = rom_extractor.scan_for_sprites(mock_rom_file, start_offset=0x8000, end_offset=0x10000, step=0x1000)
 
         assert results == []
 
@@ -1301,6 +1293,7 @@ class TestROMSpriteQualityAssessmentComprehensive:
     def rom_extractor(self):
         """Create a ROM extractor instance via AppContext."""
         from core.app_context import get_app_context
+
         return get_app_context().rom_extractor
 
     def test_assess_sprite_quality_perfect_sprite_comprehensive(self, rom_extractor):
@@ -1333,6 +1326,7 @@ class TestROMSpriteQualityAssessmentComprehensive:
     def test_assess_sprite_quality_random_data_comprehensive(self, rom_extractor):
         """Test quality assessment for random-looking data"""
         import random
+
         random.seed(42)  # Reproducible random
         sprite_data = bytes([random.randint(0, 255) for _ in range(512)])
 
@@ -1374,6 +1368,7 @@ class TestROMExtractorAdvancedFeatures:
     def rom_extractor(self):
         """Create a ROM extractor instance via AppContext."""
         from core.app_context import get_app_context
+
         return get_app_context().rom_extractor
 
     @pytest.fixture
@@ -1384,14 +1379,14 @@ class TestROMExtractorAdvancedFeatures:
 
         # Add SNES ROM header at 0x7FC0
         header_offset = 0x7FC0
-        rom_data[header_offset:header_offset+21] = b"TEST ROM TITLE      "  # 21 chars
-        rom_data[header_offset+21] = 0x20  # ROM type
-        rom_data[header_offset+22] = 0x09  # ROM size (512KB)
-        rom_data[header_offset+23] = 0x00  # SRAM size
+        rom_data[header_offset : header_offset + 21] = b"TEST ROM TITLE      "  # 21 chars
+        rom_data[header_offset + 21] = 0x20  # ROM type
+        rom_data[header_offset + 22] = 0x09  # ROM size (512KB)
+        rom_data[header_offset + 23] = 0x00  # SRAM size
 
         # Add checksum (simplified)
-        rom_data[header_offset+28:header_offset+30] = b"\x34\x12"  # Checksum
-        rom_data[header_offset+30:header_offset+32] = b"\xCB\xED"  # Complement
+        rom_data[header_offset + 28 : header_offset + 30] = b"\x34\x12"  # Checksum
+        rom_data[header_offset + 30 : header_offset + 32] = b"\xcb\xed"  # Complement
 
         rom_path.write_bytes(rom_data)
         return str(rom_path)
@@ -1408,14 +1403,14 @@ class TestROMExtractorAdvancedFeatures:
 
         # Add SNES ROM header with KIRBY title at 0x7FC0
         header_offset = 0x7FC0
-        rom_data[header_offset:header_offset+21] = b"KIRBY SUPER STAR    "  # 21 chars
-        rom_data[header_offset+21] = 0x20  # ROM type
-        rom_data[header_offset+22] = 0x09  # ROM size (512KB)
-        rom_data[header_offset+23] = 0x00  # SRAM size
+        rom_data[header_offset : header_offset + 21] = b"KIRBY SUPER STAR    "  # 21 chars
+        rom_data[header_offset + 21] = 0x20  # ROM type
+        rom_data[header_offset + 22] = 0x09  # ROM size (512KB)
+        rom_data[header_offset + 23] = 0x00  # SRAM size
 
         # Add checksum (simplified)
-        rom_data[header_offset+28:header_offset+30] = b"\x34\x12"  # Checksum
-        rom_data[header_offset+30:header_offset+32] = b"\xCB\xED"  # Complement
+        rom_data[header_offset + 28 : header_offset + 30] = b"\x34\x12"  # Checksum
+        rom_data[header_offset + 30 : header_offset + 32] = b"\xcb\xed"  # Complement
 
         rom_path.write_bytes(rom_data)
 
@@ -1424,7 +1419,7 @@ class TestROMExtractorAdvancedFeatures:
         with patch.object(rom_extractor.rom_injector, "find_sprite_locations") as mock_find_locations:
             mock_locations = {
                 "kirby_normal": SpritePointer(offset=0x8000, bank=0x10, address=0x0000),
-                "kirby_flying": SpritePointer(offset=0x9000, bank=0x12, address=0x1000)
+                "kirby_flying": SpritePointer(offset=0x9000, bank=0x12, address=0x1000),
             }
             mock_find_locations.return_value = mock_locations
 

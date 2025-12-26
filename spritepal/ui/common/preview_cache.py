@@ -7,6 +7,7 @@ This module provides a memory-efficient cache for preview data:
 - Thread-safe operations for concurrent access
 - Size-based eviction to prevent memory bloat
 """
+
 from __future__ import annotations
 
 import hashlib

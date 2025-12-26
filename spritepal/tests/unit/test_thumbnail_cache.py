@@ -4,6 +4,7 @@ Tests for ThumbnailCache.
 Tests the QImage-specific LRU cache implementation including key generation,
 caching operations, and memory management.
 """
+
 from __future__ import annotations
 
 import pytest

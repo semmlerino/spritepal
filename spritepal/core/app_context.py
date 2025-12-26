@@ -14,6 +14,7 @@ Usage:
     state_manager = context.application_state_manager
     operations = context.core_operations_manager
 """
+
 from __future__ import annotations
 
 import atexit
@@ -134,9 +135,7 @@ class AppContext:
                     mgr.cleanup()
                     logger.debug("Cleaned up %s", type(mgr).__name__)
                 except Exception:
-                    logger.warning(
-                        "Error cleaning up %s", type(mgr).__name__, exc_info=True
-                    )
+                    logger.warning("Error cleaning up %s", type(mgr).__name__, exc_info=True)
 
         logger.info("AppContext cleanup complete")
 
@@ -154,9 +153,7 @@ def get_app_context() -> AppContext:
         RuntimeError: If AppContext was not initialized via create_app_context()
     """
     if _app_context is None:
-        raise RuntimeError(
-            "AppContext not initialized. Call create_app_context() first."
-        )
+        raise RuntimeError("AppContext not initialized. Call create_app_context() first.")
     return _app_context
 
 
@@ -211,9 +208,7 @@ def create_app_context(
         if qt_parent is None:
             qt_parent = QApplication.instance()
             if qt_parent is None:
-                logger.warning(
-                    "No QApplication instance found - managers will have no Qt parent"
-                )
+                logger.warning("No QApplication instance found - managers will have no Qt parent")
 
         # 1. ConfigurationService
         if configuration_service is None:

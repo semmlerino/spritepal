@@ -18,10 +18,10 @@ if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
     from ui.injection_dialog import InjectionDialog
 
+from core.app_context import get_app_context
 from core.console_error_handler import ConsoleErrorHandler
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.services.image_utils import pil_to_qpixmap
-from core.app_context import get_app_context
 from core.services.preview_generator import create_vram_preview_request
 from core.types import ROMExtractionParams, VRAMExtractionParams
 from core.workers import ROMExtractionWorker, VRAMExtractionWorker
@@ -101,9 +101,7 @@ class ExtractionController(QObject):
         _ = self.main_window.arrange_rows_requested.connect(self.open_row_arrangement)
         _ = self.main_window.arrange_grid_requested.connect(self.open_grid_arrangement)
         _ = self.main_window.inject_requested.connect(self.start_injection)
-        _ = self.main_window.extraction_panel.offset_changed.connect(
-            self.update_preview_with_offset
-        )
+        _ = self.main_window.extraction_panel.offset_changed.connect(self.update_preview_with_offset)
 
         # Connect injection manager signals
         _ = self.injection_manager.injection_progress.connect(self._on_injection_progress)
@@ -217,10 +215,7 @@ class ExtractionController(QObject):
             self.preview_info_changed.emit(f"Tiles: {tile_count}")
         else:
             logger.error("Failed to convert PIL image to QPixmap for preview")
-            self.error_handler.handle_warning(
-                "Preview Error",
-                "Failed to convert preview image for display"
-            )
+            self.error_handler.handle_warning("Preview Error", "Failed to convert preview image for display")
 
     def _on_preview_image_ready(self, pil_image: Image.Image) -> None:
         """Handle preview PIL image ready"""
@@ -282,7 +277,7 @@ class ExtractionController(QObject):
                 vram_path=vram_path,
                 offset=offset,
                 sprite_name=f"vram_0x{offset:06X}",
-                size=(self.main_window.sprite_preview.width(), self.main_window.sprite_preview.height())
+                size=(self.main_window.sprite_preview.width(), self.main_window.sprite_preview.height()),
             )
 
             # Generate preview with progress tracking
@@ -352,17 +347,13 @@ class ExtractionController(QObject):
             # Validate sprite file before launching
             image_result = FileValidator.validate_image_file(sprite_file)
             if not image_result.is_valid:
-                self.main_window.status_bar.showMessage(
-                    f"Invalid sprite file: {image_result.error_message}"
-                )
+                self.main_window.status_bar.showMessage(f"Invalid sprite file: {image_result.error_message}")
                 return
 
             # Ensure launcher path is absolute and exists
             launcher_path = launcher_path.resolve()
             if not launcher_path.exists():
-                self.main_window.status_bar.showMessage(
-                    "Pixel editor launcher not found"
-                )
+                self.main_window.status_bar.showMessage("Pixel editor launcher not found")
                 return
 
             # Launch pixel editor with the sprite file
@@ -370,9 +361,7 @@ class ExtractionController(QObject):
                 # Use absolute paths for safety
                 sprite_file_abs = Path(sprite_file).resolve()
                 _ = subprocess.Popen([sys.executable, str(launcher_path), str(sprite_file_abs)])
-                self.main_window.status_bar.showMessage(
-                    f"Opened {sprite_file_abs.name} in pixel editor"
-                )
+                self.main_window.status_bar.showMessage(f"Opened {sprite_file_abs.name} in pixel editor")
             except (OSError, subprocess.SubprocessError) as e:
                 # Expected subprocess errors (file not found, permission denied, etc.)
                 self.error_handler.handle_warning("Pixel Editor", f"Failed to open: {e}")
@@ -408,10 +397,9 @@ class ExtractionController(QObject):
             dialog = RowArrangementDialog(sprite_file, tiles_per_row, parent)
 
             # Pass palette data from the main window's sprite preview if available
-            if (
-                hasattr(self.main_window, "sprite_preview")
-                and self.main_window.sprite_preview
-            ) and hasattr(self.main_window.sprite_preview, "get_palettes"):
+            if (hasattr(self.main_window, "sprite_preview") and self.main_window.sprite_preview) and hasattr(
+                self.main_window.sprite_preview, "get_palettes"
+            ):
                 try:
                     palettes = self.main_window.sprite_preview.get_palettes()
                     if palettes:
@@ -419,7 +407,7 @@ class ExtractionController(QObject):
                 except Exception as e:
                     # Log palette loading error but continue with dialog
                     logger.warning(f"Failed to load palette data for dialog: {e}")
-                        # Dialog can still function without palette data
+                    # Dialog can still function without palette data
 
             if dialog.exec():
                 # Get the arranged sprite path
@@ -428,9 +416,7 @@ class ExtractionController(QObject):
                 if arranged_path and Path(arranged_path).exists():
                     # Open the arranged sprite in the pixel editor
                     self.open_in_editor(arranged_path)
-                    self.main_window.status_bar.showMessage(
-                        "Opened arranged sprites in pixel editor"
-                    )
+                    self.main_window.status_bar.showMessage("Opened arranged sprites in pixel editor")
                 else:
                     self.main_window.status_bar.showMessage("Row arrangement cancelled")
         except Exception as e:
@@ -458,10 +444,9 @@ class ExtractionController(QObject):
         dialog = GridArrangementDialog(sprite_file, tiles_per_row, parent)
 
         # Pass palette data from the main window's sprite preview if available
-        if (
-            hasattr(self.main_window, "sprite_preview")
-            and self.main_window.sprite_preview
-        ) and hasattr(self.main_window.sprite_preview, "get_palettes"):
+        if (hasattr(self.main_window, "sprite_preview") and self.main_window.sprite_preview) and hasattr(
+            self.main_window.sprite_preview, "get_palettes"
+        ):
             try:
                 palettes = self.main_window.sprite_preview.get_palettes()
                 if palettes:
@@ -469,7 +454,7 @@ class ExtractionController(QObject):
             except Exception as e:
                 # Log palette loading error but continue with dialog
                 logger.warning(f"Failed to load palette data for dialog: {e}")
-                    # Dialog can still function without palette data
+                # Dialog can still function without palette data
 
         if dialog.exec():
             # Get the arranged sprite path
@@ -478,9 +463,7 @@ class ExtractionController(QObject):
             if arranged_path and Path(arranged_path).exists():
                 # Open the arranged sprite in the pixel editor
                 self.open_in_editor(arranged_path)
-                self.main_window.status_bar.showMessage(
-                    "Opened grid-arranged sprites in pixel editor"
-                )
+                self.main_window.status_bar.showMessage("Opened grid-arranged sprites in pixel editor")
             else:
                 self.main_window.status_bar.showMessage("Grid arrangement cancelled")
 
@@ -494,10 +477,7 @@ class ExtractionController(QObject):
             Number of tiles per row
         """
         # Try to get from main window's sprite preview first
-        if (
-            hasattr(self.main_window, "sprite_preview")
-            and self.main_window.sprite_preview
-        ):
+        if hasattr(self.main_window, "sprite_preview") and self.main_window.sprite_preview:
             try:
                 _, tiles_per_row = self.main_window.sprite_preview.get_tile_info()
                 if tiles_per_row > 0:
@@ -535,7 +515,9 @@ class ExtractionController(QObject):
         # Validate sprite file exists before creating dialog
         sprite_result = FileValidator.validate_file_existence(sprite_path, "Sprite file")
         if not sprite_result.is_valid:
-            self.main_window.status_bar.showMessage(sprite_result.error_message or f"Sprite file not found: {sprite_path}")
+            self.main_window.status_bar.showMessage(
+                sprite_result.error_message or f"Sprite file not found: {sprite_path}"
+            )
             return
 
         # Get smart input VRAM suggestion using injection manager
@@ -592,9 +574,7 @@ class ExtractionController(QObject):
                 current_injection_params
                 and params_dict.get("mode") == "rom"
                 and self._current_injection_dialog
-                and hasattr(
-                    self._current_injection_dialog, "save_rom_injection_parameters"
-                )
+                and hasattr(self._current_injection_dialog, "save_rom_injection_parameters")
             ):
                 try:
                     self._current_injection_dialog.save_rom_injection_parameters()

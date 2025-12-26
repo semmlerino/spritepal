@@ -1,6 +1,7 @@
 """
 Tests for ROM validator
 """
+
 from __future__ import annotations
 
 import struct
@@ -21,6 +22,8 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.no_manager_setup,
 ]
+
+
 def create_valid_rom_header(
     title="TEST ROM",
     checksum=0x1234,
@@ -29,14 +32,14 @@ def create_valid_rom_header(
     rom_size=0x0C,
     sram_size=0x00,
     developer=0x01,
-    version=0x00
+    version=0x00,
 ):
     """Create a valid SNES ROM header (32 bytes)"""
     header = bytearray(32)
 
     # Title (21 bytes)
     title_bytes = title.encode("ascii")[:21]
-    header[0:len(title_bytes)] = title_bytes
+    header[0 : len(title_bytes)] = title_bytes
 
     # ROM makeup byte
     header[21] = rom_type
@@ -60,22 +63,24 @@ def create_valid_rom_header(
 
     return bytes(header)
 
-def create_test_rom(size=0x200000, has_smc_header=False, header_location=0x7FC0,
-                   header_data=None, calculate_checksum=True):
+
+def create_test_rom(
+    size=0x200000, has_smc_header=False, header_location=0x7FC0, header_data=None, calculate_checksum=True
+):
     """Create a test ROM with specified properties"""
     # Create ROM data
     rom_data = bytearray(size)
 
     # Fill with some pattern so it's not all zeros
     for i in range(0, size, 256):
-        rom_data[i:i+256] = bytes(range(256))
+        rom_data[i : i + 256] = bytes(range(256))
 
     # Add header
     if header_data is None:
         header_data = create_valid_rom_header()
 
     if header_location < len(rom_data) - 32:
-        rom_data[header_location:header_location+32] = header_data
+        rom_data[header_location : header_location + 32] = header_data
 
     # Calculate and update checksum if requested
     if calculate_checksum:
@@ -98,6 +103,7 @@ def create_test_rom(size=0x200000, has_smc_header=False, header_location=0x7FC0,
         rom_data = smc_header + rom_data
 
     return bytes(rom_data)
+
 
 class TestROMValidator:
     """Test ROM validation functionality"""
@@ -212,7 +218,7 @@ class TestROMValidator:
         rom_path = tmp_path / "non_ascii.sfc"
         # Create header with some non-ASCII bytes
         header_data = bytearray(create_valid_rom_header())
-        header_data[10:15] = b"\xFF\xFE\xFD\xFC\xFB"  # Non-ASCII
+        header_data[10:15] = b"\xff\xfe\xfd\xfc\xfb"  # Non-ASCII
         rom_data = create_test_rom(header_data=bytes(header_data))
         rom_path.write_bytes(rom_data)
 
@@ -343,9 +349,7 @@ class TestROMValidator:
 
         sprite_offset = 0x200000  # Valid offset within ROM
 
-        header, smc_offset = ROMValidator.validate_rom_for_injection(
-            str(rom_path), sprite_offset
-        )
+        header, smc_offset = ROMValidator.validate_rom_for_injection(str(rom_path), sprite_offset)
 
         assert header.title == "TEST ROM"
         assert smc_offset == 0
@@ -390,8 +394,6 @@ class TestROMValidator:
         sprite_offset = 0x1FFFF0
 
         # Should succeed because offset is within actual ROM data
-        header, smc_offset = ROMValidator.validate_rom_for_injection(
-            str(rom_path), sprite_offset
-        )
+        header, smc_offset = ROMValidator.validate_rom_for_injection(str(rom_path), sprite_offset)
 
         assert smc_offset == 512  # SMC header detected

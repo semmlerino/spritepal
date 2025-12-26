@@ -137,7 +137,7 @@ class SimpleSmartTab(QWidget):
             self.region_combo.clear()
         for i, (offset, quality) in enumerate(sprites):
             if self.region_combo:
-                self.region_combo.addItem(f"Region {i+1}: 0x{offset:06X} (Q: {quality:.2f})")
+                self.region_combo.addItem(f"Region {i + 1}: 0x{offset:06X} (Q: {quality:.2f})")
 
     def get_sprite_regions(self) -> list[SpriteRegion]:
         """
@@ -159,7 +159,7 @@ class SimpleSmartTab(QWidget):
                 sprite_count=1,
                 size_bytes=0x1000,
                 density=quality,
-                custom_name=f"Region {i+1}"
+                custom_name=f"Region {i + 1}",
             )
             regions.append(region)
         return regions

@@ -13,10 +13,12 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+
 # Check if we're in the virtual environment
 def check_virtual_env():
     """Check if we're running in the virtual environment."""
-    return bool(hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
+    return bool(hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix))
+
 
 # If not in venv, try to activate it
 if not check_virtual_env():
@@ -28,7 +30,7 @@ if not check_virtual_env():
         print(f"📦 Found virtual environment at: {venv_path}")
 
         # Try to use the venv Python directly
-        if os.name == 'nt':  # Windows
+        if os.name == "nt":  # Windows
             python_exe = venv_path / "Scripts" / "python.exe"
         else:  # Unix/Linux/Mac
             python_exe = venv_path / "bin" / "python"
@@ -36,6 +38,7 @@ if not check_virtual_env():
         if python_exe.exists():
             print(f"🚀 Restarting with venv Python: {python_exe}")
             import subprocess
+
             # Re-run this script with the venv Python
             result = subprocess.run([str(python_exe), str(Path(__file__)), *sys.argv[1:]], check=False)
             sys.exit(result.returncode)
@@ -48,64 +51,99 @@ try:
     from PySide6.QtWidgets import QApplication
 
     from ui.windows.detached_gallery_window import DetachedGalleryWindow
+
     QT_AVAILABLE = True
 except ImportError:
     QT_AVAILABLE = False
     print("❌ Qt not available. Please install PySide6.")
     sys.exit(1)
 
+
 def create_sample_sprites():
     """Create sample sprite data for demonstration."""
     sprite_names = [
-        "Kirby Walking", "Kirby Running", "Kirby Jumping", "Kirby Flying",
-        "Kirby Inhaling", "Meta Knight", "King Dedede", "Waddle Dee",
-        "Waddle Doo", "Gordo", "Bronto Burt", "Cappy", "Scarfy",
-        "Hot Head", "Sparky", "Blade Knight", "Sir Kibble", "Poppy Bros",
-        "Shotzo", "Laser Ball", "UFO", "Wheelie", "Rocky", "Mr. Shine",
-        "Mr. Bright", "Heavy Lobster", "Computer Virus", "Marx"
+        "Kirby Walking",
+        "Kirby Running",
+        "Kirby Jumping",
+        "Kirby Flying",
+        "Kirby Inhaling",
+        "Meta Knight",
+        "King Dedede",
+        "Waddle Dee",
+        "Waddle Doo",
+        "Gordo",
+        "Bronto Burt",
+        "Cappy",
+        "Scarfy",
+        "Hot Head",
+        "Sparky",
+        "Blade Knight",
+        "Sir Kibble",
+        "Poppy Bros",
+        "Shotzo",
+        "Laser Ball",
+        "UFO",
+        "Wheelie",
+        "Rocky",
+        "Mr. Shine",
+        "Mr. Bright",
+        "Heavy Lobster",
+        "Computer Virus",
+        "Marx",
     ]
 
     sprites = []
     for i in range(len(sprite_names)):
-        sprites.append({
-            'offset': 0x200000 + (i * 0x2000),
-            'decompressed_size': 1024 + (i * 128),
-            'tile_count': 16 + (i * 2),
-            'compressed': i % 3 == 0,  # Every 3rd sprite is HAL compressed
-            'name': sprite_names[i],
-        })
+        sprites.append(
+            {
+                "offset": 0x200000 + (i * 0x2000),
+                "decompressed_size": 1024 + (i * 128),
+                "tile_count": 16 + (i * 2),
+                "compressed": i % 3 == 0,  # Every 3rd sprite is HAL compressed
+                "name": sprite_names[i],
+            }
+        )
 
     return sprites
+
 
 def create_colorful_thumbnails(gallery_window, sprites):
     """Create colorful mock thumbnails for the sprites."""
     colors = [
-        Qt.GlobalColor.red, Qt.GlobalColor.green, Qt.GlobalColor.blue,
-        Qt.GlobalColor.yellow, Qt.GlobalColor.cyan, Qt.GlobalColor.magenta,
-        Qt.GlobalColor.darkRed, Qt.GlobalColor.darkGreen, Qt.GlobalColor.darkBlue,
-        Qt.GlobalColor.darkYellow, Qt.GlobalColor.darkCyan, Qt.GlobalColor.darkMagenta,
+        Qt.GlobalColor.red,
+        Qt.GlobalColor.green,
+        Qt.GlobalColor.blue,
+        Qt.GlobalColor.yellow,
+        Qt.GlobalColor.cyan,
+        Qt.GlobalColor.magenta,
+        Qt.GlobalColor.darkRed,
+        Qt.GlobalColor.darkGreen,
+        Qt.GlobalColor.darkBlue,
+        Qt.GlobalColor.darkYellow,
+        Qt.GlobalColor.darkCyan,
+        Qt.GlobalColor.darkMagenta,
         QColor(255, 165, 0),  # Orange
         QColor(128, 0, 128),  # Purple
-        QColor(255, 192, 203), # Pink
-        QColor(165, 42, 42),   # Brown
-        QColor(0, 128, 128),   # Teal
-        QColor(128, 128, 0),   # Olive
+        QColor(255, 192, 203),  # Pink
+        QColor(165, 42, 42),  # Brown
+        QColor(0, 128, 128),  # Teal
+        QColor(128, 128, 0),  # Olive
         QColor(255, 20, 147),  # Deep pink
-        QColor(72, 61, 139),   # Dark slate blue
-        QColor(255, 69, 0),    # Red orange
-        QColor(50, 205, 50),   # Lime green
+        QColor(72, 61, 139),  # Dark slate blue
+        QColor(255, 69, 0),  # Red orange
+        QColor(50, 205, 50),  # Lime green
         QColor(186, 85, 211),  # Medium orchid
-        QColor(255, 215, 0),   # Gold
+        QColor(255, 215, 0),  # Gold
         QColor(30, 144, 255),  # Dodger blue
-        QColor(220, 20, 60),   # Crimson
-        QColor(0, 206, 209),   # Dark turquoise
+        QColor(220, 20, 60),  # Crimson
+        QColor(0, 206, 209),  # Dark turquoise
         QColor(138, 43, 226),  # Blue violet
     ]
 
     gallery = gallery_window.gallery_widget
 
     for i, sprite in enumerate(sprites):
-        offset = sprite['offset']
+        offset = sprite["offset"]
 
         # Create unique thumbnail
         pixmap = QPixmap(128, 128)
@@ -127,24 +165,24 @@ def create_colorful_thumbnails(gallery_window, sprites):
         painter.setFont(font)
 
         # Sprite number
-        painter.drawText(12, 25, f"#{i+1}")
+        painter.drawText(12, 25, f"#{i + 1}")
 
         # Sprite name (truncated)
-        name = sprite['name'][:10] + "..." if len(sprite['name']) > 10 else sprite['name']
+        name = sprite["name"][:10] + "..." if len(sprite["name"]) > 10 else sprite["name"]
         painter.drawText(12, 40, name)
 
         # Offset
         painter.drawText(12, 55, f"0x{offset:06X}")
 
         # Size info
-        size_kb = sprite['decompressed_size'] // 1024
+        size_kb = sprite["decompressed_size"] // 1024
         painter.drawText(12, 70, f"{size_kb}KB")
 
         # Tile count
         painter.drawText(12, 85, f"{sprite['tile_count']} tiles")
 
         # HAL compression indicator
-        if sprite['compressed']:
+        if sprite["compressed"]:
             painter.fillRect(90, 95, 30, 20, Qt.GlobalColor.yellow)
             painter.setPen(Qt.GlobalColor.black)
             font_small = QFont("Arial", 7, QFont.Weight.Bold)
@@ -155,6 +193,7 @@ def create_colorful_thumbnails(gallery_window, sprites):
 
         # Set the thumbnail using the gallery widget's method
         gallery.set_thumbnail(offset, pixmap)
+
 
 class StandaloneGalleryLauncher:
     """Standalone launcher for the detached gallery."""
@@ -178,6 +217,7 @@ class StandaloneGalleryLauncher:
         """Initialize SpritePal core managers."""
         try:
             from core.managers import initialize_managers
+
             initialize_managers()
 
             print("✅ SpritePal managers initialized successfully")
@@ -191,6 +231,7 @@ class StandaloneGalleryLauncher:
 
         # Get dependencies from AppContext
         from core.app_context import get_app_context
+
         ctx = get_app_context()
         core_ops_manager = ctx.core_operations_manager
         settings_manager = ctx.application_state_manager
@@ -261,6 +302,7 @@ class StandaloneGalleryLauncher:
         # Run the application
         return self.app.exec()
 
+
 def main():
     """Main entry point."""
     if not QT_AVAILABLE:
@@ -275,8 +317,10 @@ def main():
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

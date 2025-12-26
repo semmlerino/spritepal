@@ -7,6 +7,7 @@ This module tests the consolidated application state manager including:
 - Cache statistics
 - UI coordination
 """
+
 from __future__ import annotations
 
 import json
@@ -277,10 +278,12 @@ class TestSessionManagement:
     def test_update_session_data(self, manager, qtbot):
         """update_session_data should update multiple values."""
         with qtbot.waitSignal(manager.session_changed, timeout=signal_timeout()):
-            manager.update_session_data({
-                "vram_path": "/new/vram.dmp",
-                "cgram_path": "/new/cgram.dmp",
-            })
+            manager.update_session_data(
+                {
+                    "vram_path": "/new/vram.dmp",
+                    "cgram_path": "/new/cgram.dmp",
+                }
+            )
 
         assert manager.get("session", "vram_path") == "/new/vram.dmp"
         assert manager.get("session", "cgram_path") == "/new/cgram.dmp"
@@ -359,12 +362,14 @@ class TestWindowState:
 
     def test_update_window_state(self, manager):
         """update_window_state should store geometry."""
-        manager.update_window_state({
-            "width": 1200,
-            "height": 800,
-            "x": 100,
-            "y": 50,
-        })
+        manager.update_window_state(
+            {
+                "width": 1200,
+                "height": 800,
+                "x": 100,
+                "y": 50,
+            }
+        )
 
         geometry = manager.get_window_geometry()
 
@@ -386,11 +391,13 @@ class TestWindowState:
 
     def test_window_state_with_splitter_sizes(self, manager):
         """update_window_state should handle splitter sizes."""
-        manager.update_window_state({
-            "width": 1000,
-            "height": 700,
-            "splitter_sizes": [300, 400, 300],
-        })
+        manager.update_window_state(
+            {
+                "width": 1000,
+                "height": 700,
+                "splitter_sizes": [300, 400, 300],
+            }
+        )
 
         geometry = manager.get_window_geometry()
 

@@ -74,7 +74,7 @@ class MainWindow(QMainWindow):
 
     # Completion signals for controller communication
     extraction_completed = Signal(list)  # list of extracted files
-    extraction_error_occurred = Signal(str)     # error message
+    extraction_error_occurred = Signal(str)  # error message
 
     def __init__(
         self,
@@ -163,11 +163,11 @@ class MainWindow(QMainWindow):
 
     def _create_left_panel(self) -> QWidget:
         """Create the left panel with scrollable tabs and pinned action zone.
-        
+
         Structure:
         - Content Zone (top, scrollable): Contains extraction tabs
         - Action Zone (bottom, fixed): Contains output settings + action buttons
-        
+
         This ensures action buttons are always visible regardless of tab content height.
         """
         left_panel = QWidget(self)
@@ -181,7 +181,7 @@ class MainWindow(QMainWindow):
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        
+
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, 0)
@@ -190,26 +190,21 @@ class MainWindow(QMainWindow):
         # Create tab widget for extraction methods
         self.extraction_tabs = QTabWidget(self)
         from PySide6.QtWidgets import QSizePolicy
+
         self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
         # ROM extraction tab (first tab, selected by default)
         from core.app_context import get_app_context
+
         extraction_manager = get_app_context().core_operations_manager
-        self.rom_extraction_panel = ROMExtractionPanel(
-            parent=self,
-            extraction_manager=extraction_manager
-        )
+        self.rom_extraction_panel = ROMExtractionPanel(parent=self, extraction_manager=extraction_manager)
         self.extraction_tabs.addTab(self.rom_extraction_panel, "ROM Extraction")
-        self.extraction_tabs.setTabToolTip(
-            0, "Extract sprites directly from game ROM files"
-        )
+        self.extraction_tabs.setTabToolTip(0, "Extract sprites directly from game ROM files")
 
         # VRAM extraction tab
         self.extraction_panel = ExtractionPanel(settings_manager=self.settings_manager)
         self.extraction_tabs.addTab(self.extraction_panel, "VRAM Extraction")
-        self.extraction_tabs.setTabToolTip(
-            1, "Extract from emulator memory dumps (VRAM/CGRAM/OAM)"
-        )
+        self.extraction_tabs.setTabToolTip(1, "Extract from emulator memory dumps (VRAM/CGRAM/OAM)")
 
         content_layout.addWidget(self.extraction_tabs)
         content_layout.addStretch()  # Push content to top, keep compact
@@ -227,7 +222,7 @@ class MainWindow(QMainWindow):
         action_zone_layout.setSpacing(SPACING_COMPACT_SMALL)  # 6px - tighter for cohesion
 
         # Output settings and buttons will be added by managers in _setup_managers()
-        
+
         main_layout.addWidget(self.action_zone)  # No stretch = fixed size based on content
 
         return left_panel
@@ -235,17 +230,15 @@ class MainWindow(QMainWindow):
     def _setup_managers(self) -> None:
         """Set up all UI managers"""
         # Create managers in dependency order
-        self.status_bar_manager = StatusBarManager(self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache)
+        self.status_bar_manager = StatusBarManager(
+            self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache
+        )
         self.output_settings_manager = OutputSettingsManager(self, self)
 
         # Connect ROM panel to shared output name via signals (decoupled communication)
-        self.output_settings_manager.output_name_changed.connect(
-            self.rom_extraction_panel.set_output_name
-        )
+        self.output_settings_manager.output_name_changed.connect(self.rom_extraction_panel.set_output_name)
         # Initialize with current value
-        self.rom_extraction_panel.set_output_name(
-            self.output_settings_manager.get_output_name()
-        )
+        self.rom_extraction_panel.set_output_name(self.output_settings_manager.get_output_name())
 
         self.toolbar_manager = ToolbarManager(self, self)
 
@@ -287,6 +280,7 @@ class MainWindow(QMainWindow):
         right_panel.setMinimumWidth(MIN_PANEL_WIDTH)
         # Ensure right panel has proper size policy
         from PySide6.QtWidgets import QSizePolicy
+
         right_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Configure splitter now that both panels exist
@@ -359,23 +353,11 @@ class MainWindow(QMainWindow):
 
             self.status_bar_manager.show_message(f"Cleared {removed_count} cache files")
 
-            QMessageBox.information(
-                self,
-                "Cache Cleared",
-                f"Successfully removed {removed_count} cache files."
-            )
+            QMessageBox.information(self, "Cache Cleared", f"Successfully removed {removed_count} cache files.")
         except (OSError, PermissionError) as e:
-            QMessageBox.critical(
-                self,
-                "File Error",
-                f"Cannot access cache files: {e}"
-            )
+            QMessageBox.critical(self, "File Error", f"Cannot access cache files: {e}")
         except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Failed to clear cache: {e!s}"
-            )
+            QMessageBox.critical(self, "Error", f"Failed to clear cache: {e!s}")
 
     def on_extract_clicked(self) -> None:
         """Handle extract button click"""
@@ -404,22 +386,14 @@ class MainWindow(QMainWindow):
 
         # Validate output name
         if not settings.output_name:
-            QMessageBox.warning(
-                self,
-                "Missing Output Name",
-                "Please enter an output name for the extracted sprites."
-            )
+            QMessageBox.warning(self, "Missing Output Name", "Please enter an output name for the extracted sprites.")
             return
 
         # Proceed with extraction
         if is_rom_mode:
             self._handle_rom_extraction(settings.output_name)
         else:
-            self._handle_vram_extraction(
-                settings.output_name,
-                settings.export_palette_files,
-                settings.include_metadata
-            )
+            self._handle_vram_extraction(settings.output_name, settings.export_palette_files, settings.include_metadata)
 
     def on_open_editor_clicked(self) -> None:
         """Handle open in editor button click"""
@@ -458,8 +432,7 @@ class MainWindow(QMainWindow):
         """Check if VRAM extraction is ready"""
         if self.extraction_panel.is_grayscale_mode():
             return self.extraction_panel.has_vram()
-        return (self.extraction_panel.has_vram() and
-               self.extraction_panel.has_cgram())
+        return self.extraction_panel.has_vram() and self.extraction_panel.has_cgram()
 
     def is_grayscale_mode(self) -> bool:
         """Check if in grayscale mode"""
@@ -472,8 +445,7 @@ class MainWindow(QMainWindow):
     # KeyboardActionsProtocol
     def can_open_manual_offset_dialog(self) -> bool:
         """Check if manual offset dialog can be opened"""
-        return (self.ui_coordinator.is_rom_tab_active() and
-                bool(self.rom_extraction_panel.rom_path))
+        return self.ui_coordinator.is_rom_tab_active() and bool(self.rom_extraction_panel.rom_path)
 
     def open_manual_offset_dialog(self) -> None:
         """Open manual offset dialog"""
@@ -493,22 +465,15 @@ class MainWindow(QMainWindow):
             # Validate parameters using extraction manager
             # Delayed import to avoid initialization order issues
             from core.app_context import get_app_context
+
             try:
                 extraction_manager = get_app_context().core_operations_manager
                 extraction_manager.validate_extraction_params(params)
             except (ValueError, TypeError) as e:
-                QMessageBox.warning(
-                    self,
-                    "Validation Error",
-                    f"Invalid extraction parameters: {e}"
-                )
+                QMessageBox.warning(self, "Validation Error", f"Invalid extraction parameters: {e}")
                 return
             except Exception as e:
-                QMessageBox.warning(
-                    self,
-                    "Validation Error",
-                    str(e)
-                )
+                QMessageBox.warning(self, "Validation Error", str(e))
                 return
 
             self._output_path = params["output_base"]
@@ -623,7 +588,7 @@ class MainWindow(QMainWindow):
             "<p>A modern sprite extraction tool for SNES games.</p>"
             "<p>Simplifies sprite extraction with automatic palette association.</p>"
             "<br>"
-            "<p>Part of the Kirby Super Star sprite editing toolkit.</p>"
+            "<p>Part of the Kirby Super Star sprite editing toolkit.</p>",
         )
 
     def _show_keyboard_shortcuts(self) -> None:
@@ -677,12 +642,8 @@ class MainWindow(QMainWindow):
 
         # Connect ROM extraction panel signals
         self.rom_extraction_panel.files_changed.connect(self._on_rom_files_changed)
-        self.rom_extraction_panel.extraction_ready.connect(
-            self._on_rom_extraction_ready
-        )
-        self.rom_extraction_panel.output_name_changed.connect(
-            self._on_rom_output_name_changed
-        )
+        self.rom_extraction_panel.extraction_ready.connect(self._on_rom_extraction_ready)
+        self.rom_extraction_panel.output_name_changed.connect(self._on_rom_output_name_changed)
 
         # Note: Output settings are now shown in a dialog on Extract click
         # The output_settings_manager just tracks the suggested output name
@@ -761,7 +722,10 @@ class MainWindow(QMainWindow):
 
         # Update or hide cache status indicators through manager
         if show_indicators:
-            if not hasattr(self.status_bar_manager, "cache_status_widget") or self.status_bar_manager.cache_status_widget is None:
+            if (
+                not hasattr(self.status_bar_manager, "cache_status_widget")
+                or self.status_bar_manager.cache_status_widget is None
+            ):
                 # Re-create indicators if they were previously hidden
                 self.status_bar_manager.setup_status_bar_indicators()
             else:
@@ -787,7 +751,9 @@ class MainWindow(QMainWindow):
         # Use settings from dialog (stored in _handle_vram_extraction)
         return {
             "vram_path": self.extraction_panel.get_vram_path(),
-            "cgram_path": self.extraction_panel.get_cgram_path() if not self.extraction_panel.is_grayscale_mode() else "",
+            "cgram_path": self.extraction_panel.get_cgram_path()
+            if not self.extraction_panel.is_grayscale_mode()
+            else "",
             "oam_path": self.extraction_panel.get_oam_path(),
             "vram_offset": self.extraction_panel.get_vram_offset(),
             "output_base": getattr(self, "_vram_output_name", ""),
@@ -843,7 +809,7 @@ class MainWindow(QMainWindow):
         UserErrorDialog.display_error(
             self,
             error_message,
-            error_message  # Pass full error as technical details
+            error_message,  # Pass full error as technical details
         )
 
         # Emit signal for controller/test communication
@@ -1052,6 +1018,7 @@ class MainWindow(QMainWindow):
         from typing import cast
 
         from PySide6.QtGui import QPixmap
+
         self.sprite_preview.set_preview(cast(QPixmap, result), tile_count)
 
     def _on_controller_grayscale_ready(self, image: object) -> None:
@@ -1059,6 +1026,7 @@ class MainWindow(QMainWindow):
         from typing import cast
 
         from PIL.Image import Image as PILImage
+
         self.sprite_preview.set_grayscale_image(cast(PILImage, image))
 
     def _on_controller_palettes_ready(self, palettes: object) -> None:

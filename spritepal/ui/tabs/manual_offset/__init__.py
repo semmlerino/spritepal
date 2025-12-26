@@ -6,6 +6,7 @@ This module provides tab widgets for the manual offset dialog:
 - SimpleSmartTab: Region-based smart navigation
 - SimpleHistoryTab: Found sprite history tracking
 """
+
 from __future__ import annotations
 
 from .browse_tab import SimpleBrowseTab

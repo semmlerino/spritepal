@@ -1,4 +1,5 @@
 """Base widget class for ROM extraction widgets"""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt

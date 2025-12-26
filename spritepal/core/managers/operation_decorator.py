@@ -3,6 +3,7 @@
 This module provides a Protocol-based decorator that works with any
 manager class implementing the required interface.
 """
+
 from __future__ import annotations
 
 import functools
@@ -92,14 +93,10 @@ def with_operation_handling(
                     self._update_progress(operation, 100, 100)
                 return result
             except (OSError, PermissionError) as e:
-                enhanced = handle_file_io_error(
-                    e, operation, context, on_error=self._handle_error
-                )
+                enhanced = handle_file_io_error(e, operation, context, on_error=self._handle_error)
                 raise enhanced from e
             except (ValueError, TypeError) as e:
-                enhanced = handle_data_format_error(
-                    e, operation, context, on_error=self._handle_error
-                )
+                enhanced = handle_data_format_error(e, operation, context, on_error=self._handle_error)
                 raise enhanced from e
             except ValidationError:
                 raise

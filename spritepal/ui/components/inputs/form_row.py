@@ -4,6 +4,7 @@ Form row layout helper component
 Provides a standardized layout for label + input combinations
 used throughout SpritePal dialogs.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -36,7 +37,7 @@ class FormRow(QWidget):
         label_width: int | None = None,
         spacing: int = SPACING_SMALL,
         help_text: str = "",
-        label_alignment: Qt.AlignmentFlag | None = None
+        label_alignment: Qt.AlignmentFlag | None = None,
     ):
         super().__init__(parent)
 
@@ -163,12 +164,13 @@ class FormRow(QWidget):
         """Add stretch to the main layout"""
         self.main_layout.addStretch()
 
+
 def create_horizontal_form_row(
     label_text: str,
     input_widget: QWidget,
     label_width: int | None = None,
     help_text: str = "",
-    label_alignment: Qt.AlignmentFlag | None = None
+    label_alignment: Qt.AlignmentFlag | None = None,
 ) -> FormRow:
     """Convenience function to create a horizontal form row"""
     return FormRow(
@@ -177,18 +179,10 @@ def create_horizontal_form_row(
         orientation="horizontal",
         label_width=label_width,
         help_text=help_text,
-        label_alignment=label_alignment
+        label_alignment=label_alignment,
     )
 
-def create_vertical_form_row(
-    label_text: str,
-    input_widget: QWidget,
-    help_text: str = ""
-) -> FormRow:
+
+def create_vertical_form_row(label_text: str, input_widget: QWidget, help_text: str = "") -> FormRow:
     """Convenience function to create a vertical form row"""
-    return FormRow(
-        label_text=label_text,
-        input_widget=input_widget,
-        orientation="vertical",
-        help_text=help_text
-    )
+    return FormRow(label_text=label_text, input_widget=input_widget, orientation="vertical", help_text=help_text)

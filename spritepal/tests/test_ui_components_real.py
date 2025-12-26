@@ -7,6 +7,7 @@ Contains tests for:
 
 Note: ZoomablePreviewWidget and PreviewPanel tests are in test_zoomable_preview.py
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -81,7 +82,7 @@ class TestRowArrangementDialog:
     def test_scroll_position_preserved_on_palette_toggle(self, dialog, qtbot):
         """Test that scroll position is preserved when toggling palette application"""
         # Skip if dialog doesn't have the method (not all versions may have it)
-        if not hasattr(dialog, 'toggle_palette_application'):
+        if not hasattr(dialog, "toggle_palette_application"):
             pytest.skip("Dialog does not have toggle_palette_application method")
 
         # Get initial window title for comparison
@@ -89,7 +90,6 @@ class TestRowArrangementDialog:
 
         # Toggle palette application
         dialog.toggle_palette_application()
-
 
     def test_dialog_initialization(self, temp_sprite_path, qtbot):
         """Test that dialog initializes properly with real components"""

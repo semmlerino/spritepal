@@ -2,6 +2,7 @@
 Sprite injection functionality for SpritePal
 Handles reinsertion of edited sprites back into VRAM
 """
+
 from __future__ import annotations
 
 import json
@@ -22,6 +23,7 @@ from utils.file_validator import atomic_write
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 def encode_4bpp_tile(tile_pixels: list[int] | np.ndarray) -> bytes:
     """
@@ -44,7 +46,7 @@ def encode_4bpp_tile(tile_pixels: list[int] | np.ndarray) -> bytes:
         raise ValueError(f"Expected 64 pixels, got {len(pixels)}")
 
     # Reshape to 8x8 and mask to 4-bit
-    pixels = (pixels.reshape(8, 8) & PIXEL_MASK_4BIT)
+    pixels = pixels.reshape(8, 8) & PIXEL_MASK_4BIT
 
     # Extract bitplanes (vectorized bit extraction)
     # Each bitplane is an 8x8 array of 0s and 1s
@@ -70,6 +72,7 @@ def encode_4bpp_tile(tile_pixels: list[int] | np.ndarray) -> bytes:
     output[17:32:2] = bp3  # Odd indices 17,19,21,23,25,27,29,31
 
     return bytes(output)
+
 
 class SpriteInjector:
     """Handles sprite injection back to VRAM"""
@@ -160,7 +163,9 @@ class SpriteInjector:
                 original_max = int(pixels.max()) if pixels.size > 0 else 0
                 # Divide by 17 to get original 4-bit indices (0-15), clamp to 15
                 pixels = np.minimum(15, pixels // 17).astype(np.uint8)
-                logger.debug(f"Converting grayscale to palette indices: max grayscale={original_max}, max index={int(pixels.max()) if pixels.size > 0 else 0}")
+                logger.debug(
+                    f"Converting grayscale to palette indices: max grayscale={original_max}, max index={int(pixels.max()) if pixels.size > 0 else 0}"
+                )
             elif img.mode == "P":
                 # Already indexed - convert directly to NumPy
                 pixels = np.array(img, dtype=np.uint8)
@@ -196,7 +201,7 @@ class SpriteInjector:
         # From (height, width) to (tiles_y, TILE_HEIGHT, tiles_x, TILE_WIDTH)
         # Then transpose to (tiles_y, tiles_x, TILE_HEIGHT, TILE_WIDTH)
         # This groups all pixels for each tile together
-        tiles = pixels[:tiles_y * TILE_HEIGHT, :tiles_x * TILE_WIDTH]
+        tiles = pixels[: tiles_y * TILE_HEIGHT, : tiles_x * TILE_WIDTH]
         tiles = tiles.reshape(tiles_y, TILE_HEIGHT, tiles_x, TILE_WIDTH)
         tiles = tiles.transpose(0, 2, 1, 3)  # Now shape is (tiles_y, tiles_x, 8, 8)
 
@@ -208,7 +213,7 @@ class SpriteInjector:
 
         for i in range(total_tiles):
             tile_data = encode_4bpp_tile(tiles[i])
-            output_data[i * 32:(i + 1) * 32] = tile_data
+            output_data[i * 32 : (i + 1) * 32] = tile_data
 
         logger.info(f"Converted {total_tiles} tiles to {len(output_data)} bytes of 4bpp tile data")
         return bytes(output_data)
@@ -245,7 +250,9 @@ class SpriteInjector:
 
             # Validate offset
             if offset + len(tile_data) > len(self.vram_data):
-                logger.error(f"Tile data would exceed VRAM bounds: offset=0x{offset:04X}, size={len(tile_data)}, VRAM size={len(self.vram_data)}")
+                logger.error(
+                    f"Tile data would exceed VRAM bounds: offset=0x{offset:04X}, size={len(tile_data)}, VRAM size={len(self.vram_data)}"
+                )
                 return (
                     False,
                     f"Tile data ({len(tile_data)} bytes) would exceed VRAM size at offset 0x{offset:04X}",
@@ -274,4 +281,3 @@ class SpriteInjector:
             self.vram_data = bytearray()
             logger.exception("Sprite injection failed")
             return False, f"Error injecting sprite: {e!s}"
-

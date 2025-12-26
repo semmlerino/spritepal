@@ -8,6 +8,7 @@ These tests verify that:
 4. Failed injection does not invalidate cache
 5. VRAM injection does not affect ROM cache
 """
+
 from __future__ import annotations
 
 import json
@@ -54,9 +55,7 @@ class TestROMCacheInvalidation:
         rom_path.write_bytes(b"SNES ROM DATA" * 1000)  # ~13KB fake ROM
         return rom_path
 
-    def test_invalidate_clears_sprite_locations_cache(
-        self, rom_cache, sample_rom: Path, tmp_path: Path
-    ) -> None:
+    def test_invalidate_clears_sprite_locations_cache(self, rom_cache, sample_rom: Path, tmp_path: Path) -> None:
         """invalidate_rom_cache() clears sprite_locations cache."""
         # Save some sprite locations
         sprite_data = {"sprites": [{"offset": 0x1000, "name": "test"}]}
@@ -75,9 +74,7 @@ class TestROMCacheInvalidation:
         assert removed >= 1
         assert not cache_file.exists(), "Cache file was not deleted"
 
-    def test_invalidate_clears_rom_info_cache(
-        self, rom_cache, sample_rom: Path
-    ) -> None:
+    def test_invalidate_clears_rom_info_cache(self, rom_cache, sample_rom: Path) -> None:
         """invalidate_rom_cache() clears rom_info cache."""
         # Save some ROM info
         rom_info = {"title": "Test ROM", "checksum": "ABCD"}
@@ -96,15 +93,12 @@ class TestROMCacheInvalidation:
         assert removed >= 1
         assert not cache_file.exists(), "Cache file was not deleted"
 
-    def test_invalidate_clears_preview_cache(
-        self, rom_cache, sample_rom: Path
-    ) -> None:
+    def test_invalidate_clears_preview_cache(self, rom_cache, sample_rom: Path) -> None:
         """invalidate_rom_cache() clears preview caches."""
         # Save some preview data
         preview_data = b"fake tile data"
         save_result = rom_cache.save_preview_data(
-            str(sample_rom), offset=0x1000, tile_data=preview_data,
-            width=8, height=8
+            str(sample_rom), offset=0x1000, tile_data=preview_data, width=8, height=8
         )
         assert save_result is True, "Failed to save preview data"
 
@@ -121,19 +115,14 @@ class TestROMCacheInvalidation:
         preview_files_after = list(rom_cache.cache_dir.glob(f"{rom_hash}_preview_*.json"))
         assert len(preview_files_after) == 0, "Preview cache files were not deleted"
 
-    def test_invalidate_clears_hash_cache(
-        self, rom_cache, sample_rom: Path
-    ) -> None:
+    def test_invalidate_clears_hash_cache(self, rom_cache, sample_rom: Path) -> None:
         """invalidate_rom_cache() clears in-memory hash cache entry."""
         # Access ROM to populate hash cache
         rom_cache._get_rom_hash(str(sample_rom))
 
         # Verify hash is cached
         with rom_cache._hash_cache_lock:
-            cached_keys = [
-                k for k in rom_cache._hash_cache
-                if k.startswith(str(sample_rom))
-            ]
+            cached_keys = [k for k in rom_cache._hash_cache if k.startswith(str(sample_rom))]
             assert len(cached_keys) > 0
 
         # Invalidate
@@ -141,15 +130,10 @@ class TestROMCacheInvalidation:
 
         # Verify hash cache was cleared
         with rom_cache._hash_cache_lock:
-            cached_keys = [
-                k for k in rom_cache._hash_cache
-                if k.startswith(str(sample_rom))
-            ]
+            cached_keys = [k for k in rom_cache._hash_cache if k.startswith(str(sample_rom))]
             assert len(cached_keys) == 0
 
-    def test_invalidate_does_not_affect_other_roms(
-        self, rom_cache, sample_rom: Path, tmp_path: Path
-    ) -> None:
+    def test_invalidate_does_not_affect_other_roms(self, rom_cache, sample_rom: Path, tmp_path: Path) -> None:
         """invalidate_rom_cache() only clears cache for specified ROM."""
         # Create another ROM
         other_rom = tmp_path / "other.sfc"
@@ -176,9 +160,7 @@ class TestROMCacheInvalidation:
         assert not sample_cache.exists()
         assert other_cache.exists()
 
-    def test_invalidate_returns_zero_when_cache_disabled(
-        self, tmp_path: Path
-    ) -> None:
+    def test_invalidate_returns_zero_when_cache_disabled(self, tmp_path: Path) -> None:
         """invalidate_rom_cache() returns 0 when caching is disabled."""
         from core.services.rom_cache import ROMCache
 
@@ -190,9 +172,7 @@ class TestROMCacheInvalidation:
         result = cache.invalidate_rom_cache("/some/rom.sfc")
         assert result == 0
 
-    def test_invalidate_handles_nonexistent_rom(
-        self, rom_cache
-    ) -> None:
+    def test_invalidate_handles_nonexistent_rom(self, rom_cache) -> None:
         """invalidate_rom_cache() handles nonexistent ROM gracefully."""
         # Should not raise, just return 0
         removed = rom_cache.invalidate_rom_cache("/nonexistent/rom.sfc")
@@ -208,14 +188,11 @@ class TestInjectionCacheIntegration:
         from core.managers.core_operations_manager import CoreOperationsManager
 
         # Create manager with mocked dependencies
-        with patch.object(CoreOperationsManager, '__init__', lambda self: None):
+        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
             manager = CoreOperationsManager()
             manager._logger = MagicMock()
             manager._current_worker = MagicMock()
-            manager._current_worker.params = {
-                'mode': 'rom',
-                'output_rom': '/path/to/output.sfc'
-            }
+            manager._current_worker.params = {"mode": "rom", "output_rom": "/path/to/output.sfc"}
 
             # Mock the methods we don't want to test
             manager._handle_worker_completion = MagicMock()
@@ -225,31 +202,28 @@ class TestInjectionCacheIntegration:
             mock_cache = MagicMock()
             mock_cache.invalidate_rom_cache.return_value = 5
 
-            with patch.object(manager, '_ensure_rom_cache', return_value=mock_cache):
+            with patch.object(manager, "_ensure_rom_cache", return_value=mock_cache):
                 manager._on_worker_finished(success=True, message="OK")
 
             # Verify cache invalidation was called
-            mock_cache.invalidate_rom_cache.assert_called_once_with('/path/to/output.sfc')
+            mock_cache.invalidate_rom_cache.assert_called_once_with("/path/to/output.sfc")
 
     def test_on_worker_finished_skips_invalidation_on_failure(self) -> None:
         """_on_worker_finished does not invalidate cache on failed injection."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        with patch.object(CoreOperationsManager, '__init__', lambda self: None):
+        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
             manager = CoreOperationsManager()
             manager._logger = MagicMock()
             manager._current_worker = MagicMock()
-            manager._current_worker.params = {
-                'mode': 'rom',
-                'output_rom': '/path/to/output.sfc'
-            }
+            manager._current_worker.params = {"mode": "rom", "output_rom": "/path/to/output.sfc"}
 
             manager._handle_worker_completion = MagicMock()
             manager.injection_finished = MagicMock()
 
             mock_cache = MagicMock()
 
-            with patch.object(manager, '_ensure_rom_cache', return_value=mock_cache):
+            with patch.object(manager, "_ensure_rom_cache", return_value=mock_cache):
                 manager._on_worker_finished(success=False, message="Error")
 
             # Verify cache invalidation was NOT called
@@ -259,18 +233,18 @@ class TestInjectionCacheIntegration:
         """_invalidate_injection_cache skips invalidation for VRAM injection."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        with patch.object(CoreOperationsManager, '__init__', lambda self: None):
+        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
             manager = CoreOperationsManager()
             manager._logger = MagicMock()
             manager._current_worker = MagicMock()
             manager._current_worker.params = {
-                'mode': 'vram',  # VRAM mode, not ROM
-                'output_vram': '/path/to/output.vram'
+                "mode": "vram",  # VRAM mode, not ROM
+                "output_vram": "/path/to/output.vram",
             }
 
             mock_cache = MagicMock()
 
-            with patch.object(manager, '_ensure_rom_cache', return_value=mock_cache):
+            with patch.object(manager, "_ensure_rom_cache", return_value=mock_cache):
                 manager._invalidate_injection_cache()
 
             # Verify cache invalidation was NOT called for VRAM
@@ -280,7 +254,7 @@ class TestInjectionCacheIntegration:
         """_invalidate_injection_cache handles case when worker is None."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        with patch.object(CoreOperationsManager, '__init__', lambda self: None):
+        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
             manager = CoreOperationsManager()
             manager._logger = MagicMock()
             manager._current_worker = None  # No worker
@@ -292,7 +266,7 @@ class TestInjectionCacheIntegration:
         """_invalidate_injection_cache handles case when worker has no params."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        with patch.object(CoreOperationsManager, '__init__', lambda self: None):
+        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
             manager = CoreOperationsManager()
             manager._logger = MagicMock()
             manager._current_worker = MagicMock(spec=[])  # No params attribute

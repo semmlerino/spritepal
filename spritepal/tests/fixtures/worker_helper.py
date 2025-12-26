@@ -1,6 +1,7 @@
 """
 Test worker helpers for injection tests.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -87,5 +88,6 @@ class WorkerHelper:
     def cleanup(self) -> None:
         """Cleanup test files"""
         import shutil
+
         if self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)

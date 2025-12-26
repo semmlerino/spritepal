@@ -1,6 +1,7 @@
 """
 Comprehensive sprite finder that scans ROMs for actual character sprites
 """
+
 from __future__ import annotations
 
 import json
@@ -39,6 +40,7 @@ logger = get_logger(__name__)
 @dataclass
 class SpriteCandidate:
     """Represents a potential sprite found in ROM"""
+
     offset: int
     compressed_size: int
     decompressed_size: int
@@ -57,7 +59,7 @@ class SpriteCandidate:
             "tile_count": self.tile_count,
             "confidence": round(self.confidence, 3),
             "visual_metrics": {k: round(v, 3) for k, v in self.visual_metrics.items()},
-            "preview_path": self.preview_path
+            "preview_path": self.preview_path,
         }
 
 
@@ -68,6 +70,7 @@ class ScanResult:
     This is the unified result type used by scan_offset() to provide
     consistent validation across sequential and parallel finders.
     """
+
     offset: int
     compressed_size: int
     decompressed_size: int
@@ -86,8 +89,7 @@ class ScanResult:
             "tile_count": self.tile_count,
             "confidence": round(self.confidence, 3),
             "tile_validation_score": round(self.tile_validation_score, 3),
-            "visual_metrics": {k: round(v, 3) for k, v in self.visual_metrics.items()}
-                             if self.visual_metrics else None
+            "visual_metrics": {k: round(v, 3) for k, v in self.visual_metrics.items()} if self.visual_metrics else None,
         }
 
     def to_sprite_candidate(self, preview_path: str | None = None) -> SpriteCandidate:
@@ -99,7 +101,7 @@ class ScanResult:
             tile_count=self.tile_count,
             confidence=self.confidence,
             visual_metrics=self.visual_metrics or {},
-            preview_path=preview_path
+            preview_path=preview_path,
         )
 
 
@@ -148,7 +150,7 @@ class SpriteFinder:
             return False
 
         # Only check first 4 bytes for definite non-starters
-        header = rom_data[offset:offset + 4]
+        header = rom_data[offset : offset + 4]
 
         # 0xFF is the HAL stream terminator - can't be first byte
         if header[0] == 0xFF:
@@ -164,11 +166,7 @@ class SpriteFinder:
         return True
 
     def _calculate_quick_confidence(
-        self,
-        decompressed_size: int,
-        compressed_size: int,
-        tile_count: int,
-        tile_validation_score: float
+        self, decompressed_size: int, compressed_size: int, tile_count: int, tile_validation_score: float
     ) -> float:
         """
         Calculate confidence score without visual validation.
@@ -214,7 +212,7 @@ class SpriteFinder:
         offset: int,
         quick_check: bool = True,
         full_visual_validation: bool = False,
-        min_tile_confidence: float = 0.4
+        min_tile_confidence: float = 0.4,
     ) -> ScanResult | None:
         """
         Unified offset scanning pipeline.
@@ -255,18 +253,14 @@ class SpriteFinder:
             return None
 
         # Step 4: Tile data validation
-        is_valid, tile_confidence = self.validator.validate_tile_data(
-            sprite_data, tile_count
-        )
+        is_valid, tile_confidence = self.validator.validate_tile_data(sprite_data, tile_count)
         if not is_valid or tile_confidence < min_tile_confidence:
             return None
 
         # Step 5: Calculate confidence
         if full_visual_validation:
             # Run full visual validation (expensive)
-            visual_metrics, final_confidence = self._run_visual_validation(
-                sprite_data, tile_confidence
-            )
+            visual_metrics, final_confidence = self._run_visual_validation(sprite_data, tile_confidence)
         else:
             # Calculate confidence from structural data only
             visual_metrics = None
@@ -274,7 +268,7 @@ class SpriteFinder:
                 decompressed_size=len(sprite_data),
                 compressed_size=compressed_size,
                 tile_count=tile_count,
-                tile_validation_score=tile_confidence
+                tile_validation_score=tile_confidence,
             )
 
         return ScanResult(
@@ -284,13 +278,11 @@ class SpriteFinder:
             tile_count=tile_count,
             confidence=final_confidence,
             tile_validation_score=tile_confidence,
-            visual_metrics=visual_metrics
+            visual_metrics=visual_metrics,
         )
 
     def _run_visual_validation(
-        self,
-        sprite_data: bytes,
-        tile_confidence: float
+        self, sprite_data: bytes, tile_confidence: float
     ) -> tuple[dict[str, float] | None, float]:
         """
         Run full visual validation pipeline.
@@ -311,9 +303,7 @@ class SpriteFinder:
 
             self._convert_to_png(sprite_data, temp_image_path)
 
-            is_valid, confidence, metrics = self.validator.validate_sprite_image(
-                temp_image_path
-            )
+            is_valid, confidence, metrics = self.validator.validate_sprite_image(temp_image_path)
 
             if is_valid:
                 return metrics, confidence
@@ -335,7 +325,7 @@ class SpriteFinder:
         min_confidence: float = 0.6,
         save_previews: bool = True,
         max_candidates: int = 50,
-        use_region_optimization: bool = True
+        use_region_optimization: bool = True,
     ) -> list[SpriteCandidate]:
         """
         Scan ROM for actual character sprites.
@@ -381,7 +371,7 @@ class SpriteFinder:
             # Get optimized scan ranges
             scan_ranges = self.region_detector.get_optimized_scan_ranges(
                 rom_data[start_offset:end_offset],
-                min_gap_size=0x10000  # 64KB minimum gap
+                min_gap_size=0x10000,  # 64KB minimum gap
             )
 
             # Adjust ranges to absolute offsets and generate scan offsets
@@ -426,7 +416,9 @@ class SpriteFinder:
             # Progress update every 1000 offsets
             if processed % 1000 == 0:
                 progress = (processed / total_offsets) * 100
-                logger.info(f"Progress: {progress:.1f}% ({processed}/{total_offsets}), found {found_count} candidates, skipped {skipped_duplicates} duplicates")
+                logger.info(
+                    f"Progress: {progress:.1f}% ({processed}/{total_offsets}), found {found_count} candidates, skipped {skipped_duplicates} duplicates"
+                )
 
             # Try to decompress at this offset
             compressed_size = 0
@@ -446,9 +438,7 @@ class SpriteFinder:
                     continue
 
                 # Quick pre-validation
-                is_valid, quick_confidence = self.validator.validate_tile_data(
-                    sprite_data, tile_count
-                )
+                is_valid, quick_confidence = self.validator.validate_tile_data(sprite_data, tile_count)
 
                 if not is_valid or quick_confidence < 0.5:
                     continue
@@ -463,9 +453,7 @@ class SpriteFinder:
                     self._convert_to_png(sprite_data, temp_image_path)
 
                     # Visual validation
-                    is_valid, confidence, metrics = self.validator.validate_sprite_image(
-                        temp_image_path
-                    )
+                    is_valid, confidence, metrics = self.validator.validate_sprite_image(temp_image_path)
 
                     if is_valid and confidence >= min_confidence:
                         # Found a candidate!
@@ -474,7 +462,7 @@ class SpriteFinder:
                         # Save preview if requested
                         preview_path = None
                         if save_previews:
-                            preview_name = f"sprite_{offset:06X}_conf{int(confidence*100)}.png"
+                            preview_name = f"sprite_{offset:06X}_conf{int(confidence * 100)}.png"
                             preview_path = Path(self.output_dir) / preview_name
 
                             # Copy temp image to preview
@@ -489,7 +477,7 @@ class SpriteFinder:
                             tile_count=tile_count,
                             confidence=confidence,
                             visual_metrics=metrics,
-                            preview_path=str(preview_path) if preview_path else None
+                            preview_path=str(preview_path) if preview_path else None,
                         )
 
                         candidates.append(candidate)
@@ -539,9 +527,7 @@ class SpriteFinder:
         height_tiles = (num_tiles + width_tiles - 1) // width_tiles
 
         # Render using TileRenderer (palette_index=None for grayscale)
-        image = self.tile_renderer.render_tiles(
-            tile_data, width_tiles, height_tiles, palette_index=None
-        )
+        image = self.tile_renderer.render_tiles(tile_data, width_tiles, height_tiles, palette_index=None)
         if image is not None:
             # Convert to grayscale and save
             image.convert("L").save(output_path, "PNG")
@@ -554,7 +540,7 @@ class SpriteFinder:
         summary = {
             "rom_file": rom_name,
             "total_candidates": len(candidates),
-            "candidates": [c.to_dict() for c in candidates]
+            "candidates": [c.to_dict() for c in candidates],
         }
 
         with summary_path.open("w") as f:
@@ -570,7 +556,7 @@ class SpriteFinder:
             f.write(f"Found {len(candidates)} sprite candidates\n\n")
 
             for i, candidate in enumerate(candidates[:20]):  # Top 20
-                f.write(f"{i+1}. Offset: 0x{candidate.offset:06X}\n")
+                f.write(f"{i + 1}. Offset: 0x{candidate.offset:06X}\n")
                 f.write(f"   Confidence: {candidate.confidence:.1%}\n")
                 f.write(f"   Size: {candidate.tile_count} tiles ({candidate.decompressed_size} bytes)\n")
                 f.write(f"   Compressed: {candidate.compressed_size} bytes\n")
@@ -610,9 +596,7 @@ class SpriteFinder:
                 return None
 
             # Quick pre-validation
-            is_valid, quick_confidence = self.validator.validate_tile_data(
-                sprite_data, tile_count
-            )
+            is_valid, quick_confidence = self.validator.validate_tile_data(sprite_data, tile_count)
 
             if not is_valid or quick_confidence < 0.4:  # Lower threshold for single offset
                 return None
@@ -625,7 +609,9 @@ class SpriteFinder:
                 "decompressed_size": len(sprite_data),
                 "tile_count": tile_count,
                 "quality": quick_confidence,
-                "alignment": "perfect" if len(sprite_data) % BYTES_PER_TILE == 0 else f"{len(sprite_data) % BYTES_PER_TILE} extra bytes"
+                "alignment": "perfect"
+                if len(sprite_data) % BYTES_PER_TILE == 0
+                else f"{len(sprite_data) % BYTES_PER_TILE} extra bytes",
             }
 
         except Exception:
@@ -656,12 +642,10 @@ class SpriteFinder:
             # Normalize address (handles SNES->file conversion and SMC headers)
             file_offset = normalize_address(offset, rom_size)
 
-            with rom_file.open('rb') as f:
+            with rom_file.open("rb") as f:
                 rom_data = f.read()
 
-            logger.debug(
-                f"Checking offset: input=0x{offset:06X} -> file=0x{file_offset:06X}"
-            )
+            logger.debug(f"Checking offset: input=0x{offset:06X} -> file=0x{file_offset:06X}")
             return self.find_sprite_at_offset(rom_data, file_offset)
         except Exception as e:
             logger.warning(f"Failed to check offset 0x{offset:06X}: {e}")

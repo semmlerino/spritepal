@@ -5,6 +5,7 @@ These tests require real HAL compression tools and verify actual sprite
 finding and extraction behavior. They test with a synthetic ROM unless
 a real Kirby ROM is available.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -36,10 +37,10 @@ class TestSpriteFinder:
         rom_info = test_rom_with_sprites
 
         # Skip if no sprites in test ROM (real Kirby ROM not available)
-        if not rom_info['sprites']:
+        if not rom_info["sprites"]:
             pytest.skip("No compressed sprites in test ROM - real Kirby ROM not available")
 
-        rom_path = str(rom_info['path'])
+        rom_path = str(rom_info["path"])
 
         # Create sprite finder
         finder = SpriteFinder()
@@ -49,8 +50,8 @@ class TestSpriteFinder:
 
         # Find sprites at known locations
         sprites_found = []
-        for sprite_info in rom_info['sprites']:
-            offset = sprite_info['offset']
+        for sprite_info in rom_info["sprites"]:
+            offset = sprite_info["offset"]
             result = finder.find_sprite_at_offset(rom_data, offset)
             if result:
                 sprites_found.append(result)
@@ -59,24 +60,25 @@ class TestSpriteFinder:
         assert len(sprites_found) > 0, "Should find test sprites"
 
         # Verify sprite properties match expectations
-        for found, expected in zip(sprites_found, rom_info['sprites'], strict=False):
-            assert found['offset'] == expected['offset']
+        for found, expected in zip(sprites_found, rom_info["sprites"], strict=False):
+            assert found["offset"] == expected["offset"]
             # Allow some variance in tile count since decompression may vary
-            assert found['tile_count'] > 0
-            assert found['decompressed_size'] > 0
+            assert found["tile_count"] > 0
+            assert found["decompressed_size"] > 0
 
     def test_sprite_finder_with_rom_extractor(self, test_rom_with_sprites):
         """Test sprite finder working with ROM extractor."""
         rom_info = test_rom_with_sprites
 
         # Skip if no sprites in test ROM
-        if not rom_info['sprites']:
+        if not rom_info["sprites"]:
             pytest.skip("No compressed sprites in test ROM - real Kirby ROM not available")
 
-        rom_path = str(rom_info['path'])
+        rom_path = str(rom_info["path"])
 
         # Create ROM extractor via app context (verifies app context is working)
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
         assert extractor is not None
 
@@ -88,8 +90,8 @@ class TestSpriteFinder:
 
         # Scan for sprites at known locations
         found_sprites = []
-        for sprite_info in rom_info['sprites']:
-            sprite = finder.find_sprite_at_offset(rom_data, sprite_info['offset'])
+        for sprite_info in rom_info["sprites"]:
+            sprite = finder.find_sprite_at_offset(rom_data, sprite_info["offset"])
             if sprite:
                 found_sprites.append(sprite)
 
@@ -119,9 +121,9 @@ class TestSpriteFinder:
                 if sprite:
                     found_count += 1
                     # Verify sprite has reasonable properties
-                    assert sprite['tile_count'] > 0
-                    assert sprite['decompressed_size'] > 0
-                    assert sprite['quality'] > 0
+                    assert sprite["tile_count"] > 0
+                    assert sprite["decompressed_size"] > 0
+                    assert sprite["quality"] > 0
 
         # Should find at least some sprites
         assert found_count > 0, "Should find sprites at known locations"
@@ -158,18 +160,18 @@ class TestHALCompression:
         # HAL decompression returns the exact original data
         assert len(decompressed) >= len(original_data), "Decompressed size should be at least original"
         # First N bytes should match (HAL may pad output)
-        assert decompressed[:len(original_data)] == original_data, "Data should match after cycle"
+        assert decompressed[: len(original_data)] == original_data, "Data should match after cycle"
 
     def test_decompress_from_rom_offset(self, test_rom_with_sprites):
         """Test decompressing directly from ROM at offset."""
         rom_info = test_rom_with_sprites
-        rom_path = str(rom_info['path'])
+        rom_path = str(rom_info["path"])
 
-        if not rom_info['sprites']:
+        if not rom_info["sprites"]:
             pytest.skip("No test sprites in ROM - real Kirby ROM not available")
 
-        sprite_info = rom_info['sprites'][0]
-        offset = sprite_info['offset']
+        sprite_info = rom_info["sprites"][0]
+        offset = sprite_info["offset"]
 
         # Decompress from ROM
         compressor = HALCompressor()
@@ -182,7 +184,7 @@ class TestHALCompression:
     def test_parallel_decompression(self, test_rom_with_sprites):
         """Test that HAL process pool handles parallel operations."""
         rom_info = test_rom_with_sprites
-        rom_path = str(rom_info['path'])
+        rom_path = str(rom_info["path"])
 
         rom_data = Path(rom_path).read_bytes()
 
@@ -213,23 +215,24 @@ class TestROMExtractor:
     def test_extract_sprite_from_rom(self, test_rom_with_sprites, tmp_path):
         """Test extracting sprites from ROM to files."""
         rom_info = test_rom_with_sprites
-        rom_path = str(rom_info['path'])
+        rom_path = str(rom_info["path"])
 
-        if not rom_info['sprites']:
+        if not rom_info["sprites"]:
             pytest.skip("No test sprites in ROM - real Kirby ROM not available")
 
         # Use app context to get ROMExtractor
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
 
         # Extract at a known sprite offset
-        sprite_info = rom_info['sprites'][0]
+        sprite_info = rom_info["sprites"][0]
         output_path = tmp_path / "extracted_sprite.bin"
 
         # Use extract_sprite_data which returns decompressed bytes
         sprite_data = extractor.extract_sprite_data(
             rom_path=rom_path,
-            sprite_offset=sprite_info['offset'],
+            sprite_offset=sprite_info["offset"],
         )
 
         assert sprite_data is not None, "Should extract sprite data"
@@ -244,16 +247,17 @@ class TestROMExtractor:
     def test_extract_with_decompression(self, test_rom_with_sprites, tmp_path):
         """Test extracting and decompressing sprites."""
         rom_info = test_rom_with_sprites
-        rom_path = str(rom_info['path'])
+        rom_path = str(rom_info["path"])
 
-        if not rom_info['sprites']:
+        if not rom_info["sprites"]:
             pytest.skip("No test sprites in ROM - real Kirby ROM not available")
 
         # Use app context to get ROMExtractor
         from core.app_context import get_app_context
+
         extractor = get_app_context().rom_extractor
 
-        sprite_info = rom_info['sprites'][0]
+        sprite_info = rom_info["sprites"][0]
         output_path = tmp_path / "decompressed_sprite.bin"
 
         # Extract with decompression
@@ -261,9 +265,7 @@ class TestROMExtractor:
 
         # Use the injector to find and decompress
         compressed_size, decompressed_data = extractor.rom_injector.find_compressed_sprite(
-            rom_data,
-            sprite_info['offset'],
-            expected_size=None
+            rom_data, sprite_info["offset"], expected_size=None
         )
 
         assert decompressed_data is not None, "Should decompress sprite"

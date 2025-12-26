@@ -2,6 +2,7 @@
 Empty region detection for optimized ROM scanning.
 Identifies regions that can be skipped during sprite searching.
 """
+
 from __future__ import annotations
 
 import math
@@ -22,17 +23,21 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 class EmptyRegionConfig(NamedTuple):
     """Configuration for empty region detection."""
+
     entropy_threshold: float = EMPTY_REGION_ENTROPY_THRESHOLD
     zero_threshold: float = EMPTY_REGION_ZERO_THRESHOLD
     pattern_threshold: float = EMPTY_REGION_PATTERN_THRESHOLD
     max_unique_bytes: int = EMPTY_REGION_MAX_UNIQUE_BYTES
     region_size: int = EMPTY_REGION_SIZE
 
+
 @dataclass
 class RegionAnalysis:
     """Result of analyzing a ROM region."""
+
     offset: int
     size: int
     is_empty: bool
@@ -41,6 +46,7 @@ class RegionAnalysis:
     unique_bytes: int
     pattern_score: float
     reason: str = ""
+
 
 class EmptyRegionDetector:
     """Detects empty or non-sprite regions in ROM data for optimized scanning."""
@@ -99,7 +105,7 @@ class EmptyRegionDetector:
             zero_percentage=zero_percentage,
             unique_bytes=unique_bytes,
             pattern_score=pattern_score,
-            reason=reason
+            reason=reason,
         )
 
         # Cache result
@@ -149,9 +155,9 @@ class EmptyRegionDetector:
         # Check for common padding patterns
         common_patterns = [
             b"\x00" * 16,  # All zeros
-            b"\xFF" * 16,  # All ones
-            b"\x00\xFF" * 8,  # Alternating
-            b"\xFF\x00" * 8,  # Alternating reverse
+            b"\xff" * 16,  # All ones
+            b"\x00\xff" * 8,  # Alternating
+            b"\xff\x00" * 8,  # Alternating reverse
         ]
 
         # Check if data matches any common pattern
@@ -160,7 +166,7 @@ class EmptyRegionDetector:
             matches = 0
 
             for i in range(0, len(data) - pattern_len + 1, pattern_len):
-                if data[i:i + pattern_len] == pattern:
+                if data[i : i + pattern_len] == pattern:
                     matches += 1
 
             if matches > 0:
@@ -175,7 +181,7 @@ class EmptyRegionDetector:
             matches = 0
 
             for i in range(0, len(data) - pattern_len + 1, pattern_len):
-                if data[i:i + pattern_len] == first_pattern:
+                if data[i : i + pattern_len] == first_pattern:
                     matches += 1
 
             coverage = (matches * pattern_len) / len(data)
@@ -184,7 +190,9 @@ class EmptyRegionDetector:
 
         return 0.0
 
-    def scan_rom_regions(self, rom_data: bytes, progress_callback: Callable[[int, int], None] | None = None) -> list[tuple[int, int]]:
+    def scan_rom_regions(
+        self, rom_data: bytes, progress_callback: Callable[[int, int], None] | None = None
+    ) -> list[tuple[int, int]]:
         """
         Scan entire ROM and return list of non-empty regions.
 
@@ -240,7 +248,9 @@ class EmptyRegionDetector:
 
         return non_empty_regions
 
-    def get_optimized_scan_ranges(self, rom_data: bytes, min_gap_size: int = ROM_MIN_REGION_SIZE) -> list[tuple[int, int]]:
+    def get_optimized_scan_ranges(
+        self, rom_data: bytes, min_gap_size: int = ROM_MIN_REGION_SIZE
+    ) -> list[tuple[int, int]]:
         """
         Get optimized scan ranges, merging small gaps between regions.
 

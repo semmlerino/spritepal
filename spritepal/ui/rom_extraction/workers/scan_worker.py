@@ -1,4 +1,5 @@
 """Worker thread for scanning ROM for sprite offsets"""
+
 from __future__ import annotations
 
 import threading
@@ -21,6 +22,7 @@ from utils.constants import MIN_SPRITE_SIZE, ROM_SCAN_START_DEFAULT, ROM_SIZE_4M
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class SpriteScanWorker(BaseWorker):
     """Worker thread for scanning ROM for sprite offsets.
@@ -54,17 +56,25 @@ class SpriteScanWorker(BaseWorker):
     # Default step/alignment for scanning
     _DEFAULT_STEP = MIN_SPRITE_SIZE
 
-    def __init__(self, rom_path: str, extractor: ROMExtractor | None = None, use_cache: bool = True,
-                 start_offset: int | None = None, end_offset: int | None = None, parent: QObject | None = None, *,
-                 rom_cache: ROMCache,
-                 parallel_finder: ParallelSpriteFinder | None = None,
-                 step: int | None = None):
+    def __init__(
+        self,
+        rom_path: str,
+        extractor: ROMExtractor | None = None,
+        use_cache: bool = True,
+        start_offset: int | None = None,
+        end_offset: int | None = None,
+        parent: QObject | None = None,
+        *,
+        rom_cache: ROMCache,
+        parallel_finder: ParallelSpriteFinder | None = None,
+        step: int | None = None,
+    ):
         super().__init__(parent)
         self.rom_path = rom_path
         self.extractor = extractor
         self.use_cache = use_cache
         self.custom_start_offset = start_offset  # Custom scan range
-        self.custom_end_offset = end_offset      # Custom scan range
+        self.custom_end_offset = end_offset  # Custom scan range
         self._last_save_progress = 0
         self._cancellation_token = threading.Event()
 
@@ -73,7 +83,7 @@ class SpriteScanWorker(BaseWorker):
         self._parallel_finder = parallel_finder or ParallelSpriteFinder(
             num_workers=4,
             chunk_size=0x40000,  # 256KB chunks
-            step_size=self._step  # Use configured step (was hardcoded 0x100)
+            step_size=self._step,  # Use configured step (was hardcoded 0x100)
         )
 
         # Assign rom_cache
@@ -225,7 +235,7 @@ class SpriteScanWorker(BaseWorker):
                     scan_params,
                     found_sprites_list,
                     current_offset,
-                    False  # not completed
+                    False,  # not completed
                 ):
                     self.cache_progress.emit(current_progress)
                     logger.debug(f"Saved partial scan results at {current_progress}% progress")
@@ -236,7 +246,7 @@ class SpriteScanWorker(BaseWorker):
             start_offset=start_offset,
             end_offset=end_offset,
             progress_callback=progress_callback,
-            cancellation_token=self._cancellation_token
+            cancellation_token=self._cancellation_token,
         )
 
         # Convert SearchResult objects to legacy sprite info format and emit
@@ -248,7 +258,7 @@ class SpriteScanWorker(BaseWorker):
                 "decompressed_size": result.size,
                 "tile_count": result.tile_count,
                 "alignment": "perfect" if result.size % 32 == 0 else f"{result.size % 32} extra bytes",
-                "quality": result.confidence
+                "quality": result.confidence,
             }
 
             # Thread-safe add
@@ -256,8 +266,7 @@ class SpriteScanWorker(BaseWorker):
             self.sprite_found.emit(sprite_info)
 
             logger.info(
-                f"Found sprite at 0x{result.offset:X}: quality={result.confidence:.2f}, "
-                f"tiles={result.tile_count}"
+                f"Found sprite at 0x{result.offset:X}: quality={result.confidence:.2f}, tiles={result.tile_count}"
             )
 
         # Save final results after scan completes (thread-safe)
@@ -272,8 +281,8 @@ class SpriteScanWorker(BaseWorker):
                 self.rom_path,
                 scan_params,
                 found_sprites_list,
-                end_offset,   # final offset
-                True          # completed
+                end_offset,  # final offset
+                True,  # completed
             ):
                 # Ensure we emit 100% progress for the final save
                 self.cache_progress.emit(100)

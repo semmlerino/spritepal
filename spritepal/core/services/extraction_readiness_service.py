@@ -6,6 +6,7 @@ Used by both ExtractionPanel (VRAM dumps) and ROMExtractionPanel (ROM extraction
 
 This module uses pure functions instead of a stateless service class.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

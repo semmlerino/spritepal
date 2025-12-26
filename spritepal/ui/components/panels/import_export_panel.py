@@ -3,6 +3,7 @@ Import/Export Panel for Manual Offset Dialog
 
 Handles importing and exporting sprite offsets to/from JSON files.
 """
+
 from __future__ import annotations
 
 import json
@@ -97,17 +98,14 @@ class ImportExportPanel(QWidget):
                 self,
                 "No Data to Export",
                 "No sprite offsets found. Run a scan first to find sprites.",
-                QMessageBox.StandardButton.Ok
+                QMessageBox.StandardButton.Ok,
             )
             return
 
         # Get save file path
         default_name = f"sprite_offsets_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.json"
         file_path = browse_for_save_file(
-            self,
-            "Export Sprite Offsets",
-            "JSON Files (*.json);;All Files (*)",
-            default_name
+            self, "Export Sprite Offsets", "JSON Files (*.json);;All Files (*)", default_name
         )
 
         if not file_path:
@@ -126,7 +124,7 @@ class ImportExportPanel(QWidget):
                     self,
                     "No Data to Export",
                     "No sprite offsets found to export. Scan for sprites first.",
-                    QMessageBox.StandardButton.Ok
+                    QMessageBox.StandardButton.Ok,
                 )
                 return
 
@@ -140,17 +138,17 @@ class ImportExportPanel(QWidget):
                     "rom_size": self.rom_size,
                     "export_timestamp": datetime.now(UTC).isoformat(),
                     "spritepal_version": "1.0.0",
-                    "total_sprites": len(self.found_sprites)
+                    "total_sprites": len(self.found_sprites),
                 },
                 "sprites": [
                     {
                         "offset": f"0x{offset:06X}",
                         "offset_decimal": offset,
                         "quality": round(quality, 3),
-                        "name": f"sprite_{i+1:03d}_0x{offset:06X}"
+                        "name": f"sprite_{i + 1:03d}_0x{offset:06X}",
                     }
                     for i, (offset, quality) in enumerate(self.found_sprites)
-                ]
+                ],
             }
 
             # Write to file with atomic operation
@@ -174,7 +172,7 @@ class ImportExportPanel(QWidget):
                 self,
                 "Export Successful",
                 f"Successfully exported {sprite_count} sprite offsets to:\n{file_path}",
-                QMessageBox.StandardButton.Ok
+                QMessageBox.StandardButton.Ok,
             )
 
         except PermissionError as e:
@@ -184,7 +182,7 @@ class ImportExportPanel(QWidget):
                 self,
                 "Export Failed",
                 f"Cannot write to file:\n{error_msg}\n\nTry selecting a different location.",
-                QMessageBox.StandardButton.Ok
+                QMessageBox.StandardButton.Ok,
             )
         except OSError as e:
             error_msg = f"File I/O error: {e}"
@@ -193,26 +191,17 @@ class ImportExportPanel(QWidget):
                 self,
                 "Export Failed",
                 f"Failed to write file:\n{error_msg}\n\nCheck disk space and try again.",
-                QMessageBox.StandardButton.Ok
+                QMessageBox.StandardButton.Ok,
             )
         except Exception as e:
             error_msg = f"Failed to export offsets: {e}"
             self.status_changed.emit(error_msg)
-            _ = QMessageBox.critical(
-                self,
-                "Export Failed",
-                error_msg,
-                QMessageBox.StandardButton.Ok
-            )
+            _ = QMessageBox.critical(self, "Export Failed", error_msg, QMessageBox.StandardButton.Ok)
 
     def _import_offsets(self):
         """Import offsets from file"""
         # Get file path
-        file_path = browse_for_open_file(
-            self,
-            "Import Sprite Offsets",
-            "JSON Files (*.json);;All Files (*)"
-        )
+        file_path = browse_for_open_file(self, "Import Sprite Offsets", "JSON Files (*.json);;All Files (*)")
 
         if not file_path:
             return
@@ -264,7 +253,7 @@ class ImportExportPanel(QWidget):
                         f"but current ROM is {self.rom_size} bytes.\n\n"
                         f"Import anyway? Some offsets may be invalid.",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        QMessageBox.StandardButton.No
+                        QMessageBox.StandardButton.No,
                     )
                     if result != QMessageBox.StandardButton.Yes:
                         return
@@ -329,7 +318,7 @@ class ImportExportPanel(QWidget):
                     "Import Successful",
                     f"Successfully imported {imported_count} sprite offsets from:\n{Path(file_path).name}\n\n"
                     f"{skipped_count} entries were skipped due to invalid data or out-of-bounds offsets.",
-                    QMessageBox.StandardButton.Ok
+                    QMessageBox.StandardButton.Ok,
                 )
             else:
                 self.status_changed.emit("No valid sprite offsets found in file")
@@ -337,27 +326,19 @@ class ImportExportPanel(QWidget):
                     self,
                     "No Data Imported",
                     "No valid sprite offsets were found in the file.",
-                    QMessageBox.StandardButton.Ok
+                    QMessageBox.StandardButton.Ok,
                 )
 
         except json.JSONDecodeError as e:
             error_msg = f"Invalid JSON file: {e}"
             self.status_changed.emit(error_msg)
             _ = QMessageBox.critical(
-                self,
-                "Import Failed",
-                f"Failed to parse JSON file:\n{error_msg}",
-                QMessageBox.StandardButton.Ok
+                self, "Import Failed", f"Failed to parse JSON file:\n{error_msg}", QMessageBox.StandardButton.Ok
             )
         except Exception as e:
             error_msg = f"Failed to import offsets: {e}"
             self.status_changed.emit(error_msg)
-            _ = QMessageBox.critical(
-                self,
-                "Import Failed",
-                error_msg,
-                QMessageBox.StandardButton.Ok
-            )
+            _ = QMessageBox.critical(self, "Import Failed", error_msg, QMessageBox.StandardButton.Ok)
 
     def get_found_sprites(self) -> list[tuple[int, float]]:
         """Get the current list of found sprites"""

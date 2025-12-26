@@ -45,9 +45,11 @@ def handle_exception(
     # Call the default handler to maintain normal behavior
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
+
 def apply_dark_theme(app: QApplication) -> None:
     """Apply a modern dark theme to the application."""
     SpritePalApp._apply_dark_theme(app)  # type: ignore[arg-type]
+
 
 class SpritePalApp(QApplication):
     """Main application class for SpritePal"""
@@ -111,9 +113,7 @@ class SpritePalApp(QApplication):
             QPalette.ColorRole.WindowText,
             QColor(127, 127, 127),
         )
-        dark_palette.setColor(
-            QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(127, 127, 127)
-        )
+        dark_palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(127, 127, 127))
         dark_palette.setColor(
             QPalette.ColorGroup.Disabled,
             QPalette.ColorRole.ButtonText,
@@ -414,6 +414,7 @@ class SpritePalApp(QApplication):
         """Show the main window"""
         self.main_window.show()
 
+
 def main():
     """Main entry point"""
     # Create ConfigurationService FIRST - single source of truth for paths
@@ -472,6 +473,7 @@ def main():
         logger.info("App context cleaned up")
 
     sys.exit(result)
+
 
 if __name__ == "__main__":
     main()

@@ -2,6 +2,7 @@
 Sprite thumbnail widget for gallery display.
 Compact version of SpritePreviewWidget optimized for grid layouts.
 """
+
 from __future__ import annotations
 
 from typing import Any, override
@@ -16,6 +17,7 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 class SpriteThumbnailWidget(QWidget):
     """Compact sprite thumbnail for gallery display."""
 
@@ -24,12 +26,7 @@ class SpriteThumbnailWidget(QWidget):
     double_clicked = Signal(int)  # Emits offset when double-clicked
     selected = Signal(bool)  # Emits selection state
 
-    def __init__(
-        self,
-        offset: int = 0,
-        size: int = 128,
-        parent: QWidget | None = None
-    ):
+    def __init__(self, offset: int = 0, size: int = 128, parent: QWidget | None = None):
         """
         Initialize sprite thumbnail widget.
 
@@ -113,11 +110,7 @@ class SpriteThumbnailWidget(QWidget):
         # Set tooltip
         self.setToolTip(f"Offset: {self.offset_text}")
 
-    def set_sprite_data(
-        self,
-        pixmap: QPixmap,
-        sprite_info: dict[str, object] | None = None
-    ):
+    def set_sprite_data(self, pixmap: QPixmap, sprite_info: dict[str, object] | None = None):
         """
         Set the sprite thumbnail data.
 
@@ -135,9 +128,7 @@ class SpriteThumbnailWidget(QWidget):
         if pixmap and not pixmap.isNull():
             label_size = self.thumbnail_label.size() if self.thumbnail_label else QSize(128, 128)
             scaled = pixmap.scaled(
-                label_size,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
+                label_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
             )
             if self.thumbnail_label:
                 self.thumbnail_label.setPixmap(scaled)
@@ -171,22 +162,13 @@ class SpriteThumbnailWidget(QWidget):
         # Draw sprite icon in center
         icon_size = min(placeholder.width(), placeholder.height()) // 3
         painter.setPen(QPen(QColor(80, 80, 80), 2))
-        painter.drawRect(
-            center_x - icon_size // 2,
-            center_y - icon_size // 2,
-            icon_size,
-            icon_size
-        )
+        painter.drawRect(center_x - icon_size // 2, center_y - icon_size // 2, icon_size, icon_size)
 
         # Draw "SPRITE" text
         painter.setPen(QPen(QColor(100, 100, 100)))
         font_size = max(8, min(14, placeholder.height() // 20))
         painter.setFont(QFont("Arial", font_size))
-        painter.drawText(
-            placeholder.rect(),
-            Qt.AlignmentFlag.AlignCenter,
-            "SPRITE"
-        )
+        painter.drawText(placeholder.rect(), Qt.AlignmentFlag.AlignCenter, "SPRITE")
         painter.end()
 
         if self.thumbnail_label:
@@ -198,8 +180,8 @@ class SpriteThumbnailWidget(QWidget):
             return
 
         # Get sprite name if available
-        if 'name' in self.sprite_info:
-            self.sprite_name = self.sprite_info['name']
+        if "name" in self.sprite_info:
+            self.sprite_name = self.sprite_info["name"]
             # Show name as primary label with offset as secondary
             display_text = f"{self.sprite_name}\n{self.offset_text}"
         else:
@@ -210,18 +192,18 @@ class SpriteThumbnailWidget(QWidget):
             self.info_label.setText(display_text)
 
         # Update size text
-        if 'decompressed_size' in self.sprite_info:
-            size_kb = self.sprite_info['decompressed_size'] / 1024
+        if "decompressed_size" in self.sprite_info:
+            size_kb = self.sprite_info["decompressed_size"] / 1024
             self.size_text = f"{size_kb:.1f}KB"
-        elif 'size' in self.sprite_info:
-            size_bytes = self.sprite_info['size']
+        elif "size" in self.sprite_info:
+            size_bytes = self.sprite_info["size"]
             if size_bytes > 1024:
                 self.size_text = f"{size_bytes / 1024:.1f}KB"
             else:
                 self.size_text = f"{size_bytes}B"
 
         # Update compression status
-        if self.sprite_info.get('compressed', False):
+        if self.sprite_info.get("compressed", False):
             self.compression_text = "HAL"
         else:
             self.compression_text = "Raw"
@@ -234,10 +216,10 @@ class SpriteThumbnailWidget(QWidget):
             f"Type: {self.compression_text}" if self.compression_text else "",
         ]
 
-        if 'tile_count' in self.sprite_info:
+        if "tile_count" in self.sprite_info:
             tooltip_parts.append(f"Tiles: {self.sprite_info['tile_count']}")
 
-        if 'width' in self.sprite_info and 'height' in self.sprite_info:
+        if "width" in self.sprite_info and "height" in self.sprite_info:
             tooltip_parts.append(f"Dimensions: {self.sprite_info['width']}x{self.sprite_info['height']}")
 
         self.setToolTip("\n".join(filter(None, tooltip_parts)))

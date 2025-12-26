@@ -29,10 +29,9 @@ from tests.infrastructure.qt_real_testing import (
 )
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
-_offscreen_mode = os.environ.get('QT_QPA_PLATFORM') == 'offscreen'
+_offscreen_mode = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 skip_in_offscreen = pytest.mark.skipif(
-    _offscreen_mode,
-    reason="Complex Qt widgets + EventLoopHelper crash in offscreen mode"
+    _offscreen_mode, reason="Complex Qt widgets + EventLoopHelper crash in offscreen mode"
 )
 
 # Module-level marker - tests don't use managers
@@ -49,22 +48,23 @@ def large_rom_data(tmp_path) -> str:
 
     # Fill with pattern data to make it realistic
     for i in range(0, rom_size, 4):
-        rom_data[i:i+4] = (i // 4).to_bytes(4, 'little')
+        rom_data[i : i + 4] = (i // 4).to_bytes(4, "little")
 
     rom_path.write_bytes(rom_data)
     return str(rom_path)
+
 
 @pytest.fixture
 def massive_sprite_dataset() -> list[dict[str, Any]]:
     """Create a massive sprite dataset for memory testing."""
     return [
         {
-            'offset': 0x10000 + i * 0x800,
-            'name': f'MassiveSprite_{i:05d}',
-            'decompressed_size': 1024 + (i % 500),
-            'tile_count': 32 + (i % 64),
-            'compressed': i % 3 == 0,
-            'quality': 0.5 + (i % 100) / 200.0,
+            "offset": 0x10000 + i * 0x800,
+            "name": f"MassiveSprite_{i:05d}",
+            "decompressed_size": 1024 + (i % 500),
+            "tile_count": 32 + (i % 64),
+            "compressed": i % 3 == 0,
+            "quality": 0.5 + (i % 100) / 200.0,
         }
         for i in range(5000)  # 5000 sprites
     ]
@@ -102,6 +102,7 @@ class MockROMCache:
         """Get ROM data from cache or load it."""
         if rom_path in self.cached_roms:
             import time
+
             self.access_times[rom_path] = time.time()
             return self.cached_roms[rom_path]
 
@@ -115,6 +116,7 @@ class MockROMCache:
 
             self.cached_roms[rom_path] = data
             import time
+
             self.access_times[rom_path] = time.time()
             return data
         except Exception:
@@ -140,12 +142,13 @@ class MockROMCache:
         if oldest_rom in self.access_times:
             del self.access_times[oldest_rom]
 
+
 class MockThumbnailCache:
     """Mock thumbnail cache for testing memory behavior."""
 
     def __init__(self, max_thumbnails=1000):
         """Initialize thumbnail cache.
-        
+
         Args:
             max_thumbnails: Maximum number of thumbnails to cache
         """
@@ -186,6 +189,7 @@ class MockThumbnailCache:
                 # Rough estimate: width * height * 4 bytes per pixel (RGBA)
                 total_bytes += image.width() * image.height() * 4
         return total_bytes
+
 
 @pytest.mark.gui
 @pytest.mark.integration
@@ -240,17 +244,19 @@ class TestMemoryManagementIntegration(QtTestCase):
 
     def test_weak_references_prevent_leaks(self, massive_sprite_dataset):
         """Test that weak references prevent memory leaks."""
+
         # Use a class wrapper since plain dicts can't have weak references
         class SpriteData:
             """Wrapper class that supports weak references."""
-            __slots__ = ('data', '__weakref__')  # __weakref__ enables weak refs with __slots__
+
+            __slots__ = ("data", "__weakref__")  # __weakref__ enables weak refs with __slots__
 
             def __init__(self, data: dict):
                 self.data = data
 
             @property
             def offset(self):
-                return self.data['offset']
+                return self.data["offset"]
 
         class SpriteRegistry:
             def __init__(self):
@@ -345,7 +351,7 @@ class TestMemoryManagementIntegration(QtTestCase):
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
-        with patch('ui.workers.batch_thumbnail_worker.TileRenderer'):
+        with patch("ui.workers.batch_thumbnail_worker.TileRenderer"):
             worker = BatchThumbnailWorker(large_rom_data)
 
             # Start worker to load ROM data
@@ -373,7 +379,7 @@ class TestMemoryManagementIntegration(QtTestCase):
 
             # Should have released most memory
             cleanup_ratio = memory_after_cleanup / memory_increase if memory_increase > 0 else 0
-            assert cleanup_ratio < 0.3, f"Only {(1-cleanup_ratio)*100:.1f}% of memory was cleaned up"
+            assert cleanup_ratio < 0.3, f"Only {(1 - cleanup_ratio) * 100:.1f}% of memory was cleaned up"
 
     @skip_in_offscreen
     def test_pixmap_memory_management(self):
@@ -475,6 +481,7 @@ class TestMemoryManagementIntegration(QtTestCase):
 
     def test_circular_reference_prevention(self):
         """Test prevention of circular references that could cause leaks."""
+
         class Parent:
             def __init__(self, name):
                 self.name = name
@@ -539,6 +546,7 @@ class TestMemoryManagementIntegration(QtTestCase):
 
     def test_cache_eviction_policies(self):
         """Test different cache eviction policies."""
+
         class LRUCache:
             def __init__(self, max_size=100):
                 self.max_size = max_size
@@ -585,6 +593,7 @@ class TestMemoryManagementIntegration(QtTestCase):
         assert cache.get("key_1") is None  # Should be evicted
         assert cache.get("key_5") is not None  # Should be there
 
+
 @pytest.mark.headless
 @pytest.mark.integration
 class TestMemoryManagementHeadlessIntegration:
@@ -592,6 +601,7 @@ class TestMemoryManagementHeadlessIntegration:
 
     def test_headless_memory_pool_logic(self):
         """Test memory pool logic without Qt dependencies."""
+
         class MockMemoryPool:
             def __init__(self, pool_size=10, item_size=1024):
                 self.pool_size = pool_size
@@ -619,11 +629,7 @@ class TestMemoryManagementHeadlessIntegration:
                         item[i] = 0
 
             def get_usage(self):
-                return {
-                    'allocated': len(self.allocated_items),
-                    'free': len(self.free_items),
-                    'total': self.pool_size
-                }
+                return {"allocated": len(self.allocated_items), "free": len(self.free_items), "total": self.pool_size}
 
         pool = MockMemoryPool(pool_size=5)
 
@@ -638,16 +644,16 @@ class TestMemoryManagementHeadlessIntegration:
         assert pool.allocate() is None
 
         usage = pool.get_usage()
-        assert usage['allocated'] == 5
-        assert usage['free'] == 0
+        assert usage["allocated"] == 5
+        assert usage["free"] == 0
 
         # Free some items
         for item in items[:3]:
             pool.free(item)
 
         usage = pool.get_usage()
-        assert usage['allocated'] == 2
-        assert usage['free'] == 3
+        assert usage["allocated"] == 2
+        assert usage["free"] == 3
 
         # Should be able to allocate again
         new_item = pool.allocate()
@@ -655,6 +661,7 @@ class TestMemoryManagementHeadlessIntegration:
 
     def test_headless_reference_counting_logic(self):
         """Test reference counting logic."""
+
         class MockReferenceCounter:
             def __init__(self):
                 self.references = {}
@@ -715,6 +722,7 @@ class TestMemoryManagementHeadlessIntegration:
 
     def test_headless_cache_coherency_logic(self):
         """Test cache coherency logic."""
+
         class MockCacheCoordinator:
             def __init__(self):
                 self.caches = {}
@@ -726,16 +734,16 @@ class TestMemoryManagementHeadlessIntegration:
             def invalidate_key(self, key):
                 """Invalidate key across all caches."""
                 for cache_name, cache in self.caches.items():
-                    if hasattr(cache, 'invalidate'):
+                    if hasattr(cache, "invalidate"):
                         cache.invalidate(key)
                         self.invalidation_log.append((cache_name, key))
 
             def clear_all_caches(self):
                 """Clear all registered caches."""
                 for cache_name, cache in self.caches.items():
-                    if hasattr(cache, 'clear'):
+                    if hasattr(cache, "clear"):
                         cache.clear()
-                        self.invalidation_log.append((cache_name, 'CLEAR_ALL'))
+                        self.invalidation_log.append((cache_name, "CLEAR_ALL"))
 
         class MockCache:
             def __init__(self, name):

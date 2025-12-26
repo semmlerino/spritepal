@@ -4,6 +4,7 @@ Test constants validation and usage in Phase 2 improvements.
 Validates that constants are properly defined, used consistently,
 and that the replacement of magic numbers is effective.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -17,6 +18,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.no_manager_setup,
 ]
+
 
 class TestConstantsValidation:
     """Test constants definition and validation"""
@@ -54,8 +56,9 @@ class TestConstantsValidation:
 
         # Check descending order
         for i in range(len(buffer_sizes) - 1):
-            assert buffer_sizes[i] > buffer_sizes[i + 1], \
+            assert buffer_sizes[i] > buffer_sizes[i + 1], (
                 f"Buffer sizes not in descending order: {buffer_sizes[i]} <= {buffer_sizes[i + 1]}"
+            )
 
     def test_palette_info_completeness(self):
         """Test that palette info covers all sprite palettes"""
@@ -67,7 +70,9 @@ class TestConstantsValidation:
 
             name, description = palette_info[palette_idx]
             assert isinstance(name, str) and len(name) > 0, f"Invalid name for palette {palette_idx}"
-            assert isinstance(description, str) and len(description) > 0, f"Invalid description for palette {palette_idx}"
+            assert isinstance(description, str) and len(description) > 0, (
+                f"Invalid description for palette {palette_idx}"
+            )
 
     def test_file_pattern_constants_validity(self):
         """Test that file pattern constants are valid glob patterns"""
@@ -128,6 +133,7 @@ class TestConstantsValidation:
             assert len(namespace) > 0, f"Namespace {namespace} should not be empty"
             assert namespace.isalnum() or "_" in namespace, f"Namespace {namespace} has invalid characters"
 
+
 class TestSpacingConstantsValidation:
     """Test UI spacing constants validation"""
 
@@ -145,8 +151,9 @@ class TestSpacingConstantsValidation:
         ]
 
         for spacing in spacing_values:
-            assert spacing % spacing_constants.BASE_UNIT == 0 or spacing == spacing_constants.BASE_UNIT // 2, \
+            assert spacing % spacing_constants.BASE_UNIT == 0 or spacing == spacing_constants.BASE_UNIT // 2, (
                 f"Spacing {spacing} doesn't follow 8px grid system"
+            )
 
     def test_widget_size_consistency(self):
         """Test widget size constants are consistent and reasonable"""
@@ -205,9 +212,9 @@ class TestSpacingConstantsValidation:
         assert 50 <= spacing_constants.COLLAPSIBLE_ANIMATION_DURATION <= 500
 
         # Easing should be valid CSS easing function
-        assert spacing_constants.COLLAPSIBLE_EASING in [
-            "ease", "ease-in", "ease-out", "ease-in-out", "linear"
-        ], f"Invalid easing function: {spacing_constants.COLLAPSIBLE_EASING}"
+        assert spacing_constants.COLLAPSIBLE_EASING in ["ease", "ease-in", "ease-out", "ease-in-out", "linear"], (
+            f"Invalid easing function: {spacing_constants.COLLAPSIBLE_EASING}"
+        )
 
     def test_preview_widget_constants(self):
         """Test preview widget constants are reasonable"""
@@ -219,6 +226,7 @@ class TestSpacingConstantsValidation:
         # Zoom should allow reasonable magnification
         max_magnified_size = spacing_constants.PREVIEW_MIN_SIZE * spacing_constants.MAX_ZOOM
         assert max_magnified_size >= 2560, "Maximum zoom should allow reasonable magnification"
+
 
 class TestConstantUsageValidation:
     """Test that constants are being used correctly in the codebase"""
@@ -273,4 +281,3 @@ class TestConstantUsageValidation:
             assert isinstance(key, str), f"Settings key {key} should be string"
             assert len(key) > 0, f"Settings key {key} should not be empty"
             assert key.replace("_", "").isalnum(), f"Settings key {key} has invalid characters"
-

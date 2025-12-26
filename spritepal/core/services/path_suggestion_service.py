@@ -6,6 +6,7 @@ strategies: metadata, session data, basename patterns, and saved settings.
 
 This module uses pure functions instead of a stateless service class.
 """
+
 from __future__ import annotations
 
 import json
@@ -90,9 +91,7 @@ def find_vram_path(
     # Strategy 2: Session manager vram_path
     if session_manager:
         try:
-            session_vram = cast(
-                str, session_manager.get(SETTINGS_NS_SESSION, "vram_path", "")
-            )
+            session_vram = cast(str, session_manager.get(SETTINGS_NS_SESSION, "vram_path", ""))
             if result := validate_path(session_vram):
                 return result
         except (OSError, ValueError, TypeError):
@@ -109,9 +108,7 @@ def find_vram_path(
 
     if loaded_metadata:
         # Check top-level source_vram (absolute path)
-        if result := validate_path(
-            cast(str, loaded_metadata.get("source_vram", ""))
-        ):
+        if result := validate_path(cast(str, loaded_metadata.get("source_vram", ""))):
             return result
         # Check extraction.vram_source (relative path)
         extraction = loaded_metadata.get("extraction")
@@ -144,9 +141,7 @@ def find_vram_path(
         try:
             last_vram = cast(
                 str,
-                session_manager.get(
-                    SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, ""
-                ),
+                session_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_VRAM, ""),
             )
             if result := validate_path(last_vram):
                 return result

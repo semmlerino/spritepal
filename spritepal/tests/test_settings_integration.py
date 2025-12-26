@@ -2,6 +2,7 @@
 
 This file creates ApplicationStateManager instances directly for testing with isolated sessions.
 """
+
 from __future__ import annotations
 
 import json
@@ -24,6 +25,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
 ]
+
 
 class TestSettingsIntegration:
     """Test settings integration across application components"""
@@ -56,10 +58,7 @@ class TestSettingsIntegration:
         """Test that settings persist across application restarts"""
         # Use ApplicationStateManager directly for isolated testing
         temp_file = Path(temp_settings_dir) / "test_settings.json"
-        settings1 = ApplicationStateManager(
-            app_name="TestApp",
-            settings_path=temp_file
-        )
+        settings1 = ApplicationStateManager(app_name="TestApp", settings_path=temp_file)
 
         # Set various settings
         settings1.set("session", "vram_path", "/test/vram.dmp")
@@ -72,10 +71,7 @@ class TestSettingsIntegration:
         settings1.save_settings()
 
         # Session 2: Load settings in new instance
-        settings2 = ApplicationStateManager(
-            app_name="TestApp",
-            settings_path=temp_file
-        )
+        settings2 = ApplicationStateManager(app_name="TestApp", settings_path=temp_file)
 
         # Verify settings persisted
         assert settings2.get("session", "vram_path") == "/test/vram.dmp"
@@ -112,10 +108,7 @@ class TestSettingsIntegration:
         """Test UI geometry settings persistence"""
         # Create ApplicationStateManager with temporary file
         temp_file = Path(temp_settings_dir) / "geometry_settings.json"
-        settings = ApplicationStateManager(
-            app_name="SpritePal",
-            settings_path=temp_file
-        )
+        settings = ApplicationStateManager(app_name="SpritePal", settings_path=temp_file)
 
         # Simulate saving window state
         window_state = {
@@ -133,10 +126,7 @@ class TestSettingsIntegration:
         settings.save_settings()
 
         # Load in new instance
-        new_settings = ApplicationStateManager(
-            app_name="SpritePal",
-            settings_path=temp_file
-        )
+        new_settings = ApplicationStateManager(app_name="SpritePal", settings_path=temp_file)
 
         # Verify all geometry saved
         assert new_settings.get("ui", "window_x") == 100
@@ -240,10 +230,7 @@ class TestSettingsIntegration:
             f.write("{ corrupted json }")
 
         # Create an ApplicationStateManager with our temp settings file
-        settings = ApplicationStateManager(
-            app_name="SpritePal",
-            settings_path=settings_file
-        )
+        settings = ApplicationStateManager(app_name="SpritePal", settings_path=settings_file)
 
         # Should load defaults without crashing
         # Verify defaults loaded (since file was corrupted)

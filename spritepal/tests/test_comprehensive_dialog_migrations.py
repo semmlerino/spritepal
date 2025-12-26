@@ -6,6 +6,7 @@ and maintain full functionality after migration to the new component architectur
 
 Uses session_managers fixture from core_fixtures.py with shared_state_safe marker.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -34,6 +35,7 @@ def _create_injection_dialog(**kwargs) -> InjectionDialog:
         settings_manager=context.application_state_manager,
         **kwargs,
     )
+
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -65,10 +67,7 @@ class TestComprehensiveDialogMigrations:
             Path(temp_file.name).unlink()
 
     def test_all_dialogs_inherit_from_correct_base_classes(
-        self,
-        qtbot: Any,
-        test_sprite_image: str,
-        manager_context_factory: Any
+        self, qtbot: Any, test_sprite_image: str, manager_context_factory: Any
     ) -> None:
         """Test that all migrated dialogs inherit from the correct component base classes"""
         with manager_context_factory():
@@ -104,10 +103,7 @@ class TestComprehensiveDialogMigrations:
                     pass
 
     def test_all_dialogs_have_consistent_component_features(
-        self,
-        qtbot: Any,
-        test_sprite_image: str,
-        manager_context_factory: Any
+        self, qtbot: Any, test_sprite_image: str, manager_context_factory: Any
     ) -> None:
         """Test that all migrated dialogs have consistent component features"""
         with manager_context_factory():
@@ -409,6 +405,7 @@ class TestComprehensiveDialogMigrations:
                 except Exception:
                     pass
 
+
 # Manager Context Integration Tests
 class TestManagerContextIntegration:
     """Test manager context integration with dialog migrations.
@@ -498,7 +495,7 @@ class TestManagerContextIntegration:
             # Manager state should persist
             same_manager = context.get_manager("injection")
             assert same_manager is injection_manager
-            assert hasattr(same_manager, 'test_value')
+            assert hasattr(same_manager, "test_value")
             assert same_manager.test_value == "test_state"
 
             dialog2.close()

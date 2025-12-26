@@ -2,6 +2,7 @@
 
 Handles sprite search and ROM scanning operations with worker management.
 """
+
 from __future__ import annotations
 
 import logging
@@ -167,9 +168,7 @@ class SpriteSearchCoordinator(QObject):
         self._scan_progress_dialog.show()
 
         # Create and start worker
-        self._scan_worker = SpriteScanWorker(
-            self._rom_path, step=0x1000, rom_cache=self._rom_cache
-        )
+        self._scan_worker = SpriteScanWorker(self._rom_path, step=0x1000, rom_cache=self._rom_cache)
         self._scan_worker.progress_detailed.connect(self._on_scan_progress)
         self._scan_worker.sprites_found.connect(self._on_scan_complete)
         self._scan_worker.error.connect(self._on_scan_error)
@@ -269,9 +268,7 @@ class SpriteSearchCoordinator(QObject):
             item.setData(Qt.ItemDataRole.UserRole, offset)
             list_widget.addItem(item)
 
-        list_widget.itemDoubleClicked.connect(
-            lambda item: self._jump_to_sprite(item.data(Qt.ItemDataRole.UserRole))
-        )
+        list_widget.itemDoubleClicked.connect(lambda item: self._jump_to_sprite(item.data(Qt.ItemDataRole.UserRole)))
         layout.addWidget(list_widget)
 
         # Buttons

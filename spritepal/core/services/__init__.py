@@ -17,6 +17,7 @@ These services are placed in core/ rather than utils/ because they depend on Qt
 or core layer types. The utils/ package is reserved for pure Python utilities
 with only stdlib dependencies.
 """
+
 from __future__ import annotations
 
 from core.services.path_suggestion_service import (

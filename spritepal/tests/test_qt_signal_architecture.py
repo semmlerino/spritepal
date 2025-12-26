@@ -8,6 +8,7 @@ This test suite validates:
 4. Protocol compliance with concrete implementations
 5. Error scenarios and cleanup
 """
+
 from __future__ import annotations
 
 import threading
@@ -35,6 +36,8 @@ pytestmark = [
     pytest.mark.performance,
     pytest.mark.slow,
 ]
+
+
 class SignalCapture(QObject):
     """Helper class to capture Qt signals for testing"""
 
@@ -49,11 +52,13 @@ class SignalCapture(QObject):
         with self.lock:
             current_thread = threading.current_thread()
             self.captured_signals.append(args)
-            self.signal_threads.append({
-                'thread_id': current_thread.ident,
-                'thread_name': current_thread.name,
-                'is_main': current_thread == threading.main_thread()
-            })
+            self.signal_threads.append(
+                {
+                    "thread_id": current_thread.ident,
+                    "thread_name": current_thread.name,
+                    "is_main": current_thread == threading.main_thread(),
+                }
+            )
 
     def reset(self):
         """Reset captured data"""
@@ -81,6 +86,7 @@ class SignalCapture(QObject):
             else:
                 time.sleep(0.01)  # sleep-ok: non-Qt fallback
         return False
+
 
 class TestQtSignalArchitecture:
     """Test Qt signal architecture after controller fixes"""
@@ -155,7 +161,7 @@ class TestQtSignalArchitecture:
         injection_mgr = CoreOperationsManager()
 
         # Verify injection signals exist on CoreOperationsManager
-        injection_signals = ['injection_progress', 'injection_finished', 'compression_info']
+        injection_signals = ["injection_progress", "injection_finished", "compression_info"]
         for signal_name in injection_signals:
             assert hasattr(injection_mgr, signal_name), f"Missing {signal_name}"
             signal = getattr(injection_mgr, signal_name)
@@ -165,7 +171,7 @@ class TestQtSignalArchitecture:
         extraction_mgr = CoreOperationsManager()
 
         # Verify extraction signals exist on CoreOperationsManager
-        extraction_signals = ['extraction_progress', 'cache_saved', 'preview_generated']
+        extraction_signals = ["extraction_progress", "cache_saved", "preview_generated"]
         for signal_name in extraction_signals:
             assert hasattr(extraction_mgr, signal_name), f"Missing {signal_name}"
             signal = getattr(extraction_mgr, signal_name)
@@ -192,7 +198,7 @@ class TestQtSignalArchitecture:
 
         # Verify signal was handled in main thread (Qt queued connection)
         thread_info = signal_capture.signal_threads[0]
-        assert thread_info['is_main']  # Signal should be delivered to main thread
+        assert thread_info["is_main"]  # Signal should be delivered to main thread
 
     def test_signal_parameter_types(self, app, signal_capture):
         """Test that signal parameters are passed correctly with proper types"""
@@ -305,6 +311,7 @@ class TestQtSignalArchitecture:
             # Use Qt-safe waiting
             app.processEvents()
             from PySide6.QtCore import QThread
+
             current_thread = QThread.currentThread()
             if current_thread:
                 current_thread.msleep(10)
@@ -315,7 +322,7 @@ class TestQtSignalArchitecture:
 
         # Verify all were delivered to main thread
         for thread_info in signal_capture.signal_threads:
-            assert thread_info['is_main']
+            assert thread_info["is_main"]
 
     def test_signal_disconnection(self, app, signal_capture):
         """Test proper signal disconnection"""
@@ -337,6 +344,7 @@ class TestQtSignalArchitecture:
         manager.injection_progress.emit("Disconnected")
         # Give time for potential delivery using Qt-safe wait
         from PySide6.QtTest import QTest
+
         QTest.qWait(100)  # wait-ok: verifying signal NOT delivered after disconnect
         assert len(signal_capture.captured_signals) == 0
 
@@ -362,12 +370,13 @@ class TestQtSignalArchitecture:
         def capture_method_call(method_name):
             def wrapper(*args, **kwargs):
                 called_methods.append((method_name, args, kwargs))
+
             return wrapper
 
         # Mock controller handler methods
-        controller._on_injection_progress = capture_method_call('_on_injection_progress')
-        controller._on_injection_finished = capture_method_call('_on_injection_finished')
-        controller._on_cache_saved = capture_method_call('_on_cache_saved')
+        controller._on_injection_progress = capture_method_call("_on_injection_progress")
+        controller._on_injection_finished = capture_method_call("_on_injection_finished")
+        controller._on_cache_saved = capture_method_call("_on_cache_saved")
 
         # Emit signals from managers
         injection_mgr.injection_progress.emit("Test progress")
@@ -377,13 +386,14 @@ class TestQtSignalArchitecture:
         # Process events to ensure signal delivery
         app.processEvents()
         from PySide6.QtTest import QTest
+
         QTest.qWait(100)  # wait-ok: ensuring queued signal delivery completes
 
         # Verify controller methods were called
         assert len(called_methods) == 3
-        assert called_methods[0] == ('_on_injection_progress', ("Test progress",), {})
-        assert called_methods[1] == ('_on_injection_finished', (True, "Success"), {})
-        assert called_methods[2] == ('_on_cache_saved', ("sprite_cache", 5), {})
+        assert called_methods[0] == ("_on_injection_progress", ("Test progress",), {})
+        assert called_methods[1] == ("_on_injection_finished", (True, "Success"), {})
+        assert called_methods[2] == ("_on_cache_saved", ("sprite_cache", 5), {})
 
     def test_worker_thread_signal_pattern(self, app, signal_capture):
         """Test the worker thread pattern with proper signal handling"""
@@ -432,7 +442,7 @@ class TestQtSignalArchitecture:
 
         # Verify all signals were delivered to main thread
         for thread_info in signal_capture.signal_threads:
-            assert thread_info['is_main']
+            assert thread_info["is_main"]
 
         # Cleanup: Wait for worker to fully stop before test ends
         # This prevents segfaults from worker destruction during teardown
@@ -443,6 +453,7 @@ class TestQtSignalArchitecture:
         # Disconnect signals before worker is destroyed
         worker.progress.disconnect(signal_capture.capture)
         worker.finished_signal.disconnect(signal_capture.capture)
+
 
 class TestMemoryManagement:
     """Test memory management and leak prevention in signal architecture"""
@@ -549,6 +560,7 @@ class TestMemoryManagement:
 
         # Force garbage collection
         import gc
+
         gc.collect()
 
         # Worker should be collected
@@ -556,6 +568,7 @@ class TestMemoryManagement:
 
         # Capture should still be valid
         assert capture is not None
+
 
 class TestPerformanceImpact:
     """Test performance impact of casting approach"""
@@ -589,6 +602,7 @@ class TestPerformanceImpact:
             qapp.processEvents()
             # Use Qt-safe delay
             from PySide6.QtCore import QThread
+
             current_thread = QThread.currentThread()
             if current_thread:
                 current_thread.msleep(1)
@@ -603,6 +617,7 @@ class TestPerformanceImpact:
             # Signal delivery should be fast
             assert avg_time < 0.001, f"Average delivery time too high: {avg_time:.6f}s"
             assert max_time < 0.01, f"Max delivery time too high: {max_time:.6f}s"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

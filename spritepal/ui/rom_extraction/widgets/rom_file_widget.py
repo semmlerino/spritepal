@@ -1,4 +1,5 @@
 """ROM file selector widget for ROM extraction"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -31,8 +32,12 @@ class ROMFileWidget(BaseExtractionWidget):
 
     # Signals
     browse_clicked = Signal()  # Emitted when browse button clicked
-    cache_status_changed = Signal(object)  # Emitted when cache status changes (use object to avoid PySide6 copy warning)
-    partial_scan_detected = Signal(object)  # Emitted when partial scan cache found (use object to avoid PySide6 copy warning)
+    cache_status_changed = Signal(
+        object
+    )  # Emitted when cache status changes (use object to avoid PySide6 copy warning)
+    partial_scan_detected = Signal(
+        object
+    )  # Emitted when partial scan cache found (use object to avoid PySide6 copy warning)
 
     def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCache) -> None:
         super().__init__(parent)
@@ -66,7 +71,7 @@ class ROMFileWidget(BaseExtractionWidget):
 
         self.browse_rom_btn = QPushButton("Browse...")
         self.browse_rom_btn.setMinimumHeight(BUTTON_MIN_HEIGHT)
-        self.browse_rom_btn.setMinimumWidth(90)   # Fits "Browse..." text
+        self.browse_rom_btn.setMinimumWidth(90)  # Fits "Browse..." text
         self.browse_rom_btn.setMaximumWidth(120)  # Prevents over-expansion
         _ = self.browse_rom_btn.clicked.connect(self.browse_clicked.emit)
         rom_row.addWidget(self.browse_rom_btn)
@@ -76,7 +81,9 @@ class ROMFileWidget(BaseExtractionWidget):
         # ROM info display (shows ROM details after loading)
         self.rom_info_label = QLabel()
         self.rom_info_label.setWordWrap(True)
-        self.rom_info_label.setContentsMargins(CONTROL_PANEL_LABEL_WIDTH + SPACING_MEDIUM, 0, 0, 0)  # Align with path field
+        self.rom_info_label.setContentsMargins(
+            CONTROL_PANEL_LABEL_WIDTH + SPACING_MEDIUM, 0, 0, 0
+        )  # Align with path field
         rom_layout.addWidget(self.rom_info_label)
 
         # Loading progress bar (hidden by default)
@@ -104,9 +111,7 @@ class ROMFileWidget(BaseExtractionWidget):
     def _set_empty_state_guidance(self) -> None:
         """Show simple guidance when no ROM is loaded, with detailed tooltip"""
         if self.rom_info_label:
-            self.rom_info_label.setText(
-                f'<span style="color: {COLORS["text_muted"]};">Select ROM file to begin</span>'
-            )
+            self.rom_info_label.setText(f'<span style="color: {COLORS["text_muted"]};">Select ROM file to begin</span>')
             self.rom_info_label.setToolTip(
                 "Getting Started:\n"
                 "1. Click Browse to select a SNES ROM file\n"
@@ -184,11 +189,7 @@ class ROMFileWidget(BaseExtractionWidget):
                 has_sprite_cache = True
 
             # Check for partial scan cache (must match SpriteScanWorker params)
-            scan_params = {
-                "start_offset": 0xC0000,
-                "end_offset": 0xF0000,
-                "alignment": 0x100
-            }
+            scan_params = {"start_offset": 0xC0000, "end_offset": 0xF0000, "alignment": 0x100}
             partial_scan = self._rom_cache.get_partial_scan_results(self._rom_path, scan_params)
             if partial_scan:
                 has_scan_cache = True
@@ -207,7 +208,7 @@ class ROMFileWidget(BaseExtractionWidget):
             "has_sprite_cache": has_sprite_cache,
             "has_scan_cache": has_scan_cache,
             "sprite_count": len(sprite_locations) if sprite_locations else 0,
-            "partial_scan_data": partial_scan_data
+            "partial_scan_data": partial_scan_data,
         }
 
         # Emit signal if cache status changed

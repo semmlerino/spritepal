@@ -4,6 +4,7 @@ Tests for PreviewGenerator service.
 Tests the consolidated preview generation logic including caching,
 thread safety, error handling, and different preview types.
 """
+
 from __future__ import annotations
 
 import concurrent.futures
@@ -37,6 +38,8 @@ pytestmark = [
     pytest.mark.usefixtures("session_managers"),
     pytest.mark.shared_state_safe,
 ]
+
+
 class TestLRUCache:
     """Test the LRU cache implementation."""
 
@@ -62,11 +65,7 @@ class TestLRUCache:
         pixmap = ThreadSafeTestImage(64, 64)
         pil_image = Image.new("RGB", (64, 64))
         result = PreviewResult(
-            pixmap=pixmap,
-            pil_image=pil_image,
-            tile_count=16,
-            sprite_name="test_sprite",
-            generation_time=0.1
+            pixmap=pixmap, pil_image=pil_image, tile_count=16, sprite_name="test_sprite", generation_time=0.1
         )
 
         # Test miss
@@ -94,11 +93,7 @@ class TestLRUCache:
             pixmap = ThreadSafeTestImage(64, 64)
             pil_image = Image.new("RGB", (64, 64))
             result = PreviewResult(
-                pixmap=pixmap,
-                pil_image=pil_image,
-                tile_count=16,
-                sprite_name=f"sprite_{i}",
-                generation_time=0.1
+                pixmap=pixmap, pil_image=pil_image, tile_count=16, sprite_name=f"sprite_{i}", generation_time=0.1
             )
             results.append(result)
 
@@ -139,7 +134,7 @@ class TestLRUCache:
         cache.put("key3", result3)
 
         assert cache.get("key1") is not None  # Still there (was accessed)
-        assert cache.get("key2") is None      # Evicted (least recent)
+        assert cache.get("key2") is None  # Evicted (least recent)
         assert cache.get("key3") is not None  # New item
 
     def test_cache_clear(self):
@@ -170,11 +165,7 @@ class TestLRUCache:
         pixmap = ThreadSafeTestImage(64, 64)  # 64*64*4 = 16KB
         pil_image = Image.new("RGB", (64, 64))  # 64*64*3 = 12KB
         result = PreviewResult(
-            pixmap=pixmap,
-            pil_image=pil_image,
-            tile_count=16,
-            sprite_name="test",
-            generation_time=0.1
+            pixmap=pixmap, pil_image=pil_image, tile_count=16, sprite_name="test", generation_time=0.1
         )
 
         cache.put("key1", result)
@@ -196,11 +187,7 @@ class TestLRUCache:
             pixmap = ThreadSafeTestImage(64, 64)
             pil_image = Image.new("RGB", (64, 64))
             result = PreviewResult(
-                pixmap=pixmap,
-                pil_image=pil_image,
-                tile_count=16,
-                sprite_name=f"sprite_{i}",
-                generation_time=0.1
+                pixmap=pixmap, pil_image=pil_image, tile_count=16, sprite_name=f"sprite_{i}", generation_time=0.1
             )
             results.append(result)
 
@@ -223,11 +210,7 @@ class TestLRUCache:
         pil_image = Image.new("RGBA", (128, 128))  # 128*128*4 = 65536 bytes
 
         result = PreviewResult(
-            pixmap=pixmap,
-            pil_image=pil_image,
-            tile_count=256,
-            sprite_name="test",
-            generation_time=0.1
+            pixmap=pixmap, pil_image=pil_image, tile_count=256, sprite_name="test", generation_time=0.1
         )
 
         size = result.byte_size()
@@ -271,11 +254,7 @@ class TestPreviewRequest:
     def test_preview_request_creation(self):
         """Test creating preview requests."""
         request = PreviewRequest(
-            source_type="vram",
-            data_path="/path/to/vram.bin",
-            offset=0x8000,
-            sprite_name="test_sprite",
-            size=(256, 256)
+            source_type="vram", data_path="/path/to/vram.bin", offset=0x8000, sprite_name="test_sprite", size=(256, 256)
         )
 
         assert request.source_type == "vram"
@@ -289,12 +268,7 @@ class TestPreviewRequest:
     def test_preview_request_with_palette(self):
         """Test preview request with palette data."""
         palette = PaletteData(data=b"\x00" * 512, format="snes_cgram")
-        request = PreviewRequest(
-            source_type="rom",
-            data_path="/path/to/rom.smc",
-            offset=0x200000,
-            palette=palette
-        )
+        request = PreviewRequest(source_type="rom", data_path="/path/to/rom.smc", offset=0x200000, palette=palette)
 
         assert request.palette is not None
         assert request.palette.data == b"\x00" * 512
@@ -315,13 +289,14 @@ class TestPreviewRequest:
     def test_cache_key_with_palette(self):
         """Test cache key includes palette data."""
         palette1 = PaletteData(data=b"\x00" * 512)
-        palette2 = PaletteData(data=b"\xFF" * 512)
+        palette2 = PaletteData(data=b"\xff" * 512)
 
         request1 = PreviewRequest("vram", "/path/file.bin", 0x8000, palette=palette1)
         request2 = PreviewRequest("vram", "/path/file.bin", 0x8000, palette=palette2)
 
         # Different palettes should produce different cache keys
         assert request1.cache_key() != request2.cache_key()
+
 
 class TestPreviewGenerator:
     """Test the main PreviewGenerator class."""
@@ -508,6 +483,7 @@ class TestPreviewGenerator:
 
             # Wait for debounce to settle
             from PySide6.QtWidgets import QApplication
+
             QApplication.processEvents()  # Allow debounce timer to fire
 
             # Only the last request should be processed
@@ -546,17 +522,13 @@ class TestPreviewGenerator:
         assert generator._extraction_manager_ref is None
         assert generator._rom_extractor_ref is None
 
+
 class TestHelperFunctions:
     """Test helper functions."""
 
     def test_create_vram_preview_request(self):
         """Test VRAM preview request creation helper."""
-        request = create_vram_preview_request(
-            "/path/to/vram.bin",
-            0x8000,
-            "test_sprite",
-            (256, 256)
-        )
+        request = create_vram_preview_request("/path/to/vram.bin", 0x8000, "test_sprite", (256, 256))
 
         assert request.source_type == "vram"
         assert request.data_path == "/path/to/vram.bin"
@@ -567,13 +539,7 @@ class TestHelperFunctions:
     def test_create_rom_preview_request(self):
         """Test ROM preview request creation helper."""
         sprite_config = {"width": 16, "height": 16}
-        request = create_rom_preview_request(
-            "/path/to/rom.smc",
-            0x200000,
-            "rom_sprite",
-            sprite_config,
-            (128, 128)
-        )
+        request = create_rom_preview_request("/path/to/rom.smc", 0x200000, "rom_sprite", sprite_config, (128, 128))
 
         assert request.source_type == "rom"
         assert request.data_path == "/path/to/rom.smc"
@@ -611,6 +577,7 @@ def test_preview_generation_performance():
         assert generation_time < 1.0  # Should be fast with mocks
 
     generator.cleanup()
+
 
 def test_cache_performance(qapp):
     """Test cache performance with many items.

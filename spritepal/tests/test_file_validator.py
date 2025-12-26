@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import pytest
@@ -32,6 +31,7 @@ from utils.file_validator import (
 )
 
 # NOTE: pytestmark is defined at the top of the file
+
 
 class TestBasicFileValidator:
     """Test cases for BasicFileValidator."""
@@ -96,15 +96,11 @@ class TestBasicFileValidator:
             tmp.flush()
 
             # Should pass with correct extension
-            result = BasicFileValidator.validate_properties(
-                tmp.name, allowed_extensions={".txt"}
-            )
+            result = BasicFileValidator.validate_properties(tmp.name, allowed_extensions={".txt"})
             assert result.is_valid
 
             # Should fail with wrong extension
-            result = BasicFileValidator.validate_properties(
-                tmp.name, allowed_extensions={".pdf"}
-            )
+            result = BasicFileValidator.validate_properties(tmp.name, allowed_extensions={".pdf"})
             assert not result.is_valid
             assert "Invalid file extension" in result.error_message
 
@@ -117,22 +113,16 @@ class TestBasicFileValidator:
             tmp.flush()
 
             # Should pass within size limits
-            result = BasicFileValidator.validate_properties(
-                tmp.name, min_size=50, max_size=200
-            )
+            result = BasicFileValidator.validate_properties(tmp.name, min_size=50, max_size=200)
             assert result.is_valid
 
             # Should fail below minimum
-            result = BasicFileValidator.validate_properties(
-                tmp.name, min_size=200
-            )
+            result = BasicFileValidator.validate_properties(tmp.name, min_size=200)
             assert not result.is_valid
             assert "File too small" in result.error_message
 
             # Should fail above maximum
-            result = BasicFileValidator.validate_properties(
-                tmp.name, max_size=50
-            )
+            result = BasicFileValidator.validate_properties(tmp.name, max_size=50)
             assert not result.is_valid
             assert "File too large" in result.error_message
 
@@ -169,6 +159,7 @@ class TestBasicFileValidator:
         assert BasicFileValidator.format_file_size(1024 * 1024) == "1MB"
         assert BasicFileValidator.format_file_size(5 * 1024 * 1024) == "5MB"
 
+
 class TestFormatValidator:
     """Test cases for FormatValidator."""
 
@@ -180,7 +171,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".dmp",
-            resolved_path="/test/memory.dmp"
+            resolved_path="/test/memory.dmp",
         )
 
         result = FormatValidator.validate_vram_format(file_info)
@@ -195,7 +186,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".dmp",
-            resolved_path="/test/vram.dmp"
+            resolved_path="/test/vram.dmp",
         )
 
         result = FormatValidator.validate_vram_format(file_info)
@@ -210,7 +201,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".dmp",
-            resolved_path="/test/vram.dmp"
+            resolved_path="/test/vram.dmp",
         )
 
         result = FormatValidator.validate_vram_format(file_info)
@@ -225,7 +216,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".dmp",
-            resolved_path="/test/vram_file.dmp"
+            resolved_path="/test/vram_file.dmp",
         )
 
         result = FormatValidator.validate_vram_format(file_info)
@@ -240,7 +231,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".dmp",
-            resolved_path="/test/cgram.dmp"
+            resolved_path="/test/cgram.dmp",
         )
 
         result = FormatValidator.validate_cgram_format(file_info)
@@ -254,7 +245,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".dmp",
-            resolved_path="/test/cgram.dmp"
+            resolved_path="/test/cgram.dmp",
         )
 
         result = FormatValidator.validate_cgram_format(file_info)
@@ -269,7 +260,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".dmp",
-            resolved_path="/test/oam.dmp"
+            resolved_path="/test/oam.dmp",
         )
 
         result = FormatValidator.validate_oam_format(file_info)
@@ -283,7 +274,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".smc",
-            resolved_path="/test/rom.smc"
+            resolved_path="/test/rom.smc",
         )
 
         result = FormatValidator.validate_rom_format(file_info)
@@ -298,7 +289,7 @@ class TestFormatValidator:
             exists=True,
             is_readable=True,
             extension=".sfc",
-            resolved_path="/test/rom.sfc"
+            resolved_path="/test/rom.sfc",
         )
 
         result = FormatValidator.validate_rom_format(file_info)
@@ -330,6 +321,7 @@ class TestFormatValidator:
         result = FormatValidator.validate_offset(0x2000, max_offset=0x1000)
         assert not result.is_valid
         assert "exceeds maximum" in result.error_message
+
 
 class TestContentValidator:
     """Test cases for ContentValidator."""
@@ -392,6 +384,7 @@ class TestContentValidator:
         assert not result.is_valid
         assert "Cannot read VRAM file" in result.error_message
 
+
 class TestFileValidatorFacade:
     """Test cases for FileValidator facade."""
 
@@ -432,9 +425,7 @@ class TestFileValidatorFacade:
             tmp.write(b"test")
             tmp.flush()
 
-            result = FileValidator._validate_basic_file_properties(
-                tmp.name, {".txt"}
-            )
+            result = FileValidator._validate_basic_file_properties(tmp.name, {".txt"})
             assert result.is_valid
 
             # Test _get_file_info
@@ -500,9 +491,7 @@ class TestAtomicWrite:
         assert target.exists()
         assert target.read_bytes() == data
 
-    def test_atomic_write_cleans_up_temp_on_write_failure(
-        self, tmp_path: Path
-    ) -> None:
+    def test_atomic_write_cleans_up_temp_on_write_failure(self, tmp_path: Path) -> None:
         """Test atomic_write cleans up temp file if write fails."""
         from utils.file_validator import atomic_write
 
@@ -544,9 +533,7 @@ class TestAtomicWrite:
         assert not src.exists()
         assert dst.read_bytes() == b"source content"
 
-    def test_atomic_replace_windows_retry_on_sharing_violation(
-        self, tmp_path: Path
-    ) -> None:
+    def test_atomic_replace_windows_retry_on_sharing_violation(self, tmp_path: Path) -> None:
         """Test _atomic_replace on Windows retries on WinError 32 (sharing violation)."""
         from utils.file_validator import _atomic_replace
 
@@ -580,11 +567,9 @@ class TestAtomicWrite:
         # Verify exponential backoff was used (50ms, 100ms)
         assert mock_sleep.call_count == 2
         mock_sleep.assert_any_call(0.05)  # 50ms
-        mock_sleep.assert_any_call(0.1)   # 100ms
+        mock_sleep.assert_any_call(0.1)  # 100ms
 
-    def test_atomic_replace_windows_fails_after_max_retries(
-        self, tmp_path: Path
-    ) -> None:
+    def test_atomic_replace_windows_fails_after_max_retries(self, tmp_path: Path) -> None:
         """Test _atomic_replace on Windows fails after max retries exhausted."""
         from utils.file_validator import (
             _WINDOWS_RETRY_ATTEMPTS,
@@ -613,9 +598,7 @@ class TestAtomicWrite:
         # Source file should still exist since replace failed
         assert src.exists()
 
-    def test_atomic_replace_windows_no_retry_for_non_sharing_violation(
-        self, tmp_path: Path
-    ) -> None:
+    def test_atomic_replace_windows_no_retry_for_non_sharing_violation(self, tmp_path: Path) -> None:
         """Test _atomic_replace doesn't retry for non-winerror-32 PermissionErrors."""
         from utils.file_validator import _atomic_replace
 
@@ -646,9 +629,7 @@ class TestAtomicWrite:
         assert call_count == 1
         mock_sleep.assert_not_called()
 
-    def test_atomic_replace_windows_no_retry_for_oserror(
-        self, tmp_path: Path
-    ) -> None:
+    def test_atomic_replace_windows_no_retry_for_oserror(self, tmp_path: Path) -> None:
         """Test _atomic_replace doesn't retry for non-PermissionError OSErrors."""
         from utils.file_validator import _atomic_replace
 

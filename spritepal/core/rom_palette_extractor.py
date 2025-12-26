@@ -2,6 +2,7 @@
 ROM palette extraction functionality for SpritePal
 Extracts sprite palettes directly from ROM files
 """
+
 from __future__ import annotations
 
 import json
@@ -11,6 +12,7 @@ from typing import Any
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class ROMPaletteExtractor:
     """Extracts palettes directly from ROM files"""
@@ -48,9 +50,7 @@ class ROMPaletteExtractor:
                 palette_data = f.read(512)
 
             if len(palette_data) < 512:
-                logger.warning(
-                    f"Insufficient palette data at offset 0x{palette_offset:X}"
-                )
+                logger.warning(f"Insufficient palette data at offset 0x{palette_offset:X}")
                 return created_files
 
             # Process each requested palette
@@ -73,18 +73,14 @@ class ROMPaletteExtractor:
                     json.dump(palette_json, f, indent=2)
 
                 created_files.append(palette_path)
-                logger.info(
-                    f"Extracted palette {palette_idx} to {Path(palette_path).name}"
-                )
+                logger.info(f"Extracted palette {palette_idx} to {Path(palette_path).name}")
 
         except OSError as e:
             logger.warning(f"Failed to extract palettes from ROM: {e}")
 
         return created_files
 
-    def _extract_palette_colors(
-        self, palette_data: bytes, palette_idx: int
-    ) -> list[list[int]]:
+    def _extract_palette_colors(self, palette_data: bytes, palette_idx: int) -> list[list[int]]:
         """
         Extract 16 colors for a specific palette.
 
@@ -128,7 +124,9 @@ class ROMPaletteExtractor:
         return colors
 
     def get_palette_config_from_sprite_config(
-        self, game_config: dict[str, Any], sprite_name: str  # pyright: ignore[reportExplicitAny]  # JSON config
+        self,
+        game_config: dict[str, Any],
+        sprite_name: str,  # pyright: ignore[reportExplicitAny]  # JSON config
     ) -> tuple[int | None, list[int] | None]:
         """
         Get palette offset and indices for a specific sprite.
@@ -144,11 +142,7 @@ class ROMPaletteExtractor:
         palette_info = game_config.get("palettes", {})
         palette_offset = palette_info.get("offset", None)
         if palette_offset and isinstance(palette_offset, str):
-            palette_offset = (
-                int(palette_offset, 16)
-                if palette_offset.startswith("0x")
-                else int(palette_offset)
-            )
+            palette_offset = int(palette_offset, 16) if palette_offset.startswith("0x") else int(palette_offset)
 
         # Get sprite-specific palette indices
         sprites = game_config.get("sprites", {})

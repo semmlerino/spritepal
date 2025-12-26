@@ -1,6 +1,7 @@
 """
 Unit tests for GridImageProcessor
 """
+
 from __future__ import annotations
 
 from unittest.mock import Mock
@@ -21,6 +22,8 @@ pytestmark = [
     pytest.mark.slow,
     pytest.mark.allows_registry_state(reason="Image processing tests don't use managers"),
 ]
+
+
 class TestGridImageProcessor:
     """Test the GridImageProcessor class"""
 
@@ -441,9 +444,7 @@ class TestGridImageProcessor:
         processor = GridImageProcessor()
 
         # Process sprite sheet using real file
-        result_image, result_tiles = processor.process_sprite_sheet_as_grid(
-            str(sprite_file), 2
-        )
+        result_image, result_tiles = processor.process_sprite_sheet_as_grid(str(sprite_file), 2)
 
         # Check results - test actual behavior, not mocked behavior
         assert result_image is not None

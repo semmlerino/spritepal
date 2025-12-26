@@ -5,6 +5,7 @@ Provides consistent focus indicators, keyboard navigation hints, and WCAG 2.1 co
 NOTE: This file uses dark theme compatible colors from theme.py.
 Focus states use bright borders instead of light backgrounds.
 """
+
 from __future__ import annotations
 
 from typing import cast
@@ -282,6 +283,7 @@ def apply_global_accessibility_styles() -> None:
         # Some attributes may not be available in this Qt version
         pass
 
+
 def configure_accessibility_settings() -> None:
     """Configure application-wide accessibility settings."""
     app = QApplication.instance()
@@ -306,6 +308,7 @@ def configure_accessibility_settings() -> None:
     except AttributeError:
         # This method might not be available in all Qt versions
         pass
+
 
 def initialize_accessibility() -> None:
     """Initialize all accessibility features for the application."""

@@ -1,4 +1,5 @@
 """Scrollable preview group widget for displaying images in a scroll area."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -48,8 +49,7 @@ class ScrollablePreviewGroup(QGroupBox):
 
         if with_styling:
             self._preview_label.setStyleSheet(
-                f"background-color: {COLORS['background']}; "
-                f"border: 1px solid {COLORS['border']};"
+                f"background-color: {COLORS['background']}; border: 1px solid {COLORS['border']};"
             )
 
         self._scroll_area.setWidget(self._preview_label)

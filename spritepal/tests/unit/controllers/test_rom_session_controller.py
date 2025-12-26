@@ -1,4 +1,5 @@
 """Unit tests for ROMSessionController."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -95,9 +96,7 @@ class TestGetLastRomPath:
             result = controller.get_last_rom_path()
 
         assert result == str(rom_file)
-        mock_settings.get.assert_called_once_with(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, ""
-        )
+        mock_settings.get.assert_called_once_with(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "")
 
     def test_returns_none_if_not_exists(self, tmp_path) -> None:
         """Should return None if file doesn't exist."""
@@ -197,9 +196,7 @@ class TestLoadRomFile:
         with patch("core.app_context.get_app_context", return_value=mock_context):
             controller.load_rom_file(str(rom_file))
 
-        mock_settings.set.assert_any_call(
-            SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, str(rom_file)
-        )
+        mock_settings.set.assert_any_call(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, str(rom_file))
         mock_settings.set_last_used_directory.assert_called_once_with(str(tmp_path))
 
     def test_returns_none_for_empty_path(self) -> None:
@@ -239,6 +236,7 @@ class TestFormatHeader:
 
     def test_formats_valid_header(self, qtbot) -> None:
         """Should format header with all info."""
+
         # Create a mock header
         @dataclass
         class MockHeader:
@@ -264,6 +262,7 @@ class TestFormatHeader:
 
     def test_formats_header_without_config(self, qtbot) -> None:
         """Should show warning for unknown ROM."""
+
         @dataclass
         class MockHeader:
             title: str = "UNKNOWN ROM"

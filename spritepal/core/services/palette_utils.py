@@ -4,6 +4,7 @@ Shared palette extraction utilities.
 This module provides shared palette extraction logic used by both
 ROMService and VRAMService to avoid code duplication.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -98,9 +99,7 @@ def extract_palettes_and_create_files(
                 "extraction_size": num_tiles * BYTES_PER_TILE,
             }
 
-            metadata_file = palette_manager.create_metadata_json(
-                output_base, palette_files, extraction_params
-            )
+            metadata_file = palette_manager.create_metadata_json(output_base, palette_files, extraction_params)
             created_files.append(metadata_file)
 
     # Analyze OAM if available

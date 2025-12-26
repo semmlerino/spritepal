@@ -12,6 +12,7 @@ REAL COMPONENT TESTING:
 
 Uses session_app_context fixture from app_context_fixtures.py with shared_state_safe marker.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -66,7 +67,7 @@ def test_rom_data() -> bytes:
     # SNES internal header at 0x7FC0 (LoROM)
     header_offset = 0x7FC0
     # Game title (21 bytes)
-    data[header_offset:header_offset + 21] = b"TEST ROM DATA        "[:21]
+    data[header_offset : header_offset + 21] = b"TEST ROM DATA        "[:21]
     # ROM makeup byte (0x20 = LoROM)
     data[header_offset + 0x15] = 0x20
     # ROM type (0x00 = ROM only)
@@ -248,8 +249,9 @@ class TestInjectionManagerEdgeCases:
 
         # Create a PNG file without companion JSON
         from PIL import Image
+
         png_path = tmp_path / "test.png"
-        Image.new('RGBA', (16, 16)).save(png_path)
+        Image.new("RGBA", (16, 16)).save(png_path)
 
         metadata = manager.load_metadata(str(png_path))
         # Should return None when no metadata file exists

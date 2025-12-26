@@ -13,14 +13,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Set environment to allow GUI tests
-os.environ['DISPLAY'] = ':99'
-os.environ['QT_QPA_PLATFORM'] = 'xcb'  # Use X11 backend
+os.environ["DISPLAY"] = ":99"
+os.environ["QT_QPA_PLATFORM"] = "xcb"  # Use X11 backend
+
 
 def run_tests():
     """Run the integration tests directly."""
-    print("="*60)
+    print("=" * 60)
     print("RUNNING SPRITE GALLERY INTEGRATION TESTS")
-    print("="*60)
+    print("=" * 60)
 
     try:
         from PySide6.QtWidgets import QApplication
@@ -46,6 +47,7 @@ def run_tests():
 
                     # Create mock qtbot
                     from unittest.mock import MagicMock
+
                     qtbot = MagicMock()
                     qtbot.wait = lambda ms: None
                     qtbot.addWidget = lambda w: None
@@ -55,11 +57,12 @@ def run_tests():
 
                     # Check method signature to see what fixtures it needs
                     import inspect
+
                     sig = inspect.signature(test_method)
                     params = list(sig.parameters.keys())
 
                     # Run test with appropriate fixtures
-                    if 'qtbot' in params:
+                    if "qtbot" in params:
                         # Most tests need qtbot
                         from tests.conftest import (
                             gallery_tab,
@@ -67,15 +70,15 @@ def run_tests():
                             test_sprites,
                         )
 
-                        if 'gallery_tab' in params:
+                        if "gallery_tab" in params:
                             tab = gallery_tab(qtbot)
                             test_method(tab)
-                        elif 'gallery_with_sprites' in params:
+                        elif "gallery_with_sprites" in params:
                             tab = gallery_tab(qtbot)
                             sprites = test_sprites()
                             gallery = gallery_with_sprites(tab, sprites)
                             test_method(gallery, qtbot)
-                        elif 'test_sprites' in params:
+                        elif "test_sprites" in params:
                             sprites = test_sprites()
                             test_method(qtbot, sprites)
                         else:
@@ -93,9 +96,9 @@ def run_tests():
                     errors.append(f"{test_class.__name__}.{method_name}: {e!s}")
 
         # Run TestSpriteGalleryTab tests
-        print("\n" + "="*40)
+        print("\n" + "=" * 40)
         print("Testing SpriteGalleryTab")
-        print("="*40)
+        print("=" * 40)
 
         # Create simple inline test
         from PySide6.QtCore import Qt
@@ -122,12 +125,14 @@ def run_tests():
             tab = SpriteGalleryTab()
             sprites = []
             for i in range(17):
-                sprites.append({
-                    'offset': i * 0x1000,
-                    'decompressed_size': 2048,
-                    'tile_count': 64,
-                    'compressed': i % 3 == 0,
-                })
+                sprites.append(
+                    {
+                        "offset": i * 0x1000,
+                        "decompressed_size": 2048,
+                        "tile_count": 64,
+                        "compressed": i % 3 == 0,
+                    }
+                )
             tab.sprites_data = sprites
             tab.gallery_widget.set_sprites(sprites)
             assert len(tab.gallery_widget.thumbnails) == 17
@@ -146,18 +151,19 @@ def run_tests():
 
             # Add mock extractor
             from unittest.mock import MagicMock
+
             tab.rom_extractor = MagicMock()
 
             # Set sprites
             sprites = []
             for i in range(10):
-                sprites.append({'offset': i * 0x1000, 'decompressed_size': 1024})
+                sprites.append({"offset": i * 0x1000, "decompressed_size": 1024})
             tab.sprites_data = sprites
             tab.gallery_widget.set_sprites(sprites)
 
             # Generate thumbnails
             for sprite in sprites:
-                offset = sprite['offset']
+                offset = sprite["offset"]
                 if offset in tab.gallery_widget.thumbnails:
                     pixmap = QPixmap(128, 128)
                     pixmap.fill(Qt.GlobalColor.darkGray)
@@ -176,7 +182,7 @@ def run_tests():
             valid_count = 0
             if tab.detached_window.gallery_widget:
                 for thumbnail in tab.detached_window.gallery_widget.thumbnails.values():
-                    if hasattr(thumbnail, 'sprite_pixmap') and thumbnail.sprite_pixmap:
+                    if hasattr(thumbnail, "sprite_pixmap") and thumbnail.sprite_pixmap:
                         if not thumbnail.sprite_pixmap.isNull():
                             valid_count += 1
 
@@ -223,6 +229,7 @@ def run_tests():
             print("\n📝 Testing detached window scrolling...")
             # Get dependencies from AppContext
             from core.app_context import get_app_context
+
             ctx = get_app_context()
             core_ops_manager = ctx.core_operations_manager
             settings_manager = ctx.application_state_manager
@@ -235,7 +242,7 @@ def run_tests():
 
             sprites = []
             for i in range(5):
-                sprites.append({'offset': i * 0x1000})
+                sprites.append({"offset": i * 0x1000})
             window.set_sprites(sprites)
 
             detached_gallery = window.gallery_widget
@@ -258,9 +265,9 @@ def run_tests():
             errors.append(f"Detached scrolling: {e}")
 
         # Print summary
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("TEST SUMMARY")
-        print("="*60)
+        print("=" * 60)
         print(f"✅ Passed: {passed}")
         print(f"❌ Failed: {failed}")
 
@@ -277,8 +284,10 @@ def run_tests():
     except Exception as e:
         print(f"\n❌ Test runner error: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(run_tests())

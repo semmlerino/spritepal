@@ -2,6 +2,7 @@
 Sprite gallery model for efficient handling of large sprite collections.
 Implements virtual scrolling through QAbstractListModel.
 """
+
 from __future__ import annotations
 
 from typing import Any, override
@@ -19,6 +20,7 @@ from PySide6.QtGui import QPixmap
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class SpriteGalleryModel(QAbstractListModel):
     """Model for sprite gallery using virtual item view."""
@@ -113,13 +115,13 @@ class SpriteGalleryModel(QAbstractListModel):
             return offset in self._selected_offsets
 
         if role == self.CompressedRole:
-            return sprite.get('compressed', False)
+            return sprite.get("compressed", False)
 
         if role == self.SizeRole:
-            return sprite.get('decompressed_size', sprite.get('size', 0))
+            return sprite.get("decompressed_size", sprite.get("size", 0))
 
         if role == self.TileCountRole:
-            return sprite.get('tile_count', 0)
+            return sprite.get("tile_count", 0)
 
         if role == Qt.ItemDataRole.SizeHintRole:
             # Return size hint for item
@@ -128,7 +130,9 @@ class SpriteGalleryModel(QAbstractListModel):
         return None
 
     @override
-    def setData(self, index: QModelIndex | QPersistentModelIndex, value: object, role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(
+        self, index: QModelIndex | QPersistentModelIndex, value: object, role: int = Qt.ItemDataRole.EditRole
+    ) -> bool:
         """Set data for the given index and role."""
         if not index.isValid():
             return False
@@ -231,7 +235,7 @@ class SpriteGalleryModel(QAbstractListModel):
                         continue
 
                 # Check compression filter
-                if compressed_only and not sprite.get('compressed', False):
+                if compressed_only and not sprite.get("compressed", False):
                     continue
 
                 self._filtered_sprites.append(sprite)
@@ -254,9 +258,9 @@ class SpriteGalleryModel(QAbstractListModel):
         if sort_key == "Offset":
             self._sprites.sort(key=lambda x: self._get_offset(x))
         elif sort_key == "Size":
-            self._sprites.sort(key=lambda x: x.get('decompressed_size', x.get('size', 0)), reverse=True)
+            self._sprites.sort(key=lambda x: x.get("decompressed_size", x.get("size", 0)), reverse=True)
         elif sort_key == "Tiles":
-            self._sprites.sort(key=lambda x: x.get('tile_count', 0), reverse=True)
+            self._sprites.sort(key=lambda x: x.get("tile_count", 0), reverse=True)
 
         # Re-apply filter after sorting
         if self._use_filtering:
@@ -335,11 +339,7 @@ class SpriteGalleryModel(QAbstractListModel):
         self._thumbnail_size = size
         # Emit size hint changed for all items
         if self._sprites:
-            self.dataChanged.emit(
-                self.index(0, 0),
-                self.index(self.rowCount() - 1, 0),
-                [Qt.ItemDataRole.SizeHintRole]
-            )
+            self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 0), [Qt.ItemDataRole.SizeHintRole])
 
     def set_columns(self, columns: int):
         """Set the number of columns for grid layout."""
@@ -376,18 +376,14 @@ class SpriteGalleryModel(QAbstractListModel):
 
         # Notify view that all pixmaps need refresh
         if self._sprites:
-            self.dataChanged.emit(
-                self.index(0, 0),
-                self.index(self.rowCount() - 1, 0),
-                [self.PixmapRole]
-            )
+            self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 0), [self.PixmapRole])
 
     @staticmethod
     def _get_offset(sprite: dict[str, Any]) -> int:  # pyright: ignore[reportExplicitAny] - sprite data
         """Extract offset from sprite data."""
-        offset = sprite.get('offset', 0)
+        offset = sprite.get("offset", 0)
         if isinstance(offset, str):
-            return int(offset, 16) if offset.startswith('0x') else int(offset)
+            return int(offset, 16) if offset.startswith("0x") else int(offset)
         return offset
 
     def get_sprite_count_info(self) -> tuple[int, int, int]:

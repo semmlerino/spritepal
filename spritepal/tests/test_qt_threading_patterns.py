@@ -11,6 +11,7 @@ This suite specifically tests:
 SKIPPED: QThread signal synchronization tests hang in Qt offscreen mode.
 These tests require a real display.
 """
+
 from __future__ import annotations
 
 import threading
@@ -39,6 +40,8 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.slow,
 ]
+
+
 class ThreadInfoCapture:
     """Helper to capture thread information during signal delivery"""
 
@@ -51,20 +54,22 @@ class ThreadInfoCapture:
         with self.lock:
             thread = threading.current_thread()
             qt_thread = QThread.currentThread()
-            self.captures.append({
-                'label': label,
-                'thread_id': thread.ident,
-                'thread_name': thread.name,
-                'is_main': thread == threading.main_thread(),
-                'qt_thread': qt_thread,
-                'qt_thread_id': id(qt_thread) if qt_thread else None
-            })
+            self.captures.append(
+                {
+                    "label": label,
+                    "thread_id": thread.ident,
+                    "thread_name": thread.name,
+                    "is_main": thread == threading.main_thread(),
+                    "qt_thread": qt_thread,
+                    "qt_thread_id": id(qt_thread) if qt_thread else None,
+                }
+            )
 
     def get_capture(self, label: str):
         """Get capture by label"""
         with self.lock:
             for capture in self.captures:
-                if capture['label'] == label:
+                if capture["label"] == label:
                     return capture
         return None
 
@@ -72,6 +77,7 @@ class ThreadInfoCapture:
         """Reset captures"""
         with self.lock:
             self.captures.clear()
+
 
 class TestQThreadPatterns:
     """Test different QThread implementation patterns"""
@@ -102,17 +108,17 @@ class TestQThreadPatterns:
                 self.should_stop = False
 
             def process(self):
-                thread_capture.capture('worker_start')
+                thread_capture.capture("worker_start")
                 self.started.emit()
 
                 for i in range(5):
                     if self.should_stop:
                         break
-                    thread_capture.capture(f'worker_progress_{i}')
+                    thread_capture.capture(f"worker_progress_{i}")
                     self.progress.emit(i)
                     time.sleep(0.01)  # sleep-ok: thread interleaving
 
-                thread_capture.capture('worker_finish')
+                thread_capture.capture("worker_finish")
                 self.finished.emit()
 
             def stop(self):
@@ -123,7 +129,7 @@ class TestQThreadPatterns:
         thread = QThread()
 
         # Capture main thread info
-        thread_capture.capture('main_thread')
+        thread_capture.capture("main_thread")
 
         # Move worker to thread
         worker.moveToThread(thread)
@@ -159,18 +165,18 @@ class TestQThreadPatterns:
         assert thread.wait(1000)
 
         # Verify thread execution
-        main_capture = thread_capture.get_capture('main_thread')
-        worker_start = thread_capture.get_capture('worker_start')
+        main_capture = thread_capture.get_capture("main_thread")
+        worker_start = thread_capture.get_capture("worker_start")
 
         # Worker should run in different thread
-        assert worker_start['thread_id'] != main_capture['thread_id']
-        assert not worker_start['is_main']
+        assert worker_start["thread_id"] != main_capture["thread_id"]
+        assert not worker_start["is_main"]
 
         # All worker operations should be in same thread
         for i in range(5):
-            progress = thread_capture.get_capture(f'worker_progress_{i}')
+            progress = thread_capture.get_capture(f"worker_progress_{i}")
             if progress:
-                assert progress['thread_id'] == worker_start['thread_id']
+                assert progress["thread_id"] == worker_start["thread_id"]
 
         # Signals should be received
         assert len(signal_received) == 5
@@ -182,10 +188,10 @@ class TestQThreadPatterns:
             progress = Signal(int)
 
             def run(self):
-                thread_capture.capture('subclass_run')
+                thread_capture.capture("subclass_run")
 
                 for i in range(5):
-                    thread_capture.capture(f'subclass_progress_{i}')
+                    thread_capture.capture(f"subclass_progress_{i}")
                     self.progress.emit(i)
                     time.sleep(0.01)  # sleep-ok: thread interleaving
 
@@ -204,9 +210,9 @@ class TestQThreadPatterns:
         QApplication.processEvents()
 
         # Verify execution in separate thread
-        run_capture = thread_capture.get_capture('subclass_run')
+        run_capture = thread_capture.get_capture("subclass_run")
         assert run_capture is not None
-        assert not run_capture['is_main']
+        assert not run_capture["is_main"]
 
         # Verify signals received
         assert len(signal_received) == 5
@@ -260,6 +266,7 @@ class TestQThreadPatterns:
         # Cleanup
         worker.deleteLater()
         thread.deleteLater()
+
 
 class TestSignalSlotAcrossThreads:
     """Test signal/slot mechanism across threads"""
@@ -383,6 +390,7 @@ class TestSignalSlotAcrossThreads:
         assert len(received_data[0]) == 10
         assert all(f"worker_{i}" in received_data[0] for i in range(10))
 
+
 class TestEventLoopManagement:
     """Test event loop management in worker threads"""
 
@@ -488,6 +496,7 @@ class TestEventLoopManagement:
         # Verify result
         assert len(results) == 1
         assert results[0] == "Timer completed"
+
 
 class TestSynchronizationPatterns:
     """Test Qt synchronization patterns"""
@@ -639,6 +648,7 @@ class TestSynchronizationPatterns:
             thread.quit()
             thread.wait()
 
+
 class TestWorkerLifecycle:
     """Test worker lifecycle management"""
 
@@ -720,6 +730,7 @@ class TestWorkerLifecycle:
         assert len(errors) == 1
         assert "Test error" in errors[0][0]
         assert isinstance(errors[0][1], ValueError)
+
 
 class TestRealWorldScenarios:
     """Test real-world threading scenarios"""
@@ -818,11 +829,7 @@ class TestRealWorldScenarios:
 
         # Create multiple worker threads
         threads = []
-        chunks = {
-            0: [1, 2, 3],
-            1: [4, 5, 6],
-            2: [7, 8, 9]
-        }
+        chunks = {0: [1, 2, 3], 1: [4, 5, 6], 2: [7, 8, 9]}
 
         for chunk_id, data in chunks.items():
             # Process chunk when thread starts
@@ -842,6 +849,7 @@ class TestRealWorldScenarios:
         assert processor.processed_data[0] == [2, 4, 6]
         assert processor.processed_data[1] == [8, 10, 12]
         assert processor.processed_data[2] == [14, 16, 18]
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

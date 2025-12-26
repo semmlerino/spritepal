@@ -126,9 +126,7 @@ class CacheOperationsManager(QObject):
             True if saved successfully, False otherwise
         """
         rom_cache = self._ensure_rom_cache()
-        return rom_cache.save_partial_scan_results(
-            rom_path, scan_params, found_sprites, current_offset, completed
-        )
+        return rom_cache.save_partial_scan_results(rom_path, scan_params, found_sprites, current_offset, completed)
 
     def clear_scan_progress(
         self,

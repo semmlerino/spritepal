@@ -4,6 +4,7 @@ Reusable file drop zone widget.
 A drag-and-drop zone for file input with visual state feedback,
 status badges (Required/Optional/Loaded), and browse button.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -262,9 +263,7 @@ class DropZone(QWidget):
 
     def _browse_file(self) -> None:
         """Browse for file using file dialog."""
-        filename = browse_for_open_file(
-            self, f"Select {self.file_type} File", self._file_filter
-        )
+        filename = browse_for_open_file(self, f"Select {self.file_type} File", self._file_filter)
 
         if filename:
             self.set_file(filename)

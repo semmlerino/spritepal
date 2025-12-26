@@ -4,6 +4,7 @@ Consolidated UI coordinator for MainWindow preview, session, and tab operations.
 This module merges PreviewCoordinator, SessionCoordinator, and TabCoordinator
 into a single class to reduce file count and boilerplate.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -126,15 +127,11 @@ class UICoordinator(QObject):
         preview_group = QGroupBox("Extraction Preview")
         preview_layout = QVBoxLayout()
 
-        preview_layout.addWidget(
-            self.sprite_preview, 1
-        )  # Give stretch factor to expand
+        preview_layout.addWidget(self.sprite_preview, 1)  # Give stretch factor to expand
 
         # Configure preview info label
         self.preview_info.setStyleSheet(get_muted_text_style())
-        self.preview_info.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
-        )
+        self.preview_info.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         preview_layout.addWidget(self.preview_info, 0)  # No stretch factor
 
         preview_group.setLayout(preview_layout)
@@ -248,11 +245,13 @@ class UICoordinator(QObject):
         session_data = self.extraction_panel.get_session_data()
 
         # Add output settings
-        session_data.update({
-            "output_name": self.output_settings_manager.get_output_name(),
-            "create_grayscale": self.output_settings_manager.get_grayscale_enabled(),
-            "create_metadata": self.output_settings_manager.get_metadata_enabled(),
-        })
+        session_data.update(
+            {
+                "output_name": self.output_settings_manager.get_output_name(),
+                "create_grayscale": self.output_settings_manager.get_grayscale_enabled(),
+                "create_metadata": self.output_settings_manager.get_metadata_enabled(),
+            }
+        )
 
         # Save session data
         self.session_manager.update_session_data(session_data)
@@ -323,10 +322,7 @@ class UICoordinator(QObject):
 
         # Update output info label
         is_grayscale_mode = self.actions_handler.is_grayscale_mode()
-        self.output_settings_manager.update_output_info_label(
-            is_vram_tab=True,
-            is_grayscale_mode=is_grayscale_mode
-        )
+        self.output_settings_manager.update_output_info_label(is_vram_tab=True, is_grayscale_mode=is_grayscale_mode)
 
         # Update checkbox states based on mode
         self.output_settings_manager.set_extraction_mode_options(is_grayscale_mode)

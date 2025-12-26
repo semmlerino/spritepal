@@ -4,6 +4,7 @@ Refactored sprite finder tests using real components and test doubles.
 Instead of mocking internal methods, we use real SpriteFinder with
 test doubles only for external dependencies (ROM files, image files).
 """
+
 from __future__ import annotations
 
 import json
@@ -34,6 +35,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.usefixtures("mock_hal"),
 ]
+
 
 class TestSpriteCandidate:
     """Test SpriteCandidate dataclass behavior."""
@@ -89,6 +91,7 @@ class TestSpriteCandidate:
         assert result["visual_metrics"]["edge_score"] == 0.712  # Rounded
         assert result["preview_path"] == preview_path
 
+
 @pytest.mark.usefixtures("isolated_managers")
 class TestSpriteFinderWithRealComponents:
     """Test SpriteFinder using real components with test doubles for external dependencies."""
@@ -138,7 +141,7 @@ class TestSpriteFinderWithRealComponents:
         # Verify real components are created (not mocked)
         assert finder.extractor is not None
         assert finder.validator is not None
-        assert hasattr(finder, 'find_sprites_in_rom')
+        assert hasattr(finder, "find_sprites_in_rom")
 
     def test_find_sprites_behavior_with_test_doubles(self, test_rom_with_sprites, output_dir):
         """Test sprite finding behavior using test doubles for ROM data."""
@@ -147,7 +150,7 @@ class TestSpriteFinderWithRealComponents:
 
         # Mock only the external dependency (ROM decompression)
         # This allows us to test the SpriteFinder logic without HAL compression complexity
-        with patch.object(finder.extractor.rom_injector, 'find_compressed_sprite') as mock_decompress:
+        with patch.object(finder.extractor.rom_injector, "find_compressed_sprite") as mock_decompress:
             # Configure test double to return predictable sprite data
             sprite_data = self._create_test_sprite_data(tile_count=16)
             mock_decompress.return_value = (256, sprite_data)  # (compressed_size, decompressed_data)
@@ -159,7 +162,7 @@ class TestSpriteFinderWithRealComponents:
                 end_offset=0x200100,
                 step=0x100,
                 min_confidence=0.5,
-                save_previews=False  # Skip preview generation for unit test
+                save_previews=False,  # Skip preview generation for unit test
             )
 
             # Verify behavior: Sprite was found and validated
@@ -173,7 +176,7 @@ class TestSpriteFinderWithRealComponents:
         finder = SpriteFinder(output_dir)
 
         # Mock validator to return different confidence scores
-        with patch.object(finder.validator, 'validate_sprite_image') as mock_validate:
+        with patch.object(finder.validator, "validate_sprite_image") as mock_validate:
             # Setup: Return high and low confidence scores alternately
             mock_validate.side_effect = [
                 (True, 0.9, {"coherence": 0.9}),  # High confidence
@@ -182,7 +185,7 @@ class TestSpriteFinderWithRealComponents:
             ]
 
             # Mock decompression to always succeed
-            with patch.object(finder.extractor.rom_injector, 'find_compressed_sprite') as mock_decompress:
+            with patch.object(finder.extractor.rom_injector, "find_compressed_sprite") as mock_decompress:
                 sprite_data = self._create_test_sprite_data(tile_count=16)
                 mock_decompress.return_value = (256, sprite_data)
 
@@ -193,7 +196,7 @@ class TestSpriteFinderWithRealComponents:
                     end_offset=0x200300,
                     step=0x100,
                     min_confidence=0.6,  # Filter out low confidence
-                    save_previews=False
+                    save_previews=False,
                 )
 
                 # Verify behavior: Only high/medium confidence sprites included
@@ -208,13 +211,13 @@ class TestSpriteFinderWithRealComponents:
         # Create test sprite data
         sprite_data = self._create_test_sprite_data(tile_count=16)
 
-        with patch.object(finder.extractor.rom_injector, 'find_compressed_sprite') as mock_decompress:
+        with patch.object(finder.extractor.rom_injector, "find_compressed_sprite") as mock_decompress:
             mock_decompress.return_value = (256, sprite_data)
 
             # Mock image conversion to avoid complex image processing
-            with patch.object(finder.extractor, '_convert_4bpp_to_png') as mock_convert:
+            with patch.object(finder.extractor, "_convert_4bpp_to_png") as mock_convert:
                 # Create a simple test image
-                test_image = Image.new('RGBA', (64, 64), color=(255, 0, 0, 255))
+                test_image = Image.new("RGBA", (64, 64), color=(255, 0, 0, 255))
                 mock_convert.return_value = test_image
 
                 # Find sprites with preview generation
@@ -224,7 +227,7 @@ class TestSpriteFinderWithRealComponents:
                     end_offset=0x200100,
                     step=0x100,
                     min_confidence=0.5,
-                    save_previews=True  # Enable preview generation
+                    save_previews=True,  # Enable preview generation
                 )
 
                 # Verify behavior: Preview paths are set for found sprites
@@ -237,7 +240,7 @@ class TestSpriteFinderWithRealComponents:
         finder = SpriteFinder(output_dir)
 
         # Mock decompression to raise exception
-        with patch.object(finder.extractor.rom_injector, 'find_compressed_sprite') as mock_decompress:
+        with patch.object(finder.extractor.rom_injector, "find_compressed_sprite") as mock_decompress:
             mock_decompress.side_effect = Exception("Decompression failed")
 
             # Find sprites - should handle errors gracefully
@@ -247,7 +250,7 @@ class TestSpriteFinderWithRealComponents:
                 end_offset=0x200100,
                 step=0x100,
                 min_confidence=0.5,
-                save_previews=False
+                save_previews=False,
             )
 
             # Verify behavior: No candidates found but no crash
@@ -272,7 +275,7 @@ class TestSpriteFinderIntegration:
         finder = SpriteFinder(str(output_dir))
 
         # Create test sprite image for validation
-        test_sprite = Image.new('RGBA', (64, 64))
+        test_sprite = Image.new("RGBA", (64, 64))
         # Draw some patterns to make it look like a sprite
         for x in range(64):
             for y in range(64):
@@ -282,22 +285,18 @@ class TestSpriteFinderIntegration:
                     test_sprite.putpixel((x, y), (0, 255, 0, 255))
 
         # Test validation directly
-        with patch.object(finder.extractor, '_convert_4bpp_to_png') as mock_convert:
+        with patch.object(finder.extractor, "_convert_4bpp_to_png") as mock_convert:
             mock_convert.return_value = test_sprite
 
             # Mock only the decompression
-            with patch.object(finder.extractor.rom_injector, 'find_compressed_sprite') as mock_decompress:
-                mock_decompress.return_value = (256, b'\x00' * 512)
+            with patch.object(finder.extractor.rom_injector, "find_compressed_sprite") as mock_decompress:
+                mock_decompress.return_value = (256, b"\x00" * 512)
 
                 # Find sprites and let real validator process them
                 candidates = finder.find_sprites_in_rom(
-                    rom_path=str(rom_path),
-                    start_offset=0x200000,
-                    end_offset=0x200100,
-                    step=0x100,
-                    min_confidence=0.0
+                    rom_path=str(rom_path), start_offset=0x200000, end_offset=0x200100, step=0x100, min_confidence=0.0
                 )
 
                 # Verify validation was performed
                 for candidate in candidates:
-                    assert 'visual_metrics' in candidate.__dict__ or candidate.visual_metrics is not None
+                    assert "visual_metrics" in candidate.__dict__ or candidate.visual_metrics is not None

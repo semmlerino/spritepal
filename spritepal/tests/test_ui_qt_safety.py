@@ -4,6 +4,7 @@ Tests for Qt boolean evaluation safety fixes.
 Tests that Qt containers are properly checked with `is not None` instead of truthiness,
 preventing bugs where empty containers evaluate to False.
 """
+
 from __future__ import annotations
 
 from unittest.mock import Mock
@@ -30,6 +31,7 @@ try:
         QVBoxLayout,
         QWidget,
     )
+
     QT_AVAILABLE = True
 except ImportError:
     # Create mock classes for headless testing
@@ -43,6 +45,7 @@ except ImportError:
     QWidget = Mock
     QApplication = Mock
     QT_AVAILABLE = False
+
 
 class TestQtBooleanEvaluationFixes:
     """Test Qt boolean evaluation safety patterns"""
@@ -164,6 +167,7 @@ class TestQtBooleanEvaluationFixes:
         assert bool(vbox)
         assert bool(hbox)
 
+
 class TestQtSafetyPatterns:
     """Test safe patterns for Qt boolean evaluation"""
 
@@ -219,13 +223,14 @@ class TestQtSafetyPatterns:
 
         # Demonstrate the difference
         assert check_truthiness(mock_empty_layout) is False  # Bug: empty container fails
-        assert check_not_none(mock_empty_layout) is True    # Fix: empty container passes
+        assert check_not_none(mock_empty_layout) is True  # Fix: empty container passes
 
-        assert check_truthiness(mock_none_layout) is False   # Correct: None fails
-        assert check_not_none(mock_none_layout) is False     # Correct: None fails
+        assert check_truthiness(mock_none_layout) is False  # Correct: None fails
+        assert check_not_none(mock_none_layout) is False  # Correct: None fails
 
         assert check_truthiness(mock_populated_layout) is True  # Correct: populated passes
-        assert check_not_none(mock_populated_layout) is True    # Correct: populated passes
+        assert check_not_none(mock_populated_layout) is True  # Correct: populated passes
+
 
 class TestSpecificFixedLocations:
     """Test specific locations where Qt boolean evaluation fixes were applied"""
@@ -301,6 +306,7 @@ class TestSpecificFixedLocations:
         add_to_splitter_safely(mock_splitter, mock_widget)
         mock_splitter.addWidget.assert_called_once_with(mock_widget)
 
+
 class TestQtBooleanEvaluationRegressionPrevention:
     """Tests to prevent regression of Qt boolean evaluation bugs"""
 
@@ -311,14 +317,11 @@ class TestQtBooleanEvaluationRegressionPrevention:
             # Layout patterns
             lambda layout, widget: layout.addWidget(widget) if layout is not None else None,
             lambda layout, item: layout.addItem(item) if layout is not None else None,
-
             # Container patterns
             lambda container, item: container.addItem(item) if container is not None else None,
             lambda container, widget: container.addWidget(widget) if container is not None else None,
-
             # Tab widget patterns
             lambda tabs, widget, title: tabs.addTab(widget, title) if tabs is not None else None,
-
             # Tree/List patterns
             lambda tree, item: tree.addTopLevelItem(item) if tree is not None else None,
         ]
@@ -370,6 +373,7 @@ class TestQtBooleanEvaluationRegressionPrevention:
         result = correct_pattern_add(mock_empty_container, "item")
         assert result is True  # Correct: empty container is accepted
         mock_empty_container.addItem.assert_called_once_with("item")  # Item added
+
 
 class TestQtBooleanEvaluationIntegration:
     """Integration tests for Qt boolean evaluation fixes"""

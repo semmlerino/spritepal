@@ -1,6 +1,7 @@
 """
 Palette colorization for sprite images with caching
 """
+
 from __future__ import annotations
 
 from PIL import Image
@@ -23,14 +24,10 @@ class PaletteColorizer(QObject):
         self._current_palettes: dict[int, list[tuple[int, int, int]]] = {}
         self._palette_applied: bool = False
         self._selected_palette_index: int = 8  # Default to palette 8
-        self._colorized_cache: dict[tuple[int, int], Image.Image] = (
-            {}
-        )  # (row_index, palette_index) -> Image
+        self._colorized_cache: dict[tuple[int, int], Image.Image] = {}  # (row_index, palette_index) -> Image
         self._max_cache_size: int = 100  # Limit cache size to prevent memory issues
 
-    def set_palettes(
-        self, palettes_dict: dict[int, list[tuple[int, int, int]]]
-    ) -> None:
+    def set_palettes(self, palettes_dict: dict[int, list[tuple[int, int, int]]]) -> None:
         """Set the available palettes for colorization
 
         Args:
@@ -170,9 +167,7 @@ class PaletteColorizer(QObject):
         else:
             return rgba_image
 
-    def get_display_image(
-        self, row_index: int, grayscale_image: Image.Image
-    ) -> Image.Image:
+    def get_display_image(self, row_index: int, grayscale_image: Image.Image) -> Image.Image:
         """Get the appropriate display image for a row (grayscale or colorized)
 
         Args:

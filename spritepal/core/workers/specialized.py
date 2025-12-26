@@ -20,6 +20,7 @@ from .base import ManagedWorker
 
 logger = get_logger(__name__)
 
+
 class SignalConnectionHelper:
     """
     Helper class for standardizing signal connections in workers.
@@ -52,14 +53,16 @@ class SignalConnectionHelper:
         """
         if not isinstance(self.manager, expected_type):
             # Check if it's a Mock object (common in tests)
-            if hasattr(self.manager, '_spec_class'):
+            if hasattr(self.manager, "_spec_class"):
                 # This is a Mock with a spec, check if spec matches expected type
-                mock_spec = getattr(self.manager, '_spec_class', None)
+                mock_spec = getattr(self.manager, "_spec_class", None)
                 if mock_spec and issubclass(expected_type, mock_spec):
                     logger.debug(f"Accepting Mock with matching spec for {operation_type}")
                     return True
 
-            logger.error(f"Invalid manager type for {operation_type}: expected {expected_type}, got {type(self.manager)}")
+            logger.error(
+                f"Invalid manager type for {operation_type}: expected {expected_type}, got {type(self.manager)}"
+            )
             return False
         return True
 
@@ -73,9 +76,7 @@ class SignalConnectionHelper:
         """
         progress_signal = getattr(self.manager, progress_signal_name, None)
         if progress_signal is not None:
-            connection = progress_signal.connect(
-                lambda msg: self.worker.emit_progress(progress_percent, msg)
-            )
+            connection = progress_signal.connect(lambda msg: self.worker.emit_progress(progress_percent, msg))
             self._connections.append(connection)
             logger.debug(f"Connected progress signal: {progress_signal_name}")
         else:
@@ -156,18 +157,13 @@ class SignalConnectionHelper:
             injection_manager: The injection manager instance (typed as object because
                 Qt signals cannot be expressed in Protocol types)
         """
+
         def on_injection_finished(success: bool, message: str) -> None:
             """Handle injection completion and emit worker completion signal."""
-            self.worker.operation_finished.emit(
-                success,
-                f"Injection {'completed' if success else 'failed'}: {message}"
-            )
+            self.worker.operation_finished.emit(success, f"Injection {'completed' if success else 'failed'}: {message}")
 
         # Cast to Any for signal access
         mgr: Any = injection_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
         connection = mgr.injection_finished.connect(on_injection_finished)
         self._connections.append(connection)
         logger.debug("Connected injection completion signals")
-
-
-

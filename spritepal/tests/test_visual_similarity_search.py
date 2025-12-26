@@ -11,6 +11,7 @@ Tests cover:
 - Sprite group finding
 - Animation detection
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -158,9 +159,7 @@ class TestPerceptualHash:
         # Not all elements should be equal
         assert not np.array_equal(hash1, hash2)
 
-    def test_phash_scaled_image_similar_hash(
-        self, engine: VisualSimilarityEngine, gradient_image: Image.Image
-    ) -> None:
+    def test_phash_scaled_image_similar_hash(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Scaled version of image should have similar phash."""
         original_hash = engine._calculate_phash(gradient_image)
 
@@ -171,18 +170,14 @@ class TestPerceptualHash:
         # Should be identical since both are resized to hash_size
         np.testing.assert_array_equal(original_hash, scaled_hash)
 
-    def test_phash_output_dimensions(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_phash_output_dimensions(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Phash output should be hash_size^2 binary values."""
         result = engine._calculate_phash(solid_red_image)
 
         # Default hash_size=8, so 64 bits
         assert result.shape == (64,)
 
-    def test_phash_output_type_and_range(
-        self, engine: VisualSimilarityEngine, gradient_image: Image.Image
-    ) -> None:
+    def test_phash_output_type_and_range(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Output should be np.ndarray of uint8 with values in [0, 1]."""
         result = engine._calculate_phash(gradient_image)
 
@@ -190,18 +185,14 @@ class TestPerceptualHash:
         assert result.dtype == np.uint8
         assert np.all((result == 0) | (result == 1))
 
-    def test_phash_grayscale_image(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_phash_grayscale_image(self, engine: VisualSimilarityEngine) -> None:
         """Grayscale image should work correctly."""
         gray_img = Image.new("L", (64, 64), 128)
         result = engine._calculate_phash(gray_img)
 
         assert result.shape == (64,)
 
-    def test_phash_rgba_image(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_phash_rgba_image(self, engine: VisualSimilarityEngine) -> None:
         """RGBA image should be converted and hashed."""
         rgba_img = Image.new("RGBA", (64, 64), (255, 0, 0, 128))
         result = engine._calculate_phash(rgba_img)
@@ -233,18 +224,14 @@ class TestDifferenceHash:
 
         np.testing.assert_array_equal(hash1, hash2)
 
-    def test_dhash_output_dimensions(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_dhash_output_dimensions(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Dhash should be hash_size * hash_size bits."""
         result = engine._calculate_dhash(solid_red_image)
 
         # hash_size=8, image resized to 9x8, differences give 8x8=64
         assert result.shape == (64,)
 
-    def test_dhash_output_type_and_range(
-        self, engine: VisualSimilarityEngine, gradient_image: Image.Image
-    ) -> None:
+    def test_dhash_output_type_and_range(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Output should be np.ndarray of uint8 with binary values."""
         result = engine._calculate_dhash(gradient_image)
 
@@ -252,9 +239,7 @@ class TestDifferenceHash:
         assert result.dtype == np.uint8
         assert np.all((result == 0) | (result == 1))
 
-    def test_dhash_gradient_image_pattern(
-        self, engine: VisualSimilarityEngine, gradient_image: Image.Image
-    ) -> None:
+    def test_dhash_gradient_image_pattern(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Gradient image should produce dhash with all 1s (always increasing)."""
         result = engine._calculate_dhash(gradient_image)
 
@@ -293,25 +278,19 @@ class TestDifferenceHash:
 class TestColorHistogram:
     """Tests for color histogram calculation."""
 
-    def test_histogram_output_dimensions(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_histogram_output_dimensions(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Histogram should be 48-element array (16 bins x 3 channels)."""
         result = engine._calculate_color_histogram(solid_red_image)
 
         assert result.shape == (48,)
 
-    def test_histogram_normalization(
-        self, engine: VisualSimilarityEngine, random_image: Image.Image
-    ) -> None:
+    def test_histogram_normalization(self, engine: VisualSimilarityEngine, random_image: Image.Image) -> None:
         """Histogram values should sum to ~1.0 (normalized)."""
         result = engine._calculate_color_histogram(random_image)
 
         assert abs(np.sum(result) - 1.0) < 0.01
 
-    def test_histogram_single_color_image(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_histogram_single_color_image(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Solid red image should have peak in highest R bin, lowest G/B bins."""
         result = engine._calculate_color_histogram(solid_red_image)
 
@@ -326,9 +305,7 @@ class TestColorHistogram:
         assert result[16] > 0.3  # G channel, bin 0
         assert result[32] > 0.3  # B channel, bin 0
 
-    def test_histogram_black_image(
-        self, engine: VisualSimilarityEngine, solid_black_image: Image.Image
-    ) -> None:
+    def test_histogram_black_image(self, engine: VisualSimilarityEngine, solid_black_image: Image.Image) -> None:
         """All-black image should have histogram at lowest bins."""
         result = engine._calculate_color_histogram(solid_black_image)
 
@@ -337,9 +314,7 @@ class TestColorHistogram:
         assert result[16] > 0.3  # G channel bin 0
         assert result[32] > 0.3  # B channel bin 0
 
-    def test_histogram_white_image(
-        self, engine: VisualSimilarityEngine, solid_white_image: Image.Image
-    ) -> None:
+    def test_histogram_white_image(self, engine: VisualSimilarityEngine, solid_white_image: Image.Image) -> None:
         """All-white image should have histogram at highest bins."""
         result = engine._calculate_color_histogram(solid_white_image)
 
@@ -348,9 +323,7 @@ class TestColorHistogram:
         assert result[31] > 0.3  # G channel bin 15
         assert result[47] > 0.3  # B channel bin 15
 
-    def test_histogram_rgba_image_conversion(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_histogram_rgba_image_conversion(self, engine: VisualSimilarityEngine) -> None:
         """RGBA images should be converted to RGB before histogram."""
         rgba_img = Image.new("RGBA", (64, 64), (255, 0, 0, 128))
         result = engine._calculate_color_histogram(rgba_img)
@@ -368,9 +341,7 @@ class TestColorHistogram:
 
         np.testing.assert_array_almost_equal(hist1, hist2)
 
-    def test_histogram_grayscale_conversion(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_histogram_grayscale_conversion(self, engine: VisualSimilarityEngine) -> None:
         """Grayscale image should be converted to RGB."""
         gray_img = Image.new("L", (64, 64), 128)
         result = engine._calculate_color_histogram(gray_img)
@@ -386,9 +357,7 @@ class TestColorHistogram:
 class TestIndexSprite:
     """Tests for sprite indexing."""
 
-    def test_index_sprite_basic(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_index_sprite_basic(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Index a sprite and verify it's stored in database."""
         engine.index_sprite(0x1000, solid_red_image)
 
@@ -417,18 +386,14 @@ class TestIndexSprite:
         assert 0x1000 in engine.sprite_database
         assert 0x2000 in engine.sprite_database
 
-    def test_index_sprite_with_metadata(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_index_sprite_with_metadata(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Index sprite with metadata dict."""
         metadata = {"name": "hero", "frame": 1}
         result = engine.index_sprite(0x1000, solid_red_image, metadata=metadata)
 
         assert result.metadata == metadata
 
-    def test_index_sprite_without_metadata(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_index_sprite_without_metadata(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Index sprite without metadata should default to empty dict."""
         result = engine.index_sprite(0x1000, solid_red_image)
 
@@ -459,9 +424,7 @@ class TestIndexSprite:
         assert result.histogram is not None
         assert result.metadata == {"test": True}
 
-    def test_index_sprite_various_image_sizes(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_index_sprite_various_image_sizes(self, engine: VisualSimilarityEngine) -> None:
         """Index sprites of different sizes."""
         for size, offset in [(16, 0x1000), (32, 0x2000), (64, 0x3000), (128, 0x4000)]:
             img = Image.new("RGB", (size, size), (100, 100, 100))
@@ -477,9 +440,7 @@ class TestIndexSprite:
 class TestHammingDistance:
     """Tests for Hamming distance calculation."""
 
-    def test_hamming_distance_identical_hashes(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_hamming_distance_identical_hashes(self, engine: VisualSimilarityEngine) -> None:
         """Two identical binary arrays should have distance 0."""
         hash1 = np.array([1, 0, 1, 0, 1, 0, 1, 0], dtype=np.uint8)
         hash2 = np.array([1, 0, 1, 0, 1, 0, 1, 0], dtype=np.uint8)
@@ -487,9 +448,7 @@ class TestHammingDistance:
         distance = engine._hamming_distance(hash1, hash2)
         assert distance == 0
 
-    def test_hamming_distance_completely_different(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_hamming_distance_completely_different(self, engine: VisualSimilarityEngine) -> None:
         """Inverted arrays should have maximum distance."""
         hash1 = np.array([1, 1, 1, 1, 0, 0, 0, 0], dtype=np.uint8)
         hash2 = np.array([0, 0, 0, 0, 1, 1, 1, 1], dtype=np.uint8)
@@ -497,9 +456,7 @@ class TestHammingDistance:
         distance = engine._hamming_distance(hash1, hash2)
         assert distance == 8  # All bits different
 
-    def test_hamming_distance_single_bit_difference(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_hamming_distance_single_bit_difference(self, engine: VisualSimilarityEngine) -> None:
         """Arrays differing by 1 bit should return distance=1."""
         hash1 = np.array([1, 0, 1, 0], dtype=np.uint8)
         hash2 = np.array([1, 0, 1, 1], dtype=np.uint8)
@@ -507,9 +464,7 @@ class TestHammingDistance:
         distance = engine._hamming_distance(hash1, hash2)
         assert distance == 1
 
-    def test_hamming_distance_symmetric(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_hamming_distance_symmetric(self, engine: VisualSimilarityEngine) -> None:
         """hamming_distance(A, B) should equal hamming_distance(B, A)."""
         hash1 = np.array([1, 0, 1, 0, 1, 1], dtype=np.uint8)
         hash2 = np.array([0, 0, 1, 1, 1, 0], dtype=np.uint8)
@@ -519,9 +474,7 @@ class TestHammingDistance:
 
         assert dist1 == dist2
 
-    def test_hamming_distance_returns_integer(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_hamming_distance_returns_integer(self, engine: VisualSimilarityEngine) -> None:
         """Output should be int type."""
         hash1 = np.array([1, 0, 1, 0], dtype=np.uint8)
         hash2 = np.array([1, 1, 0, 0], dtype=np.uint8)
@@ -529,9 +482,7 @@ class TestHammingDistance:
         distance = engine._hamming_distance(hash1, hash2)
         assert isinstance(distance, (int, np.integer))
 
-    def test_hamming_distance_large_arrays(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_hamming_distance_large_arrays(self, engine: VisualSimilarityEngine) -> None:
         """Should work with 64-bit or larger arrays."""
         hash1 = np.zeros(64, dtype=np.uint8)
         hash2 = np.ones(64, dtype=np.uint8)
@@ -548,18 +499,14 @@ class TestHammingDistance:
 class TestHistogramSimilarity:
     """Tests for histogram similarity calculation."""
 
-    def test_histogram_similarity_identical(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_histogram_similarity_identical(self, engine: VisualSimilarityEngine) -> None:
         """Two identical histograms should return ~1.0."""
         hist = np.array([0.5, 0.5], dtype=np.float32)
 
         similarity = engine._histogram_similarity(hist, hist)
         assert abs(similarity - 1.0) < 0.01
 
-    def test_histogram_similarity_completely_different(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_histogram_similarity_completely_different(self, engine: VisualSimilarityEngine) -> None:
         """Non-overlapping histograms should return ~0.0."""
         hist1 = np.array([1.0, 0.0, 0.0], dtype=np.float32)
         hist2 = np.array([0.0, 0.0, 1.0], dtype=np.float32)
@@ -567,9 +514,7 @@ class TestHistogramSimilarity:
         similarity = engine._histogram_similarity(hist1, hist2)
         assert similarity == 0.0
 
-    def test_histogram_similarity_partial_overlap(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_histogram_similarity_partial_overlap(self, engine: VisualSimilarityEngine) -> None:
         """Partial overlap should return 0.0 < similarity < 1.0."""
         hist1 = np.array([0.5, 0.5, 0.0], dtype=np.float32)
         hist2 = np.array([0.0, 0.5, 0.5], dtype=np.float32)
@@ -577,9 +522,7 @@ class TestHistogramSimilarity:
         similarity = engine._histogram_similarity(hist1, hist2)
         assert 0.0 < similarity < 1.0
 
-    def test_histogram_similarity_range(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_histogram_similarity_range(self, engine: VisualSimilarityEngine) -> None:
         """Should always return value in [0.0, 1.0]."""
         hist1 = np.array([0.25, 0.25, 0.25, 0.25], dtype=np.float32)
         hist2 = np.array([0.5, 0.5, 0.0, 0.0], dtype=np.float32)
@@ -587,9 +530,7 @@ class TestHistogramSimilarity:
         similarity = engine._histogram_similarity(hist1, hist2)
         assert 0.0 <= similarity <= 1.0
 
-    def test_histogram_similarity_symmetric(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_histogram_similarity_symmetric(self, engine: VisualSimilarityEngine) -> None:
         """Similarity should be symmetric."""
         hist1 = np.array([0.3, 0.3, 0.4], dtype=np.float32)
         hist2 = np.array([0.5, 0.3, 0.2], dtype=np.float32)
@@ -608,9 +549,7 @@ class TestHistogramSimilarity:
 class TestSimilarityCalculation:
     """Tests for overall similarity score calculation."""
 
-    def test_similarity_identical_sprites(
-        self, engine: VisualSimilarityEngine, gradient_image: Image.Image
-    ) -> None:
+    def test_similarity_identical_sprites(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Two identical sprite hashes should have similarity ~1.0."""
         hash1 = engine.index_sprite(0x1000, gradient_image)
         hash2 = engine.index_sprite(0x2000, gradient_image)
@@ -772,9 +711,7 @@ class TestFindSimilar:
         for i in range(1, len(results)):
             assert results[i - 1].similarity_score >= results[i].similarity_score
 
-    def test_find_similar_empty_database(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_find_similar_empty_database(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Searching empty database should return empty list."""
         results = engine.find_similar(solid_red_image)
         assert results == []
@@ -824,9 +761,7 @@ class TestFindSimilar:
 class TestBuildIndex:
     """Tests for similarity index building."""
 
-    def test_build_index_sets_flag(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_build_index_sets_flag(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """build_similarity_index() should set index_built=True."""
         engine.index_sprite(0x1000, solid_red_image)
 
@@ -834,17 +769,13 @@ class TestBuildIndex:
 
         assert engine.index_built is True
 
-    def test_build_index_empty_database(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_build_index_empty_database(self, engine: VisualSimilarityEngine) -> None:
         """Calling on empty database should log warning and return."""
         engine.build_similarity_index()
         # Should not raise, just log warning
         assert engine.index_built is False or engine.index_built is True
 
-    def test_build_index_with_sprites(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_build_index_with_sprites(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Building index with sprites should complete successfully."""
         engine.index_sprite(0x1000, solid_red_image)
         engine.index_sprite(0x2000, solid_red_image)
@@ -853,9 +784,7 @@ class TestBuildIndex:
 
         assert engine.index_built is True
 
-    def test_build_index_idempotent(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_build_index_idempotent(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Building index twice should be safe."""
         engine.index_sprite(0x1000, solid_red_image)
 
@@ -864,9 +793,7 @@ class TestBuildIndex:
 
         assert engine.index_built is True
 
-    def test_build_index_preserves_database(
-        self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
-    ) -> None:
+    def test_build_index_preserves_database(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Index building shouldn't modify sprite_database."""
         engine.index_sprite(0x1000, solid_red_image)
         db_before = dict(engine.sprite_database)
@@ -973,9 +900,7 @@ class TestImportExport:
         assert len(new_engine.sprite_database) == len(engine.sprite_database)
         assert new_engine.index_built == engine.index_built
 
-    def test_import_nonexistent_file_raises(
-        self, engine: VisualSimilarityEngine, tmp_path: Path
-    ) -> None:
+    def test_import_nonexistent_file_raises(self, engine: VisualSimilarityEngine, tmp_path: Path) -> None:
         """Importing non-existent file should raise error."""
         fake_path = tmp_path / "nonexistent.pkl"
 
@@ -992,9 +917,7 @@ class TestSpriteGroupFinder:
     """Tests for sprite group finding."""
 
     @pytest.fixture
-    def populated_engine(
-        self, engine: VisualSimilarityEngine
-    ) -> VisualSimilarityEngine:
+    def populated_engine(self, engine: VisualSimilarityEngine) -> VisualSimilarityEngine:
         """Engine with various sprites indexed."""
         # Group 1: Similar red images
         for i in range(3):
@@ -1015,18 +938,14 @@ class TestSpriteGroupFinder:
 
         return engine
 
-    def test_sprite_group_finder_initialization(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_sprite_group_finder_initialization(self, engine: VisualSimilarityEngine) -> None:
         """GroupFinder should initialize with engine and empty groups list."""
         finder = SpriteGroupFinder(engine)
 
         assert finder.engine == engine
         assert finder.groups == []
 
-    def test_find_sprite_groups_basic(
-        self, populated_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_sprite_groups_basic(self, populated_engine: VisualSimilarityEngine) -> None:
         """Find groups of similar sprites."""
         finder = SpriteGroupFinder(populated_engine)
 
@@ -1034,52 +953,36 @@ class TestSpriteGroupFinder:
 
         assert len(groups) > 0
 
-    def test_find_sprite_groups_respects_threshold(
-        self, populated_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_sprite_groups_respects_threshold(self, populated_engine: VisualSimilarityEngine) -> None:
         """Looser threshold merges more sprites into fewer groups."""
         finder = SpriteGroupFinder(populated_engine)
 
-        loose_groups = finder.find_sprite_groups(
-            similarity_threshold=0.5, min_group_size=2
-        )
-        strict_groups = finder.find_sprite_groups(
-            similarity_threshold=0.95, min_group_size=2
-        )
+        loose_groups = finder.find_sprite_groups(similarity_threshold=0.5, min_group_size=2)
+        strict_groups = finder.find_sprite_groups(similarity_threshold=0.95, min_group_size=2)
 
         # Loose threshold merges more sprites → fewer larger groups
         # Strict threshold matches fewer sprites → more smaller groups (or none)
         assert len(loose_groups) <= len(strict_groups)
 
-    def test_find_sprite_groups_respects_min_size(
-        self, populated_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_sprite_groups_respects_min_size(self, populated_engine: VisualSimilarityEngine) -> None:
         """min_group_size should filter out small groups."""
         finder = SpriteGroupFinder(populated_engine)
 
-        groups = finder.find_sprite_groups(
-            similarity_threshold=0.7, min_group_size=5
-        )
+        groups = finder.find_sprite_groups(similarity_threshold=0.7, min_group_size=5)
 
         for group in groups:
             assert len(group) >= 5
 
-    def test_find_sprite_groups_sorted_by_size(
-        self, populated_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_sprite_groups_sorted_by_size(self, populated_engine: VisualSimilarityEngine) -> None:
         """Groups should be sorted descending by size."""
         finder = SpriteGroupFinder(populated_engine)
 
-        groups = finder.find_sprite_groups(
-            similarity_threshold=0.5, min_group_size=2
-        )
+        groups = finder.find_sprite_groups(similarity_threshold=0.5, min_group_size=2)
 
         for i in range(1, len(groups)):
             assert len(groups[i - 1]) >= len(groups[i])
 
-    def test_find_sprite_groups_empty_database(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_sprite_groups_empty_database(self, engine: VisualSimilarityEngine) -> None:
         """Empty database should return empty groups list."""
         finder = SpriteGroupFinder(engine)
 
@@ -1097,9 +1000,7 @@ class TestAnimationDetection:
     """Tests for animation sequence detection."""
 
     @pytest.fixture
-    def animation_engine(
-        self, engine: VisualSimilarityEngine
-    ) -> VisualSimilarityEngine:
+    def animation_engine(self, engine: VisualSimilarityEngine) -> VisualSimilarityEngine:
         """Engine with animation-like sprites (sequential, similar)."""
         # Create animation sequence - similar images at sequential offsets
         for i in range(4):
@@ -1113,53 +1014,37 @@ class TestAnimationDetection:
 
         return engine
 
-    def test_find_animations_basic(
-        self, animation_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_animations_basic(self, animation_engine: VisualSimilarityEngine) -> None:
         """Find animation sequences with proximity and similarity."""
         finder = SpriteGroupFinder(animation_engine)
 
-        animations = finder.find_animations(
-            offset_proximity=0x500, similarity_threshold=0.7
-        )
+        animations = finder.find_animations(offset_proximity=0x500, similarity_threshold=0.7)
 
         assert len(animations) > 0
 
-    def test_find_animations_respects_offset_proximity(
-        self, animation_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_animations_respects_offset_proximity(self, animation_engine: VisualSimilarityEngine) -> None:
         """Animation frames should be within offset_proximity distance."""
         finder = SpriteGroupFinder(animation_engine)
 
         # Very small proximity should not find animations
-        animations = finder.find_animations(
-            offset_proximity=0x10, similarity_threshold=0.5
-        )
+        animations = finder.find_animations(offset_proximity=0x10, similarity_threshold=0.5)
 
         # Frames are 0x100 apart, so 0x10 proximity shouldn't find them
         for anim in animations:
             for i in range(1, len(anim)):
                 assert anim[i] - anim[i - 1] <= 0x10
 
-    def test_find_animations_respects_similarity_threshold(
-        self, animation_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_animations_respects_similarity_threshold(self, animation_engine: VisualSimilarityEngine) -> None:
         """Only similar adjacent frames should be connected."""
         finder = SpriteGroupFinder(animation_engine)
 
         # Very high threshold might find fewer animations
-        strict_anims = finder.find_animations(
-            offset_proximity=0x500, similarity_threshold=0.99
-        )
-        loose_anims = finder.find_animations(
-            offset_proximity=0x500, similarity_threshold=0.5
-        )
+        strict_anims = finder.find_animations(offset_proximity=0x500, similarity_threshold=0.99)
+        loose_anims = finder.find_animations(offset_proximity=0x500, similarity_threshold=0.5)
 
         assert len(strict_anims) <= len(loose_anims)
 
-    def test_find_animations_min_2_frames(
-        self, animation_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_animations_min_2_frames(self, animation_engine: VisualSimilarityEngine) -> None:
         """Animations with <2 frames should not be returned."""
         finder = SpriteGroupFinder(animation_engine)
 
@@ -1168,9 +1053,7 @@ class TestAnimationDetection:
         for anim in animations:
             assert len(anim) >= 2
 
-    def test_find_animations_empty_database(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_find_animations_empty_database(self, engine: VisualSimilarityEngine) -> None:
         """Empty database should return empty animations list."""
         finder = SpriteGroupFinder(engine)
 
@@ -1187,9 +1070,7 @@ class TestAnimationDetection:
 class TestEdgeCases:
     """Tests for edge cases and error conditions."""
 
-    def test_very_small_image_1x1_pixel(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_very_small_image_1x1_pixel(self, engine: VisualSimilarityEngine) -> None:
         """1x1 pixel image should be resizable and hashable."""
         tiny = Image.new("RGB", (1, 1), (128, 128, 128))
 
@@ -1198,9 +1079,7 @@ class TestEdgeCases:
         assert result is not None
         assert result.phash is not None
 
-    def test_very_large_image_handling(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_very_large_image_handling(self, engine: VisualSimilarityEngine) -> None:
         """Large images should be resizable."""
         large = Image.new("RGB", (512, 512), (100, 100, 100))
 
@@ -1208,9 +1087,7 @@ class TestEdgeCases:
 
         assert result is not None
 
-    def test_transparent_png_conversion(
-        self, engine: VisualSimilarityEngine
-    ) -> None:
+    def test_transparent_png_conversion(self, engine: VisualSimilarityEngine) -> None:
         """RGBA PNG should convert to RGB without errors."""
         rgba = Image.new("RGBA", (64, 64), (255, 0, 0, 128))
 
@@ -1231,9 +1108,7 @@ class TestEdgeCases:
 
         assert isinstance(results, list)
 
-    def test_large_sprite_database(
-        self, small_engine: VisualSimilarityEngine
-    ) -> None:
+    def test_large_sprite_database(self, small_engine: VisualSimilarityEngine) -> None:
         """Engine should handle many sprites without crashes."""
         for i in range(100):
             img = Image.new("RGB", (16, 16), (i % 256, (i * 2) % 256, (i * 3) % 256))
@@ -1257,7 +1132,7 @@ class TestDataStructures:
             phash=np.zeros(64, dtype=np.uint8),
             dhash=np.zeros(64, dtype=np.uint8),
             histogram=np.zeros(48, dtype=np.float32),
-            metadata={"test": True}
+            metadata={"test": True},
         )
 
         assert sprite_hash.offset == 0x1000
@@ -1268,12 +1143,7 @@ class TestDataStructures:
 
     def test_similarity_match_dataclass_fields(self) -> None:
         """Verify SimilarityMatch has all 4 fields and correct types."""
-        match = SimilarityMatch(
-            offset=0x2000,
-            similarity_score=0.95,
-            hash_distance=3,
-            metadata={"name": "sprite1"}
-        )
+        match = SimilarityMatch(offset=0x2000, similarity_score=0.95, hash_distance=3, metadata={"name": "sprite1"})
 
         assert match.offset == 0x2000
         assert match.similarity_score == 0.95
@@ -1282,18 +1152,9 @@ class TestDataStructures:
 
     def test_sprite_hash_with_metadata(self) -> None:
         """Metadata dict can be arbitrary key-value pairs."""
-        metadata = {
-            "name": "hero",
-            "frame": 1,
-            "tags": ["player", "animation"],
-            "nested": {"a": 1}
-        }
+        metadata = {"name": "hero", "frame": 1, "tags": ["player", "animation"], "nested": {"a": 1}}
         sprite_hash = SpriteHash(
-            offset=0,
-            phash=np.zeros(64),
-            dhash=np.zeros(64),
-            histogram=np.zeros(48),
-            metadata=metadata
+            offset=0, phash=np.zeros(64), dhash=np.zeros(64), histogram=np.zeros(48), metadata=metadata
         )
 
         assert sprite_hash.metadata == metadata

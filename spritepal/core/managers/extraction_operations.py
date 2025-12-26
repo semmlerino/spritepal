@@ -205,9 +205,7 @@ class ExtractionOperationsManager(QObject):
 
         return result.files
 
-    def get_sprite_preview(
-        self, rom_path: str, offset: int, sprite_name: str | None = None
-    ) -> tuple[bytes, int, int]:
+    def get_sprite_preview(self, rom_path: str, offset: int, sprite_name: str | None = None) -> tuple[bytes, int, int]:
         """
         Get a preview of sprite data from ROM without saving files.
 
@@ -302,9 +300,7 @@ class ExtractionOperationsManager(QObject):
         rom_service = self._ensure_rom_service()
         return rom_service.get_rom_extractor()
 
-    def get_known_sprite_locations(
-        self, rom_path: str
-    ) -> dict[str, object]:  # Pointer objects with .offset attribute
+    def get_known_sprite_locations(self, rom_path: str) -> dict[str, object]:  # Pointer objects with .offset attribute
         """
         Get known sprite locations for a ROM with caching.
 
@@ -332,9 +328,7 @@ class ExtractionOperationsManager(QObject):
 
         return locations
 
-    def read_rom_header(
-        self, rom_path: str
-    ) -> dict[str, object]:  # ROM header with title, rom_type, checksum, etc.
+    def read_rom_header(self, rom_path: str) -> dict[str, object]:  # ROM header with title, rom_type, checksum, etc.
         """
         Read ROM header information.
 
@@ -352,9 +346,7 @@ class ExtractionOperationsManager(QObject):
 
     # ========== Validation Helpers ==========
 
-    def validate_rom_file(
-        self, rom_path: str
-    ) -> dict[str, object] | None:  # Error dict with error and error_type keys
+    def validate_rom_file(self, rom_path: str) -> dict[str, object] | None:  # Error dict with error and error_type keys
         """Validate ROM file exists, is readable, and has reasonable size.
 
         Uses FileValidator for comprehensive validation, converts result to dict format.

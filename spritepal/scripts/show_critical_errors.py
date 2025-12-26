@@ -19,15 +19,12 @@ CRITICAL_TYPES = [
     "reportAssignmentType",
 ]
 
+
 def main():
     print("🔍 Running basedpyright to find critical errors...\n")
 
     # Run basedpyright
-    result = subprocess.run(
-        ["../venv/bin/basedpyright", "."],
-        check=False, capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["../venv/bin/basedpyright", "."], check=False, capture_output=True, text=True)
 
     output = result.stdout + result.stderr
 
@@ -43,11 +40,7 @@ def main():
             total_errors += 1
 
             if error_type in CRITICAL_TYPES:
-                errors[error_type].append({
-                    "file": file_path,
-                    "line": int(line_num),
-                    "message": message
-                })
+                errors[error_type].append({"file": file_path, "line": int(line_num), "message": message})
 
     # Show results
     print(f"Total errors found: {total_errors}\n")
@@ -71,6 +64,7 @@ def main():
         print("✅ No critical errors found!")
         print("\nConsider running the full analysis with:")
         print("  python scripts/typecheck_analysis.py")
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,7 @@
 """
 Test error handler functionality
 """
+
 from __future__ import annotations
 
 import pytest
@@ -15,6 +16,7 @@ pytestmark = [
     pytest.mark.slow,
     pytest.mark.allows_registry_state(reason="Pure error handling tests, no managers"),
 ]
+
 
 class TestErrorHandler:
     """Test error handler signal-based approach"""

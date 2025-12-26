@@ -1,6 +1,7 @@
 """
 Tests for row arrangement refactored components
 """
+
 from __future__ import annotations
 
 from unittest.mock import Mock, patch
@@ -20,6 +21,8 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
 ]
+
+
 class TestRowImageProcessor:
     """Test the RowImageProcessor component"""
 
@@ -115,6 +118,7 @@ class TestRowImageProcessor:
             assert "index" in row
             assert isinstance(row["image"], Image.Image)
 
+
 class TestArrangementManager:
     """Test the ArrangementManager component"""
 
@@ -203,6 +207,7 @@ class TestArrangementManager:
         assert manager.get_arranged_indices() == []
         manager.arrangement_cleared.emit.assert_called_once()
         manager.arrangement_changed.emit.assert_called_once()
+
 
 class TestPaletteColorizer:
     """Test the PaletteColorizer component"""
@@ -306,6 +311,7 @@ class TestPaletteColorizer:
             mock_apply.assert_not_called()  # Should use cache
             assert result2 is result1  # Same object
 
+
 class TestArrangementPreviewGenerator:
     """Test the ArrangementPreviewGenerator component"""
 
@@ -328,9 +334,7 @@ class TestArrangementPreviewGenerator:
         tile_rows = []
         arranged_indices = []
 
-        result = generator.create_arranged_image(
-            original, tile_rows, arranged_indices, 8
-        )
+        result = generator.create_arranged_image(original, tile_rows, arranged_indices, 8)
 
         assert result is None
 
@@ -343,9 +347,7 @@ class TestArrangementPreviewGenerator:
         tile_rows = [{"index": 0, "image": row_image, "tiles": 16}]
         arranged_indices = [0]
 
-        result = generator.create_arranged_image(
-            original, tile_rows, arranged_indices, 8
-        )
+        result = generator.create_arranged_image(original, tile_rows, arranged_indices, 8)
 
         assert result is not None
         assert result.size == (128, 8)  # Single row height
@@ -355,15 +357,10 @@ class TestArrangementPreviewGenerator:
         generator = ArrangementPreviewGenerator()
 
         original = Image.new("L", (128, 64))
-        tile_rows = [
-            {"index": i, "image": Image.new("L", (128, 8)), "tiles": 16}
-            for i in range(4)
-        ]
+        tile_rows = [{"index": i, "image": Image.new("L", (128, 8)), "tiles": 16} for i in range(4)]
         arranged_indices = [0, 2, 1]  # Different order
 
-        result = generator.create_arranged_image(
-            original, tile_rows, arranged_indices, 8, row_spacing_ratio=0.75
-        )
+        result = generator.create_arranged_image(original, tile_rows, arranged_indices, 8, row_spacing_ratio=0.75)
 
         assert result is not None
         # Height = 2 * spacing + last row = 2 * 6 + 8 = 20
@@ -381,9 +378,7 @@ class TestArrangementPreviewGenerator:
         tile_rows = [{"index": 0, "image": Image.new("L", (128, 8)), "tiles": 16}]
         arranged_indices = [0]
 
-        result = generator.create_arranged_image(
-            original, tile_rows, arranged_indices, 8
-        )
+        result = generator.create_arranged_image(original, tile_rows, arranged_indices, 8)
 
         assert result is not None
         assert result.mode == "RGBA"  # Colorized output
@@ -396,9 +391,7 @@ class TestArrangementPreviewGenerator:
         test_image = Image.new("L", (128, 16))
 
         with patch.object(test_image, "save") as mock_save:
-            output_path = generator.export_arranged_image(
-                "/path/to/sprite.png", test_image, 2
-            )
+            output_path = generator.export_arranged_image("/path/to/sprite.png", test_image, 2)
 
             assert output_path == "sprite_arranged.png"
             mock_save.assert_called_once_with("sprite_arranged.png")
@@ -407,12 +400,6 @@ class TestArrangementPreviewGenerator:
         """Test output filename generation"""
         generator = ArrangementPreviewGenerator()
 
-        assert (
-            generator.generate_output_filename("/path/to/sprite.png")
-            == "sprite_arranged.png"
-        )
+        assert generator.generate_output_filename("/path/to/sprite.png") == "sprite_arranged.png"
 
-        assert (
-            generator.generate_output_filename("sprite.png", "_modified")
-            == "sprite_modified.png"
-        )
+        assert generator.generate_output_filename("sprite.png", "_modified") == "sprite_modified.png"

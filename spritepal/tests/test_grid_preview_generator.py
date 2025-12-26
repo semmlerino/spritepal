@@ -4,6 +4,7 @@ Unit tests for GridPreviewGenerator using real components.
 Migrated from mock-based tests to use real GridImageProcessor,
 GridArrangementManager, and PaletteColorizer instances.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -336,9 +337,7 @@ class TestGridPreviewGenerator:
         # Add selected tiles
         selected_tiles = [TilePosition(0, 1), TilePosition(1, 0)]
 
-        result = generator.create_grid_preview_with_overlay(
-            processor, manager, selected_tiles=selected_tiles
-        )
+        result = generator.create_grid_preview_with_overlay(processor, manager, selected_tiles=selected_tiles)
 
         assert result is not None
         assert result.mode == "RGBA"
@@ -454,9 +453,7 @@ class TestGridPreviewGenerator:
         sprite_path = tmp_path / "sprite.png"
         sprite_path.touch()
 
-        result = generator.export_grid_arrangement(
-            str(sprite_path), arranged_image, "test"
-        )
+        result = generator.export_grid_arrangement(str(sprite_path), arranged_image, "test")
 
         # Function returns just filename (stem + arrangement + suffix), not full path
         assert result == "sprite_test_arranged.png"
@@ -474,9 +471,7 @@ class TestGridPreviewGenerator:
         sprite_path = tmp_path / "sprite.png"
         sprite_path.touch()
 
-        result = generator.export_grid_arrangement(
-            str(sprite_path), arranged_image
-        )
+        result = generator.export_grid_arrangement(str(sprite_path), arranged_image)
 
         # Function returns just filename (stem + arrangement + suffix), not full path
         assert result == "sprite_grid_arranged.png"

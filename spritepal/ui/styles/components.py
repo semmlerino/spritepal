@@ -1,6 +1,7 @@
 """
 Component-specific styling functions for SpritePal UI
 """
+
 from __future__ import annotations
 
 from typing import TypedDict
@@ -171,11 +172,7 @@ def _build_badge_style(config: BadgeStyleConfig) -> str:
 # =============================================================================
 
 
-def get_button_style(
-    style_type: str = "primary",
-    min_height: int | None = None,
-    font_size: str | None = None
-) -> str:
+def get_button_style(style_type: str = "primary", min_height: int | None = None, font_size: str | None = None) -> str:
     """
     Get button styling CSS
 
@@ -279,10 +276,8 @@ def get_button_style(
     {get_disabled_state_style()}
     """
 
-def get_input_style(
-    input_type: str = "text",
-    min_width: int | None = None
-) -> str:
+
+def get_input_style(input_type: str = "text", min_width: int | None = None) -> str:
     """
     Get input field styling CSS
 
@@ -350,6 +345,7 @@ def get_input_style(
 
     return base_style
 
+
 def get_panel_style(panel_type: str = "default") -> str:
     """
     Get panel/groupbox styling CSS
@@ -384,6 +380,7 @@ def get_panel_style(panel_type: str = "default") -> str:
     }}
     """
 
+
 def get_status_style(status_type: str = "info") -> str:
     """
     Get status indicator styling CSS
@@ -413,6 +410,7 @@ def get_status_style(status_type: str = "info") -> str:
     }}
     """
 
+
 def get_progress_style() -> str:
     """Get progress bar styling CSS"""
     return f"""
@@ -428,6 +426,7 @@ def get_progress_style() -> str:
         border-radius: {DIMENSIONS["border_radius_small"]}px;
     }}
     """
+
 
 def get_tab_style() -> str:
     """Get tab widget styling CSS"""
@@ -457,10 +456,8 @@ def get_tab_style() -> str:
     }}
     """
 
-def get_muted_text_style(
-    italic: bool = False,
-    color_level: str = "medium"
-) -> str:
+
+def get_muted_text_style(italic: bool = False, color_level: str = "medium") -> str:
     """
     Get muted text styling CSS for info labels
 
@@ -475,7 +472,7 @@ def get_muted_text_style(
     color_map = {
         "light": "#c8c8c8",  # Brightest - WCAG AA on #383838
         "medium": COLORS["gray"],  # Standard gray (now #a0a0a0)
-        "dark": "#b0b0b0",   # Slightly muted - WCAG AA on dark backgrounds
+        "dark": "#b0b0b0",  # Slightly muted - WCAG AA on dark backgrounds
     }
 
     color = color_map.get(color_level, COLORS["gray"])
@@ -491,9 +488,10 @@ def get_muted_text_style(
 
     return f"""
     QLabel {{
-        {' '.join(style_parts)}
+        {" ".join(style_parts)}
     }}
     """
+
 
 def get_link_text_style(color: str = "extract") -> str:
     """
@@ -518,14 +516,12 @@ def get_link_text_style(color: str = "extract") -> str:
     return f"""
     QLabel {{
         color: {text_color};
-        font-size: {FONTS['small_size']};
+        font-size: {FONTS["small_size"]};
     }}
     """
 
-def get_monospace_text_style(
-    color: str = "default",
-    font_size: str | None = None
-) -> str:
+
+def get_monospace_text_style(color: str = "default", font_size: str | None = None) -> str:
     """
     Get monospace text styling CSS
 
@@ -554,6 +550,7 @@ def get_monospace_text_style(
         font-size: {font_size};
     }}
     """
+
 
 def get_bold_text_style(color: str = "default") -> str:
     """
@@ -599,6 +596,7 @@ def get_section_label_style() -> str:
     }
     """
 
+
 def get_success_text_style() -> str:
     """
     Get success text styling CSS (green + bold)
@@ -613,6 +611,7 @@ def get_success_text_style() -> str:
     }}
     """
 
+
 def get_error_text_style() -> str:
     """
     Get error text styling CSS (red color)
@@ -626,10 +625,8 @@ def get_error_text_style() -> str:
     }}
     """
 
-def get_hex_label_style(
-    background: bool = True,
-    color: str = "extract"
-) -> str:
+
+def get_hex_label_style(background: bool = True, color: str = "extract") -> str:
     """
     Get hex/code label styling CSS (monospace with optional background)
 
@@ -667,6 +664,7 @@ def get_hex_label_style(
 
     base_style += "}"
     return base_style
+
 
 def get_slider_style(color: str = "extract") -> str:
     """
@@ -710,6 +708,7 @@ def get_slider_style(color: str = "extract") -> str:
     }}
     """
 
+
 def get_preview_panel_style() -> str:
     """
     Get dark preview panel styling CSS for image displays
@@ -726,6 +725,7 @@ def get_preview_panel_style() -> str:
     }}
     """
 
+
 def get_minimal_preview_style() -> str:
     """
     Get minimal preview styling CSS for compact displays
@@ -740,6 +740,7 @@ def get_minimal_preview_style() -> str:
         border-radius: 2px;
     }}
     """
+
 
 def get_borderless_preview_style() -> str:
     """
@@ -759,6 +760,7 @@ def get_borderless_preview_style() -> str:
         padding: 0px;
     }
     """
+
 
 def get_splitter_style(handle_width: int = 8) -> str:
     """
@@ -786,6 +788,7 @@ def get_splitter_style(handle_width: int = 8) -> str:
     }}
     """
 
+
 def get_dialog_button_box_style() -> str:
     """
     Get dialog button box styling CSS
@@ -806,6 +809,7 @@ def get_dialog_button_box_style() -> str:
         border-radius: {DIMENSIONS["border_radius"]}px;
     }}
     """
+
 
 def get_scroll_area_style(background_color: str = "background") -> str:
     """
@@ -853,6 +857,7 @@ def get_scroll_area_style(background_color: str = "background") -> str:
     }}
     """
 
+
 def get_dark_preview_style() -> str:
     """
     Get comprehensive dark theme styling for sprite preview areas
@@ -879,6 +884,7 @@ def get_dark_preview_style() -> str:
         background-color: {COLORS["preview_background"]};
     }}
     """
+
 
 def get_dark_panel_style() -> str:
     """

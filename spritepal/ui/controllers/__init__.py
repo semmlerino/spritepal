@@ -6,6 +6,7 @@ They own state, emit signals, and provide clean APIs for panels to use.
 
 Controllers follow the QObject pattern with signals for async communication.
 """
+
 from __future__ import annotations
 
 from .extraction_params_controller import ExtractionParams, ExtractionParamsController

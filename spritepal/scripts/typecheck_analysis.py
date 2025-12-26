@@ -62,12 +62,7 @@ class TypeCheckAnalyzer:
         print()
 
         try:
-            result = subprocess.run(
-                cmd,
-                check=False, capture_output=True,
-                text=True,
-                cwd=self.project_path
-            )
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True, cwd=self.project_path)
             return result.stdout + result.stderr
         except Exception as e:
             print(f"❌ Error running basedpyright: {e}")
@@ -91,7 +86,7 @@ class TypeCheckAnalyzer:
                     "severity": severity,
                     "message": message,
                     "type": error_type,
-                    "full_line": line
+                    "full_line": line,
                 }
 
                 if severity == "error":
@@ -137,11 +132,7 @@ class TypeCheckAnalyzer:
         print("=" * 60)
 
         # Sort by count
-        sorted_errors = sorted(
-            self.error_groups.items(),
-            key=lambda x: len(x[1]),
-            reverse=True
-        )
+        sorted_errors = sorted(self.error_groups.items(), key=lambda x: len(x[1]), reverse=True)
 
         for error_type, errors in sorted_errors:
             severity = "🔴" if error_type in self.CRITICAL_ERRORS else "🟡"
@@ -153,11 +144,7 @@ class TypeCheckAnalyzer:
         print("📄 FILES WITH MOST ERRORS")
         print("=" * 60)
 
-        sorted_files = sorted(
-            self.file_errors.items(),
-            key=lambda x: len(x[1]),
-            reverse=True
-        )
+        sorted_files = sorted(self.file_errors.items(), key=lambda x: len(x[1]), reverse=True)
 
         for file_path, errors in sorted_files[:limit]:
             print(f"\n{file_path}: {len(errors)} errors")
@@ -183,7 +170,7 @@ class TypeCheckAnalyzer:
             },
             "error_groups": {k: len(v) for k, v in self.error_groups.items()},
             "file_errors": {k: len(v) for k, v in self.file_errors.items()},
-            "critical_errors": []
+            "critical_errors": [],
         }
 
         # Add some critical error examples
@@ -197,34 +184,13 @@ class TypeCheckAnalyzer:
 
         print(f"\n💾 Report saved to: {filename}")
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="Analyze basedpyright type checking results"
-    )
-    parser.add_argument(
-        "files",
-        nargs="*",
-        help="Specific files to check (default: entire project)"
-    )
-    parser.add_argument(
-        "--save",
-        "-s",
-        help="Save report to file",
-        action="store_true"
-    )
-    parser.add_argument(
-        "--critical",
-        "-c",
-        help="Show only critical errors",
-        action="store_true"
-    )
-    parser.add_argument(
-        "--limit",
-        "-l",
-        type=int,
-        default=20,
-        help="Maximum number of errors to show (default: 20)"
-    )
+    parser = argparse.ArgumentParser(description="Analyze basedpyright type checking results")
+    parser.add_argument("files", nargs="*", help="Specific files to check (default: entire project)")
+    parser.add_argument("--save", "-s", help="Save report to file", action="store_true")
+    parser.add_argument("--critical", "-c", help="Show only critical errors", action="store_true")
+    parser.add_argument("--limit", "-l", type=int, default=20, help="Maximum number of errors to show (default: 20)")
 
     args = parser.parse_args()
 
@@ -255,6 +221,7 @@ def main():
 
     # Return exit code based on errors
     return 0 if len(analyzer.errors) == 0 else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

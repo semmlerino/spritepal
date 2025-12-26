@@ -1,4 +1,5 @@
 """Unit tests for dump file detection service."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -238,10 +239,12 @@ class TestFindDumpsFromDirectories:
         vram = valid_dir / "VRAM.dmp"
         vram.write_bytes(b"vram")
 
-        result = find_dumps_from_directories([
-            Path("/nonexistent"),
-            valid_dir,
-        ])
+        result = find_dumps_from_directories(
+            [
+                Path("/nonexistent"),
+                valid_dir,
+            ]
+        )
         assert result.vram_path == vram
 
 

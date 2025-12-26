@@ -13,6 +13,7 @@ Testing approach:
 - Real worker creation and lifecycle management
 - Real parameter validation and error conditions
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -159,9 +160,7 @@ class TestExtractionControllerIntegration:
         return MockMainWindow()
 
     @pytest.fixture
-    def real_managers(
-        self, isolated_managers: None
-    ) -> Any:
+    def real_managers(self, isolated_managers: None) -> Any:
         """Get real managers from AppContext."""
         _ = isolated_managers  # Ensures fixture runs first to initialize managers
         context = get_app_context()
@@ -173,9 +172,7 @@ class TestExtractionControllerIntegration:
         }
 
     @pytest.fixture
-    def controller(
-        self, mock_main_window: MockMainWindow, real_managers: dict[str, Any]
-    ) -> Any:
+    def controller(self, mock_main_window: MockMainWindow, real_managers: dict[str, Any]) -> Any:
         """Create ExtractionController with automatic worker cleanup."""
         ctrl = ExtractionController(
             main_window=mock_main_window,
@@ -215,9 +212,7 @@ class TestExtractionControllerIntegration:
         assert controller.worker is None
         assert controller.rom_worker is None
 
-    def test_ui_signal_connections(
-        self, mock_main_window: MockMainWindow, real_managers: dict[str, Any]
-    ) -> None:
+    def test_ui_signal_connections(self, mock_main_window: MockMainWindow, real_managers: dict[str, Any]) -> None:
         """Test that controller properly connects to UI signals."""
         extract_spy = QSignalSpy(mock_main_window.extract_requested)
         editor_spy = QSignalSpy(mock_main_window.open_in_editor_requested)
@@ -251,9 +246,7 @@ class TestExtractionControllerIntegration:
         assert offset_spy.count() == 1
         assert offset_spy.at(0)[0] == 0x1000
 
-    def test_manager_signal_connections(
-        self, mock_main_window: MockMainWindow, real_managers: dict[str, Any]
-    ) -> None:
+    def test_manager_signal_connections(self, mock_main_window: MockMainWindow, real_managers: dict[str, Any]) -> None:
         """Test that controller connects to real manager signals."""
         extraction_mgr = real_managers["extraction_manager"]
         injection_mgr = real_managers["injection_manager"]
@@ -290,11 +283,13 @@ class TestExtractionControllerIntegration:
             settings_manager=real_managers["settings_manager"],
         )
 
-        mock_main_window.set_extraction_params({
-            "vram_path": "",
-            "cgram_path": test_files["cgram_path"],
-            "output_base": test_files["output_base"],
-        })
+        mock_main_window.set_extraction_params(
+            {
+                "vram_path": "",
+                "cgram_path": test_files["cgram_path"],
+                "output_base": test_files["output_base"],
+            }
+        )
 
         mock_main_window.reset_extraction_status()
         controller.start_extraction()
@@ -318,12 +313,14 @@ class TestExtractionControllerIntegration:
             settings_manager=real_managers["settings_manager"],
         )
 
-        mock_main_window.set_extraction_params({
-            "vram_path": test_files["vram_path"],
-            "cgram_path": "",
-            "output_base": test_files["output_base"],
-            "grayscale_mode": False,
-        })
+        mock_main_window.set_extraction_params(
+            {
+                "vram_path": test_files["vram_path"],
+                "cgram_path": "",
+                "output_base": test_files["output_base"],
+                "grayscale_mode": False,
+            }
+        )
 
         mock_main_window.reset_extraction_status()
         controller.start_extraction()
@@ -347,12 +344,14 @@ class TestExtractionControllerIntegration:
             settings_manager=real_managers["settings_manager"],
         )
 
-        mock_main_window.set_extraction_params({
-            "vram_path": str(tmp_path / "nonexistent.vram"),
-            "cgram_path": "",
-            "output_base": str(tmp_path / "output"),
-            "grayscale_mode": True,
-        })
+        mock_main_window.set_extraction_params(
+            {
+                "vram_path": str(tmp_path / "nonexistent.vram"),
+                "cgram_path": "",
+                "output_base": str(tmp_path / "output"),
+                "grayscale_mode": True,
+            }
+        )
 
         mock_main_window.reset_extraction_status()
         controller.start_extraction()
@@ -380,11 +379,13 @@ class TestExtractionControllerIntegration:
         invalid_vram = tmp_path / "invalid.vram"
         invalid_vram.write_bytes(b"\x00" * 100)
 
-        mock_main_window.set_extraction_params({
-            "vram_path": str(invalid_vram),
-            "cgram_path": "",
-            "output_base": str(tmp_path / "output"),
-        })
+        mock_main_window.set_extraction_params(
+            {
+                "vram_path": str(invalid_vram),
+                "cgram_path": "",
+                "output_base": str(tmp_path / "output"),
+            }
+        )
 
         mock_main_window.reset_extraction_status()
         controller.start_extraction()
@@ -403,15 +404,17 @@ class TestExtractionControllerIntegration:
         test_files: dict[str, str],
     ) -> None:
         """Test successful worker creation with real managers."""
-        mock_main_window.set_extraction_params({
-            "vram_path": test_files["vram_path"],
-            "cgram_path": test_files["cgram_path"],
-            "oam_path": test_files["oam_path"],
-            "output_base": test_files["output_base"],
-            "create_grayscale": True,
-            "create_metadata": True,
-            "grayscale_mode": False,
-        })
+        mock_main_window.set_extraction_params(
+            {
+                "vram_path": test_files["vram_path"],
+                "cgram_path": test_files["cgram_path"],
+                "oam_path": test_files["oam_path"],
+                "output_base": test_files["output_base"],
+                "create_grayscale": True,
+                "create_metadata": True,
+                "grayscale_mode": False,
+            }
+        )
 
         mock_main_window.reset_extraction_status()
         controller.start_extraction()
@@ -432,11 +435,13 @@ class TestExtractionControllerIntegration:
         test_files: dict[str, str],
     ) -> None:
         """Test proper worker cleanup with real workers."""
-        mock_main_window.set_extraction_params({
-            "vram_path": test_files["vram_path"],
-            "cgram_path": test_files["cgram_path"],
-            "output_base": test_files["output_base"],
-        })
+        mock_main_window.set_extraction_params(
+            {
+                "vram_path": test_files["vram_path"],
+                "cgram_path": test_files["cgram_path"],
+                "output_base": test_files["output_base"],
+            }
+        )
 
         controller.start_extraction()
 
@@ -448,9 +453,7 @@ class TestExtractionControllerIntegration:
 
     # --- Signal Handler Tests ---
 
-    def test_progress_handler(
-        self, controller: ExtractionController, mock_main_window: MockMainWindow
-    ) -> None:
+    def test_progress_handler(self, controller: ExtractionController, mock_main_window: MockMainWindow) -> None:
         """Test progress message handler emits signal."""
         test_message = "Extracting sprites..."
         signal_received: list[str] = []
@@ -461,9 +464,7 @@ class TestExtractionControllerIntegration:
         assert len(signal_received) == 1
         assert signal_received[0] == test_message
 
-    def test_preview_ready_handler(
-        self, controller: ExtractionController, mock_main_window: MockMainWindow
-    ) -> None:
+    def test_preview_ready_handler(self, controller: ExtractionController, mock_main_window: MockMainWindow) -> None:
         """Test preview ready handler emits signals."""
         from unittest.mock import patch
 
@@ -497,9 +498,7 @@ class TestExtractionControllerIntegration:
         assert len(signals_received) == 1
         assert signals_received[0] is test_image
 
-    def test_palettes_ready_handler(
-        self, controller: ExtractionController, mock_main_window: MockMainWindow
-    ) -> None:
+    def test_palettes_ready_handler(self, controller: ExtractionController, mock_main_window: MockMainWindow) -> None:
         """Test palettes ready handler emits signal."""
         test_palettes = {8: [[0, 0, 0], [255, 0, 0]]}
         signals_received: list[dict[int, list[list[int]]]] = []
@@ -527,9 +526,7 @@ class TestExtractionControllerIntegration:
         assert signals_received[0] == extracted_files
         assert controller.worker is None
 
-    def test_extraction_error_handler(
-        self, controller: ExtractionController, mock_main_window: MockMainWindow
-    ) -> None:
+    def test_extraction_error_handler(self, controller: ExtractionController, mock_main_window: MockMainWindow) -> None:
         """Test extraction error handler emits signal and cleans up worker."""
         from tests.controllers.test_extraction_controller import DummyWorker
 
@@ -546,9 +543,7 @@ class TestExtractionControllerIntegration:
 
     # --- ROM Extraction Tests ---
 
-    def test_rom_extraction_worker_creation(
-        self, controller: ExtractionController, tmp_path: Path
-    ) -> None:
+    def test_rom_extraction_worker_creation(self, controller: ExtractionController, tmp_path: Path) -> None:
         """Test ROM extraction worker creation with real managers."""
         rom_file = tmp_path / "test.sfc"
         rom_data = b"\x00" * 0x100000  # 1MB ROM
@@ -566,9 +561,7 @@ class TestExtractionControllerIntegration:
 
         assert controller.rom_worker is not None
 
-    def test_rom_extraction_cleanup(
-        self, controller: ExtractionController, tmp_path: Path
-    ) -> None:
+    def test_rom_extraction_cleanup(self, controller: ExtractionController, tmp_path: Path) -> None:
         """Test ROM extraction worker cleanup."""
         rom_file = tmp_path / "test.sfc"
         rom_file.write_bytes(b"\x00" * 0x100000)
@@ -607,9 +600,7 @@ class TestExtractionControllerIntegration:
         )
 
         mock_main_window.extraction_panel.has_vram = Mock(return_value=True)
-        mock_main_window.extraction_panel.get_vram_path = Mock(
-            return_value=test_files["vram_path"]
-        )
+        mock_main_window.extraction_panel.get_vram_path = Mock(return_value=test_files["vram_path"])
         mock_main_window.sprite_preview.width = Mock(return_value=256)
         mock_main_window.sprite_preview.height = Mock(return_value=256)
         mock_main_window.sprite_preview.update_preview = Mock()
@@ -625,9 +616,7 @@ class TestExtractionControllerIntegration:
 
     # --- Error Handler Tests ---
 
-    def test_error_handler_integration(
-        self, mock_main_window: MockMainWindow, real_managers: dict[str, Any]
-    ) -> None:
+    def test_error_handler_integration(self, mock_main_window: MockMainWindow, real_managers: dict[str, Any]) -> None:
         """Test error handler integration with real managers."""
         controller = ExtractionController(
             main_window=mock_main_window,

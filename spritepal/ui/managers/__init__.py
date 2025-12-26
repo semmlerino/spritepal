@@ -4,6 +4,7 @@ UI managers package
 Contains manager classes that handle specific UI responsibilities,
 following the Single Responsibility Principle.
 """
+
 from __future__ import annotations
 
 from .output_settings_manager import OutputSettingsManager

@@ -8,6 +8,7 @@ These tests verify the following fixes:
 - Issue #4: ROM state consistency on write failure (rom_injector.py)
 - Issue #5: VRAM buffer cleanup on error (injector.py)
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -40,9 +41,7 @@ class TestTempFileCleanup:
     created with delete=False would leak.
     """
 
-    def test_temp_file_cleaned_on_compression_error(
-        self, tmp_path: Path, isolated_managers: Any
-    ) -> None:
+    def test_temp_file_cleaned_on_compression_error(self, tmp_path: Path, isolated_managers: Any) -> None:
         """Temp file should be deleted even if compression raises."""
         from core.hal_compression import HALCompressionError
         from core.rom_injector import ROMInjector
@@ -57,15 +56,16 @@ class TestTempFileCleanup:
         rom_size = 512 * 1024  # 512KB
         rom_data = bytearray(rom_size)
         header_offset = 0x7FC0
-        rom_data[header_offset:header_offset + 21] = b"TEST ROM".ljust(21, b" ")
+        rom_data[header_offset : header_offset + 21] = b"TEST ROM".ljust(21, b" ")
         rom_data[header_offset + 21] = 0x20  # LoROM
         rom_data[header_offset + 23] = 0x09  # 512KB (2^(9+10) = 512KB)
-        rom_data[header_offset + 30:header_offset + 32] = (0x1234).to_bytes(2, "little")
-        rom_data[header_offset + 28:header_offset + 30] = (0x1234 ^ 0xFFFF).to_bytes(2, "little")
+        rom_data[header_offset + 30 : header_offset + 32] = (0x1234).to_bytes(2, "little")
+        rom_data[header_offset + 28 : header_offset + 30] = (0x1234 ^ 0xFFFF).to_bytes(2, "little")
         rom_path.write_bytes(bytes(rom_data))
 
         # Create a simple 16x16 indexed PNG
         from PIL import Image
+
         img = Image.new("P", (16, 16))
         img.putpalette(list(range(256)) * 3)
         img.save(sprite_path)
@@ -86,15 +86,13 @@ class TestTempFileCleanup:
             mock_compressor_class.return_value = mock_compressor
 
             # Bypass ROM validation
-            mock_validator.validate_rom_for_injection.return_value = (
-                {"title": "TEST ROM"},
-                0x7FC0
-            )
+            mock_validator.validate_rom_for_injection.return_value = ({"title": "TEST ROM"}, 0x7FC0)
 
             injector = ROMInjector()
 
             # Also mock read_rom_header to return expected structure
             from core.rom_validator import ROMHeader
+
             mock_header = ROMHeader(
                 title="TEST ROM",
                 rom_type=0x20,
@@ -138,9 +136,7 @@ class TestROMStateConsistency:
     If the write failed, the internal state was inconsistent.
     """
 
-    def test_rom_data_unchanged_on_write_failure(
-        self, tmp_path: Path, isolated_managers: Any
-    ) -> None:
+    def test_rom_data_unchanged_on_write_failure(self, tmp_path: Path, isolated_managers: Any) -> None:
         """self.rom_data should remain unchanged if atomic_write fails."""
         from core.rom_injector import ROMInjector
 
@@ -152,18 +148,19 @@ class TestROMStateConsistency:
         # Create a minimal ROM with header
         original_rom_data = bytearray(0x8000)
         header_offset = 0x7FC0
-        original_rom_data[header_offset:header_offset + 21] = b"TEST ROM".ljust(21, b" ")
+        original_rom_data[header_offset : header_offset + 21] = b"TEST ROM".ljust(21, b" ")
         original_rom_data[header_offset + 21] = 0x20
         original_rom_data[header_offset + 23] = 0x08
-        original_rom_data[header_offset + 30:header_offset + 32] = (0x1234).to_bytes(2, "little")
-        original_rom_data[header_offset + 28:header_offset + 30] = (0x1234 ^ 0xFFFF).to_bytes(2, "little")
+        original_rom_data[header_offset + 30 : header_offset + 32] = (0x1234).to_bytes(2, "little")
+        original_rom_data[header_offset + 28 : header_offset + 30] = (0x1234 ^ 0xFFFF).to_bytes(2, "little")
 
         # Put known data at offset 0x1000
-        original_rom_data[0x1000:0x1010] = b"\xAA" * 16
+        original_rom_data[0x1000:0x1010] = b"\xaa" * 16
         rom_path.write_bytes(bytes(original_rom_data))
 
         # Create a simple 16x16 indexed PNG
         from PIL import Image
+
         img = Image.new("P", (16, 16))
         img.putpalette(list(range(256)) * 3)
         img.save(sprite_path)
@@ -212,9 +209,7 @@ class TestWorkerCleanup:
     would keep running but exception handlers didn't stop it.
     """
 
-    def test_worker_cleared_on_exception(
-        self, isolated_managers: Any, qtbot: Any, tmp_path: Path
-    ) -> None:
+    def test_worker_cleared_on_exception(self, isolated_managers: Any, qtbot: Any, tmp_path: Path) -> None:
         """_current_worker should be None after exception in start_injection."""
         manager = get_extraction_manager()
 
@@ -250,9 +245,7 @@ class TestOffsetParseError:
     any indication to the caller.
     """
 
-    def test_invalid_offset_logged_and_indicated(
-        self, tmp_path: Path, isolated_managers: Any, caplog: Any
-    ) -> None:
+    def test_invalid_offset_logged_and_indicated(self, tmp_path: Path, isolated_managers: Any, caplog: Any) -> None:
         """Parse failure should log warning and set offset_parse_error."""
         import logging
 
@@ -274,10 +267,7 @@ class TestOffsetParseError:
         manager = get_extraction_manager()
 
         with caplog.at_level(logging.WARNING, logger=manager._logger.name):
-            result = manager.load_rom_injection_defaults(
-                str(sprite_path),
-                metadata
-            )
+            result = manager.load_rom_injection_defaults(str(sprite_path), metadata)
 
         # Should have logged a warning
         assert any("Failed to parse ROM offset" in record.message for record in caplog.records)
@@ -296,9 +286,7 @@ class TestVRAMBufferCleanup:
     causing memory accumulation on repeated failures.
     """
 
-    def test_vram_cleared_on_injection_error(
-        self, tmp_path: Path, isolated_managers: Any
-    ) -> None:
+    def test_vram_cleared_on_injection_error(self, tmp_path: Path, isolated_managers: Any) -> None:
         """self.vram_data should be empty after injection error."""
         from core.injector import SpriteInjector
 
@@ -309,6 +297,7 @@ class TestVRAMBufferCleanup:
 
         # Create a simple 16x16 indexed PNG
         from PIL import Image
+
         img = Image.new("P", (16, 16))
         img.putpalette(list(range(256)) * 3)
         img.save(sprite_path)

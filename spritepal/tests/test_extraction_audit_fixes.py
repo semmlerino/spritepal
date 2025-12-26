@@ -11,6 +11,7 @@ ROM sprite extraction workflow audit:
 - LOC-2.2c: Duplicate sprite detection
 - ROM-1.1a: SMC header validation
 """
+
 from __future__ import annotations
 
 import struct
@@ -218,9 +219,7 @@ class TestCompressionRatioValidation:
         injector = ROMInjector()
 
         # Mock find_compressed_sprite to return suspicious ratio
-        with patch.object(
-            injector.hal_compressor, "decompress_from_rom"
-        ) as mock_decompress:
+        with patch.object(injector.hal_compressor, "decompress_from_rom") as mock_decompress:
             # Return 10000 bytes decompressed
             mock_decompress.return_value = b"\x00" * 10000
 
@@ -378,9 +377,7 @@ class TestSMCHeaderValidation:
         header_result, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
 
         assert smc_offset == 512
-        assert any(
-            "content validation failed" in r.message.lower() for r in caplog.records
-        )
+        assert any("content validation failed" in r.message.lower() for r in caplog.records)
 
 
 # ============================================================================

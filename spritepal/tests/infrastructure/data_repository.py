@@ -5,6 +5,7 @@ Provides consistent access to real test data files (VRAM, ROM, CGRAM, etc.)
 instead of creating temporary mock data in each test. This improves test
 reliability and ensures tests use realistic data patterns.
 """
+
 from __future__ import annotations
 
 import shutil
@@ -19,6 +20,7 @@ from PIL import Image
 @dataclass
 class DataSet:
     """Represents a complete set of test data for extraction/injection testing."""
+
     name: str
     description: str
     vram_path: str | None = None
@@ -33,6 +35,7 @@ class DataSet:
             self.sprite_images = []
         if self.metadata_files is None:
             self.metadata_files = []
+
 
 class DataRepository:
     """
@@ -124,20 +127,17 @@ class DataRepository:
         """Register generated test data sets."""
         # Small test data set
         self._data_sets["small_test"] = DataSet(
-            name="small_test",
-            description="Small generated test data for unit tests"
+            name="small_test", description="Small generated test data for unit tests"
         )
 
         # Medium test data set
         self._data_sets["medium_test"] = DataSet(
-            name="medium_test",
-            description="Medium generated test data for integration tests"
+            name="medium_test", description="Medium generated test data for integration tests"
         )
 
         # Comprehensive test data set
         self._data_sets["comprehensive_test"] = DataSet(
-            name="comprehensive_test",
-            description="Comprehensive generated test data for full workflow testing"
+            name="comprehensive_test", description="Comprehensive generated test data for full workflow testing"
         )
 
     def get_data_set(self, name: str) -> DataSet | None:
@@ -260,10 +260,7 @@ class DataRepository:
 
         # Generate VRAM file
         if not data_set.vram_path or not Path(data_set.vram_path).exists():
-            data_set.vram_path = self._create_vram_file(
-                f"{data_set.name}_vram.dmp",
-                config["vram_size"]
-            )
+            data_set.vram_path = self._create_vram_file(f"{data_set.name}_vram.dmp", config["vram_size"])
 
         # Generate CGRAM file
         if not data_set.cgram_path or not Path(data_set.cgram_path).exists():
@@ -275,10 +272,7 @@ class DataRepository:
 
         # Generate ROM file
         if not data_set.rom_path or not Path(data_set.rom_path).exists():
-            data_set.rom_path = self._create_rom_file(
-                f"{data_set.name}_rom.sfc",
-                config["rom_size"]
-            )
+            data_set.rom_path = self._create_rom_file(f"{data_set.name}_rom.sfc", config["rom_size"])
 
     def _create_vram_file(self, filename: str, size: int) -> str:
         """Create a realistic VRAM file with sprite-like data patterns."""
@@ -340,10 +334,10 @@ class DataRepository:
         # Add some realistic OAM entries
         for i in range(min(128, len(oam_data) // 4)):
             base = i * 4
-            oam_data[base] = (i * 8) % 256      # X position
+            oam_data[base] = (i * 8) % 256  # X position
             oam_data[base + 1] = (i * 8) % 240  # Y position
-            oam_data[base + 2] = i % 256        # Tile number
-            oam_data[base + 3] = 0x20 | (i % 8) # Attributes (palette, etc.)
+            oam_data[base + 2] = i % 256  # Tile number
+            oam_data[base + 3] = 0x20 | (i % 8)  # Attributes (palette, etc.)
 
         Path(filepath).write_bytes(oam_data)
 
@@ -359,7 +353,7 @@ class DataRepository:
         # Add ROM header
         header_offset = 0x7FC0
         if size > header_offset + 32:
-            rom_data[header_offset:header_offset + 21] = b"SPRITEPAL TEST ROM   "
+            rom_data[header_offset : header_offset + 21] = b"SPRITEPAL TEST ROM   "
             rom_data[header_offset + 21] = 0x30  # ROM type
             rom_data[header_offset + 22] = 0x0C  # ROM size
             rom_data[header_offset + 23] = 0x00  # SRAM size
@@ -473,7 +467,7 @@ class DataRepository:
                 "has_vram": data_set.vram_path is not None,
                 "has_cgram": data_set.cgram_path is not None,
                 "has_rom": data_set.rom_path is not None,
-            }
+            },
         }
 
     def cleanup(self) -> None:
@@ -497,8 +491,10 @@ class DataRepository:
         self._temp_files.clear()
         self._temp_dirs.clear()
 
+
 class _DataRepositorySingleton:
     """Singleton holder for DataRepository."""
+
     _instance: DataRepository | None = None
 
     @classmethod
@@ -515,9 +511,11 @@ class _DataRepositorySingleton:
             cls._instance.cleanup()
             cls._instance = None
 
+
 def get_test_data_repository() -> DataRepository:
     """Get the global test data repository instance."""
     return _DataRepositorySingleton.get()
+
 
 def cleanup_test_data_repository() -> None:
     """Clean up the global test data repository."""
@@ -554,9 +552,11 @@ def get_vram_test_data(size: str = "medium") -> dict[str, Any]:
     """Get VRAM test data."""
     return get_test_data_repository().get_vram_extraction_data(size)
 
+
 def get_rom_test_data(size: str = "medium") -> dict[str, Any]:
     """Get ROM test data."""
     return get_test_data_repository().get_rom_extraction_data(size)
+
 
 def get_injection_test_data(size: str = "medium") -> dict[str, Any]:
     """Get injection test data."""

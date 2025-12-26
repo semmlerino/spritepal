@@ -8,6 +8,7 @@ Consolidates tests from:
 These tests verify fixes for specific bugs and crashes. They should be preserved
 to prevent regressions when the codebase changes.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -182,31 +183,37 @@ class TestOffsetParsingFixes:
     Bug fix: Accept various hex formats (0x, 0X, bare hex) and reject invalid input.
     """
 
-    @pytest.mark.parametrize("input_text,expected", [
-        ("0x8000", 0x8000),
-        ("0X8000", 0x8000),
-        ("8000", 0x8000),
-        ("0xABCD", 0xABCD),
-        ("abcd", 0xABCD),
-        ("0x0", 0x0),
-        ("FFFF", 0xFFFF),
-        (" 0x8000 ", 0x8000),  # With whitespace
-    ])
+    @pytest.mark.parametrize(
+        "input_text,expected",
+        [
+            ("0x8000", 0x8000),
+            ("0X8000", 0x8000),
+            ("8000", 0x8000),
+            ("0xABCD", 0xABCD),
+            ("abcd", 0xABCD),
+            ("0x0", 0x0),
+            ("FFFF", 0xFFFF),
+            (" 0x8000 ", 0x8000),  # With whitespace
+        ],
+    )
     def test_parse_hex_offset_valid(self, injection_dialog, input_text, expected):
         """Test parsing of valid hex offset format: {input_text}"""
         result = injection_dialog.rom_offset_input._parse_hex_offset(input_text)
         assert result == expected
 
-    @pytest.mark.parametrize("invalid_input", [
-        "",
-        "   ",
-        "not_hex",
-        "0xGGGG",
-        "12345G",
-        "0x",
-        "x8000",
-        None,
-    ])
+    @pytest.mark.parametrize(
+        "invalid_input",
+        [
+            "",
+            "   ",
+            "not_hex",
+            "0xGGGG",
+            "12345G",
+            "0x",
+            "x8000",
+            None,
+        ],
+    )
     def test_parse_hex_offset_invalid(self, injection_dialog, invalid_input):
         """Test parsing rejects invalid hex input"""
         result = injection_dialog.rom_offset_input._parse_hex_offset(invalid_input)
@@ -220,10 +227,11 @@ class TestOffsetParsingFixes:
         dialog.set_current_tab(1)  # ROM tab
 
         # Mock file selectors to avoid UI blocking
-        with patch.object(dialog.sprite_file_selector, "get_path", return_value="/fake/sprite.png"), \
-             patch.object(dialog.input_rom_selector, "get_path", return_value="/fake/input.sfc"), \
-             patch.object(dialog.output_rom_selector, "get_path", return_value="/fake/output.sfc"):
-
+        with (
+            patch.object(dialog.sprite_file_selector, "get_path", return_value="/fake/sprite.png"),
+            patch.object(dialog.input_rom_selector, "get_path", return_value="/fake/input.sfc"),
+            patch.object(dialog.output_rom_selector, "get_path", return_value="/fake/output.sfc"),
+        ):
             # Test invalid offset
             dialog.rom_offset_input.hex_edit.setText("invalid_hex")
 
@@ -274,8 +282,11 @@ class TestROMLoadingSafety:
             QApplication.processEvents()
 
             # Verify an error dialog was shown (critical or warning)
-            assert mock_msgbox.critical.called or mock_msgbox.warning.called or \
-                   dialog.sprite_location_combo.itemText(0) in ("Error loading ROM", "Load ROM file first...")
+            assert (
+                mock_msgbox.critical.called
+                or mock_msgbox.warning.called
+                or dialog.sprite_location_combo.itemText(0) in ("Error loading ROM", "Load ROM file first...")
+            )
 
     def test_load_rom_info_invalid_file_size(self, injection_dialog, qtbot):
         """Test ROM loading with invalid file size - async worker pattern.
@@ -314,10 +325,12 @@ class TestROMLoadingSafety:
                     # Test passes if either:
                     # 1. A warning/error dialog was shown
                     # 2. UI was updated to show error state
-                    assert mock_msgbox.critical.called or mock_msgbox.warning.called or \
-                           dialog.sprite_location_combo.itemText(0) in (
-                               "Error loading ROM", "Loading ROM info...", "Load ROM file first..."
-                           )
+                    assert (
+                        mock_msgbox.critical.called
+                        or mock_msgbox.warning.called
+                        or dialog.sprite_location_combo.itemText(0)
+                        in ("Error loading ROM", "Loading ROM info...", "Load ROM file first...")
+                    )
 
             finally:
                 Path(tmp_file.name).unlink()
@@ -357,12 +370,7 @@ class TestPreviewWorkerSafety:
         rom_file.write_bytes(b"\x00" * 0x10000)  # 64KB dummy ROM
 
         # Create worker with invalid (negative) offset
-        worker = SpritePreviewWorker(
-            rom_path=str(rom_file),
-            offset=-1,
-            sprite_name="test",
-            extractor=mock_extractor
-        )
+        worker = SpritePreviewWorker(rom_path=str(rom_file), offset=-1, sprite_name="test", extractor=mock_extractor)
 
         # Mock the error signal
         error_messages = []
@@ -381,10 +389,7 @@ class TestPreviewWorkerSafety:
         mock_extractor = Mock()
 
         worker = SpritePreviewWorker(
-            rom_path="/nonexistent/rom.sfc",
-            offset=0x8000,
-            sprite_name="test",
-            extractor=mock_extractor
+            rom_path="/nonexistent/rom.sfc", offset=0x8000, sprite_name="test", extractor=mock_extractor
         )
 
         error_messages = []
@@ -409,7 +414,7 @@ class TestPreviewWorkerSafety:
                     rom_path=tmp_file.name,
                     offset=0x10000,  # Offset beyond file size
                     sprite_name="test",
-                    extractor=mock_extractor
+                    extractor=mock_extractor,
                 )
 
                 error_messages = []
@@ -465,10 +470,11 @@ class TestInputValidation:
         dialog.set_current_tab(1)
 
         # Test missing sprite path
-        with patch.object(dialog.sprite_file_selector, "get_path", return_value=""), \
-             patch.object(dialog.input_rom_selector, "get_path", return_value=""), \
-             patch.object(dialog.output_rom_selector, "get_path", return_value=""):
-
+        with (
+            patch.object(dialog.sprite_file_selector, "get_path", return_value=""),
+            patch.object(dialog.input_rom_selector, "get_path", return_value=""),
+            patch.object(dialog.output_rom_selector, "get_path", return_value=""),
+        ):
             with patch("PySide6.QtWidgets.QMessageBox.warning") as mock_warning:
                 result = dialog.get_parameters()
                 assert result is None

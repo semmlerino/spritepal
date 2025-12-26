@@ -21,108 +21,125 @@ def analyze_test_file(content: str, filename: str) -> dict[str, Any]:
         Dictionary with marker categories and analysis results
     """
     analysis = {
-        'execution_env': [],
-        'test_type': [],
-        'qt_components': [],
-        'threading': [],
-        'special': [],
-        'reasons': [],
+        "execution_env": [],
+        "test_type": [],
+        "qt_components": [],
+        "threading": [],
+        "special": [],
+        "reasons": [],
     }
 
     # Execution Environment Analysis
-    has_qt_imports = any(qt_term in content for qt_term in [
-        'PySide6', 'PyQt5', 'PySide6', 'PySide2', 'QWidget', 'QDialog',
-        'QApplication', 'QMainWindow', 'qtbot'
-    ])
+    has_qt_imports = any(
+        qt_term in content
+        for qt_term in [
+            "PySide6",
+            "PyQt5",
+            "PySide6",
+            "PySide2",
+            "QWidget",
+            "QDialog",
+            "QApplication",
+            "QMainWindow",
+            "qtbot",
+        ]
+    )
 
-    has_gui_usage = any(gui_term in content for gui_term in [
-        'exec_()', 'show()', 'hide()', '.exec()', 'qtbot',
-        'QApplication([])', 'QApplication.instance()'
-    ])
+    has_gui_usage = any(
+        gui_term in content
+        for gui_term in [
+            "exec_()",
+            "show()",
+            "hide()",
+            ".exec()",
+            "qtbot",
+            "QApplication([])",
+            "QApplication.instance()",
+        ]
+    )
 
-    uses_mocks = any(mock_term in content for mock_term in [
-        'Mock', 'MagicMock', '@patch', 'mock_', 'patch('
-    ])
+    uses_mocks = any(mock_term in content for mock_term in ["Mock", "MagicMock", "@patch", "mock_", "patch("])
 
     if has_gui_usage and not uses_mocks:
-        analysis['execution_env'].append('gui')
-        analysis['reasons'].append('Real GUI components requiring display')
+        analysis["execution_env"].append("gui")
+        analysis["reasons"].append("Real GUI components requiring display")
     elif uses_mocks or not has_qt_imports:
-        analysis['execution_env'].append('headless')
+        analysis["execution_env"].append("headless")
 
     if uses_mocks and not has_gui_usage:
-        analysis['execution_env'].append('mock_only')
+        analysis["execution_env"].append("mock_only")
 
     # Test Type Analysis
-    if 'integration' in filename.lower() or any(term in content for term in [
-        'workflow', 'end_to_end', 'e2e', 'tempfile', 'tmp_path'
-    ]):
-        analysis['test_type'].append('integration')
-    elif not has_qt_imports and not any(term in content for term in ['tempfile', 'tmp_path']):
-        analysis['test_type'].append('unit')
+    if "integration" in filename.lower() or any(
+        term in content for term in ["workflow", "end_to_end", "e2e", "tempfile", "tmp_path"]
+    ):
+        analysis["test_type"].append("integration")
+    elif not has_qt_imports and not any(term in content for term in ["tempfile", "tmp_path"]):
+        analysis["test_type"].append("unit")
 
     # Qt Component Analysis
     if has_qt_imports:
         if uses_mocks:
-            analysis['qt_components'].extend(['qt_mock'])
+            analysis["qt_components"].extend(["qt_mock"])
         else:
-            analysis['qt_components'].extend(['qt_real', 'qt_app'])
+            analysis["qt_components"].extend(["qt_real", "qt_app"])
     else:
-        analysis['qt_components'].append('no_qt')
+        analysis["qt_components"].append("no_qt")
 
     # Threading and Serial Requirements Analysis
     threading_patterns = [
-        ('QApplication management', r'QApplication\(\[\]\)|QApplication\.instance\(\)'),
-        ('Singleton management', r'reset_singleton|ManualOffsetDialogSingleton'),
-        ('Manager registry manipulation', r'ManagerRegistry.*reset'),
-        ('HAL process pool', r'HALProcessPool|ProcessPool.*HAL'),
-        ('Thread safety concerns', r'thread_safety|threading|QThread'),
-        ('Real Qt components', r'real_qt|RealComponentFactory'),
-        ('Timer usage', r'QTimer|timer'),
+        ("QApplication management", r"QApplication\(\[\]\)|QApplication\.instance\(\)"),
+        ("Singleton management", r"reset_singleton|ManualOffsetDialogSingleton"),
+        ("Manager registry manipulation", r"ManagerRegistry.*reset"),
+        ("HAL process pool", r"HALProcessPool|ProcessPool.*HAL"),
+        ("Thread safety concerns", r"thread_safety|threading|QThread"),
+        ("Real Qt components", r"real_qt|RealComponentFactory"),
+        ("Timer usage", r"QTimer|timer"),
     ]
 
     needs_serial = False
     for reason, pattern in threading_patterns:
         if re.search(pattern, content, re.IGNORECASE):
-            analysis['reasons'].append(reason)
+            analysis["reasons"].append(reason)
             needs_serial = True
 
-            if 'QApplication' in reason:
-                analysis['threading'].append('qt_application')
-            elif 'Singleton' in reason or 'Manager registry' in reason:
-                analysis['threading'].append('singleton')
-            elif 'process pool' in reason.lower():
-                analysis['threading'].append('process_pool')
-            elif 'Thread' in reason or 'timer' in reason.lower():
-                analysis['threading'].append('worker_threads')
+            if "QApplication" in reason:
+                analysis["threading"].append("qt_application")
+            elif "Singleton" in reason or "Manager registry" in reason:
+                analysis["threading"].append("singleton")
+            elif "process pool" in reason.lower():
+                analysis["threading"].append("process_pool")
+            elif "Thread" in reason or "timer" in reason.lower():
+                analysis["threading"].append("worker_threads")
 
     if needs_serial:
-        analysis['threading'].append('serial')
+        analysis["threading"].append("serial")
     elif uses_mocks and not has_gui_usage:
-        analysis['special'].append('parallel_safe')
+        analysis["special"].append("parallel_safe")
 
     # Additional Special Markers
-    if any(term in content for term in ['dialog', 'Dialog', 'exec_']):
-        analysis['special'].append('dialog')
+    if any(term in content for term in ["dialog", "Dialog", "exec_"]):
+        analysis["special"].append("dialog")
         if uses_mocks:
-            analysis['special'].append('mock_dialogs')
+            analysis["special"].append("mock_dialogs")
 
-    if any(term in content for term in ['widget', 'Widget', 'QWidget']):
-        analysis['special'].append('widget')
+    if any(term in content for term in ["widget", "Widget", "QWidget"]):
+        analysis["special"].append("widget")
 
-    if any(term in content for term in ['tempfile', 'tmp_path', 'open(', 'Path(']):
-        analysis['special'].append('file_io')
+    if any(term in content for term in ["tempfile", "tmp_path", "open(", "Path("]):
+        analysis["special"].append("file_io")
 
-    if any(term in content for term in ['rom', 'ROM', '.smc', '.dmp', 'vram', 'VRAM']):
-        analysis['special'].append('rom_data')
+    if any(term in content for term in ["rom", "ROM", ".smc", ".dmp", "vram", "VRAM"]):
+        analysis["special"].append("rom_data")
 
-    if any(term in content for term in ['performance', 'benchmark', 'profil']):
-        analysis['special'].extend(['performance', 'benchmark'])
+    if any(term in content for term in ["performance", "benchmark", "profil"]):
+        analysis["special"].extend(["performance", "benchmark"])
 
-    if any(term in content for term in ['time.sleep', 'QTimer', 'wait_']) or (has_gui_usage and not uses_mocks):
-        analysis['special'].append('slow')
+    if any(term in content for term in ["time.sleep", "QTimer", "wait_"]) or (has_gui_usage and not uses_mocks):
+        analysis["special"].append("slow")
 
     return analysis
+
 
 def get_marker_list(analysis: dict[str, Any]) -> list[str]:
     """Get comprehensive pytest markers from analysis results."""
@@ -130,19 +147,20 @@ def get_marker_list(analysis: dict[str, Any]) -> list[str]:
 
     # Add all markers from analysis categories
     all_marker_categories = [
-        analysis['execution_env'],
-        analysis['test_type'],
-        analysis['qt_components'],
-        analysis['threading'],
-        analysis['special']
+        analysis["execution_env"],
+        analysis["test_type"],
+        analysis["qt_components"],
+        analysis["threading"],
+        analysis["special"],
     ]
 
     for category in all_marker_categories:
         for marker in category:
-            markers.append(f'pytest.mark.{marker}')
+            markers.append(f"pytest.mark.{marker}")
 
     # Remove duplicates and sort
     return sorted(set(markers))
+
 
 def add_pytest_markers(file_path: Path, analysis: dict[str, Any]) -> bool:
     """
@@ -154,12 +172,12 @@ def add_pytest_markers(file_path: Path, analysis: dict[str, Any]) -> bool:
     content = file_path.read_text()
 
     # Check if pytestmark already exists
-    if 'pytestmark' in content:
+    if "pytestmark" in content:
         print(f"  Skipped {file_path.name} - markers already exist")
         return False
 
     # Skip files with less than 10 lines (likely empty or template files)
-    if len(content.split('\n')) < 10:
+    if len(content.split("\n")) < 10:
         print(f"  Skipped {file_path.name} - too short")
         return False
 
@@ -170,7 +188,7 @@ def add_pytest_markers(file_path: Path, analysis: dict[str, Any]) -> bool:
         return False
 
     # Create marker block
-    reasons = analysis.get('reasons', [])
+    reasons = analysis.get("reasons", [])
     if reasons:
         marker_comment = f"# Test characteristics: {', '.join(reasons)}"
     else:
@@ -185,7 +203,7 @@ def add_pytest_markers(file_path: Path, analysis: dict[str, Any]) -> bool:
     marker_block = "\n".join(marker_lines) + "\n\n"
 
     # Find insertion point - after imports but before first class/function
-    lines = content.split('\n')
+    lines = content.split("\n")
     insert_idx = 0
 
     # Skip docstring if present
@@ -201,8 +219,7 @@ def add_pytest_markers(file_path: Path, analysis: dict[str, Any]) -> bool:
 
         if not in_docstring:
             # Skip imports, constants, and blank lines
-            if (line.startswith('import ') or line.startswith('from ') or
-                line.strip() == '' or line.startswith('#')):
+            if line.startswith("import ") or line.startswith("from ") or line.strip() == "" or line.startswith("#"):
                 insert_idx = i + 1
                 continue
 
@@ -211,20 +228,21 @@ def add_pytest_markers(file_path: Path, analysis: dict[str, Any]) -> bool:
 
     # Insert marker block
     lines.insert(insert_idx, marker_block)
-    new_content = '\n'.join(lines)
+    new_content = "\n".join(lines)
 
     try:
         file_path.write_text(new_content)
-        marker_summary = [m.split('.')[-1] for m in markers]
+        marker_summary = [m.split(".")[-1] for m in markers]
         print(f"  ✓ Added {len(markers)} markers to {file_path.name}: {', '.join(marker_summary)}")
         return True
     except Exception as e:
         print(f"  ✗ Error writing {file_path.name}: {e}")
         return False
 
+
 def main():
     """Main function to process test files."""
-    test_dir = Path('tests')
+    test_dir = Path("tests")
     if not test_dir.exists():
         print("Error: tests directory not found")
         return
@@ -234,24 +252,24 @@ def main():
     error_count = 0
 
     stats = {
-        'gui': 0,
-        'headless': 0,
-        'mock_only': 0,
-        'serial': 0,
-        'parallel_safe': 0,
-        'integration': 0,
-        'unit': 0,
+        "gui": 0,
+        "headless": 0,
+        "mock_only": 0,
+        "serial": 0,
+        "parallel_safe": 0,
+        "integration": 0,
+        "unit": 0,
     }
 
     print("🔍 Analyzing test files for systematic pytest marker application...\n")
 
-    for test_file in sorted(test_dir.rglob('test_*.py')):
+    for test_file in sorted(test_dir.rglob("test_*.py")):
         try:
             content = test_file.read_text()
             analysis = analyze_test_file(content, test_file.name)
 
             # Update statistics
-            for category in ['execution_env', 'test_type', 'threading', 'special']:
+            for category in ["execution_env", "test_type", "threading", "special"]:
                 for marker in analysis.get(category, []):
                     if marker in stats:
                         stats[marker] += 1
@@ -294,5 +312,6 @@ def main():
     print("  # Skip slow tests for quick feedback:")
     print("  pytest -m 'not slow'")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

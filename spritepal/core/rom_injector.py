@@ -2,6 +2,7 @@
 ROM injection functionality for SpritePal.
 Handles injection of edited sprites directly into ROM files.
 """
+
 from __future__ import annotations
 
 import struct
@@ -22,6 +23,7 @@ from utils.rom_backup import ROMBackupManager
 
 logger = get_logger(__name__)
 
+
 @dataclass
 class SpritePointer:
     """Sprite data pointer in ROM"""
@@ -31,6 +33,7 @@ class SpritePointer:
     address: int
     compressed_size: int | None = None
     offset_variants: list[int] | None = None
+
 
 class ROMInjector(SpriteInjector):
     """Handles sprite injection directly into ROM files"""
@@ -50,9 +53,7 @@ class ROMInjector(SpriteInjector):
         self.header = header
         logger.debug(f"ROM Title: {header.title}")
         logger.debug(f"ROM Type: 0x{header.rom_type:02X}")
-        logger.debug(
-            f"Checksum: 0x{header.checksum:04X}, Complement: 0x{header.checksum_complement:04X}"
-        )
+        logger.debug(f"Checksum: 0x{header.checksum:04X}, Complement: 0x{header.checksum_complement:04X}")
         return self.header
 
     def calculate_checksum(self, rom_data: bytes | bytearray) -> tuple[int, int]:
@@ -124,9 +125,7 @@ class ROMInjector(SpriteInjector):
         else:
             # Apply default size limit to prevent the 42KB issue
             expected_size = default_max_sprite_size
-            logger.warning(
-                f"No expected size provided, using default max limit: {expected_size} bytes"
-            )
+            logger.warning(f"No expected size provided, using default max limit: {expected_size} bytes")
 
         # Create temp file for decompression with only the relevant portion
         # Extract a window from offset to offset + 128KB (or end of ROM)
@@ -183,14 +182,10 @@ class ROMInjector(SpriteInjector):
                     # Use cached full_decompressed instead of re-decompressing
                     sprite_offset = self._find_sprite_in_data(full_decompressed, expected_size)
                     if sprite_offset >= 0:
-                        logger.info(
-                            f"Found valid sprite data at offset {sprite_offset} within decompressed block"
-                        )
-                        decompressed = full_decompressed[sprite_offset:sprite_offset + expected_size]
+                        logger.info(f"Found valid sprite data at offset {sprite_offset} within decompressed block")
+                        decompressed = full_decompressed[sprite_offset : sprite_offset + expected_size]
                     else:
-                        logger.warning(
-                            "Could not find valid sprite data. Consider using sprite scanner."
-                        )
+                        logger.warning("Could not find valid sprite data. Consider using sprite scanner.")
             elif expected_size and len(decompressed) < expected_size:
                 logger.warning(
                     f"Decompressed data ({original_size} bytes) is smaller than expected "
@@ -287,7 +282,7 @@ class ROMInjector(SpriteInjector):
 
         for tile_idx in tile_indices:
             tile_offset = tile_idx * bytes_per_tile
-            tile_data = data[tile_offset:tile_offset + bytes_per_tile]
+            tile_data = data[tile_offset : tile_offset + bytes_per_tile]
 
             # Check for 4bpp characteristics
             if self._has_4bpp_tile_characteristics(tile_data):
@@ -314,15 +309,11 @@ class ROMInjector(SpriteInjector):
 
         # Check for variety in bitplanes (not all 0 or all FF)
         # 4bpp has 4 bitplanes organized in specific pattern
-        bitplane_stats = {
-            "zeros": 0,
-            "ones": 0,
-            "varied": 0
-        }
+        bitplane_stats = {"zeros": 0, "ones": 0, "varied": 0}
 
         # Check all 4 bitplanes
         for plane_start in [0, 1, 16, 17]:  # Bitplane starting positions
-            plane_bytes = [tile_data[plane_start + i*2] for i in range(8)]
+            plane_bytes = [tile_data[plane_start + i * 2] for i in range(8)]
 
             if all(b == 0 for b in plane_bytes):
                 bitplane_stats["zeros"] += 1
@@ -360,14 +351,14 @@ class ROMInjector(SpriteInjector):
             if test_offset > max_offset:
                 break
 
-            test_data = data[test_offset:test_offset + expected_size]
+            test_data = data[test_offset : test_offset + expected_size]
             if self._validate_sprite_data(test_data):
                 return test_offset
 
         # If common offsets fail, scan tile by tile (slower)
         logger.debug("Common offsets failed, scanning tile boundaries...")
         for test_offset in range(0, min(max_offset, 0x2000), bytes_per_tile):
-            test_data = data[test_offset:test_offset + expected_size]
+            test_data = data[test_offset : test_offset + expected_size]
             if self._validate_sprite_data(test_data):
                 return test_offset
 
@@ -455,9 +446,7 @@ class ROMInjector(SpriteInjector):
 
             # No terminator found within limit
             compressed_size = pos - offset
-            logger.debug(
-                f"HAL parsing reached limit without terminator: size={compressed_size} bytes"
-            )
+            logger.debug(f"HAL parsing reached limit without terminator: size={compressed_size} bytes")
             return compressed_size
 
         except Exception as e:
@@ -476,8 +465,7 @@ class ROMInjector(SpriteInjector):
         as approximate and validated against actual decompression output.
         """
         logger.warning(
-            f"Using conservative size estimation at offset 0x{offset:X} - "
-            "HAL parsing failed, result may be inaccurate"
+            f"Using conservative size estimation at offset 0x{offset:X} - HAL parsing failed, result may be inaccurate"
         )
         max_size = min(0x10000, len(rom_data) - offset)  # Max 64KB
 
@@ -521,14 +509,10 @@ class ROMInjector(SpriteInjector):
         """
         try:
             start_time = time.time()
-            logger.info(
-                f"Starting ROM injection: {Path(sprite_path).name} -> offset 0x{sprite_offset:X}"
-            )
+            logger.info(f"Starting ROM injection: {Path(sprite_path).name} -> offset 0x{sprite_offset:X}")
 
             # Validate ROM before modification
-            _header_info, _header_offset = ROMValidator.validate_rom_for_injection(
-                rom_path, sprite_offset
-            )
+            _header_info, _header_offset = ROMValidator.validate_rom_for_injection(rom_path, sprite_offset)
 
             # Create backup if requested - ABORT if backup fails
             backup_path = None
@@ -567,9 +551,7 @@ class ROMInjector(SpriteInjector):
 
             # Find and decompress original sprite for size comparison
             logger.info("Analyzing original sprite data in ROM")
-            original_size, original_data = self.find_compressed_sprite(
-                self.rom_data, file_offset
-            )
+            original_size, original_data = self.find_compressed_sprite(self.rom_data, file_offset)
             logger.debug(f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed")
 
             # Compress new sprite data
@@ -590,9 +572,7 @@ class ROMInjector(SpriteInjector):
                 uncompressed_size = len(tile_data)
                 if uncompressed_size == 0:
                     return False, "Cannot compress empty sprite data"
-                compression_ratio = (
-                    (uncompressed_size - compressed_size) / uncompressed_size * 100
-                )
+                compression_ratio = (uncompressed_size - compressed_size) / uncompressed_size * 100
                 space_saved = original_size - compressed_size
                 compression_mode = "fast" if fast_compression else "standard"
 
@@ -605,9 +585,7 @@ class ROMInjector(SpriteInjector):
                 # Check if compressed data fits
                 if compressed_size > original_size:
                     suggestion = (
-                        "standard compression"
-                        if fast_compression
-                        else "a smaller sprite or split it into parts"
+                        "standard compression" if fast_compression else "a smaller sprite or split it into parts"
                     )
                     return False, (
                         f"Compressed sprite too large: {compressed_size} bytes "
@@ -636,16 +614,12 @@ class ROMInjector(SpriteInjector):
                     f"{compressed_size} bytes exceeds ROM size {len(modified_rom)}"
                 )
             logger.info(f"Injecting {compressed_size} bytes of compressed data at ROM offset 0x{sprite_offset:X}")
-            modified_rom[file_offset : file_offset + compressed_size] = (
-                compressed_data
-            )
+            modified_rom[file_offset : file_offset + compressed_size] = compressed_data
 
             # Pad remaining space if needed
             if compressed_size < original_size:
                 padding = b"\xff" * (original_size - compressed_size)
-                modified_rom[
-                    file_offset + compressed_size : file_offset + original_size
-                ] = padding
+                modified_rom[file_offset + compressed_size : file_offset + original_size] = padding
                 logger.info(f"Padded {original_size - compressed_size} bytes with 0xFF")
 
             # Update checksum on the copy
@@ -689,9 +663,7 @@ class ROMInjector(SpriteInjector):
             header = self.read_rom_header(rom_path)
 
             # Get sprite configurations for this ROM
-            sprite_configs = self.sprite_config_loader.get_game_sprites(
-                header.title, header.checksum
-            )
+            sprite_configs = self.sprite_config_loader.get_game_sprites(header.title, header.checksum)
 
             # Convert configs to SpritePointer objects
             for name, config in sprite_configs.items():
@@ -713,7 +685,9 @@ class ROMInjector(SpriteInjector):
             else:
                 logger.info(f"Found {len(pointers)} sprite locations for ROM: {header.title}")
                 for name, pointer in pointers.items():
-                    logger.debug(f"  {name}: offset=0x{pointer.offset:X}, bank=0x{pointer.bank:02X}, size={pointer.compressed_size}")
+                    logger.debug(
+                        f"  {name}: offset=0x{pointer.offset:X}, bank=0x{pointer.bank:02X}, size={pointer.compressed_size}"
+                    )
 
         except Exception:
             logger.exception("Failed to find sprite locations")
@@ -721,8 +695,11 @@ class ROMInjector(SpriteInjector):
         return pointers
 
     def find_compressed_sprite_with_fallback(
-        self, rom_data: bytes, primary_offset: int, fallback_offsets: list[int] | None = None,
-        expected_size: int | None = None
+        self,
+        rom_data: bytes,
+        primary_offset: int,
+        fallback_offsets: list[int] | None = None,
+        expected_size: int | None = None,
     ) -> tuple[int, bytes, int]:
         """
         Try to find and decompress sprite data with fallback offsets.
@@ -744,11 +721,9 @@ class ROMInjector(SpriteInjector):
 
         last_error = None
         for i, offset in enumerate(offsets_to_try):
-            logger.debug(f"Trying offset {i+1}/{len(offsets_to_try)}: 0x{offset:X}")
+            logger.debug(f"Trying offset {i + 1}/{len(offsets_to_try)}: 0x{offset:X}")
             try:
-                compressed_size, decompressed = self.find_compressed_sprite(
-                    rom_data, offset, expected_size
-                )
+                compressed_size, decompressed = self.find_compressed_sprite(rom_data, offset, expected_size)
 
                 # Check if data is valid (multiple of tile size)
                 bytes_per_tile = 32
@@ -758,9 +733,13 @@ class ROMInjector(SpriteInjector):
                     logger.info(f"Successfully decompressed sprite at offset 0x{offset:X} (perfectly aligned)")
                     return compressed_size, decompressed, offset
                 if extra_bytes <= bytes_per_tile // 4:  # Allow up to 8 extra bytes
-                    logger.info(f"Successfully decompressed sprite at offset 0x{offset:X} (minor misalignment: {extra_bytes} extra bytes)")
+                    logger.info(
+                        f"Successfully decompressed sprite at offset 0x{offset:X} (minor misalignment: {extra_bytes} extra bytes)"
+                    )
                     return compressed_size, decompressed, offset
-                logger.warning(f"Offset 0x{offset:X} produced misaligned data ({extra_bytes} extra bytes), trying next offset")
+                logger.warning(
+                    f"Offset 0x{offset:X} produced misaligned data ({extra_bytes} extra bytes), trying next offset"
+                )
                 continue
 
             except Exception as e:

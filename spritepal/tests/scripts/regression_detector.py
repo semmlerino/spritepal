@@ -27,6 +27,7 @@ from pathlib import Path
 @dataclass
 class TestChange:
     """Represents a change in test status between runs."""
+
     test_name: str
     test_file: str
     before_status: str  # passed, failed, error, skipped, missing
@@ -36,9 +37,11 @@ class TestChange:
     change_type: str  # improvement, regression, new_failure, fixed, new_test, removed_test
     impact_score: float  # 0-1 score of impact severity
 
+
 @dataclass
 class RegressionReport:
     """Comprehensive regression analysis report."""
+
     comparison_id: str
     before_timestamp: datetime
     after_timestamp: datetime
@@ -70,6 +73,7 @@ class RegressionReport:
     regression_risk_score: float = 0.0
     overall_health_change: float = 0.0
 
+
 class RegressionDetector:
     """Detects regressions and improvements between test runs."""
 
@@ -79,48 +83,48 @@ class RegressionDetector:
 
         # Impact scoring weights
         self.IMPACT_WEIGHTS = {
-            'critical_test': 3.0,      # Tests marked as critical
-            'infrastructure': 2.5,     # Core infrastructure tests
-            'integration': 2.0,        # Integration tests
-            'unit': 1.0,              # Regular unit tests
-            'performance': 0.5,        # Performance tests
-            'gui': 0.3,               # GUI tests (often flaky)
+            "critical_test": 3.0,  # Tests marked as critical
+            "infrastructure": 2.5,  # Core infrastructure tests
+            "integration": 2.0,  # Integration tests
+            "unit": 1.0,  # Regular unit tests
+            "performance": 0.5,  # Performance tests
+            "gui": 0.3,  # GUI tests (often flaky)
         }
 
         # Test file patterns for categorization
         self.TEST_PATTERNS = {
-            'infrastructure': [
-                'test_base_manager.py',
-                'test_manager_registry.py',
-                'test_exceptions.py',
-                'test_constants.py',
-                'infrastructure/',
-                'conftest.py',
+            "infrastructure": [
+                "test_base_manager.py",
+                "test_manager_registry.py",
+                "test_exceptions.py",
+                "test_constants.py",
+                "infrastructure/",
+                "conftest.py",
             ],
-            'critical_test': [
-                'test_controller.py',
-                'test_extraction_manager.py',
-                'test_injection_manager.py',
-                'test_session_manager.py',
+            "critical_test": [
+                "test_controller.py",
+                "test_extraction_manager.py",
+                "test_injection_manager.py",
+                "test_session_manager.py",
             ],
-            'integration': [
-                'integration',
-                'workflow',
-                'end_to_end',
-                'complete_',
+            "integration": [
+                "integration",
+                "workflow",
+                "end_to_end",
+                "complete_",
             ],
-            'performance': [
-                'performance',
-                'benchmark',
-                'cache',
+            "performance": [
+                "performance",
+                "benchmark",
+                "cache",
             ],
-            'gui': [
-                'dialog',
-                'widget',
-                'ui_components',
-                'preview',
-                'grid_arrangement',
-                'manual_offset',
+            "gui": [
+                "dialog",
+                "widget",
+                "ui_components",
+                "preview",
+                "grid_arrangement",
+                "manual_offset",
             ],
         }
 
@@ -140,7 +144,7 @@ class RegressionDetector:
         }
 
         baseline_file = self.results_dir / f"baseline_{tag}.json"
-        with Path(baseline_file).open('w') as f:
+        with Path(baseline_file).open("w") as f:
             json.dump(baseline_data, f, indent=2)
 
         print(f"Baseline created: {baseline_file}")
@@ -162,12 +166,12 @@ class RegressionDetector:
         # Initialize report
         report = RegressionReport(
             comparison_id=comparison_id,
-            before_timestamp=datetime.fromisoformat(before_data.get('timestamp', datetime.now().isoformat())),
-            after_timestamp=datetime.fromisoformat(after_data.get('timestamp', datetime.now().isoformat())),
+            before_timestamp=datetime.fromisoformat(before_data.get("timestamp", datetime.now().isoformat())),
+            after_timestamp=datetime.fromisoformat(after_data.get("timestamp", datetime.now().isoformat())),
             before_run_info=before_data,
             after_run_info=after_data,
-            total_before=before_data.get('total_tests', 0),
-            total_after=after_data.get('total_tests', 0),
+            total_before=before_data.get("total_tests", 0),
+            total_after=after_data.get("total_tests", 0),
             tests_added=0,
             tests_removed=0,
         )
@@ -187,7 +191,9 @@ class RegressionDetector:
         project_root = self.results_dir.parent.parent
 
         cmd = [
-            sys.executable, "-m", "pytest",
+            sys.executable,
+            "-m",
+            "pytest",
             "tests/",
             "--tb=short",
             "--quiet",
@@ -200,10 +206,11 @@ class RegressionDetector:
         try:
             result = subprocess.run(
                 cmd,
-                check=False, cwd=project_root,
+                check=False,
+                cwd=project_root,
                 capture_output=True,
                 text=True,
-                timeout=1800  # 30 minute timeout
+                timeout=1800,  # 30 minute timeout
             )
 
             duration = (datetime.now() - start_time).total_seconds()
@@ -224,7 +231,7 @@ class RegressionDetector:
 
             # Save results
             result_file = self.results_dir / f"{run_id}_{start_time.strftime('%Y%m%d_%H%M%S')}.json"
-            with Path(result_file).open('w') as f:
+            with Path(result_file).open("w") as f:
                 json.dump(test_data, f, indent=2)
 
             return result_file
@@ -244,7 +251,7 @@ class RegressionDetector:
             }
 
             result_file = self.results_dir / f"{run_id}_timeout.json"
-            with Path(result_file).open('w') as f:
+            with Path(result_file).open("w") as f:
                 json.dump(test_data, f, indent=2)
 
             return result_file
@@ -256,32 +263,34 @@ class RegressionDetector:
         # Parse pytest summary
         passed = failed = errors = skipped = 0
 
-        passed_match = re.search(r'(\d+) passed', output)
+        passed_match = re.search(r"(\d+) passed", output)
         if passed_match:
             passed = int(passed_match.group(1))
 
-        failed_match = re.search(r'(\d+) failed', output)
+        failed_match = re.search(r"(\d+) failed", output)
         if failed_match:
             failed = int(failed_match.group(1))
 
-        error_match = re.search(r'(\d+) error', output)
+        error_match = re.search(r"(\d+) error", output)
         if error_match:
             errors = int(error_match.group(1))
 
-        skipped_match = re.search(r'(\d+) skipped', output)
+        skipped_match = re.search(r"(\d+) skipped", output)
         if skipped_match:
             skipped = int(skipped_match.group(1))
 
         total = passed + failed + errors + skipped
 
-        test_data.update({
-            "total_tests": total,
-            "passed_tests": passed,
-            "failed_tests": failed,
-            "error_tests": errors,
-            "skipped_tests": skipped,
-            "pass_rate": passed / total if total > 0 else 0.0,
-        })
+        test_data.update(
+            {
+                "total_tests": total,
+                "passed_tests": passed,
+                "failed_tests": failed,
+                "error_tests": errors,
+                "skipped_tests": skipped,
+                "pass_rate": passed / total if total > 0 else 0.0,
+            }
+        )
 
     def _analyze_test_changes(self, before_data: dict, after_data: dict, report: RegressionReport) -> None:
         """Analyze individual test changes between runs."""
@@ -289,10 +298,10 @@ class RegressionDetector:
         # For now, work with high-level metrics since we don't have detailed per-test data
         # In a real implementation, you'd parse JUnit XML or use pytest-json-report
 
-        before_passed = before_data.get('passed_tests', 0)
-        after_passed = after_data.get('passed_tests', 0)
-        before_failed = before_data.get('failed_tests', 0)
-        after_failed = after_data.get('failed_tests', 0)
+        before_passed = before_data.get("passed_tests", 0)
+        after_passed = after_data.get("passed_tests", 0)
+        before_failed = before_data.get("failed_tests", 0)
+        after_failed = after_data.get("failed_tests", 0)
 
         # Calculate net changes
         net_passed_change = after_passed - before_passed
@@ -328,8 +337,8 @@ class RegressionDetector:
             report.regressions.append(change)
 
         # Test count changes
-        report.tests_added = max(0, after_data.get('total_tests', 0) - before_data.get('total_tests', 0))
-        report.tests_removed = max(0, before_data.get('total_tests', 0) - after_data.get('total_tests', 0))
+        report.tests_added = max(0, after_data.get("total_tests", 0) - before_data.get("total_tests", 0))
+        report.tests_removed = max(0, before_data.get("total_tests", 0) - after_data.get("total_tests", 0))
 
     def _calculate_impact_scores(self, report: RegressionReport) -> None:
         """Calculate impact scores for all changes."""
@@ -342,8 +351,8 @@ class RegressionDetector:
         """Analyze changes by test categories."""
 
         # Extract category information if available
-        before_categories = before_data.get('failures_by_category', {})
-        after_categories = after_data.get('failures_by_category', {})
+        before_categories = before_data.get("failures_by_category", {})
+        after_categories = after_data.get("failures_by_category", {})
 
         # Calculate category changes
         all_categories = set(before_categories.keys()) | set(after_categories.keys())
@@ -353,10 +362,10 @@ class RegressionDetector:
             after_count = after_categories.get(category, 0)
 
             report.category_changes[category] = {
-                'before': before_count,
-                'after': after_count,
-                'change': after_count - before_count,
-                'improvement': before_count - after_count,
+                "before": before_count,
+                "after": after_count,
+                "change": after_count - before_count,
+                "improvement": before_count - after_count,
             }
 
     def _calculate_summary_metrics(self, report: RegressionReport) -> None:
@@ -372,8 +381,8 @@ class RegressionDetector:
         report.regression_risk_score = regressions_score / total_impact if total_impact > 0 else 0.0
 
         # Overall health change
-        before_health = report.before_run_info.get('pass_rate', 0.0)
-        after_health = report.after_run_info.get('pass_rate', 0.0)
+        before_health = report.before_run_info.get("pass_rate", 0.0)
+        after_health = report.after_run_info.get("pass_rate", 0.0)
         report.overall_health_change = after_health - before_health
 
     def generate_report_text(self, report: RegressionReport) -> str:
@@ -392,13 +401,13 @@ class RegressionDetector:
         lines.append("📊 OVERALL SUMMARY")
         lines.append("-" * 40)
 
-        before_passed = report.before_run_info.get('passed_tests', 0)
-        after_passed = report.after_run_info.get('passed_tests', 0)
-        before_total = report.before_run_info.get('total_tests', 0)
-        after_total = report.after_run_info.get('total_tests', 0)
+        before_passed = report.before_run_info.get("passed_tests", 0)
+        after_passed = report.after_run_info.get("passed_tests", 0)
+        before_total = report.before_run_info.get("total_tests", 0)
+        after_total = report.after_run_info.get("total_tests", 0)
 
-        before_rate = report.before_run_info.get('pass_rate', 0.0)
-        after_rate = report.after_run_info.get('pass_rate', 0.0)
+        before_rate = report.before_run_info.get("pass_rate", 0.0)
+        after_rate = report.after_run_info.get("pass_rate", 0.0)
 
         lines.append(f"Tests before:     {before_passed:>6}/{before_total:<6} ({before_rate:>5.1%})")
         lines.append(f"Tests after:      {after_passed:>6}/{after_total:<6} ({after_rate:>5.1%})")
@@ -441,9 +450,9 @@ class RegressionDetector:
             lines.append("-" * 40)
 
             for category, changes in report.category_changes.items():
-                before = changes['before']
-                after = changes['after']
-                change = changes['change']
+                before = changes["before"]
+                after = changes["after"]
+                change = changes["change"]
 
                 if change > 0:
                     trend = f"+{change} ❌"
@@ -457,8 +466,8 @@ class RegressionDetector:
             lines.append("")
 
         # Performance analysis
-        before_duration = report.before_run_info.get('total_duration', 0.0)
-        after_duration = report.after_run_info.get('total_duration', 0.0)
+        before_duration = report.before_run_info.get("total_duration", 0.0)
+        after_duration = report.after_run_info.get("total_duration", 0.0)
 
         if before_duration > 0 and after_duration > 0:
             duration_change = after_duration - before_duration
@@ -521,8 +530,9 @@ class RegressionDetector:
             lines.append("⚠️  Address risk factors before proceeding with more changes.")
 
         if report.category_changes:
-            improving_categories = [cat for cat, changes in report.category_changes.items()
-                                  if changes['improvement'] > 0]
+            improving_categories = [
+                cat for cat, changes in report.category_changes.items() if changes["improvement"] > 0
+            ]
             if improving_categories:
                 lines.append(f"✅ Focus on categories showing improvement: {', '.join(improving_categories)}")
 
@@ -608,32 +618,24 @@ class RegressionDetector:
             "overall_health_change": report.overall_health_change,
         }
 
-        with Path(report_file).open('w') as f:
+        with Path(report_file).open("w") as f:
             json.dump(report_data, f, indent=2)
 
         return report_file
 
+
 def main():
     """Main entry point for regression detector."""
     parser = argparse.ArgumentParser(description="Regression Detection System")
-    parser.add_argument("--compare", nargs=2, metavar=("BEFORE", "AFTER"),
-                       help="Compare two result files")
-    parser.add_argument("--baseline", action="store_true",
-                       help="Create a new baseline")
-    parser.add_argument("--tag", required=False,
-                       help="Tag for baseline (required with --baseline)")
-    parser.add_argument("--description", default="",
-                       help="Description for baseline")
-    parser.add_argument("--auto-compare", action="store_true",
-                       help="Auto-compare recent results")
-    parser.add_argument("--days", type=int, default=7,
-                       help="Days to look back for auto-compare")
-    parser.add_argument("--verify-fix",
-                       help="Verify specific fix with expected improvement")
-    parser.add_argument("--expected-improvement", type=int, default=0,
-                       help="Expected number of test improvements")
-    parser.add_argument("--save-report", action="store_true",
-                       help="Save detailed report to file")
+    parser.add_argument("--compare", nargs=2, metavar=("BEFORE", "AFTER"), help="Compare two result files")
+    parser.add_argument("--baseline", action="store_true", help="Create a new baseline")
+    parser.add_argument("--tag", required=False, help="Tag for baseline (required with --baseline)")
+    parser.add_argument("--description", default="", help="Description for baseline")
+    parser.add_argument("--auto-compare", action="store_true", help="Auto-compare recent results")
+    parser.add_argument("--days", type=int, default=7, help="Days to look back for auto-compare")
+    parser.add_argument("--verify-fix", help="Verify specific fix with expected improvement")
+    parser.add_argument("--expected-improvement", type=int, default=0, help="Expected number of test improvements")
+    parser.add_argument("--save-report", action="store_true", help="Save detailed report to file")
 
     args = parser.parse_args()
 
@@ -686,9 +688,9 @@ def main():
         print(f"Found {len(pairs)} comparison pairs in last {args.days} days")
 
         for before_file, after_file in pairs:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"Comparing {before_file.name} → {after_file.name}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             report = detector.compare_results(before_file, after_file)
             print(detector.generate_report_text(report))
@@ -712,6 +714,7 @@ def main():
     print("  Create baseline:    python regression_detector.py --baseline --tag 'before_fixes'")
     print("  Compare files:      python regression_detector.py --compare before.json after.json")
     print("  Auto-compare:       python regression_detector.py --auto-compare")
+
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,5 @@
 """Unit tests for sprite display formatter functions."""
+
 from __future__ import annotations
 
 from ui.controllers.sprite_display_formatter import (

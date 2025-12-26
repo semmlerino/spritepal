@@ -1,6 +1,7 @@
 """
 Grid-based image processing for flexible sprite extraction
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,9 +24,7 @@ class GridImageProcessor(RowImageProcessor):
         self.grid_cols = 0
         self.original_image: Image.Image | None = None
 
-    def extract_tiles_as_grid(
-        self, image: Image.Image, tiles_per_row: int
-    ) -> dict[TilePosition, Image.Image]:
+    def extract_tiles_as_grid(self, image: Image.Image, tiles_per_row: int) -> dict[TilePosition, Image.Image]:
         """Extract individual tiles from sprite sheet into a grid structure
 
         Args:
@@ -51,9 +50,7 @@ class GridImageProcessor(RowImageProcessor):
 
         # Validate tile dimensions
         if self.tile_width <= 0 or self.tile_height <= 0:
-            raise ValueError(
-                f"Invalid tile dimensions: {self.tile_width}x{self.tile_height}"
-            )
+            raise ValueError(f"Invalid tile dimensions: {self.tile_width}x{self.tile_height}")
 
         if self.tiles:
             self.tiles.clear()
@@ -64,9 +61,7 @@ class GridImageProcessor(RowImageProcessor):
 
         # Validate grid dimensions
         if self.grid_cols <= 0 or self.grid_rows <= 0:
-            raise ValueError(
-                f"Invalid grid dimensions: {self.grid_cols}x{self.grid_rows}"
-            )
+            raise ValueError(f"Invalid grid dimensions: {self.grid_cols}x{self.grid_rows}")
 
         # Extract each tile
         for row in range(self.grid_rows):
@@ -126,9 +121,7 @@ class GridImageProcessor(RowImageProcessor):
                 row_tiles.append((position, self.tiles[position]))
         return row_tiles
 
-    def get_tile_group(
-        self, group: TileGroup
-    ) -> list[tuple[TilePosition, Image.Image]]:
+    def get_tile_group(self, group: TileGroup) -> list[tuple[TilePosition, Image.Image]]:
         """Get all tiles in a group
 
         Args:
@@ -234,9 +227,7 @@ class GridImageProcessor(RowImageProcessor):
 
         return strip
 
-    def create_group_image(
-        self, group: TileGroup, preserve_layout: bool = True
-    ) -> Image.Image | None:
+    def create_group_image(self, group: TileGroup, preserve_layout: bool = True) -> Image.Image | None:
         """Create an image from a tile group
 
         Args:

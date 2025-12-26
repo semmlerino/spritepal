@@ -11,6 +11,7 @@ This refactored version uses:
 - No mocking of core components
 - Proper worker lifecycle management
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -32,6 +33,7 @@ pytestmark = [
     pytest.mark.shared_state_safe,
 ]
 
+
 class TestVRAMExtractionWorker:
     """Test the VRAMExtractionWorker class with real components."""
 
@@ -45,7 +47,10 @@ class TestVRAMExtractionWorker:
     def extraction_manager(self, session_managers) -> CoreOperationsManager:
         """Get extraction manager from session managers."""
         from typing import cast
-        return cast(CoreOperationsManager, get_app_context().core_operations_manager)  # cast-ok: getting concrete type from app context
+
+        return cast(
+            CoreOperationsManager, get_app_context().core_operations_manager
+        )  # cast-ok: getting concrete type from app context
 
     @pytest.fixture
     def test_files(self, tmp_path):
@@ -264,12 +269,13 @@ class TestVRAMExtractionWorker:
 
         # The worker should check isInterruptionRequested() during long operations
         # This is enforced by the @handle_worker_errors decorator
-        assert hasattr(worker, 'isInterruptionRequested')
+        assert hasattr(worker, "isInterruptionRequested")
         assert callable(worker.isInterruptionRequested)
 
         # Note: QThread's requestInterruption/isInterruptionRequested are thread-specific
         # They only work properly when called from within the running thread
         # For testing, we verify the mechanism exists
+
 
 class TestROMExtractionWorker:
     """Test the ROMExtractionWorker class with real components."""
@@ -278,7 +284,10 @@ class TestROMExtractionWorker:
     def extraction_manager(self, session_managers) -> CoreOperationsManager:
         """Get extraction manager from session managers."""
         from typing import cast
-        return cast(CoreOperationsManager, get_app_context().core_operations_manager)  # cast-ok: getting concrete type from app context
+
+        return cast(
+            CoreOperationsManager, get_app_context().core_operations_manager
+        )  # cast-ok: getting concrete type from app context
 
     @pytest.fixture
     def test_rom_files(self, tmp_path):
@@ -290,12 +299,12 @@ class TestROMExtractionWorker:
         rom_data += b"TEST ROM" + b"\x00" * 13  # Title (21 bytes)
         rom_data += b"\x21"  # Map mode
         rom_data += b"\x00"  # Cartridge type
-        rom_data += b"\x0A"  # ROM size
+        rom_data += b"\x0a"  # ROM size
         rom_data += b"\x00"  # SRAM size
         rom_data += b"\x01\x00"  # Country/License
         rom_data += b"\x00"  # Version
-        rom_data += b"\xFF\xFF"  # Checksum complement
-        rom_data += b"\xFF\xFF"  # Checksum
+        rom_data += b"\xff\xff"  # Checksum complement
+        rom_data += b"\xff\xff"  # Checksum
         rom_data += b"\x00" * (0x100000 - len(rom_data))  # Fill to 1MB
         rom_file.write_bytes(rom_data)
 
@@ -446,6 +455,7 @@ class TestROMExtractionWorker:
         # Performing operation should raise InterruptedError
         with pytest.raises(InterruptedError, match="Operation was cancelled"):
             worker.perform_operation()
+
 
 # Session fixture for QApplication compatibility
 @pytest.fixture

@@ -4,6 +4,7 @@ Scan controller for ROM extraction panel.
 This module manages the sprite scanning workflow including cache coordination,
 scan dialog creation, and result formatting.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -165,14 +166,14 @@ class ScanController(QObject):
     ) -> None:
         """
         Start the sprite scanning workflow.
-        
+
         This is the single entry point for scanning. It:
         1. Checks state manager for permission to scan
         2. Creates and shows the dialog
         3. Checks cache / prompts for resume
         4. Creates worker and connects signals
         5. Emits sprite_selected when user applies result
-        
+
         Args:
             rom_path: Path to the ROM file to scan
             extractor: ROM extractor for decompression
@@ -198,18 +199,14 @@ class ScanController(QObject):
             dialog = self._create_scan_dialog(parent_widget)
             self._current_dialog = dialog
             self._setup_scan_worker(dialog, rom_path, extractor)
-            
+
             self.scan_started.emit()
             dialog.exec()
         except Exception as e:
             logger.exception("Error in sprite scanning")
             if self._state_manager:
                 self._state_manager.finish_scanning(success=False, error=str(e))
-            UserErrorDialog.display_error(
-                parent_widget,
-                "Failed to scan for sprites",
-                f"Technical details: {e!s}"
-            )
+            UserErrorDialog.display_error(parent_widget, "Failed to scan for sprites", f"Technical details: {e!s}")
 
     def cancel(self) -> None:
         """Cancel the current scan operation."""
@@ -291,9 +288,7 @@ class ScanController(QObject):
 
     def _create_button_box(self) -> QDialogButtonBox:
         """Create the button box with Close and Apply buttons."""
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Close | QDialogButtonBox.StandardButton.Apply
-        )
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close | QDialogButtonBox.StandardButton.Apply)
         apply_btn = button_box.button(QDialogButtonBox.StandardButton.Apply)
         if apply_btn:
             apply_btn.setText("Use Selected Offset")
@@ -332,10 +327,7 @@ class ScanController(QObject):
         rom_cache = self._cache if self._cache is not None else get_app_context().rom_cache
 
         # Create scan worker
-        self._scan_worker = SpriteScanWorker(
-            rom_path, extractor, use_cache=use_cache, parent=self,
-            rom_cache=rom_cache
-        )
+        self._scan_worker = SpriteScanWorker(rom_path, extractor, use_cache=use_cache, parent=self, rom_cache=rom_cache)
 
         # Create scan context to pass data between handlers
         self._scan_context = ScanContext()
@@ -375,9 +367,7 @@ class ScanController(QObject):
         if partial_cache and not partial_cache.get("completed", False):
             # Show resume dialog
             parent_widget = dialog.parent() if dialog.parent() else dialog
-            user_choice = ResumeScanDialog.show_resume_dialog(
-                dict(partial_cache), cast(QWidget, parent_widget)
-            )
+            user_choice = ResumeScanDialog.show_resume_dialog(dict(partial_cache), cast(QWidget, parent_widget))
 
             if user_choice == ResumeScanDialog.CANCEL:
                 return None
@@ -385,7 +375,7 @@ class ScanController(QObject):
                 self._update_cache_status(dialog, "fresh", "Starting fresh scan (ignoring cache)")
                 return False
             # RESUME
-            self._update_cache_status(dialog, "resuming", "\U0001F4CA Resuming from cached progress...")
+            self._update_cache_status(dialog, "resuming", "\U0001f4ca Resuming from cached progress...")
             return True
         self._update_cache_status(dialog, "fresh", "No cache found - starting fresh scan")
         return True
@@ -410,21 +400,11 @@ class ScanController(QObject):
             dialog: The scan dialog
         """
         if self._scan_worker:
-            self._scan_worker.progress_detailed.connect(
-                lambda c, t: self._on_scan_progress(dialog, c, t)
-            )
-            self._scan_worker.sprite_found.connect(
-                lambda info: self._on_sprite_found(dialog, info)
-            )
-            self._scan_worker.finished.connect(
-                lambda: self._on_scan_complete(dialog)
-            )
-            self._scan_worker.cache_status.connect(
-                lambda status: self._on_cache_status(dialog, status)
-            )
-            self._scan_worker.cache_progress.connect(
-                lambda progress: self._on_cache_progress(dialog, progress)
-            )
+            self._scan_worker.progress_detailed.connect(lambda c, t: self._on_scan_progress(dialog, c, t))
+            self._scan_worker.sprite_found.connect(lambda info: self._on_sprite_found(dialog, info))
+            self._scan_worker.finished.connect(lambda: self._on_scan_complete(dialog))
+            self._scan_worker.cache_status.connect(lambda status: self._on_cache_status(dialog, status))
+            self._scan_worker.cache_progress.connect(lambda progress: self._on_cache_progress(dialog, progress))
 
     def _connect_dialog_signals(self, dialog: ScanDialog) -> None:
         """Connect dialog button signals.
@@ -453,7 +433,7 @@ class ScanController(QObject):
         """Handle sprite found during scan."""
         if self._scan_context is None:
             return
-            
+
         self._scan_context.found_offsets.append(sprite_info)
 
         # Update results text
@@ -471,7 +451,7 @@ class ScanController(QObject):
         """Handle scan completion."""
         if self._scan_context is None:
             return
-            
+
         dialog.progress_bar.setValue(100)
         dialog.progress_bar.setFormat("Scan complete")
 
@@ -491,7 +471,7 @@ class ScanController(QObject):
 
     def _on_cache_status(self, dialog: ScanDialog, status: str) -> None:
         """Handle cache status update."""
-        dialog.cache_status_label.setText(f"\U0001F4BE {status}")
+        dialog.cache_status_label.setText(f"\U0001f4be {status}")
 
         # Update style based on status
         if "Saving" in status:
@@ -506,7 +486,7 @@ class ScanController(QObject):
     def _on_cache_progress(self, dialog: ScanDialog, progress: int) -> None:
         """Handle cache progress update."""
         if progress > 0:
-            dialog.cache_status_label.setText(f"\U0001F4BE Saving progress ({progress}%)...")
+            dialog.cache_status_label.setText(f"\U0001f4be Saving progress ({progress}%)...")
 
     def _on_apply_clicked(self, dialog: ScanDialog) -> None:
         """Handle Apply button click."""
@@ -631,7 +611,7 @@ class ScanController(QObject):
 
     def _save_scan_results_to_cache(self, dialog: ScanDialog, found_offsets: list[SpriteInfo]) -> None:
         """Save scan results to cache."""
-        self._update_cache_status(dialog, "saving", "\U0001F4BE Saving results to cache...")
+        self._update_cache_status(dialog, "saving", "\U0001f4be Saving results to cache...")
         # Defer actual save to next event loop iteration to allow UI update
         QTimer.singleShot(0, lambda: self._do_cache_save(dialog, found_offsets))
 
@@ -639,7 +619,7 @@ class ScanController(QObject):
         """Perform the actual cache save operation."""
         if self._current_rom_path is None:
             return
-            
+
         # Convert to cache format
         sprite_locations: dict[str, Mapping[str, object]] = {}
         for sprite in found_offsets:
@@ -647,28 +627,21 @@ class ScanController(QObject):
             sprite_locations[name] = {
                 "offset": sprite["offset"],
                 "compressed_size": sprite.get("compressed_size"),
-                "quality": sprite.get("quality", 0.0)
+                "quality": sprite.get("quality", 0.0),
             }
 
         # Save to cache
-        if dialog.rom_cache and dialog.rom_cache.save_sprite_locations(
-            self._current_rom_path, sprite_locations
-        ):
-            self._update_cache_status(
-                dialog, "saved",
-                f"\u2705 Saved {len(found_offsets)} sprites to cache"
-            )
+        if dialog.rom_cache and dialog.rom_cache.save_sprite_locations(self._current_rom_path, sprite_locations):
+            self._update_cache_status(dialog, "saved", f"\u2705 Saved {len(found_offsets)} sprites to cache")
             # Update results text
             current_text = dialog.results_text.toPlainText()
             dialog.results_text.setPlainText(
                 current_text + "\n\u2705 Results saved to cache for faster future scans.\n"
             )
         else:
-            dialog.cache_status_label.setText("\u26A0\uFE0F Could not save to cache")
+            dialog.cache_status_label.setText("\u26a0\ufe0f Could not save to cache")
             current_text = dialog.results_text.toPlainText()
-            dialog.results_text.setPlainText(
-                current_text + "\n\u26A0\uFE0F Could not save results to cache.\n"
-            )
+            dialog.results_text.setPlainText(current_text + "\n\u26a0\ufe0f Could not save results to cache.\n")
 
     def get_cache_key(self, rom_path: str, scan_params: Mapping[str, int] | None = None) -> str:
         """Generate a cache key for the given ROM and scan parameters."""
@@ -758,7 +731,7 @@ class ScanController(QObject):
     def _format_scan_summary_detailed(self, found_offsets: list[SpriteInfo]) -> str:
         """Format scan completion summary (detailed format for scan results)."""
         from operator import itemgetter
-        
+
         text = f"\nScan complete! Found {len(found_offsets)} valid sprite locations.\n"
 
         if found_offsets:
@@ -769,9 +742,11 @@ class ScanController(QObject):
             for i, sprite in enumerate(sorted_sprites[:5]):
                 size_info = ""
                 if "size_limit_used" in sprite:
-                    size_info = f", {sprite['size_limit_used']/1024:.0f}KB limit"
-                text += (f"{i+1}. {sprite['offset_hex']} - Quality: {sprite['quality']:.2f}, "
-                        f"{sprite['tile_count']} tiles{size_info}\n")
+                    size_info = f", {sprite['size_limit_used'] / 1024:.0f}KB limit"
+                text += (
+                    f"{i + 1}. {sprite['offset_hex']} - Quality: {sprite['quality']:.2f}, "
+                    f"{sprite['tile_count']} tiles{size_info}\n"
+                )
         else:
             text += "\nNo valid sprites found in scanned range.\n"
 

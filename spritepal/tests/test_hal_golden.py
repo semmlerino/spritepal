@@ -12,6 +12,7 @@ Usage:
     # Regenerate golden data with real HAL
     SPRITEPAL_EXHAL_PATH=/path/to/exhal uv run pytest tests/test_hal_golden.py --regenerate-golden -v
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -148,18 +149,14 @@ class TestGoldenHALChecksums:
             # Verify size matches recorded
             expected_size = entry.get("expected_size")
             if expected_size is not None:
-                assert size == expected_size, (
-                    f"{name}: size {size} != expected {expected_size}"
-                )
+                assert size == expected_size, f"{name}: size {size} != expected {expected_size}"
 
             # Verify checksum matches recorded
             expected_sha256 = entry.get("expected_sha256")
             if expected_sha256:
                 actual_sha256 = hashlib.sha256(output_path.read_bytes()).hexdigest()
                 assert actual_sha256 == expected_sha256, (
-                    f"{name}: checksum mismatch\n"
-                    f"  expected: {expected_sha256}\n"
-                    f"  actual:   {actual_sha256}"
+                    f"{name}: checksum mismatch\n  expected: {expected_sha256}\n  actual:   {actual_sha256}"
                 )
 
 

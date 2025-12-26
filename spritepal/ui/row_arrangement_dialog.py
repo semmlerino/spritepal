@@ -2,6 +2,7 @@
 Row Arrangement Dialog for SpritePal
 Intuitive drag-and-drop interface for arranging sprite rows
 """
+
 from __future__ import annotations
 
 import warnings
@@ -50,6 +51,7 @@ from .widgets.row_widgets import DragDropListWidget, RowPreviewWidget
 if TYPE_CHECKING:
     from PIL import Image
 
+
 class RowArrangementDialog(SplitterDialog):
     """Dialog for arranging sprite rows with intuitive drag-and-drop interface"""
 
@@ -91,9 +93,7 @@ class RowArrangementDialog(SplitterDialog):
         )
 
         # Connect signals after UI is created
-        self.arrangement_manager.arrangement_changed.connect(
-            self._on_arrangement_changed
-        )
+        self.arrangement_manager.arrangement_changed.connect(self._on_arrangement_changed)
         # Note: palette_mode_changed and palette_index_changed signals are emitted by colorizer
         # but no handlers needed - the logic is in toggle_palette_application() and _cycle_palette()
 
@@ -113,10 +113,8 @@ class RowArrangementDialog(SplitterDialog):
             return
         try:
             # Use image processor to load and extract rows
-            self.original_image, self.tile_rows = (
-                self.image_processor.process_sprite_sheet(
-                    self.sprite_path, self.tiles_per_row
-                )
+            self.original_image, self.tile_rows = self.image_processor.process_sprite_sheet(
+                self.sprite_path, self.tiles_per_row
             )
 
             # Get tile dimensions from processor
@@ -125,9 +123,7 @@ class RowArrangementDialog(SplitterDialog):
 
         except (OSError, ValueError, RuntimeError) as e:
             # CRITICAL FIX FOR BUG #21: Show error dialog and set up minimal state to prevent crashes
-            _ = QMessageBox.critical(
-                self, "Error Loading Sprite", f"Failed to load sprite file:\n{e!s}"
-            )
+            _ = QMessageBox.critical(self, "Error Loading Sprite", f"Failed to load sprite file:\n{e!s}")
             # Set up minimal state to prevent crashes
             self.original_image = None
             self.tile_rows = []
@@ -148,17 +144,13 @@ class RowArrangementDialog(SplitterDialog):
 
         # Left panel - Available rows
         self.left_panel: QGroupBox = QGroupBox("Available Rows")
-        self.left_panel.setMinimumWidth(
-            380
-        )  # Increased to accommodate wider thumbnails
+        self.left_panel.setMinimumWidth(380)  # Increased to accommodate wider thumbnails
         left_layout = QVBoxLayout(self.left_panel)
 
         # Available rows list
         self.available_list = DragDropListWidget(accept_external_drops=False)
         self.available_list.itemDoubleClicked.connect(self._add_row_to_arrangement)
-        _ = self.available_list.itemSelectionChanged.connect(
-            self._on_available_selection_changed
-        )
+        _ = self.available_list.itemSelectionChanged.connect(self._on_available_selection_changed)
         # Add spacing between list items
         self.available_list.setSpacing(SPACING_COMPACT_SMALL)
         left_layout.addWidget(self.available_list)
@@ -182,9 +174,7 @@ class RowArrangementDialog(SplitterDialog):
 
         # Right panel - Arranged rows
         self.right_panel: QGroupBox = QGroupBox("Arranged Rows")
-        self.right_panel.setMinimumWidth(
-            380
-        )  # Increased to accommodate wider thumbnails
+        self.right_panel.setMinimumWidth(380)  # Increased to accommodate wider thumbnails
         right_layout = QVBoxLayout(self.right_panel)
 
         # Arranged rows list
@@ -192,9 +182,7 @@ class RowArrangementDialog(SplitterDialog):
         self.arranged_list.external_drop.connect(self._add_row_to_arrangement)
         self.arranged_list.item_dropped.connect(self._refresh_arrangement)
         self.arranged_list.itemDoubleClicked.connect(self._remove_row_from_arrangement)
-        _ = self.arranged_list.itemSelectionChanged.connect(
-            self._on_arranged_selection_changed
-        )
+        _ = self.arranged_list.itemSelectionChanged.connect(self._on_arranged_selection_changed)
         # Add spacing between list items
         self.arranged_list.setSpacing(SPACING_COMPACT_SMALL)
         right_layout.addWidget(self.arranged_list)
@@ -231,7 +219,7 @@ class RowArrangementDialog(SplitterDialog):
         # Add content and preview to main vertical splitter
         # Main splitter is already created by SplitterDialog in vertical orientation
         self.add_panel(content_splitter, stretch_factor=7)  # 70% for content
-        self.add_panel(preview_group, stretch_factor=3)     # 30% for preview
+        self.add_panel(preview_group, stretch_factor=3)  # 30% for preview
 
         # Add custom buttons using SplitterDialog's button system
         self.export_btn: QPushButton = self.add_button("Export Arranged", callback=self._export_arranged)
@@ -352,9 +340,7 @@ class RowArrangementDialog(SplitterDialog):
         position = self.arrangement_manager.get_row_position(row_index)
 
         # Create and execute command
-        cmd = RemoveRowCommand(
-            manager=self.arrangement_manager, row_index=row_index, position=position
-        )
+        cmd = RemoveRowCommand(manager=self.arrangement_manager, row_index=row_index, position=position)
         self.undo_stack.push(cmd)
         self._refresh_ui()
         self._update_status(
@@ -375,14 +361,10 @@ class RowArrangementDialog(SplitterDialog):
             return
 
         # Create and execute command
-        cmd = AddMultipleRowsCommand(
-            manager=self.arrangement_manager, row_indices=row_indices
-        )
+        cmd = AddMultipleRowsCommand(manager=self.arrangement_manager, row_indices=row_indices)
         self.undo_stack.push(cmd)
         self._refresh_ui()
-        self._update_status(
-            f"Added all rows to arrangement ({self.arrangement_manager.get_arranged_count()} total)"
-        )
+        self._update_status(f"Added all rows to arrangement ({self.arrangement_manager.get_arranged_count()} total)")
 
     def _add_selected_rows(self) -> None:
         """Add selected rows to arrangement via undo-able command"""
@@ -394,9 +376,7 @@ class RowArrangementDialog(SplitterDialog):
         row_indices = [
             item.data(Qt.ItemDataRole.UserRole)
             for item in selected_items
-            if not self.arrangement_manager.is_row_arranged(
-                item.data(Qt.ItemDataRole.UserRole)
-            )
+            if not self.arrangement_manager.is_row_arranged(item.data(Qt.ItemDataRole.UserRole))
         ]
 
         if not row_indices:
@@ -404,9 +384,7 @@ class RowArrangementDialog(SplitterDialog):
             return
 
         # Create and execute command
-        cmd = AddMultipleRowsCommand(
-            manager=self.arrangement_manager, row_indices=row_indices
-        )
+        cmd = AddMultipleRowsCommand(manager=self.arrangement_manager, row_indices=row_indices)
         self.undo_stack.push(cmd)
         self._refresh_ui()
         self._update_status(f"Added {len(row_indices)} selected rows to arrangement")
@@ -432,14 +410,10 @@ class RowArrangementDialog(SplitterDialog):
             return
 
         # Create and execute command
-        cmd = RemoveMultipleRowsCommand(
-            manager=self.arrangement_manager, rows_with_positions=rows_with_positions
-        )
+        cmd = RemoveMultipleRowsCommand(manager=self.arrangement_manager, rows_with_positions=rows_with_positions)
         self.undo_stack.push(cmd)
         self._refresh_ui()
-        self._update_status(
-            f"Removed {len(rows_with_positions)} selected rows from arrangement"
-        )
+        self._update_status(f"Removed {len(rows_with_positions)} selected rows from arrangement")
 
     def _clear_arrangement(self) -> None:
         """Clear all arranged rows via undo-able command"""
@@ -451,9 +425,7 @@ class RowArrangementDialog(SplitterDialog):
         previous_state = self.arrangement_manager.get_state_copy()
 
         # Create and execute command
-        cmd = ClearRowsCommand(
-            manager=self.arrangement_manager, previous_state=previous_state
-        )
+        cmd = ClearRowsCommand(manager=self.arrangement_manager, previous_state=previous_state)
         self.undo_stack.push(cmd)
         self._refresh_ui()
         self._update_status("Cleared all arranged rows")
@@ -478,9 +450,7 @@ class RowArrangementDialog(SplitterDialog):
             return
 
         # Create and execute command
-        cmd = ReorderRowsCommand(
-            manager=self.arrangement_manager, old_order=old_order, new_order=new_order
-        )
+        cmd = ReorderRowsCommand(manager=self.arrangement_manager, old_order=old_order, new_order=new_order)
         self.undo_stack.push(cmd)
         self._update_preview()
         self._update_status("Reordered rows")
@@ -553,9 +523,7 @@ class RowArrangementDialog(SplitterDialog):
             # Apply palette to original image if enabled
             display_image = self.original_image
             if self.colorizer.is_palette_mode():
-                colorized = self.preview_generator.apply_palette_to_full_image(
-                    self.original_image
-                )
+                colorized = self.preview_generator.apply_palette_to_full_image(self.original_image)
                 if colorized:
                     display_image = colorized
 
@@ -636,8 +604,7 @@ class RowArrangementDialog(SplitterDialog):
 
             if self.output_path:
                 self._update_status(
-                    f"Exported {self.arrangement_manager.get_arranged_count()} rows to "
-                    f"{Path(self.output_path).name}"
+                    f"Exported {self.arrangement_manager.get_arranged_count()} rows to {Path(self.output_path).name}"
                 )
 
             # Accept dialog
@@ -709,14 +676,10 @@ class RowArrangementDialog(SplitterDialog):
         if palette_enabled:
             palette_idx = self.colorizer.get_selected_palette_index()
             self.setWindowTitle(f"Arrange Sprite Rows - Palette {palette_idx}")
-            self._update_status(
-                f"Palette mode: Palette {palette_idx} applied | Press C to toggle, P to cycle"
-            )
+            self._update_status(f"Palette mode: Palette {palette_idx} applied | Press C to toggle, P to cycle")
         else:
             self.setWindowTitle("Arrange Sprite Rows - Grayscale")
-            self._update_status(
-                "Grayscale mode: Original sprite colors | Press C to toggle palette"
-            )
+            self._update_status("Grayscale mode: Original sprite colors | Press C to toggle palette")
 
     def _get_display_image_for_row(self, row_index: int) -> Image.Image | None:
         """Get the appropriate display image for a row (grayscale or colorized)"""
@@ -739,9 +702,7 @@ class RowArrangementDialog(SplitterDialog):
 
         # Update status and title
         self.setWindowTitle(f"Arrange Sprite Rows - Palette {new_palette_idx}")
-        self._update_status(
-            f"Palette mode: Palette {new_palette_idx} applied | Press C to toggle, P to cycle"
-        )
+        self._update_status(f"Palette mode: Palette {new_palette_idx} applied | Press C to toggle, P to cycle")
 
     @override
     def keyPressEvent(self, a0: QKeyEvent | None) -> None:
@@ -749,29 +710,19 @@ class RowArrangementDialog(SplitterDialog):
         if a0 and a0.key() == Qt.Key.Key_Delete:
             # Delete selected rows from arrangement
             self._remove_selected_rows()
-        elif a0 and (
-            a0.key() == Qt.Key.Key_Z
-            and a0.modifiers() == Qt.KeyboardModifier.ControlModifier
-        ):
+        elif a0 and (a0.key() == Qt.Key.Key_Z and a0.modifiers() == Qt.KeyboardModifier.ControlModifier):
             # Ctrl+Z: Undo
             self._on_undo()
-        elif a0 and (
-            a0.key() == Qt.Key.Key_Y
-            and a0.modifiers() == Qt.KeyboardModifier.ControlModifier
-        ):
+        elif a0 and (a0.key() == Qt.Key.Key_Y and a0.modifiers() == Qt.KeyboardModifier.ControlModifier):
             # Ctrl+Y: Redo
             self._on_redo()
         elif a0 and (
             a0.key() == Qt.Key.Key_Z
-            and a0.modifiers()
-            == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+            and a0.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
         ):
             # Ctrl+Shift+Z: Redo (alternative)
             self._on_redo()
-        elif a0 and (
-            a0.key() == Qt.Key.Key_A
-            and a0.modifiers() == Qt.KeyboardModifier.ControlModifier
-        ):
+        elif a0 and (a0.key() == Qt.Key.Key_A and a0.modifiers() == Qt.KeyboardModifier.ControlModifier):
             # Ctrl+A: Add all rows
             self._add_all_rows()
         elif a0 and a0.key() == Qt.Key.Key_Escape:

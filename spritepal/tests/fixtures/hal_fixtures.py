@@ -18,6 +18,7 @@ Fixtures:
     - mock_hal_tools: Create mock exhal/inhal executables
     - hal_test_data: Standard test data patterns
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -103,10 +104,10 @@ def reset_hal_singletons(request: FixtureRequest) -> Generator[None, None, None]
     markers = [m.name for m in request.node.iter_markers()]
 
     # Only run for tests that use HAL fixtures or have real_hal marker
-    hal_fixtures = {'hal_pool', 'hal_compressor', 'mock_hal'}
-    fixture_names = set(getattr(request, 'fixturenames', []))
+    hal_fixtures = {"hal_pool", "hal_compressor", "mock_hal"}
+    fixture_names = set(getattr(request, "fixturenames", []))
     uses_hal = bool(hal_fixtures & fixture_names)
-    has_hal_marker = 'real_hal' in markers
+    has_hal_marker = "real_hal" in markers
 
     if not (uses_hal or has_hal_marker):
         # Non-HAL test: skip reset entirely for efficiency
@@ -118,6 +119,7 @@ def reset_hal_singletons(request: FixtureRequest) -> Generator[None, None, None]
 
     # Reset HAL singletons using centralized helper
     from tests.fixtures.core_fixtures import reset_hal_singletons_only
+
     reset_hal_singletons_only()
 
 
@@ -138,8 +140,8 @@ def hal_pool(request: FixtureRequest, tmp_path: Path) -> Generator[MockHALProces
     """
     # Check CLI option first, then marker
     use_real = (
-        request.config.getoption("--use-real-hal", default=False) or
-        request.node.get_closest_marker("real_hal") is not None
+        request.config.getoption("--use-real-hal", default=False)
+        or request.node.get_closest_marker("real_hal") is not None
     )
 
     if use_real:
@@ -203,8 +205,8 @@ def hal_compressor(request: FixtureRequest, tmp_path: Path) -> Generator[MockHAL
     """
     # Check CLI option first, then marker
     use_real = (
-        request.config.getoption("--use-real-hal", default=False) or
-        request.node.get_closest_marker("real_hal") is not None
+        request.config.getoption("--use-real-hal", default=False)
+        or request.node.get_closest_marker("real_hal") is not None
     )
 
     if use_real:
@@ -230,7 +232,7 @@ def hal_compressor(request: FixtureRequest, tmp_path: Path) -> Generator[MockHAL
         yield compressor  # type: ignore[misc]
 
         # Cleanup if pool was initialized
-        if hasattr(compressor, '_pool') and compressor._pool:
+        if hasattr(compressor, "_pool") and compressor._pool:
             compressor._pool.shutdown()
     else:
         # Use mock HAL compressor
@@ -271,6 +273,7 @@ def mock_hal(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     # Reset any existing real HAL singletons FIRST (before patching)
     with contextlib.suppress(Exception):
         from core.hal_compression import HALProcessPool as RealHALProcessPool
+
         RealHALProcessPool.reset_singleton()
 
     # Patch at source module
@@ -290,6 +293,7 @@ def mock_hal(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     # Also reset real HAL singletons in case they were created
     with contextlib.suppress(Exception):
         from core.hal_compression import HALProcessPool as RealHALProcessPool
+
         RealHALProcessPool.reset_singleton()
 
 
@@ -313,10 +317,10 @@ def hal_test_data() -> dict[str, bytes]:
     return {
         "small": b"Small test data for compression" * 10,
         "medium": b"M" * 0x1000,  # 4KB
-        "large": b"L" * 0x8000,   # 32KB
+        "large": b"L" * 0x8000,  # 32KB
         "pattern": bytes([(i * 17) % 256 for i in range(0x2000)]),  # 8KB pattern
         "zeros": b"\x00" * 0x1000,  # 4KB zeros
-        "ones": b"\xff" * 0x1000,   # 4KB ones
+        "ones": b"\xff" * 0x1000,  # 4KB ones
     }
 
 

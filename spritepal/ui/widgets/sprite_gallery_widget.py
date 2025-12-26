@@ -2,6 +2,7 @@
 Sprite gallery widget for displaying multiple sprite thumbnails.
 Provides efficient virtual scrolling using Model/View architecture.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, override
@@ -41,6 +42,7 @@ logger = get_logger(__name__)
 VIEWPORT_MARGIN = 20
 THUMBNAIL_REQUEST_BATCH_SIZE = 50  # Request thumbnails in batches
 VIEWPORT_BUFFER_ROWS = 2  # Load extra rows above/below viewport
+
 
 class SpriteGalleryWidget(QWidget):
     """Widget displaying a gallery of sprite thumbnails using virtual scrolling."""
@@ -550,9 +552,9 @@ class SpriteGalleryWidget(QWidget):
         if self.model:
             selected = self.model.get_selected_sprites()
             if selected:
-                offset = selected[0].get('offset', 0)
+                offset = selected[0].get("offset", 0)
                 if isinstance(offset, str):
-                    return int(offset, 16) if offset.startswith('0x') else int(offset)
+                    return int(offset, 16) if offset.startswith("0x") else int(offset)
                 if isinstance(offset, int):
                     return offset
         return None
@@ -588,12 +590,12 @@ class SpriteGalleryWidget(QWidget):
             for i in range(self.model.rowCount()):
                 sprite = self.model.get_sprite_at_row(i)
                 if sprite:
-                    offset = sprite.get('offset', 0)
+                    offset = sprite.get("offset", 0)
                     if isinstance(offset, str):
-                        offset = int(offset, 16) if offset.startswith('0x') else int(offset)
+                        offset = int(offset, 16) if offset.startswith("0x") else int(offset)
                     # Create a minimal object that has the offset
                     if isinstance(offset, int):
-                        result[offset] = type('ThumbnailCompat', (), {'offset': offset})
+                        result[offset] = type("ThumbnailCompat", (), {"offset": offset})
         return result
 
     def cleanup(self) -> None:

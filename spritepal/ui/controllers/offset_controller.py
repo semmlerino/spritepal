@@ -5,6 +5,7 @@ Manages offset state, debouncing, step sizes, and emits signals
 for offset changes. Handles the coordination between slider,
 spinbox, presets, and jumps without owning any Qt widgets.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -306,9 +307,7 @@ class OffsetController(QObject):
         try:
             if self._pending_offset is not None:
                 offset_value = self._pending_offset
-                logger.debug(
-                    f"Emitting debounced offset change: {offset_value} (0x{offset_value:04X})"
-                )
+                logger.debug(f"Emitting debounced offset change: {offset_value} (0x{offset_value:04X})")
                 self.offset_changed.emit(offset_value)
                 self._pending_offset = None
         except RuntimeError:

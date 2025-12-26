@@ -2,6 +2,7 @@
 
 Handles cache statistics tracking, status display, and cache management.
 """
+
 from __future__ import annotations
 
 import logging
@@ -253,17 +254,17 @@ class CacheStatusController(QObject):
 
             message = f"""Cache Statistics:
 
-Directory: {stats.get('cache_dir', 'Unknown')}
-Total Files: {stats.get('total_files', 0)}
+Directory: {stats.get("cache_dir", "Unknown")}
+Total Files: {stats.get("total_files", 0)}
 Total Size: {size_str}
-Sprite Location Caches: {stats.get('sprite_location_caches', 0)}
-ROM Info Caches: {stats.get('rom_info_caches', 0)}
-Scan Progress Caches: {stats.get('scan_progress_caches', 0)}
+Sprite Location Caches: {stats.get("sprite_location_caches", 0)}
+ROM Info Caches: {stats.get("rom_info_caches", 0)}
+Scan Progress Caches: {stats.get("scan_progress_caches", 0)}
 
 Session Statistics:
-Total Requests: {session_stats['total_requests']}
-Cache Hits: {session_stats['hits']}
-Cache Misses: {session_stats['misses']}"""
+Total Requests: {session_stats["total_requests"]}
+Cache Hits: {session_stats["hits"]}
+Cache Misses: {session_stats["misses"]}"""
 
             if session_stats["total_requests"] > 0:
                 hit_rate = (session_stats["hits"] / session_stats["total_requests"]) * 100

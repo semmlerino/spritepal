@@ -17,11 +17,12 @@ def run_basedpyright():
     print("🔍 Running basedpyright type checking on tests...")
 
     try:
-        result = subprocess.run([
-            sys.executable, "-m", "basedpyright",
-            "tests/",
-            "--stats"
-        ], capture_output=True, text=True, cwd=Path(__file__).parent)
+        result = subprocess.run(
+            [sys.executable, "-m", "basedpyright", "tests/", "--stats"],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent,
+        )
 
         print("📊 Type checking results:")
         print(result.stdout)
@@ -36,18 +37,26 @@ def run_basedpyright():
         print("❌ basedpyright not found. Install with: pip install basedpyright")
         return False
 
+
 def run_mypy():
     """Run mypy as fallback type checker."""
     print("🔍 Running mypy type checking on tests...")
 
     try:
-        result = subprocess.run([
-            sys.executable, "-m", "mypy",
-            "tests/test_type_safety_example.py",
-            "tests/conftest.py",
-            "--ignore-missing-imports",
-            "--show-error-codes"
-        ], capture_output=True, text=True, cwd=Path(__file__).parent)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mypy",
+                "tests/test_type_safety_example.py",
+                "tests/conftest.py",
+                "--ignore-missing-imports",
+                "--show-error-codes",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent,
+        )
 
         print("📊 MyPy results:")
         print(result.stdout)
@@ -62,6 +71,7 @@ def run_mypy():
         print("❌ mypy not found. Install with: pip install mypy")
         return False
 
+
 def validate_syntax():
     """Validate Python syntax of key test files."""
     print("🔍 Validating Python syntax...")
@@ -74,9 +84,12 @@ def validate_syntax():
 
     for file_path in test_files:
         try:
-            result = subprocess.run([
-                sys.executable, "-m", "py_compile", file_path
-            ], capture_output=True, text=True, cwd=Path(__file__).parent)
+            result = subprocess.run(
+                [sys.executable, "-m", "py_compile", file_path],
+                capture_output=True,
+                text=True,
+                cwd=Path(__file__).parent,
+            )
 
             if result.returncode == 0:
                 print(f"✅ {file_path}")
@@ -90,6 +103,7 @@ def validate_syntax():
 
     return True
 
+
 def run_import_tests():
     """Test that improved imports work correctly."""
     print("🔍 Testing imports...")
@@ -101,9 +115,9 @@ def run_import_tests():
 
     for import_test in import_tests:
         try:
-            result = subprocess.run([
-                sys.executable, "-c", import_test
-            ], capture_output=True, text=True, cwd=Path(__file__).parent)
+            result = subprocess.run(
+                [sys.executable, "-c", import_test], capture_output=True, text=True, cwd=Path(__file__).parent
+            )
 
             if result.returncode == 0:
                 print(f"✅ {import_test}")
@@ -116,6 +130,7 @@ def run_import_tests():
             return False
 
     return True
+
 
 def main():
     """Run all type safety validations."""
@@ -151,6 +166,7 @@ def main():
     else:
         print("❌ Some validations failed. Check output above.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

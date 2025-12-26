@@ -1,6 +1,7 @@
 """
 Base manager class providing common functionality for all managers
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,8 +23,10 @@ except ImportError:
     except ImportError:
         # Final fallback to standard logging
         import logging
+
         def get_logger(name: str) -> logging.Logger:
             return logging.getLogger(name)
+
 
 class BaseManager(QObject):
     """Abstract base class for all manager classes"""
@@ -229,9 +232,7 @@ class BaseManager(QObject):
         """
         self.progress_updated.emit(message)
 
-    def _handle_worker_completion(
-        self, operation: str, success: bool, message: str
-    ) -> None:
+    def _handle_worker_completion(self, operation: str, success: bool, message: str) -> None:
         """Handle common worker completion logic.
 
         Finishes the operation tracking and logs the result. Subclasses should
@@ -294,26 +295,18 @@ class BaseManager(QObject):
         )
         raise enhanced
 
-    def _handle_file_io_error(
-        self, error: Exception, operation: str, context: str = ""
-    ) -> None:
+    def _handle_file_io_error(self, error: Exception, operation: str, context: str = "") -> None:
         """Handle file I/O errors. Delegates to error_helpers."""
         from .error_helpers import handle_file_io_error
 
-        enhanced = handle_file_io_error(
-            error, operation, context, on_error=self._handle_error
-        )
+        enhanced = handle_file_io_error(error, operation, context, on_error=self._handle_error)
         raise enhanced
 
-    def _handle_data_format_error(
-        self, error: Exception, operation: str, context: str = ""
-    ) -> None:
+    def _handle_data_format_error(self, error: Exception, operation: str, context: str = "") -> None:
         """Handle data format errors. Delegates to error_helpers."""
         from .error_helpers import handle_data_format_error
 
-        enhanced = handle_data_format_error(
-            error, operation, context, on_error=self._handle_error
-        )
+        enhanced = handle_data_format_error(error, operation, context, on_error=self._handle_error)
         raise enhanced
 
     def _handle_operation_error(
@@ -326,11 +319,5 @@ class BaseManager(QObject):
         """Handle operation-specific errors. Delegates to error_helpers."""
         from .error_helpers import handle_operation_error
 
-        enhanced = handle_operation_error(
-            error, operation, error_class, context, on_error=self._handle_error
-        )
+        enhanced = handle_operation_error(error, operation, error_class, context, on_error=self._handle_error)
         raise enhanced
-
-
-# Re-export decorator for backward compatibility
-from .operation_decorator import with_operation_handling as with_operation_handling

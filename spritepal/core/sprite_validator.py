@@ -2,6 +2,7 @@
 Enhanced sprite validation for SpritePal
 Provides comprehensive validation for sprites before injection
 """
+
 from __future__ import annotations
 
 import json
@@ -14,6 +15,7 @@ from utils.constants import BYTES_PER_TILE
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class SpriteValidator:
     """Enhanced sprite validation with detailed error reporting"""
@@ -60,9 +62,7 @@ class SpriteValidator:
 
                 # Validate against metadata if provided
                 if metadata_path and Path(metadata_path).exists():
-                    meta_errors, meta_warnings = SpriteValidator._validate_against_metadata(
-                        img, metadata_path
-                    )
+                    meta_errors, meta_warnings = SpriteValidator._validate_against_metadata(img, metadata_path)
                     errors.extend(meta_errors)
                     warnings.extend(meta_warnings)
 
@@ -79,9 +79,7 @@ class SpriteValidator:
 
         # Check mode
         if img.mode not in ["P", "L"]:
-            errors.append(
-                f"Image must be in indexed (P) or grayscale (L) mode, found: {img.mode}"
-            )
+            errors.append(f"Image must be in indexed (P) or grayscale (L) mode, found: {img.mode}")
 
         # Check if has transparency
         if img.mode == "P" and "transparency" in img.info:
@@ -114,9 +112,7 @@ class SpriteValidator:
 
         # Check common sprite sheet dimensions
         if width > 256 or height > 256:
-            warnings.append(
-                f"Sprite dimensions ({width}x{height}) are larger than typical (256x256)"
-            )
+            warnings.append(f"Sprite dimensions ({width}x{height}) are larger than typical (256x256)")
 
         return errors, warnings
 
@@ -139,9 +135,7 @@ class SpriteValidator:
             # Check color indices
             max_index = max(unique_colors) if unique_colors else 0
             if max_index > 15:
-                errors.append(
-                    f"Image uses color index {max_index}, maximum allowed is 15"
-                )
+                errors.append(f"Image uses color index {max_index}, maximum allowed is 15")
 
             # Check if using index 0 (usually transparent)
             if 0 in unique_colors:
@@ -151,9 +145,7 @@ class SpriteValidator:
                 transparency_percent = (transparent_pixels / total_pixels) * 100
 
                 if transparency_percent > 50:
-                    warnings.append(
-                        f"Image has {transparency_percent:.1f}% transparent pixels (index 0)"
-                    )
+                    warnings.append(f"Image has {transparency_percent:.1f}% transparent pixels (index 0)")
 
         elif img.mode == "L":
             # For grayscale, check if values are multiples of 17
@@ -170,16 +162,12 @@ class SpriteValidator:
                     non_standard_values.append(val)
 
             if non_standard_values:
-                warnings.append(
-                    f"Image contains non-standard grayscale values: {sorted(non_standard_values)[:5]}..."
-                )
+                warnings.append(f"Image contains non-standard grayscale values: {sorted(non_standard_values)[:5]}...")
 
         return errors, warnings
 
     @staticmethod
-    def _validate_against_metadata(
-        img: Image.Image, metadata_path: str
-    ) -> tuple[list[str], list[str]]:
+    def _validate_against_metadata(img: Image.Image, metadata_path: str) -> tuple[list[str], list[str]]:
         """Validate sprite against its metadata"""
         errors: list[str] = []
         warnings: list[str] = []
@@ -198,9 +186,7 @@ class SpriteValidator:
                     actual_tiles = (width // 8) * (height // 8)
 
                     if actual_tiles != expected_tiles:
-                        warnings.append(
-                            f"Tile count mismatch: expected {expected_tiles}, found {actual_tiles}"
-                        )
+                        warnings.append(f"Tile count mismatch: expected {expected_tiles}, found {actual_tiles}")
 
         except Exception as e:
             warnings.append(f"Failed to validate against metadata: {e}")
@@ -247,9 +233,7 @@ class SpriteValidator:
             return 0, 0
 
     @staticmethod
-    def check_sprite_compatibility(
-        sprite1_path: str, sprite2_path: str
-    ) -> tuple[bool, list[str]]:
+    def check_sprite_compatibility(sprite1_path: str, sprite2_path: str) -> tuple[bool, list[str]]:
         """
         Check if two sprites are compatible (e.g., for swapping).
 

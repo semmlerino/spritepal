@@ -12,6 +12,7 @@ Key Features:
 - Thread safety helpers for concurrent testing
 - Event loop management for async operations
 """
+
 from __future__ import annotations
 
 import gc
@@ -39,6 +40,7 @@ __all__ = ["MemoryHelper", "QtTestCase", "EventLoopHelper", "ThreadSafetyHelper"
 
 # Type variable for generic widget types
 W = TypeVar("W", bound=QWidget)
+
 
 class QtTestCase:
     """
@@ -224,11 +226,7 @@ class ThreadSafetyHelper:
 
     @staticmethod
     @contextmanager
-    def run_in_thread(
-        func: Callable,
-        *args,
-        **kwargs
-    ) -> Generator[QThread, None, None]:
+    def run_in_thread(func: Callable, *args, **kwargs) -> Generator[QThread, None, None]:
         """
         Run a function in a separate thread.
 
@@ -240,6 +238,7 @@ class ThreadSafetyHelper:
         Yields:
             Thread instance
         """
+
         class Worker(QObject):
             finished = Signal()
             error = Signal(Exception)

@@ -1,4 +1,5 @@
 """ROM extraction UI widgets"""
+
 from __future__ import annotations
 
 from .cgram_selector_widget import CGRAMSelectorWidget

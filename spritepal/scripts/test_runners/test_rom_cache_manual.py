@@ -20,6 +20,7 @@ import importlib
 rom_cache_module = importlib.import_module("core.services.rom_cache")
 ROMCache = rom_cache_module.ROMCache
 
+
 # Create a simple SpritePointer class for testing
 class SpritePointer:
     def __init__(self, offset, bank=0, address=0, compressed_size=None, offset_variants=None):
@@ -28,6 +29,7 @@ class SpritePointer:
         self.address = address
         self.compressed_size = compressed_size
         self.offset_variants = offset_variants
+
 
 def test_basic_cache_operations():
     """Test basic cache save and load operations"""
@@ -46,18 +48,8 @@ def test_basic_cache_operations():
 
         # Test saving sprite locations
         sprite_locations = {
-            "kirby_idle": SpritePointer(
-                offset=0x12345,
-                bank=0x20,
-                address=0x8000,
-                compressed_size=256
-            ),
-            "kirby_walk": SpritePointer(
-                offset=0x23456,
-                bank=0x21,
-                address=0x8100,
-                compressed_size=512
-            )
+            "kirby_idle": SpritePointer(offset=0x12345, bank=0x20, address=0x8000, compressed_size=256),
+            "kirby_walk": SpritePointer(offset=0x23456, bank=0x21, address=0x8100, compressed_size=512),
         }
 
         success = cache.save_sprite_locations(test_rom, sprite_locations)
@@ -79,20 +71,11 @@ def test_basic_cache_operations():
             return False
 
         # Test partial scan results
-        scan_params = {
-            "start_offset": 0xC0000,
-            "end_offset": 0xF0000,
-            "alignment": 0x100
-        }
+        scan_params = {"start_offset": 0xC0000, "end_offset": 0xF0000, "alignment": 0x100}
 
-        found_sprites = [
-            {"offset": 0xC1000, "name": "sprite1"},
-            {"offset": 0xC2000, "name": "sprite2"}
-        ]
+        found_sprites = [{"offset": 0xC1000, "name": "sprite1"}, {"offset": 0xC2000, "name": "sprite2"}]
 
-        success = cache.save_partial_scan_results(
-            test_rom, scan_params, found_sprites, 0xC3000
-        )
+        success = cache.save_partial_scan_results(test_rom, scan_params, found_sprites, 0xC3000)
         print(f"✓ Saved partial scan results: {success}")
 
         # Load partial scan results
@@ -114,6 +97,7 @@ def test_basic_cache_operations():
 
     return True
 
+
 def test_singleton_behavior():
     """Test the singleton cache instance"""
     print("\n=== Testing Singleton Behavior ===")
@@ -127,6 +111,7 @@ def test_singleton_behavior():
         return True
     print("✗ Singleton returns different instances")
     return False
+
 
 def test_cache_with_ui_integration():
     """Test cache integration with UI components"""
@@ -154,6 +139,7 @@ def test_cache_with_ui_integration():
 
     return True
 
+
 def main():
     """Run all manual tests"""
     print("ROM Cache Manual Test Suite")
@@ -162,11 +148,7 @@ def main():
     all_passed = True
 
     # Run tests
-    tests = [
-        test_basic_cache_operations,
-        test_singleton_behavior,
-        test_cache_with_ui_integration
-    ]
+    tests = [test_basic_cache_operations, test_singleton_behavior, test_cache_with_ui_integration]
 
     for test in tests:
         try:
@@ -183,6 +165,7 @@ def main():
         return 0
     print("❌ Some tests failed!")
     return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

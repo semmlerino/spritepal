@@ -3,6 +3,7 @@ Test logging configuration functionality - essential smoke tests only.
 
 Most tests removed as they just verify Python's logging module API.
 """
+
 from __future__ import annotations
 
 import logging

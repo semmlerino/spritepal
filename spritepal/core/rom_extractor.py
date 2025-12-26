@@ -2,6 +2,7 @@
 ROM sprite extraction functionality for SpritePal
 Extracts sprites directly from ROM files using HAL decompression
 """
+
 from __future__ import annotations
 
 import math
@@ -102,9 +103,7 @@ class ROMExtractor:
         try:
             # Offset validation performed by HALCompressor.decompress_from_rom()
             # Try to decompress the data at the offset
-            decompressed_data = self.hal_compressor.decompress_from_rom(
-                rom_path, sprite_offset
-            )
+            decompressed_data = self.hal_compressor.decompress_from_rom(rom_path, sprite_offset)
 
             return decompressed_data
 
@@ -140,9 +139,7 @@ class ROMExtractor:
             expected_size = self._load_sprite_configuration(sprite_name, header)
 
             # Stage 3: Decompress sprite data
-            compressed_size, sprite_data = self._decompress_sprite_data(
-                rom_data, sprite_offset, expected_size
-            )
+            compressed_size, sprite_data = self._decompress_sprite_data(rom_data, sprite_offset, expected_size)
 
             # Stage 4: Convert to PNG
             output_path = f"{output_base}.png"
@@ -150,23 +147,26 @@ class ROMExtractor:
             tile_count = self._convert_4bpp_to_png(sprite_data, output_path)
 
             # Stage 5: Extract palettes (ROM or default)
-            palette_files, rom_palettes_used = self._extract_rom_palettes(
-                rom_path, sprite_name, header, output_base
-            )
+            palette_files, rom_palettes_used = self._extract_rom_palettes(rom_path, sprite_name, header, output_base)
 
             # Stage 6: Fall back to default palettes if needed
             if not palette_files and sprite_name:
-                palette_files = self._load_default_palettes(
-                    sprite_name, output_base, header.title
-                )
+                palette_files = self._load_default_palettes(sprite_name, output_base, header.title)
 
             if not palette_files:
                 logger.info("No palettes available - sprite will be grayscale in editor")
 
             # Stage 7: Create extraction metadata
             extraction_info = self._create_extraction_metadata(
-                rom_path, sprite_offset, sprite_name, compressed_size,
-                tile_count, sprite_data, header, rom_palettes_used, palette_files
+                rom_path,
+                sprite_offset,
+                sprite_name,
+                compressed_size,
+                tile_count,
+                sprite_data,
+                header,
+                rom_palettes_used,
+                palette_files,
             )
 
         except HALCompressionError as e:
@@ -233,9 +233,7 @@ class ROMExtractor:
             return None
 
         # Get sprite configurations for this ROM
-        sprite_configs = self.sprite_config_loader.get_game_sprites(
-            header.title, header.checksum
-        )
+        sprite_configs = self.sprite_config_loader.get_game_sprites(header.title, header.checksum)
 
         if sprite_name in sprite_configs:
             expected_size = sprite_configs[sprite_name].estimated_size
@@ -259,9 +257,7 @@ class ROMExtractor:
             Tuple of (compressed_size, decompressed_data)
         """
         logger.info(f"Decompressing sprite data at offset 0x{sprite_offset:X}")
-        compressed_size, sprite_data = self.rom_injector.find_compressed_sprite(
-            rom_data, sprite_offset, expected_size
-        )
+        compressed_size, sprite_data = self.rom_injector.find_compressed_sprite(rom_data, sprite_offset, expected_size)
 
         logger.info(
             f"Decompressed sprite from 0x{sprite_offset:X}: "
@@ -301,10 +297,9 @@ class ROMExtractor:
 
         # Get palette configuration
         logger.debug(f"Getting palette configuration for {sprite_name}")
-        palette_offset, palette_indices = (
-            self.rom_palette_extractor.get_palette_config_from_sprite_config(
-                cast(dict[str, Any], game_config), sprite_name  # type: ignore[reportExplicitAny] - interface with palette extractor
-            )
+        palette_offset, palette_indices = self.rom_palette_extractor.get_palette_config_from_sprite_config(
+            cast(dict[str, Any], game_config),
+            sprite_name,  # type: ignore[reportExplicitAny] - interface with palette extractor
         )
 
         if palette_offset and palette_indices:
@@ -342,16 +337,12 @@ class ROMExtractor:
             Game configuration dict or None if not found
         """
         # Use unified game matching (checksum + flexible title) from sprite_config_loader
-        game_name, config = self.sprite_config_loader.find_game_config(
-            header.title, header.checksum
-        )
+        game_name, config = self.sprite_config_loader.find_game_config(header.title, header.checksum)
         if game_name:
             logger.debug(f"Found game configuration: {game_name}")
         return config
 
-    def _load_default_palettes(
-        self, sprite_name: str, output_base: str, rom_title: str = ""
-    ) -> list[str]:
+    def _load_default_palettes(self, sprite_name: str, output_base: str, rom_title: str = "") -> list[str]:
         """
         Load default palettes as fallback.
 
@@ -366,9 +357,7 @@ class ROMExtractor:
         # Try sprite name first
         if self.default_palette_loader.has_default_palettes(sprite_name):
             logger.info(f"Falling back to default palettes for {sprite_name}")
-            palette_files = self.default_palette_loader.create_palette_files(
-                sprite_name, output_base
-            )
+            palette_files = self.default_palette_loader.create_palette_files(sprite_name, output_base)
             logger.info(f"Created {len(palette_files)} default palette files for {sprite_name}")
             for pf in palette_files:
                 logger.debug(f"  - {Path(pf).name}")
@@ -378,16 +367,9 @@ class ROMExtractor:
         if rom_title and self.default_palette_loader.has_palettes_for_rom_title(rom_title):
             palette_key = self.default_palette_loader.get_palette_key_for_rom_title(rom_title)
             if palette_key:
-                logger.info(
-                    f"Falling back to default palettes for ROM title: "
-                    f"{rom_title} -> {palette_key}"
-                )
-                palette_files = self.default_palette_loader.create_palette_files(
-                    palette_key, output_base
-                )
-                logger.info(
-                    f"Created {len(palette_files)} default palette files via ROM title"
-                )
+                logger.info(f"Falling back to default palettes for ROM title: {rom_title} -> {palette_key}")
+                palette_files = self.default_palette_loader.create_palette_files(palette_key, output_base)
+                logger.info(f"Created {len(palette_files)} default palette files via ROM title")
                 for pf in palette_files:
                     logger.debug(f"  - {Path(pf).name}")
                 return palette_files
@@ -395,9 +377,16 @@ class ROMExtractor:
         return []
 
     def _create_extraction_metadata(
-        self, rom_path: str, sprite_offset: int, sprite_name: str,
-        compressed_size: int, tile_count: int, sprite_data: bytes,
-        header: ROMHeader, rom_palettes_used: bool, palette_files: list[str]
+        self,
+        rom_path: str,
+        sprite_offset: int,
+        sprite_name: str,
+        compressed_size: int,
+        tile_count: int,
+        sprite_data: bytes,
+        header: ROMHeader,
+        rom_palettes_used: bool,
+        palette_files: list[str],
     ) -> dict[str, object]:
         """
         Create extraction metadata dictionary.
@@ -453,7 +442,9 @@ class ROMExtractor:
 
         # Check if we have partial tile data
         if len(tile_data) % BYTES_PER_TILE != 0:
-            logger.warning(f"Tile data not aligned: {len(tile_data)} bytes ({len(tile_data) % BYTES_PER_TILE} extra bytes)")
+            logger.warning(
+                f"Tile data not aligned: {len(tile_data)} bytes ({len(tile_data) % BYTES_PER_TILE} extra bytes)"
+            )
 
         # Calculate image dimensions
         img_width = tiles_per_row * TILE_WIDTH
@@ -589,14 +580,17 @@ class ROMExtractor:
 
             # Perform the scan
             found_sprites = self._perform_scan(
-                rom_data, resume_offset, end_offset, step,
-                found_sprites, rom_cache, rom_path, scan_params
+                rom_data, resume_offset, end_offset, step, found_sprites, rom_cache, rom_path, scan_params
             )
 
             # Sort by quality and save results
             found_sprites.sort(key=lambda x: x["quality"], reverse=True)
             rom_cache.save_partial_scan_results(
-                rom_path, cast(dict[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), end_offset, completed=True
+                rom_path,
+                cast(dict[str, int], scan_params),
+                cast(list[Mapping[str, object]], found_sprites),
+                end_offset,
+                completed=True,
             )
 
             return found_sprites
@@ -620,12 +614,7 @@ class ROMExtractor:
         Returns:
             Scan parameters dictionary
         """
-        return {
-            "start_offset": start_offset,
-            "end_offset": end_offset,
-            "step": step,
-            "scan_type": "sprite_scan"
-        }
+        return {"start_offset": start_offset, "end_offset": end_offset, "step": step, "scan_type": "sprite_scan"}
 
     def _load_cached_scan(
         self, rom_cache: ROMCache, rom_path: str, scan_params: Mapping[str, object]
@@ -665,8 +654,10 @@ class ROMExtractor:
         if cached_progress and not cached_progress.get("completed", False):
             found_sprites = cast(list[SpriteInfo], cached_progress.get("found_sprites", []))
             resume_offset = cast(int, cached_progress.get("current_offset", start_offset))
-            logger.info(f"Resuming scan from cached progress: {len(found_sprites)} sprites found, "
-                       f"resuming from offset 0x{resume_offset:X}")
+            logger.info(
+                f"Resuming scan from cached progress: {len(found_sprites)} sprites found, "
+                f"resuming from offset 0x{resume_offset:X}"
+            )
             return found_sprites, resume_offset
 
         return [], start_offset
@@ -709,8 +700,15 @@ class ROMExtractor:
         return end_offset
 
     def _perform_scan(
-        self, rom_data: bytes, resume_offset: int, end_offset: int, step: int,
-        found_sprites: list[SpriteInfo], rom_cache: ROMCache, rom_path: str, scan_params: Mapping[str, object]
+        self,
+        rom_data: bytes,
+        resume_offset: int,
+        end_offset: int,
+        step: int,
+        found_sprites: list[SpriteInfo],
+        rom_cache: ROMCache,
+        rom_path: str,
+        scan_params: Mapping[str, object],
     ) -> list[SpriteInfo]:
         """Perform the actual sprite scanning.
 
@@ -749,7 +747,11 @@ class ROMExtractor:
             # Save progress periodically
             if scan_count % save_progress_interval == 0:
                 rom_cache.save_partial_scan_results(
-                    rom_path, cast(dict[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), offset, completed=False
+                    rom_path,
+                    cast(dict[str, int], scan_params),
+                    cast(list[Mapping[str, object]], found_sprites),
+                    offset,
+                    completed=False,
                 )
 
             # Try to find sprite at this offset
@@ -834,12 +836,17 @@ class ROMExtractor:
             "decompressed_size": len(sprite_data),
             "tile_count": num_tiles,
             "alignment": alignment_status,
-            "quality": self._assess_sprite_quality(sprite_data)
+            "quality": self._assess_sprite_quality(sprite_data),
         }
 
     def _handle_scan_error(
-        self, error: Exception, found_sprites: list[SpriteInfo], rom_cache: ROMCache,
-        rom_path: str, scan_params: Mapping[str, object], resume_offset: int
+        self,
+        error: Exception,
+        found_sprites: list[SpriteInfo],
+        rom_cache: ROMCache,
+        rom_path: str,
+        scan_params: Mapping[str, object],
+        resume_offset: int,
     ) -> None:
         """Handle errors during scanning and save partial results.
 
@@ -858,7 +865,11 @@ class ROMExtractor:
         if found_sprites:
             try:
                 rom_cache.save_partial_scan_results(
-                    rom_path, cast(dict[str, int], scan_params), cast(list[Mapping[str, object]], found_sprites), resume_offset, completed=False
+                    rom_path,
+                    cast(dict[str, int], scan_params),
+                    cast(list[Mapping[str, object]], found_sprites),
+                    resume_offset,
+                    completed=False,
                 )
             except Exception as cache_error:
                 logger.warning(f"Failed to save partial results on scan failure: {cache_error}")
@@ -1008,7 +1019,7 @@ class ROMExtractor:
         valid_tile_count = 0
         for i in range(tiles_checked):
             tile_offset = i * BYTES_PER_TILE
-            tile_data = sprite_data[tile_offset:tile_offset + BYTES_PER_TILE]
+            tile_data = sprite_data[tile_offset : tile_offset + BYTES_PER_TILE]
             if len(tile_data) == BYTES_PER_TILE and self._validate_4bpp_tile(tile_data):
                 valid_tile_count += 1
 
@@ -1054,7 +1065,7 @@ class ROMExtractor:
             if test_offset + BUFFER_SIZE_8KB > data_size:
                 continue
 
-            embedded_data = sprite_data[test_offset:test_offset + BUFFER_SIZE_8KB]
+            embedded_data = sprite_data[test_offset : test_offset + BUFFER_SIZE_8KB]
             # Recursive call but without embedded check to avoid infinite recursion
             embedded_score = self._assess_sprite_quality(embedded_data, check_embedded=False)
 
@@ -1166,10 +1177,10 @@ class ROMExtractor:
         correlation = 0
         for i in range(8):  # Check each row
             # Get bytes from each bitplane pair
-            p0 = tile_data[i*2]
-            p1 = tile_data[i*2 + 1]
-            p2 = tile_data[16 + i*2]
-            p3 = tile_data[16 + i*2 + 1]
+            p0 = tile_data[i * 2]
+            p1 = tile_data[i * 2 + 1]
+            p2 = tile_data[16 + i * 2]
+            p3 = tile_data[16 + i * 2 + 1]
 
             # Check if there's some correlation between planes
             if (p0 & p2) != 0 or (p1 & p3) != 0:
@@ -1195,9 +1206,9 @@ class ROMExtractor:
         pattern_matches = 0
         bytes_per_tile = BYTES_PER_TILE
 
-        for i in range(0, min(len(data) - bytes_per_tile*2, BYTE_FREQUENCY_SAMPLE_SIZE), bytes_per_tile):
-            tile1 = data[i:i+bytes_per_tile]
-            tile2 = data[i+bytes_per_tile:i+bytes_per_tile*2]
+        for i in range(0, min(len(data) - bytes_per_tile * 2, BYTE_FREQUENCY_SAMPLE_SIZE), bytes_per_tile):
+            tile1 = data[i : i + bytes_per_tile]
+            tile2 = data[i + bytes_per_tile : i + bytes_per_tile * 2]
 
             # Count similar bytes between adjacent tiles
             similar_bytes = sum(1 for j in range(bytes_per_tile) if tile1[j] == tile2[j])

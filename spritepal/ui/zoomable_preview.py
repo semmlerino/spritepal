@@ -1,6 +1,7 @@
 """
 Zoomable sprite preview widget for SpritePal
 """
+
 from __future__ import annotations
 
 from typing import override
@@ -103,9 +104,7 @@ class ZoomablePreviewWidget(QWidget):
             center_y = self.height() / 2
 
             # Apply pan and zoom around center
-            transform.translate(
-                center_x + self._pan_offset.x(), center_y + self._pan_offset.y()
-            )
+            transform.translate(center_x + self._pan_offset.x(), center_y + self._pan_offset.y())
             transform.scale(self._zoom, self._zoom)
             transform.translate(-self._pixmap.width() / 2, -self._pixmap.height() / 2)
 
@@ -223,13 +222,9 @@ class ZoomablePreviewWidget(QWidget):
 
             # Create the current transform
             current_transform = QTransform()
-            current_transform.translate(
-                center_x + self._pan_offset.x(), center_y + self._pan_offset.y()
-            )
+            current_transform.translate(center_x + self._pan_offset.x(), center_y + self._pan_offset.y())
             current_transform.scale(self._zoom, self._zoom)
-            current_transform.translate(
-                -self._pixmap.width() / 2, -self._pixmap.height() / 2
-            )
+            current_transform.translate(-self._pixmap.width() / 2, -self._pixmap.height() / 2)
 
             # Transform mouse position to image coordinates
             inv_transform, _ = current_transform.inverted()
@@ -240,24 +235,16 @@ class ZoomablePreviewWidget(QWidget):
 
             # Create new transform with updated zoom
             new_transform = QTransform()
-            new_transform.translate(
-                center_x + self._pan_offset.x(), center_y + self._pan_offset.y()
-            )
+            new_transform.translate(center_x + self._pan_offset.x(), center_y + self._pan_offset.y())
             new_transform.scale(self._zoom, self._zoom)
-            new_transform.translate(
-                -self._pixmap.width() / 2, -self._pixmap.height() / 2
-            )
+            new_transform.translate(-self._pixmap.width() / 2, -self._pixmap.height() / 2)
 
             # Find where the image point would be with new transform
             new_widget_pos = new_transform.map(image_pos)
 
             # Adjust pan offset to keep image point under cursor
-            self._pan_offset.setX(
-                self._pan_offset.x() + mouse_pos.x() - new_widget_pos.x()
-            )
-            self._pan_offset.setY(
-                self._pan_offset.y() + mouse_pos.y() - new_widget_pos.y()
-            )
+            self._pan_offset.setX(self._pan_offset.x() + mouse_pos.x() - new_widget_pos.x())
+            self._pan_offset.setY(self._pan_offset.y() + mouse_pos.y() - new_widget_pos.y())
 
             self.update()
 
@@ -305,17 +292,13 @@ class ZoomablePreviewWidget(QWidget):
                 self._zoom = 4.0
                 self._pan_offset = QPointF(0, 0)
                 self.update()
-            elif event.modifiers() == (
-                Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
-            ):
+            elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
                 # Ctrl+Shift+0: Zoom to fit
                 self.zoom_to_fit()
         else:
             super().keyPressEvent(event)
 
-    def set_preview(
-        self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0
-    ) -> None:
+    def set_preview(self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0) -> None:
         """Set the preview pixmap"""
         self._pixmap = pixmap
         self._tile_count = tile_count
@@ -365,6 +348,7 @@ class ZoomablePreviewWidget(QWidget):
         self._pan_offset = QPointF(0, 0)
         self.update()
 
+
 class PreviewPanel(QWidget):
     """Panel containing the zoomable preview with controls"""
 
@@ -378,12 +362,8 @@ class PreviewPanel(QWidget):
         self.colorizer = PaletteColorizer()
 
         # Connect colorizer signals
-        _ = self.colorizer.palette_mode_changed.connect(
-            self._on_colorizer_palette_mode_changed
-        )
-        _ = self.colorizer.palette_index_changed.connect(
-            self._on_colorizer_palette_index_changed
-        )
+        _ = self.colorizer.palette_mode_changed.connect(self._on_colorizer_palette_mode_changed)
+        _ = self.colorizer.palette_index_changed.connect(self._on_colorizer_palette_index_changed)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -403,7 +383,9 @@ class PreviewPanel(QWidget):
 
         # Control buttons
         controls = QHBoxLayout()
-        controls.setContentsMargins(SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL)
+        controls.setContentsMargins(
+            SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL, SPACING_COMPACT_SMALL
+        )
 
         # Palette application controls
         self.palette_toggle = QCheckBox("Apply Palette")
@@ -493,11 +475,7 @@ class PreviewPanel(QWidget):
 
     def _on_palette_changed(self, _palette_name: str) -> None:
         """Handle palette selection change."""
-        if (
-            self.palette_toggle.isChecked()
-            and self._grayscale_image
-            and self.colorizer.has_palettes()
-        ):
+        if self.palette_toggle.isChecked() and self._grayscale_image and self.colorizer.has_palettes():
             # Update colorizer's selected palette
             palette_index = self.palette_selector.currentData()
             if palette_index:
@@ -510,9 +488,7 @@ class PreviewPanel(QWidget):
             return
 
         # Get colorized image from colorizer
-        self._colorized_image = self.colorizer.get_display_image(
-            0, self._grayscale_image
-        )
+        self._colorized_image = self.colorizer.get_display_image(0, self._grayscale_image)
 
         # Update preview with colorized image
         if self._colorized_image:
@@ -550,9 +526,7 @@ class PreviewPanel(QWidget):
                     else:
                         # Keep grayscale value with full alpha
                         gray_value = (
-                            pixel_value
-                            if self._grayscale_image.mode != "P"
-                            else (pixel_value * MAX_BYTE_VALUE) // 15
+                            pixel_value if self._grayscale_image.mode != "P" else (pixel_value * MAX_BYTE_VALUE) // 15
                         )
                         # Ensure non-zero pixels are visible even if index is 0
                         if palette_index == 0 and not self._apply_transparency:
@@ -564,15 +538,11 @@ class PreviewPanel(QWidget):
             pixmap = self._pil_to_pixmap(rgba_image)
             self.preview.update_pixmap(pixmap)
 
-    def set_preview(
-        self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0
-    ) -> None:
+    def set_preview(self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0) -> None:
         """Set the preview pixmap"""
         self.preview.set_preview(pixmap, tile_count, tiles_per_row)
 
-    def update_preview(
-        self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0
-    ) -> None:
+    def update_preview(self, pixmap: QPixmap | None, tile_count: int = 0, tiles_per_row: int = 0) -> None:
         """Update the preview pixmap without resetting view (for real-time updates)"""
         self.preview.update_pixmap(pixmap)
         # Update tile info if provided

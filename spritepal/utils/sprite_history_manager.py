@@ -4,6 +4,7 @@ Sprite history management utilities.
 This module provides non-Qt history management for sprite tracking,
 including duplicate prevention, limit enforcement, and data management.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -46,11 +47,7 @@ class SpriteHistoryManager:
             return False
 
         # Create sprite info
-        sprite_info = {
-            "offset": offset,
-            "quality": quality,
-            "timestamp": datetime.now(tz=UTC)
-        }
+        sprite_info = {"offset": offset, "quality": quality, "timestamp": datetime.now(tz=UTC)}
 
         # Add to history
         self._found_sprites.append(sprite_info)
@@ -134,4 +131,3 @@ class SpriteHistoryManager:
             quality = sprite["quality"]
             items.append(f"0x{offset:06X} - Quality: {quality:.2f}")
         return items
-

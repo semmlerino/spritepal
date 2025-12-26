@@ -7,6 +7,7 @@ Tests focus on:
 3. Debouncing effectiveness
 4. Cache efficiency measurements
 """
+
 from __future__ import annotations
 
 import time
@@ -64,14 +65,16 @@ class PerformanceTestData:
             height = width  # Square sprites for consistency
             data = PerformanceTestData.generate_sprite_data(width, height)
 
-            sprites.append({
-                "offset": offset,
-                "width": width,
-                "height": height,
-                "data": data,
-                "size": len(data),
-                "name": f"perf_sprite_{i:03d}"
-            })
+            sprites.append(
+                {
+                    "offset": offset,
+                    "width": width,
+                    "height": height,
+                    "data": data,
+                    "size": len(data),
+                    "name": f"perf_sprite_{i:03d}",
+                }
+            )
 
         return sprites
 
@@ -86,7 +89,7 @@ class TestSmartPreviewCoordinatorPerformance:
 
     def teardown_method(self) -> None:
         """Clean up coordinator tests."""
-        if hasattr(self, 'coordinator'):
+        if hasattr(self, "coordinator"):
             self.coordinator.cleanup()
             del self.coordinator
 
@@ -117,11 +120,11 @@ class TestSmartPreviewCoordinatorPerformance:
         max_response = max(response_times)
 
         # Sanity bounds: loose enough for CI, catches major regressions
-        assert avg_response < perf_bound(0.01), f"Average response too slow: {avg_response*1000:.2f}ms"
-        assert max_response < perf_bound(0.02), f"Max response too slow: {max_response*1000:.2f}ms"
+        assert avg_response < perf_bound(0.01), f"Average response too slow: {avg_response * 1000:.2f}ms"
+        assert max_response < perf_bound(0.02), f"Max response too slow: {max_response * 1000:.2f}ms"
         assert total_time < perf_bound(2.0), f"Total time too long: {total_time:.2f}s"
 
-        print(f"60fps simulation: avg={avg_response*1000:.2f}ms, max={max_response*1000:.2f}ms")
+        print(f"60fps simulation: avg={avg_response * 1000:.2f}ms, max={max_response * 1000:.2f}ms")
 
     @pytest.mark.performance
     def test_debouncing_effectiveness_performance(self) -> None:
@@ -150,15 +153,15 @@ class TestSmartPreviewCoordinatorPerformance:
         assert submission_time < perf_bound(1.0), f"Rapid update submission too slow: {submission_time:.3f}s"
 
         # Check performance metrics (if available)
-        if hasattr(self.coordinator, '_performance_metrics'):
+        if hasattr(self.coordinator, "_performance_metrics"):
             metrics = self.coordinator._performance_metrics
             total_requests = metrics.get("total_requests", 0)
 
             # Should have fewer actual preview generations than input requests
             debounce_ratio = total_requests / num_rapid_updates if total_requests > 0 else 1
-            assert debounce_ratio < 0.5, f"Debouncing not effective: {debounce_ratio*100:.1f}% requests processed"
+            assert debounce_ratio < 0.5, f"Debouncing not effective: {debounce_ratio * 100:.1f}% requests processed"
 
-            print(f"Debouncing effectiveness: {debounce_ratio*100:.1f}% of rapid updates processed")
+            print(f"Debouncing effectiveness: {debounce_ratio * 100:.1f}% of rapid updates processed")
 
     @pytest.mark.performance
     def test_cache_hit_rate_optimization(self) -> None:
@@ -208,9 +211,9 @@ class TestSmartPreviewCoordinatorPerformance:
         # With backtracking, should achieve decent hit rate
         expected_hit_rate = 25  # At least 25% with backtracking pattern
         assert hit_rate >= expected_hit_rate, f"Cache hit rate too low: {hit_rate:.1f}%"
-        assert avg_response_time < perf_bound(0.05), f"Average response too slow: {avg_response_time*1000:.2f}ms"
+        assert avg_response_time < perf_bound(0.05), f"Average response too slow: {avg_response_time * 1000:.2f}ms"
 
-        print(f"Cache optimization: {hit_rate:.1f}% hit rate, avg={avg_response_time*1000:.2f}ms")
+        print(f"Cache optimization: {hit_rate:.1f}% hit rate, avg={avg_response_time * 1000:.2f}ms")
 
 
 if __name__ == "__main__":

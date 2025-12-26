@@ -4,6 +4,7 @@ Base worker classes for standardized async operations.
 This module provides the foundation for all worker threads in SpritePal,
 ensuring consistent interfaces, proper error handling, and type safety.
 """
+
 from __future__ import annotations
 
 import weakref
@@ -29,10 +30,9 @@ logger = get_logger(__name__)
 P = ParamSpec("P")
 R = TypeVar("R")
 
+
 def handle_worker_errors(
-    operation_context: str = "operation",
-    handle_interruption: bool = False,
-    include_runtime_error: bool = False
+    operation_context: str = "operation", handle_interruption: bool = False, include_runtime_error: bool = False
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator for standardized worker exception handling.
@@ -67,6 +67,7 @@ def handle_worker_errors(
             # Your operation code here
             pass
     """
+
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -121,7 +122,9 @@ def handle_worker_errors(
                 return None  # type: ignore[return-value]  # Signal emission is the real result
 
         return wrapper
+
     return decorator
+
 
 class BaseWorker(QThread):
     """
@@ -161,6 +164,7 @@ class BaseWorker(QThread):
         # Auto-register with WorkerManager for cleanup_all()
         # Import here to avoid circular imports
         from core.services.worker_lifecycle import WorkerManager
+
         WorkerManager._register_worker(self)
 
     def _cleanup_connections(self) -> None:
@@ -174,7 +178,9 @@ class BaseWorker(QThread):
         self._signal_connections.clear()
         logger.debug(f"{self._operation_name}: Cleaned up {connection_count} signal connections")
 
-    def connect_signal_with_tracking(self, signal: SignalInstance, slot: Callable[..., object]) -> QMetaObject.Connection:
+    def connect_signal_with_tracking(
+        self, signal: SignalInstance, slot: Callable[..., object]
+    ) -> QMetaObject.Connection:
         """Connect a signal and track the connection for cleanup"""
         connection = signal.connect(slot)
         self._signal_connections.append(connection)
@@ -285,6 +291,7 @@ class BaseWorker(QThread):
         Should emit operation_finished signal when complete.
         """
 
+
 class ManagedWorker(BaseWorker):
     """
     Worker that delegates to a manager for business logic.
@@ -319,10 +326,7 @@ class ManagedWorker(BaseWorker):
     """Emitted when active palette indices ready. Args: palette_indices (list[int])."""
 
     def __init__(
-        self,
-        manager: BaseManager | None = None,
-        manager_factory: object | None = None,
-        parent: QObject | None = None
+        self, manager: BaseManager | None = None, manager_factory: object | None = None, parent: QObject | None = None
     ) -> None:
         super().__init__(parent)
 

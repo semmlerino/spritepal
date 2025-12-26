@@ -6,6 +6,7 @@ while using the new SplitterDialog architecture.
 
 This is a real Qt integration test that requires a GUI environment.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -25,6 +26,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.allows_registry_state(reason="Dialog initialization uses ManagerRegistry"),
 ]
+
 
 class TestRowArrangementDialogMigration:
     """Test RowArrangementDialog migration to SplitterDialog architecture"""
@@ -144,6 +146,7 @@ class TestRowArrangementDialogMigration:
 
         # Main splitter should be vertical
         from PySide6.QtCore import Qt
+
         assert dialog.main_splitter.orientation() == Qt.Orientation.Vertical
 
         # Handle width should be set correctly

@@ -52,16 +52,12 @@ import sys
 try:
     import PySide6  # noqa: F401
 except ImportError as e:
-    sys.exit(
-        "FATAL: PySide6 is required for tests but not installed.\n"
-        "Run: uv sync --extra dev\n"
-        f"Import error: {e}"
-    )
+    sys.exit(f"FATAL: PySide6 is required for tests but not installed.\nRun: uv sync --extra dev\nImport error: {e}")
 
 # CRITICAL: Set offscreen mode BEFORE any Qt imports to prevent dialogs
 import os
 
-os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import importlib
 import importlib.abc
@@ -131,9 +127,7 @@ def pytest_sessionstart(session: Any) -> None:
     import threading
 
     session.config._thread_baseline = threading.active_count()
-    session.config._thread_identities = {
-        t.ident: t.name for t in threading.enumerate() if t.ident is not None
-    }
+    session.config._thread_identities = {t.ident: t.name for t in threading.enumerate() if t.ident is not None}
 
 
 def _patch_qpixmap_init() -> None:
@@ -142,7 +136,7 @@ def _patch_qpixmap_init() -> None:
         from PySide6.QtCore import QCoreApplication, QThread
         from PySide6.QtGui import QPixmap
 
-        if hasattr(QPixmap, '_test_guard_installed'):
+        if hasattr(QPixmap, "_test_guard_installed"):
             return  # Already installed
 
         original_init = QPixmap.__init__
@@ -150,10 +144,7 @@ def _patch_qpixmap_init() -> None:
         def guarded_init(self, *args, **kwargs):
             app = QCoreApplication.instance()
             if app and QThread.currentThread() != app.thread():
-                raise RuntimeError(
-                    "CRITICAL: QPixmap created in worker thread! "
-                    "Use QImage or ThreadSafeTestImage."
-                )
+                raise RuntimeError("CRITICAL: QPixmap created in worker thread! Use QImage or ThreadSafeTestImage.")
             original_init(self, *args, **kwargs)
 
         QPixmap.__init__ = guarded_init
@@ -185,7 +176,7 @@ class _QPixmapGuardFinder(importlib.abc.MetaPathFinder):
         3. Patch QPixmap
         4. Return None - the caller finds the patched module in sys.modules
         """
-        if fullname != 'PySide6.QtGui' or self._installed:
+        if fullname != "PySide6.QtGui" or self._installed:
             return
 
         # Mark as installed to prevent re-triggering
@@ -212,7 +203,7 @@ def _install_qpixmap_guard_unconditional() -> None:
     Uses an import hook that triggers as soon as PySide6.QtGui is imported.
     """
     # If Qt is already imported, patch directly
-    if 'PySide6.QtGui' in sys.modules:
+    if "PySide6.QtGui" in sys.modules:
         _patch_qpixmap_init()
         return
 
@@ -236,23 +227,20 @@ def pytest_addoption(parser: Any) -> None:
         default_leak_mode = "fail" if is_ci else "warn"
 
     parser.addoption(
-        "--use-real-hal",
-        action="store_true",
-        default=False,
-        help="Use real HAL process pool instead of mocks (slower)"
+        "--use-real-hal", action="store_true", default=False, help="Use real HAL process pool instead of mocks (slower)"
     )
     parser.addoption(
         "--require-real-hal",
         action="store_true",
         default=False,
-        help="Fail (don't skip) if real HAL binaries not found for @real_hal tests"
+        help="Fail (don't skip) if real HAL binaries not found for @real_hal tests",
     )
     parser.addoption(
         "--leak-mode",
         action="store",
         choices=["fail", "warn"],
         default=default_leak_mode,
-        help=f"Leak policy: fail or warn for resource/thread leaks. Default: {'fail' if is_ci else 'warn'} ({'CI' if is_ci else 'local'}). Override with SPRITEPAL_LEAK_MODE env var."
+        help=f"Leak policy: fail or warn for resource/thread leaks. Default: {'fail' if is_ci else 'warn'} ({'CI' if is_ci else 'local'}). Override with SPRITEPAL_LEAK_MODE env var.",
     )
     # NOTE: --run-segfault-tests option removed - segfault-prone tests have been deleted
 
@@ -280,7 +268,7 @@ def _uses_session_fixtures(item: Any) -> bool:
     """
     from tests.fixtures.core_fixtures import SESSION_DEPENDENT_FIXTURES
 
-    fixture_names = set(getattr(item, 'fixturenames', []))
+    fixture_names = set(getattr(item, "fixturenames", []))
     return bool(fixture_names & SESSION_DEPENDENT_FIXTURES)
 
 
@@ -308,7 +296,7 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     import warnings
 
     # === Track real_hal tests for CI visibility ===
-    real_hal_tests = [item for item in items if item.get_closest_marker('real_hal')]
+    real_hal_tests = [item for item in items if item.get_closest_marker("real_hal")]
     config._real_hal_test_count = len(real_hal_tests)
     config._real_hal_test_nodeids = [item.nodeid for item in real_hal_tests]
 
@@ -400,15 +388,15 @@ def _validate_no_same_module_mixing(items: list[Any]) -> None:
     # Group fixtures by module
     module_fixtures: dict[str, set[str]] = defaultdict(set)
     for item in items:
-        module = getattr(item.module, '__name__', None) if hasattr(item, 'module') else None
+        module = getattr(item.module, "__name__", None) if hasattr(item, "module") else None
         if module:
-            fixture_names = set(getattr(item, 'fixturenames', []))
+            fixture_names = set(getattr(item, "fixturenames", []))
             module_fixtures[module].update(fixture_names)
 
     # Check for mixing
     for module, fixtures in module_fixtures.items():
         uses_session = bool(fixtures & SESSION_DEPENDENT_FIXTURES)
-        uses_isolated = 'isolated_managers' in fixtures
+        uses_isolated = "isolated_managers" in fixtures
         if uses_session and uses_isolated:
             pytest.fail(
                 f"Module '{module}' uses both session_managers and isolated_managers. "
@@ -428,6 +416,7 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
     cleanup across the test suite.
     """
     from tests.fixtures.core_fixtures import reset_all_singletons
+
     reset_all_singletons()
 
 
@@ -437,7 +426,7 @@ def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: Any)
     Warns if real_hal tests were skipped due to missing HAL binaries,
     making silent failures visible in CI output.
     """
-    if not hasattr(config, '_real_hal_test_count'):
+    if not hasattr(config, "_real_hal_test_count"):
         return
 
     total_count = config._real_hal_test_count
@@ -446,8 +435,8 @@ def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: Any)
 
     # Count skipped real_hal tests by checking skip reasons
     skipped_real_hal = 0
-    skipped_stats = terminalreporter.stats.get('skipped', [])
-    real_hal_nodeids = set(getattr(config, '_real_hal_test_nodeids', []))
+    skipped_stats = terminalreporter.stats.get("skipped", [])
+    real_hal_nodeids = set(getattr(config, "_real_hal_test_nodeids", []))
 
     for report in skipped_stats:
         # Check if this skipped test is a real_hal test
@@ -457,8 +446,7 @@ def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: Any)
     if skipped_real_hal > 0:
         terminalreporter.write_line("")
         terminalreporter.write_line(
-            f"WARNING: {skipped_real_hal}/{total_count} @real_hal tests were SKIPPED "
-            "(HAL binaries not found)",
+            f"WARNING: {skipped_real_hal}/{total_count} @real_hal tests were SKIPPED (HAL binaries not found)",
             yellow=True,
         )
         terminalreporter.write_line(
@@ -481,6 +469,7 @@ def pytest_runtest_setup(item: Any) -> None:
     # Always check actual registry state - don't assume
     try:
         from core.managers import is_clean
+
         item._registry_was_clean = is_clean()
     except ImportError:
         item._registry_was_clean = True  # Assume clean if can't import
@@ -507,8 +496,8 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
         return
 
     # Skip for tests that use manager fixtures (they manage lifecycle)
-    fixture_names = set(getattr(item, 'fixturenames', []))
-    cleanup_fixtures = {'isolated_managers', 'session_managers', 'managers_initialized'}
+    fixture_names = set(getattr(item, "fixturenames", []))
+    cleanup_fixtures = {"isolated_managers", "session_managers", "managers_initialized"}
     if cleanup_fixtures.intersection(fixture_names):
         return  # Test uses a fixture that manages registry lifecycle
 
@@ -519,7 +508,7 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     try:
         from core.managers import is_clean
 
-        was_clean = getattr(item, '_registry_was_clean', True)
+        was_clean = getattr(item, "_registry_was_clean", True)
         is_clean_now = is_clean()
 
         # Only fail if the test changed state from clean to dirty
@@ -539,6 +528,7 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
 # NOTE: xdist registry cleanliness check has been consolidated into
 # pytest_runtest_setup hook above for better performance (single import)
 
+
 @pytest.fixture
 def test_data_factory() -> Callable[..., bytearray]:
     """
@@ -547,6 +537,7 @@ def test_data_factory() -> Callable[..., bytearray]:
     Provides a unified way to create VRAM, CGRAM, and OAM test data
     with realistic patterns used across the test suite.
     """
+
     def _create_test_data(data_type: str, size: int | None = None, **kwargs: Any) -> bytearray:
         """
         Create test data of specified type.
@@ -595,16 +586,17 @@ def test_data_factory() -> Callable[..., bytearray]:
 
             # Add realistic OAM data (sprite attributes)
             for i in range(0, min(len(data), 512), 4):  # 4 bytes per entry
-                data[i] = i % 256      # X position
+                data[i] = i % 256  # X position
                 data[i + 1] = i % 224  # Y position
                 data[i + 2] = i % 256  # Tile index
-                data[i + 3] = 0x20     # Attributes
+                data[i + 3] = 0x20  # Attributes
 
             return data
 
         raise ValueError(f"Unknown data type: {data_type}")
 
     return _create_test_data
+
 
 @pytest.fixture
 def temp_files() -> Iterator[Callable[[bytes, str], str]]:
@@ -632,6 +624,7 @@ def temp_files() -> Iterator[Callable[[bytes, str], str]]:
             Path(file_path).unlink(missing_ok=True)
         except OSError:
             pass  # File might already be deleted
+
 
 @pytest.fixture
 def standard_test_params(
@@ -667,9 +660,11 @@ def standard_test_params(
         "oam_data": oam_data,
     }
 
+
 # ============================================================================
 # Function-scoped fixtures for proper test isolation
 # ============================================================================
+
 
 @pytest.fixture(scope="function")
 def mock_manager_registry() -> Generator[Mock, None, None]:
@@ -735,6 +730,7 @@ def skip_requires_display(request: FixtureRequest):
 # Test Cleanup Verification
 # ============================================================================
 
+
 @pytest.fixture(autouse=True)
 def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
     """Verify that test cleanup actually succeeded (autouse for Qt/manager tests).
@@ -747,11 +743,19 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
     """
     # Only run for tests that use Qt or manager fixtures
     relevant_fixtures = {
-        'qtbot', 'qt_app', 'qapp', 'hal_pool', 'cleanup_singleton',
-        'isolated_managers', 'session_managers', 'managers',
-        'real_factory', 'real_extraction_manager', 'real_injection_manager',
+        "qtbot",
+        "qt_app",
+        "qapp",
+        "hal_pool",
+        "cleanup_singleton",
+        "isolated_managers",
+        "session_managers",
+        "managers",
+        "real_factory",
+        "real_extraction_manager",
+        "real_injection_manager",
     }
-    fixture_names = set(getattr(request, 'fixturenames', []))
+    fixture_names = set(getattr(request, "fixturenames", []))
 
     if not relevant_fixtures.intersection(fixture_names):
         yield
@@ -775,18 +779,13 @@ def verify_cleanup(request: FixtureRequest) -> Generator[None, None, None]:
         ctx = get_app_context_optional()
         if ctx:
             ops_mgr = ctx.core_operations_manager
-            if hasattr(ops_mgr, 'has_active_operations') and ops_mgr.has_active_operations():
-                leaks_found.append(
-                    "CoreOperationsManager has active operations (not cleaned up)"
-                )
+            if hasattr(ops_mgr, "has_active_operations") and ops_mgr.has_active_operations():
+                leaks_found.append("CoreOperationsManager has active operations (not cleaned up)")
     except ImportError:
         pass  # AppContext not available
 
     if leaks_found:
-        message = (
-            f"Test '{request.node.name}' left manager state leaks:\n  - "
-            + "\n  - ".join(leaks_found)
-        )
+        message = f"Test '{request.node.name}' left manager state leaks:\n  - " + "\n  - ".join(leaks_found)
         if leak_mode == "warn":
             warnings.warn(message, ResourceWarning, stacklevel=2)
         else:
@@ -813,13 +812,13 @@ def enforce_shared_state_safe(request: FixtureRequest) -> Generator[None, None, 
     - Isolation is now guaranteed by fixture scoping (use isolated_managers)
     """
     # Only check tests that use session_managers
-    fixture_names = set(getattr(request, 'fixturenames', []))
-    if 'session_managers' not in fixture_names:
+    fixture_names = set(getattr(request, "fixturenames", []))
+    if "session_managers" not in fixture_names:
         yield
         return
 
     # Require the marker
-    if not request.node.get_closest_marker('shared_state_safe'):
+    if not request.node.get_closest_marker("shared_state_safe"):
         pytest.fail(
             f"Test '{request.node.name}' uses session_managers but lacks "
             "@pytest.mark.shared_state_safe marker. Either:\n"

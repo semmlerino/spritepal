@@ -123,6 +123,7 @@ class ImportAnalyzer(ast.NodeVisitor):
             else:
                 self.imports.append(import_info)
 
+
 def analyze_file(filepath: Path) -> tuple[list[dict], list[dict]]:
     """Analyze a single Python file for imports."""
     try:
@@ -137,6 +138,7 @@ def analyze_file(filepath: Path) -> tuple[list[dict], list[dict]]:
     except Exception as e:
         print(f"Error analyzing {filepath}: {e}")
         return [], []
+
 
 def build_dependency_graph(project_root: Path) -> dict[str, set[str]]:
     """Build a dependency graph for the entire project."""
@@ -163,8 +165,10 @@ def build_dependency_graph(project_root: Path) -> dict[str, set[str]]:
 
     return dict(dependencies), conditional_imports_by_file
 
+
 def find_circular_imports(dependencies: dict[str, set[str]]) -> list[list[str]]:
     """Find circular import chains."""
+
     def find_cycle(node: str, path: list[str], visited: set[str]) -> list[str] | None:
         if node in path:
             # Found a cycle
@@ -193,6 +197,7 @@ def find_circular_imports(dependencies: dict[str, set[str]]) -> list[list[str]]:
             cycles.append(cycle)
 
     return cycles
+
 
 def main():
     """Main analysis function."""
@@ -250,12 +255,17 @@ def main():
     # Save detailed report
     report_path = project_root / "import_analysis_report.json"
     with report_path.open("w") as f:
-        json.dump({
-            "dependencies": {k: list(v) for k, v in dependencies.items()},
-            "conditional_imports": conditional_imports,
-            "circular_imports": cycles,
-        }, f, indent=2)
+        json.dump(
+            {
+                "dependencies": {k: list(v) for k, v in dependencies.items()},
+                "conditional_imports": conditional_imports,
+                "circular_imports": cycles,
+            },
+            f,
+            indent=2,
+        )
     print(f"\n✅ Detailed report saved to: {report_path}")
+
 
 if __name__ == "__main__":
     main()

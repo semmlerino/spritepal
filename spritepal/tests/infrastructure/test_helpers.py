@@ -11,6 +11,7 @@ Usage:
         with qtbot.waitSignal(worker.finished):
             worker.start()
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

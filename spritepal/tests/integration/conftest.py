@@ -1,6 +1,7 @@
 """
 Integration test fixtures that use real components without mocking.
 """
+
 from __future__ import annotations
 
 import os
@@ -106,19 +107,19 @@ def test_rom_with_sprites(tmp_path, test_rom_data, real_kirby_rom):
 
         # Known sprite locations in Kirby Super Star (USA)
         return {
-            'path': rom_path,
-            'sprites': [
+            "path": rom_path,
+            "sprites": [
                 {
-                    'offset': 0x200000,
-                    'compressed_size': 65464,
-                    'decompressed_size': 7744,
-                    'tile_count': 242,
+                    "offset": 0x200000,
+                    "compressed_size": 65464,
+                    "decompressed_size": 7744,
+                    "tile_count": 242,
                 },
                 {
-                    'offset': 0x206000,
-                    'compressed_size': 40888,
-                    'decompressed_size': 832,
-                    'tile_count': 26,
+                    "offset": 0x206000,
+                    "compressed_size": 40888,
+                    "decompressed_size": 832,
+                    "tile_count": 26,
                 },
             ],
         }
@@ -129,8 +130,8 @@ def test_rom_with_sprites(tmp_path, test_rom_data, real_kirby_rom):
         rom_path.write_bytes(test_rom_data)
 
         return {
-            'path': rom_path,
-            'sprites': [],  # Empty: synthetic data has no valid HAL sprites
+            "path": rom_path,
+            "sprites": [],  # Empty: synthetic data has no valid HAL sprites
         }
 
 
@@ -180,19 +181,19 @@ def test_rom_with_real_sprites(tmp_path, real_kirby_rom):
 
     # Known sprite locations in Kirby ROM
     return {
-        'path': rom_path,
-        'sprites': [
+        "path": rom_path,
+        "sprites": [
             {
-                'offset': 0x200000,
-                'compressed_size': 65464,
-                'decompressed_size': 7744,
-                'tile_count': 242,
+                "offset": 0x200000,
+                "compressed_size": 65464,
+                "decompressed_size": 7744,
+                "tile_count": 242,
             },
             {
-                'offset': 0x206000,
-                'compressed_size': 40888,
-                'decompressed_size': 832,
-                'tile_count': 26,
+                "offset": 0x206000,
+                "compressed_size": 40888,
+                "decompressed_size": 832,
+                "tile_count": 26,
             },
         ],
     }
@@ -258,13 +259,15 @@ def manual_offset_dialog(qtbot, managers_initialized):
 def loaded_rom_panel(rom_extraction_panel, test_rom_with_sprites, qtbot):
     """Provide a ROM extraction panel with a test ROM already loaded."""
     rom_info = test_rom_with_sprites
-    rom_path = str(rom_info['path'])
+    rom_path = str(rom_info["path"])
 
     # Load the ROM (method is _load_rom_file, not load_rom)
     rom_extraction_panel._load_rom_file(rom_path)
 
     # Wait for loading to complete
-    qtbot.waitUntil(lambda: rom_extraction_panel.rom_path == rom_path and rom_extraction_panel.rom_size > 0, timeout=1000)
+    qtbot.waitUntil(
+        lambda: rom_extraction_panel.rom_path == rom_path and rom_extraction_panel.rom_size > 0, timeout=1000
+    )
 
     # Verify ROM is loaded
     assert rom_extraction_panel.rom_path == rom_path

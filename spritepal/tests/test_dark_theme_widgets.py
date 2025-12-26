@@ -8,6 +8,7 @@ Consolidates tests from:
 This module tests component-specific styling functions and their integration
 with real Qt widgets following TDD principles.
 """
+
 from __future__ import annotations
 
 import os
@@ -61,6 +62,7 @@ _is_offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
 try:
     from ui.widgets.sprite_preview_widget import SpritePreviewWidget
     from ui.zoomable_preview import ZoomablePreviewWidget
+
     WIDGETS_AVAILABLE = True
 except ImportError:
     WIDGETS_AVAILABLE = False
@@ -91,9 +93,7 @@ class TestButtonStyling:
         assert "QPushButton:hover {" in css
         assert "QPushButton:pressed {" in css
 
-    @pytest.mark.parametrize("button_type", [
-        "primary", "secondary", "accent", "extract", "editor", "default"
-    ])
+    @pytest.mark.parametrize("button_type", ["primary", "secondary", "accent", "extract", "editor", "default"])
     def test_button_style_supports_all_types(self, button_type: str) -> None:
         """Button styling should support all defined button types."""
         css = get_button_style(style_type=button_type)
@@ -145,7 +145,7 @@ class TestButtonStyling:
 
         # Default buttons should have different text color handling
         assert COLORS["light_gray"] in default_css  # Default background
-        assert COLORS["primary"] in primary_css    # Primary background
+        assert COLORS["primary"] in primary_css  # Primary background
 
 
 class TestInputStyling:
@@ -489,22 +489,31 @@ class TestCSSValidation:
         issues = []
 
         # Check for balanced braces
-        open_braces = css.count('{')
-        close_braces = css.count('}')
+        open_braces = css.count("{")
+        close_braces = css.count("}")
         if open_braces != close_braces:
             issues.append(f"Unbalanced braces: {open_braces} open, {close_braces} close")
 
         # Check for basic property syntax
-        if ':' in css and ';' not in css:
+        if ":" in css and ";" not in css:
             issues.append("CSS properties should end with semicolons")
 
         return issues
 
-    @pytest.mark.parametrize("style_function", [
-        get_button_style, get_input_style, get_panel_style, get_status_style,
-        get_progress_style, get_tab_style, get_preview_panel_style,
-        get_dark_preview_style, get_dark_panel_style
-    ])
+    @pytest.mark.parametrize(
+        "style_function",
+        [
+            get_button_style,
+            get_input_style,
+            get_panel_style,
+            get_status_style,
+            get_progress_style,
+            get_tab_style,
+            get_preview_panel_style,
+            get_dark_preview_style,
+            get_dark_panel_style,
+        ],
+    )
     def test_all_styling_functions_return_valid_css(self, style_function) -> None:
         """All styling functions should return structurally valid CSS."""
         css = style_function()
@@ -644,7 +653,7 @@ class TestPreviewWidgetDarkTheme:
         assert preview_widget is not None
 
         # If the widget has a preview_label, test its styling
-        if hasattr(preview_widget, 'preview_label') and preview_widget.preview_label:
+        if hasattr(preview_widget, "preview_label") and preview_widget.preview_label:
             style_sheet = preview_widget.preview_label.styleSheet()
 
             # Should contain dark background styling
@@ -826,7 +835,7 @@ class TestStylesheetIntegration:
 class TestMockApplicationIntegration:
     """Test application-level theme integration using mocks where appropriate."""
 
-    @patch('launch_spritepal.QApplication')
+    @patch("launch_spritepal.QApplication")
     def test_application_theme_setup_mock(self, mock_qapp_class) -> None:
         """Test application theme setup logic with mocked QApplication."""
         # Mock QApplication instance
@@ -857,7 +866,7 @@ class TestMockApplicationIntegration:
             {"SPRITEPAL_THEME": "dark"},
             {"SPRITEPAL_THEME": "auto"},
             {"CI": "1"},  # CI environment
-            {}  # No environment variables
+            {},  # No environment variables
         ]
 
         for env_vars in test_environments:
@@ -948,13 +957,28 @@ class TestComponentStylingHeadless:
         """All component styling functions should be importable."""
         # This test ensures all functions are properly defined
         functions = [
-            get_button_style, get_input_style, get_panel_style, get_status_style,
-            get_progress_style, get_tab_style, get_muted_text_style, get_link_text_style,
-            get_monospace_text_style, get_bold_text_style, get_success_text_style,
-            get_error_text_style, get_hex_label_style, get_slider_style,
-            get_splitter_style, get_dialog_button_box_style, get_scroll_area_style,
-            get_preview_panel_style, get_minimal_preview_style, get_borderless_preview_style,
-            get_dark_preview_style, get_dark_panel_style
+            get_button_style,
+            get_input_style,
+            get_panel_style,
+            get_status_style,
+            get_progress_style,
+            get_tab_style,
+            get_muted_text_style,
+            get_link_text_style,
+            get_monospace_text_style,
+            get_bold_text_style,
+            get_success_text_style,
+            get_error_text_style,
+            get_hex_label_style,
+            get_slider_style,
+            get_splitter_style,
+            get_dialog_button_box_style,
+            get_scroll_area_style,
+            get_preview_panel_style,
+            get_minimal_preview_style,
+            get_borderless_preview_style,
+            get_dark_preview_style,
+            get_dark_panel_style,
         ]
 
         for func in functions:
@@ -989,11 +1013,11 @@ class TestIntegrationHeadless:
         """Test that CSS generation works correctly for integration scenarios."""
         # Test that all major styling functions can be called together
         styles = {
-            'theme': get_theme_style(),
-            'button': get_button_style("primary"),
-            'input': get_input_style("text"),
-            'panel': get_panel_style("default"),
-            'preview': get_dark_preview_style(),
+            "theme": get_theme_style(),
+            "button": get_button_style("primary"),
+            "input": get_input_style("text"),
+            "panel": get_panel_style("default"),
+            "preview": get_dark_preview_style(),
         }
 
         for style_name, css in styles.items():
@@ -1001,20 +1025,17 @@ class TestIntegrationHeadless:
             assert len(css) > 0, f"Style {style_name} should not be empty"
 
             # Basic CSS validation
-            assert css.count('{') == css.count('}'), f"Style {style_name} has unbalanced braces"
+            assert css.count("{") == css.count("}"), f"Style {style_name} has unbalanced braces"
 
     def test_color_references_in_integrated_styles(self) -> None:
         """Test that integrated styles reference valid colors."""
         # Generate integrated stylesheet combining multiple components
         integrated_css = (
-            get_theme_style() +
-            get_button_style("primary") +
-            get_input_style("text") +
-            get_panel_style("default")
+            get_theme_style() + get_button_style("primary") + get_input_style("text") + get_panel_style("default")
         )
 
         # Find all color references
-        color_pattern = re.compile(r'#[0-9A-Fa-f]{6}')
+        color_pattern = re.compile(r"#[0-9A-Fa-f]{6}")
         colors_in_css = set(color_pattern.findall(integrated_css))
 
         # Test that found colors are all valid theme colors

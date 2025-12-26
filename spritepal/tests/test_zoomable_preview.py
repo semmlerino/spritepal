@@ -1,6 +1,7 @@
 """
 Tests for ZoomablePreviewWidget and PreviewPanel
 """
+
 from __future__ import annotations
 
 import sys
@@ -120,9 +121,7 @@ class TestZoomablePreviewWidget:
         initial_grid = widget._grid_visible
 
         # Simulate G key press
-        key_event = QKeyEvent(
-            QKeyEvent.Type.KeyPress, Qt.Key.Key_G, Qt.KeyboardModifier.NoModifier
-        )
+        key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_G, Qt.KeyboardModifier.NoModifier)
         widget.keyPressEvent(key_event)
 
         assert widget._grid_visible != initial_grid
@@ -146,6 +145,7 @@ class TestZoomablePreviewWidget:
 
         assert widget._pixmap is not None
         assert not widget._pixmap.isNull()
+
 
 @pytest.mark.gui
 class TestPreviewPanel:
@@ -178,8 +178,7 @@ class TestPreviewPanel:
     def test_palettes(self):
         """Create test palette data"""
         return {
-            8: [[0, 0, 0], [255, 192, 203], [255, 255, 255], [128, 128, 128]]
-            + [[0, 0, 0]] * 12,
+            8: [[0, 0, 0], [255, 192, 203], [255, 255, 255], [128, 128, 128]] + [[0, 0, 0]] * 12,
             9: [[0, 0, 0], [255, 0, 0], [0, 255, 0], [0, 0, 255]] + [[0, 0, 0]] * 12,
         }
 
@@ -234,9 +233,7 @@ class TestPreviewPanel:
         initial_checked = panel.palette_toggle.isChecked()
 
         # Simulate C key press
-        key_event = QKeyEvent(
-            QKeyEvent.Type.KeyPress, Qt.Key.Key_C, Qt.KeyboardModifier.NoModifier
-        )
+        key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_C, Qt.KeyboardModifier.NoModifier)
         panel.keyPressEvent(key_event)
 
         assert panel.palette_toggle.isChecked() != initial_checked
@@ -249,27 +246,19 @@ class TestPreviewPanel:
         assert isinstance(pixmap, QPixmap)
         assert not pixmap.isNull()
 
-    def test_apply_palette_to_grayscale_image(
-        self, panel, test_grayscale_image, test_palettes
-    ):
+    def test_apply_palette_to_grayscale_image(self, panel, test_grayscale_image, test_palettes):
         """Test applying palette to grayscale image through colorizer"""
         panel.set_palettes(test_palettes)
-        result = panel.colorizer.apply_palette_to_image(
-            test_grayscale_image, test_palettes[8]
-        )
+        result = panel.colorizer.apply_palette_to_image(test_grayscale_image, test_palettes[8])
 
         assert result is not None
         assert result.mode == "RGBA"
         assert result.size == test_grayscale_image.size
 
-    def test_apply_palette_to_palette_image(
-        self, panel, test_palette_image, test_palettes
-    ):
+    def test_apply_palette_to_palette_image(self, panel, test_palette_image, test_palettes):
         """Test applying palette to palette mode image through colorizer"""
         panel.set_palettes(test_palettes)
-        result = panel.colorizer.apply_palette_to_image(
-            test_palette_image, test_palettes[8]
-        )
+        result = panel.colorizer.apply_palette_to_image(test_palette_image, test_palettes[8])
 
         assert result is not None
         assert result.mode == "RGBA"
@@ -303,9 +292,7 @@ class TestPreviewPanel:
         assert panel.palette_selector.isEnabled() is False
 
     @patch("ui.zoomable_preview.PreviewPanel._pil_to_pixmap")
-    def test_show_grayscale_preserves_view(
-        self, mock_pil_to_pixmap, panel, test_grayscale_image
-    ):
+    def test_show_grayscale_preserves_view(self, mock_pil_to_pixmap, panel, test_grayscale_image):
         """Test that showing grayscale preserves view state"""
         # Mock the conversion
         mock_pixmap = Mock()
@@ -324,9 +311,7 @@ class TestPreviewPanel:
         panel.preview.update_pixmap.assert_called_once_with(mock_pixmap)
 
     @patch("ui.zoomable_preview.PreviewPanel._pil_to_pixmap")
-    def test_apply_palette_preserves_view(
-        self, mock_pil_to_pixmap, panel, test_grayscale_image, test_palettes
-    ):
+    def test_apply_palette_preserves_view(self, mock_pil_to_pixmap, panel, test_grayscale_image, test_palettes):
         """Test that applying palette preserves view state"""
         # Mock the conversion
         mock_pixmap = Mock()

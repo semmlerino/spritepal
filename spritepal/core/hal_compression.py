@@ -2,6 +2,7 @@
 HAL compression/decompression module for SpritePal.
 Interfaces with exhal/inhal C tools for ROM sprite injection.
 """
+
 from __future__ import annotations
 
 import atexit
@@ -28,12 +29,15 @@ from typing import NamedTuple
 
 class HALResultStatus(Enum):
     """Status of a HAL operation result for explicit tracking."""
-    COMPLETED = "completed"      # Operation completed successfully or with error
-    TIMED_OUT = "timed_out"      # Operation did not return within timeout
-    PENDING = "pending"          # Operation submitted but no result yet (internal use)
+
+    COMPLETED = "completed"  # Operation completed successfully or with error
+    TIMED_OUT = "timed_out"  # Operation did not return within timeout
+    PENDING = "pending"  # Operation submitted but no result yet (internal use)
+
 
 try:
     from PySide6.QtWidgets import QApplication
+
     QT_AVAILABLE = True
 except ImportError:
     QApplication = None
@@ -49,6 +53,7 @@ def _is_wsl_environment() -> bool:
         return "microsoft" in release or "wsl" in release
     except (OSError, AttributeError):
         return False
+
 
 from utils.constants import (
     DATA_SIZE,
@@ -69,14 +74,18 @@ from utils.safe_logging import (
 
 logger = get_logger(__name__)
 
+
 class HALCompressionError(Exception):
     """Raised when HAL compression/decompression fails"""
+
 
 class HALPoolError(HALCompressionError):
     """Raised when HAL process pool operations fail"""
 
+
 class HALRequest(NamedTuple):
     """Request structure for HAL process pool operations"""
+
     operation: str  # 'decompress' or 'compress'
     rom_path: str
     offset: int
@@ -85,6 +94,7 @@ class HALRequest(NamedTuple):
     fast: bool = False
     request_id: str | None = None
     batch_id: str | None = None  # Unique batch identifier to prevent result misattribution
+
 
 class HALResult(NamedTuple):
     """Result structure for HAL process pool operations.
@@ -98,6 +108,7 @@ class HALResult(NamedTuple):
         status: Explicit status tracking (COMPLETED, TIMED_OUT, PENDING)
         batch_id: Unique batch identifier to validate result ownership
     """
+
     success: bool
     data: bytes | None = None
     size: int | None = None
@@ -106,7 +117,10 @@ class HALResult(NamedTuple):
     status: HALResultStatus = HALResultStatus.COMPLETED
     batch_id: str | None = None
 
-def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queue[HALRequest | None], result_queue: mp.Queue[HALResult]) -> None:
+
+def _hal_worker_process(
+    exhal_path: str, inhal_path: str, request_queue: mp.Queue[HALRequest | None], result_queue: mp.Queue[HALResult]
+) -> None:
     """Worker process function for HAL operations.
 
     Runs in a separate process and handles HAL compression/decompression requests.
@@ -122,11 +136,13 @@ def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queu
     worker_logger = None
     try:
         from utils.logging_config import get_logger
+
         worker_logger = get_logger(f"hal_worker_{os.getpid()}")
     except (ImportError, ModuleNotFoundError, FileNotFoundError):
         # If custom logging unavailable (import error or missing config file),
         # fall back to basic stdlib logger
         import logging
+
         worker_logger = logging.getLogger(f"hal_worker_{os.getpid()}")
         worker_logger.setLevel(logging.DEBUG)
         if not worker_logger.handlers:
@@ -168,7 +184,7 @@ def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queu
                     success=False,
                     error_message=f"Unknown operation: {request.operation}",
                     request_id=request.request_id,
-                    batch_id=request.batch_id
+                    batch_id=request.batch_id,
                 )
 
             # Put result in queue with error handling for closed pipes
@@ -196,7 +212,7 @@ def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queu
                     success=False,
                     error_message=f"Worker process error: {e!s}",
                     request_id=getattr(request, "request_id", None) if request is not None else None,
-                    batch_id=getattr(request, "batch_id", None) if request is not None else None
+                    batch_id=getattr(request, "batch_id", None) if request is not None else None,
                 )
                 result_queue.put(result)
             except (BrokenPipeError, EOFError, OSError, ConnectionResetError):
@@ -210,6 +226,7 @@ def _hal_worker_process(exhal_path: str, inhal_path: str, request_queue: mp.Queu
 
     worker_logger.debug(f"HAL worker process {os.getpid()} exiting")
 
+
 def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
     """Process decompression request in worker process."""
     try:
@@ -219,7 +236,7 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
                 success=False,
                 error_message=f"ROM file not found: {request.rom_path}",
                 request_id=request.request_id,
-                batch_id=request.batch_id
+                batch_id=request.batch_id,
             )
 
         # Create temporary output file
@@ -234,7 +251,7 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
                     success=False,
                     error_message=f"Invalid offset: {request.offset} (must be non-negative integer)",
                     request_id=request.request_id,
-                    batch_id=request.batch_id
+                    batch_id=request.batch_id,
                 )
 
             offset_hex = f"0x{request.offset:X}"
@@ -247,18 +264,14 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
                     success=False,
                     error_message=f"Decompression failed: {result.stderr}",
                     request_id=request.request_id,
-                    batch_id=request.batch_id
+                    batch_id=request.batch_id,
                 )
 
             # Read decompressed data
             data = Path(output_path).read_bytes()
 
             return HALResult(
-                success=True,
-                data=data,
-                size=len(data),
-                request_id=request.request_id,
-                batch_id=request.batch_id
+                success=True, data=data, size=len(data), request_id=request.request_id, batch_id=request.batch_id
             )
 
         finally:
@@ -271,8 +284,9 @@ def _process_decompress(exhal_path: str, request: HALRequest) -> HALResult:
             success=False,
             error_message=f"Decompression error: {e!s}",
             request_id=request.request_id,
-            batch_id=request.batch_id
+            batch_id=request.batch_id,
         )
+
 
 def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
     """Process compression request in worker process."""
@@ -282,7 +296,7 @@ def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
                 success=False,
                 error_message="No data provided for compression",
                 request_id=request.request_id,
-                batch_id=request.batch_id
+                batch_id=request.batch_id,
             )
 
         # Write input to temp file
@@ -305,24 +319,21 @@ def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
                         success=False,
                         error_message=f"Compression failed: {result.stderr}",
                         request_id=request.request_id,
-                        batch_id=request.batch_id
+                        batch_id=request.batch_id,
                     )
 
                 # Get compressed size
                 compressed_size = Path(request.output_path).stat().st_size
 
                 return HALResult(
-                    success=True,
-                    size=compressed_size,
-                    request_id=request.request_id,
-                    batch_id=request.batch_id
+                    success=True, size=compressed_size, request_id=request.request_id, batch_id=request.batch_id
                 )
             # ROM injection - not supported in pool mode for safety
             return HALResult(
                 success=False,
                 error_message="ROM injection not supported in pool mode",
                 request_id=request.request_id,
-                batch_id=request.batch_id
+                batch_id=request.batch_id,
             )
 
         finally:
@@ -335,8 +346,9 @@ def _process_compress(inhal_path: str, request: HALRequest) -> HALResult:
             success=False,
             error_message=f"Compression error: {e!s}",
             request_id=request.request_id,
-            batch_id=request.batch_id
+            batch_id=request.batch_id,
         )
+
 
 class HALProcessPool:
     """Singleton HAL process pool for efficient compression/decompression operations."""
@@ -426,13 +438,13 @@ class HALProcessPool:
                     p = mp.Process(
                         target=_hal_worker_process,
                         args=(exhal_path, inhal_path, self._request_queue, self._result_queue),
-                        daemon=False  # Non-daemon: allows graceful shutdown, requires explicit cleanup
+                        daemon=False,  # Non-daemon: allows graceful shutdown, requires explicit cleanup
                     )
                     p.start()
                     self._processes.append(p)
                     if p.pid is not None:  # Ensure PID is available before appending
                         self._process_pids.append(p.pid)
-                    logger.debug(f"Started worker process {i+1}/{pool_size}: PID {p.pid}")
+                    logger.debug(f"Started worker process {i + 1}/{pool_size}: PID {p.pid}")
 
                 # Connect to Qt application aboutToQuit signal if available
                 self._connect_qt_cleanup()
@@ -447,7 +459,7 @@ class HALProcessPool:
                         operation="decompress",
                         rom_path="",  # Will fail but tests communication
                         offset=0,
-                        request_id=f"init_test_{i}"
+                        request_id=f"init_test_{i}",
                     )
                     for i in range(pool_size)
                 ]
@@ -488,7 +500,7 @@ class HALProcessPool:
                     safe_warning(
                         logger,
                         f"HAL pool partially initialized: {responses_received}/{pool_size} workers responded. "
-                        f"Meets minimum threshold ({min_required}), but some operations may be slower."
+                        f"Meets minimum threshold ({min_required}), but some operations may be slower.",
                     )
                 else:
                     logger.debug(f"Pool communication test successful - all {pool_size} workers responded")
@@ -529,9 +541,7 @@ class HALProcessPool:
         """
         if not self._pool_initialized or self._shutdown:
             return HALResult(
-                success=False,
-                error_message="Pool not initialized or shutting down",
-                request_id=request.request_id
+                success=False, error_message="Pool not initialized or shutting down", request_id=request.request_id
             )
 
         # Set timeout before try block to ensure it's available in exception handlers
@@ -553,14 +563,10 @@ class HALProcessPool:
             return HALResult(
                 success=False,
                 error_message=f"Operation timed out after {timeout} seconds",
-                request_id=request.request_id
+                request_id=request.request_id,
             )
         except Exception as e:
-            return HALResult(
-                success=False,
-                error_message=f"Pool error: {e!s}",
-                request_id=request.request_id
-            )
+            return HALResult(success=False, error_message=f"Pool error: {e!s}", request_id=request.request_id)
 
     def submit_batch(self, requests: list[HALRequest]) -> list[HALResult]:
         """Submit multiple requests to the pool for parallel processing.
@@ -595,25 +601,19 @@ class HALProcessPool:
             request_ids = [req.request_id for req in requests]
             non_none_ids = [rid for rid in request_ids if rid is not None]
             if len(set(non_none_ids)) != len(non_none_ids):
-                safe_warning(
-                    logger,
-                    "Non-unique request IDs detected in batch - reassigning unique IDs"
-                )
+                safe_warning(logger, "Non-unique request IDs detected in batch - reassigning unique IDs")
                 # Create new requests with unique IDs and batch_id to prevent result collision
                 requests = [
                     req._replace(request_id=f"batch_{id(req)}_{i}", batch_id=current_batch_id)
                     for i, req in enumerate(requests)
                 ]
             elif None in request_ids:
-                safe_warning(
-                    logger,
-                    "None request_id detected in batch - assigning unique IDs"
-                )
+                safe_warning(logger, "None request_id detected in batch - assigning unique IDs")
                 # Create new requests for those with None IDs, add batch_id to all
                 requests = [
                     req._replace(
                         request_id=f"batch_none_{id(req)}_{i}" if req.request_id is None else req.request_id,
-                        batch_id=current_batch_id
+                        batch_id=current_batch_id,
                     )
                     for i, req in enumerate(requests)
                 ]
@@ -645,10 +645,7 @@ class HALProcessPool:
                 wait_time = min(per_request_timeout, max(0.1, remaining))
 
                 if remaining <= 0:
-                    safe_warning(
-                        logger,
-                        f"Batch timeout: received {received_count}/{len(requests)} results"
-                    )
+                    safe_warning(logger, f"Batch timeout: received {received_count}/{len(requests)} results")
                     break
 
                 try:
@@ -666,7 +663,7 @@ class HALProcessPool:
                         # Stale result from previous batch - discard and log
                         safe_debug(
                             logger,
-                            f"Discarding stale result with batch_id={result.batch_id} (expected {current_batch_id})"
+                            f"Discarding stale result with batch_id={result.batch_id} (expected {current_batch_id})",
                         )
                 except queue.Empty:
                     # Individual request timed out, but continue trying for others
@@ -694,15 +691,9 @@ class HALProcessPool:
                     except queue.Empty:
                         break
                 if drained_count > 0:
-                    safe_debug(
-                        logger,
-                        f"Drained {drained_count} late-arriving results from queue"
-                    )
+                    safe_debug(logger, f"Drained {drained_count} late-arriving results from queue")
                 if discarded_stale > 0:
-                    safe_debug(
-                        logger,
-                        f"Discarded {discarded_stale} stale results from previous batches"
-                    )
+                    safe_debug(logger, f"Discarded {discarded_stale} stale results from previous batches")
 
             # Return results in same order as requests with explicit status
             final_results = []
@@ -797,10 +788,7 @@ class HALProcessPool:
                         safe_debug(logger, "Manager shutdown taking longer, waiting additional 2s")
                         shutdown_thread.join(timeout=2.0)
                         if shutdown_thread.is_alive():
-                            safe_warning(
-                                logger,
-                                "Manager shutdown did not complete in 3s - forcing cleanup"
-                            )
+                            safe_warning(logger, "Manager shutdown did not complete in 3s - forcing cleanup")
                 except Exception as e:
                     safe_debug(logger, f"Error during manager shutdown: {e}")
                 finally:
@@ -809,7 +797,7 @@ class HALProcessPool:
             # Clear all references
             self._processes.clear()
             self._process_pids.clear()
-            if hasattr(self, '_process_refs'):
+            if hasattr(self, "_process_refs"):
                 self._process_refs.clear()
             self._request_queue = None
             self._result_queue = None
@@ -868,10 +856,12 @@ class HALProcessPool:
         """Destructor to ensure cleanup happens even if shutdown is not called explicitly."""
         try:
             # More defensive checks during destructor
-            if (hasattr(self, "_pool_initialized") and
-                hasattr(self, "_shutdown") and
-                self._pool_initialized and
-                not self._shutdown):
+            if (
+                hasattr(self, "_pool_initialized")
+                and hasattr(self, "_shutdown")
+                and self._pool_initialized
+                and not self._shutdown
+            ):
                 safe_debug(logger, "HALProcessPool destructor triggered - cleaning up resources")
                 self.shutdown()
         except Exception:
@@ -949,7 +939,7 @@ class HALProcessPool:
             # Clear all state including weak references
             self._processes.clear()
             self._process_pids.clear()
-            if hasattr(self, '_process_refs'):
+            if hasattr(self, "_process_refs"):
                 self._process_refs.clear()
             self._pool_initialized = False
             self._manager = None
@@ -995,12 +985,11 @@ class HALProcessPool:
         """
         cls.reset_singleton()
 
+
 class HALCompressor:
     """Handles HAL compression/decompression for ROM injection"""
 
-    def __init__(
-        self, exhal_path: str | None = None, inhal_path: str | None = None, use_pool: bool = True
-    ):
+    def __init__(self, exhal_path: str | None = None, inhal_path: str | None = None, use_pool: bool = True):
         """
         Initialize HAL compressor.
 
@@ -1101,9 +1090,7 @@ class HALCompressor:
             f"Please run 'python compile_hal_tools.py' to build for your platform."
         )
 
-    def decompress_from_rom(
-        self, rom_path: str, offset: int, output_path: str | None = None
-    ) -> bytes:
+    def decompress_from_rom(self, rom_path: str, offset: int, output_path: str | None = None) -> bytes:
         """
         Decompress data from ROM at specified offset.
 
@@ -1131,7 +1118,7 @@ class HALCompressor:
                 rom_path=rom_path,
                 offset=offset,
                 output_path=output_path,
-                request_id=f"decompress_{offset}"
+                request_id=f"decompress_{offset}",
             )
 
             result = self._pool.submit_request(request)
@@ -1158,14 +1145,11 @@ class HALCompressor:
             logger.debug(f"Running command: {' '.join(cmd)}")
 
             try:
-                result = subprocess.run(
-                    cmd, check=False, capture_output=True, text=True, timeout=30
-                )
+                result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
             except subprocess.TimeoutExpired:
                 logger.error(f"Decompression timed out at offset 0x{offset:X}")
                 raise HALCompressionError(
-                    f"Decompression timed out at offset 0x{offset:X} - "
-                    "data may be malformed or not HAL-compressed"
+                    f"Decompression timed out at offset 0x{offset:X} - data may be malformed or not HAL-compressed"
                 ) from None
 
             logger.debug(f"Command completed with return code: {result.returncode}")
@@ -1184,12 +1168,8 @@ class HALCompressor:
 
             # Validate decompressed size (HAL max is 64KB)
             if len(data) > 65536:
-                logger.error(
-                    f"Decompression produced {len(data)} bytes, exceeds 64KB HAL limit"
-                )
-                raise HALCompressionError(
-                    f"Decompression bomb detected: {len(data)} bytes exceeds 64KB limit"
-                )
+                logger.error(f"Decompression produced {len(data)} bytes, exceeds 64KB HAL limit")
+                raise HALCompressionError(f"Decompression bomb detected: {len(data)} bytes exceeds 64KB limit")
 
             logger.info(f"Successfully decompressed {len(data)} bytes from ROM offset 0x{offset:X}")
             return data
@@ -1200,9 +1180,7 @@ class HALCompressor:
                 with contextlib.suppress(Exception):
                     Path(output_path).unlink()
 
-    def compress_to_file(
-        self, input_data: bytes, output_path: str, fast: bool = False
-    ) -> int:
+    def compress_to_file(self, input_data: bytes, output_path: str, fast: bool = False) -> int:
         """
         Compress data to a file.
 
@@ -1219,9 +1197,7 @@ class HALCompressor:
         # Check size limit
         if len(input_data) > DATA_SIZE:
             logger.error(f"Input data too large: {len(input_data)} bytes (max {DATA_SIZE})")
-            raise HALCompressionError(
-                f"Input data too large: {len(input_data)} bytes (max {DATA_SIZE})"
-            )
+            raise HALCompressionError(f"Input data too large: {len(input_data)} bytes (max {DATA_SIZE})")
 
         # Write input to temp file
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
@@ -1261,12 +1237,7 @@ class HALCompressor:
                 Path(tmp_path).unlink()
 
     def compress_to_rom(
-        self,
-        input_data: bytes,
-        rom_path: str,
-        offset: int,
-        output_rom_path: str | None = None,
-        fast: bool = False
+        self, input_data: bytes, rom_path: str, offset: int, output_rom_path: str | None = None, fast: bool = False
     ) -> tuple[bool, str]:
         """
         Compress data and inject into ROM at specified offset.
@@ -1286,10 +1257,7 @@ class HALCompressor:
         # Check size limit
         if len(input_data) > DATA_SIZE:
             logger.error(f"Input data too large: {len(input_data)} bytes (max {DATA_SIZE})")
-            return (
-                False,
-                f"Input data too large: {len(input_data)} bytes (max {DATA_SIZE})"
-            )
+            return (False, f"Input data too large: {len(input_data)} bytes (max {DATA_SIZE})")
 
         # If no output path, modify in place - but create backup first
         if output_rom_path is None:
@@ -1301,8 +1269,7 @@ class HALCompressor:
                 logger.error(f"Failed to create backup for in-place modification: {e}")
                 return (
                     False,
-                    f"Cannot modify ROM in-place: backup failed ({e}). "
-                    "Specify an output path or free up disk space."
+                    f"Cannot modify ROM in-place: backup failed ({e}). Specify an output path or free up disk space.",
                 )
             output_rom_path = rom_path
             logger.debug("Modifying ROM in place (backup created)")
@@ -1346,10 +1313,7 @@ class HALCompressor:
                     compressed_size = match.group(1)
 
             logger.info(f"Successfully injected compressed data ({compressed_size} bytes) at offset 0x{offset:X}")
-            return (
-                True,
-                f"Successfully injected compressed data ({compressed_size} bytes) at offset 0x{offset:X}"
-            )
+            return (True, f"Successfully injected compressed data ({compressed_size} bytes) at offset 0x{offset:X}")
 
         finally:
             # Clean up temp file
@@ -1363,9 +1327,7 @@ class HALCompressor:
         def _test_tool(tool_path: str, tool_name: str) -> str | None:
             """Helper to test a single HAL tool. Returns error message or None if success."""
             logger.debug(f"Testing {tool_name} at: {tool_path}")
-            result = subprocess.run(
-                [tool_path], check=False, capture_output=True, text=True
-            )
+            result = subprocess.run([tool_path], check=False, capture_output=True, text=True)
             # Check both stdout and stderr for tool output
             output = (result.stdout + result.stderr).lower()
             if tool_name.lower() not in output and "usage" not in output:
@@ -1385,7 +1347,9 @@ class HALCompressor:
 
         except FileNotFoundError:
             logger.exception("HAL tools not found")
-            error_msg = f"HAL tools not found. Please run 'python compile_hal_tools.py' to build for {platform.system()}"
+            error_msg = (
+                f"HAL tools not found. Please run 'python compile_hal_tools.py' to build for {platform.system()}"
+            )
         except OSError as e:
             logger.exception("OS error testing tools")
             if platform.system() == "Windows" and hasattr(e, "winerror") and getattr(e, "winerror", None) == 193:
@@ -1428,12 +1392,7 @@ class HALCompressor:
 
         # Convert to HALRequest objects
         hal_requests = [
-            HALRequest(
-                operation="decompress",
-                rom_path=rom_path,
-                offset=offset,
-                request_id=f"batch_{i}"
-            )
+            HALRequest(operation="decompress", rom_path=rom_path, offset=offset, request_id=f"batch_{i}")
             for i, (rom_path, offset) in enumerate(requests)
         ]
 
@@ -1482,7 +1441,7 @@ class HALCompressor:
                 data=data,
                 output_path=output_path,
                 fast=fast,
-                request_id=f"batch_compress_{i}"
+                request_id=f"batch_compress_{i}",
             )
             for i, (data, output_path, fast) in enumerate(requests)
         ]
@@ -1507,15 +1466,16 @@ class HALCompressor:
         if not self._pool:
             return {
                 "enabled": False,
-                "reason": "Pool initialization failed" if self._pool_failed else "Pool not configured"
+                "reason": "Pool initialization failed" if self._pool_failed else "Pool not configured",
             }
 
         return {
             "enabled": True,
             "initialized": self._pool.is_initialized,
             "pool_size": getattr(self._pool, "_pool_size", 0),
-            "mode": "pool" if self._pool.is_initialized else "subprocess"
+            "mode": "pool" if self._pool.is_initialized else "subprocess",
         }
+
 
 # Module-level cleanup for memory leak prevention
 # WARNING: SPOOKY ACTION AT A DISTANCE
@@ -1531,5 +1491,6 @@ def _cleanup_hal_singleton():
         HALProcessPool.reset_singleton()
     except Exception:
         pass  # Ignore errors during cleanup
+
 
 atexit.register(_cleanup_hal_singleton)

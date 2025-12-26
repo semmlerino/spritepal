@@ -124,9 +124,7 @@ class WorkflowStateManager(QObject):
 
     # ========== State Transitions ==========
 
-    def transition(
-        self, new_state: ExtractionState, error_message: str | None = None
-    ) -> bool:
+    def transition(self, new_state: ExtractionState, error_message: str | None = None) -> bool:
         """
         Attempt to transition to a new workflow state.
 
@@ -141,9 +139,7 @@ class WorkflowStateManager(QObject):
             # Check if transition is valid
             valid_targets = self.VALID_TRANSITIONS.get(self._workflow_state, set())
             if new_state not in valid_targets:
-                self._logger.warning(
-                    f"Invalid workflow transition: {self._workflow_state.name} -> {new_state.name}"
-                )
+                self._logger.warning(f"Invalid workflow transition: {self._workflow_state.name} -> {new_state.name}")
                 return False
 
             old_state = self._workflow_state

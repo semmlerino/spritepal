@@ -3,6 +3,7 @@ Dialog for displaying visual similarity search results.
 
 Shows similar sprites with thumbnails, similarity scores, and allows navigation.
 """
+
 from __future__ import annotations
 
 from typing import Any, override
@@ -27,6 +28,7 @@ from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class SimilarityResultWidget(QFrame):
     """Widget displaying a single similarity search result."""
@@ -69,9 +71,10 @@ class SimilarityResultWidget(QFrame):
         if self.thumbnail and not self.thumbnail.isNull():
             # Scale thumbnail to reasonable size
             scaled_thumbnail = self.thumbnail.scaled(
-                THUMBNAIL_SIZE, THUMBNAIL_SIZE,
+                THUMBNAIL_SIZE,
+                THUMBNAIL_SIZE,
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
+                Qt.TransformationMode.SmoothTransformation,
             )
             thumbnail_label.setPixmap(scaled_thumbnail)
         else:
@@ -132,6 +135,7 @@ class SimilarityResultWidget(QFrame):
             self.sprite_selected.emit(self.match.offset)
         super().mousePressEvent(event)
 
+
 class SimilarityResultsDialog(DialogBase):
     """Dialog showing visual similarity search results."""
 
@@ -148,7 +152,7 @@ class SimilarityResultsDialog(DialogBase):
             modal=True,
             min_size=(600, 400),
             size=(800, 600),
-            with_button_box=False  # We'll create our own close button
+            with_button_box=False,  # We'll create our own close button
         )
 
     @override
@@ -164,8 +168,12 @@ class SimilarityResultsDialog(DialogBase):
 
         if not self.matches:
             # No results found
-            no_results_label = QLabel("No similar sprites found.\n\nTry adjusting the similarity threshold or ensuring more sprites are indexed.")
-            no_results_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic; text-align: center; margin: 40px;")
+            no_results_label = QLabel(
+                "No similar sprites found.\n\nTry adjusting the similarity threshold or ensuring more sprites are indexed."
+            )
+            no_results_label.setStyleSheet(
+                f"color: {COLORS['text_muted']}; font-style: italic; text-align: center; margin: 40px;"
+            )
             no_results_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(no_results_label)
         else:
@@ -216,10 +224,9 @@ class SimilarityResultsDialog(DialogBase):
         self.sprite_selected.emit(offset)
         self.accept()  # Close dialog after selection
 
+
 def show_similarity_results(
-    matches: list[SimilarityMatch],
-    source_offset: int,
-    parent: QWidget | None = None
+    matches: list[SimilarityMatch], source_offset: int, parent: QWidget | None = None
 ) -> SimilarityResultsDialog:
     """
     Convenience function to show similarity results dialog.

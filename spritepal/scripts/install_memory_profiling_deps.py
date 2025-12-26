@@ -26,12 +26,10 @@ def install_package(package_name: str, description: str):
         print(f"❌ Failed to install {package_name}: {e}")
         return False
 
+
 def check_virtual_environment():
     """Check if we're in a virtual environment."""
-    in_venv = (
-        hasattr(sys, "real_prefix") or
-        (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
-    )
+    in_venv = hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
 
     if not in_venv:
         print("⚠️  WARNING: Not in a virtual environment!")
@@ -48,6 +46,7 @@ def check_virtual_environment():
         print(f"✅ Virtual environment detected: {sys.prefix}")
 
     return True
+
 
 def main():
     """Install all memory profiling dependencies."""
@@ -105,6 +104,7 @@ def main():
     print("   python scripts/profile_dialog_leaks.py --dialog ManualOffsetDialog")
 
     return 0 if not failed_packages else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -1,6 +1,7 @@
 """
 Test sprite validation functionality
 """
+
 from __future__ import annotations
 
 import json
@@ -19,6 +20,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.no_manager_setup,
 ]
+
 
 class TestSpriteValidator:
     """Test sprite validation"""
@@ -47,9 +49,7 @@ class TestSpriteValidator:
             img.save(sprite_path)
 
             # Validate
-            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(
-                sprite_path
-            )
+            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(sprite_path)
 
             assert is_valid
             assert len(errors) == 0
@@ -64,9 +64,7 @@ class TestSpriteValidator:
             img.save(sprite_path)
 
             # Validate
-            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(
-                sprite_path
-            )
+            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(sprite_path)
 
             assert not is_valid
             assert any("Width must be a multiple of 8" in e for e in errors)
@@ -93,9 +91,7 @@ class TestSpriteValidator:
             img.save(sprite_path)
 
             # Validate
-            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(
-                sprite_path
-            )
+            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(sprite_path)
 
             assert not is_valid
             assert any("uses 20 colors" in e for e in errors)
@@ -115,9 +111,7 @@ class TestSpriteValidator:
             img.save(sprite_path)
 
             # Validate
-            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(
-                sprite_path
-            )
+            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(sprite_path)
 
             assert is_valid
             assert len(errors) == 0
@@ -136,9 +130,7 @@ class TestSpriteValidator:
             img.save(sprite_path)
 
             # Validate
-            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(
-                sprite_path
-            )
+            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(sprite_path)
 
             assert is_valid  # Still valid, just has warnings
             assert any("non-standard grayscale values" in w for w in warnings)
@@ -151,9 +143,7 @@ class TestSpriteValidator:
             img.save(sprite_path)
 
             # Validate
-            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(
-                sprite_path
-            )
+            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(sprite_path)
 
             assert is_valid
             assert any("larger than typical" in w for w in warnings)
@@ -175,9 +165,7 @@ class TestSpriteValidator:
             img.save(sprite_path)
 
             # Estimate size
-            uncompressed, compressed = SpriteValidator.estimate_compressed_size(
-                sprite_path
-            )
+            uncompressed, compressed = SpriteValidator.estimate_compressed_size(sprite_path)
 
             # 128x128 pixels = 16x16 tiles = 256 tiles = 8192 bytes uncompressed
             assert uncompressed == 256 * 32  # 8192
@@ -198,9 +186,7 @@ class TestSpriteValidator:
             img2.save(sprite2_path)
 
             # Check compatibility
-            compatible, reasons = SpriteValidator.check_sprite_compatibility(
-                sprite1_path, sprite2_path
-            )
+            compatible, reasons = SpriteValidator.check_sprite_compatibility(sprite1_path, sprite2_path)
             assert compatible
             assert len(reasons) == 0
 
@@ -209,9 +195,7 @@ class TestSpriteValidator:
             img3 = Image.new("P", (32, 32))  # Different size
             img3.save(sprite3_path)
 
-            compatible, reasons = SpriteValidator.check_sprite_compatibility(
-                sprite1_path, sprite3_path
-            )
+            compatible, reasons = SpriteValidator.check_sprite_compatibility(sprite1_path, sprite3_path)
             assert not compatible
             assert any("Different dimensions" in r for r in reasons)
 
@@ -230,12 +214,11 @@ class TestSpriteValidator:
                 json.dump(metadata, f)
 
             # Validate
-            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(
-                sprite_path, metadata_path
-            )
+            is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(sprite_path, metadata_path)
 
             assert is_valid  # Still valid, just warning
             assert any("Tile count mismatch" in w for w in warnings)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

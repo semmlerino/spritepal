@@ -39,9 +39,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         Args:
             color_key: Key from COLORS dict - 'disabled_text' for inactive, 'border_focus' for active
         """
-        self.offset_label.setStyleSheet(
-            f"font-family: monospace; color: {COLORS[color_key]}; font-size: 14px;"
-        )
+        self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS[color_key]}; font-size: 14px;")
 
     def _setup_ui(self):
         """Initialize the user interface"""

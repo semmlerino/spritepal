@@ -4,6 +4,7 @@ Worker orchestrator for ROM extraction panel.
 This module centralizes the management of all background workers used by the
 ROM extraction panel, providing a clean interface for worker lifecycle management.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -118,15 +119,11 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_header_worker(self) -> None:
         """Clean up header worker resources."""
-        WorkerManager.cleanup_worker_attr(
-            self, "_header_worker", "_header_thread", timeout=2000
-        )
+        WorkerManager.cleanup_worker_attr(self, "_header_worker", "_header_thread", timeout=2000)
 
     # ========== Sprite Location Loading ==========
 
-    def load_sprite_locations(
-        self, rom_path: str, extraction_manager: ROMExtractor
-    ) -> None:
+    def load_sprite_locations(self, rom_path: str, extraction_manager: ROMExtractor) -> None:
         """Load known sprite locations from ROM asynchronously.
 
         Args:
@@ -164,9 +161,7 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_info_worker(self) -> None:
         """Clean up info worker resources."""
-        WorkerManager.cleanup_worker_attr(
-            self, "_info_worker", "_info_thread", timeout=2000
-        )
+        WorkerManager.cleanup_worker_attr(self, "_info_worker", "_info_thread", timeout=2000)
 
     # ========== Sprite Scanning ==========
 
@@ -217,9 +212,7 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_scan_worker(self) -> None:
         """Clean up scan worker resources."""
-        WorkerManager.cleanup_worker_attr(
-            self, "_scan_worker", "_scan_thread", timeout=5000
-        )
+        WorkerManager.cleanup_worker_attr(self, "_scan_worker", "_scan_thread", timeout=5000)
 
     # ========== Similarity Indexing ==========
 
@@ -249,9 +242,7 @@ class ROMWorkerOrchestrator(QObject):
         self._similarity_worker.moveToThread(self._similarity_thread)
 
         # Connect signals
-        self._similarity_worker.progress.connect(
-            lambda p, m: self.similarity_progress.emit(m)
-        )
+        self._similarity_worker.progress.connect(lambda p, m: self.similarity_progress.emit(m))
         self._similarity_worker.sprite_indexed.connect(self.sprite_indexed.emit)
         self._similarity_worker.index_saved.connect(self.index_saved.emit)
         self._similarity_worker.index_loaded.connect(self.index_loaded.emit)
@@ -275,9 +266,7 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_similarity_worker(self) -> None:
         """Clean up similarity worker resources."""
-        WorkerManager.cleanup_worker_attr(
-            self, "_similarity_worker", "_similarity_thread", timeout=5000
-        )
+        WorkerManager.cleanup_worker_attr(self, "_similarity_worker", "_similarity_thread", timeout=5000)
 
     # ========== General Methods ==========
 

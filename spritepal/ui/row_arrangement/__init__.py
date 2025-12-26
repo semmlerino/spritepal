@@ -1,6 +1,7 @@
 """
 Row and grid arrangement components for SpritePal
 """
+
 from __future__ import annotations
 
 from .arrangement_manager import ArrangementManager

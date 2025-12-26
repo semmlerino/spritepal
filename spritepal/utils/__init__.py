@@ -1,4 +1,5 @@
 """Utility functions for SpritePal"""
+
 from __future__ import annotations
 
 from utils.validation import (

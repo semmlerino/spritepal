@@ -4,6 +4,7 @@ Sprite preset management dialog for SpritePal.
 Provides a UI for managing user-defined sprite presets with CRUD operations,
 import/export, and filtering capabilities.
 """
+
 from __future__ import annotations
 
 import logging
@@ -131,6 +132,7 @@ class AddEditPresetDialog(DialogBase):
         # Rename Ok button to "Save"
         if self.button_box:
             from PySide6.QtWidgets import QDialogButtonBox
+
             ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
             if ok_button:
                 ok_button.setText("Save")
@@ -385,15 +387,9 @@ class SpritePresetDialog(DialogBase):
 
         # Apply filter
         if filter_mode == "game" and self._current_game_title:
-            presets = [
-                p for p in presets
-                if p.game_title.upper() == self._current_game_title.upper()
-            ]
+            presets = [p for p in presets if p.game_title.upper() == self._current_game_title.upper()]
         elif filter_mode == "checksum" and self._current_checksum is not None:
-            presets = [
-                p for p in presets
-                if self._current_checksum in p.game_checksums
-            ]
+            presets = [p for p in presets if self._current_checksum in p.game_checksums]
         elif filter_mode == "user":
             presets = [p for p in presets if p.source == "user"]
         elif filter_mode == "imported":
@@ -402,7 +398,8 @@ class SpritePresetDialog(DialogBase):
         # Apply search
         if search_text:
             presets = [
-                p for p in presets
+                p
+                for p in presets
                 if search_text in p.name.lower()
                 or search_text in p.game_title.lower()
                 or any(search_text in t.lower() for t in p.tags)
@@ -461,9 +458,7 @@ Source: {preset.source}<br>
 
     def _on_add_preset(self) -> None:
         """Add a new preset."""
-        dialog = AddEditPresetDialog(
-            self, game_title=self._current_game_title
-        )
+        dialog = AddEditPresetDialog(self, game_title=self._current_game_title)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             preset = dialog.get_preset()
             if self._preset_manager.add_preset(preset):
@@ -538,9 +533,7 @@ Source: {preset.source}<br>
                 self.presets_changed.emit()
                 self.update_status(f"Imported {count} presets")
             else:
-                QMessageBox.warning(
-                    self, "Import Failed", "No presets were imported."
-                )
+                QMessageBox.warning(self, "Import Failed", "No presets were imported.")
 
     def _on_export_all(self) -> None:
         """Export all presets to file."""
@@ -557,9 +550,7 @@ Source: {preset.source}<br>
             if count > 0:
                 self.update_status(f"Exported {count} presets to {path}")
             else:
-                QMessageBox.warning(
-                    self, "Export Failed", "No presets were exported."
-                )
+                QMessageBox.warning(self, "Export Failed", "No presets were exported.")
 
     def _on_export_selected(self) -> None:
         """Export selected preset to file."""
@@ -578,9 +569,7 @@ Source: {preset.source}<br>
         if path:
             if not path.endswith(".spritepal-presets.json"):
                 path += ".spritepal-presets.json"
-            count = self._preset_manager.export_presets(
-                Path(path), preset_names=[preset.name]
-            )
+            count = self._preset_manager.export_presets(Path(path), preset_names=[preset.name])
             if count > 0:
                 self.update_status(f"Exported preset: {preset.name}")
 

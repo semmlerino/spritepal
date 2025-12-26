@@ -7,6 +7,7 @@ when the dialog is closed, preventing resource leaks and test pollution.
 IMPORTANT: Subclasses should use register_worker() for all workers to ensure
 proper cleanup on dialog close.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, override

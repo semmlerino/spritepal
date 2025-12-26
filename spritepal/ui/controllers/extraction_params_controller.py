@@ -4,6 +4,7 @@ Controller for ROM extraction parameters and readiness.
 Manages mode state (preset vs manual), validates readiness,
 and builds extraction parameters for the worker.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

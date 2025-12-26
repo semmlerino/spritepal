@@ -2,6 +2,7 @@
 Injection dialog for SpritePal
 Allows users to configure sprite injection parameters
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -46,6 +47,7 @@ from ui.workers.rom_info_loader_worker import ROMInfoLoaderWorker
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class InjectionDialog(TabbedDialog):
     """Dialog for configuring sprite injection parameters"""
@@ -176,10 +178,7 @@ class InjectionDialog(TabbedDialog):
             self._load_sprite_preview()
             self._validate_sprite()
 
-
-    def _create_splitter_tab(
-        self, add_controls_method: Callable[[QVBoxLayout], None]
-    ) -> QWidget:
+    def _create_splitter_tab(self, add_controls_method: Callable[[QVBoxLayout], None]) -> QWidget:
         """Create a tab with splitter layout for left controls and right preview.
 
         Args:
@@ -239,16 +238,13 @@ class InjectionDialog(TabbedDialog):
         prev_tab_shortcut.activated.connect(self._prev_tab)
 
         # Update button box if it exists
-        if hasattr(self, 'button_box') and self.button_box:
+        if hasattr(self, "button_box") and self.button_box:
             ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
             if ok_button:
                 ok_button.setText("&Apply")
                 ok_button.setToolTip("Apply injection settings (Ctrl+S)")
                 AccessibilityHelper.make_accessible(
-                    ok_button,
-                    "Apply Injection",
-                    "Apply sprite injection settings and close dialog",
-                    "Ctrl+S"
+                    ok_button, "Apply Injection", "Apply sprite injection settings and close dialog", "Ctrl+S"
                 )
 
             cancel_button = self.button_box.button(QDialogButtonBox.StandardButton.Cancel)
@@ -256,10 +252,7 @@ class InjectionDialog(TabbedDialog):
                 cancel_button.setText("&Cancel")
                 cancel_button.setToolTip("Cancel without applying changes (Escape)")
                 AccessibilityHelper.make_accessible(
-                    cancel_button,
-                    "Cancel",
-                    "Cancel without applying changes",
-                    "Escape"
+                    cancel_button, "Cancel", "Cancel without applying changes", "Escape"
                 )
 
     def _next_tab(self) -> None:
@@ -282,34 +275,27 @@ class InjectionDialog(TabbedDialog):
         """Apply comprehensive accessibility enhancements to the dialog"""
         # Set dialog accessible name and description
         AccessibilityHelper.make_accessible(
-            self,
-            "Sprite Injection Dialog",
-            "Configure parameters for injecting sprites into VRAM or ROM files"
+            self, "Sprite Injection Dialog", "Configure parameters for injecting sprites into VRAM or ROM files"
         )
 
         # Add focus indicators
         AccessibilityHelper.add_focus_indicators(self)
 
         # Make tab widget accessible if it exists
-        if hasattr(self, '_main_tab_widget') and self._main_tab_widget:
+        if hasattr(self, "_main_tab_widget") and self._main_tab_widget:
             self._main_tab_widget.setAccessibleName("Injection Mode Tabs")
             self._main_tab_widget.setAccessibleDescription("Choose between VRAM or ROM injection mode")
 
         # Make preview widget accessible
         if self.preview_widget:
             AccessibilityHelper.make_accessible(
-                self.preview_widget,
-                "Sprite Preview",
-                "Preview of the sprite to be injected"
+                self.preview_widget, "Sprite Preview", "Preview of the sprite to be injected"
             )
 
         # Make sprite file selector accessible
         if self.sprite_file_selector:
             AccessibilityHelper.make_accessible(
-                self.sprite_file_selector,
-                "Sprite File Selector",
-                "Select the PNG sprite file to inject",
-                "Alt+S"
+                self.sprite_file_selector, "Sprite File Selector", "Select the PNG sprite file to inject", "Alt+S"
             )
 
     def _add_vram_controls(self, layout: QVBoxLayout) -> None:
@@ -325,9 +311,7 @@ class InjectionDialog(TabbedDialog):
             self.extraction_info.setReadOnly(True)
             self.extraction_info.setToolTip("Information about the original sprite extraction")
         AccessibilityHelper.make_accessible(
-            self.extraction_info,
-            "Extraction Information",
-            "Read-only information about the original sprite extraction"
+            self.extraction_info, "Extraction Information", "Read-only information about the original sprite extraction"
         )
         extraction_layout.addWidget(self.extraction_info)
 
@@ -372,14 +356,11 @@ class InjectionDialog(TabbedDialog):
         offset_row = FormRow(
             label_text="Injection Offset:",
             input_widget=None,  # Will be set below
-            orientation="horizontal"
+            orientation="horizontal",
         )
 
         self.vram_offset_input = HexOffsetInput(
-            placeholder="0xC000",
-            with_decimal_display=True,
-            input_width=100,
-            decimal_width=60
+            placeholder="0xC000", with_decimal_display=True, input_width=100, decimal_width=60
         )
         self.vram_offset_input.text_changed.connect(self._on_vram_offset_changed)
         self.vram_offset_input.setToolTip("Memory offset in VRAM where the sprite will be injected (e.g., 0xC000)")
@@ -412,9 +393,7 @@ class InjectionDialog(TabbedDialog):
         self.input_rom_selector.path_changed.connect(self._on_input_rom_changed)
         self.input_rom_selector.setToolTip("Select the ROM file to inject the sprite into")
         AccessibilityHelper.make_accessible(
-            self.input_rom_selector,
-            "Input ROM Selector",
-            "Select the ROM file to inject the sprite into"
+            self.input_rom_selector, "Input ROM Selector", "Select the ROM file to inject the sprite into"
         )
 
         rom_layout.addWidget(self.input_rom_selector)
@@ -433,7 +412,7 @@ class InjectionDialog(TabbedDialog):
         AccessibilityHelper.make_accessible(
             self.output_rom_selector,
             "Output ROM Selector",
-            "Specify where to save the modified ROM with the injected sprite"
+            "Specify where to save the modified ROM with the injected sprite",
         )
 
         rom_layout.addWidget(self.output_rom_selector)
@@ -446,27 +425,19 @@ class InjectionDialog(TabbedDialog):
         if self.sprite_location_combo:
             self.sprite_location_combo.addItem("Select sprite location...", None)
         if self.sprite_location_combo:
-            self.sprite_location_combo.currentIndexChanged.connect(
-                self._on_sprite_location_changed
-            )
+            self.sprite_location_combo.currentIndexChanged.connect(self._on_sprite_location_changed)
             self.sprite_location_combo.setToolTip("Select a predefined sprite location in the ROM")
         AccessibilityHelper.make_accessible(
             self.sprite_location_combo,
             "Sprite Location",
-            "Select a predefined sprite location in the ROM or enter custom offset"
+            "Select a predefined sprite location in the ROM or enter custom offset",
         )
 
-        self.rom_offset_input = HexOffsetInput(
-            placeholder="0x0",
-            with_decimal_display=False,
-            input_width=100
-        )
+        self.rom_offset_input = HexOffsetInput(placeholder="0x0", with_decimal_display=False, input_width=100)
         self.rom_offset_input.text_changed.connect(self._on_rom_offset_changed)
         self.rom_offset_input.setToolTip("Enter a custom ROM offset for sprite injection (e.g., 0x8000)")
         AccessibilityHelper.make_accessible(
-            self.rom_offset_input,
-            "Custom ROM Offset",
-            "Enter a custom ROM offset for sprite injection"
+            self.rom_offset_input, "Custom ROM Offset", "Enter a custom ROM offset for sprite injection"
         )
 
         # Create container for combo + custom offset controls
@@ -485,7 +456,7 @@ class InjectionDialog(TabbedDialog):
             label_text="Sprite &Location:",
             input_widget=location_container,
             orientation="horizontal",
-            label_width=EXTRACTION_LABEL_MIN_WIDTH
+            label_width=EXTRACTION_LABEL_MIN_WIDTH,
         )
         # Set buddy for accessibility
         location_row.label.setBuddy(self.sprite_location_combo)
@@ -495,12 +466,14 @@ class InjectionDialog(TabbedDialog):
         compression_layout = QHBoxLayout()
         self.fast_compression_check = QCheckBox("&Fast compression (larger file size)", self)
         if self.fast_compression_check:
-            self.fast_compression_check.setToolTip("Use faster compression algorithm that may result in larger file size")
+            self.fast_compression_check.setToolTip(
+                "Use faster compression algorithm that may result in larger file size"
+            )
         AccessibilityHelper.make_accessible(
             self.fast_compression_check,
             "Fast Compression",
             "Use faster compression algorithm that may result in larger file size",
-            "Alt+F"
+            "Alt+F",
         )
         compression_layout.addWidget(self.fast_compression_check)
         compression_layout.addStretch()
@@ -537,7 +510,9 @@ class InjectionDialog(TabbedDialog):
             vram_offset_raw = metadata_info.get("extraction_vram_offset")
             self.extraction_vram_offset = vram_offset_raw if isinstance(vram_offset_raw, str) else None
             rom_info_raw = metadata_info.get("rom_extraction_info")
-            self.rom_extraction_info = cast(Mapping[str, object], rom_info_raw) if isinstance(rom_info_raw, dict) else None
+            self.rom_extraction_info = (
+                cast(Mapping[str, object], rom_info_raw) if isinstance(rom_info_raw, dict) else None
+            )
 
             # Display extraction info
             if metadata_info.get("extraction"):
@@ -546,15 +521,9 @@ class InjectionDialog(TabbedDialog):
 
                 if source_type == "rom" and self.rom_extraction_info:
                     # ROM extraction metadata
-                    info_text = (
-                        f"Original ROM: {self.rom_extraction_info.get('rom_source', 'Unknown')}\n"
-                    )
-                    info_text += (
-                        f"Sprite: {self.rom_extraction_info.get('sprite_name', 'Unknown')}\n"
-                    )
-                    info_text += (
-                        f"ROM Offset: {self.rom_extraction_info.get('rom_offset', 'Unknown')}\n"
-                    )
+                    info_text = f"Original ROM: {self.rom_extraction_info.get('rom_source', 'Unknown')}\n"
+                    info_text += f"Sprite: {self.rom_extraction_info.get('sprite_name', 'Unknown')}\n"
+                    info_text += f"ROM Offset: {self.rom_extraction_info.get('rom_offset', 'Unknown')}\n"
                     info_text += f"Tiles: {self.rom_extraction_info.get('tile_count', 'Unknown')}"
                     if self.extraction_info:
                         self.extraction_info.setText(info_text)
@@ -566,9 +535,7 @@ class InjectionDialog(TabbedDialog):
                 else:
                     # VRAM extraction metadata
                     info_text = f"Original VRAM: {extraction.get('vram_source', 'Unknown')}\n"
-                    info_text += (
-                        f"Offset: {extraction.get('vram_offset', '0xC000')}\n"
-                    )
+                    info_text += f"Offset: {extraction.get('vram_offset', '0xC000')}\n"
                     info_text += f"Tiles: {extraction.get('tile_count', 'Unknown')}"
                     if self.extraction_info:
                         self.extraction_info.setText(info_text)
@@ -693,9 +660,7 @@ class InjectionDialog(TabbedDialog):
                 )
             elif error_type == "PermissionError":
                 logger.error("ROM file permission error")
-                _ = QMessageBox.critical(
-                    self, "ROM File Access Error", f"Cannot access the ROM file:\n\n{error_msg}"
-                )
+                _ = QMessageBox.critical(self, "ROM File Access Error", f"Cannot access the ROM file:\n\n{error_msg}")
             elif error_type == "ValueError":
                 logger.error("Invalid ROM file")
                 _ = QMessageBox.warning(
@@ -703,9 +668,7 @@ class InjectionDialog(TabbedDialog):
                 )
             else:
                 logger.error("Failed to load ROM info")
-                _ = QMessageBox.warning(
-                    self, "ROM Load Error", f"Failed to load ROM information:\n\n{error_msg}"
-                )
+                _ = QMessageBox.warning(self, "ROM Load Error", f"Failed to load ROM information:\n\n{error_msg}")
             return
 
         # Display ROM info
@@ -728,9 +691,7 @@ class InjectionDialog(TabbedDialog):
 
             for display_name, offset in sprite_locations.items():
                 if self.sprite_location_combo:
-                    self.sprite_location_combo.addItem(
-                    f"{display_name} (0x{offset:06X})", offset
-                )
+                    self.sprite_location_combo.addItem(f"{display_name} (0x{offset:06X})", offset)
 
             # Check for sprite location loading error
             if "sprite_locations_error" in rom_info:
@@ -825,8 +786,9 @@ class InjectionDialog(TabbedDialog):
         offset = self.vram_offset_input.get_value() if self.vram_offset_input else None
         if offset is None:
             error_msg = (
-                f"Invalid VRAM offset value: '{offset_text}'" + "\n" +
-                "Please enter a valid hexadecimal value (e.g., 0xC000, C000)"
+                f"Invalid VRAM offset value: '{offset_text}'"
+                + "\n"
+                + "Please enter a valid hexadecimal value (e.g., 0xC000, C000)"
             )
             return error_msg, None
 
@@ -866,8 +828,9 @@ class InjectionDialog(TabbedDialog):
             offset = self.rom_offset_input.get_value()
             if offset is None:
                 error_msg = (
-                    f"Invalid ROM offset value: '{offset_text}'" + "\n" +
-                    "Please enter a valid hexadecimal value (e.g., 0x8000, 8000)"
+                    f"Invalid ROM offset value: '{offset_text}'"
+                    + "\n"
+                    + "Please enter a valid hexadecimal value (e.g., 0x8000, 8000)"
                 )
                 return error_msg, None
 
@@ -928,9 +891,7 @@ class InjectionDialog(TabbedDialog):
         else:
             # Try to find and auto-fill input VRAM
             suggested_input = self.injection_manager.find_suggested_input_vram(
-                self.sprite_path,
-                self.metadata if hasattr(self, "metadata") else None,
-                self.suggested_input_vram
+                self.sprite_path, self.metadata if hasattr(self, "metadata") else None, self.suggested_input_vram
             )
             if suggested_input and self.input_vram_selector:
                 self.input_vram_selector.set_path(suggested_input)
@@ -951,10 +912,12 @@ class InjectionDialog(TabbedDialog):
             metadata_dict = {
                 "metadata": self.metadata,
                 "rom_extraction_info": self.rom_extraction_info,
-                "extraction_vram_offset": self.extraction_vram_offset
+                "extraction_vram_offset": self.extraction_vram_offset,
             }
 
-        defaults: Mapping[str, object] = self.injection_manager.load_rom_injection_defaults(self.sprite_path, metadata_dict)
+        defaults: Mapping[str, object] = self.injection_manager.load_rom_injection_defaults(
+            self.sprite_path, metadata_dict
+        )
 
         # Set input ROM
         input_rom = cast(str, defaults["input_rom"]) if defaults["input_rom"] else ""
@@ -1033,8 +996,7 @@ class InjectionDialog(TabbedDialog):
                     sprite_locations[display_name] = offset
 
         restore_info: Mapping[str, object] = self.injection_manager.restore_saved_sprite_location(
-            self.extraction_vram_offset,
-            sprite_locations
+            self.extraction_vram_offset, sprite_locations
         )
 
         sprite_location_index = restore_info["sprite_location_index"]
@@ -1045,7 +1007,9 @@ class InjectionDialog(TabbedDialog):
                 if 0 <= idx < self.sprite_location_combo.count():
                     self.sprite_location_combo.setCurrentIndex(idx)
                 else:
-                    logger.warning(f"Saved sprite location index {idx} out of bounds (count: {self.sprite_location_combo.count()})")
+                    logger.warning(
+                        f"Saved sprite location index {idx} out of bounds (count: {self.sprite_location_combo.count()})"
+                    )
         else:
             custom_offset = restore_info["custom_offset"]
             if custom_offset and self.rom_offset_input:
@@ -1057,7 +1021,7 @@ class InjectionDialog(TabbedDialog):
             input_rom=self.input_rom_selector.get_path() if self.input_rom_selector else "",
             sprite_location_text=self.sprite_location_combo.currentText() if self.sprite_location_combo else "",
             custom_offset=self.rom_offset_input.get_text() if self.rom_offset_input else "",
-            fast_compression=self.fast_compression_check.isChecked() if self.fast_compression_check else False
+            fast_compression=self.fast_compression_check.isChecked() if self.fast_compression_check else False,
         )
 
     def _load_sprite_preview(self) -> None:
@@ -1124,19 +1088,13 @@ class InjectionDialog(TabbedDialog):
 
             # Show validation results in a message box
             if errors:
-                _ = QMessageBox.critical(
-                    self, "Sprite Validation Failed", "\n".join(msg_parts)
-                )
+                _ = QMessageBox.critical(self, "Sprite Validation Failed", "\n".join(msg_parts))
             else:
                 # Just warnings - show as information
-                _ = QMessageBox.information(
-                    self, "Sprite Validation Warnings", "\n".join(msg_parts)
-                )
+                _ = QMessageBox.information(self, "Sprite Validation Warnings", "\n".join(msg_parts))
 
         # Also estimate compressed size
-        uncompressed, estimated_compressed = SpriteValidator.estimate_compressed_size(
-            self.sprite_path
-        )
+        uncompressed, estimated_compressed = SpriteValidator.estimate_compressed_size(self.sprite_path)
         if uncompressed > 0:
             size_info = f"Estimated size: {uncompressed} bytes uncompressed, ~{estimated_compressed} bytes compressed"
 

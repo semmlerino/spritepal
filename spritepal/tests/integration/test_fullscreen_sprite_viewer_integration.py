@@ -37,31 +37,33 @@ def sample_sprites_data() -> list[dict[str, Any]]:
     """Create sample sprite data for testing."""
     return [
         {
-            'offset': 0x10000,
-            'name': 'Sprite_001',
-            'decompressed_size': 1024,
-            'tile_count': 32,
+            "offset": 0x10000,
+            "name": "Sprite_001",
+            "decompressed_size": 1024,
+            "tile_count": 32,
         },
         {
-            'offset': 0x20000,
-            'name': 'Sprite_002',
-            'decompressed_size': 2048,
-            'tile_count': 64,
+            "offset": 0x20000,
+            "name": "Sprite_002",
+            "decompressed_size": 2048,
+            "tile_count": 64,
         },
         {
-            'offset': 0x30000,
-            'name': 'Sprite_003',
-            'decompressed_size': 512,
-            'tile_count': 16,
+            "offset": 0x30000,
+            "name": "Sprite_003",
+            "decompressed_size": 512,
+            "tile_count": 16,
         },
     ]
+
 
 @pytest.fixture
 def mock_rom_extractor():
     """Create mock ROM extractor for testing."""
     extractor = Mock()
-    extractor.extract_sprite = Mock(return_value=b'\x00' * 1024)
+    extractor.extract_sprite = Mock(return_value=b"\x00" * 1024)
     return extractor
+
 
 @pytest.fixture
 def mock_parent_gallery():
@@ -88,6 +90,7 @@ def mock_parent_gallery():
 
     return TestParentGallery()
 
+
 @pytest.mark.gui
 @pytest.mark.integration
 class TestFullscreenSpriteViewerIntegration(QtTestCase):
@@ -112,50 +115,37 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
         self.signal_emissions.append((signal_name, args))
 
     def test_keyboard_navigation_through_all_sprites(
-        self,
-        sample_sprites_data: list[dict[str, Any]],
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
+        self, sample_sprites_data: list[dict[str, Any]], mock_parent_gallery: Mock, mock_rom_extractor: Mock
     ):
         """Test keyboard navigation through all sprites."""
         self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
 
         # Track signal emissions
-        self.viewer.sprite_changed.connect(
-            lambda offset: self._track_signal_emissions('sprite_changed', offset)
-        )
+        self.viewer.sprite_changed.connect(lambda offset: self._track_signal_emissions("sprite_changed", offset))
 
         # Set up sprite data
         assert self.viewer.set_sprite_data(
             sample_sprites_data,
             0x10000,  # Start with first sprite
             "test_rom.sfc",
-            mock_rom_extractor
+            mock_rom_extractor,
         )
 
         # Test navigation forward through all sprites
         for i in range(len(sample_sprites_data)):
-            sample_sprites_data[i]['offset']
+            sample_sprites_data[i]["offset"]
             assert self.viewer.current_index == i
 
             if i < len(sample_sprites_data) - 1:
                 # Navigate to next sprite
-                key_event = QKeyEvent(
-                    QKeyEvent.Type.KeyPress,
-                    Qt.Key.Key_Right,
-                    Qt.KeyboardModifier.NoModifier
-                )
+                key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
                 self.viewer.keyPressEvent(key_event)
 
                 # Wait for transition
                 EventLoopHelper.process_events(100)
 
         # Test wraparound to first sprite
-        key_event = QKeyEvent(
-            QKeyEvent.Type.KeyPress,
-            Qt.Key.Key_Right,
-            Qt.KeyboardModifier.NoModifier
-        )
+        key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
         self.viewer.keyPressEvent(key_event)
         EventLoopHelper.process_events(100)
 
@@ -165,87 +155,55 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
         assert len(self.signal_emissions) >= len(sample_sprites_data)
 
         # Test backward navigation
-        key_event = QKeyEvent(
-            QKeyEvent.Type.KeyPress,
-            Qt.Key.Key_Left,
-            Qt.KeyboardModifier.NoModifier
-        )
+        key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Left, Qt.KeyboardModifier.NoModifier)
         self.viewer.keyPressEvent(key_event)
         EventLoopHelper.process_events(100)
 
         # Should wrap to last sprite
         assert self.viewer.current_index == len(sample_sprites_data) - 1
 
-    def test_edge_cases_single_sprite(
-        self,
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
-    ):
+    def test_edge_cases_single_sprite(self, mock_parent_gallery: Mock, mock_rom_extractor: Mock):
         """Test edge cases with single sprite (no navigation)."""
-        single_sprite = [{
-            'offset': 0x10000,
-            'name': 'OnlySprite',
-            'decompressed_size': 1024,
-            'tile_count': 32,
-        }]
+        single_sprite = [
+            {
+                "offset": 0x10000,
+                "name": "OnlySprite",
+                "decompressed_size": 1024,
+                "tile_count": 32,
+            }
+        ]
 
         self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
 
-        assert self.viewer.set_sprite_data(
-            single_sprite,
-            0x10000,
-            "test_rom.sfc",
-            mock_rom_extractor
-        )
+        assert self.viewer.set_sprite_data(single_sprite, 0x10000, "test_rom.sfc", mock_rom_extractor)
 
         assert self.viewer.current_index == 0
 
         # Navigation should stay at same sprite
         for key in [Qt.Key.Key_Left, Qt.Key.Key_Right]:
-            key_event = QKeyEvent(
-                QKeyEvent.Type.KeyPress,
-                key,
-                Qt.KeyboardModifier.NoModifier
-            )
+            key_event = QKeyEvent(QKeyEvent.Type.KeyPress, key, Qt.KeyboardModifier.NoModifier)
             self.viewer.keyPressEvent(key_event)
             EventLoopHelper.process_events(50)
             assert self.viewer.current_index == 0
 
-    def test_empty_sprite_data_handling(
-        self,
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
-    ):
+    def test_empty_sprite_data_handling(self, mock_parent_gallery: Mock, mock_rom_extractor: Mock):
         """Test handling of empty sprite data."""
         self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
 
         # Should return False for empty data
-        assert not self.viewer.set_sprite_data(
-            [],
-            0x10000,
-            "test_rom.sfc",
-            mock_rom_extractor
-        )
+        assert not self.viewer.set_sprite_data([], 0x10000, "test_rom.sfc", mock_rom_extractor)
 
         # Viewer should remain in safe state
         assert self.viewer.sprites_data == []
         assert self.viewer.current_index == 0
 
     def test_info_overlay_toggle(
-        self,
-        sample_sprites_data: list[dict[str, Any]],
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
+        self, sample_sprites_data: list[dict[str, Any]], mock_parent_gallery: Mock, mock_rom_extractor: Mock
     ):
         """Test info overlay toggle functionality."""
         self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
 
-        assert self.viewer.set_sprite_data(
-            sample_sprites_data,
-            0x10000,
-            "test_rom.sfc",
-            mock_rom_extractor
-        )
+        assert self.viewer.set_sprite_data(sample_sprites_data, 0x10000, "test_rom.sfc", mock_rom_extractor)
 
         # Initial state - info should be shown
         # Note: Use isHidden() instead of isVisible() because isVisible() requires
@@ -255,11 +213,7 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
         assert not self.viewer.info_overlay.isHidden()
 
         # Toggle info off
-        key_event = QKeyEvent(
-            QKeyEvent.Type.KeyPress,
-            Qt.Key.Key_I,
-            Qt.KeyboardModifier.NoModifier
-        )
+        key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_I, Qt.KeyboardModifier.NoModifier)
         self.viewer.keyPressEvent(key_event)
 
         assert not self.viewer.show_info
@@ -272,30 +226,18 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
         assert not self.viewer.info_overlay.isHidden()
 
     def test_smooth_scaling_toggle(
-        self,
-        sample_sprites_data: list[dict[str, Any]],
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
+        self, sample_sprites_data: list[dict[str, Any]], mock_parent_gallery: Mock, mock_rom_extractor: Mock
     ):
         """Test smooth scaling toggle functionality."""
         self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
 
-        assert self.viewer.set_sprite_data(
-            sample_sprites_data,
-            0x10000,
-            "test_rom.sfc",
-            mock_rom_extractor
-        )
+        assert self.viewer.set_sprite_data(sample_sprites_data, 0x10000, "test_rom.sfc", mock_rom_extractor)
 
         # Initial state - smooth scaling enabled
         assert self.viewer.smooth_scaling
 
         # Toggle smooth scaling
-        key_event = QKeyEvent(
-            QKeyEvent.Type.KeyPress,
-            Qt.Key.Key_S,
-            Qt.KeyboardModifier.NoModifier
-        )
+        key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_S, Qt.KeyboardModifier.NoModifier)
         self.viewer.keyPressEvent(key_event)
 
         assert not self.viewer.smooth_scaling
@@ -306,10 +248,7 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
         assert self.viewer.smooth_scaling
 
     def test_escape_key_closes_viewer(
-        self,
-        sample_sprites_data: list[dict[str, Any]],
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
+        self, sample_sprites_data: list[dict[str, Any]], mock_parent_gallery: Mock, mock_rom_extractor: Mock
     ):
         """Test ESC key closes the viewer."""
         self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
@@ -323,23 +262,14 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
 
         self.viewer.viewer_closed.connect(on_viewer_closed)
 
-        assert self.viewer.set_sprite_data(
-            sample_sprites_data,
-            0x10000,
-            "test_rom.sfc",
-            mock_rom_extractor
-        )
+        assert self.viewer.set_sprite_data(sample_sprites_data, 0x10000, "test_rom.sfc", mock_rom_extractor)
 
         # Show the viewer
         self.viewer.show()
         EventLoopHelper.process_events(50)
 
         # Press ESC
-        key_event = QKeyEvent(
-            QKeyEvent.Type.KeyPress,
-            Qt.Key.Key_Escape,
-            Qt.KeyboardModifier.NoModifier
-        )
+        key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
         self.viewer.keyPressEvent(key_event)
 
         # Process close event
@@ -349,19 +279,15 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
         assert viewer_closed
 
     @pytest.mark.performance
-    def test_memory_usage_with_large_sprite_set(
-        self,
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
-    ):
+    def test_memory_usage_with_large_sprite_set(self, mock_parent_gallery: Mock, mock_rom_extractor: Mock):
         """Test memory usage with large sprite data set."""
         # Create large sprite data set
         large_sprite_set = [
             {
-                'offset': 0x10000 + i * 0x1000,
-                'name': f'Sprite_{i:03d}',
-                'decompressed_size': 1024,
-                'tile_count': 32,
+                "offset": 0x10000 + i * 0x1000,
+                "name": f"Sprite_{i:03d}",
+                "decompressed_size": 1024,
+                "tile_count": 32,
             }
             for i in range(1000)  # 1000 sprites
         ]
@@ -370,20 +296,11 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
             self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
 
             # Set large data set
-            assert self.viewer.set_sprite_data(
-                large_sprite_set,
-                0x10000,
-                "test_rom.sfc",
-                mock_rom_extractor
-            )
+            assert self.viewer.set_sprite_data(large_sprite_set, 0x10000, "test_rom.sfc", mock_rom_extractor)
 
             # Navigate through several sprites quickly
             for _ in range(50):
-                key_event = QKeyEvent(
-                    QKeyEvent.Type.KeyPress,
-                    Qt.Key.Key_Right,
-                    Qt.KeyboardModifier.NoModifier
-                )
+                key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
                 self.viewer.keyPressEvent(key_event)
                 EventLoopHelper.process_events(1)  # Minimal processing
 
@@ -392,10 +309,7 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
             self.viewer = None
 
     def test_signal_emissions_accuracy(
-        self,
-        sample_sprites_data: list[dict[str, Any]],
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
+        self, sample_sprites_data: list[dict[str, Any]], mock_parent_gallery: Mock, mock_rom_extractor: Mock
     ):
         """Test that signal emissions contain correct data."""
         self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
@@ -407,7 +321,7 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
             sample_sprites_data,
             0x20000,  # Start with second sprite
             "test_rom.sfc",
-            mock_rom_extractor
+            mock_rom_extractor,
         )
 
         # Initial signal should be emitted for current sprite
@@ -421,11 +335,7 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
         for expected_offset in expected_offsets:
             initial_count = len(sprite_changes)
 
-            key_event = QKeyEvent(
-                QKeyEvent.Type.KeyPress,
-                Qt.Key.Key_Right,
-                Qt.KeyboardModifier.NoModifier
-            )
+            key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
             self.viewer.keyPressEvent(key_event)
             EventLoopHelper.process_events(100)
 
@@ -434,10 +344,7 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
             assert sprite_changes[-1] == expected_offset
 
     def test_transition_timer_delays_display_update(
-        self,
-        sample_sprites_data: list[dict[str, Any]],
-        mock_parent_gallery: Mock,
-        mock_rom_extractor: Mock
+        self, sample_sprites_data: list[dict[str, Any]], mock_parent_gallery: Mock, mock_rom_extractor: Mock
     ):
         """Test that transition timer delays display update for smooth visuals.
 
@@ -447,22 +354,13 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
         """
         self.viewer = self.create_widget(FullscreenSpriteViewer, mock_parent_gallery)
 
-        assert self.viewer.set_sprite_data(
-            sample_sprites_data,
-            0x10000,
-            "test_rom.sfc",
-            mock_rom_extractor
-        )
+        assert self.viewer.set_sprite_data(sample_sprites_data, 0x10000, "test_rom.sfc", mock_rom_extractor)
 
         initial_index = self.viewer.current_index
 
         # Rapid key presses - navigation happens immediately
         for _ in range(len(sample_sprites_data)):
-            key_event = QKeyEvent(
-                QKeyEvent.Type.KeyPress,
-                Qt.Key.Key_Right,
-                Qt.KeyboardModifier.NoModifier
-            )
+            key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
             self.viewer.keyPressEvent(key_event)
             # No event processing between key presses
 
@@ -477,6 +375,7 @@ class TestFullscreenSpriteViewerIntegration(QtTestCase):
 
         # Process events to allow timer-delayed display update to complete
         EventLoopHelper.process_events(200)
+
 
 @pytest.mark.gui
 @pytest.mark.integration
@@ -501,12 +400,7 @@ class TestFullscreenViewerCleanupIntegration(QtTestCase):
         for i in range(3):  # Test multiple instances
             viewer = self.create_widget(FullscreenSpriteViewer, None)
 
-            viewer.set_sprite_data(
-                sample_sprites_data,
-                0x10000,
-                "test_rom.sfc",
-                mock_rom_extractor
-            )
+            viewer.set_sprite_data(sample_sprites_data, 0x10000, "test_rom.sfc", mock_rom_extractor)
 
             # Set up signal spy before showing
             close_spy = QSignalSpy(viewer.viewer_closed)
@@ -521,12 +415,10 @@ class TestFullscreenViewerCleanupIntegration(QtTestCase):
             assert close_spy.count() == 1, f"Viewer {i}: viewer_closed signal not emitted"
 
             # Verify timers are stopped (prevents resource leaks)
-            if hasattr(viewer, 'transition_timer'):
-                assert not viewer.transition_timer.isActive(), \
-                    f"Viewer {i}: transition_timer still active after close"
-            if hasattr(viewer, 'cursor_timer'):
-                assert not viewer.cursor_timer.isActive(), \
-                    f"Viewer {i}: cursor_timer still active after close"
+            if hasattr(viewer, "transition_timer"):
+                assert not viewer.transition_timer.isActive(), f"Viewer {i}: transition_timer still active after close"
+            if hasattr(viewer, "cursor_timer"):
+                assert not viewer.cursor_timer.isActive(), f"Viewer {i}: cursor_timer still active after close"
 
             # Schedule deletion for proper cleanup
             viewer.deleteLater()
@@ -546,14 +438,9 @@ class TestFullscreenViewerCleanupIntegration(QtTestCase):
         # Connect to signals
         signal_calls: list[int | str] = []
         viewer.sprite_changed.connect(signal_calls.append)
-        viewer.viewer_closed.connect(lambda: signal_calls.append('closed'))
+        viewer.viewer_closed.connect(lambda: signal_calls.append("closed"))
 
-        viewer.set_sprite_data(
-            sample_sprites_data,
-            0x10000,
-            "test_rom.sfc",
-            mock_rom_extractor
-        )
+        viewer.set_sprite_data(sample_sprites_data, 0x10000, "test_rom.sfc", mock_rom_extractor)
 
         # Show, navigate, then close
         viewer.show()
@@ -561,11 +448,7 @@ class TestFullscreenViewerCleanupIntegration(QtTestCase):
 
         # Navigation should emit signals
         initial_count = len(signal_calls)
-        key_event = QKeyEvent(
-            QKeyEvent.Type.KeyPress,
-            Qt.Key.Key_Right,
-            Qt.KeyboardModifier.NoModifier
-        )
+        key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
         viewer.keyPressEvent(key_event)
         EventLoopHelper.process_events(100)
 
@@ -576,15 +459,16 @@ class TestFullscreenViewerCleanupIntegration(QtTestCase):
         EventLoopHelper.process_events(100)
 
         # Should have received closed signal
-        assert 'closed' in signal_calls
+        assert "closed" in signal_calls
 
         # Verify that closed signal was emitted exactly once
-        close_count = sum(1 for s in signal_calls if s == 'closed')
+        close_count = sum(1 for s in signal_calls if s == "closed")
         assert close_count == 1, f"Expected exactly 1 'closed' signal, got {close_count}"
 
         # Verify we got sprite_changed signals for navigation
         sprite_signals = [s for s in signal_calls if isinstance(s, int)]
         assert len(sprite_signals) >= 1, "Expected at least one sprite_changed signal"
+
 
 @pytest.mark.headless
 @pytest.mark.integration
@@ -593,7 +477,7 @@ class TestFullscreenViewerMockIntegration:
 
     def test_headless_functionality_with_mocks(self, sample_sprites_data):
         """Test viewer functionality in headless environment with mocks."""
-        with patch('ui.widgets.fullscreen_sprite_viewer.QApplication') as mock_qapp_class:
+        with patch("ui.widgets.fullscreen_sprite_viewer.QApplication") as mock_qapp_class:
             # Mock QApplication and screen
             mock_app = Mock()
             mock_screen = Mock()
@@ -602,7 +486,7 @@ class TestFullscreenViewerMockIntegration:
             mock_app.primaryScreen.return_value = mock_screen
             mock_qapp_class.primaryScreen.return_value = mock_screen
 
-            with patch('ui.widgets.fullscreen_sprite_viewer.QWidget'):
+            with patch("ui.widgets.fullscreen_sprite_viewer.QWidget"):
                 # Create mock viewer to test logic
                 viewer = Mock()
                 viewer.sprites_data = []
@@ -617,7 +501,7 @@ class TestFullscreenViewerMockIntegration:
                     viewer.sprites_data = sprites_data
                     viewer.current_index = 0
                     for i, sprite in enumerate(sprites_data):
-                        if sprite.get('offset', 0) == current_offset:
+                        if sprite.get("offset", 0) == current_offset:
                             viewer.current_index = i
                             break
                     return True

@@ -16,6 +16,7 @@ Benefits of real component testing vs mocking:
 Uses app_context fixture from app_context_fixtures.py for per-test isolation.
 Migrated from isolated_managers to enable parallel execution.
 """
+
 from __future__ import annotations
 
 import json
@@ -54,6 +55,7 @@ def injection_manager_real(app_context: AppContext):
     """
     return app_context.core_operations_manager
 
+
 @pytest.fixture
 def temp_files_with_real_content(tmp_path):
     """Create temporary files with realistic content for validation."""
@@ -69,18 +71,21 @@ def temp_files_with_real_content(tmp_path):
 
     # Create ROM file with realistic header
     rom_file = tmp_path / "test.sfc"
-    rom_data = (b"\x00" * 0x7FC0 +  # ROM data
-                b"Test ROM" + b"\x00" * 13 +  # Title (21 bytes)
-                b"\x21" +  # Map mode
-                b"\x00" +  # Cartridge type
-                b"\x0A" +  # ROM size (1MB)
-                b"\x00" +  # SRAM size
-                b"\x01\x00" +  # Country code
-                b"\x33" +  # License code
-                b"\x00" +  # Version
-                b"\x00\x00" +  # Checksum complement
-                b"\xFF\xFF" +  # Checksum
-                b"\x00" * (0x400000 - 0x7FE0))  # Fill to 4MB
+    rom_data = (
+        b"\x00" * 0x7FC0  # ROM data
+        + b"Test ROM"
+        + b"\x00" * 13  # Title (21 bytes)
+        + b"\x21"  # Map mode
+        + b"\x00"  # Cartridge type
+        + b"\x0a"  # ROM size (1MB)
+        + b"\x00"  # SRAM size
+        + b"\x01\x00"  # Country code
+        + b"\x33"  # License code
+        + b"\x00"  # Version
+        + b"\x00\x00"  # Checksum complement
+        + b"\xff\xff"  # Checksum
+        + b"\x00" * (0x400000 - 0x7FE0)
+    )  # Fill to 4MB
     rom_file.write_bytes(rom_data)
 
     # Create valid JSON metadata
@@ -89,7 +94,7 @@ def temp_files_with_real_content(tmp_path):
         "source_vram": str(vram_file),
         "extraction_date": "2025-01-01",
         "sprite_count": 1,
-        "format_version": "1.0"
+        "format_version": "1.0",
     }
     metadata_file.write_text(json.dumps(metadata, indent=2))
 
@@ -98,8 +103,9 @@ def temp_files_with_real_content(tmp_path):
         "vram_path": str(vram_file),
         "rom_path": str(rom_file),
         "metadata_path": str(metadata_file),
-        "output_dir": str(tmp_path)
+        "output_dir": str(tmp_path),
     }
+
 
 class TestInjectionManagerInitialization:
     """TDD tests for InjectionManager initialization and lifecycle.
@@ -114,7 +120,7 @@ class TestInjectionManagerInitialization:
 
     def test_manager_initialization_with_real_components_tdd(self, injection_manager_real):
         """TDD: Manager should initialize with proper state and dependencies.
-        
+
         RED: Test that manager initializes correctly with real components
         GREEN: Verify all required attributes and dependencies are set
         REFACTOR: Ensure clean initialization without side effects
@@ -131,7 +137,7 @@ class TestInjectionManagerInitialization:
 
     def test_manager_lifecycle_with_real_components(self, injection_manager_real):
         """TDD: Manager should handle complete lifecycle correctly.
-        
+
         Tests proper initialization, operation, and cleanup phases.
         """
         manager = injection_manager_real
@@ -146,7 +152,7 @@ class TestInjectionManagerInitialization:
 
     def test_manager_cleanup_real_worker_lifecycle(self, injection_manager_real, tmp_path):
         """TDD: Manager should properly clean up real workers.
-        
+
         Tests actual worker lifecycle management, not mocked behavior.
         """
         manager = injection_manager_real
@@ -170,6 +176,7 @@ class TestInjectionManagerInitialization:
         finally:
             worker_helper.cleanup()
 
+
 class TestInjectionManagerParameterValidation:
     """TDD tests for parameter validation with real file I/O.
 
@@ -178,7 +185,9 @@ class TestInjectionManagerParameterValidation:
     Uses app_context fixture for per-test isolation (parallel-safe).
     """
 
-    def test_validate_vram_injection_params_valid_real_files(self, temp_files_with_real_content, app_context: AppContext):
+    def test_validate_vram_injection_params_valid_real_files(
+        self, temp_files_with_real_content, app_context: AppContext
+    ):
         """TDD: Validation should succeed with real valid files.
 
         RED: Validation should pass for properly formatted files
@@ -216,7 +225,9 @@ class TestInjectionManagerParameterValidation:
             # This is acceptable as it shows real edge cases
             pass
 
-    def test_validate_rom_injection_params_valid_real_files(self, temp_files_with_real_content, app_context: AppContext):
+    def test_validate_rom_injection_params_valid_real_files(
+        self, temp_files_with_real_content, app_context: AppContext
+    ):
         """TDD: ROM validation should work with real ROM file structure.
 
         Tests real ROM file validation including header checks, size validation,
@@ -258,7 +269,7 @@ class TestInjectionManagerParameterValidation:
 
     def test_validate_missing_required_params_parameter_logic(self):
         """TDD: Parameter validation should catch missing required fields.
-        
+
         Tests parameter structure validation independent of file operations.
         """
         manager = CoreOperationsManager()
@@ -274,7 +285,7 @@ class TestInjectionManagerParameterValidation:
 
     def test_validate_invalid_mode_parameter_validation(self, temp_files_with_real_content):
         """TDD: Mode validation should reject invalid modes before file validation.
-        
+
         Tests parameter validation logic independent of file operations.
         """
         manager = CoreOperationsManager()
@@ -294,7 +305,7 @@ class TestInjectionManagerParameterValidation:
 
     def test_validate_nonexistent_sprite_file_real_filesystem(self):
         """TDD: Validation should fail for missing sprite files with real filesystem.
-        
+
         Tests actual file existence validation without mocking filesystem operations.
         """
         manager = CoreOperationsManager()
@@ -317,7 +328,7 @@ class TestInjectionManagerParameterValidation:
 
     def test_validate_negative_offset_real_validation(self, temp_files_with_real_content):
         """TDD: Validation should reject negative offsets with real files.
-        
+
         RED: Negative offset should always be invalid regardless of file validity
         GREEN: Real validation should catch this before file validation
         REFACTOR: Test parameter validation logic independent of file mocking
@@ -343,7 +354,7 @@ class TestInjectionManagerParameterValidation:
 
     def test_validate_metadata_file_real_json_validation(self, temp_files_with_real_content):
         """TDD: Metadata validation should parse real JSON and validate structure.
-        
+
         Tests real JSON parsing, structure validation, and content verification
         that mocks cannot provide.
         """
@@ -381,7 +392,7 @@ class TestInjectionManagerParameterValidation:
 
     def test_validate_nonexistent_metadata_file_real_filesystem(self, temp_files_with_real_content):
         """TDD: Validation should fail with real filesystem checks for missing files.
-        
+
         Tests actual filesystem operations and file existence checking.
         """
         manager = CoreOperationsManager()
@@ -404,6 +415,7 @@ class TestInjectionManagerParameterValidation:
         assert Path(params["input_vram"]).exists()
         # Metadata file should not exist
         assert not Path(params["metadata_path"]).exists()
+
 
 class TestInjectionManagerWorkflows:
     """Test injection workflow methods.
@@ -522,6 +534,7 @@ class TestInjectionManagerWorkflows:
         finally:
             worker_helper.cleanup()
 
+
 class TestInjectionManagerSignalHandling:
     """Test worker signal handling.
 
@@ -564,6 +577,7 @@ class TestInjectionManagerSignalHandling:
         with patch.object(manager, "injection_finished") as mock_signal:
             manager._on_worker_finished(False, "Error message")
             mock_signal.emit.assert_called_once_with(False, "Error message")
+
 
 class TestInjectionManagerVRAMSuggestion:
     """Test smart VRAM suggestion functionality.
@@ -644,9 +658,7 @@ class TestInjectionManagerVRAMSuggestion:
         sprite_file = tmp_path / "sprite.png"
         sprite_file.write_text("fake sprite data")
 
-        result = manager.get_smart_vram_suggestion(
-            str(sprite_file), metadata_path=str(metadata_file)
-        )
+        result = manager.get_smart_vram_suggestion(str(sprite_file), metadata_path=str(metadata_file))
         assert result == str(vram_file)
 
     def test_get_smart_vram_suggestion_vram_suffix_pattern(self, tmp_path):
@@ -665,6 +677,7 @@ class TestInjectionManagerVRAMSuggestion:
 
 
 # Integration test demonstrating TDD methodology with real components
+
 
 def test_complete_injection_workflow_tdd_real_components(tmp_path, qtbot):
     """Complete TDD workflow test demonstrating real component integration.
@@ -723,6 +736,7 @@ def test_complete_injection_workflow_tdd_real_components(tmp_path, qtbot):
     # Verify files exist and are reasonable
     assert Path(params["sprite_path"]).exists()
     assert Path(params["input_vram"]).exists()
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

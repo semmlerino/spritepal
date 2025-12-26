@@ -5,6 +5,7 @@ Handles window state management for ManualOffsetDialog including fullscreen mode
 and position persistence. Extracted from ManualOffsetDialog to separate window
 management concerns from business logic.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,6 +24,7 @@ from PySide6.QtGui import QGuiApplication
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class ViewStateManager(QObject):
     """
@@ -198,9 +200,7 @@ class ViewStateManager(QObject):
                 required_width = int(width * 0.8)
                 required_height = int(height * 0.8)
 
-                if (intersection.width() >= required_width and
-                    intersection.height() >= required_height):
-
+                if intersection.width() >= required_width and intersection.height() >= required_height:
                     # Additional check: ensure the dialog isn't positioned too high
                     # The top of the dialog should be at least 50px from the top of screen
                     if y >= screen_geometry.y() + 50:
@@ -248,7 +248,7 @@ class ViewStateManager(QObject):
             # Position is valid - restore it
             self.dialog_widget.move(x, y)
             # Don't restore size for manual offset dialog - use dialog's preferred size
-            if 'Manual Offset' not in self.dialog_widget.windowTitle():
+            if "Manual Offset" not in self.dialog_widget.windowTitle():
                 self.dialog_widget.resize(width, height)
                 logger.debug(f"Successfully restored window position: {x},{y} size: {width}x{height}")
             else:
@@ -290,15 +290,23 @@ class ViewStateManager(QObject):
 
                 # Ensure dialog stays within screen bounds with extra safety margins
                 margin = 50  # Extra safety margin
-                center_x = max(screen_geometry.x() + margin, min(center_x, screen_geometry.x() + screen_geometry.width() - dialog_width - margin))
-                center_y = max(screen_geometry.y() + margin, min(center_y, screen_geometry.y() + screen_geometry.height() - dialog_height - margin))
+                center_x = max(
+                    screen_geometry.x() + margin,
+                    min(center_x, screen_geometry.x() + screen_geometry.width() - dialog_width - margin),
+                )
+                center_y = max(
+                    screen_geometry.y() + margin,
+                    min(center_y, screen_geometry.y() + screen_geometry.height() - dialog_height - margin),
+                )
 
                 # Extra safety: never allow negative or zero positions
                 center_x = max(100, center_x)
                 center_y = max(100, center_y)
 
                 self.dialog_widget.move(center_x, center_y)
-                logger.debug(f"GEOMETRY: Centered dialog on screen at {center_x},{center_y} (screen: {screen_geometry.width()}x{screen_geometry.height()})")
+                logger.debug(
+                    f"GEOMETRY: Centered dialog on screen at {center_x},{center_y} (screen: {screen_geometry.width()}x{screen_geometry.height()})"
+                )
                 logger.debug(f"GEOMETRY: Final centered geometry: {self.dialog_widget.geometry()}")
             else:
                 # Last resort - move to top-left with small offset

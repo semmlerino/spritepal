@@ -41,13 +41,7 @@ def run_stability_tests():
     print("-" * 70)
 
     # Run the tests
-    cmd = [
-        sys.executable, "-m", "pytest",
-        str(test_file),
-        "-v",
-        "--tb=short",
-        "--color=yes"
-    ]
+    cmd = [sys.executable, "-m", "pytest", str(test_file), "-v", "--tb=short", "--color=yes"]
 
     try:
         result = subprocess.run(cmd, check=False, cwd=test_file.parent.parent)
@@ -70,6 +64,7 @@ def run_stability_tests():
         print(f"❌ ERROR running tests: {e}")
         return 1
 
+
 def run_quick_validation():
     """Run a quick validation of critical fixes."""
 
@@ -89,17 +84,13 @@ def run_quick_validation():
         "TestWorkerCancellationStability::test_no_terminate_calls_in_codebase",
         "TestWorkerCancellationStability::test_worker_manager_safe_patterns",
         "TestTOCTOURaceConditionStability::test_manager_registry_thread_safety",
-        "TestCircularReferenceStability::test_weak_reference_patterns"
+        "TestCircularReferenceStability::test_weak_reference_patterns",
     ]
 
     for test in critical_tests:
         print(f"Running: {test.split('::')[-1]}...")
 
-        cmd = [
-            sys.executable, "-m", "pytest",
-            f"{test_file}::{test}",
-            "-q"
-        ]
+        cmd = [sys.executable, "-m", "pytest", f"{test_file}::{test}", "-q"]
 
         result = subprocess.run(cmd, check=False, cwd=test_file.parent.parent, capture_output=True)
 
@@ -113,12 +104,14 @@ def run_quick_validation():
     print("✅ ALL CRITICAL STABILITY TESTS PASSED")
     return 0
 
+
 def main():
     """Main entry point."""
 
     if len(sys.argv) > 1 and sys.argv[1] == "--quick":
         return run_quick_validation()
     return run_stability_tests()
+
 
 if __name__ == "__main__":
     sys.exit(main())

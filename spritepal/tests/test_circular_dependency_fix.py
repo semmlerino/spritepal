@@ -1,4 +1,5 @@
 """Test that the circular dependency between MainWindow and ExtractionController is fixed."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -50,7 +51,6 @@ class TestCircularDependencyFix:
         # Verify controller is not created yet (lazy initialization)
         assert window._controller is None, "Controller should not be created during __init__"
 
-
     def test_controller_setter_works(self, qtbot, app, main_window_deps):
         """Test that controller setter works for testing purposes."""
         window = MainWindow(**main_window_deps)
@@ -65,7 +65,6 @@ class TestCircularDependencyFix:
         # Verify it was set
         assert window.controller is mock_controller, "Controller setter should work"
         assert window._controller is mock_controller, "Internal reference should be updated"
-
 
     def test_no_circular_import_at_module_level(self):
         """Test that there's no circular import at module level.
@@ -92,4 +91,3 @@ class TestCircularDependencyFix:
 
         # If we get here, it didn't hang
         assert window is not None
-

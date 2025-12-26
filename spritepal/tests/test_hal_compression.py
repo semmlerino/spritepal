@@ -14,6 +14,7 @@ Note: These tests use multiprocessing boundary mocks (Manager, Process) because
 they're testing HALProcessPool's process lifecycle management - the actual
 multiprocessing behavior needs to be controlled for deterministic testing.
 """
+
 from __future__ import annotations
 
 import os
@@ -427,9 +428,7 @@ class TestHALWorkerProcessErrorHandling:
             mock_logger.return_value = Mock()
 
             # Should not raise exception
-            _hal_worker_process(
-                "fake_exhal", "fake_inhal", mock_request_queue, mock_result_queue
-            )
+            _hal_worker_process("fake_exhal", "fake_inhal", mock_request_queue, mock_result_queue)
 
     def test_worker_handles_connection_reset_gracefully(self):
         """Test that worker process handles ConnectionResetError gracefully"""
@@ -441,9 +440,7 @@ class TestHALWorkerProcessErrorHandling:
             mock_logger.return_value = Mock()
 
             # Should not raise exception
-            _hal_worker_process(
-                "fake_exhal", "fake_inhal", mock_request_queue, mock_result_queue
-            )
+            _hal_worker_process("fake_exhal", "fake_inhal", mock_request_queue, mock_result_queue)
 
     def test_worker_handles_eof_error_gracefully(self):
         """Test that worker process handles EOFError gracefully"""
@@ -455,9 +452,7 @@ class TestHALWorkerProcessErrorHandling:
             mock_logger.return_value = Mock()
 
             # Should not raise exception
-            _hal_worker_process(
-                "fake_exhal", "fake_inhal", mock_request_queue, mock_result_queue
-            )
+            _hal_worker_process("fake_exhal", "fake_inhal", mock_request_queue, mock_result_queue)
 
     def test_worker_responds_to_shutdown_signal(self):
         """Test that worker process responds to shutdown signal (None request)"""
@@ -469,9 +464,7 @@ class TestHALWorkerProcessErrorHandling:
             mock_logger.return_value = Mock()
 
             # Should exit gracefully
-            _hal_worker_process(
-                "fake_exhal", "fake_inhal", mock_request_queue, mock_result_queue
-            )
+            _hal_worker_process("fake_exhal", "fake_inhal", mock_request_queue, mock_result_queue)
 
 
 # ============================================================================
@@ -747,9 +740,7 @@ class TestHALToolDetection:
         dummy_exhal.chmod(0o755)
         dummy_inhal.chmod(0o755)
 
-        compressor = HALCompressor(
-            exhal_path=str(dummy_exhal), inhal_path=str(dummy_inhal)
-        )
+        compressor = HALCompressor(exhal_path=str(dummy_exhal), inhal_path=str(dummy_inhal))
 
         assert compressor.exhal_path == str(dummy_exhal)
         assert compressor.inhal_path == str(dummy_inhal)
@@ -766,9 +757,7 @@ class TestHALToolDetection:
 
         # All instances should find the same tools
         for i in range(1, len(paths)):
-            assert (
-                paths[0] == paths[i]
-            ), f"Instance {i} found different tools than instance 0"
+            assert paths[0] == paths[i], f"Instance {i} found different tools than instance 0"
 
     def test_spritepal_directory_calculation(self):
         """Test that the spritepal directory is calculated correctly from different contexts"""
@@ -1072,9 +1061,7 @@ class TestHALMockingPerformance:
 
         # Compare performance
         init_speedup = real_init_time / mock_init_time if mock_init_time > 0 else 1000
-        request_speedup = (
-            real_request_time / mock_request_time if mock_request_time > 0 else 1000
-        )
+        request_speedup = real_request_time / mock_request_time if mock_request_time > 0 else 1000
 
         print("\nPerformance Comparison:")
         print(f"  Initialization: {init_speedup:.1f}x faster")
@@ -1143,18 +1130,14 @@ class TestHALCompressorMocking:
         rom_path.write_bytes(b"\x00" * 0x10000)
 
         # Batch decompression
-        requests = [
-            (str(rom_path), offset) for offset in range(0x1000, 0x5000, 0x1000)
-        ]
+        requests = [(str(rom_path), offset) for offset in range(0x1000, 0x5000, 0x1000)]
         results = hal_compressor.decompress_batch(requests)
 
         assert len(results) == 4
         assert all(success for success, _ in results)
 
         # Batch compression
-        compress_requests = [
-            (b"data" * 100, str(tmp_path / f"out_{i}.bin"), False) for i in range(3)
-        ]
+        compress_requests = [(b"data" * 100, str(tmp_path / f"out_{i}.bin"), False) for i in range(3)]
         compress_results = hal_compressor.compress_batch(compress_requests)
 
         assert len(compress_results) == 3

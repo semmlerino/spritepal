@@ -4,6 +4,7 @@ Sprite preset manager for user-managed sprite offset presets.
 This module provides CRUD operations for sprite presets, ROM matching,
 and import/export functionality for community sharing.
 """
+
 from __future__ import annotations
 
 import json
@@ -104,9 +105,7 @@ class SpritePresetManager(QObject):
                 except (KeyError, TypeError, ValueError) as e:
                     self._logger.warning(f"Skipping invalid preset: {e}")
 
-            self._logger.info(
-                f"Loaded {len(self._presets)} user presets (version {version})"
-            )
+            self._logger.info(f"Loaded {len(self._presets)} user presets (version {version})")
             self.presets_loaded.emit()
 
         except (OSError, json.JSONDecodeError) as e:
@@ -246,11 +245,7 @@ class SpritePresetManager(QObject):
         if preset_names is None:
             presets_to_export = list(self._presets.values())
         else:
-            presets_to_export = [
-                self._presets[name]
-                for name in preset_names
-                if name in self._presets
-            ]
+            presets_to_export = [self._presets[name] for name in preset_names if name in self._presets]
 
         if not presets_to_export:
             self._logger.warning("No presets to export")
@@ -261,10 +256,7 @@ class SpritePresetManager(QObject):
             export_data = {
                 "version": "1.0",
                 "format": "spritepal-presets",
-                "presets": [
-                    {**preset.to_dict(), "source": "imported"}
-                    for preset in presets_to_export
-                ],
+                "presets": [{**preset.to_dict(), "source": "imported"} for preset in presets_to_export],
             }
 
             with open(path, "w", encoding="utf-8") as f:
@@ -314,9 +306,7 @@ class SpritePresetManager(QObject):
                             self._presets[preset.name] = preset
                             imported_count += 1
                         else:
-                            self._logger.debug(
-                                f"Skipping existing preset '{preset.name}'"
-                            )
+                            self._logger.debug(f"Skipping existing preset '{preset.name}'")
                     else:
                         self._presets[preset.name] = preset
                         imported_count += 1

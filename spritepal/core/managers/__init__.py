@@ -14,6 +14,7 @@ Architecture:
     - ApplicationStateManager: Consolidated manager for session, settings, state
     - CoreOperationsManager: Consolidated manager for extraction, injection, palette
 """
+
 from __future__ import annotations
 
 import threading
@@ -196,32 +197,28 @@ __all__ = [
     "ApplicationStateManager",
     "BaseManager",
     "CoreOperationsManager",
-    # Error helpers
     "ErrorCallback",
-    "handle_categorized_error",
-    "handle_data_format_error",
-    "handle_file_io_error",
-    "handle_operation_error",
-    # Operation decorator
-    "OperationManager",
-    "with_operation_handling",
-    # Exceptions
     "ExtractionError",
     "ExtractionState",
     "FileOperationError",
     "InjectionError",
     "ManagerError",
     "NavigationError",
+    "OperationManager",
     "PreviewError",
     "SessionError",
     "SpritePresetManager",
     "ValidationError",
     "WorkflowStateManager",
-    # Module functions
     "cleanup_managers",
+    "handle_categorized_error",
+    "handle_data_format_error",
+    "handle_file_io_error",
+    "handle_operation_error",
     "initialize_managers",
     "is_clean",
     "is_initialized",
     "reset_for_tests",
     "validate_manager_dependencies",
+    "with_operation_handling",
 ]

@@ -34,10 +34,10 @@ pytestmark = [
 
 # Module-level constants for reuse
 SIGNALS_TO_DISCONNECT = [
-    ('sprite_found', 'on_sprite_found'),
-    ('progress', 'on_scan_progress'),
-    ('finished', 'on_scan_finished'),
-    ('error', 'on_scan_error'),
+    ("sprite_found", "on_sprite_found"),
+    ("progress", "on_scan_progress"),
+    ("finished", "on_scan_finished"),
+    ("error", "on_scan_error"),
 ]
 
 
@@ -46,9 +46,10 @@ def test_rom_file(tmp_path) -> str:
     """Create a test ROM file."""
     rom_path = tmp_path / "test_rom.sfc"
     # Create a minimal ROM file
-    rom_data = b'SNES' + b'\x00' * (1024 * 1024 - 4)  # 1MB ROM
+    rom_data = b"SNES" + b"\x00" * (1024 * 1024 - 4)  # 1MB ROM
     rom_path.write_bytes(rom_data)
     return str(rom_path)
+
 
 @pytest.fixture
 def mock_extraction_manager():
@@ -58,9 +59,9 @@ def mock_extraction_manager():
     # Mock rom_service.extract_sprite_to_png (called via rom_service now)
     manager.rom_service.extract_sprite_to_png.return_value = True
     manager.get_known_sprite_locations.return_value = {
-        'sprite_1': Mock(offset=0x10000),
-        'sprite_2': Mock(offset=0x20000),
-        'sprite_3': Mock(offset=0x30000),
+        "sprite_1": Mock(offset=0x10000),
+        "sprite_2": Mock(offset=0x20000),
+        "sprite_3": Mock(offset=0x30000),
     }
     return manager
 
@@ -83,6 +84,7 @@ def mock_rom_cache():
     cache.cache_sprite.return_value = None
     return cache
 
+
 @pytest.fixture
 def mock_scan_worker():
     """Create mock scan worker."""
@@ -99,6 +101,7 @@ def mock_scan_worker():
     worker.wait.return_value = True
     return worker
 
+
 @pytest.fixture
 def mock_thumbnail_worker():
     """Create mock thumbnail worker."""
@@ -111,6 +114,7 @@ def mock_thumbnail_worker():
     worker.cleanup = Mock()
     return worker
 
+
 @pytest.fixture
 def mock_scan_worker_running():
     """Create mock scan worker that is currently running."""
@@ -121,6 +125,7 @@ def mock_scan_worker_running():
     worker.wait.return_value = True
     return worker
 
+
 @pytest.fixture
 def mock_thumbnail_worker_for_queueing():
     """Create mock thumbnail worker configured for thumbnail queueing."""
@@ -129,6 +134,7 @@ def mock_thumbnail_worker_for_queueing():
     worker.start = Mock()
     worker.isRunning.return_value = False
     return worker
+
 
 @pytest.mark.gui
 @pytest.mark.integration
@@ -218,7 +224,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         status_text = self.window.status_bar.currentMessage()
         assert "ROM loaded" in status_text or "sprites" in status_text.lower()
 
-    @patch('ui.windows.detached_gallery_window.SpriteScanWorker')
+    @patch("ui.windows.detached_gallery_window.SpriteScanWorker")
     def test_rom_scanning_with_proper_cleanup(
         self,
         mock_scan_worker_class,
@@ -226,7 +232,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         mock_settings_manager,
         mock_rom_cache,
         mock_scan_worker,
-        test_rom_file
+        test_rom_file,
     ):
         """Test ROM scanning with proper worker cleanup."""
         mock_scan_worker_class.return_value = mock_scan_worker
@@ -251,18 +257,13 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         assert self.window.scanning
 
         # Simulate sprite found
-        sprite_info = {
-            'offset': 0x10000,
-            'decompressed_size': 1024,
-            'tile_count': 32,
-            'quality': 0.8
-        }
+        sprite_info = {"offset": 0x10000, "decompressed_size": 1024, "tile_count": 32, "quality": 0.8}
         self.window._on_sprite_found(sprite_info)
 
         # Verify sprite was added (one more than initial count)
         assert len(self.window.sprites_data) == initial_sprite_count + 1
         # Verify our new sprite is in the list
-        added_sprites = [s for s in self.window.sprites_data if s.get('offset') == 0x10000 and s.get('quality') == 0.8]
+        added_sprites = [s for s in self.window.sprites_data if s.get("offset") == 0x10000 and s.get("quality") == 0.8]
         assert len(added_sprites) == 1
 
         # Simulate scan completion
@@ -273,14 +274,14 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         assert self.window.scan_worker is None
         assert self.window.scan_timeout_timer is None
 
-    @patch('ui.windows.detached_gallery_window.ThumbnailWorkerController')
+    @patch("ui.windows.detached_gallery_window.ThumbnailWorkerController")
     def test_thumbnail_generation_lifecycle(
         self,
         mock_thumbnail_controller_class,
         mock_extraction_manager,
         mock_settings_manager,
         mock_rom_cache,
-        test_rom_file
+        test_rom_file,
     ):
         """Test thumbnail generation worker lifecycle.
 
@@ -305,8 +306,8 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
 
         # Set some sprite data
         self.window.sprites_data = [
-            {'offset': 0x10000, 'name': 'Sprite1'},
-            {'offset': 0x20000, 'name': 'Sprite2'},
+            {"offset": 0x10000, "name": "Sprite1"},
+            {"offset": 0x20000, "name": "Sprite2"},
         ]
 
         # Generate thumbnails
@@ -316,10 +317,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         mock_thumbnail_controller_class.assert_called_once()
 
         # Verify start_worker was called with correct arguments
-        mock_controller.start_worker.assert_called_once_with(
-            test_rom_file,
-            mock_extraction_manager.get_rom_extractor()
-        )
+        mock_controller.start_worker.assert_called_once_with(test_rom_file, mock_extraction_manager.get_rom_extractor())
 
         # Verify queue_thumbnail was called for each sprite
         assert mock_controller.queue_thumbnail.call_count == 2
@@ -327,15 +325,17 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         # Verify controller is stored on the window
         assert self.window.thumbnail_controller is not None
 
-    def test_memory_management_with_large_sprite_set(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache):
+    def test_memory_management_with_large_sprite_set(
+        self, mock_extraction_manager, mock_settings_manager, mock_rom_cache
+    ):
         """Test memory management with large number of sprites."""
         # Create large sprite data set
         large_sprite_set = [
             {
-                'offset': 0x10000 + i * 0x1000,
-                'name': f'Sprite_{i:03d}',
-                'decompressed_size': 1024 + (i * 10),
-                'tile_count': 32 + (i % 16),
+                "offset": 0x10000 + i * 0x1000,
+                "name": f"Sprite_{i:03d}",
+                "decompressed_size": 1024 + (i * 10),
+                "tile_count": 32 + (i % 16),
             }
             for i in range(2000)  # 2000 sprites
         ]
@@ -408,14 +408,14 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
 
         # Set sprite data
         self.window.sprites_data = [
-            {'offset': 0x10000, 'name': 'Sprite1'},
-            {'offset': 0x20000, 'name': 'Sprite2'},
+            {"offset": 0x10000, "name": "Sprite1"},
+            {"offset": 0x20000, "name": "Sprite2"},
         ]
 
         # Mock gallery widget selection
         self.window.gallery_widget.get_selected_sprite_offset = Mock(return_value=0x10000)
 
-        with patch('ui.windows.detached_gallery_window.FullscreenSpriteViewer') as mock_viewer_class:
+        with patch("ui.windows.detached_gallery_window.FullscreenSpriteViewer") as mock_viewer_class:
             mock_viewer = Mock()
             mock_viewer.set_sprite_data.return_value = True
             mock_viewer_class.return_value = mock_viewer
@@ -428,8 +428,10 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             mock_viewer.set_sprite_data.assert_called_once()
             mock_viewer.show.assert_called_once()
 
-    @patch('ui.windows.detached_gallery_window.QMessageBox')
-    def test_sprite_extraction_workflow(self, mock_msgbox, mock_extraction_manager, mock_settings_manager, mock_rom_cache, tmp_path):
+    @patch("ui.windows.detached_gallery_window.QMessageBox")
+    def test_sprite_extraction_workflow(
+        self, mock_msgbox, mock_extraction_manager, mock_settings_manager, mock_rom_cache, tmp_path
+    ):
         """Test sprite extraction workflow."""
         self.window = DetachedGalleryWindow(
             extraction_manager=mock_extraction_manager,
@@ -448,14 +450,11 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
 
         # Verify rom_service.extract_sprite_to_png was called
         mock_extraction_manager.rom_service.extract_sprite_to_png.assert_called_once_with(
-            "test_rom.sfc",
-            0x10000,
-            output_file,
-            None
+            "test_rom.sfc", 0x10000, output_file, None
         )
 
-    @patch('ui.windows.detached_gallery_window.QMessageBox')
-    @patch('ui.windows.detached_gallery_window.SpriteScanWorker')
+    @patch("ui.windows.detached_gallery_window.QMessageBox")
+    @patch("ui.windows.detached_gallery_window.SpriteScanWorker")
     def test_scan_timeout_handling(
         self,
         mock_scan_worker_class,
@@ -464,7 +463,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         mock_settings_manager,
         mock_rom_cache,
         mock_scan_worker_running,
-        test_rom_file
+        test_rom_file,
     ):
         """Test scan timeout handling prevents infinite scanning."""
         mock_scan_worker_class.return_value = mock_scan_worker_running
@@ -492,15 +491,16 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         # Create massive sprite set to test virtual scrolling
         massive_sprite_set = [
             {
-                'offset': 0x10000 + i * 0x100,
-                'name': f'Sprite_{i:05d}',
-                'decompressed_size': 512,
-                'tile_count': 16,
+                "offset": 0x10000 + i * 0x100,
+                "name": f"Sprite_{i:05d}",
+                "decompressed_size": 512,
+                "tile_count": 16,
             }
             for i in range(10000)  # 10,000 sprites
         ]
 
         import time
+
         start_time = time.time()
 
         self.window = DetachedGalleryWindow(
@@ -529,7 +529,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         mock_rom_cache,
         mock_scan_worker_running,
         mock_thumbnail_worker,
-        test_rom_file
+        test_rom_file,
     ):
         """Test management of concurrent workers prevents issues."""
         self.window = DetachedGalleryWindow(
@@ -553,20 +553,21 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         assert self.window.scan_worker is None
         assert self.window.thumbnail_controller is None
 
+
 @pytest.mark.gui
 @pytest.mark.integration
 @pytest.mark.performance
 class TestGalleryWindowPerformance(QtTestCase):
     """Performance-focused integration tests."""
 
-    @patch('ui.windows.detached_gallery_window.ThumbnailWorkerController')
+    @patch("ui.windows.detached_gallery_window.ThumbnailWorkerController")
     def test_thumbnail_generation_performance(
         self,
         mock_controller_class,
         mock_extraction_manager,
         mock_settings_manager,
         mock_rom_cache,
-        mock_thumbnail_worker_for_queueing
+        mock_thumbnail_worker_for_queueing,
     ):
         """Test thumbnail generation performance with realistic sprite counts."""
         mock_controller_class.return_value = mock_thumbnail_worker_for_queueing
@@ -575,10 +576,10 @@ class TestGalleryWindowPerformance(QtTestCase):
         typical_sprite_count = 300
         sprites_data = [
             {
-                'offset': 0x10000 + i * 0x800,
-                'name': f'Sprite_{i:03d}',
-                'decompressed_size': 1024,
-                'tile_count': 32,
+                "offset": 0x10000 + i * 0x800,
+                "name": f"Sprite_{i:03d}",
+                "decompressed_size": 1024,
+                "tile_count": 32,
             }
             for i in range(typical_sprite_count)
         ]
@@ -608,7 +609,7 @@ class TestGalleryWindowPerformance(QtTestCase):
 
     def test_window_resize_performance(self, mock_extraction_manager, mock_settings_manager, mock_rom_cache):
         """Test window resize performance with many sprites."""
-        sprites_data = [{'offset': 0x10000 + i * 0x100, 'name': f'S{i}'} for i in range(1000)]
+        sprites_data = [{"offset": 0x10000 + i * 0x100, "name": f"S{i}"} for i in range(1000)]
 
         window = DetachedGalleryWindow(
             extraction_manager=mock_extraction_manager,
@@ -633,6 +634,7 @@ class TestGalleryWindowPerformance(QtTestCase):
         # Should handle resizes smoothly (< 2 seconds for all resizes)
         assert resize_time < 2.0, f"Window resizing took {resize_time:.2f}s, too slow"
 
+
 @pytest.mark.headless
 @pytest.mark.integration
 class TestGalleryWindowHeadlessIntegration:
@@ -640,7 +642,7 @@ class TestGalleryWindowHeadlessIntegration:
 
     def test_headless_worker_lifecycle_logic(self):
         """Test worker lifecycle logic in headless environment."""
-        with patch('ui.windows.detached_gallery_window.DetachedGalleryWindow.__init__') as mock_init:
+        with patch("ui.windows.detached_gallery_window.DetachedGalleryWindow.__init__") as mock_init:
             mock_init.return_value = None
 
             # Create mock window to test cleanup logic
@@ -654,14 +656,14 @@ class TestGalleryWindowHeadlessIntegration:
                 workers_cleaned = 0
 
                 if window.scan_worker is not None:
-                    if hasattr(window.scan_worker, 'isRunning') and window.scan_worker.isRunning():
+                    if hasattr(window.scan_worker, "isRunning") and window.scan_worker.isRunning():
                         window.scan_worker.requestInterruption()
                         window.scan_worker.wait(3000)
                     window.scan_worker = None
                     workers_cleaned += 1
 
                 if window.thumbnail_worker is not None:
-                    if hasattr(window.thumbnail_worker, 'cleanup'):
+                    if hasattr(window.thumbnail_worker, "cleanup"):
                         window.thumbnail_worker.cleanup()
                     window.thumbnail_worker = None
                     workers_cleaned += 1
@@ -721,8 +723,8 @@ class TestGalleryWindowHeadlessIntegration:
 
         # Verify all signals were disconnected
         assert len(disconnected_signals) == len(SIGNALS_TO_DISCONNECT)
-        assert 'sprite_found' in disconnected_signals
-        assert 'progress' in disconnected_signals
+        assert "sprite_found" in disconnected_signals
+        assert "progress" in disconnected_signals
 
     def test_headless_infinite_loop_prevention_logic(self):
         """Test infinite loop prevention logic without real workers."""
@@ -774,7 +776,7 @@ class TestGalleryWindowHeadlessIntegration:
 
         # Test with some work - should process and then idle stop
         worker_logic = MockThumbnailWorkerLogic()
-        worker_logic.request_queue = ['req1', 'req2', 'req3']
+        worker_logic.request_queue = ["req1", "req2", "req3"]
 
         iterations, processed = worker_logic.simulate_processing_loop()
 
@@ -783,7 +785,7 @@ class TestGalleryWindowHeadlessIntegration:
 
         # Test stop request - should stop immediately
         worker_logic = MockThumbnailWorkerLogic()
-        worker_logic.request_queue = ['req1', 'req2']
+        worker_logic.request_queue = ["req1", "req2"]
         worker_logic.stop_requested = True
 
         iterations, processed = worker_logic.simulate_processing_loop()

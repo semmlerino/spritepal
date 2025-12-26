@@ -3,6 +3,7 @@ Test Qt infrastructure smoke test.
 
 Most tests removed as they just verify Qt framework behavior.
 """
+
 from __future__ import annotations
 
 from unittest.mock import Mock

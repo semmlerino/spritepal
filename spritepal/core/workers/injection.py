@@ -23,9 +23,11 @@ from .specialized import SignalConnectionHelper
 
 logger = get_logger(__name__)
 
+
 # Type definitions for injection parameters
 class VRAMInjectionParams(TypedDict, total=False):
     """Type definition for VRAM injection parameters"""
+
     mode: str  # "vram"
     sprite_path: str
     input_vram: str
@@ -33,8 +35,10 @@ class VRAMInjectionParams(TypedDict, total=False):
     offset: int
     metadata_path: str | None
 
+
 class ROMInjectionParams(TypedDict, total=False):
     """Type definition for ROM injection parameters"""
+
     mode: str  # "rom"
     sprite_path: str
     input_rom: str
@@ -42,6 +46,7 @@ class ROMInjectionParams(TypedDict, total=False):
     offset: int
     fast_compression: bool
     metadata_path: str | None
+
 
 class VRAMInjectionWorker(ManagedWorker):
     """
@@ -110,6 +115,7 @@ class VRAMInjectionWorker(ManagedWorker):
             self.emit_error(error_msg)
             self.operation_finished.emit(False, error_msg)
 
+
 class ROMInjectionWorker(ManagedWorker):
     """
     Worker for ROM injection operations.
@@ -176,4 +182,3 @@ class ROMInjectionWorker(ManagedWorker):
             logger.error(f"{self._operation_name}: {error_msg}")
             self.emit_error(error_msg)
             self.operation_finished.emit(False, error_msg)
-

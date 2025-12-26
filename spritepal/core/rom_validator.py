@@ -1,6 +1,7 @@
 """
 ROM validation utilities for SpritePal
 """
+
 from __future__ import annotations
 
 import struct
@@ -61,14 +62,14 @@ class ROMValidator:
 
     # Valid ROM sizes (in bytes, without header)
     VALID_ROM_SIZES: ClassVar[list[int]] = [
-        ROM_SIZE_512KB,   # 512KB (4 Mbit)
-        ROM_SIZE_1MB,     # 1MB (8 Mbit)
-        ROM_SIZE_1_5MB,   # 1.5MB (12 Mbit)
-        ROM_SIZE_2MB,     # 2MB (16 Mbit)
-        ROM_SIZE_2_5MB,   # 2.5MB (20 Mbit)
-        ROM_SIZE_3MB,     # 3MB (24 Mbit)
-        ROM_SIZE_4MB,     # 4MB (32 Mbit)
-        ROM_SIZE_6MB,     # 6MB (48 Mbit)
+        ROM_SIZE_512KB,  # 512KB (4 Mbit)
+        ROM_SIZE_1MB,  # 1MB (8 Mbit)
+        ROM_SIZE_1_5MB,  # 1.5MB (12 Mbit)
+        ROM_SIZE_2MB,  # 2MB (16 Mbit)
+        ROM_SIZE_2_5MB,  # 2.5MB (20 Mbit)
+        ROM_SIZE_3MB,  # 3MB (24 Mbit)
+        ROM_SIZE_4MB,  # 4MB (32 Mbit)
+        ROM_SIZE_6MB,  # 6MB (48 Mbit)
     ]
 
     # Known game titles and their checksums
@@ -249,9 +250,7 @@ class ROMValidator:
         return True
 
     @classmethod
-    def calculate_checksum(
-        cls, rom_data: bytes | bytearray, header_offset: int = 0
-    ) -> tuple[int, int]:
+    def calculate_checksum(cls, rom_data: bytes | bytearray, header_offset: int = 0) -> tuple[int, int]:
         """
         Calculate SNES ROM checksum and complement.
 
@@ -275,9 +274,7 @@ class ROMValidator:
         return checksum, complement
 
     @classmethod
-    def verify_rom_checksum(
-        cls, rom_path: str, header: ROMHeader, lenient: bool = False
-    ) -> bool:
+    def verify_rom_checksum(cls, rom_path: str, header: ROMHeader, lenient: bool = False) -> bool:
         """
         Verify ROM checksum matches header.
 
@@ -299,10 +296,7 @@ class ROMValidator:
         calculated_checksum, _ = cls.calculate_checksum(rom_data, header.header_offset)
 
         if calculated_checksum != header.checksum:
-            msg = (
-                f"ROM checksum mismatch: expected 0x{header.checksum:04X}, "
-                f"got 0x{calculated_checksum:04X}"
-            )
+            msg = f"ROM checksum mismatch: expected 0x{header.checksum:04X}, got 0x{calculated_checksum:04X}"
             if lenient:
                 logger.warning(f"{msg} (continuing in lenient mode)")
                 return False
@@ -392,10 +386,7 @@ class ROMValidator:
         actual_rom_size = file_size - smc_header_offset
 
         if sprite_offset >= actual_rom_size:
-            raise ROMSizeError(
-                f"Sprite offset 0x{sprite_offset:X} is beyond ROM size "
-                f"(0x{actual_rom_size:X} bytes)"
-            )
+            raise ROMSizeError(f"Sprite offset 0x{sprite_offset:X} is beyond ROM size (0x{actual_rom_size:X} bytes)")
 
         # Identify version
         version = cls.identify_rom_version(header)

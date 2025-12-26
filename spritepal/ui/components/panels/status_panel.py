@@ -3,6 +3,7 @@ Status Panel for Manual Offset Dialog
 
 Displays detection status, progress information, scanning progress, and cache status.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -22,9 +23,9 @@ if TYPE_CHECKING:
 class StatusPanel(QWidget):
     """Panel for displaying status information and progress"""
 
-    def __init__(self, parent: QWidget | None = None, *,
-                 settings_manager: ApplicationStateManager,
-                 rom_cache: ROMCache):
+    def __init__(
+        self, parent: QWidget | None = None, *, settings_manager: ApplicationStateManager, rom_cache: ROMCache
+    ):
         super().__init__(parent)
         self.setStyleSheet(get_panel_style())
 

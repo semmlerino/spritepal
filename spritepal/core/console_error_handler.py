@@ -4,6 +4,7 @@ Console-based error handler for fallback scenarios.
 This provides a real implementation that logs errors to console instead of
 silently swallowing them like MockErrorHandler does.
 """
+
 from __future__ import annotations
 
 import sys
@@ -13,6 +14,7 @@ from typing import override
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class ConsoleErrorHandler:
     """
@@ -67,10 +69,10 @@ class ConsoleErrorHandler:
         logger.critical(f"CRITICAL ERROR - {title}: {message}")
 
         # Print to stderr with emphasis
-        print(f"\n{'='*60}", file=sys.stderr)
+        print(f"\n{'=' * 60}", file=sys.stderr)
         print(f"CRITICAL ERROR: {title}", file=sys.stderr)
         print(f"{message}", file=sys.stderr)
-        print(f"{'='*60}\n", file=sys.stderr)
+        print(f"{'=' * 60}\n", file=sys.stderr)
 
     def handle_warning(self, title: str, message: str) -> None:
         """
@@ -103,11 +105,7 @@ class ConsoleErrorHandler:
         print(f"INFO [{title}]: {message}")
 
     def handle_validation_error(
-        self,
-        error: Exception,
-        context_info: str,
-        user_input: str | None = None,
-        **context_kwargs: object
+        self, error: Exception, context_info: str, user_input: str | None = None, **context_kwargs: object
     ) -> None:
         """
         Handle a validation error with context.
@@ -161,7 +159,4 @@ class ConsoleErrorHandler:
     @override
     def __repr__(self) -> str:
         """String representation of the handler."""
-        return (
-            f"ConsoleErrorHandler(errors={self._error_count}, "
-            f"warnings={self._warning_count})"
-        )
+        return f"ConsoleErrorHandler(errors={self._error_count}, warnings={self._warning_count})"

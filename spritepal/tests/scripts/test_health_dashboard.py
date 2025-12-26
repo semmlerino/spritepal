@@ -40,9 +40,11 @@ pytestmark = [
 FailureCategory = str
 TestMetrics = dict[str, int | float]
 
+
 @dataclass
 class FailureRecord:
     """Represents a single test failure with categorization."""
+
     test_name: str
     test_file: str
     failure_type: str
@@ -56,9 +58,11 @@ class FailureRecord:
     is_mock_related: bool = False
     is_qt_related: bool = False
 
+
 @dataclass
 class SuiteMetrics:
     """Comprehensive test suite metrics."""
+
     timestamp: datetime
     total_tests: int
     passed_tests: int
@@ -87,90 +91,91 @@ class SuiteMetrics:
     critical_failures: int = 0
     quick_wins_available: int = 0
 
+
 class FailureCategorizer:
     """Categorizes test failures based on error patterns."""
 
     CATEGORY_PATTERNS = {
-        'type_annotation': [
-            r'TypeError.*type object',
-            r'ArgumentError.*type',
-            r'NameError.*not defined',
-            r'AttributeError.*type object',
-            r'unsupported operand type',
-            r'invalid type in comparison',
-            r'Union\[.*\] object',
+        "type_annotation": [
+            r"TypeError.*type object",
+            r"ArgumentError.*type",
+            r"NameError.*not defined",
+            r"AttributeError.*type object",
+            r"unsupported operand type",
+            r"invalid type in comparison",
+            r"Union\[.*\] object",
         ],
-        'timeout': [
-            r'timeout',
-            r'TimeoutError',
-            r'pytest timeout',
-            r'test session starts \(platform',
-            r'timed out after \d+',
+        "timeout": [
+            r"timeout",
+            r"TimeoutError",
+            r"pytest timeout",
+            r"test session starts \(platform",
+            r"timed out after \d+",
         ],
-        'import_error': [
-            r'ImportError',
-            r'ModuleNotFoundError',
-            r'cannot import name',
-            r'circular import',
-            r'No module named',
+        "import_error": [
+            r"ImportError",
+            r"ModuleNotFoundError",
+            r"cannot import name",
+            r"circular import",
+            r"No module named",
         ],
-        'qt_related': [
-            r'QApplication',
-            r'QWidget',
-            r'QDialog',
-            r'qtbot',
-            r'QTest',
-            r'QSignal',
-            r'QTimer',
-            r'PySide6',
-            r'PySide6',
+        "qt_related": [
+            r"QApplication",
+            r"QWidget",
+            r"QDialog",
+            r"qtbot",
+            r"QTest",
+            r"QSignal",
+            r"QTimer",
+            r"PySide6",
+            r"PySide6",
         ],
-        'mock_related': [
-            r'Mock.*object',
-            r'MagicMock',
-            r'patch.*object',
-            r'mock.*attribute',
-            r'MockFactory',
-            r'assert_called',
-            r'side_effect',
+        "mock_related": [
+            r"Mock.*object",
+            r"MagicMock",
+            r"patch.*object",
+            r"mock.*attribute",
+            r"MockFactory",
+            r"assert_called",
+            r"side_effect",
         ],
-        'hal_compression': [
-            r'HAL.*compression',
-            r'compression.*error',
-            r'exhal',
-            r'inhal',
-            r'BrokenPipeError',
-            r'subprocess.*hal',
+        "hal_compression": [
+            r"HAL.*compression",
+            r"compression.*error",
+            r"exhal",
+            r"inhal",
+            r"BrokenPipeError",
+            r"subprocess.*hal",
         ],
-        'threading': [
-            r'thread',
-            r'QThread',
-            r'Worker.*thread',
-            r'ThreadPoolExecutor',
-            r'concurrent.futures',
-            r'race condition',
-            r'deadlock',
+        "threading": [
+            r"thread",
+            r"QThread",
+            r"Worker.*thread",
+            r"ThreadPoolExecutor",
+            r"concurrent.futures",
+            r"race condition",
+            r"deadlock",
         ],
-        'file_operations': [
-            r'FileNotFoundError',
-            r'PermissionError',
-            r'OSError.*file',
-            r'IOError',
-            r'file.*not found',
-            r'directory.*not found',
+        "file_operations": [
+            r"FileNotFoundError",
+            r"PermissionError",
+            r"OSError.*file",
+            r"IOError",
+            r"file.*not found",
+            r"directory.*not found",
         ],
-        'memory_issues': [
-            r'MemoryError',
-            r'out of memory',
-            r'allocation failed',
-            r'memory.*overflow',
+        "memory_issues": [
+            r"MemoryError",
+            r"out of memory",
+            r"allocation failed",
+            r"memory.*overflow",
         ],
-        'logic_bugs': [
-            r'AssertionError',
-            r'ValueError.*invalid',
-            r'IndexError',
-            r'KeyError',
-            r'AttributeError.*object.*no attribute',
+        "logic_bugs": [
+            r"AssertionError",
+            r"ValueError.*invalid",
+            r"IndexError",
+            r"KeyError",
+            r"AttributeError.*object.*no attribute",
         ],
     }
 
@@ -185,7 +190,7 @@ class FailureCategorizer:
                 if re.search(pattern, combined_text, re.IGNORECASE):
                     return category
 
-        return 'uncategorized'
+        return "uncategorized"
 
     def analyze_failure_trends(self, failures: list[FailureRecord]) -> dict[str, any]:
         """Analyze failure trends and patterns."""
@@ -194,9 +199,9 @@ class FailureCategorizer:
 
         # Identify quick wins (categories with many simple fixes)
         quick_win_categories = {
-            'type_annotation': 0.8,  # 80% can be fixed quickly
-            'import_error': 0.9,     # 90% can be fixed quickly
-            'mock_related': 0.6,     # 60% can be fixed quickly
+            "type_annotation": 0.8,  # 80% can be fixed quickly
+            "import_error": 0.9,  # 90% can be fixed quickly
+            "mock_related": 0.6,  # 60% can be fixed quickly
         }
 
         quick_wins = sum(
@@ -206,12 +211,13 @@ class FailureCategorizer:
         )
 
         return {
-            'category_distribution': dict(category_counts),
-            'file_distribution': dict(file_counts.most_common(10)),
-            'quick_wins_estimate': quick_wins,
-            'critical_categories': [cat for cat, count in category_counts.items() if count >= 10],
-            'affected_files': len(file_counts),
+            "category_distribution": dict(category_counts),
+            "file_distribution": dict(file_counts.most_common(10)),
+            "quick_wins_estimate": quick_wins,
+            "critical_categories": [cat for cat, count in category_counts.items() if count >= 10],
+            "affected_files": len(file_counts),
         }
+
 
 class HealthTestRunner:
     """Handles test execution with different strategies."""
@@ -223,17 +229,23 @@ class HealthTestRunner:
     def run_progressive_tests(self) -> dict[str, SuiteMetrics]:
         """Run tests in progressive stages to quickly identify issues."""
         stages = [
-            ("smoke_tests", [
-                "tests/test_constants.py",
-                "tests/test_base_manager.py",
-                "tests/test_exceptions.py",
-            ]),
+            (
+                "smoke_tests",
+                [
+                    "tests/test_constants.py",
+                    "tests/test_base_manager.py",
+                    "tests/test_exceptions.py",
+                ],
+            ),
             ("unit_core", ["-m", "not gui and not integration"]),
             ("integration", ["-m", "integration and not gui"]),
-            ("gui_basic", [
-                "tests/test_collapsible_group_box.py",
-                "tests/test_sprite_preview_widget.py",
-            ]),
+            (
+                "gui_basic",
+                [
+                    "tests/test_collapsible_group_box.py",
+                    "tests/test_sprite_preview_widget.py",
+                ],
+            ),
             ("full_suite", ["tests/"]),
         ]
 
@@ -258,7 +270,9 @@ class HealthTestRunner:
 
         # Prepare pytest command
         cmd = [
-            sys.executable, "-m", "pytest",
+            sys.executable,
+            "-m",
+            "pytest",
             "--tb=short",
             "--quiet",
             "--junitxml=test_results.xml",  # type: ignore[attr-defined]
@@ -273,7 +287,7 @@ class HealthTestRunner:
                 cwd=self.project_root,
                 capture_output=True,
                 text=True,
-                timeout=600  # 10 minute timeout for entire stage
+                timeout=600,  # 10 minute timeout for entire stage
             )
 
             total_duration = time.time() - start_time
@@ -292,10 +306,12 @@ class HealthTestRunner:
                 total_duration=600,
                 average_duration=600,
                 median_duration=600,
-                timeout_failures=1
+                timeout_failures=1,
             )
 
-    def _parse_test_results(self, stage_name: str, result: subprocess.CompletedProcess, duration: float) -> SuiteMetrics:  # type: ignore[attr-defined]
+    def _parse_test_results(
+        self, stage_name: str, result: subprocess.CompletedProcess, duration: float
+    ) -> SuiteMetrics:  # type: ignore[attr-defined]
         """Parse test results from pytest output and XML."""
         metrics = SuiteMetrics(
             timestamp=datetime.now(),
@@ -314,29 +330,26 @@ class HealthTestRunner:
 
         # Look for pytest summary line
         summary_patterns = [
-            r'(\d+) passed',
-            r'(\d+) failed',
-            r'(\d+) error',
-            r'(\d+) skipped',
+            r"(\d+) passed",
+            r"(\d+) failed",
+            r"(\d+) error",
+            r"(\d+) skipped",
         ]
 
         for pattern in summary_patterns:
             match = re.search(pattern, output)
             if match:
                 count = int(match.group(1))
-                if 'passed' in pattern:
+                if "passed" in pattern:
                     metrics.passed_tests = count
-                elif 'failed' in pattern:
+                elif "failed" in pattern:
                     metrics.failed_tests = count
-                elif 'error' in pattern:
+                elif "error" in pattern:
                     metrics.error_tests = count
-                elif 'skipped' in pattern:
+                elif "skipped" in pattern:
                     metrics.skipped_tests = count
 
-        metrics.total_tests = (
-            metrics.passed_tests + metrics.failed_tests +
-            metrics.error_tests + metrics.skipped_tests
-        )
+        metrics.total_tests = metrics.passed_tests + metrics.failed_tests + metrics.error_tests + metrics.skipped_tests
 
         if metrics.total_tests > 0:
             metrics.pass_rate = metrics.passed_tests / metrics.total_tests
@@ -360,25 +373,22 @@ class HealthTestRunner:
             failures = []
             durations = []
 
-            for testcase in root.findall('.//testcase'):
-                name = testcase.get('name', '')
-                file = testcase.get('file', '')
-                duration = float(testcase.get('time', 0))
+            for testcase in root.findall(".//testcase"):
+                name = testcase.get("name", "")
+                file = testcase.get("file", "")
+                duration = float(testcase.get("time", 0))
                 durations.append(duration)
 
                 # Check for failures or errors
-                failure = testcase.find('failure')
-                error = testcase.find('error')
+                failure = testcase.find("failure")
+                error = testcase.find("error")
 
                 if failure is not None or error is not None:
                     element = failure if failure is not None else error
-                    message = element.get('message', '')
-                    text = element.text or ''
+                    message = element.get("message", "")
+                    text = element.text or ""
 
-                    failure_info = {
-                        'message': message,
-                        'traceback': text
-                    }
+                    failure_info = {"message": message, "traceback": text}
 
                     category = categorizer.categorize_failure(failure_info)
 
@@ -390,11 +400,11 @@ class HealthTestRunner:
                         traceback=text,
                         duration=duration,
                         category=category,
-                        is_timeout='timeout' in message.lower(),
-                        is_import_error=category == 'import_error',
-                        is_type_error=category == 'type_annotation',
-                        is_mock_related=category == 'mock_related',
-                        is_qt_related=category == 'qt_related',
+                        is_timeout="timeout" in message.lower(),
+                        is_import_error=category == "import_error",
+                        is_type_error=category == "type_annotation",
+                        is_mock_related=category == "mock_related",
+                        is_qt_related=category == "qt_related",
                     )
 
                     failures.append(test_failure)
@@ -402,9 +412,9 @@ class HealthTestRunner:
             # Update metrics with detailed analysis
             if failures:
                 analysis = categorizer.analyze_failure_trends(failures)
-                metrics.failures_by_category = analysis['category_distribution']
-                metrics.failures_by_file = analysis['file_distribution']
-                metrics.quick_wins_available = analysis['quick_wins_estimate']
+                metrics.failures_by_category = analysis["category_distribution"]
+                metrics.failures_by_file = analysis["file_distribution"]
+                metrics.quick_wins_available = analysis["quick_wins_estimate"]
 
                 # Count specific failure types
                 metrics.timeout_failures = sum(1 for f in failures if f.is_timeout)
@@ -418,14 +428,14 @@ class HealthTestRunner:
                 durations.sort()
                 metrics.median_duration = durations[len(durations) // 2]
                 metrics.slowest_tests = [
-                    (tc.get('name', 'unknown'), float(tc.get('time', 0)))
-                    for tc in root.findall('.//testcase')
+                    (tc.get("name", "unknown"), float(tc.get("time", 0))) for tc in root.findall(".//testcase")
                 ]
                 metrics.slowest_tests.sort(key=lambda x: x[1], reverse=True)
                 metrics.slowest_tests = metrics.slowest_tests[:10]
 
         except Exception as e:
             print(f"Warning: Could not parse XML results: {e}")
+
 
 class HealthMonitor:
     """Main class for monitoring test suite health."""
@@ -488,7 +498,7 @@ class HealthMonitor:
             "quick_wins_available": metrics.quick_wins_available,
         }
 
-        with filepath.open('w') as f:
+        with filepath.open("w") as f:
             json.dump(data, f, indent=2)
 
         return filepath
@@ -549,10 +559,18 @@ class HealthMonitor:
         report.append("📊 OVERALL METRICS")
         report.append("-" * 40)
         report.append(f"Total Tests:      {metrics.total_tests:>6}")
-        report.append(f"Passed:           {metrics.passed_tests:>6} ({metrics.passed_tests/metrics.total_tests*100:5.1f}%)")
-        report.append(f"Failed:           {metrics.failed_tests:>6} ({metrics.failed_tests/metrics.total_tests*100:5.1f}%)")
-        report.append(f"Errors:           {metrics.error_tests:>6} ({metrics.error_tests/metrics.total_tests*100:5.1f}%)")
-        report.append(f"Skipped:          {metrics.skipped_tests:>6} ({metrics.skipped_tests/metrics.total_tests*100:5.1f}%)")
+        report.append(
+            f"Passed:           {metrics.passed_tests:>6} ({metrics.passed_tests / metrics.total_tests * 100:5.1f}%)"
+        )
+        report.append(
+            f"Failed:           {metrics.failed_tests:>6} ({metrics.failed_tests / metrics.total_tests * 100:5.1f}%)"
+        )
+        report.append(
+            f"Errors:           {metrics.error_tests:>6} ({metrics.error_tests / metrics.total_tests * 100:5.1f}%)"
+        )
+        report.append(
+            f"Skipped:          {metrics.skipped_tests:>6} ({metrics.skipped_tests / metrics.total_tests * 100:5.1f}%)"
+        )
         report.append("")
         report.append(f"Pass Rate:        {metrics.pass_rate:>6.1%}")
         report.append(f"Total Duration:   {metrics.total_duration:>6.1f}s")
@@ -712,6 +730,7 @@ class HealthMonitor:
 
         return fixes
 
+
 def main():
     """Main entry point for test health dashboard."""
     parser = argparse.ArgumentParser(description="SpritePal Test Health Dashboard")
@@ -721,8 +740,7 @@ def main():
     parser.add_argument("--quick-check", action="store_true", help="Run quick smoke tests only")
     parser.add_argument("--historical", action="store_true", help="Include historical analysis")
     parser.add_argument("--compare", help="Compare with historical data (e.g., 'last-week')")
-    parser.add_argument("--mode", choices=["quick", "progressive", "full"], default="full",
-                       help="Test execution mode")
+    parser.add_argument("--mode", choices=["quick", "progressive", "full"], default="full", help="Test execution mode")
     parser.add_argument("--save", action="store_true", help="Save results to history")
 
     args = parser.parse_args()
@@ -788,6 +806,7 @@ def main():
                 print("-" * 30)
                 for i, fix in enumerate(fix_list, 1):
                     print(f"{i}. {fix}")
+
 
 if __name__ == "__main__":
     main()

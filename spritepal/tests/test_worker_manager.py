@@ -31,6 +31,8 @@ pytestmark = [
     pytest.mark.slow,
     pytest.mark.headless,
 ]
+
+
 class RealTestWorker(QThread):
     """Real test worker that performs actual work."""
 
@@ -61,7 +63,7 @@ class RealTestWorker(QThread):
 
                 # Emit progress
                 progress_percent = (i + 1) * 20
-                self.progress.emit(progress_percent, f"Processing step {i+1}")
+                self.progress.emit(progress_percent, f"Processing step {i + 1}")
 
             # Work completed successfully
             self.work_done = True
@@ -75,6 +77,7 @@ class RealTestWorker(QThread):
         self.should_run = False
         self.requestInterruption()
         self.quit()
+
 
 class SlowStoppingWorker(QThread):
     """Worker that takes time to stop, for testing timeouts."""
@@ -104,6 +107,7 @@ class SlowStoppingWorker(QThread):
         self._stop_requested_time = time.time()
         self.requestInterruption()
         super().quit()
+
 
 class TestWorkerManagerReal:
     """Test WorkerManager with real Qt workers."""
@@ -323,6 +327,7 @@ class TestWorkerManagerReal:
 
         # Verify priority is set (give Qt a moment to apply it)
         from PySide6.QtWidgets import QApplication
+
         QApplication.processEvents()
 
         # Note: Linux often ignores thread priority for non-root processes,
@@ -352,7 +357,9 @@ class TestWorkerManagerReal:
         # Start and let it run briefly
         worker.start()
         qtbot.waitUntil(worker.isRunning, timeout=TEST_TIMEOUT_MEDIUM)
-        qtbot.waitUntil(lambda: worker._work_cycles > 0, timeout=signal_timeout(SHORT))  # Wait for worker to do some work
+        qtbot.waitUntil(
+            lambda: worker._work_cycles > 0, timeout=signal_timeout(SHORT)
+        )  # Wait for worker to do some work
 
         # Interrupt
         worker.stop()
@@ -380,12 +387,22 @@ class TestWorkerCancellationStability:
         # Search for any terminate() calls in production code only
         # Exclude virtual environments, test files, and external dependencies
         result = subprocess.run(
-            ["grep", "-r", r"\.terminate()", ".", "--include=*.py",
-             "--exclude-dir=.venv", "--exclude-dir=venv", "--exclude-dir=__pycache__",
-             "--exclude-dir=.git", "--exclude-dir=node_modules"],
-            check=False, cwd="/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal",
+            [
+                "grep",
+                "-r",
+                r"\.terminate()",
+                ".",
+                "--include=*.py",
+                "--exclude-dir=.venv",
+                "--exclude-dir=venv",
+                "--exclude-dir=__pycache__",
+                "--exclude-dir=.git",
+                "--exclude-dir=node_modules",
+            ],
+            check=False,
+            cwd="/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal",
             capture_output=True,
-            text=True
+            text=True,
         )
 
         # Filter out test files, comments, and documentation
@@ -407,8 +424,7 @@ class TestWorkerCancellationStability:
                 continue
 
             # Skip lines that are clearly documentation/comments
-            if ("CRITICAL:" in content or "which can corrupt" in content or
-                "Never uses" in content or "# " in content):
+            if "CRITICAL:" in content or "which can corrupt" in content or "Never uses" in content or "# " in content:
                 continue
 
             # Skip external dependencies and virtual environments
@@ -422,9 +438,8 @@ class TestWorkerCancellationStability:
 
             problematic_lines.append(line)
 
-        assert not problematic_lines, (
-            "Found dangerous terminate() calls in production code:\n"
-            + "\n".join(problematic_lines)
+        assert not problematic_lines, "Found dangerous terminate() calls in production code:\n" + "\n".join(
+            problematic_lines
         )
 
     def test_worker_manager_safe_patterns(self):
@@ -474,10 +489,10 @@ class TestWorkerCancellationStability:
             if "cleanup" in name.lower() or "cancel" in name.lower():
                 # Either direct use of patterns OR delegation to cleanup_worker is valid
                 has_safe_pattern = (
-                    "requestInterruption" in actual_code or
-                    "cancel()" in actual_code or
-                    "quit()" in actual_code or
-                    "cleanup_worker" in actual_code  # Delegates to safe cleanup method
+                    "requestInterruption" in actual_code
+                    or "cancel()" in actual_code
+                    or "quit()" in actual_code
+                    or "cleanup_worker" in actual_code  # Delegates to safe cleanup method
                 )
                 assert has_safe_pattern, f"Method {name} should use safe cancellation patterns"
 

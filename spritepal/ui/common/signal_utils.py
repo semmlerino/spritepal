@@ -3,6 +3,7 @@ Signal utilities for safe Qt signal handling.
 
 Provides utilities for safely disconnecting signals and checking Qt object validity.
 """
+
 from __future__ import annotations
 
 import warnings

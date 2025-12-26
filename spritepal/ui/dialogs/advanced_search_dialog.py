@@ -3,6 +3,7 @@ Advanced search dialog for sophisticated sprite searching.
 
 Provides multiple search modes, filters, history, and visual search capabilities.
 """
+
 from __future__ import annotations
 
 import json
@@ -62,6 +63,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SearchHistoryEntry:
     """Entry in search history."""
+
     timestamp: datetime
     search_type: str
     query: str
@@ -72,6 +74,7 @@ class SearchHistoryEntry:
         """Format for display in history list."""
         time_str = self.timestamp.strftime("%H:%M:%S")
         return f"[{time_str}] {self.search_type}: {self.query} ({self.results_count} results)"
+
 
 class SearchWorker(BaseWorker):
     """Worker thread for background searching.
@@ -123,31 +126,37 @@ class SearchWorker(BaseWorker):
         start = int(self.params.get("start_offset", 0))
         end_val = self.params.get("end_offset", None)
         end = int(end_val) if end_val is not None else None
-        filters_val = self.params.get("filters", SearchFilter(
-            min_size=MIN_SPRITE_SIZE,
-            max_size=MAX_SPRITE_SIZE,
-            min_tiles=1,
-            max_tiles=1024,
-            alignment=1,
-            include_compressed=True,
-            include_uncompressed=False,
-            confidence_threshold=0.5
-        ))
-        filters = filters_val if isinstance(filters_val, SearchFilter) else SearchFilter(
-            min_size=MIN_SPRITE_SIZE,
-            max_size=MAX_SPRITE_SIZE,
-            min_tiles=1,
-            max_tiles=1024,
-            alignment=1,
-            include_compressed=True,
-            include_uncompressed=False,
-            confidence_threshold=0.5
+        filters_val = self.params.get(
+            "filters",
+            SearchFilter(
+                min_size=MIN_SPRITE_SIZE,
+                max_size=MAX_SPRITE_SIZE,
+                min_tiles=1,
+                max_tiles=1024,
+                alignment=1,
+                include_compressed=True,
+                include_uncompressed=False,
+                confidence_threshold=0.5,
+            ),
+        )
+        filters = (
+            filters_val
+            if isinstance(filters_val, SearchFilter)
+            else SearchFilter(
+                min_size=MIN_SPRITE_SIZE,
+                max_size=MAX_SPRITE_SIZE,
+                min_tiles=1,
+                max_tiles=1024,
+                alignment=1,
+                include_compressed=True,
+                include_uncompressed=False,
+                confidence_threshold=0.5,
+            )
         )
 
         # Create parallel finder
         self.finder = ParallelSpriteFinder(
-            num_workers=int(self.params.get("num_workers", 4)),
-            step_size=int(self.params.get("step_size", 0x100))
+            num_workers=int(self.params.get("num_workers", 4)), step_size=int(self.params.get("step_size", 0x100))
         )
 
         # Search without progress callback (removed dead signal)
@@ -155,7 +164,7 @@ class SearchWorker(BaseWorker):
             rom_path,
             start,
             end,
-            cancellation_token=self  # type: ignore[arg-type]  # Worker has is_cancelled() method
+            cancellation_token=self,  # type: ignore[arg-type]  # Worker has is_cancelled() method
         )
 
         # Apply filters
@@ -225,7 +234,7 @@ class SearchWorker(BaseWorker):
             matches = similarity_engine.find_similar(
                 target,
                 max_results=max_results,
-                similarity_threshold=similarity_threshold / 100.0  # Convert percentage to decimal
+                similarity_threshold=similarity_threshold / 100.0,  # Convert percentage to decimal
             )
 
             self.progress.emit(1, 1)
@@ -240,8 +249,7 @@ class SearchWorker(BaseWorker):
                     tile_count=0,  # Not available from similarity search
                     compressed_size=0,  # Not available from similarity search
                     confidence=match.similarity_score,
-                    metadata={"similarity_score": match.similarity_score,
-                             "hash_distance": match.hash_distance}
+                    metadata={"similarity_score": match.similarity_score, "hash_distance": match.hash_distance},
                 )
                 results.append(result)
                 self.result_found.emit(result)
@@ -271,26 +279,32 @@ class SearchWorker(BaseWorker):
 
             # Use memory-mapped file for large ROMs
             with Path(rom_path).open("rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as rom_data:
-                    rom_size = len(rom_data)
+                rom_size = len(rom_data)
 
-                    if operation == "Single Pattern" or len(patterns) == 1:
-                        # Single pattern search
-                        pattern = patterns[0]
-                        if pattern_type == "hex":
-                            self._search_hex_pattern(rom_data, pattern, alignment, context_bytes, max_results, rom_size)
-                        elif pattern_type == "regex":
-                            self._search_regex_pattern(rom_data, pattern, case_sensitive, alignment, context_bytes, max_results, rom_size)
-                        else:
-                            self.error.emit(f"Unknown pattern type: {pattern_type}")
-                            return
-                    # Multiple pattern search
-                    elif pattern_type == "hex":
-                        self._search_multiple_hex_patterns(rom_data, patterns, operation, alignment, context_bytes, max_results, rom_size)
+                if operation == "Single Pattern" or len(patterns) == 1:
+                    # Single pattern search
+                    pattern = patterns[0]
+                    if pattern_type == "hex":
+                        self._search_hex_pattern(rom_data, pattern, alignment, context_bytes, max_results, rom_size)
                     elif pattern_type == "regex":
-                        self._search_multiple_regex_patterns(rom_data, patterns, operation, case_sensitive, alignment, context_bytes, max_results, rom_size)
+                        self._search_regex_pattern(
+                            rom_data, pattern, case_sensitive, alignment, context_bytes, max_results, rom_size
+                        )
                     else:
                         self.error.emit(f"Unknown pattern type: {pattern_type}")
                         return
+                # Multiple pattern search
+                elif pattern_type == "hex":
+                    self._search_multiple_hex_patterns(
+                        rom_data, patterns, operation, alignment, context_bytes, max_results, rom_size
+                    )
+                elif pattern_type == "regex":
+                    self._search_multiple_regex_patterns(
+                        rom_data, patterns, operation, case_sensitive, alignment, context_bytes, max_results, rom_size
+                    )
+                else:
+                    self.error.emit(f"Unknown pattern type: {pattern_type}")
+                    return
 
             self.search_complete.emit([])  # Results are emitted individually via result_found
 
@@ -298,7 +312,9 @@ class SearchWorker(BaseWorker):
             logger.exception("Pattern search error")
             self.error.emit(str(e))
 
-    def _search_hex_pattern(self, rom_data: mmap.mmap, pattern_str: str, alignment: int, context_bytes: int, max_results: int, rom_size: int):
+    def _search_hex_pattern(
+        self, rom_data: mmap.mmap, pattern_str: str, alignment: int, context_bytes: int, max_results: int, rom_size: int
+    ):
         """Search for hex pattern with wildcard support."""
         try:
             # Parse hex pattern (e.g., "00 01 02 ?? FF")
@@ -349,8 +365,8 @@ class SearchWorker(BaseWorker):
                                 "pattern_type": "hex",
                                 "context_start": context_start,
                                 "context_data": context_data.hex(),
-                                "match_data": bytes(rom_data[offset:offset + pattern_len]).hex()
-                            }
+                                "match_data": bytes(rom_data[offset : offset + pattern_len]).hex(),
+                            },
                         )
 
                         self.result_found.emit(result)
@@ -376,7 +392,16 @@ class SearchWorker(BaseWorker):
             logger.exception("Hex pattern search error")
             self.error.emit(f"Hex pattern search failed: {e}")
 
-    def _search_regex_pattern(self, rom_data: mmap.mmap, pattern_str: str, case_sensitive: bool, alignment: int, context_bytes: int, max_results: int, rom_size: int):
+    def _search_regex_pattern(
+        self,
+        rom_data: mmap.mmap,
+        pattern_str: str,
+        case_sensitive: bool,
+        alignment: int,
+        context_bytes: int,
+        max_results: int,
+        rom_size: int,
+    ):
         """Search for regex pattern in ROM data."""
         try:
             # Compile regex pattern
@@ -389,7 +414,7 @@ class SearchWorker(BaseWorker):
 
             results_count = 0
             chunk_size = 0x10000  # 64KB chunks
-            overlap_size = 1024   # Overlap to catch patterns spanning chunks
+            overlap_size = 1024  # Overlap to catch patterns spanning chunks
 
             # Search through ROM data in chunks
             for start_offset in range(0, rom_size, chunk_size - overlap_size):
@@ -435,8 +460,8 @@ class SearchWorker(BaseWorker):
                             "context_start": context_start,
                             "context_data": context_data.hex(),
                             "match_data": match.group().hex(),
-                            "match_text": self._safe_decode(match.group())
-                        }
+                            "match_text": self._safe_decode(match.group()),
+                        },
                     )
 
                     self.result_found.emit(result)
@@ -498,7 +523,9 @@ class SearchWorker(BaseWorker):
             logger.exception(f"Failed to parse hex pattern '{pattern_str}': {e}")
             return b"", b""
 
-    def _match_hex_pattern_at_offset(self, rom_data: mmap.mmap, offset: int, pattern_bytes: bytes, mask_bytes: bytes) -> bool:
+    def _match_hex_pattern_at_offset(
+        self, rom_data: mmap.mmap, offset: int, pattern_bytes: bytes, mask_bytes: bytes
+    ) -> bool:
         """Check if hex pattern matches at specific offset."""
         if offset + len(pattern_bytes) > len(rom_data):
             return False
@@ -525,7 +552,16 @@ class SearchWorker(BaseWorker):
         except Exception:
             return "<decode error>"
 
-    def _search_multiple_hex_patterns(self, rom_data: mmap.mmap, patterns: list[str], operation: str, alignment: int, context_bytes: int, max_results: int, rom_size: int):
+    def _search_multiple_hex_patterns(
+        self,
+        rom_data: mmap.mmap,
+        patterns: list[str],
+        operation: str,
+        alignment: int,
+        context_bytes: int,
+        max_results: int,
+        rom_size: int,
+    ):
         """Search for multiple hex patterns with OR/AND operations."""
         try:
             # Parse all patterns
@@ -567,7 +603,9 @@ class SearchWorker(BaseWorker):
                                 continue
 
                             if self._match_hex_pattern_at_offset(rom_data, offset, pattern_bytes, mask):
-                                result = self._create_pattern_result(rom_data, offset, pattern_len, pattern_str, "hex", context_bytes, rom_size)
+                                result = self._create_pattern_result(
+                                    rom_data, offset, pattern_len, pattern_str, "hex", context_bytes, rom_size
+                                )
                                 self.result_found.emit(result)
                                 results_count += 1
                                 offset += pattern_len
@@ -612,7 +650,15 @@ class SearchWorker(BaseWorker):
                         if len(pattern_matches) == len(parsed_patterns):
                             # Use the first match as the main result
                             main_pattern, main_offset, main_len = pattern_matches[0]
-                            result = self._create_pattern_result(rom_data, main_offset, main_len, f"AND: {main_pattern} (+{len(pattern_matches)-1} more)", "hex", context_bytes, rom_size)
+                            result = self._create_pattern_result(
+                                rom_data,
+                                main_offset,
+                                main_len,
+                                f"AND: {main_pattern} (+{len(pattern_matches) - 1} more)",
+                                "hex",
+                                context_bytes,
+                                rom_size,
+                            )
                             result.metadata["and_matches"] = pattern_matches
                             self.result_found.emit(result)
                             results_count += 1
@@ -626,7 +672,17 @@ class SearchWorker(BaseWorker):
             logger.exception("Multiple hex pattern search error")
             self.error.emit(f"Multiple hex pattern search failed: {e}")
 
-    def _search_multiple_regex_patterns(self, rom_data: mmap.mmap, patterns: list[str], operation: str, case_sensitive: bool, alignment: int, context_bytes: int, max_results: int, rom_size: int):
+    def _search_multiple_regex_patterns(
+        self,
+        rom_data: mmap.mmap,
+        patterns: list[str],
+        operation: str,
+        case_sensitive: bool,
+        alignment: int,
+        context_bytes: int,
+        max_results: int,
+        rom_size: int,
+    ):
         """Search for multiple regex patterns with OR/AND operations."""
         try:
             # Compile all patterns
@@ -646,7 +702,7 @@ class SearchWorker(BaseWorker):
 
             results_count = 0
             chunk_size = 0x10000  # 64KB chunks
-            overlap_size = 1024   # Overlap to catch patterns spanning chunks
+            overlap_size = 1024  # Overlap to catch patterns spanning chunks
             and_window_size = 256  # For AND operations
 
             if operation.startswith("OR"):
@@ -677,7 +733,9 @@ class SearchWorker(BaseWorker):
                             if start_offset > 0 and match.start() < overlap_size:
                                 continue
 
-                            result = self._create_pattern_result(rom_data, match_offset, match_len, pattern_str, "regex", context_bytes, rom_size)
+                            result = self._create_pattern_result(
+                                rom_data, match_offset, match_len, pattern_str, "regex", context_bytes, rom_size
+                            )
                             result.metadata["match_text"] = self._safe_decode(match.group())
                             self.result_found.emit(result)
                             results_count += 1
@@ -709,7 +767,9 @@ class SearchWorker(BaseWorker):
                             if match:
                                 match_offset = offset + match.start()
                                 match_len = match.end() - match.start()
-                                pattern_matches.append((pattern_str, match_offset, match_len, self._safe_decode(match.group())))
+                                pattern_matches.append(
+                                    (pattern_str, match_offset, match_len, self._safe_decode(match.group()))
+                                )
                             else:
                                 break
 
@@ -717,7 +777,15 @@ class SearchWorker(BaseWorker):
                         if len(pattern_matches) == len(compiled_patterns):
                             # Use the first match as the main result
                             main_pattern, main_offset, main_len, main_text = pattern_matches[0]
-                            result = self._create_pattern_result(rom_data, main_offset, main_len, f"AND: {main_pattern} (+{len(pattern_matches)-1} more)", "regex", context_bytes, rom_size)
+                            result = self._create_pattern_result(
+                                rom_data,
+                                main_offset,
+                                main_len,
+                                f"AND: {main_pattern} (+{len(pattern_matches) - 1} more)",
+                                "regex",
+                                context_bytes,
+                                rom_size,
+                            )
                             result.metadata["match_text"] = main_text
                             result.metadata["and_matches"] = pattern_matches
                             self.result_found.emit(result)
@@ -732,7 +800,16 @@ class SearchWorker(BaseWorker):
             logger.exception("Multiple regex pattern search error")
             self.error.emit(f"Multiple regex pattern search failed: {e}")
 
-    def _create_pattern_result(self, rom_data: mmap.mmap, offset: int, size: int, pattern: str, pattern_type: str, context_bytes: int, rom_size: int) -> SearchResult:
+    def _create_pattern_result(
+        self,
+        rom_data: mmap.mmap,
+        offset: int,
+        size: int,
+        pattern: str,
+        pattern_type: str,
+        context_bytes: int,
+        rom_size: int,
+    ) -> SearchResult:
         """Create a SearchResult for a pattern match."""
         context_start = max(0, offset - context_bytes)
         context_end = min(rom_size, offset + size + context_bytes)
@@ -749,8 +826,8 @@ class SearchWorker(BaseWorker):
                 "pattern_type": pattern_type,
                 "context_start": context_start,
                 "context_data": context_data.hex(),
-                "match_data": bytes(rom_data[offset:offset + size]).hex()
-            }
+                "match_data": bytes(rom_data[offset : offset + size]).hex(),
+            },
         )
 
     def _apply_filters(self, result: SearchResult, filters: SearchFilter) -> bool:
@@ -802,6 +879,7 @@ class SearchWorker(BaseWorker):
     def emit_error(self, message: str, exception: Exception | None = None) -> None:
         """Emit error signal - compatibility method for decorator."""
         self.error.emit(message)
+
 
 class AdvancedSearchDialog(QDialog):
     """
@@ -872,9 +950,7 @@ class AdvancedSearchDialog(QDialog):
         layout.addWidget(results_group)
 
         # Dialog buttons
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Close
-        )
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
 
         self.search_button = QPushButton("Search")
@@ -1041,11 +1117,7 @@ class AdvancedSearchDialog(QDialog):
 
         # Search scope
         self.visual_scope_combo = QComboBox()
-        self.visual_scope_combo.addItems([
-            "Current ROM",
-            "All Indexed Sprites",
-            "Selected Region"
-        ])
+        self.visual_scope_combo.addItems(["Current ROM", "All Indexed Sprites", "Selected Region"])
         self.visual_scope_combo.setToolTip(TOOLTIPS["search_scope"])
         sim_layout.addWidget(QLabel("Search Scope:"), 1, 0)
         sim_layout.addWidget(self.visual_scope_combo, 1, 1, 1, 2)
@@ -1082,9 +1154,7 @@ class AdvancedSearchDialog(QDialog):
         # Pattern input
         self.pattern_edit = QTextEdit()
         self.pattern_edit.setMaximumHeight(100)
-        self.pattern_edit.setPlaceholderText(
-            "Enter hex pattern (e.g. '00 01 02 ?? ?? FF') or regex"
-        )
+        self.pattern_edit.setPlaceholderText("Enter hex pattern (e.g. '00 01 02 ?? ?? FF') or regex")
         pattern_layout.addWidget(self.pattern_edit)
 
         pattern_group.setLayout(pattern_layout)
@@ -1200,14 +1270,10 @@ class AdvancedSearchDialog(QDialog):
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self._focus_search)
 
         # Ctrl+Enter - Start search
-        QShortcut(QKeySequence("Ctrl+Return"), self).activated.connect(
-            self._start_search
-        )
+        QShortcut(QKeySequence("Ctrl+Return"), self).activated.connect(self._start_search)
 
         # Escape - Stop search
-        QShortcut(QKeySequence("Escape"), self).activated.connect(
-            self._stop_search
-        )
+        QShortcut(QKeySequence("Escape"), self).activated.connect(self._stop_search)
 
         # Ctrl+H - Show history
         QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self._show_history_tab)
@@ -1247,7 +1313,7 @@ class AdvancedSearchDialog(QDialog):
             "end_offset": end,
             "num_workers": self.workers_spin.value(),
             "step_size": self.step_size_spin.value(),
-            "filters": filters
+            "filters": filters,
         }
 
         self.search_worker = SearchWorker("parallel", params)
@@ -1271,7 +1337,7 @@ class AdvancedSearchDialog(QDialog):
             search_type="Parallel",
             query=f"0x{start:X} - {f'0x{end:X}' if end else 'EOF'}",
             filters=filters,
-            results_count=0
+            results_count=0,
         )
         self.search_history.append(entry)
 
@@ -1329,7 +1395,7 @@ class AdvancedSearchDialog(QDialog):
             "rom_path": self.rom_path,
             "similarity_threshold": similarity_threshold,
             "search_scope": search_scope,
-            "max_results": 50
+            "max_results": 50,
         }
 
         if use_offset_mode:
@@ -1358,14 +1424,16 @@ class AdvancedSearchDialog(QDialog):
             search_type="Visual",
             query=f"{query_description} (threshold: {similarity_threshold}%)",
             filters=SearchFilter(
-                min_size=0, max_size=MAX_SPRITE_SIZE,
-                min_tiles=0, max_tiles=1024,
+                min_size=0,
+                max_size=MAX_SPRITE_SIZE,
+                min_tiles=0,
+                max_tiles=1024,
                 alignment=1,
                 include_compressed=True,
                 include_uncompressed=True,
-                confidence_threshold=self.similarity_slider.value() / 100.0
+                confidence_threshold=self.similarity_slider.value() / 100.0,
             ),
-            results_count=0
+            results_count=0,
         )
         self.search_history.append(entry)
 
@@ -1393,13 +1461,15 @@ class AdvancedSearchDialog(QDialog):
             for i, pattern in enumerate(patterns):
                 if not self._validate_hex_pattern(pattern):
                     if self.results_label:
-                        self.results_label.setText(f"Invalid hex pattern on line {i+1}: Use format like: 00 01 02 ?? FF")
+                        self.results_label.setText(
+                            f"Invalid hex pattern on line {i + 1}: Use format like: 00 01 02 ?? FF"
+                        )
                     return
         else:  # regex
             for i, pattern in enumerate(patterns):
                 if not self._validate_regex_pattern(pattern):
                     if self.results_label:
-                        self.results_label.setText(f"Invalid regex pattern on line {i+1}")
+                        self.results_label.setText(f"Invalid regex pattern on line {i + 1}")
                     return
 
         # Get search options
@@ -1416,7 +1486,7 @@ class AdvancedSearchDialog(QDialog):
             "context_bytes": self.context_size_spin.value(),
             "max_results": self.max_results_spin.value(),
             "whole_word": self.whole_word_check.isChecked(),
-            "operation": self.pattern_operation_combo.currentText()
+            "operation": self.pattern_operation_combo.currentText(),
         }
 
         # Create worker
@@ -1448,9 +1518,9 @@ class AdvancedSearchDialog(QDialog):
                 alignment=alignment,
                 include_compressed=True,
                 include_uncompressed=True,
-                confidence_threshold=0.0
+                confidence_threshold=0.0,
             ),
-            results_count=0
+            results_count=0,
         )
         self.search_history.append(entry)
 
@@ -1513,6 +1583,7 @@ class AdvancedSearchDialog(QDialog):
         """Disconnect search worker signals before cleanup."""
         if self.search_worker:
             from contextlib import suppress
+
             with suppress(RuntimeError, TypeError):
                 self.search_worker.result_found.disconnect(self._add_result)
                 self.search_worker.search_complete.disconnect(self._search_complete)
@@ -1588,16 +1659,12 @@ class AdvancedSearchDialog(QDialog):
             self._update_history_display()
 
         # For visual search, show similarity results dialog
-        if (self.search_worker is not None and
-            self.search_worker.search_type == "visual" and
-            results):
+        if self.search_worker is not None and self.search_worker.search_type == "visual" and results:
             self._show_visual_search_results(results)
 
         # Update results
         if self.results_label:
-            self.results_label.setText(
-            f"Search complete: {len(results)} sprites found"
-        )
+            self.results_label.setText(f"Search complete: {len(results)} sprites found")
         self.search_completed.emit(len(results))
 
     def _search_error(self, error_msg: str):
@@ -1639,10 +1706,7 @@ class AdvancedSearchDialog(QDialog):
 
         try:
             offset_text, ok = QInputDialog.getText(
-                self,
-                "Reference Sprite Offset",
-                "Enter sprite offset (hex format):",
-                text="0x"
+                self, "Reference Sprite Offset", "Enter sprite offset (hex format):", text="0x"
             )
 
             if ok and offset_text.strip():
@@ -1695,10 +1759,7 @@ class AdvancedSearchDialog(QDialog):
         from PySide6.QtWidgets import QFileDialog
 
         filename, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Reference Image",
-            "",
-            "Image Files (*.png *.bmp *.gif *.jpg *.jpeg);;All Files (*.*)"
+            self, "Select Reference Image", "", "Image Files (*.png *.bmp *.gif *.jpg *.jpeg);;All Files (*.*)"
         )
 
         if filename:
@@ -1741,9 +1802,7 @@ class AdvancedSearchDialog(QDialog):
             width, height = image.size
             if width < 8 or height < 8:
                 if self.ref_preview_label:
-                    self.ref_preview_label.setText(
-                        f"Image too small ({width}x{height}). Minimum: 8x8"
-                    )
+                    self.ref_preview_label.setText(f"Image too small ({width}x{height}). Minimum: 8x8")
                 self._uploaded_image = None
                 return False
 
@@ -1770,6 +1829,7 @@ class AdvancedSearchDialog(QDialog):
             # Show preview
             # Convert PIL image to QPixmap
             from io import BytesIO
+
             buffer = BytesIO()
             image.save(buffer, format="PNG")
             buffer.seek(0)
@@ -1780,17 +1840,12 @@ class AdvancedSearchDialog(QDialog):
             # Scale for display (max 128 pixels)
             if pixmap.width() > 128 or pixmap.height() > 128:
                 pixmap = pixmap.scaled(
-                    128, 128,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
+                    128, 128, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                 )
 
             if self.ref_preview_label:
                 self.ref_preview_label.setPixmap(pixmap)
-                self.ref_preview_label.setToolTip(
-                    f"Image: {image_path.name}\n"
-                    f"Size: {image.size[0]}x{image.size[1]}"
-                )
+                self.ref_preview_label.setToolTip(f"Image: {image_path.name}\nSize: {image.size[0]}x{image.size[1]}")
 
             logger.info(f"Loaded reference image: {path} ({image.size[0]}x{image.size[1]})")
             return True
@@ -1827,12 +1882,7 @@ class AdvancedSearchDialog(QDialog):
         """Update the reference sprite preview."""
         try:
             # Create a preview request
-            request = PreviewRequest(
-                source_type="rom",
-                data_path=self.rom_path,
-                offset=offset,
-                size=(128, 128)
-            )
+            request = PreviewRequest(source_type="rom", data_path=self.rom_path, offset=offset, size=(128, 128))
 
             # Generate preview using the preview service
             preview_generator = PreviewGenerator()
@@ -1841,9 +1891,7 @@ class AdvancedSearchDialog(QDialog):
             if result and result.pixmap and not result.pixmap.isNull():
                 # Scale preview to fit the label
                 scaled_pixmap = result.pixmap.scaled(
-                    128, 128,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
+                    128, 128, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                 )
                 if self.ref_preview_label:
                     self.ref_preview_label.setPixmap(scaled_pixmap)
@@ -1869,12 +1917,12 @@ class AdvancedSearchDialog(QDialog):
             for result in results:
                 # Runtime type is SearchResult, but typed as Any to avoid object issues
                 result_typed: Any = result  # pyright: ignore[reportExplicitAny] - worker result list contains SearchResult objects
-                metadata = result_typed.metadata if hasattr(result_typed, 'metadata') else {}
+                metadata = result_typed.metadata if hasattr(result_typed, "metadata") else {}
                 match = SimilarityMatch(
                     offset=result_typed.offset,
                     similarity_score=result_typed.confidence,
                     hash_distance=int(metadata.get("hash_distance", 0)) if metadata else 0,
-                    metadata=metadata or {}
+                    metadata=metadata or {},
                 )
                 matches.append(match)
 
@@ -1912,7 +1960,7 @@ class AdvancedSearchDialog(QDialog):
                 "This may take several minutes but only needs to be done once per ROM.\n\n"
                 "Would you like to build the similarity index now?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
+                QMessageBox.StandardButton.Yes,
             )
 
             if reply == QMessageBox.StandardButton.Yes:
@@ -1943,7 +1991,7 @@ class AdvancedSearchDialog(QDialog):
                 "2. Extract visual features from each sprite\n"
                 "3. Build a searchable similarity index\n"
                 "4. Save the index for future searches\n\n"
-                "This functionality will be added in a future update."
+                "This functionality will be added in a future update.",
             )
         except Exception as e:
             logger.exception(f"Error in _build_similarity_index: {e}")
@@ -1976,22 +2024,24 @@ class AdvancedSearchDialog(QDialog):
         # Convert to serializable format
         data = []
         for entry in self.search_history[-100:]:  # Keep last 100
-            data.append({
-                "timestamp": entry.timestamp.isoformat(),
-                "search_type": entry.search_type,
-                "query": entry.query,
-                "results_count": entry.results_count,
-                "filters": {
-                    "min_size": entry.filters.min_size,
-                    "max_size": entry.filters.max_size,
-                    "min_tiles": entry.filters.min_tiles,
-                    "max_tiles": entry.filters.max_tiles,
-                    "alignment": entry.filters.alignment,
-                    "include_compressed": entry.filters.include_compressed,
-                    "include_uncompressed": entry.filters.include_uncompressed,
-                    "confidence_threshold": entry.filters.confidence_threshold
+            data.append(
+                {
+                    "timestamp": entry.timestamp.isoformat(),
+                    "search_type": entry.search_type,
+                    "query": entry.query,
+                    "results_count": entry.results_count,
+                    "filters": {
+                        "min_size": entry.filters.min_size,
+                        "max_size": entry.filters.max_size,
+                        "min_tiles": entry.filters.min_tiles,
+                        "max_tiles": entry.filters.max_tiles,
+                        "alignment": entry.filters.alignment,
+                        "include_compressed": entry.filters.include_compressed,
+                        "include_uncompressed": entry.filters.include_uncompressed,
+                        "confidence_threshold": entry.filters.confidence_threshold,
+                    },
                 }
-            })
+            )
 
         with Path(history_file).open("w") as f:
             json.dump(data, f, indent=2)
@@ -2013,7 +2063,7 @@ class AdvancedSearchDialog(QDialog):
                     search_type=item["search_type"],
                     query=item["query"],
                     filters=filters,
-                    results_count=item["results_count"]
+                    results_count=item["results_count"],
                 )
                 self.search_history.append(entry)
 

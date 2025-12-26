@@ -170,9 +170,7 @@ class HALStreamBuilder:
         self._data.append(start_byte & 0xFF)
         return self
 
-    def backref(
-        self, offset: int, count: int, command: int = 4, long_form: bool = False
-    ) -> HALStreamBuilder:
+    def backref(self, offset: int, count: int, command: int = 4, long_form: bool = False) -> HALStreamBuilder:
         """Add backref command (commands 4-7).
 
         Args:
@@ -667,12 +665,7 @@ class TestRealHALComparison:
         input_file, compressed_file, _ = temp_files
 
         # Create mixed pattern: some repeating, some varied
-        input_data = (
-            bytes([0x00] * 32)
-            + bytes(range(256))
-            + bytes([0xFF] * 64)
-            + bytes([0x12, 0x34] * 50)
-        )
+        input_data = bytes([0x00] * 32) + bytes(range(256)) + bytes([0xFF] * 64) + bytes([0x12, 0x34] * 50)
 
         compressed = self._compress_with_inhal(input_data, input_file, compressed_file)
         if compressed is None:

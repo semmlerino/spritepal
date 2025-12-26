@@ -5,6 +5,7 @@ This module provides mock implementations of HAL compression/decompression
 that eliminate process pool overhead while maintaining interface compatibility.
 Tests run 7x faster with these mocks compared to real HAL process pools.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -98,9 +99,7 @@ class MockHALProcessPool:
         """
         if not self._pool_initialized or self._shutdown:
             return HALResult(
-                success=False,
-                error_message="Pool not initialized or shutting down",
-                request_id=request.request_id
+                success=False, error_message="Pool not initialized or shutting down", request_id=request.request_id
             )
 
         self._request_count += 1
@@ -112,9 +111,7 @@ class MockHALProcessPool:
         # Check for configured failures
         if request.request_id in self._mock_failures:
             return HALResult(
-                success=False,
-                error_message=self._mock_failures[request.request_id],
-                request_id=request.request_id
+                success=False, error_message=self._mock_failures[request.request_id], request_id=request.request_id
             )
 
         # Process based on operation type
@@ -123,9 +120,7 @@ class MockHALProcessPool:
         if request.operation == "compress":
             return self._mock_compress(request)
         return HALResult(
-            success=False,
-            error_message=f"Unknown operation: {request.operation}",
-            request_id=request.request_id
+            success=False, error_message=f"Unknown operation: {request.operation}", request_id=request.request_id
         )
 
     def _mock_decompress(self, request: HALRequest) -> HALResult:
@@ -144,17 +139,12 @@ class MockHALProcessPool:
 
             # Add marker for test verification
             marker = f"MOCK_DECOMP_{request.offset:08X}".encode()
-            data = marker + data[len(marker):]
+            data = marker + data[len(marker) :]
         else:
             # Random data for stress testing
             data = os.urandom(0x8000)
 
-        return HALResult(
-            success=True,
-            data=data,
-            size=len(data),
-            request_id=request.request_id
-        )
+        return HALResult(success=True, data=data, size=len(data), request_id=request.request_id)
 
     def _mock_compress(self, request: HALRequest) -> HALResult:
         """Generate mock compressed size."""
@@ -162,9 +152,7 @@ class MockHALProcessPool:
 
         if not request.data:
             return HALResult(
-                success=False,
-                error_message="No data provided for compression",
-                request_id=request.request_id
+                success=False, error_message="No data provided for compression", request_id=request.request_id
             )
 
         # Simulate compression with ~60% ratio
@@ -180,17 +168,13 @@ class MockHALProcessPool:
                 # Use hash for deterministic but varied data
                 data_hash = hashlib.md5(request.data).hexdigest()
                 mock_data = f"MOCK_COMPRESSED_{data_hash}".encode()
-                mock_data = mock_data + b'\x00' * (compressed_size - len(mock_data))
+                mock_data = mock_data + b"\x00" * (compressed_size - len(mock_data))
             else:
                 mock_data = os.urandom(compressed_size)
 
             Path(request.output_path).write_bytes(mock_data[:compressed_size])
 
-        return HALResult(
-            success=True,
-            size=compressed_size,
-            request_id=request.request_id
-        )
+        return HALResult(success=True, size=compressed_size, request_id=request.request_id)
 
     def submit_batch(self, requests: list[HALRequest]) -> list[HALResult]:
         """Process multiple requests - uses single-threaded mock processing."""
@@ -199,9 +183,7 @@ class MockHALProcessPool:
         if not self._pool_initialized or self._shutdown:
             return [
                 HALResult(
-                    success=False,
-                    error_message="Pool not initialized or shutting down",
-                    request_id=req.request_id
+                    success=False, error_message="Pool not initialized or shutting down", request_id=req.request_id
                 )
                 for req in requests
             ]
@@ -276,7 +258,7 @@ class MockHALProcessPool:
             "decompress_count": self._decompress_count,
             "compress_count": self._compress_count,
             "batch_count": self._batch_count,
-            "pool_size": self._pool_size
+            "pool_size": self._pool_size,
         }
 
     def configure_failure(self, request_id: str, error_message: str):
@@ -291,6 +273,7 @@ class MockHALProcessPool:
         """Toggle between deterministic and random mock data."""
         self._deterministic_data = enabled
 
+
 class MockHALCompressor:
     """
     Fast mock implementation of HALCompressor for unit tests.
@@ -298,12 +281,7 @@ class MockHALCompressor:
     Provides instant compression/decompression without subprocess overhead.
     """
 
-    def __init__(
-        self,
-        exhal_path: str | None = None,
-        inhal_path: str | None = None,
-        use_pool: bool = True
-    ):
+    def __init__(self, exhal_path: str | None = None, inhal_path: str | None = None, use_pool: bool = True):
         """Initialize mock compressor."""
         self.exhal_path = exhal_path or "mock_exhal"
         self.inhal_path = inhal_path or "mock_inhal"
@@ -328,12 +306,7 @@ class MockHALCompressor:
                 self._pool = None
                 self._pool_failed = True
 
-    def decompress_from_rom(
-        self,
-        rom_path: str,
-        offset: int,
-        output_path: str | None = None
-    ) -> bytes:
+    def decompress_from_rom(self, rom_path: str, offset: int, output_path: str | None = None) -> bytes:
         """Mock decompression - returns predictable data instantly."""
         self._decompress_count += 1
 
@@ -344,7 +317,7 @@ class MockHALCompressor:
                 rom_path=rom_path,
                 offset=offset,
                 output_path=output_path,
-                request_id=f"decompress_{offset}"
+                request_id=f"decompress_{offset}",
             )
 
             result = self._pool.submit_request(request)
@@ -366,7 +339,7 @@ class MockHALCompressor:
 
             # Add marker
             marker = f"MOCK_DECOMP_{offset:08X}".encode()
-            data = marker + data[len(marker):]
+            data = marker + data[len(marker) :]
         else:
             data = os.urandom(data_size)
 
@@ -376,12 +349,7 @@ class MockHALCompressor:
 
         return data
 
-    def compress_to_file(
-        self,
-        input_data: bytes,
-        output_path: str,
-        fast: bool = False
-    ) -> int:
+    def compress_to_file(self, input_data: bytes, output_path: str, fast: bool = False) -> int:
         """Mock compression - returns predictable size instantly."""
         self._compress_count += 1
 
@@ -394,7 +362,7 @@ class MockHALCompressor:
         if self._deterministic:
             data_hash = hashlib.md5(input_data).hexdigest()
             mock_data = f"MOCK_COMP_{data_hash}".encode()
-            mock_data = mock_data + b'\x00' * (compressed_size - len(mock_data))
+            mock_data = mock_data + b"\x00" * (compressed_size - len(mock_data))
         else:
             mock_data = os.urandom(compressed_size)
 
@@ -403,12 +371,7 @@ class MockHALCompressor:
         return compressed_size
 
     def compress_to_rom(
-        self,
-        input_data: bytes,
-        rom_path: str,
-        offset: int,
-        output_rom_path: str | None = None,
-        fast: bool = False
+        self, input_data: bytes, rom_path: str, offset: int, output_rom_path: str | None = None, fast: bool = False
     ) -> tuple[bool, str]:
         """Mock ROM injection - simulates success instantly."""
         self._compress_count += 1
@@ -427,10 +390,7 @@ class MockHALCompressor:
         """Mock tool test - always succeeds."""
         return True, "HAL compression tools are working correctly"
 
-    def decompress_batch(
-        self,
-        requests: list[tuple[str, int]]
-    ) -> list[tuple[bool, bytes | str]]:
+    def decompress_batch(self, requests: list[tuple[str, int]]) -> list[tuple[bool, bytes | str]]:
         """Mock batch decompression."""
         self._batch_decompress_count += 1
 
@@ -444,10 +404,7 @@ class MockHALCompressor:
 
         return results
 
-    def compress_batch(
-        self,
-        requests: list[tuple[bytes, str, bool]]
-    ) -> list[tuple[bool, int | str]]:
+    def compress_batch(self, requests: list[tuple[bytes, str, bool]]) -> list[tuple[bool, int | str]]:
         """Mock batch compression."""
         self._batch_compress_count += 1
 
@@ -467,7 +424,7 @@ class MockHALCompressor:
         if not self._pool:
             return {
                 "enabled": False,
-                "reason": "Pool not configured" if not self._use_pool else "Pool initialization failed"
+                "reason": "Pool not configured" if not self._use_pool else "Pool initialization failed",
             }
 
         return {
@@ -475,7 +432,7 @@ class MockHALCompressor:
             "initialized": self._pool.is_initialized,
             "pool_size": 4,
             "mode": "mock_pool",
-            "statistics": self._pool.get_statistics() if hasattr(self._pool, 'get_statistics') else {}
+            "statistics": self._pool.get_statistics() if hasattr(self._pool, "get_statistics") else {},
         }
 
     def get_statistics(self) -> dict[str, int]:
@@ -484,10 +441,10 @@ class MockHALCompressor:
             "decompress_count": self._decompress_count,
             "compress_count": self._compress_count,
             "batch_decompress_count": self._batch_decompress_count,
-            "batch_compress_count": self._batch_compress_count
+            "batch_compress_count": self._batch_compress_count,
         }
 
-        if self._pool and hasattr(self._pool, 'get_statistics'):
+        if self._pool and hasattr(self._pool, "get_statistics"):
             stats["pool"] = self._pool.get_statistics()
 
         return stats
@@ -501,8 +458,9 @@ class MockHALCompressor:
         """
         self._deterministic = enabled
         # Also set on pool if available
-        if self._pool and hasattr(self._pool, 'set_deterministic_mode'):
+        if self._pool and hasattr(self._pool, "set_deterministic_mode"):
             self._pool.set_deterministic_mode(enabled)
+
 
 def create_mock_hal_tools(tmp_path: Path) -> tuple[str, str]:
     """
@@ -526,6 +484,7 @@ def create_mock_hal_tools(tmp_path: Path) -> tuple[str, str]:
 
     return str(exhal_path), str(inhal_path)
 
+
 def patch_hal_for_tests():
     """
     Patch HAL modules to use mock implementations.
@@ -534,11 +493,8 @@ def patch_hal_for_tests():
     """
     from unittest.mock import patch
 
-    return patch.multiple(
-        'core.hal_compression',
-        HALProcessPool=MockHALProcessPool,
-        HALCompressor=MockHALCompressor
-    )
+    return patch.multiple("core.hal_compression", HALProcessPool=MockHALProcessPool, HALCompressor=MockHALCompressor)
+
 
 def configure_hal_mocking(use_mocks: bool = True, deterministic: bool = True):
     """
@@ -550,17 +506,19 @@ def configure_hal_mocking(use_mocks: bool = True, deterministic: bool = True):
     """
     if use_mocks:
         # Set environment variable for detection
-        os.environ['SPRITEPAL_MOCK_HAL'] = '1'
-        os.environ['SPRITEPAL_MOCK_HAL_DETERMINISTIC'] = '1' if deterministic else '0'
+        os.environ["SPRITEPAL_MOCK_HAL"] = "1"
+        os.environ["SPRITEPAL_MOCK_HAL_DETERMINISTIC"] = "1" if deterministic else "0"
     else:
         # Clear environment variables
-        os.environ.pop('SPRITEPAL_MOCK_HAL', None)
-        os.environ.pop('SPRITEPAL_MOCK_HAL_DETERMINISTIC', None)
+        os.environ.pop("SPRITEPAL_MOCK_HAL", None)
+        os.environ.pop("SPRITEPAL_MOCK_HAL_DETERMINISTIC", None)
+
 
 def is_hal_mocked() -> bool:
     """Check if HAL mocking is enabled."""
-    return os.environ.get('SPRITEPAL_MOCK_HAL') == '1'
+    return os.environ.get("SPRITEPAL_MOCK_HAL") == "1"
+
 
 def is_hal_deterministic() -> bool:
     """Check if HAL mocks should use deterministic data."""
-    return os.environ.get('SPRITEPAL_MOCK_HAL_DETERMINISTIC', '1') == '1'
+    return os.environ.get("SPRITEPAL_MOCK_HAL_DETERMINISTIC", "1") == "1"

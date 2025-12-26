@@ -6,6 +6,7 @@ test data generators, and common test utilities.
 
 This module uses lazy loading to avoid Qt dependency chains in headless environments.
 """
+
 from __future__ import annotations
 
 import os
@@ -25,6 +26,7 @@ def _get_qt_mocks():
             MockQWidget,
             MockSignal,
         )
+
         return {
             "MockQLabel": MockQLabel,
             "MockQPixmap": MockQPixmap,
@@ -35,6 +37,7 @@ def _get_qt_mocks():
     except ImportError:
         # Provide basic mocks if qt_mocks can't be imported
         from unittest.mock import Mock
+
         return {
             "MockQLabel": Mock,
             "MockQPixmap": Mock,
@@ -42,6 +45,7 @@ def _get_qt_mocks():
             "MockQWidget": Mock,
             "MockSignal": Mock,
         }
+
 
 def _is_headless_environment() -> bool:
     """Detect if Qt is truly unavailable (not just CI/no-DISPLAY).
@@ -56,6 +60,7 @@ def _is_headless_environment() -> bool:
     # Try to actually initialize Qt - this is the authoritative check
     try:
         from PySide6.QtWidgets import QApplication
+
         QApplication.instance() or QApplication([])
         # In offscreen mode, primaryScreen() may return None but Qt still works
         # So we only return True (headless) if Qt import/init itself fails
@@ -64,6 +69,7 @@ def _is_headless_environment() -> bool:
         # Qt genuinely unavailable - use mock fallback
         return True
 
+
 def _get_real_factory():
     """Lazy import and return RealComponentFactory for Qt-enabled environments.
 
@@ -71,9 +77,11 @@ def _get_real_factory():
     """
     try:
         from tests.infrastructure.real_component_factory import RealComponentFactory
+
         return RealComponentFactory()
     except ImportError as e:
         raise RuntimeError(f"Cannot import RealComponentFactory in headless environment: {e}") from e
+
 
 # Make Qt mocks available at module level for backward compatibility
 def __getattr__(name: str):
@@ -82,6 +90,7 @@ def __getattr__(name: str):
     if name in qt_mocks:
         return qt_mocks[name]
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
 
 __all__ = [
     "MockQLabel",

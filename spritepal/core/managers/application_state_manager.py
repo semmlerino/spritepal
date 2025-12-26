@@ -78,9 +78,13 @@ class ApplicationStateManager(BaseManager):
     # UI coordination signals
     preview_ready = Signal(int, QImage)  # offset, preview_image
 
-    def __init__(self, app_name: str = "SpritePal", settings_path: Path | None = None,
-                 parent: QObject | None = None,
-                 configuration_service: ConfigurationService | None = None) -> None:
+    def __init__(
+        self,
+        app_name: str = "SpritePal",
+        settings_path: Path | None = None,
+        parent: QObject | None = None,
+        configuration_service: ConfigurationService | None = None,
+    ) -> None:
         """
         Initialize application state manager.
 
@@ -102,6 +106,7 @@ class ApplicationStateManager(BaseManager):
                 # Create ConfigurationService if not provided
                 # (AppContext normally provides this, but fallback is safe since it's stateless)
                 from core.configuration_service import ConfigurationService
+
                 config = ConfigurationService()
             self._settings_file = config.settings_file
 
@@ -121,9 +126,7 @@ class ApplicationStateManager(BaseManager):
         # Forward workflow state changes to unified state_changed signal
         self._workflow_manager.workflow_state_changed.connect(self._on_workflow_state_changed)
 
-    def _on_workflow_state_changed(
-        self, old_state: ExtractionState, new_state: ExtractionState
-    ) -> None:
+    def _on_workflow_state_changed(self, old_state: ExtractionState, new_state: ExtractionState) -> None:
         """Forward workflow state changes to unified state_changed signal."""
         self.state_changed.emit("workflow", {"old": old_state.name, "new": new_state.name})
 
@@ -248,20 +251,20 @@ class ApplicationStateManager(BaseManager):
                 "window_x": -1,
                 "window_y": -1,
                 "restore_position": True,
-                "theme": "default"
+                "theme": "default",
             },
             "cache": {
                 "enabled": True,
                 "max_size_mb": 500,
                 "expiration_days": 30,
                 "auto_cleanup": True,
-                "show_indicators": True
+                "show_indicators": True,
             },
             "paths": {
                 "default_dumps_dir": str(Path.home() / "Documents" / "Mesen2" / "Debugger"),
                 "last_used_dir": "",
                 "last_export_dir": "",
-                "last_import_dir": ""
+                "last_import_dir": "",
             },
             "recent_files": {
                 "vram": [],
@@ -269,12 +272,10 @@ class ApplicationStateManager(BaseManager):
                 "oam": [],
                 "rom": [],
                 "max_recent": 10,
-            }
+            },
         }
 
-    def _merge_with_defaults(
-        self, data: dict[str, dict[str, object]]
-    ) -> dict[str, dict[str, object]]:
+    def _merge_with_defaults(self, data: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:
         """Merge loaded settings with defaults."""
         defaults = self._get_default_settings()
 
@@ -291,9 +292,7 @@ class ApplicationStateManager(BaseManager):
 
     # ========== SessionManagerProtocol Methods ==========
 
-    def get(
-        self, category: str, key: str, default: object = None
-    ) -> object:
+    def get(self, category: str, key: str, default: object = None) -> object:
         """
         Get a persistent setting value.
 
@@ -665,11 +664,7 @@ class ApplicationStateManager(BaseManager):
 
         # Fall back to default dumps directory (platform-appropriate)
         default_dir = str(
-            self.get(
-                "paths",
-                "default_dumps_dir",
-                str(Path.home() / "Documents" / "Mesen2" / "Debugger")
-            )
+            self.get("paths", "default_dumps_dir", str(Path.home() / "Documents" / "Mesen2" / "Debugger"))
         )
         if default_dir and Path(default_dir).exists():
             return default_dir

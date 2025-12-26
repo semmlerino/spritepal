@@ -18,6 +18,7 @@ This replaces test_main_window_state_integration.py which heavily mocked:
 - All signal connections (100+ lines of mock signal handling)
 - All widget interactions (800+ lines of simulated Qt behavior)
 """
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -150,7 +151,6 @@ class TestRealMainWindowStateIntegration:
             assert main_window.arrange_button.isEnabled() is False, "Arrange button should start disabled"
             assert main_window.inject_button.isEnabled() is False, "Inject button should start disabled"
 
-
     def test_real_button_state_management_vs_mocked(self):
         """
         Test real button state management vs mocked button simulation.
@@ -264,7 +264,9 @@ class TestRealMainWindowStateIntegration:
             print(f"Editor spy captured {editor_spy.count()} signals")
 
             # Now the real signal should be emitted (button enabled AND _output_path set)
-            assert editor_spy.count() == 1, "REAL BUG FIXED: Signal should be emitted when both button enabled and _output_path set"
+            assert editor_spy.count() == 1, (
+                "REAL BUG FIXED: Signal should be emitted when both button enabled and _output_path set"
+            )
 
             # Validate signal args contain real file path
             editor_signal_args = editor_spy.at(0)
@@ -377,6 +379,7 @@ class TestRealMainWindowStateIntegration:
 
             # Validate real controller integration (vs mock controller)
             assert main_window.controller is not None, "Should have real controller instance"
+
 
 class TestRealMainWindowWorkflowIntegration:
     """
@@ -493,6 +496,7 @@ class TestRealMainWindowWorkflowIntegration:
             assert main_window.extract_button.shortcut().toString() == "Ctrl+E", "Real keyboard shortcut"
             assert main_window.open_editor_button.shortcut().toString() == "Ctrl+O", "Real editor shortcut"
 
+
 class TestBugDiscoveryRealVsMocked:
     """
     Demonstrate specific bugs that real MainWindow tests catch vs 1600+ lines of mocks.
@@ -589,15 +593,15 @@ class TestBugDiscoveryRealVsMocked:
             after_editor_enabled = main_window.open_editor_button.isEnabled()
 
             # This discovers state synchronization bugs
-            assert after_editor_enabled != initial_editor_enabled, \
+            assert after_editor_enabled != initial_editor_enabled, (
                 "REAL BUG: Editor button state should change after extraction"
+            )
 
             # Test new extraction resets state properly
             main_window.new_extraction()
 
             reset_editor_enabled = main_window.open_editor_button.isEnabled()
-            assert reset_editor_enabled == initial_editor_enabled, \
-                "REAL BUG: New extraction should reset button states"
+            assert reset_editor_enabled == initial_editor_enabled, "REAL BUG: New extraction should reset button states"
 
     def test_discovered_bug_button_enabled_but_no_action(self):
         """
@@ -633,6 +637,7 @@ class TestBugDiscoveryRealVsMocked:
             # This demonstrates the architectural bug: UI state (button enabled)
             # is inconsistent with logic state (_output_path empty)
             # Mocks would never catch this because they don't test real UI state
+
 
 if __name__ == "__main__":
     # Run the tests directly

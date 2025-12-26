@@ -2,6 +2,7 @@
 Batch thumbnail worker for generating sprite thumbnails asynchronously.
 Handles queue management and priority-based generation.
 """
+
 from __future__ import annotations
 
 import mmap
@@ -39,6 +40,7 @@ logger = get_logger(__name__)
 @dataclass
 class ThumbnailRequest:
     """Request for thumbnail generation."""
+
     offset: int
     size: int
     priority: int = 0
@@ -48,6 +50,7 @@ class ThumbnailRequest:
         if not isinstance(other, ThumbnailRequest):
             return NotImplemented
         return self.priority < other.priority
+
 
 class BatchThumbnailWorker(QObject):
     """
@@ -73,12 +76,7 @@ class BatchThumbnailWorker(QObject):
     finished = Signal()
     """Emitted when worker finishes all requests."""
 
-    def __init__(
-        self,
-        rom_path: str,
-        rom_extractor: ROMExtractor | None = None,
-        parent: QObject | None = None
-    ):
+    def __init__(self, rom_path: str, rom_extractor: ROMExtractor | None = None, parent: QObject | None = None):
         """
         Initialize the batch thumbnail worker.
 
@@ -92,6 +90,7 @@ class BatchThumbnailWorker(QObject):
         self.rom_path = rom_path
         if rom_extractor is None:
             from core.app_context import get_app_context
+
             rom_extractor = get_app_context().rom_extractor
         self.rom_extractor = rom_extractor
         self.tile_renderer = TileRenderer()
@@ -120,16 +119,11 @@ class BatchThumbnailWorker(QObject):
         self._use_multithreading = True
         self._thread_pool = None
         self._max_workers = 4  # Optimal for I/O + CPU bound tasks
-        
+
         # Cleanup tracking for idempotent cleanup
         self._cleanup_called = False
 
-    def queue_thumbnail(
-        self,
-        offset: int,
-        size: int = 128,
-        priority: int = 0
-    ) -> None:
+    def queue_thumbnail(self, offset: int, size: int = 128, priority: int = 0) -> None:
         """
         Queue a thumbnail for generation.
 
@@ -144,12 +138,7 @@ class BatchThumbnailWorker(QObject):
             self._request_queue.put(request)
             self._pending_count += 1
 
-    def queue_batch(
-        self,
-        offsets: list[int],
-        size: int = 128,
-        priority_start: int = 0
-    ) -> None:
+    def queue_batch(self, offsets: list[int], size: int = 128, priority_start: int = 0) -> None:
         """
         Queue multiple thumbnails for generation.
 
@@ -284,7 +273,9 @@ class BatchThumbnailWorker(QObject):
 
                     # Auto-stop after being idle for too long
                     if idle_iterations >= max_idle_iterations:
-                        logger.info(f"Auto-stopping after {idle_iterations * 100}ms idle, processed {processed_count} total")
+                        logger.info(
+                            f"Auto-stopping after {idle_iterations * 100}ms idle, processed {processed_count} total"
+                        )
                         break
 
                     # Sleep longer when idle to reduce CPU usage
@@ -315,7 +306,9 @@ class BatchThumbnailWorker(QObject):
                 qimage = self._generate_thumbnail(request)
 
                 if qimage and not qimage.isNull():
-                    logger.debug(f"Generated valid thumbnail for 0x{request.offset:06X} (size: {qimage.width()}x{qimage.height()})")
+                    logger.debug(
+                        f"Generated valid thumbnail for 0x{request.offset:06X} (size: {qimage.width()}x{qimage.height()})"
+                    )
                     # Cache it
                     self._add_to_cache(cache_key, qimage)
 
@@ -349,7 +342,7 @@ class BatchThumbnailWorker(QObject):
         rom_file = None
         rom_mmap = None
         try:
-            rom_file = Path(self.rom_path).open('rb')
+            rom_file = Path(self.rom_path).open("rb")
             try:
                 # Try memory mapping first
                 rom_mmap = mmap.mmap(rom_file.fileno(), 0, access=mmap.ACCESS_READ)
@@ -413,9 +406,11 @@ class BatchThumbnailWorker(QObject):
             end_offset = min(file_offset + size, len(self._rom_mmap))
             chunk = self._rom_mmap[file_offset:end_offset]
             # Slicing always returns bytes, not int
-            return chunk if isinstance(chunk, bytes) else bytes(chunk) if hasattr(chunk, '__iter__') else None
+            return chunk if isinstance(chunk, bytes) else bytes(chunk) if hasattr(chunk, "__iter__") else None
         except Exception as e:
-            logger.error(f"Failed to read ROM chunk at ROM offset 0x{offset:06X} (file: 0x{offset + self._smc_offset:06X}): {e}")
+            logger.error(
+                f"Failed to read ROM chunk at ROM offset 0x{offset:06X} (file: 0x{offset + self._smc_offset:06X}): {e}"
+            )
             return None
 
     def _get_next_request(self) -> ThumbnailRequest | None:
@@ -513,7 +508,7 @@ class BatchThumbnailWorker(QObject):
             # Try to decompress sprite at offset
             decompressed_data = None
 
-            if self.rom_extractor and hasattr(self.rom_extractor, 'rom_injector'):
+            if self.rom_extractor and hasattr(self.rom_extractor, "rom_injector"):
                 # Try HAL decompression
                 try:
                     # Read chunk for decompression
@@ -523,7 +518,7 @@ class BatchThumbnailWorker(QObject):
                         _, decompressed_data = rom_injector.find_compressed_sprite(
                             chunk,
                             0,  # Offset within chunk
-                            expected_size=None
+                            expected_size=None,
                         )
                         if decompressed_data:
                             logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{request.offset:06X}")
@@ -560,7 +555,7 @@ class BatchThumbnailWorker(QObject):
                 decompressed_data,
                 width_tiles,
                 height_tiles,
-                palette_index=None  # Grayscale by default
+                palette_index=None,  # Grayscale by default
             )
 
             if not image:
@@ -576,7 +571,7 @@ class BatchThumbnailWorker(QObject):
                     request.size,
                     request.size,
                     Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
+                    Qt.TransformationMode.SmoothTransformation,
                 )
 
             return qimage
@@ -666,7 +661,7 @@ class BatchThumbnailWorker(QObject):
 
     def _clear_cache_memory(self) -> None:
         """Clear cache memory with logging."""
-        if hasattr(self, '_cache') and self._cache:
+        if hasattr(self, "_cache") and self._cache:
             cache_size = len(self._cache)
             if self._cache:
                 self._cache.clear()
@@ -674,24 +669,26 @@ class BatchThumbnailWorker(QObject):
                 logger.debug(f"Cleared thumbnail cache: freed {cache_size} cached images")
                 # Log cache statistics before clearing
                 stats = self._cache.get_stats()
-                logger.debug(f"Cache stats before clear: hit_rate={stats['hit_rate']:.1f}%, hits={stats['hits']}, misses={stats['misses']}")
+                logger.debug(
+                    f"Cache stats before clear: hit_rate={stats['hit_rate']:.1f}%, hits={stats['hits']}, misses={stats['misses']}"
+                )
 
     def _clear_rom_data(self) -> None:
         """Clear ROM data from memory with logging."""
-        if hasattr(self, '_rom_mmap') and self._rom_mmap is not None:
+        if hasattr(self, "_rom_mmap") and self._rom_mmap is not None:
             try:
-                if hasattr(self._rom_mmap, '__len__'):
+                if hasattr(self._rom_mmap, "__len__"):
                     rom_size = len(self._rom_mmap)
                 else:
                     rom_size = 0
 
                 # Close memory map
-                if hasattr(self._rom_mmap, 'close') and callable(getattr(self._rom_mmap, 'close', None)):
+                if hasattr(self._rom_mmap, "close") and callable(getattr(self._rom_mmap, "close", None)):
                     self._rom_mmap.close()
                 self._rom_mmap = None
 
                 # Close file handle
-                if hasattr(self, '_rom_file') and self._rom_file:
+                if hasattr(self, "_rom_file") and self._rom_file:
                     self._rom_file.close()
                     self._rom_file = None
 
@@ -708,7 +705,7 @@ class BatchThumbnailWorker(QObject):
         if self._cleanup_called:
             return
         self._cleanup_called = True
-        
+
         logger.debug("BatchThumbnailWorker cleanup started")
 
         # Request stop
@@ -729,6 +726,7 @@ class BatchThumbnailWorker(QObject):
             logger.warning(f"Error clearing ROM data during cleanup: {e}")
 
         logger.debug("BatchThumbnailWorker cleanup completed")
+
 
 class ThumbnailWorkerController(QObject):
     """
@@ -824,7 +822,7 @@ class ThumbnailWorkerController(QObject):
         if self._cleanup_called:
             return
         self._cleanup_called = True
-        
+
         self.stop_worker()
         if self.worker:
             self.worker.cleanup()

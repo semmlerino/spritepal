@@ -16,9 +16,9 @@ from typing import Any, ParamSpec, TypeVar
 
 import pytest
 
-F = TypeVar('F', bound=Callable[..., Any])
-P = ParamSpec('P')
-R = TypeVar('R')
+F = TypeVar("F", bound=Callable[..., Any])
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 class EnvironmentInfo:
@@ -32,21 +32,21 @@ class EnvironmentInfo:
 
     def _detect_wsl(self) -> bool:
         """Fast WSL detection via filesystem."""
-        if sys.platform != 'linux':
+        if sys.platform != "linux":
             return False
         try:
             uname = os.uname().release.lower()
-            return 'microsoft' in uname or 'wsl' in uname
+            return "microsoft" in uname or "wsl" in uname
         except (OSError, AttributeError):
             return False
 
     def _detect_headless(self) -> bool:
         """Simple headless detection."""
-        if os.environ.get('QT_QPA_PLATFORM') == 'offscreen':
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             return True
         if self.is_wsl:
             return True
-        if sys.platform.startswith('linux') and not os.environ.get('DISPLAY'):
+        if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
             return True
         return False
 
@@ -54,6 +54,7 @@ class EnvironmentInfo:
         """Check if PySide6 is available."""
         try:
             import PySide6.QtCore  # noqa: F401
+
             return True
         except ImportError:
             return False
@@ -61,11 +62,11 @@ class EnvironmentInfo:
     # Properties for backward compatibility
     @property
     def is_ci(self) -> bool:
-        return bool(os.environ.get('CI'))
+        return bool(os.environ.get("CI"))
 
     @property
     def is_docker(self) -> bool:
-        return Path('/.dockerenv').exists()
+        return Path("/.dockerenv").exists()
 
     @property
     def has_display(self) -> bool:
@@ -74,21 +75,22 @@ class EnvironmentInfo:
     @property
     def xvfb_available(self) -> bool:
         import shutil
-        return shutil.which('Xvfb') is not None
+
+        return shutil.which("Xvfb") is not None
 
     @property
     def qt_info(self) -> dict[str, Any]:
-        return {'available': self.pyside6_available}
+        return {"available": self.pyside6_available}
 
     @property
     def ci_system(self) -> str | None:
-        if os.environ.get('GITHUB_ACTIONS'):
-            return 'GitHub Actions'
-        return 'CI' if self.is_ci else None
+        if os.environ.get("GITHUB_ACTIONS"):
+            return "GitHub Actions"
+        return "CI" if self.is_ci else None
 
     @property
     def recommended_qt_platform(self) -> str | None:
-        return 'offscreen' if self.is_headless else None
+        return "offscreen" if self.is_headless else None
 
     @property
     def should_use_xvfb(self) -> bool:
@@ -184,57 +186,46 @@ def require_qt(feature: str) -> None:
 # Test Decorators
 # =============================================================================
 
+
 def skip_if_wsl(func_or_reason: F | str | None = None) -> F | Callable[[F], F]:
     """Skip test if running in WSL.
-    
+
     Can be used as:
         @skip_if_wsl
         def test_foo(): ...
-        
+
         @skip_if_wsl("Custom reason")
         def test_bar(): ...
     """
     default_reason = "Test skipped in WSL environment"
-    
+
     if func_or_reason is None:
         # Called as @skip_if_wsl()
         def decorator(func: F) -> F:
-            return pytest.mark.skipif(
-                is_wsl_environment(),
-                reason=default_reason
-            )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+            return pytest.mark.skipif(is_wsl_environment(), reason=default_reason)(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+
         return decorator  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
     elif callable(func_or_reason):
         # Called as @skip_if_wsl (no parentheses)
-        return pytest.mark.skipif(
-            is_wsl_environment(),
-            reason=default_reason
-        )(func_or_reason)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+        return pytest.mark.skipif(is_wsl_environment(), reason=default_reason)(func_or_reason)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
     else:
         # Called as @skip_if_wsl("reason")
         reason = func_or_reason
+
         def decorator(func: F) -> F:
-            return pytest.mark.skipif(
-                is_wsl_environment(),
-                reason=reason
-            )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+            return pytest.mark.skipif(is_wsl_environment(), reason=reason)(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+
         return decorator  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
 
 
 def skip_if_no_display(func: F) -> F:
     """Skip test if no display is available."""
-    return pytest.mark.skipif(
-        not has_display_available(),
-        reason="Test requires display"
-    )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+    return pytest.mark.skipif(not has_display_available(), reason="Test requires display")(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
 
 
 def skip_in_ci(func: F) -> F:
     """Skip test in CI environments."""
-    return pytest.mark.skipif(
-        is_ci_environment(),
-        reason="Test skipped in CI"
-    )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+    return pytest.mark.skipif(is_ci_environment(), reason="Test skipped in CI")(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
 
 
 def requires_display(func: F) -> F:
@@ -246,23 +237,24 @@ def requires_real_qt(func: F) -> F:
     """Skip test if real Qt threading isn't available."""
     info = get_environment_info()
     should_skip = not info.pyside6_available
-    return pytest.mark.skipif(
-        should_skip,
-        reason="Test requires real Qt (PySide6)"
-    )(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
+    return pytest.mark.skipif(should_skip, reason="Test requires real Qt (PySide6)")(func)  # type: ignore[return-value] - pytest.mark stubs don't preserve TypeVar
 
 
 def headless_safe(func: Callable[P, R]) -> Callable[P, R]:
     """Mark test as safe to run in headless environments (no-op decorator)."""
+
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(*args, **kwargs)
+
     return wrapper
 
 
 def ci_safe(func: Callable[P, R]) -> Callable[P, R]:
     """Mark test as safe to run in CI environments (no-op decorator)."""
+
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(*args, **kwargs)
+
     return wrapper

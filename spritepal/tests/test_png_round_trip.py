@@ -2,6 +2,7 @@
 Test PNG round-trip conversion accuracy
 Ensures sprites survive the extract -> edit -> inject cycle without corruption
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -22,6 +23,7 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
+
 class TestPNGRoundTrip:
     """Test PNG conversion accuracy for both grayscale and indexed modes"""
 
@@ -29,6 +31,7 @@ class TestPNGRoundTrip:
         """Set up test fixtures"""
         # Use app context to get ROMExtractor (session_managers fixture sets up context)
         from core.app_context import get_app_context
+
         self.injector = SpriteInjector()
         self.extractor = get_app_context().rom_extractor
 
@@ -85,9 +88,7 @@ class TestPNGRoundTrip:
 
             # Verify first tile matches original
             assert len(first_tile_converted) == len(original_data)
-            assert (
-                first_tile_converted == original_data
-            ), "Round-trip conversion failed!"
+            assert first_tile_converted == original_data, "Round-trip conversion failed!"
 
     def test_indexed_round_trip(self):
         """Test round-trip conversion through indexed PNG (pixel editor workflow)"""
@@ -222,6 +223,7 @@ class TestPNGRoundTrip:
             valid, msg = self.injector.validate_sprite(str(rgb_path))
             assert not valid
             assert "must be in indexed (P) or grayscale (L) mode" in msg
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

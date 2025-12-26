@@ -12,6 +12,7 @@ Key fixtures:
 - cleanup_singleton: Dialog cleanup fixture
 - signal_timeout, wait_timeout, worker_timeout: Configurable timeouts
 """
+
 from __future__ import annotations
 
 import logging
@@ -51,9 +52,7 @@ _SESSION_THREAD_BASELINE: int = threading.active_count()
 # - Detects specific threads that leaked vs just "count increased"
 # - Can report leaked thread names and stack traces
 # - Not confused by Qt/pytest helper threads that fluctuate
-_SESSION_THREAD_IDENTITIES: dict[int, str] = {
-    t.ident: t.name for t in threading.enumerate() if t.ident is not None
-}
+_SESSION_THREAD_IDENTITIES: dict[int, str] = {t.ident: t.name for t in threading.enumerate() if t.ident is not None}
 
 # Module logger for fixture diagnostics
 _logger = logging.getLogger(__name__)
@@ -79,7 +78,7 @@ def _get_session_thread_baseline(request: pytest.FixtureRequest | None = None) -
     """
     if request is not None:
         try:
-            baseline = getattr(request.config, '_thread_baseline', None)
+            baseline = getattr(request.config, "_thread_baseline", None)
             if baseline is not None:
                 return baseline
         except AttributeError:
@@ -89,7 +88,7 @@ def _get_session_thread_baseline(request: pytest.FixtureRequest | None = None) -
         "Thread baseline fallback to module-load time (%d threads). "
         "Session baseline not available - this may cause false positive leak detection. "
         "Ensure pytest_sessionstart hook is setting config._thread_baseline.",
-        _SESSION_THREAD_BASELINE
+        _SESSION_THREAD_BASELINE,
     )
     return _SESSION_THREAD_BASELINE
 
@@ -112,7 +111,7 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
     """
     if request is not None:
         try:
-            identities = getattr(request.config, '_thread_identities', None)
+            identities = getattr(request.config, "_thread_identities", None)
             if identities is not None:
                 return identities.copy()
         except AttributeError:
@@ -121,7 +120,7 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
     _logger.warning(
         "Thread identities fallback to module-load time (%d threads). "
         "Session identities not available - this may cause false positive leak detection.",
-        len(_SESSION_THREAD_IDENTITIES)
+        len(_SESSION_THREAD_IDENTITIES),
     )
     return _SESSION_THREAD_IDENTITIES.copy()
 
@@ -169,6 +168,7 @@ def ensure_headless_qt() -> Any:
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
 
     from PySide6.QtWidgets import QApplication
+
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
@@ -178,6 +178,7 @@ def ensure_headless_qt() -> Any:
 # =============================================================================
 # Core Qt Fixtures
 # =============================================================================
+
 
 @pytest.fixture(scope="session")
 def qt_app() -> Any:
@@ -209,8 +210,7 @@ def qt_app() -> Any:
         )
     except Exception as e:
         pytest.fail(
-            f"Failed to create QApplication: {e}. "
-            "Ensure QT_QPA_PLATFORM=offscreen is set for headless environments."
+            f"Failed to create QApplication: {e}. Ensure QT_QPA_PLATFORM=offscreen is set for headless environments."
         )
 
 
@@ -258,22 +258,24 @@ def safe_qapp(qt_app: Any) -> Any:
 # These threads may appear transiently and should not cause leak failures
 # IMPORTANT: Keep this list TIGHT - generic patterns like "QThread" or "Thread-"
 # hide real worker leaks. Tests with expected leaks must use skip_thread_cleanup.
-_KNOWN_HELPER_THREADS: frozenset[str] = frozenset({
-    # Testing infrastructure
-    "pytest-timeout",
-    "pytest_timeout",
-    "coverage",
-    # Development tools
-    "pydevd",
-    "watchdog",
-    # Python runtime
-    "_GCMonitor",
-    # Qt framework internals (specific, not generic)
-    "QDBusConnectionManager",
-    # NOTE: ThreadPoolExecutor- and Dummy- patterns were intentionally removed
-    # to avoid masking real thread leaks. Tests with expected pool threads
-    # should use @pytest.mark.skip_thread_cleanup(reason="...").
-})
+_KNOWN_HELPER_THREADS: frozenset[str] = frozenset(
+    {
+        # Testing infrastructure
+        "pytest-timeout",
+        "pytest_timeout",
+        "coverage",
+        # Development tools
+        "pydevd",
+        "watchdog",
+        # Python runtime
+        "_GCMonitor",
+        # Qt framework internals (specific, not generic)
+        "QDBusConnectionManager",
+        # NOTE: ThreadPoolExecutor- and Dummy- patterns were intentionally removed
+        # to avoid masking real thread leaks. Tests with expected pool threads
+        # should use @pytest.mark.skip_thread_cleanup(reason="...").
+    }
+)
 
 
 def _is_known_helper_thread(name: str) -> bool:
@@ -306,16 +308,14 @@ def _find_leaked_threads(
     # Legacy pytest-timeout filter (now covered by helper thread filter)
     if filter_pytest_timeout:
         leaked = {
-            ident: name for ident, name in leaked.items()
+            ident: name
+            for ident, name in leaked.items()
             if "pytest_timeout" not in name.lower() and "timeout" not in name.lower()
         }
 
     # Filter known helper threads
     if filter_helper_threads:
-        leaked = {
-            ident: name for ident, name in leaked.items()
-            if not _is_known_helper_thread(name)
-        }
+        leaked = {ident: name for ident, name in leaked.items() if not _is_known_helper_thread(name)}
 
     return leaked
 
@@ -336,11 +336,13 @@ def _format_leak_message(test_name: str, leaked: dict[int, str]) -> str:
                         lines.append(f"      {subline}")
         except Exception:
             lines.append("    (stack trace unavailable)")
-    lines.extend([
-        "",
-        "Fix: Ensure all workers are properly stopped and joined.",
-        "Use @pytest.mark.skip_thread_cleanup(reason='...') to opt out if truly needed.",
-    ])
+    lines.extend(
+        [
+            "",
+            "Fix: Ensure all workers are properly stopped and joined.",
+            "Use @pytest.mark.skip_thread_cleanup(reason='...') to opt out if truly needed.",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -356,23 +358,20 @@ def _wait_for_threads(
 
     # Fast path: check immediately before entering wait loop
     # Most tests have no leaked threads - exit without any waiting
-    leaked = _find_leaked_threads(
-        before_threads, _get_current_threads(), filter_pytest_timeout
-    )
+    leaked = _find_leaked_threads(before_threads, _get_current_threads(), filter_pytest_timeout)
     if not leaked:
         return {}
 
     elapsed = 0
     while elapsed < max_wait_ms:
         # Re-check in case threads finished during our initial check
-        leaked = _find_leaked_threads(
-            before_threads, _get_current_threads(), filter_pytest_timeout
-        )
+        leaked = _find_leaked_threads(before_threads, _get_current_threads(), filter_pytest_timeout)
         if not leaked:
             break
 
         if qt_available:
             from PySide6.QtCore import QCoreApplication, QThread
+
             app = QCoreApplication.instance()
             if app:
                 app.processEvents()
@@ -401,20 +400,28 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     markers = [m.name for m in request.node.iter_markers()]
 
     # Skip if explicitly marked
-    if any(m in markers for m in ('skip_thread_cleanup', 'no_manager_setup', 'no_qt')):
+    if any(m in markers for m in ("skip_thread_cleanup", "no_manager_setup", "no_qt")):
         logger = logging.getLogger(__name__)
         logger.debug(
             "Thread cleanup skipped for %s (markers: %s)",
             request.node.nodeid,
-            [m for m in markers if m in ('skip_thread_cleanup', 'no_manager_setup', 'no_qt')]
+            [m for m in markers if m in ("skip_thread_cleanup", "no_manager_setup", "no_qt")],
         )
         yield
         return
 
     # Only run for Qt/worker tests
-    qt_fixtures = {'qtbot', 'qt_app', 'qapp', 'hal_pool', 'hal_compressor',
-                   'cleanup_singleton', 'real_factory', 'real_extraction_manager'}
-    if not (qt_fixtures & set(getattr(request, 'fixturenames', []))):
+    qt_fixtures = {
+        "qtbot",
+        "qt_app",
+        "qapp",
+        "hal_pool",
+        "hal_compressor",
+        "cleanup_singleton",
+        "real_factory",
+        "real_extraction_manager",
+    }
+    if not (qt_fixtures & set(getattr(request, "fixturenames", []))):
         yield
         return
 
@@ -425,6 +432,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     qt_available = False
     try:
         from PySide6.QtCore import QCoreApplication
+
         qt_available = QCoreApplication.instance() is not None
     except ImportError:
         pass
@@ -432,6 +440,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     # Qt-specific cleanup
     if qt_available:
         from ui.common import WorkerManager
+
         try:
             WorkerManager.cleanup_all()
         except Exception:
@@ -462,7 +471,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     if leaked:
         leak_mode = request.config.getoption("--leak-mode")
         allow_leaks = leak_mode == "warn"
-        test_name = getattr(request.node, 'name', '<unknown>')
+        test_name = getattr(request.node, "name", "<unknown>")
         message = _format_leak_message(test_name, leaked)
 
         if allow_leaks:
@@ -477,6 +486,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 # =============================================================================
 # Singleton Cleanup
 # =============================================================================
+
 
 @pytest.fixture
 def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:

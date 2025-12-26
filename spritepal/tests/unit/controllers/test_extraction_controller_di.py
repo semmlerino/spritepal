@@ -4,6 +4,7 @@ DI unit tests for ExtractionController.
 Verifies that the controller uses injected managers rather than
 falling back to the global DI container.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -24,9 +25,7 @@ pytestmark = [pytest.mark.headless]
 class TestExtractionControllerDI:
     """Test dependency injection for ExtractionController."""
 
-    def test_uses_injected_managers_not_global(
-        self, isolated_managers: ManagerRegistry
-    ) -> None:
+    def test_uses_injected_managers_not_global(self, isolated_managers: ManagerRegistry) -> None:
         """Verify controller uses provided managers, not DI fallback."""
         mock_main_window = Mock()
 
