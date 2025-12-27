@@ -29,6 +29,7 @@ These rules prevent crashes and test failures. Each has a solution.
 - **Python**: 3.12+
 - **Package Manager**: uv
 - **Config**: `pyproject.toml` (ruff, basedpyright, pytest)
+- **Test ROMs**: `roms/` directory contains Kirby Super Star ROMs for testing extraction/injection
 
 ## Claude Code Workflow
 

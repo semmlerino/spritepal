@@ -139,8 +139,26 @@ class SpriteConfigLoader:
                     f"title '{rom_title}' doesn't match expected pattern"
                 )
         elif title_matched_games:
-            selected_game = title_matched_games[0]
-            logger.warning(f"No checksum match for {checksum_hex}, using title match: '{selected_game}'")
+            # Score and sort matches by quality (exact > substring > equivalence)
+            scored = [(g, self._score_title_match(g, rom_title)) for g in title_matched_games]
+            scored.sort(key=lambda x: x[1], reverse=True)
+            selected_game = scored[0][0]
+
+            # Log match quality information
+            if len(scored) > 1:
+                if scored[0][1] == scored[1][1]:
+                    tied = [s[0] for s in scored if s[1] == scored[0][1]]
+                    logger.warning(
+                        f"No checksum match for {checksum_hex}, multiple equally-matched games: {tied}. "
+                        f"Using first: '{selected_game}'"
+                    )
+                else:
+                    logger.info(
+                        f"No checksum match for {checksum_hex}, selected '{selected_game}' "
+                        f"(score {scored[0][1]}) over {len(scored) - 1} other matches"
+                    )
+            else:
+                logger.warning(f"No checksum match for {checksum_hex}, using title match: '{selected_game}'")
         else:
             logger.debug(f"No game configuration found for ROM: title='{rom_title}', checksum={checksum_hex}")
             return None, None
@@ -317,6 +335,41 @@ class SpriteConfigLoader:
                     return True
 
         return False
+
+    def _score_title_match(self, game_name: str, rom_title: str) -> int:
+        """
+        Score match quality for title matching.
+
+        Returns:
+            100 for exact match
+            50 for game name substring of ROM title
+            25 for Kirby equivalence match (SUPER STAR ↔ FUN PAK ↔ SUPER DELUXE)
+            0 for no match
+        """
+        game_upper = game_name.upper()
+        title_upper = rom_title.upper()
+
+        # Exact match is best
+        if game_upper == title_upper:
+            return 100
+
+        # Game name is substring of ROM title
+        if game_upper in title_upper:
+            return 50
+
+        # Check for Kirby equivalence variants
+        if "KIRBY" in game_upper and "KIRBY" in title_upper:
+            equivalents = [
+                ("SUPER STAR", "FUN PAK"),
+                ("SUPER DELUXE", "FUN PAK"),
+            ]
+            for equiv1, equiv2 in equivalents:
+                if (equiv1 in game_upper and equiv2 in title_upper) or (
+                    equiv2 in game_upper and equiv1 in title_upper
+                ):
+                    return 25
+
+        return 0
 
     def get_all_known_sprites(self) -> dict[str, dict[str, SpriteConfig]]:
         """

@@ -18,9 +18,9 @@
           "notes": "Perfect quality score (1.00) - likely main character sprites"
         },
         "High_Quality_Sprite_2": {
-          "offset": "0x378000", 
-          "expected_size": 3588,
-          "notes": "Very high quality (0.98) - smaller sprite set"
+          "offset": "0x378000",
+          "expected_size": 3584,
+          "notes": "Very high quality (0.98) - smaller sprite set (112 tiles)"
         },
         "High_Quality_Sprite_3": {
           "offset": "0x1D0000",
