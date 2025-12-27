@@ -16,7 +16,11 @@ from core.hal_compression import HALCompressionError, HALCompressor
 from core.injector import SpriteInjector
 from core.rom_validator import ROMHeader, ROMValidator
 from core.sprite_config_loader import SpriteConfigLoader
-from utils.constants import DECOMPRESSION_WINDOW_SIZE
+from utils.constants import (
+    BYTES_PER_TILE,
+    DECOMPRESSION_WINDOW_SIZE,
+    SPRITE_VALIDATION_THRESHOLD,
+)
 from utils.file_validator import atomic_write
 from utils.logging_config import get_logger
 from utils.rom_backup import ROMBackupManager
@@ -192,17 +196,16 @@ class ROMInjector(SpriteInjector):
                     f"({expected_size} bytes). This may indicate a problem."
                 )
 
-            # Check if data size is valid for sprite tiles (should be multiple of 32)
-            bytes_per_tile = 32
-            extra_bytes = len(decompressed) % bytes_per_tile
+            # Check if data size is valid for sprite tiles (should be multiple of tile size)
+            extra_bytes = len(decompressed) % BYTES_PER_TILE
             if extra_bytes != 0:
                 logger.warning(
-                    f"Decompressed data size ({len(decompressed)} bytes) is not a multiple of {bytes_per_tile}. "
+                    f"Decompressed data size ({len(decompressed)} bytes) is not a multiple of {BYTES_PER_TILE}. "
                     f"Extra bytes: {extra_bytes}. This may indicate incorrect offset or corrupted data."
                 )
 
                 # If more than half a tile of extra data, likely wrong offset
-                if extra_bytes > bytes_per_tile // 2:
+                if extra_bytes > BYTES_PER_TILE // 2:
                     logger.error(
                         f"Significant data misalignment detected ({extra_bytes} extra bytes). "
                         f"The sprite offset 0x{offset:X} is likely incorrect for this ROM version."
@@ -254,13 +257,11 @@ class ROMInjector(SpriteInjector):
         if len(data) == 0:
             return False
 
-        bytes_per_tile = 32
-
         # Check if data is tile-aligned
-        if len(data) % bytes_per_tile != 0:
+        if len(data) % BYTES_PER_TILE != 0:
             return False
 
-        num_tiles = len(data) // bytes_per_tile
+        num_tiles = len(data) // BYTES_PER_TILE
 
         # Sample tiles throughout the data, not just the beginning
         # For small sprite: check all tiles (up to 10)
@@ -281,30 +282,30 @@ class ROMInjector(SpriteInjector):
         tiles_to_check = len(tile_indices)
 
         for tile_idx in tile_indices:
-            tile_offset = tile_idx * bytes_per_tile
-            tile_data = data[tile_offset : tile_offset + bytes_per_tile]
+            tile_offset = tile_idx * BYTES_PER_TILE
+            tile_data = data[tile_offset : tile_offset + BYTES_PER_TILE]
 
             # Check for 4bpp characteristics
             if self._has_4bpp_tile_characteristics(tile_data):
                 valid_tiles += 1
 
-        # Require at least 60% of sampled tiles to be valid
+        # Threshold defined in utils/constants.py - see SPRITE_VALIDATION_THRESHOLD docs
         validity_ratio = valid_tiles / tiles_to_check
         logger.debug(f"Sprite data validation: {valid_tiles}/{tiles_to_check} tiles valid ({validity_ratio:.1%})")
 
-        return validity_ratio >= 0.6
+        return validity_ratio >= SPRITE_VALIDATION_THRESHOLD
 
     def _has_4bpp_tile_characteristics(self, tile_data: bytes) -> bool:
         """
         Check if a single tile has characteristics of 4bpp sprite data.
 
         Args:
-            tile_data: 32 bytes of tile data
+            tile_data: BYTES_PER_TILE bytes of tile data (32 for 4bpp)
 
         Returns:
             True if tile appears to be valid 4bpp data
         """
-        if len(tile_data) != 32:
+        if len(tile_data) != BYTES_PER_TILE:
             return False
 
         # Check for variety in bitplanes (not all 0 or all FF)
@@ -337,8 +338,6 @@ class ROMInjector(SpriteInjector):
         Returns:
             Offset where valid sprite data starts, or -1 if not found
         """
-        bytes_per_tile = 32
-
         # Only search at tile boundaries
         max_offset = len(data) - expected_size
         if max_offset < 0:
@@ -357,7 +356,7 @@ class ROMInjector(SpriteInjector):
 
         # If common offsets fail, scan tile by tile (slower)
         logger.debug("Common offsets failed, scanning tile boundaries...")
-        for test_offset in range(0, min(max_offset, 0x2000), bytes_per_tile):
+        for test_offset in range(0, min(max_offset, 0x2000), BYTES_PER_TILE):
             test_data = data[test_offset : test_offset + expected_size]
             if self._validate_sprite_data(test_data):
                 return test_offset
@@ -726,13 +725,12 @@ class ROMInjector(SpriteInjector):
                 compressed_size, decompressed = self.find_compressed_sprite(rom_data, offset, expected_size)
 
                 # Check if data is valid (multiple of tile size)
-                bytes_per_tile = 32
-                extra_bytes = len(decompressed) % bytes_per_tile
+                extra_bytes = len(decompressed) % BYTES_PER_TILE
 
                 if extra_bytes == 0:
                     logger.info(f"Successfully decompressed sprite at offset 0x{offset:X} (perfectly aligned)")
                     return compressed_size, decompressed, offset
-                if extra_bytes <= bytes_per_tile // 4:  # Allow up to 8 extra bytes
+                if extra_bytes <= BYTES_PER_TILE // 4:  # Allow up to 8 extra bytes
                     logger.info(
                         f"Successfully decompressed sprite at offset 0x{offset:X} (minor misalignment: {extra_bytes} extra bytes)"
                     )

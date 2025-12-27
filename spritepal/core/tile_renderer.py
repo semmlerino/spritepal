@@ -8,6 +8,7 @@ from PIL import Image
 
 from core.default_palette_loader import DefaultPaletteLoader
 from core.tile_utils import decode_4bpp_tile
+from utils.constants import BYTES_PER_TILE
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -46,9 +47,8 @@ class TileRenderer:
             f"render_tiles called: data_len={len(tile_data)}, dims={width_tiles}x{height_tiles}, palette={palette_index}"
         )
         try:
-            # Validate input
-            bytes_per_tile = 32
-            expected_size = width_tiles * height_tiles * bytes_per_tile
+            # Validate input (BYTES_PER_TILE = 32 for 4bpp format)
+            expected_size = width_tiles * height_tiles * BYTES_PER_TILE
 
             if len(tile_data) < expected_size:
                 # Pad with zeros if needed
@@ -90,13 +90,13 @@ class TileRenderer:
             for tile_y in range(height_tiles):
                 for tile_x in range(width_tiles):
                     tile_index = tile_y * width_tiles + tile_x
-                    tile_offset = tile_index * bytes_per_tile
+                    tile_offset = tile_index * BYTES_PER_TILE
 
                     if tile_offset >= len(tile_data):
                         continue
 
                     # Decode the tile
-                    tile_pixels = decode_4bpp_tile(tile_data[tile_offset : tile_offset + bytes_per_tile])
+                    tile_pixels = decode_4bpp_tile(tile_data[tile_offset : tile_offset + BYTES_PER_TILE])
 
                     # Apply palette and draw to image
                     for y in range(8):

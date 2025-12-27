@@ -3,6 +3,60 @@ Workflow State Manager for extraction operations.
 
 Manages the state machine for ROM extraction workflow with defined transitions
 and blocking states. This is a focused manager with single responsibility.
+
+State Machine Diagram
+=====================
+
+All operations start and end at IDLE. From IDLE, any operation can begin:
+
+                    ┌─────────────────────────────────────────────────────┐
+                    │                      IDLE                            │
+                    │           (default - no operation active)            │
+                    └──┬────────┬────────┬────────┬────────┬──────────────┘
+                       │        │        │        │        │
+                       ▼        ▼        ▼        ▼        ▼
+                 ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+                 │LOADING  │ │SCANNING │ │PREVIEW- │ │SEARCH-  │ │EXTRACT- │
+                 │  ROM    │ │ SPRITES │ │  ING    │ │  ING    │ │  ING    │
+                 │ [BLOCK] │ │ [BLOCK] │ │         │ │         │ │ [BLOCK] │
+                 └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘
+                      │          │          ↕           ↕            │
+                      │          │     (bidirectional)               │
+                      └──────────┴──────────┴───────────┴────────────┘
+                                            │
+                                            ▼
+                                         IDLE
+
+    Any state can also transition to ERROR, and ERROR returns to IDLE.
+
+Blocking States ([BLOCK])
+=========================
+LOADING_ROM, SCANNING_SPRITES, and EXTRACTING are "blocking" states:
+
+- UI should disable controls that could start conflicting operations
+- New extraction/injection operations are rejected while in these states
+- Prevents data corruption from concurrent ROM file access
+
+Why? These operations hold file handles or memory-mapped regions that would
+conflict with other operations accessing the same ROM.
+
+Non-Blocking States
+===================
+PREVIEWING_SPRITE and SEARCHING_SPRITE are non-blocking:
+
+- User can search while a preview is loading (PREVIEWING → SEARCHING)
+- Search results can trigger a new preview (SEARCHING → PREVIEWING)
+- Both can be cancelled and return to IDLE
+
+This allows responsive UI during quick preview/search cycles.
+
+Adding New States
+=================
+When adding a new state:
+1. Add to ExtractionState enum
+2. Add to VALID_TRANSITIONS with allowed transitions
+3. If it holds file handles or mmap, add to BLOCKING_STATES
+4. Update UI components that check can_extract()/is_blocking()
 """
 
 from __future__ import annotations

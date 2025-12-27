@@ -49,7 +49,15 @@ class BaseManager(QObject):
 
     def __init__(self, name: str | None = None, parent: QObject | None = None) -> None:
         """
-        Initialize base manager
+        Initialize base manager.
+
+        The _initializing flag prevents cross-manager access during construction.
+        During initialization, other managers may not be fully constructed, so
+        accessing them via get_app_context() could return incomplete state.
+
+        IMPORTANT: Subclass _initialize() implementations should NOT call methods
+        on other managers. Wait until _initialize() completes (and _initializing
+        becomes False) before cross-manager communication.
 
         Args:
             name: manager name for logging
@@ -74,7 +82,7 @@ class BaseManager(QObject):
         try:
             self._initialize()
         finally:
-            self._initializing = False  # Clear flag regardless of success/failure
+            self._initializing = False  # Clear flag regardless of success/failure  # Clear flag regardless of success/failure
 
     def _initialize(self) -> None:
         """Initialize the manager - must be implemented by subclasses"""

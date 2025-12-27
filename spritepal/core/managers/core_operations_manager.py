@@ -43,6 +43,7 @@ from utils.constants import (
     SETTINGS_KEY_LAST_INPUT_ROM,
     SETTINGS_KEY_LAST_SPRITE_LOCATION,
     SETTINGS_NS_ROM_INJECTION,
+    VRAM_TO_ROM_MAPPING,
 )
 from utils.file_validator import FileValidator, ValidationResult
 from utils.validation import validate_range, validate_required_params, validate_type
@@ -103,11 +104,26 @@ class CoreOperationsManager(BaseManager):
     ) -> None:
         """Initialize the core operations manager.
 
+        IMPORTANT: Do not instantiate directly. Use create_app_context() instead.
+
+        The None defaults exist only for dependency injection during testing.
+        All three dependencies (session_manager, rom_cache, rom_extractor) are
+        REQUIRED and will raise RuntimeError in _initialize() if missing.
+
+        Why the signature allows None but _initialize() requires them:
+        - Allows test fixtures to inject mocks
+        - Enforces that production code goes through create_app_context()
+        - Provides clear error message if misused
+
         Args:
             parent: Qt parent object for proper lifecycle management
-            session_manager: Optional ApplicationStateManager (uses AppContext if not provided)
-            rom_cache: Optional ROMCache (uses AppContext if not provided)
-            rom_extractor: Optional ROMExtractor (uses AppContext if not provided)
+            session_manager: Required. Handles settings persistence.
+            rom_cache: Required. Provides ROM data caching.
+            rom_extractor: Required. Provides extraction/injection operations.
+
+        Raises:
+            RuntimeError: If any dependency is None at initialization time.
+                The error message directs you to use create_app_context().
         """
         # Initialize components
         self._sprite_extractor: SpriteExtractor | None = None
@@ -1256,6 +1272,10 @@ class CoreOperationsManager(BaseManager):
         """
         Convert VRAM offset to ROM offset based on known mappings.
 
+        The SNES PPU loads sprite tiles from VRAM, but the actual graphics data
+        lives in ROM at different addresses. This mapping is game-specific.
+        See VRAM_TO_ROM_MAPPING in utils/constants.py for known mappings.
+
         Args:
             vram_offset_str: VRAM offset as string (e.g., "0xC000") or int
 
@@ -1268,12 +1288,10 @@ class CoreOperationsManager(BaseManager):
             else:
                 vram_offset = vram_offset_str
 
-            if vram_offset == 0xC000:
-                return 0x0C8000
+            # Use the documented VRAM→ROM mapping from constants
+            return VRAM_TO_ROM_MAPPING.get(vram_offset)
 
         except (ValueError, TypeError):
-            return None
-        else:
             return None
 
     # ========== Settings Management ==========

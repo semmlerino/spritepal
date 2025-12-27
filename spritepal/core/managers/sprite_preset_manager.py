@@ -67,8 +67,14 @@ class SpritePresetManager(QObject):
         if self._config_service is not None:
             self._presets_file = self._config_service.config_directory / self.PRESETS_FILENAME
         else:
-            # Fallback to home directory
-            self._presets_file = Path.home() / ".spritepal" / self.PRESETS_FILENAME
+            # Fallback to home directory - log warning so this is discoverable
+            fallback_path = Path.home() / ".spritepal" / self.PRESETS_FILENAME
+            self._logger.warning(
+                f"No ConfigurationService provided. Using fallback preset path: {fallback_path}. "
+                "This may cause presets to save in an unexpected location. "
+                "Use create_app_context() for proper initialization."
+            )
+            self._presets_file = fallback_path
 
         # Load existing presets
         self._load_presets()

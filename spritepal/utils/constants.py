@@ -4,9 +4,36 @@ Constants for SpritePal
 
 from __future__ import annotations
 
-# SNES Memory offsets and sizes
-VRAM_SPRITE_OFFSET = 0xC000  # Default sprite offset in VRAM
-VRAM_SPRITE_SIZE = 0x4000  # Default sprite data size (16KB)
+# =============================================================================
+# SNES Video Memory Architecture
+# =============================================================================
+# The SNES Picture Processing Unit (PPU) has dedicated video RAM regions:
+# - VRAM: 64KB for tile data and tilemaps (addresses $0000-$FFFF)
+# - CGRAM: 512 bytes for color palettes (256 colors x 2 bytes BGR555)
+# - OAM: 544 bytes for sprite attributes (128 sprites + high table)
+#
+# For sprites (OBJ layer), tile graphics are stored in VRAM starting at an
+# address configured by the OBSEL register ($2101). Common base addresses:
+# - $0000: First half of VRAM (banks 0-1)
+# - $4000: Second quarter
+# - $8000: Third quarter
+# - $C000: Last quarter (most common for Kirby games)
+#
+# See: https://snes.nesdev.org/wiki/PPU_registers#OBSEL
+# =============================================================================
+
+# VRAM sprite base address - where sprite tiles begin in video memory
+# Kirby Super Star uses $C000 as the sprite tile base address
+VRAM_SPRITE_OFFSET = 0xC000
+
+# Mapping from VRAM addresses to ROM file offsets (game-specific)
+# For Kirby Super Star: VRAM $C000 maps to ROM offset $0C8000 (LoROM)
+# This is where the PPU reads sprite graphics from after DMA transfer
+VRAM_TO_ROM_MAPPING: dict[int, int] = {
+    0xC000: 0x0C8000,  # Standard Kirby sprite location in ROM
+}
+
+VRAM_SPRITE_SIZE = 0x4000  # Default sprite data size (16KB = 512 tiles)
 VRAM_MIN_SIZE = 0x10000  # 64KB minimum VRAM size
 VRAM_MAX_SIZE = 0x100000  # 1MB maximum VRAM size (reasonable upper bound)
 CGRAM_EXPECTED_SIZE = 512  # Standard CGRAM size in bytes
@@ -31,11 +58,25 @@ EMPTY_REGION_PATTERN_THRESHOLD = 0.85  # Repetition score to consider pattern
 EMPTY_REGION_MAX_UNIQUE_BYTES = 4  # Max unique bytes to consider empty
 EMPTY_REGION_SIZE = 4096  # Size of regions to analyze (4KB)
 
-# Sprite format
-BYTES_PER_TILE = 32  # 4bpp format
-TILE_WIDTH = 8  # Pixels
-TILE_HEIGHT = 8  # Pixels
-DEFAULT_TILES_PER_ROW = 16  # Default layout
+# =============================================================================
+# SNES Sprite Tile Format (4bpp)
+# =============================================================================
+# SNES sprites use 4 bits per pixel (4bpp), allowing 16 colors per tile.
+# Each 8x8 pixel tile is stored as 4 bitplanes in an interleaved format:
+#
+# Memory layout for one 8x8 tile (32 bytes):
+#   Bytes 0-15:  Bitplanes 0 and 1 (interleaved, 2 bytes per row)
+#   Bytes 16-31: Bitplanes 2 and 3 (interleaved, 2 bytes per row)
+#
+# Formula: 8 rows x 8 pixels x 4 bits / 8 bits per byte = 32 bytes
+#
+# This is why BYTES_PER_TILE = 32 appears throughout the codebase.
+# =============================================================================
+
+BYTES_PER_TILE = 32  # 4bpp format: 8x8 pixels x 4 bits = 32 bytes per tile
+TILE_WIDTH = 8  # Pixels per tile row
+TILE_HEIGHT = 8  # Pixels per tile column
+DEFAULT_TILES_PER_ROW = 16  # Default layout for sprite sheets
 
 # Palette information
 COLORS_PER_PALETTE = 16
@@ -124,6 +165,15 @@ SPRITE_QUALITY_BONUS = 0.15  # Quality bonus for good patterns
 ENTROPY_ANALYSIS_SAMPLE = 1024  # Bytes to sample for entropy calculation
 TILE_ANALYSIS_SAMPLE = 10  # Number of tiles to analyze for quality
 MAX_ALIGNMENT_ERROR = 16  # Maximum bytes of misalignment allowed
+
+# Sprite tile validation threshold
+# When validating extracted sprite data, we sample tiles and check if they
+# exhibit 4bpp tile characteristics (non-empty, reasonable entropy, etc.)
+# This threshold is the minimum percentage of sampled tiles that must pass.
+# 60% allows for some compressed/malformed tiles while rejecting random data.
+# Tune LOWER if valid sprites are being rejected (false negatives).
+# Tune HIGHER if garbage data is being accepted (false positives).
+SPRITE_VALIDATION_THRESHOLD = 0.6  # 60% of tiles must pass validation
 
 # Sprite entropy thresholds (unified across all validators)
 # Entropy is Shannon entropy on byte values (0-8 scale)
