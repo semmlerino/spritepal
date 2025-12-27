@@ -40,11 +40,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.app_context import get_app_context
 from core.parallel_sprite_finder import SearchResult
-from core.services.preview_generator import PreviewGenerator, PreviewRequest
+from core.services.preview_generator import PreviewRequest
 from core.visual_similarity_search import SimilarityMatch
 from ui.common import WorkerManager
-from ui.workers.advanced_search_worker import AdvancedSearchWorker
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.common.file_dialogs import FileDialogHelper
 from ui.common.spacing_constants import ADVANCED_SEARCH_MIN_SIZE, INDENT_UNDER_CONTROL
@@ -53,6 +53,7 @@ from ui.components.filters.search_filters_widget import SearchFilter
 from ui.constants.help_text import TOOLTIPS
 from ui.dialogs.similarity_results_dialog import show_similarity_results
 from ui.styles.theme import COLORS
+from ui.workers.advanced_search_worker import AdvancedSearchWorker
 from utils.constants import MAX_SPRITE_SIZE
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ class SearchHistoryEntry:
 # SearchWorker moved to ui/workers/advanced_search_worker.py
 # Alias for backwards compatibility
 SearchWorker = AdvancedSearchWorker
+
 
 class AdvancedSearchDialog(QDialog):
     """
@@ -1103,8 +1105,8 @@ class AdvancedSearchDialog(QDialog):
             # Create a preview request
             request = PreviewRequest(source_type="rom", data_path=self.rom_path, offset=offset, size=(128, 128))
 
-            # Generate preview using the preview service
-            preview_generator = PreviewGenerator()
+            # Generate preview using the preview service (via AppContext for proper ROM extractor)
+            preview_generator = get_app_context().preview_generator
             result = preview_generator.generate_preview(request)
 
             if result and result.pixmap and not result.pixmap.isNull():
