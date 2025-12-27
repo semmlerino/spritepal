@@ -29,6 +29,7 @@ from utils.constants import (
     MIN_SPRITE_TILES,
     ROM_SCAN_STEP_DEFAULT,
     ROM_SPRITE_AREA_1_START,
+    RomMappingType,
     normalize_address,
 )
 from utils.logging_config import get_logger
@@ -732,6 +733,7 @@ class SpriteFinder:
 
         Automatically handles SNES address to file offset conversion for
         addresses that look like emulator addresses (e.g., $808000).
+        Uses the correct address mapping for the ROM type (SA-1, HiROM, LoROM).
 
         Args:
             rom_path: Path to ROM file
@@ -744,13 +746,27 @@ class SpriteFinder:
             rom_file = Path(rom_path)
             rom_size = rom_file.stat().st_size
 
-            # Normalize address (handles SNES->file conversion and SMC headers)
-            file_offset = normalize_address(offset, rom_size)
+            # Get ROM header for mapping type detection (SA-1, HiROM, LoROM)
+            mapping_type: RomMappingType | None = None
+            try:
+                from core.rom_validator import ROMValidator
+
+                header, _ = ROMValidator.validate_rom_header(rom_path)
+                mapping_type = header.mapping_type
+            except Exception:
+                # Fall back to LoROM if header detection fails
+                pass
+
+            # Normalize address with correct mapping type
+            file_offset = normalize_address(offset, rom_size, mapping_type=mapping_type)
 
             with rom_file.open("rb") as f:
                 rom_data = f.read()
 
-            logger.debug(f"Checking offset: input=0x{offset:06X} -> file=0x{file_offset:06X}")
+            logger.debug(
+                f"Checking offset: input=0x{offset:06X} -> file=0x{file_offset:06X} "
+                f"(mapping={mapping_type.name if mapping_type else 'default'})"
+            )
             return self.find_sprite_at_offset(rom_data, file_offset)
         except Exception as e:
             logger.warning(f"Failed to check offset 0x{offset:06X}: {e}")

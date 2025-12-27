@@ -25,8 +25,8 @@ from utils.constants import (
     ROM_SIZE_4MB,
     ROM_SIZE_6MB,
     ROM_SIZE_512KB,
-    ROM_TYPE_SA1_MAX,
-    ROM_TYPE_SA1_MIN,
+    RomMappingType,
+    detect_mapping_type,
 )
 from utils.logging_config import get_logger
 from utils.rom_exceptions import (
@@ -55,6 +55,8 @@ class ROMHeader:
     region: int = 0
     developer: int = 0
     version: int = 0
+    # Memory mapping type for address translation (SA-1, HiROM, LoROM)
+    mapping_type: RomMappingType = RomMappingType.LOROM
 
 
 class ROMValidator:
@@ -165,8 +167,9 @@ class ROMValidator:
 
                 # Verify checksum format
                 if (checksum ^ checksum_complement) == ROM_CHECKSUM_COMPLEMENT_MASK:
-                    # Detect SA-1 chip (used by Kirby Super Star, Super Mario RPG, etc.)
-                    has_sa1 = ROM_TYPE_SA1_MIN <= rom_type <= ROM_TYPE_SA1_MAX
+                    # Detect memory mapping type (SA-1, HiROM, LoROM)
+                    detected_mapping = detect_mapping_type(rom_type, base_offset)
+                    has_sa1 = detected_mapping == RomMappingType.SA1
 
                     header = ROMHeader(
                         title=title,
@@ -180,6 +183,7 @@ class ROMValidator:
                         region=region,
                         developer=developer,
                         version=version,
+                        mapping_type=detected_mapping,
                     )
 
                     chip_info = " [SA-1]" if has_sa1 else ""

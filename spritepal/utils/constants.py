@@ -4,6 +4,8 @@ Constants for SpritePal
 
 from __future__ import annotations
 
+from enum import Enum, auto
+
 # =============================================================================
 # SNES Video Memory Architecture
 # =============================================================================
@@ -272,6 +274,22 @@ ROM_TYPE_SA1_MIN = 0x34  # SA-1 chip type range start
 ROM_TYPE_SA1_MAX = 0x36  # SA-1 chip type range end
 
 
+class RomMappingType(Enum):
+    """
+    ROM memory mapping type for SNES address translation.
+
+    Different SNES cartridge types use different address mapping schemes:
+    - LOROM: Standard low ROM mapping (32KB per bank)
+    - HIROM: High ROM mapping (64KB per bank, linear addressing)
+    - SA1: SA-1 coprocessor mapping (Kirby Super Star, Super Mario RPG)
+          Uses simple offset: ROM = Mesen2_address - 0x300000
+    """
+
+    LOROM = auto()
+    HIROM = auto()
+    SA1 = auto()
+
+
 def is_snes_address(address: int) -> bool:
     """
     Check if an address looks like an SNES address vs a file offset.
@@ -337,24 +355,136 @@ def snes_to_file_offset(snes_addr: int, *, has_smc_header: bool = False) -> int:
     return file_offset
 
 
-def normalize_address(address: int, rom_size: int) -> int:
+def sa1_to_file_offset(mesen2_addr: int, *, has_smc_header: bool = False) -> int:
+    """
+    Convert Mesen2 SA-1 runtime address to file offset.
+
+    SA-1 games (Kirby Super Star, Super Mario RPG, etc.) use the SA-1
+    coprocessor which has a different memory mapping than standard LoROM.
+    Mesen2 emulator uses addresses starting at 0x300000 for SA-1 ROM space.
+
+    The translation is: file_offset = mesen2_address - 0x300000
+
+    Examples from SPRITE_LEARNINGS_DO_NOT_DELETE.md:
+    - Mesen2 $3D2238 → ROM $0D2238
+    - Mesen2 $57D800 → ROM $27D800
+    - Mesen2 $580000 → ROM $280000
+
+    Args:
+        mesen2_addr: Mesen2 runtime address (e.g., 0x3D2238)
+        has_smc_header: Whether ROM has 512-byte SMC header
+
+    Returns:
+        File offset in the ROM file
+    """
+    # SA-1 offset formula verified from Mesen2 testing
+    SA1_BASE_OFFSET = 0x300000
+
+    if mesen2_addr >= SA1_BASE_OFFSET:
+        file_offset = mesen2_addr - SA1_BASE_OFFSET
+    else:
+        # Address is below SA-1 range, treat as direct file offset
+        file_offset = mesen2_addr
+
+    # Add SMC header offset if present
+    if has_smc_header:
+        file_offset += 512
+
+    return file_offset
+
+
+def hirom_to_file_offset(snes_addr: int, *, has_smc_header: bool = False) -> int:
+    """
+    Convert SNES HiROM address to file offset.
+
+    HiROM mapping uses linear addressing where the ROM appears at
+    banks $C0-$FF (and mirrors at $40-$7D for addresses $0000-$FFFF).
+    The simple conversion masks off the upper bits.
+
+    Args:
+        snes_addr: SNES HiROM address (e.g., 0xC08000)
+        has_smc_header: Whether ROM has 512-byte SMC header
+
+    Returns:
+        File offset in the ROM file
+    """
+    # HiROM uses linear mapping - mask to 22-bit address space (4MB max)
+    file_offset = snes_addr & 0x3FFFFF
+
+    # Add SMC header offset if present
+    if has_smc_header:
+        file_offset += 512
+
+    return file_offset
+
+
+def detect_mapping_type(rom_type: int, header_offset: int) -> RomMappingType:
+    """
+    Detect ROM mapping type from header information.
+
+    Uses the ROM type byte (header offset +0x15) and header location
+    to determine the appropriate address mapping scheme.
+
+    Args:
+        rom_type: ROM type byte from header (at offset 0x15 within header)
+        header_offset: Header location in file (0x7FC0=LoROM, 0xFFC0=HiROM)
+
+    Returns:
+        RomMappingType enum value
+    """
+    # SA-1 chip detection (Kirby Super Star, Super Mario RPG, etc.)
+    if ROM_TYPE_SA1_MIN <= rom_type <= ROM_TYPE_SA1_MAX:
+        return RomMappingType.SA1
+
+    # HiROM detection based on header location
+    if header_offset == ROM_HEADER_OFFSET_HIROM:
+        return RomMappingType.HIROM
+
+    # ExHiROM is also HiROM mapping
+    if header_offset == ROM_HEADER_OFFSET_EXHIROM:
+        return RomMappingType.HIROM
+
+    # Default to LoROM
+    return RomMappingType.LOROM
+
+
+def normalize_address(
+    address: int,
+    rom_size: int,
+    *,
+    mapping_type: RomMappingType | None = None,
+) -> int:
     """
     Normalize an address to a file offset.
 
-    Handles both SNES addresses and direct file offsets.
+    Handles SNES addresses (various mapping types) and direct file offsets.
     Automatically detects SMC headers based on ROM size.
 
     Args:
         address: Address that may be SNES or file offset
         rom_size: Size of the ROM file in bytes
+        mapping_type: Optional ROM mapping type. If None, defaults to LoROM.
+            Pass RomMappingType.SA1 for Kirby Super Star and similar games.
 
     Returns:
         File offset suitable for ROM access
     """
     has_smc_header = rom_size % 1024 == 512
 
+    # SA-1 addresses (Mesen2 format) start at 0x300000 and don't follow
+    # the traditional LoROM pattern, so handle them specially
+    SA1_BASE_OFFSET = 0x300000
+    if mapping_type == RomMappingType.SA1 and address >= SA1_BASE_OFFSET:
+        return sa1_to_file_offset(address, has_smc_header=has_smc_header)
+
     if is_snes_address(address):
-        return snes_to_file_offset(address, has_smc_header=has_smc_header)
+        if mapping_type == RomMappingType.SA1:
+            return sa1_to_file_offset(address, has_smc_header=has_smc_header)
+        elif mapping_type == RomMappingType.HIROM:
+            return hirom_to_file_offset(address, has_smc_header=has_smc_header)
+        else:
+            # Default to LoROM for backwards compatibility
+            return snes_to_file_offset(address, has_smc_header=has_smc_header)
 
     # Already a file offset - just add SMC header offset if needed
     if has_smc_header:

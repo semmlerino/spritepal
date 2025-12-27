@@ -404,3 +404,106 @@ class TestSNESAddressParsing:
         # File offset should add 512
         offset = constants.normalize_address(0x50000, 0x200200)
         assert offset == 0x50200  # 0x50000 + 512
+
+
+class TestSA1AddressTranslation:
+    """Test SA-1 address translation (Kirby Super Star, Super Mario RPG, etc.)"""
+
+    def test_sa1_to_file_offset_basic(self):
+        """Test SA-1 address translation with documented example from SPRITE_LEARNINGS."""
+        # From SPRITE_LEARNINGS_DO_NOT_DELETE.md:
+        # Mesen2 $3D2238 -> ROM $0D2238
+        assert constants.sa1_to_file_offset(0x3D2238) == 0x0D2238
+
+    def test_sa1_to_file_offset_examples(self):
+        """Test additional SA-1 examples from learnings doc."""
+        # Mesen2 $57D800 -> ROM $27D800
+        assert constants.sa1_to_file_offset(0x57D800) == 0x27D800
+        # Mesen2 $580000 -> ROM $280000
+        assert constants.sa1_to_file_offset(0x580000) == 0x280000
+
+    def test_sa1_to_file_offset_with_smc_header(self):
+        """Test SA-1 with SMC header."""
+        offset = constants.sa1_to_file_offset(0x3D2238, has_smc_header=True)
+        assert offset == 0x0D2238 + 512
+
+    def test_sa1_address_below_base(self):
+        """Test SA-1 with address below base offset (treated as direct file offset)."""
+        # Address < 0x300000 should pass through as-is
+        offset = constants.sa1_to_file_offset(0x100000)
+        assert offset == 0x100000
+
+    def test_normalize_address_with_sa1_mapping(self):
+        """Test normalize_address with SA-1 mapping type."""
+        offset = constants.normalize_address(
+            0x3D2238,
+            0x400000,  # 4MB ROM
+            mapping_type=constants.RomMappingType.SA1,
+        )
+        assert offset == 0x0D2238
+
+
+class TestHiROMAddressTranslation:
+    """Test HiROM address translation."""
+
+    def test_hirom_to_file_offset_basic(self):
+        """Test HiROM address translation."""
+        assert constants.hirom_to_file_offset(0xC08000) == 0x8000
+
+    def test_hirom_to_file_offset_bank_c0(self):
+        """Test HiROM bank $C0."""
+        offset = constants.hirom_to_file_offset(0xC00000)
+        assert offset == 0x0
+
+    def test_hirom_to_file_offset_with_smc_header(self):
+        """Test HiROM with SMC header."""
+        offset = constants.hirom_to_file_offset(0xC08000, has_smc_header=True)
+        assert offset == 0x8000 + 512
+
+    def test_normalize_address_with_hirom_mapping(self):
+        """Test normalize_address with HiROM mapping type."""
+        offset = constants.normalize_address(
+            0xC08000,
+            0x200000,  # 2MB ROM
+            mapping_type=constants.RomMappingType.HIROM,
+        )
+        assert offset == 0x8000
+
+
+class TestMappingTypeDetection:
+    """Test ROM mapping type detection."""
+
+    def test_detect_sa1_mapping_min(self):
+        """Test SA-1 detection from rom_type byte (minimum value)."""
+        mapping = constants.detect_mapping_type(0x34, 0x7FC0)
+        assert mapping == constants.RomMappingType.SA1
+
+    def test_detect_sa1_mapping_mid(self):
+        """Test SA-1 detection from rom_type byte (middle value)."""
+        mapping = constants.detect_mapping_type(0x35, 0x7FC0)
+        assert mapping == constants.RomMappingType.SA1
+
+    def test_detect_sa1_mapping_max(self):
+        """Test SA-1 detection from rom_type byte (maximum value)."""
+        mapping = constants.detect_mapping_type(0x36, 0x7FC0)
+        assert mapping == constants.RomMappingType.SA1
+
+    def test_detect_hirom_mapping(self):
+        """Test HiROM detection from header offset."""
+        mapping = constants.detect_mapping_type(0x21, 0xFFC0)
+        assert mapping == constants.RomMappingType.HIROM
+
+    def test_detect_exhirom_mapping(self):
+        """Test ExHiROM detection from header offset."""
+        mapping = constants.detect_mapping_type(0x21, 0x40FFC0)
+        assert mapping == constants.RomMappingType.HIROM
+
+    def test_detect_lorom_mapping_default(self):
+        """Test LoROM as default."""
+        mapping = constants.detect_mapping_type(0x20, 0x7FC0)
+        assert mapping == constants.RomMappingType.LOROM
+
+    def test_detect_lorom_non_sa1_at_lorom_header(self):
+        """Test non-SA1 type at LoROM header location."""
+        mapping = constants.detect_mapping_type(0x30, 0x7FC0)
+        assert mapping == constants.RomMappingType.LOROM
