@@ -330,6 +330,88 @@ def normalize_address(address: int, rom_size: int) -> int:
     return address
 
 
+def parse_address_string(text: str) -> tuple[int, str]:
+    """
+    Parse address string in various formats used by emulators and hex editors.
+
+    Supported formats:
+    - $98:8000 or 98:8000 (SNES bank:offset, Mesen style)
+    - $988000 (SNES combined with $ prefix)
+    - 0x988000 or 988000 (hex)
+    - Pure decimal if no hex chars present
+
+    Args:
+        text: Address string to parse
+
+    Returns:
+        Tuple of (parsed_value, format_detected)
+        format_detected is one of: "snes_banked", "snes", "hex", "decimal"
+
+    Raises:
+        ValueError: If the string cannot be parsed as an address
+    """
+    text = text.strip()
+    if not text:
+        raise ValueError("Empty address string")
+
+    # Check for SNES bank:offset format (e.g., $98:8000 or 98:8000)
+    # This is the Mesen emulator style
+    if ":" in text:
+        # Remove $ prefix if present
+        clean = text.lstrip("$")
+        try:
+            bank_str, addr_str = clean.split(":", 1)
+            bank = int(bank_str, 16)
+            addr = int(addr_str, 16)
+
+            # Validate ranges
+            if bank > 0xFF:
+                raise ValueError(f"Bank value 0x{bank:X} exceeds 0xFF")
+            if addr > 0xFFFF:
+                raise ValueError(f"Address value 0x{addr:X} exceeds 0xFFFF")
+
+            # Combine into SNES address: bank in high byte, address in low 16 bits
+            return (bank << 16) | addr, "snes_banked"
+        except ValueError as e:
+            if "exceeds" in str(e):
+                raise
+            raise ValueError(f"Invalid bank:offset format: {text}") from e
+
+    # Check for $ prefix (SNES style without colon)
+    if text.startswith("$"):
+        try:
+            value = int(text[1:], 16)
+            return value, "snes"
+        except ValueError as e:
+            raise ValueError(f"Invalid SNES address: {text}") from e
+
+    # Check for 0x prefix (standard hex)
+    if text.lower().startswith("0x"):
+        try:
+            value = int(text, 16)
+            return value, "hex"
+        except ValueError as e:
+            raise ValueError(f"Invalid hex address: {text}") from e
+
+    # Try to determine if it's hex or decimal
+    # If it contains a-f characters, it's hex
+    has_hex_chars = any(c in text.lower() for c in "abcdef")
+
+    try:
+        if has_hex_chars:
+            value = int(text, 16)
+            return value, "hex"
+        else:
+            # Could be either hex or decimal - try decimal first
+            # for numbers that could reasonably be decimal (< 1000000)
+            value = int(text)
+            # If the value looks like it could be a ROM offset (large number),
+            # and has no hex chars, still treat as decimal
+            return value, "decimal"
+    except ValueError as e:
+        raise ValueError(f"Cannot parse address: {text}") from e
+
+
 # Valid ROM sizes (in bytes)
 ROM_SIZE_512KB = 0x80000  # 512KB (4 Mbit)
 ROM_SIZE_1MB = 0x100000  # 1MB (8 Mbit)

@@ -74,7 +74,7 @@ from ui.dialogs.services import BookmarkManager, CacheStatusController, ViewStat
 from ui.rom_extraction.workers import SpritePreviewWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
-from utils.constants import ROM_SIZE_2MB, ROM_SIZE_4MB
+from utils.constants import ROM_SIZE_2MB, ROM_SIZE_4MB, normalize_address, parse_address_string
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -1159,23 +1159,41 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._update_status(f"Navigated to similar sprite at 0x{target_offset:06X}")
 
     def _show_goto_dialog(self):
-        """Show go to offset dialog"""
+        """Show go to offset dialog.
 
+        Supports multiple address formats:
+        - SNES bank:offset: $98:8000 or 98:8000 (auto-converted to file offset)
+        - SNES combined: $988000
+        - Hex: 0x0C3000 or 0C3000
+        - Decimal: 123456
+        """
         current = self.get_current_offset()
-        text, ok = QInputDialog.getText(self, "Go to Offset", "Enter offset (hex or decimal):", text=f"0x{current:06X}")
+        text, ok = QInputDialog.getText(
+            self,
+            "Go to Offset",
+            "Enter offset (hex, decimal, or SNES $bank:addr):",
+            text=f"0x{current:06X}",
+        )
 
         if ok and text:
             try:
-                # Parse hex or decimal
-                offset = int(text, 16) if text.startswith(("0x", "0X")) else int(text)
+                # Parse address in various formats
+                raw_value, fmt = parse_address_string(text)
+
+                # Normalize SNES addresses to file offsets
+                offset = normalize_address(raw_value, self.rom_size)
+
+                # Show conversion feedback for SNES addresses
+                if fmt.startswith("snes"):
+                    self._update_status(f"SNES ${raw_value:06X} → File 0x{offset:06X}")
 
                 # Validate bounds
                 if 0 <= offset <= self.rom_size:
                     self.set_offset(offset)
                 else:
                     self._update_status(f"Offset out of range: 0x{offset:06X}")
-            except ValueError:
-                self._update_status(f"Invalid offset: {text}")
+            except ValueError as e:
+                self._update_status(f"Invalid offset: {e}")
 
     def _load_cached_sprites_for_map(self):
         """Load cached sprites for mini ROM map visualization"""

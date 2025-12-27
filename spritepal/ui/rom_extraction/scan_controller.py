@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 from core.types import SpriteInfo
 from ui.rom_extraction.workers import SpriteScanWorker
 from ui.styles.components import get_cache_status_style
-from utils.constants import ROM_SCAN_START_DEFAULT, ROM_SIZE_4MB
+from utils.constants import ROM_SCAN_START_DEFAULT, ROM_SCAN_STEP_TILE, ROM_SIZE_4MB
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -53,7 +53,7 @@ def compute_scan_params(
         rom_path: Path to the ROM file
         start_offset: Optional custom start offset (defaults to 0x40000)
         end_offset: Optional custom end offset (defaults to min(rom_size, 0x400000))
-        step: Optional step size (defaults to 0x100 for alignment)
+        step: Optional step size (defaults to ROM_SCAN_STEP_TILE for tile alignment)
 
     Returns:
         Dict with keys: start_offset, end_offset, alignment
@@ -62,14 +62,14 @@ def compute_scan_params(
         return {
             "start_offset": start_offset,
             "end_offset": end_offset,
-            "alignment": step if step is not None else 0x100,
+            "alignment": step if step is not None else ROM_SCAN_STEP_TILE,
         }
 
     rom_size = Path(rom_path).stat().st_size
     return {
         "start_offset": ROM_SCAN_START_DEFAULT,
         "end_offset": min(rom_size, ROM_SIZE_4MB),
-        "alignment": step if step is not None else 0x100,
+        "alignment": step if step is not None else ROM_SCAN_STEP_TILE,
     }
 
 

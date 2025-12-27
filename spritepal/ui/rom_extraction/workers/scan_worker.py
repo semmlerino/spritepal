@@ -18,7 +18,7 @@ from PySide6.QtCore import QMutex, QMutexLocker, Signal
 
 from core.parallel_sprite_finder import ParallelSpriteFinder
 from core.workers.base import BaseWorker, handle_worker_errors
-from utils.constants import MIN_SPRITE_SIZE, ROM_SCAN_START_DEFAULT, ROM_SIZE_4MB
+from utils.constants import ROM_SCAN_START_DEFAULT, ROM_SCAN_STEP_TILE, ROM_SIZE_4MB
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -53,8 +53,8 @@ class SpriteScanWorker(BaseWorker):
     progress_detailed = Signal(int, int)
     """Emitted with detailed progress. Args: current_offset, total_offsets."""
 
-    # Default step/alignment for scanning
-    _DEFAULT_STEP = MIN_SPRITE_SIZE
+    # Default step/alignment for scanning (tile-aligned for better sprite detection)
+    _DEFAULT_STEP = ROM_SCAN_STEP_TILE
 
     def __init__(
         self,

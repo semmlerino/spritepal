@@ -32,7 +32,15 @@ from ui.common.spacing_constants import (
 from ui.common.widget_helpers import create_styled_label
 from ui.styles import get_prominent_action_button_style
 from ui.styles.theme import COLORS
-from utils.constants import MIN_SPRITE_SIZE, ROM_MIN_REGION_SIZE, ROM_SIZE_1MB, ROM_SIZE_2MB, ROM_SIZE_4MB
+from utils.constants import (
+    MIN_SPRITE_SIZE,
+    ROM_MIN_REGION_SIZE,
+    ROM_SIZE_1MB,
+    ROM_SIZE_2MB,
+    ROM_SIZE_4MB,
+    normalize_address,
+    parse_address_string,
+)
 
 # Import AdvancedSearchDialog lazily to avoid circular imports
 from utils.logging_config import get_logger
@@ -520,7 +528,14 @@ class SimpleBrowseTab(QWidget):
         logger.debug(f"Advanced search selected sprite at offset 0x{offset:06X}")
 
     def _paste_from_clipboard(self) -> None:
-        """Read offset from Mesen2 clipboard file and navigate to it."""
+        """Read offset from Mesen2 clipboard file and navigate to it.
+
+        Supports multiple address formats from emulators:
+        - SNES bank:offset: $98:8000 or 98:8000 (auto-converted to file offset)
+        - SNES combined: $988000
+        - Hex: 0x0C3000 or 0C3000
+        - Decimal: 123456
+        """
         # Try multiple possible locations for the clipboard file
         possible_paths = [
             Path.home() / "Mesen2" / "sprite_clipboard.txt",
@@ -534,16 +549,20 @@ class SimpleBrowseTab(QWidget):
                     with clipboard_file.open() as f:
                         offset_str = f.read().strip()
 
-                    # Parse offset (handles both 0x and $ prefix)
-                    if offset_str.startswith("0x"):
-                        offset = int(offset_str, 16)
-                    elif offset_str.startswith("$"):
-                        offset = int(offset_str[1:], 16)
-                    else:
-                        offset = int(offset_str, 16)
+                    # Parse address in various formats (hex, decimal, SNES bank:offset)
+                    raw_value, fmt = parse_address_string(offset_str)
 
-                    # Navigate to the offset
-                    logger.info(f"Pasting offset from clipboard: 0x{offset:06X}")
+                    # Normalize SNES addresses to file offsets
+                    offset = normalize_address(raw_value, self._rom_size)
+
+                    # Log conversion info for SNES addresses
+                    if fmt.startswith("snes"):
+                        logger.info(
+                            f"Converted SNES ${raw_value:06X} → File 0x{offset:06X}"
+                        )
+                    else:
+                        logger.info(f"Pasting offset from clipboard: 0x{offset:06X}")
+
                     self.set_offset(offset)
                     return
 
