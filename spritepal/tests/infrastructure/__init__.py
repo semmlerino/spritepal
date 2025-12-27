@@ -35,12 +35,15 @@ if is_pyside6_available():
             create_tile_renderer,
         )
         from .thread_safe_test_image import ThreadSafeTestImage
+        from .worker_thread_adapter import WorkerThreadAdapter, run_worker_to_completion
 
         # Add Qt-dependent exports
         __all__.extend(
             [
                 "RealComponentFactory",
                 "ThreadSafeTestImage",
+                "WorkerThreadAdapter",
+                "run_worker_to_completion",
                 "create_main_window",
                 "create_extraction_worker",
                 "create_injection_worker",
