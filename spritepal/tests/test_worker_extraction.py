@@ -20,7 +20,6 @@ import pytest
 from PIL import Image
 from PySide6.QtTest import QSignalSpy
 
-from core.app_context import get_app_context
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.workers.extraction import ROMExtractionWorker, VRAMExtractionWorker
 from tests.infrastructure.real_component_factory import RealComponentFactory
@@ -46,11 +45,10 @@ class TestVRAMExtractionWorker:
     @pytest.fixture
     def extraction_manager(self, session_app_context) -> CoreOperationsManager:
         """Get extraction manager from session app context."""
-        from typing import cast
-
-        return cast(
-            CoreOperationsManager, get_app_context().core_operations_manager
-        )  # cast-ok: getting concrete type from app context
+        # Use the injected session_app_context directly, not get_app_context()
+        # This ensures the fixture works correctly in parallel tests where
+        # another test might have reset the global context
+        return session_app_context.core_operations_manager
 
     @pytest.fixture
     def test_files(self, tmp_path):
@@ -283,11 +281,10 @@ class TestROMExtractionWorker:
     @pytest.fixture
     def extraction_manager(self, session_app_context) -> CoreOperationsManager:
         """Get extraction manager from session app context."""
-        from typing import cast
-
-        return cast(
-            CoreOperationsManager, get_app_context().core_operations_manager
-        )  # cast-ok: getting concrete type from app context
+        # Use the injected session_app_context directly, not get_app_context()
+        # This ensures the fixture works correctly in parallel tests where
+        # another test might have reset the global context
+        return session_app_context.core_operations_manager
 
     @pytest.fixture
     def test_rom_files(self, tmp_path):

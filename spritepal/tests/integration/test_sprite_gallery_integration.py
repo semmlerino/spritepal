@@ -31,7 +31,9 @@ pytestmark = [
 @pytest.fixture
 def real_factory(tmp_path, session_app_context):
     """Create RealComponentFactory for integration tests."""
-    with RealComponentFactory() as factory:
+    # context_guaranteed=True because session_app_context fixture guarantees context exists
+    # This avoids race conditions when other fixtures temporarily suspend global context
+    with RealComponentFactory(context_guaranteed=True) as factory:
         yield factory
 
 

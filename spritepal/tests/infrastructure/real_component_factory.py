@@ -72,6 +72,7 @@ class RealComponentFactory:
         settings_dir: Path | None = None,
         fail_on_leaks: bool | None = None,
         manage_registry: bool = False,
+        context_guaranteed: bool = False,
     ):
         """
         Initialize the real component factory.
@@ -88,6 +89,12 @@ class RealComponentFactory:
                            lifecycle and will reset it during cleanup(). Use this when
                            the factory is used standalone without manager fixtures.
                            Default: False (manager lifecycle owned by test fixtures).
+            context_guaranteed: If True, skip the global context check. Use this when
+                              the factory is created from a fixture that explicitly
+                              depends on session_app_context or app_context, guaranteeing
+                              the context is available even if global state is temporarily
+                              suspended by another fixture on the same xdist worker.
+                              Default: False (check global state).
 
         Note:
             Managers must be initialized before using this factory.
@@ -103,7 +110,8 @@ class RealComponentFactory:
         self._initialized_registry = False  # Track if we initialized it
 
         # Verify managers are initialized (done by app_context or session_app_context fixtures)
-        if not is_context_initialized():
+        # Skip this check if caller guarantees context via fixture dependency
+        if not context_guaranteed and not is_context_initialized():
             raise ValueError(
                 "RealComponentFactory requires managers to be initialized. "
                 "Use app_context or session_app_context fixture."

@@ -159,11 +159,16 @@ def clean_registry_state() -> Generator[None, None, None]:
     """Ensure managers start uninitialized for a test.
 
     Useful for testing manager initialization lifecycle.
-    Cleans up managers and resets app context before and after the test.
+    Uses suspend_app_context to temporarily hide any existing context
+    without destroying it, so that session-scoped contexts survive.
+
+    IMPORTANT: This fixture should only be used by tests that specifically
+    test the manager initialization lifecycle. It must not destroy managers
+    that belong to a session-scoped context.
     """
     from PySide6.QtWidgets import QApplication
 
-    from core.app_context import reset_app_context
+    from core.app_context import is_context_initialized, suspend_app_context
     from core.managers import (
         cleanup_managers,
         is_initialized,
@@ -172,19 +177,30 @@ def clean_registry_state() -> Generator[None, None, None]:
 
     app = QApplication.instance()
 
-    if is_initialized():
-        with contextlib.suppress(Exception):
-            cleanup_managers()
-        with contextlib.suppress(Exception):
-            reset_for_tests()
+    # Check if there's an existing session context BEFORE suspending
+    # If there is, we must NOT cleanup the managers (they belong to the session)
+    had_session_context = is_context_initialized()
 
-    reset_app_context()
-    yield
+    # Use suspend_app_context to hide the current context without cleanup
+    # This preserves session-scoped contexts for parallel test safety
+    with suspend_app_context():
+        # Only reset managers if we didn't have a session context
+        # Otherwise we'd destroy managers that belong to the session
+        if not had_session_context and is_initialized():
+            with contextlib.suppress(Exception):
+                cleanup_managers()
+            with contextlib.suppress(Exception):
+                reset_for_tests()
 
-    if is_initialized():
-        with contextlib.suppress(Exception):
-            cleanup_managers()
-    reset_app_context()
+        yield
+
+        # Clean up any managers that were initialized during the test
+        # (only if they weren't already there from a session)
+        if not had_session_context and is_initialized():
+            with contextlib.suppress(Exception):
+                cleanup_managers()
+
+    # Context is automatically restored when suspend_app_context exits
 
     if app and not IS_HEADLESS:
         app.processEvents()

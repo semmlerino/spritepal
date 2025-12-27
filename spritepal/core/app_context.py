@@ -18,8 +18,10 @@ Usage:
 from __future__ import annotations
 
 import atexit
+import contextlib
 import logging
 import threading
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -301,3 +303,49 @@ def reset_app_context() -> None:
 def is_context_initialized() -> bool:
     """Check if AppContext is initialized."""
     return _app_context is not None
+
+
+@contextlib.contextmanager
+def suspend_app_context() -> Generator[None, None, None]:
+    """Temporarily suspend the global app context.
+
+    This context manager temporarily sets the global context to None
+    without calling cleanup on it. The context is restored when the
+    context manager exits.
+
+    This is useful for testing scenarios where we need to test behavior
+    when no context is initialized, but we don't want to destroy a
+    session-scoped context that should persist across tests.
+
+    WARNING: This is for test infrastructure only.
+    Do not use in production code.
+
+    Usage:
+        with suspend_app_context():
+            # _app_context is None here
+            assert not is_context_initialized()
+        # _app_context is restored here
+    """
+    global _app_context, _cleanup_registered
+
+    saved_context = None
+    saved_cleanup_registered = False
+
+    with _context_lock:
+        saved_context = _app_context
+        saved_cleanup_registered = _cleanup_registered
+        _app_context = None
+        _cleanup_registered = False
+        logger.debug("AppContext suspended (not cleaned up)")
+
+    try:
+        yield
+    finally:
+        # Clean up any context that was created during suspension
+        with _context_lock:
+            if _app_context is not None:
+                _app_context.cleanup()
+            # Restore the original context
+            _app_context = saved_context
+            _cleanup_registered = saved_cleanup_registered
+            logger.debug("AppContext restored from suspension")

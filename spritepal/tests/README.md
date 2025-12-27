@@ -96,6 +96,8 @@ Benefits:
 | `qtbot` | Qt widget testing |
 | `tmp_path` | Temporary files |
 
+**Note:** `app_context` and `session_app_context` can safely coexist in the same test run. When `app_context` detects an existing session context, it uses `suspend_app_context()` to temporarily hide it, creates an isolated context for the test, then restores the session context afterward. This prevents function-scoped tests from destroying session-scoped contexts.
+
 ### Timeout Functions
 
 ```python

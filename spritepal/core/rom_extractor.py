@@ -86,7 +86,7 @@ class ROMExtractor:
 
         Args:
             rom_path: Path to ROM file
-            sprite_offset: Offset in ROM where sprite data is located
+            sprite_offset: Offset in ROM where sprite data is located (logical offset)
 
         Returns:
             Raw sprite data as bytes
@@ -98,9 +98,17 @@ class ROMExtractor:
         logger.debug(f"Extracting sprite data from ROM: offset=0x{sprite_offset:X}")
 
         try:
-            # Offset validation performed by HALCompressor.decompress_from_rom()
-            # Try to decompress the data at the offset
-            decompressed_data = self.hal_compressor.decompress_from_rom(rom_path, sprite_offset)
+            # Check for SMC header to adjust offset if needed
+            header = self.rom_injector.read_rom_header(rom_path)
+            smc_offset = header.header_offset
+            
+            # Adjust offset: ROM offset -> file offset
+            file_offset = sprite_offset + smc_offset
+            if smc_offset > 0:
+                logger.info(f"Adjusting for {smc_offset}-byte SMC header: 0x{sprite_offset:X} -> 0x{file_offset:X}")
+
+            # Try to decompress the data at the adjusted offset
+            decompressed_data = self.hal_compressor.decompress_from_rom(rom_path, file_offset)
 
             return decompressed_data
 

@@ -48,7 +48,9 @@ pytestmark = [
 @pytest.fixture
 def real_factory(tmp_path, session_app_context: AppContext):
     """Create RealComponentFactory for integration tests."""
-    with RealComponentFactory() as factory:
+    # context_guaranteed=True because session_app_context fixture guarantees context exists
+    # This avoids race conditions when other fixtures temporarily suspend global context
+    with RealComponentFactory(context_guaranteed=True) as factory:
         yield factory
 
 
@@ -420,7 +422,8 @@ class TestWorkflowEdgeCases:
 
     def test_factory_cleanup_on_exit(self, tmp_path, session_app_context: AppContext):
         """Test that factory properly cleans up resources."""
-        with RealComponentFactory() as factory:
+        # context_guaranteed=True because session_app_context fixture guarantees context exists
+        with RealComponentFactory(context_guaranteed=True) as factory:
             cache = factory.create_rom_cache()
             renderer = factory.create_tile_renderer()
             assert cache is not None

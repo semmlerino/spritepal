@@ -43,6 +43,10 @@ def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
     Creates a fresh AppContext with isolated settings for each test.
     Automatically cleans up after the test completes.
 
+    If a session-scoped context already exists (e.g., session_app_context),
+    this fixture temporarily suspends it and restores it after the test.
+    This prevents function-scoped tests from destroying session-scoped contexts.
+
     This is the recommended fixture for most tests. It provides:
     - Complete isolation between tests
     - No global state pollution
@@ -58,32 +62,50 @@ def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
             state.update_settings(some_key="value")
             # ... test code ...
     """
+    from contextlib import ExitStack
+
     from PySide6.QtWidgets import QApplication
 
-    from core.app_context import create_app_context, reset_app_context
+    from core.app_context import (
+        create_app_context,
+        is_context_initialized,
+        reset_app_context,
+        suspend_app_context,
+    )
 
     # Ensure Qt app exists
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
 
-    # Create isolated settings
-    settings_path = tmp_path / ".test_settings.json"
+    # Check if a session context already exists
+    session_context_exists = is_context_initialized()
 
-    # Create the context - let create_app_context handle ConfigurationService creation
-    context = create_app_context(
-        app_name="TestApp",
-        settings_path=settings_path,
-    )
+    # Use ExitStack to manage the optional suspension context manager
+    with ExitStack() as stack:
+        if session_context_exists:
+            # Suspend the session context - it will be restored when we exit
+            stack.enter_context(suspend_app_context())
 
-    yield context
+        # Create isolated settings
+        settings_path = tmp_path / ".test_settings.json"
 
-    # Cleanup
-    reset_app_context()
+        # Create the context - let create_app_context handle ConfigurationService creation
+        context = create_app_context(
+            app_name="TestApp",
+            settings_path=settings_path,
+        )
 
-    # Process events to ensure cleanup completes
-    if app:
-        app.processEvents()
+        yield context
+
+        # Cleanup the test context
+        reset_app_context()
+
+        # Process events to ensure cleanup completes
+        if app:
+            app.processEvents()
+
+    # ExitStack automatically restores the session context if it was suspended
 
 
 @pytest.fixture(scope="session")
