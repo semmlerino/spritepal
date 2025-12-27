@@ -4,7 +4,8 @@
 
 | What you need | Fixture | Notes |
 |--------------|---------|-------|
-| Managers (extraction, injection, state) | `isolated_managers` | Default choice, always safe |
+| Managers (extraction, injection, state) | `app_context` | Default choice, always safe |
+| Managers (shared, performance) | `session_app_context` | Requires `@pytest.mark.shared_state_safe` |
 | Qt widgets | `qtbot` | Add `@pytest.mark.gui` |
 | Wait for signals | `qtbot.waitSignal()` | Use `with` context manager |
 | HAL compression (fast) | `hal_pool` | Mock by default |
@@ -16,11 +17,8 @@
 
 ### Basic Manager Test
 ```python
-from core.app_context import get_app_context
-
-def test_extraction_validates(isolated_managers):
-    context = get_app_context()
-    manager = context.core_operations_manager
+def test_extraction_validates(app_context):
+    manager = app_context.core_operations_manager
     result = manager.validate_extraction_params({"path": "/test"})
     assert isinstance(result, bool)
 ```
@@ -28,7 +26,7 @@ def test_extraction_validates(isolated_managers):
 ### Qt Widget Test
 ```python
 @pytest.mark.gui
-def test_button_click(qtbot, isolated_managers):
+def test_button_click(qtbot, app_context):
     widget = MyWidget()
     qtbot.addWidget(widget)
     qtbot.mouseClick(widget.button, Qt.LeftButton)
@@ -39,7 +37,7 @@ def test_button_click(qtbot, isolated_managers):
 ```python
 from tests.fixtures.timeouts import worker_timeout
 
-def test_worker_completes(qtbot, isolated_managers):
+def test_worker_completes(qtbot, app_context):
     worker = MyWorker()
     with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
         worker.start()  # Signal may emit fast - context manager catches it
@@ -64,18 +62,15 @@ def test_worker_with_image():
 
 ## Manager Access Pattern
 
-**Use `get_app_context()` to access managers:**
+**Use the `app_context` fixture to access managers:**
 ```python
-from core.app_context import get_app_context
-
-context = get_app_context()
-manager = context.core_operations_manager
-state = context.application_state_manager
+def test_something(app_context):
+    manager = app_context.core_operations_manager
+    state = app_context.application_state_manager
+    rom_cache = app_context.rom_cache
 ```
 
-Benefits: Explicit access, better IDE support, no class imports needed.
-
-**Note:** The `inject()` pattern has been removed. Use `get_app_context()` exclusively.
+Benefits: Automatic cleanup, test isolation, better IDE support.
 
 ## Timeout Functions
 
@@ -100,12 +95,12 @@ timeout=worker_timeout(LONG)  # 10000ms for slow operations
 | `time.sleep(1)` | `qtbot.wait(1000)` |
 | `timeout=5000` | `timeout=worker_timeout()` |
 | `QPixmap` in worker thread | `ThreadSafeTestImage` |
-| `session_managers` without marker | Add `@pytest.mark.shared_state_safe` |
+| `session_app_context` without marker | Add `@pytest.mark.shared_state_safe` |
 | Hardcoded `/tmp/test.bin` | `tmp_path / "test.bin"` |
 
-## When to Use session_managers
+## When to Use session_app_context
 
-Almost never. Use `isolated_managers` unless:
+Almost never. Use `app_context` unless:
 1. Test is read-only AND verified stateless
 2. You add `@pytest.mark.shared_state_safe`
 3. You understand parallel test implications
@@ -122,4 +117,4 @@ Almost never. Use `isolated_managers` unless:
 
 ---
 
-*Last updated: December 25, 2025*
+*Last updated: December 27, 2025*

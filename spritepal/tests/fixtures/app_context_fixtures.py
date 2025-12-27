@@ -1,9 +1,8 @@
 # pyright: recommended
 """
-Simplified AppContext fixtures for SpritePal tests.
+AppContext fixtures for SpritePal tests.
 
-These fixtures use the new AppContext pattern for simpler test isolation.
-They replace the legacy session_managers/isolated_managers fixtures in core_fixtures.py.
+These fixtures provide clean test isolation via the AppContext pattern.
 
 Key fixtures:
     - app_context: Function-scoped isolated AppContext (recommended default)
@@ -18,12 +17,6 @@ Fixture Selection:
     | Performance-sensitive integration | session_app_context  |
     | Need state_manager only           | state_manager        |
     | Need core_operations only         | core_operations      |
-
-Migration Guide:
-    Replace: isolated_managers -> app_context
-    Replace: session_managers -> session_app_context
-    Replace: get_app_context().application_state_manager -> state_manager fixture
-    Replace: get_app_context().core_operations_manager -> core_operations fixture
 """
 
 from __future__ import annotations
@@ -68,16 +61,11 @@ def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
     from PySide6.QtWidgets import QApplication
 
     from core.app_context import create_app_context, reset_app_context
-    from tests.fixtures.core_fixtures import _session_state
 
     # Ensure Qt app exists
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-
-    # Remember if session context was active
-    session_active = _session_state.is_initialized
-    session_settings_path = _session_state.settings_path
 
     # Create isolated settings
     settings_path = tmp_path / ".test_settings.json"
@@ -92,13 +80,6 @@ def app_context(tmp_path: Path) -> Generator[AppContext, None, None]:
 
     # Cleanup
     reset_app_context()
-
-    # Restore session context if one was active
-    if session_active and session_settings_path:
-        create_app_context(
-            app_name="TestApp-Session",
-            settings_path=session_settings_path,
-        )
 
     # Process events to ensure cleanup completes
     if app:
@@ -130,7 +111,6 @@ def session_app_context(
     from PySide6.QtWidgets import QApplication
 
     from core.app_context import create_app_context, reset_app_context
-    from tests.fixtures.core_fixtures import _session_state
 
     # Ensure Qt app exists
     app = QApplication.instance()
@@ -147,14 +127,7 @@ def session_app_context(
         settings_path=settings_path,
     )
 
-    # Store in session state so isolated_managers can detect and restore us
-    _session_state.settings_path = settings_path
-    _session_state.is_initialized = True
-
     yield context
-
-    # Reset session state
-    _session_state.is_initialized = False
 
     # Cleanup at end of session
     reset_app_context()

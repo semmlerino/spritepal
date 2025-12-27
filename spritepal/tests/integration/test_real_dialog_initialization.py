@@ -113,19 +113,17 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_manual_offset_dialog_real(self, qtbot: QtBot, isolated_managers) -> None:
+    def test_manual_offset_dialog_real(self, qtbot: QtBot, app_context: AppContext) -> None:
         """Test UnifiedManualOffsetDialog can be created with real Qt widgets.
 
         This dialog requires managers to be initialized.
         """
-        from core.app_context import get_app_context
         from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 
-        context = get_app_context()
         dialog = UnifiedManualOffsetDialog(
-            rom_cache=context.rom_cache,
-            settings_manager=context.application_state_manager,
-            extraction_manager=context.core_operations_manager,
+            rom_cache=app_context.rom_cache,
+            settings_manager=app_context.application_state_manager,
+            extraction_manager=app_context.core_operations_manager,
         )
         qtbot.addWidget(dialog)
 

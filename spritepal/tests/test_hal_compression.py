@@ -850,10 +850,7 @@ class TestHALToolDetectionRegression:
             finally:
                 # Clean up managers to prevent interference with other tests
                 try:
-                    from tests.fixtures.core_fixtures import is_session_managers_active
-
-                    if not is_session_managers_active():
-                        cleanup_managers()
+                    cleanup_managers()
                 except Exception:
                     pass  # Ignore cleanup errors
 

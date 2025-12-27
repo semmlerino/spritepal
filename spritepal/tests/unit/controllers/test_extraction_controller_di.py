@@ -17,7 +17,7 @@ from core.managers.core_operations_manager import CoreOperationsManager
 from ui.extraction_controller import ExtractionController
 
 if TYPE_CHECKING:
-    from tests.fixtures.core_fixtures import ManagerRegistry
+    from core.app_context import AppContext
 
 pytestmark = [pytest.mark.headless]
 
@@ -25,7 +25,7 @@ pytestmark = [pytest.mark.headless]
 class TestExtractionControllerDI:
     """Test dependency injection for ExtractionController."""
 
-    def test_uses_injected_managers_not_global(self, isolated_managers: ManagerRegistry) -> None:
+    def test_uses_injected_managers_not_global(self, app_context: AppContext) -> None:
         """Verify controller uses provided managers, not DI fallback."""
         mock_main_window = Mock()
 

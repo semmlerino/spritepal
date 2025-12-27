@@ -13,17 +13,13 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.app_context import get_app_context
-
-
-def get_extraction_manager():
-    """Get extraction manager via DI."""
-    return get_app_context().core_operations_manager
+if TYPE_CHECKING:
+    from core.app_context import AppContext
 
 
 # Mark all tests as headless and integration
@@ -41,7 +37,7 @@ class TestTempFileCleanup:
     created with delete=False would leak.
     """
 
-    def test_temp_file_cleaned_on_compression_error(self, tmp_path: Path, isolated_managers: Any) -> None:
+    def test_temp_file_cleaned_on_compression_error(self, tmp_path: Path, app_context: AppContext) -> None:
         """Temp file should be deleted even if compression raises."""
         from core.hal_compression import HALCompressionError
         from core.rom_injector import ROMInjector
@@ -136,7 +132,7 @@ class TestROMStateConsistency:
     If the write failed, the internal state was inconsistent.
     """
 
-    def test_rom_data_unchanged_on_write_failure(self, tmp_path: Path, isolated_managers: Any) -> None:
+    def test_rom_data_unchanged_on_write_failure(self, tmp_path: Path, app_context: AppContext) -> None:
         """self.rom_data should remain unchanged if atomic_write fails."""
         from core.rom_injector import ROMInjector
 
@@ -209,9 +205,9 @@ class TestWorkerCleanup:
     would keep running but exception handlers didn't stop it.
     """
 
-    def test_worker_cleared_on_exception(self, isolated_managers: Any, qtbot: Any, tmp_path: Path) -> None:
+    def test_worker_cleared_on_exception(self, app_context: AppContext, qtbot: Any, tmp_path: Path) -> None:
         """_current_worker should be None after exception in start_injection."""
-        manager = get_extraction_manager()
+        manager = app_context.core_operations_manager
 
         # Verify initial state
         assert manager._current_worker is None
@@ -245,7 +241,7 @@ class TestOffsetParseError:
     any indication to the caller.
     """
 
-    def test_invalid_offset_logged_and_indicated(self, tmp_path: Path, isolated_managers: Any, caplog: Any) -> None:
+    def test_invalid_offset_logged_and_indicated(self, tmp_path: Path, app_context: AppContext, caplog: Any) -> None:
         """Parse failure should log warning and set offset_parse_error."""
         import logging
 
@@ -264,7 +260,7 @@ class TestOffsetParseError:
             }
         }
 
-        manager = get_extraction_manager()
+        manager = app_context.core_operations_manager
 
         with caplog.at_level(logging.WARNING, logger=manager._logger.name):
             result = manager.load_rom_injection_defaults(str(sprite_path), metadata)
@@ -286,7 +282,7 @@ class TestVRAMBufferCleanup:
     causing memory accumulation on repeated failures.
     """
 
-    def test_vram_cleared_on_injection_error(self, tmp_path: Path, isolated_managers: Any) -> None:
+    def test_vram_cleared_on_injection_error(self, tmp_path: Path, app_context: AppContext) -> None:
         """self.vram_data should be empty after injection error."""
         from core.injector import SpriteInjector
 

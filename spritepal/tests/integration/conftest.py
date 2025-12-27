@@ -18,23 +18,12 @@ import pytest
 # root conftest.py which imports from tests.fixtures.qt_waits
 
 
-@pytest.fixture(scope="session", autouse=True)
-def ensure_session_context(session_app_context):
-    """Ensure session_app_context is initialized before any integration test.
-
-    This autouse fixture forces the session_app_context to be created at the
-    start of the session for this worker, ensuring all integration tests
-    have access to the shared context.
-    """
-    return session_app_context
-
-
 @pytest.fixture(scope="function")
 def managers_initialized(qt_app, request, tmp_path):
     """Initialize managers for integration tests.
 
-    If session_app_context or session_managers is already active, this fixture
-    is a no-op to avoid conflicting cleanup.
+    If session_app_context is already active, this fixture is a no-op
+    to avoid conflicting cleanup.
 
     Uses create_app_context() to ensure AppContext is properly set up.
     Uses isolated settings path to avoid polluting repository root.
@@ -44,7 +33,6 @@ def managers_initialized(qt_app, request, tmp_path):
         is_context_initialized,
         reset_app_context,
     )
-    from tests.fixtures.core_fixtures import is_session_managers_active
 
     was_already_initialized = is_context_initialized()
     we_initialized = False
@@ -61,10 +49,8 @@ def managers_initialized(qt_app, request, tmp_path):
     yield
 
     # Only cleanup if WE initialized this specific instance
-    # Check both: we did the initialization AND session fixtures are NOT active
-    # (session_app_context or session_managers)
-    # Also re-check is_context_initialized to avoid double-cleanup
-    if we_initialized and not is_session_managers_active() and is_context_initialized():
+    # Re-check is_context_initialized to avoid double-cleanup
+    if we_initialized and is_context_initialized():
         reset_app_context()
 
 
