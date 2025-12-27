@@ -49,7 +49,29 @@ HAL_POOL_SIZE_MAX = 16  # Maximum pool size
 HAL_POOL_TIMEOUT_SECONDS = 30  # Pool process timeout in seconds
 HAL_POOL_RETRY_ATTEMPTS = 3  # Number of retry attempts for failed operations
 HAL_POOL_SHUTDOWN_TIMEOUT = 5  # Timeout for graceful pool shutdown
-HAL_POOL_MIN_WORKER_RATIO = 0.75  # FIX T2.4: Minimum ratio of workers that must respond
+HAL_POOL_MIN_WORKER_RATIO = 0.75  # Minimum ratio of workers that must respond for valid result
+
+# =============================================================================
+# Worker Thread Timing Constants
+# =============================================================================
+# Centralized timing values for background workers. Change these to tune
+# performance on different hardware.
+#
+# The idle detection loop polls at WORKER_IDLE_CHECK_INTERVAL_MS intervals.
+# After WORKER_IDLE_RELEASE_SECONDS of no requests, ROM resources are released.
+# After WORKER_MAX_IDLE_SECONDS of no requests, the worker shuts down entirely.
+# =============================================================================
+
+WORKER_IDLE_CHECK_INTERVAL_MS = 100  # Poll interval for idle detection
+WORKER_IDLE_RELEASE_SECONDS = 2.0  # Release ROM handle after this idle time
+WORKER_IDLE_ITERATIONS = int(
+    WORKER_IDLE_RELEASE_SECONDS * 1000 / WORKER_IDLE_CHECK_INTERVAL_MS
+)  # Derived: iterations before ROM release
+WORKER_MAX_IDLE_SECONDS = 10.0  # Max idle time before full worker shutdown
+WORKER_MAX_IDLE_ITERATIONS = int(
+    WORKER_MAX_IDLE_SECONDS * 1000 / WORKER_IDLE_CHECK_INTERVAL_MS
+)  # Derived: iterations before shutdown
+THREAD_POOL_TIMEOUT_SECONDS = 2.0  # Timeout when waiting for thread pool tasks
 
 # Empty Region Detection Configuration
 EMPTY_REGION_ENTROPY_THRESHOLD = 0.1  # Shannon entropy threshold (0-8 scale)

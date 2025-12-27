@@ -174,12 +174,31 @@ def create_app_context(
     Create and set the global AppContext.
 
     This is the new explicit initialization, replacing initialize_managers().
-    Creates all managers in dependency order:
-    1. ConfigurationService (if not provided)
-    2. ApplicationStateManager
-    3. SpritePresetManager
-    4. CoreOperationsManager
-    5. ROMCache and ROMExtractor (lazy, on first access)
+
+    ## Initialization Order (IMPORTANT)
+
+    Managers must be created in this exact order due to dependencies:
+
+    1. **ConfigurationService** - Provides paths for settings, cache, and logs.
+       Must be first because all other components use it for path resolution.
+
+    2. **ApplicationStateManager** - Loads settings and manages workflow state.
+       Depends on ConfigurationService for settings file location.
+
+    3. **SpritePresetManager** - Manages sprite preset configurations.
+       Depends on ConfigurationService for preset file location.
+
+    4. **ROMCache** - Caches extracted ROM data to avoid repeated disk reads.
+       Depends on ApplicationStateManager for cache settings (enabled, location).
+
+    5. **ROMExtractor** - Extracts sprite data from ROM files.
+       Depends on ROMCache to check for cached data before extraction.
+
+    6. **CoreOperationsManager** - Coordinates extraction and injection operations.
+       Depends on all of the above for its operations.
+
+    Changing this order will cause silent failures or runtime errors.
+    Do not instantiate managers directly - always use this function.
 
     Args:
         app_name: Application name for settings

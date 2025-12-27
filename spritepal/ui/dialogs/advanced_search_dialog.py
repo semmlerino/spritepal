@@ -11,6 +11,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import IntEnum
 from pathlib import Path
 from typing import Any, override
 
@@ -59,6 +60,19 @@ from utils.constants import MAX_SPRITE_SIZE
 logger = logging.getLogger(__name__)
 
 # SearchFilter is imported from ui.components.filters.search_filters_widget
+
+
+class SearchTab(IntEnum):
+    """Tab indices for the search dialog.
+
+    IMPORTANT: Must match the order in which tabs are added in _setup_ui().
+    If you reorder tabs, update these values accordingly.
+    """
+
+    PARALLEL = 0  # Parallel search tab
+    VISUAL = 1  # Visual similarity search tab
+    PATTERN = 2  # Pattern-based search tab
+    HISTORY = 3  # Search history tab (not a search mode)
 
 
 @dataclass
@@ -486,12 +500,13 @@ class AdvancedSearchDialog(QDialog):
 
         current_tab = self.tabs.currentIndex()
 
-        if current_tab == 0:  # Parallel search
+        if current_tab == SearchTab.PARALLEL:
             self._start_parallel_search()
-        elif current_tab == 1:  # Visual search
+        elif current_tab == SearchTab.VISUAL:
             self._start_visual_search()
-        elif current_tab == 2:  # Pattern search
+        elif current_tab == SearchTab.PATTERN:
             self._start_pattern_search()
+        # SearchTab.HISTORY doesn't trigger a search
 
     def _start_parallel_search(self):
         """Start parallel search."""

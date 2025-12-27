@@ -895,7 +895,7 @@ class CoreOperationsManager(BaseManager):
             self._handle_error(e, operation)
             return False
         finally:
-            # FIX T1.1: Always finish operation if we didn't successfully start a worker.
+            # NOTE: Always finish operation if we didn't successfully start a worker.
             # If worker is running, it will call _finish_operation when it completes.
             # This prevents "injection already in progress" errors after validation failures.
             if not self._current_worker or not self._current_worker.isRunning():
@@ -1038,7 +1038,7 @@ class CoreOperationsManager(BaseManager):
         """
         Stop and clear current worker on error.
 
-        FIX #2: Ensures worker is properly stopped when exception occurs
+        Ensures worker is properly stopped when exception occurs
         after worker.start() but before normal completion.
         """
         if self._current_worker is None:
@@ -1369,7 +1369,7 @@ class CoreOperationsManager(BaseManager):
                                 result["rom_offset"] = int(rom_offset_str, 16)
                             result["custom_offset"] = rom_offset_str
                         except (ValueError, TypeError) as e:
-                            # FIX #3: Log parse failure and indicate error in result
+                            # Log parse failure and indicate error in result
                             self._logger.warning(f"Failed to parse ROM offset '{rom_offset_str}': {e}")
                             result["offset_parse_error"] = str(e)
 

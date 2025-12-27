@@ -32,6 +32,12 @@ from PySide6.QtGui import QImage, QPixmap
 
 from core.services.image_utils import pil_to_qimage
 from core.tile_renderer import TileRenderer
+from utils.constants import (
+    THREAD_POOL_TIMEOUT_SECONDS,
+    WORKER_IDLE_CHECK_INTERVAL_MS,
+    WORKER_IDLE_ITERATIONS,
+    WORKER_MAX_IDLE_ITERATIONS,
+)
 from utils.logging_config import get_logger
 from utils.rom_utils import BytesMMAPWrapper, detect_smc_offset
 
@@ -200,9 +206,6 @@ class BatchThumbnailWorker(QObject):
         logger.info("BatchThumbnailWorker started")
         self.started.emit()
 
-        # Idle threshold for releasing ROM handle (2 seconds = 20 * 100ms)
-        IDLE_ROM_RELEASE_THRESHOLD = 20
-
         try:
             # Load ROM data using memory mapping
             self._load_rom_data()
@@ -210,7 +213,6 @@ class BatchThumbnailWorker(QObject):
 
             processed_count = 0
             idle_iterations = 0
-            max_idle_iterations = 100  # Stop after 10 seconds of idle (100 * 100ms)
             last_log_count = -1  # Track last logged count to avoid spam
 
             # Initialize thread pool if multi-threading is enabled
@@ -221,7 +223,7 @@ class BatchThumbnailWorker(QObject):
             while not self._is_stop_requested():
                 # Check for pause (thread-safe)
                 if self._is_pause_requested():
-                    QThread.currentThread().msleep(100)
+                    QThread.currentThread().msleep(WORKER_IDLE_CHECK_INTERVAL_MS)
                     continue
 
                 # Collect batch of requests for parallel processing
@@ -267,20 +269,19 @@ class BatchThumbnailWorker(QObject):
                     # Increment idle counter
                     idle_iterations += 1
 
-                    # Release ROM handle after 2 seconds idle to free file lock on Windows
-                    if idle_iterations == IDLE_ROM_RELEASE_THRESHOLD and self._rom_mmap is not None:
+                    # Release ROM handle after idle to free file lock on Windows
+                    if idle_iterations == WORKER_IDLE_ITERATIONS and self._rom_mmap is not None:
                         logger.debug("Releasing ROM handle during idle to free file lock")
                         self._clear_rom_data()
 
                     # Auto-stop after being idle for too long
-                    if idle_iterations >= max_idle_iterations:
-                        logger.info(
-                            f"Auto-stopping after {idle_iterations * 100}ms idle, processed {processed_count} total"
-                        )
+                    if idle_iterations >= WORKER_MAX_IDLE_ITERATIONS:
+                        idle_ms = idle_iterations * WORKER_IDLE_CHECK_INTERVAL_MS
+                        logger.info(f"Auto-stopping after {idle_ms}ms idle, processed {processed_count} total")
                         break
 
-                    # Sleep longer when idle to reduce CPU usage
-                    QThread.currentThread().msleep(100)  # Sleep 100ms instead of busy-waiting
+                    # Sleep when idle to reduce CPU usage
+                    QThread.currentThread().msleep(WORKER_IDLE_CHECK_INTERVAL_MS)
                     continue
 
                 # Reset idle counter when we get work
@@ -459,7 +460,7 @@ class BatchThumbnailWorker(QObject):
                 return
 
             try:
-                qimage = future.result(timeout=2.0)  # 2 second timeout per thumbnail
+                qimage = future.result(timeout=THREAD_POOL_TIMEOUT_SECONDS)
                 if qimage:
                     # Cache the result
                     cache_key = ThumbnailCache.make_key(request.offset, request.size)

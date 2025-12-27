@@ -75,11 +75,24 @@ pip install -e ".[dev]"
 
 ```python
 # Run from spritepal/ directory
-from launch_spritepal import SpritePalApp
 import sys
 
-app = SpritePalApp(sys.argv)
-app.show()
+from core.app_context import create_app_context
+from core.configuration_service import ConfigurationService
+from launch_spritepal import SpritePalApp
+
+# Initialize configuration and app context (required)
+config_service = ConfigurationService()
+config_service.ensure_directories_exist()
+
+context = create_app_context(
+    "SpritePal",
+    settings_path=config_service.settings_file,
+    configuration_service=config_service,
+)
+
+# Create and run application
+app = SpritePalApp(sys.argv, context=context)
 sys.exit(app.exec())
 ```
 
