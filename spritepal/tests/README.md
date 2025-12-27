@@ -42,21 +42,35 @@ def test_worker(qtbot, app_context):
 
 ```
 tests/
-├── infrastructure/          # Test framework components
+├── unit/                   # Pure logic tests (no Qt, no app_context)
+│   ├── controllers/        # Controller unit tests
+│   ├── services/           # Service unit tests
+│   └── test_*.py           # Core logic, validators, utilities
+├── integration/            # Multi-component tests (Qt, app_context)
+│   └── test_*.py           # Manager workflows, Qt widgets, workers
+├── ui/                     # UI-specific tests
+│   └── components/         # Widget tests
+├── infrastructure/         # Test framework components
 │   ├── real_component_factory.py    # Factory for real components
-│   ├── test_helpers.py              # Worker/window helper functions
 │   ├── data_repository.py           # Consistent test data
 │   ├── thread_safe_test_image.py    # Thread-safe QPixmap alternative
 │   └── qt_mocks.py                  # Qt test doubles
-├── fixtures/               # Pytest fixtures
-│   ├── app_context_fixtures.py      # AppContext fixtures (canonical)
-│   ├── core_fixtures.py    # Singleton reset, autouse safety
-│   ├── qt_fixtures.py      # Qt-specific fixtures
-│   └── timeouts.py         # Semantic timeout functions
-├── integration/            # Integration tests
-├── controllers/            # Controller tests
-└── test_*.py              # Unit tests
+└── fixtures/               # Pytest fixtures
+    ├── app_context_fixtures.py      # AppContext fixtures (canonical)
+    ├── core_fixtures.py    # Singleton reset, autouse safety
+    ├── qt_fixtures.py      # Qt-specific fixtures
+    └── timeouts.py         # Semantic timeout functions
 ```
+
+### Where Does My Test Go?
+
+| Test Type | Directory | Criteria |
+|-----------|-----------|----------|
+| **Unit** | `tests/unit/` | No `app_context`, no `qtbot`, no Qt imports, pure logic |
+| **Integration** | `tests/integration/` | Uses `app_context`, managers, or Qt widgets |
+| **UI** | `tests/ui/` | Widget-specific tests with complex Qt setup |
+
+**Rule of thumb:** If your test imports from `PySide6` or uses the `app_context` fixture, it's an integration test.
 
 ---
 
@@ -91,10 +105,20 @@ Benefits:
 |---------|-------------|
 | `app_context` | **Preferred** - clean state each test (from `app_context_fixtures.py`) |
 | `session_app_context` | Shared state with `@pytest.mark.shared_state_safe` |
-| `isolated_managers` | Legacy (deprecated) - use `app_context` instead |
+| `test_rom_file` | Create ROM files with various sizes/options |
+| `test_vram_file` | Create VRAM dump files |
 | `hal_pool` | HAL operations (mock by default) |
 | `qtbot` | Qt widget testing |
 | `tmp_path` | Temporary files |
+
+### Test Data Patterns
+
+| Need | Use |
+|------|-----|
+| Single ROM file | `test_rom_file` fixture |
+| Single VRAM file | `test_vram_file` fixture |
+| Complete test setup (all files) | `TestDataFactory.create_test_files(tmp_path)` |
+| Injection test files | `TestDataFactory.create_injection_test_files(tmp_path)` |
 
 **Note:** `app_context` and `session_app_context` can safely coexist in the same test run. When `app_context` detects an existing session context, it uses `suspend_app_context()` to temporarily hide it, creates an isolated context for the test, then restores the session context afterward. This prevents function-scoped tests from destroying session-scoped contexts.
 
@@ -185,4 +209,4 @@ def test_with_workers(app_context):
 
 ---
 
-*Last updated: December 25, 2025*
+*Last updated: December 27, 2025*

@@ -1,26 +1,26 @@
 """
-Consolidated test data fixtures for SpritePal tests.
+Pytest fixtures for creating individual test data files (ROM, VRAM).
 
-This module provides centralized test data generation for:
-- ROM files (various sizes and configurations)
-- VRAM dump files
-- Test byte patterns
+This is the PREFERRED pattern for most tests. Use these fixtures when you need:
+- A single ROM file with specific options
+- A single VRAM file with specific options
 
 Usage:
-    # For tests that need a simple ROM file:
+    # For tests that need a ROM file:
     def test_something(test_rom_file):
         rom_path = test_rom_file()  # Default 1MB
         rom_path = test_rom_file(size="small")  # 13KB
         rom_path = test_rom_file(size="large", with_header=True)  # 2MB with SNES header
 
-    # For tests that need raw ROM data:
-    def test_something(test_rom_data_factory):
-        data = test_rom_data_factory()  # Default 1MB
-        data = test_rom_data_factory(size=32 * 1024)  # 32KB
-
     # For tests that need VRAM:
     def test_something(test_vram_file):
         vram_path = test_vram_file()  # 64KB VRAM dump
+
+For complete test setups (ROM + VRAM + CGRAM + OAM + sprite + palette + metadata),
+use TestDataFactory from test_data_factory.py instead:
+
+    from tests.fixtures.test_data_factory import TestDataFactory
+    paths = TestDataFactory.create_test_files(tmp_path)
 """
 
 from __future__ import annotations

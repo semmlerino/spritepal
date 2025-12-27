@@ -1,8 +1,28 @@
 """
-Consolidated test data factory for creating test files.
+Factory class for creating complete test file sets.
 
-This module consolidates the various _create_test_files() implementations
-that were duplicated across multiple test helper files.
+Use TestDataFactory when you need a COMPLETE test setup with all files:
+- ROM, VRAM, CGRAM, OAM files
+- Sprite PNG, palette JSON, metadata JSON
+- Output directory
+
+Usage:
+    from tests.fixtures.test_data_factory import TestDataFactory
+
+    # Complete test setup
+    paths = TestDataFactory.create_test_files(tmp_path)
+    # Use paths.rom_path, paths.vram_path, paths.sprite_path, etc.
+
+    # Injection-specific setup (zeroed files)
+    paths = TestDataFactory.create_injection_test_files(tmp_path)
+
+For SINGLE file creation (most tests), prefer pytest fixtures instead:
+
+    def test_something(test_rom_file, test_vram_file):
+        rom_path = test_rom_file(size="small")
+        vram_path = test_vram_file()
+
+See tests/fixtures/test_data_fixtures.py for the preferred single-file fixtures.
 """
 
 from __future__ import annotations
