@@ -1092,12 +1092,18 @@ class HALCompressor:
 
     def decompress_from_rom(self, rom_path: str, offset: int, output_path: str | None = None) -> bytes:
         """
-        Decompress data from ROM at specified offset.
+        Decompress data from ROM at specified file offset.
+
+        This method reads directly from the file at the given offset without
+        detecting or adjusting for SMC headers. For automatic header handling,
+        use `ROMExtractor.extract_sprite_data()` instead.
 
         Args:
-            rom_path: Path to ROM file
-            offset: Offset in ROM where compressed data starts
-            output_path: path to save decompressed data
+            rom_path: Path to ROM file (may contain 512-byte SMC header)
+            offset: **File offset** where compressed data starts.
+                For .smc files, callers must add the SMC header offset (512)
+                to logical ROM addresses before calling this method.
+            output_path: Optional path to save decompressed data
 
         Returns:
             Decompressed data as bytes

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from utils.logging_config import get_logger
+from utils.rom_utils import detect_smc_offset_from_size
 
 logger = get_logger(__name__)
 
@@ -44,8 +45,15 @@ class ROMPaletteExtractor:
 
         try:
             with Path(rom_path).open("rb") as f:
-                # Seek to palette offset
-                f.seek(palette_offset)
+                # Detect SMC header and adjust offset
+                file_size = f.seek(0, 2)
+                smc_offset = detect_smc_offset_from_size(file_size)
+                file_offset = palette_offset + smc_offset
+                if smc_offset > 0:
+                    logger.debug(f"Adjusting for {smc_offset}-byte SMC header: 0x{palette_offset:X} -> 0x{file_offset:X}")
+
+                # Seek to palette offset (adjusted for SMC header)
+                f.seek(file_offset)
 
                 # Read all palette data (256 colors * 2 bytes each = 512 bytes)
                 palette_data = f.read(512)
@@ -174,7 +182,14 @@ class ROMPaletteExtractor:
 
         try:
             with Path(rom_path).open("rb") as f:
-                f.seek(palette_offset)
+                # Detect SMC header and adjust offset
+                file_size = f.seek(0, 2)
+                smc_offset = detect_smc_offset_from_size(file_size)
+                file_offset = palette_offset + smc_offset
+                if smc_offset > 0:
+                    logger.debug(f"Adjusting for {smc_offset}-byte SMC header: 0x{palette_offset:X} -> 0x{file_offset:X}")
+
+                f.seek(file_offset)
                 palette_data = f.read(512)
 
             for idx in range(start_idx, end_idx + 1):
