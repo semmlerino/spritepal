@@ -19,6 +19,8 @@ from core.sprite_config_loader import SpriteConfigLoader
 from utils.constants import (
     BYTES_PER_TILE,
     DECOMPRESSION_WINDOW_SIZE,
+    HAL_MAX_COMPRESSION_RATIO,
+    HAL_MIN_COMPRESSION_RATIO,
     SPRITE_VALIDATION_THRESHOLD,
 )
 from utils.file_validator import atomic_write
@@ -216,7 +218,19 @@ class ROMInjector(SpriteInjector):
             compressed_size = self._parse_hal_compressed_size(bytes(rom_data), offset)
 
             # Validate compression ratio is reasonable (HAL typically achieves 30-70%)
-            # This helps detect parser errors like incorrect terminator detection
+            # This helps detect parser errors and reject non-sprite data
+            # Only apply strict ratio check when parser found a proper terminator
+            # If compressed >> decompressed (10x+), parser clearly didn't find terminator
+            hal_parsing_confident = original_size > 0 and compressed_size < original_size * 10
+            if hal_parsing_confident:
+                if not self._validate_compression_ratio(compressed_size, original_size):
+                    compression_ratio = compressed_size / original_size
+                    logger.debug(
+                        f"Rejected: invalid compression ratio ({compression_ratio:.2%}) at 0x{offset:X}. "
+                        f"compressed={compressed_size}, decompressed={original_size}"
+                    )
+                    return 0, b""  # Reject this candidate
+
             if original_size > 0:
                 compression_ratio = compressed_size / original_size
                 if compression_ratio < 0.05:
@@ -294,6 +308,28 @@ class ROMInjector(SpriteInjector):
         logger.debug(f"Sprite data validation: {valid_tiles}/{tiles_to_check} tiles valid ({validity_ratio:.1%})")
 
         return validity_ratio >= SPRITE_VALIDATION_THRESHOLD
+
+    def _validate_compression_ratio(self, compressed_size: int, decompressed_size: int) -> bool:
+        """
+        Validate that compression ratio is reasonable for HAL sprites.
+
+        HAL typically achieves 30-70% compression on sprite data.
+        Ratios outside 10-90% indicate parser errors or non-sprite data:
+        - < 10%: Parser likely found 0xFF terminator too early (false terminator)
+        - > 90%: Data isn't actually compressed (raw data, not HAL sprite)
+
+        Args:
+            compressed_size: Size of compressed data in ROM
+            decompressed_size: Size after HAL decompression
+
+        Returns:
+            True if ratio is within acceptable range, False otherwise
+        """
+        if decompressed_size == 0:
+            return False
+
+        ratio = compressed_size / decompressed_size
+        return HAL_MIN_COMPRESSION_RATIO <= ratio <= HAL_MAX_COMPRESSION_RATIO
 
     def _has_4bpp_tile_characteristics(self, tile_data: bytes) -> bool:
         """

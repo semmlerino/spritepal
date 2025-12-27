@@ -197,6 +197,17 @@ MAX_ALIGNMENT_ERROR = 16  # Maximum bytes of misalignment allowed
 # Tune HIGHER if garbage data is being accepted (false positives).
 SPRITE_VALIDATION_THRESHOLD = 0.6  # 60% of tiles must pass validation
 
+# HAL compression ratio thresholds
+# HAL typically achieves 30-70% compression on sprite data.
+# Ratios outside 10-90% indicate parser errors or non-sprite data.
+HAL_MIN_COMPRESSION_RATIO = 0.10  # < 10% = parser found 0xFF too early
+HAL_MAX_COMPRESSION_RATIO = 0.90  # > 90% = data isn't actually compressed
+
+# Tile pattern thresholds for false positive reduction
+# Reject data where too many tiles are blank (all zeros or all 0xFF)
+MAX_BLANK_TILE_RATIO = 0.50  # Max 50% of tiles can be blank
+MIN_UNIQUE_TILE_PATTERNS = 2  # Require at least 2 distinct tile patterns
+
 # Sprite entropy thresholds (unified across all validators)
 # Entropy is Shannon entropy on byte values (0-8 scale)
 # Graphics data typically has moderate entropy - not too uniform, not too random

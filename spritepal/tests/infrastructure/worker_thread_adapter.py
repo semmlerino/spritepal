@@ -115,9 +115,9 @@ class WorkerThreadAdapter:
 
         # Forward common signals if they exist
         if hasattr(self.worker, "error"):
-            getattr(self.worker, "error").connect(self.signals.error.emit)
+            self.worker.error.connect(self.signals.error.emit)
         if hasattr(self.worker, "progress"):
-            getattr(self.worker, "progress").connect(self.signals.progress.emit)
+            self.worker.progress.connect(self.signals.progress.emit)
 
     def start(self) -> None:
         """Start the worker thread."""
@@ -176,7 +176,7 @@ class WorkerThreadAdapter:
 
         # Now safe to clean up worker resources
         if hasattr(self.worker, "cleanup"):
-            cleanup_callable: Callable[[], None] = getattr(self.worker, "cleanup")
+            cleanup_callable: Callable[[], None] = self.worker.cleanup
             cleanup_callable()
 
     def __del__(self) -> None:

@@ -235,12 +235,15 @@ class TestCompressionRatioValidation:
                     rom_data = Path(tmp.name).read_bytes()
 
                     try:
-                        injector.find_compressed_sprite(rom_data, 0)
+                        compressed_size, data = injector.find_compressed_sprite(rom_data, 0)
+                        # With stricter validation, low ratios now cause rejection
+                        assert compressed_size == 0 and data == b""
                     except Exception:
                         pass  # May fail validation, that's ok
 
-        # Check for warning about low ratio
-        assert any("low compression ratio" in r.message.lower() for r in caplog.records)
+        # Check for rejection due to invalid compression ratio
+        # (Changed from warning to rejection in false positive reduction update)
+        assert any("invalid compression ratio" in r.message.lower() for r in caplog.records)
 
 
 # ============================================================================

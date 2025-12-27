@@ -131,12 +131,17 @@ class SpriteFinder:
 
     def _quick_sprite_check(self, rom_data: bytes, offset: int) -> bool:
         """
-        Quick heuristic check to filter definite non-sprites.
+        Aggressive pre-filter to reject non-HAL data before decompression.
 
-        This is a minimal filter that only rejects offsets that CANNOT contain
-        valid HAL-compressed data. Previous implementation was too aggressive
-        and rejected valid sprites. Now we let decompression validation catch
-        invalid data instead of over-filtering here.
+        Checks for HAL compression signatures to reduce false positives.
+        This is more aggressive than the previous implementation to filter
+        out obvious non-sprite data early.
+
+        HAL command byte format:
+        - 0x00-0x7F: Short commands (valid)
+        - 0x80-0xDF: Invalid range (no such HAL commands)
+        - 0xE0-0xFE: Long commands (valid)
+        - 0xFF: Stream terminator
 
         Args:
             rom_data: ROM data bytes
@@ -145,28 +150,119 @@ class SpriteFinder:
         Returns:
             True if offset might contain a sprite, False if definitely not
         """
-        # Need at least 4 bytes to attempt decompression
-        if offset + 4 > len(rom_data):
+        # Need at least 8 bytes to check signature patterns
+        if offset + 8 > len(rom_data):
             return False
 
-        # Only check first 4 bytes for definite non-starters
-        header = rom_data[offset : offset + 4]
+        header = rom_data[offset : offset + 8]
+        first = header[0]
 
-        # 0xFF is the HAL stream terminator - can't be first byte
-        if header[0] == 0xFF:
+        # REJECT: HAL terminator as first byte
+        if first == 0xFF:
             return False
 
-        # All zeros - no valid HAL command starts with 0x00
-        if all(b == 0 for b in header):
+        # REJECT: All zeros (no valid HAL command starts with 0x00 0x00 0x00 0x00)
+        if all(b == 0 for b in header[:4]):
             return False
 
-        # Let decompression validation handle everything else
-        # Previous checks (unique bytes < 4, ASCII patterns) were too aggressive
-        # and rejected valid compressed data with low entropy headers
+        # REJECT: ASCII text (documentation, strings, etc.)
+        # Check first 4 bytes - if all printable ASCII, likely text not sprite
+        if all(0x20 <= b < 0x7F for b in header[:4]):
+            return False
+
+        # REJECT: Command byte outside valid HAL range
+        # Valid: 0x00-0x7F (short commands), 0xE0-0xFE (long commands)
+        # Invalid: 0x80-0xDF (no such commands exist in HAL format)
+        if 0x80 <= first <= 0xDF:
+            return False
+
+        # ACCEPT: Looks like valid HAL command byte
         return True
 
+    def _analyze_first_commands(self, rom_data: bytes, offset: int) -> float:
+        """
+        Quick analysis of first few HAL commands to estimate sprite likelihood.
+
+        Sprite data typically has a mix of raw and RLE commands, with fewer
+        backreferences (unless it's animation frames with similarity to previous).
+
+        Args:
+            rom_data: ROM data bytes
+            offset: Offset to analyze
+
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        if offset + 16 > len(rom_data):
+            return 0.2
+
+        pos = offset
+        raw_count = 0
+        rle_count = 0
+        backref_count = 0
+
+        # Analyze first 8 commands only (lightweight check)
+        for _ in range(8):
+            if pos >= len(rom_data):
+                break
+
+            cmd = rom_data[pos]
+
+            # 0xFF terminates stream
+            if cmd == 0xFF:
+                break
+
+            # Decode command type
+            if (cmd & 0xE0) == 0xE0:
+                # Long command format
+                command = (cmd >> 2) & 0x07
+                pos += 2  # command byte + length byte
+            else:
+                # Short command format
+                command = cmd >> 5
+                pos += 1  # command byte only
+
+            # Count by command type
+            if command == 0:
+                # Raw bytes command
+                raw_count += 1
+                # Skip raw data bytes
+                if (cmd & 0xE0) != 0xE0:
+                    length = (cmd & 0x1F) + 1
+                else:
+                    # Long command length already consumed
+                    length = 1
+                pos += length
+            elif command in (1, 2, 3):
+                # RLE commands (8-bit, 16-bit, sequence)
+                rle_count += 1
+                pos += 1 if command != 2 else 2
+            elif command >= 4:
+                # Backreference commands
+                backref_count += 1
+                pos += 2  # 2-byte offset
+
+        total = raw_count + rle_count + backref_count
+        if total < 3:
+            return 0.2  # Too few commands to analyze
+
+        # Sprites typically: 40-70% raw, 20-50% RLE, <20% backref
+        raw_ratio = raw_count / total
+
+        if 0.3 <= raw_ratio <= 0.8:
+            return 0.7  # Good sprite-like distribution
+        elif raw_ratio > 0.8:
+            return 0.5  # Mostly raw - could be uncompressed section
+        else:
+            return 0.4  # Unusual distribution
+
     def _calculate_quick_confidence(
-        self, decompressed_size: int, compressed_size: int, tile_count: int, tile_validation_score: float
+        self,
+        decompressed_size: int,
+        compressed_size: int,
+        tile_count: int,
+        tile_validation_score: float,
+        command_analysis_score: float = 0.5,
     ) -> float:
         """
         Calculate confidence score without visual validation.
@@ -180,29 +276,34 @@ class SpriteFinder:
             compressed_size: Size of compressed data in ROM
             tile_count: Number of tiles in sprite
             tile_validation_score: Score from tile data validation (0.0-1.0)
+            command_analysis_score: Score from HAL command analysis (0.0-1.0)
 
         Returns:
             Confidence score between 0.0 and 1.0
         """
         score = 0.0
 
-        # Factor 1: Size reasonableness (30%)
+        # Factor 1: Size reasonableness (25%)
         if MIN_SPRITE_SIZE <= decompressed_size <= MAX_SPRITE_SIZE:
-            score += 0.3
+            score += 0.25
 
-        # Factor 2: Compression ratio (20%)
+        # Factor 2: Compression ratio (15%)
         if compressed_size > 0:
             ratio = compressed_size / decompressed_size
             if 0.1 <= ratio <= 0.7:
-                score += 0.2
+                score += 0.15
 
-        # Factor 3: Tile count (20%)
+        # Factor 3: Tile count (15%)
         if 4 <= tile_count <= 512:
-            score += 0.2
+            score += 0.15
 
-        # Factor 4: Tile validation score (30%)
-        # Scale tile_validation_score (0.0-1.0) to contribute up to 0.3
-        score += tile_validation_score * 0.3
+        # Factor 4: Tile validation score (25%)
+        # Scale tile_validation_score (0.0-1.0) to contribute up to 0.25
+        score += tile_validation_score * 0.25
+
+        # Factor 5: Command analysis score (20%)
+        # Penalize unusual HAL command distributions
+        score += command_analysis_score * 0.20
 
         return min(score, 1.0)
 
@@ -257,7 +358,10 @@ class SpriteFinder:
         if not is_valid or tile_confidence < min_tile_confidence:
             return None
 
-        # Step 5: Calculate confidence
+        # Step 5: HAL command distribution analysis
+        command_score = self._analyze_first_commands(rom_data, offset)
+
+        # Step 6: Calculate confidence
         if full_visual_validation:
             # Run full visual validation (expensive)
             visual_metrics, final_confidence = self._run_visual_validation(sprite_data, tile_confidence)
@@ -269,6 +373,7 @@ class SpriteFinder:
                 compressed_size=compressed_size,
                 tile_count=tile_count,
                 tile_validation_score=tile_confidence,
+                command_analysis_score=command_score,
             )
 
         return ScanResult(

@@ -9,7 +9,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PIL import Image
 
-from utils.constants import SPRITE_ENTROPY_MAX, SPRITE_ENTROPY_MIN
+from utils.constants import (
+    MAX_BLANK_TILE_RATIO,
+    MIN_UNIQUE_TILE_PATTERNS,
+    SPRITE_ENTROPY_MAX,
+    SPRITE_ENTROPY_MIN,
+)
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -304,9 +309,24 @@ class SpriteVisualValidator:
     def validate_tile_data(self, tile_data: bytes, tile_count: int) -> tuple[bool, float]:
         """
         Validate raw tile data before conversion to image.
+
+        Enhanced validation to reduce false positives by checking:
+        - Tile count alignment
+        - Byte entropy
+        - Blank tile ratio (all zeros or all 0xFF)
+        - Minimum unique tile patterns
+
+        Args:
+            tile_data: Raw sprite tile data (32 bytes per 4bpp tile)
+            tile_count: Expected number of tiles
+
+        Returns:
+            Tuple of (is_valid, confidence_score)
         """
-        # Quick validation based on data patterns
-        if len(tile_data) != tile_count * 32:  # 32 bytes per 4bpp tile
+        bytes_per_tile = 32  # 4bpp format: 8x8 pixels = 32 bytes
+
+        # Check for correct tile alignment
+        if len(tile_data) != tile_count * bytes_per_tile:
             return False, 0.0
 
         # Check for all zeros or all ones (common in garbage data)
@@ -314,7 +334,7 @@ class SpriteVisualValidator:
         if unique_bytes < 10:  # Too uniform
             return False, 0.1
 
-        # Check for reasonable byte distribution
+        # Check for reasonable byte distribution (entropy)
         byte_counts = np.bincount(np.frombuffer(tile_data, dtype=np.uint8), minlength=256)
         entropy = -np.sum((byte_counts / len(tile_data)) * np.log2(byte_counts / len(tile_data) + 1e-10))
 
@@ -322,4 +342,30 @@ class SpriteVisualValidator:
         if entropy < SPRITE_ENTROPY_MIN or entropy > SPRITE_ENTROPY_MAX:
             return False, 0.2
 
+        # NEW: Check for blank tile ratio
+        # Blank tiles are all zeros (transparent) or all 0xFF (uninitialized VRAM)
+        blank_tiles = 0
+        tile_patterns: set[bytes] = set()
+
+        for i in range(tile_count):
+            tile_start = i * bytes_per_tile
+            tile = tile_data[tile_start : tile_start + bytes_per_tile]
+            tile_patterns.add(tile)
+
+            # Check if tile is blank (all zeros or all 0xFF)
+            if all(b == 0 for b in tile) or all(b == 0xFF for b in tile):
+                blank_tiles += 1
+
+        # Reject if too many blank tiles
+        blank_ratio = blank_tiles / tile_count
+        if blank_ratio > MAX_BLANK_TILE_RATIO:
+            logger.debug(f"Rejected: {blank_ratio:.1%} blank tiles exceeds threshold")
+            return False, 0.3
+
+        # Reject if too few unique tile patterns (repetitive fill data)
+        if len(tile_patterns) < MIN_UNIQUE_TILE_PATTERNS:
+            logger.debug(f"Rejected: only {len(tile_patterns)} unique tile patterns")
+            return False, 0.3
+
+        # All checks passed - high confidence
         return True, 0.8
