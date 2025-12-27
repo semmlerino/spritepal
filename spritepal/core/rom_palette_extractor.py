@@ -50,7 +50,9 @@ class ROMPaletteExtractor:
                 smc_offset = detect_smc_offset_from_size(file_size)
                 file_offset = palette_offset + smc_offset
                 if smc_offset > 0:
-                    logger.debug(f"Adjusting for {smc_offset}-byte SMC header: 0x{palette_offset:X} -> 0x{file_offset:X}")
+                    logger.debug(
+                        f"Adjusting for {smc_offset}-byte SMC header: 0x{palette_offset:X} -> 0x{file_offset:X}"
+                    )
 
                 # Seek to palette offset (adjusted for SMC header)
                 f.seek(file_offset)
@@ -187,7 +189,9 @@ class ROMPaletteExtractor:
                 smc_offset = detect_smc_offset_from_size(file_size)
                 file_offset = palette_offset + smc_offset
                 if smc_offset > 0:
-                    logger.debug(f"Adjusting for {smc_offset}-byte SMC header: 0x{palette_offset:X} -> 0x{file_offset:X}")
+                    logger.debug(
+                        f"Adjusting for {smc_offset}-byte SMC header: 0x{palette_offset:X} -> 0x{file_offset:X}"
+                    )
 
                 f.seek(file_offset)
                 palette_data = f.read(512)

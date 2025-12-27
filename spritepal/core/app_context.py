@@ -344,7 +344,7 @@ def suspend_app_context() -> Generator[None, None, None]:
         # Clean up any context that was created during suspension
         with _context_lock:
             if _app_context is not None:
-                _app_context.cleanup()
+                _app_context.cleanup()  # pyright: ignore[reportUnreachable] - can be set during yield
             # Restore the original context
             _app_context = saved_context
             _cleanup_registered = saved_cleanup_registered

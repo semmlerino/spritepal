@@ -55,9 +55,10 @@ def test_rom_file(tmp_path) -> str:
 def mock_extraction_manager():
     """Create mock extraction manager for integration tests."""
     manager = Mock()
-    manager.get_rom_extractor.return_value = Mock()
-    # Mock rom_service.extract_sprite_to_png (called via rom_service now)
-    manager.rom_service.extract_sprite_to_png.return_value = True
+    # Mock rom_extractor.extract_sprite_from_rom - returns (output_path, extraction_info)
+    mock_rom_extractor = Mock()
+    mock_rom_extractor.extract_sprite_from_rom.return_value = ("test_output.png", {})
+    manager.get_rom_extractor.return_value = mock_rom_extractor
     manager.get_known_sprite_locations.return_value = {
         "sprite_1": Mock(offset=0x10000),
         "sprite_2": Mock(offset=0x20000),
@@ -448,9 +449,11 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         # Perform extraction
         self.window._perform_extraction(0x10000, output_file)
 
-        # Verify rom_service.extract_sprite_to_png was called
-        mock_extraction_manager.rom_service.extract_sprite_to_png.assert_called_once_with(
-            "test_rom.sfc", 0x10000, output_file, None
+        # Verify rom_extractor.extract_sprite_from_rom was called
+        # output_base is the path without extension
+        expected_output_base = str(tmp_path / "extracted_sprite")
+        self.window.rom_extractor.extract_sprite_from_rom.assert_called_once_with(
+            "test_rom.sfc", 0x10000, expected_output_base, sprite_name=""
         )
 
     @patch("ui.windows.detached_gallery_window.QMessageBox")

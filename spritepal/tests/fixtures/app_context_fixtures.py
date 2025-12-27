@@ -187,4 +187,3 @@ def core_operations(app_context: AppContext) -> CoreOperationsManager:
             assert result is not None
     """
     return app_context.core_operations_manager
-

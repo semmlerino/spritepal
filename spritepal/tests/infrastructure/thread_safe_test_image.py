@@ -232,5 +232,3 @@ class ThreadSafeTestImage:
             f"ThreadSafeTestImage(width={self._width}, height={self._height}, "
             f"format={self._image.format()}, bytes={self.sizeInBytes()})"
         )
-
-

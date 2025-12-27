@@ -82,7 +82,9 @@ class BaseManager(QObject):
         try:
             self._initialize()
         finally:
-            self._initializing = False  # Clear flag regardless of success/failure  # Clear flag regardless of success/failure
+            self._initializing = (
+                False  # Clear flag regardless of success/failure  # Clear flag regardless of success/failure
+            )
 
     def _initialize(self) -> None:
         """Initialize the manager - must be implemented by subclasses"""

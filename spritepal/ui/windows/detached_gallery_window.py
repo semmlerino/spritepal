@@ -1204,15 +1204,17 @@ class DetachedGalleryWindow(QMainWindow):
             if not self.rom_path:
                 raise ValueError("ROM path is not set")
 
-            # Perform extraction using the ROM service
-            result = self.extraction_manager.rom_service.extract_sprite_to_png(
+            # Perform extraction using the ROM extractor
+            # extract_sprite_from_rom takes output_base (without extension)
+            output_base = str(Path(output_path).with_suffix(""))
+            output_png_path, _extraction_info = self.rom_extractor.extract_sprite_from_rom(
                 self.rom_path,
                 offset,
-                output_path,
-                None,  # cgram_path - could add CGRAM selection later
+                output_base,
+                sprite_name="",  # No sprite name needed for manual extraction
             )
 
-            if result:
+            if output_png_path:
                 self.status_bar.showMessage(f"Sprite extracted to {output_path}")
 
                 QMessageBox.information(

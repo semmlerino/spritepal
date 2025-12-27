@@ -1231,9 +1231,7 @@ class GridArrangementDialog(SplitterDialog):
         if palette_enabled:
             palette_idx = self.colorizer.get_selected_palette_index()
             self.setWindowTitle(f"Arrange Sprite Grid - Palette {palette_idx}")
-            self._update_status(
-                f"Palette mode: Palette {palette_idx} applied | Press C to toggle, P to cycle"
-            )
+            self._update_status(f"Palette mode: Palette {palette_idx} applied | Press C to toggle, P to cycle")
         else:
             self.setWindowTitle("Arrange Sprite Grid - Grayscale")
             self._update_status("Grayscale mode: Original sprite colors | Press C to toggle palette")
@@ -1242,9 +1240,7 @@ class GridArrangementDialog(SplitterDialog):
         """Cycle through available palettes."""
         new_palette_idx = self.colorizer.cycle_palette()
         self.setWindowTitle(f"Arrange Sprite Grid - Palette {new_palette_idx}")
-        self._update_status(
-            f"Palette mode: Palette {new_palette_idx} applied | Press C to toggle, P to cycle"
-        )
+        self._update_status(f"Palette mode: Palette {new_palette_idx} applied | Press C to toggle, P to cycle")
 
     def _update_displays(self):
         """Update all display elements"""

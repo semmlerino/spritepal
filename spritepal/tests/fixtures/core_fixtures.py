@@ -55,6 +55,7 @@ except ImportError:
 # Module logger for fixture diagnostics
 _logger = logging.getLogger(__name__)
 
+
 def reset_all_singletons() -> None:
     """Reset all singleton classes for test isolation.
 
@@ -379,5 +380,3 @@ def isolated_managers(app_context: AppContext) -> Generator[None, None, None]:
     """
     _ = app_context  # Triggers app_context initialization
     yield
-
-

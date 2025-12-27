@@ -101,7 +101,7 @@ class ROMExtractor:
             # Check for SMC header to adjust offset if needed
             header = self.rom_injector.read_rom_header(rom_path)
             smc_offset = header.header_offset
-            
+
             # Adjust offset: ROM offset -> file offset
             file_offset = sprite_offset + smc_offset
             if smc_offset > 0:

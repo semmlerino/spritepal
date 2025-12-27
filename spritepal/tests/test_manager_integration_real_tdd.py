@@ -29,7 +29,6 @@ import pytest
 from PIL import Image
 
 from core.exceptions import ValidationError
-
 from tests.fixtures.timeouts import LONG, signal_timeout, worker_timeout
 
 # Phase 2 Real Component Testing Infrastructure
