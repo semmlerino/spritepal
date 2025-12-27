@@ -75,6 +75,7 @@ class TestPureAppContextComponentInitialization:
         session_mgr = app_context.application_state_manager
         injection_mgr = app_context.core_operations_manager
         settings_mgr = app_context.application_state_manager
+        preview_gen = app_context.preview_generator
 
         # Create mock main window
         mock_window = Mock()
@@ -99,6 +100,7 @@ class TestPureAppContextComponentInitialization:
                 session_manager=session_mgr,
                 injection_manager=injection_mgr,
                 settings_manager=settings_mgr,
+                preview_generator=preview_gen,
             )
 
         # Verify managers are the injected ones
@@ -106,6 +108,7 @@ class TestPureAppContextComponentInitialization:
         assert controller.session_manager is session_mgr
         assert controller.injection_manager is injection_mgr
         assert controller.settings_manager is settings_mgr
+        assert controller.preview_generator is preview_gen
 
     def test_main_window_pure_di(self, app_context: AppContext, qtbot):
         """Test MainWindow works with all deps from AppContext.
@@ -154,16 +157,24 @@ class TestPureAppContextComponentInitialization:
             dialog.deleteLater()
 
     def test_rom_extraction_panel_pure_di(self, app_context: AppContext, qtbot):
-        """Test ROMExtractionPanel works with extraction_manager from AppContext."""
+        """Test ROMExtractionPanel works with explicit dependencies from AppContext."""
         from ui.rom_extraction_panel import ROMExtractionPanel
 
         extraction_mgr = app_context.core_operations_manager
+        state_mgr = app_context.application_state_manager
+        rom_cache = app_context.rom_cache
 
-        # Create with explicit dep
-        panel = ROMExtractionPanel(extraction_manager=extraction_mgr)
+        # Create with explicit deps
+        panel = ROMExtractionPanel(
+            extraction_manager=extraction_mgr,
+            state_manager=state_mgr,
+            rom_cache=rom_cache,
+        )
 
         try:
             assert panel.extraction_manager is extraction_mgr
+            assert panel.state_manager is state_mgr
+            assert panel.rom_cache is rom_cache
         finally:
             panel.deleteLater()
 

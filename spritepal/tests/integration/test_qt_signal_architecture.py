@@ -128,6 +128,7 @@ class TestQtSignalArchitecture:
             session_manager=context.application_state_manager,
             injection_manager=injection_mgr,
             settings_manager=context.application_state_manager,
+            preview_generator=context.preview_generator,
         )
 
         # Connect signal capture to manager signals
@@ -362,6 +363,7 @@ class TestQtSignalArchitecture:
             session_manager=context.application_state_manager,
             injection_manager=injection_mgr,
             settings_manager=context.application_state_manager,
+            preview_generator=context.preview_generator,
         )
 
         # Capture controller's handling of manager signals

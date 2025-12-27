@@ -197,7 +197,12 @@ class MainWindow(QMainWindow):
         from core.app_context import get_app_context
 
         extraction_manager = get_app_context().core_operations_manager
-        self.rom_extraction_panel = ROMExtractionPanel(parent=self, extraction_manager=extraction_manager)
+        self.rom_extraction_panel = ROMExtractionPanel(
+            parent=self,
+            extraction_manager=extraction_manager,
+            state_manager=self.settings_manager,
+            rom_cache=self.rom_cache,
+        )
         self.extraction_tabs.addTab(self.rom_extraction_panel, "ROM Extraction")
         self.extraction_tabs.setTabToolTip(0, "Extract sprites directly from game ROM files")
 
@@ -983,6 +988,7 @@ class MainWindow(QMainWindow):
                 session_manager=context.application_state_manager,
                 injection_manager=context.core_operations_manager,
                 settings_manager=self.settings_manager,
+                preview_generator=context.preview_generator,
             )
             # Connect controller output signals for decoupled UI updates
             self._connect_controller_signals(self._controller)

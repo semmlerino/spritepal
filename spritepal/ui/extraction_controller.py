@@ -16,9 +16,8 @@ from PySide6.QtWidgets import QWidget
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
+    from core.services.preview_generator import PreviewGenerator
     from ui.injection_dialog import InjectionDialog
-
-from core.app_context import get_app_context
 from core.console_error_handler import ConsoleErrorHandler
 from core.managers.core_operations_manager import CoreOperationsManager
 from core.services.image_utils import pil_to_qpixmap
@@ -76,6 +75,7 @@ class ExtractionController(QObject):
         session_manager: ApplicationStateManager,
         injection_manager: CoreOperationsManager,
         settings_manager: ApplicationStateManager,
+        preview_generator: PreviewGenerator,
     ) -> None:
         super().__init__()
         self.main_window: Any = main_window  # pyright: ignore[reportExplicitAny] - MainWindow has no protocol
@@ -83,6 +83,7 @@ class ExtractionController(QObject):
         self.session_manager = session_manager
         self.injection_manager = injection_manager
         self.settings_manager = settings_manager
+        self.preview_generator = preview_generator
 
         # Workers still managed locally (thin wrappers)
         self.worker: VRAMExtractionWorker | None = None
@@ -113,9 +114,6 @@ class ExtractionController(QObject):
         _ = self.extraction_manager.cache_hit.connect(self._on_cache_hit)
         _ = self.extraction_manager.cache_miss.connect(self._on_cache_miss)
         _ = self.extraction_manager.cache_saved.connect(self._on_cache_saved)
-
-        # Get preview generator from AppContext (already configured)
-        self.preview_generator = get_app_context().preview_generator
 
     def start_extraction(self) -> None:
         """Start the extraction process"""

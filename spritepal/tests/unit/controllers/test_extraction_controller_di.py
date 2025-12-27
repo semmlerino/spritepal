@@ -14,6 +14,7 @@ import pytest
 
 from core.managers.application_state_manager import ApplicationStateManager
 from core.managers.core_operations_manager import CoreOperationsManager
+from core.services.preview_generator import PreviewGenerator
 from ui.extraction_controller import ExtractionController
 
 if TYPE_CHECKING:
@@ -33,6 +34,7 @@ class TestExtractionControllerDI:
         mock_session_manager = Mock(spec=ApplicationStateManager)
         mock_injection_manager = Mock(spec=CoreOperationsManager)
         mock_settings_manager = Mock(spec=ApplicationStateManager)
+        mock_preview_generator = Mock(spec=PreviewGenerator)
 
         controller = ExtractionController(
             mock_main_window,
@@ -40,8 +42,10 @@ class TestExtractionControllerDI:
             session_manager=mock_session_manager,
             injection_manager=mock_injection_manager,
             settings_manager=mock_settings_manager,
+            preview_generator=mock_preview_generator,
         )
 
         assert controller.extraction_manager is mock_extraction_manager
         assert controller.injection_manager is mock_injection_manager
         assert controller.session_manager is mock_session_manager
+        assert controller.preview_generator is mock_preview_generator

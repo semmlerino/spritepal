@@ -351,8 +351,9 @@ class TestMemoryManagementIntegration(QtTestCase):
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
+        mock_rom_extractor = MagicMock()
         with patch("ui.workers.batch_thumbnail_worker.TileRenderer"):
-            worker = BatchThumbnailWorker(large_rom_data)
+            worker = BatchThumbnailWorker(large_rom_data, mock_rom_extractor)
 
             # Start worker to load ROM data
             worker.start()

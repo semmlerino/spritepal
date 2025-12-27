@@ -97,6 +97,7 @@ class TestSettingsIntegration:
             session_manager=app_context.application_state_manager,
             injection_manager=app_context.core_operations_manager,
             settings_manager=settings,
+            preview_generator=app_context.preview_generator,
         )
 
         # Controller should be able to access settings

@@ -118,17 +118,18 @@ class ScanController(QObject):
 
     def __init__(
         self,
-        cache: ROMCache | None = None,
-        state_manager: ApplicationStateManager | None = None,
         parent: QObject | None = None,
+        *,
+        cache: ROMCache,
+        state_manager: ApplicationStateManager,
     ) -> None:
         """
         Initialize the scan controller.
 
         Args:
-            cache: ROM cache for storing/retrieving scan results
-            state_manager: Application state manager for state transitions
             parent: Parent QObject
+            cache: ROM cache for storing/retrieving scan results (required)
+            state_manager: Application state manager for state transitions (required)
         """
         super().__init__(parent)
         self._cache = cache
@@ -310,7 +311,6 @@ class ScanController(QObject):
             rom_path: Path to the ROM file
             extractor: ROM extractor for decompression
         """
-        from core.app_context import get_app_context
         from ui.common import WorkerManager
 
         # Clean up any existing scan worker
@@ -323,11 +323,10 @@ class ScanController(QObject):
             dialog.reject()
             return
 
-        # Get rom_cache from self._cache or AppContext
-        rom_cache = self._cache if self._cache is not None else get_app_context().rom_cache
-
-        # Create scan worker
-        self._scan_worker = SpriteScanWorker(rom_path, extractor, use_cache=use_cache, parent=self, rom_cache=rom_cache)
+        # Create scan worker (cache is required, no fallback)
+        self._scan_worker = SpriteScanWorker(
+            rom_path, extractor, use_cache=use_cache, parent=self, rom_cache=self._cache
+        )
 
         # Create scan context to pass data between handlers
         self._scan_context = ScanContext()
@@ -351,18 +350,15 @@ class ScanController(QObject):
         Returns:
             True to use cache, False to start fresh, None if cancelled
         """
-        from core.app_context import get_app_context
         from ui.dialogs import ResumeScanDialog
-
-        rom_cache = get_app_context().rom_cache
 
         # Compute scan parameters from ROM size (matches SpriteScanWorker)
         scan_params = compute_scan_params(rom_path)
 
-        partial_cache = rom_cache.get_partial_scan_results(rom_path, scan_params)
+        partial_cache = self._cache.get_partial_scan_results(rom_path, scan_params)
 
         # Store cache reference for later use
-        dialog.rom_cache = rom_cache
+        dialog.rom_cache = self._cache
 
         if partial_cache and not partial_cache.get("completed", False):
             # Show resume dialog

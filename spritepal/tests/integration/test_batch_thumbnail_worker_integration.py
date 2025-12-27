@@ -240,7 +240,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
             # Cleanup should work without starting
             worker.cleanup()
 
-    def test_real_controller_integration(self, test_rom_file):
+    def test_real_controller_integration(self, test_rom_file, real_rom_extractor):
         """Test using the real ThumbnailWorkerController - demonstrates proper usage."""
         from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 
@@ -248,7 +248,7 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
 
         try:
             # Start worker with real components
-            controller.start_worker(test_rom_file)
+            controller.start_worker(test_rom_file, real_rom_extractor)
 
             # Track results
             thumbnails_received = []

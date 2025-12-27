@@ -169,6 +169,7 @@ class TestExtractionControllerIntegration:
             "injection_manager": context.core_operations_manager,
             "session_manager": context.application_state_manager,
             "settings_manager": context.application_state_manager,
+            "preview_generator": context.preview_generator,
         }
 
     @pytest.fixture
@@ -180,6 +181,7 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
         yield ctrl
         # Cleanup any running workers
@@ -203,12 +205,14 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         assert controller.main_window == mock_main_window
         assert controller.extraction_manager == real_managers["extraction_manager"]
         assert controller.injection_manager == real_managers["injection_manager"]
         assert controller.session_manager == real_managers["session_manager"]
+        assert controller.preview_generator == real_managers["preview_generator"]
         assert controller.worker is None
         assert controller.rom_worker is None
 
@@ -227,6 +231,7 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         # Emit signals to test connections
@@ -257,6 +262,7 @@ class TestExtractionControllerIntegration:
             injection_manager=injection_mgr,
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         assert controller.extraction_manager == extraction_mgr
@@ -281,6 +287,7 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         mock_main_window.set_extraction_params(
@@ -311,6 +318,7 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         mock_main_window.set_extraction_params(
@@ -342,6 +350,7 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         mock_main_window.set_extraction_params(
@@ -373,6 +382,7 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         # Create invalid file with wrong size
@@ -597,6 +607,7 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         mock_main_window.extraction_panel.has_vram = Mock(return_value=True)
@@ -624,6 +635,7 @@ class TestExtractionControllerIntegration:
             injection_manager=real_managers["injection_manager"],
             session_manager=real_managers["session_manager"],
             settings_manager=real_managers["settings_manager"],
+            preview_generator=real_managers["preview_generator"],
         )
 
         assert controller.error_handler is not None

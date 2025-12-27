@@ -17,6 +17,7 @@ from utils.constants import ROM_SIZE_4MB
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.rom_validator import ROMHeader
 
 logger = get_logger(__name__)
@@ -100,13 +101,17 @@ class ROMSessionController(QObject):
     def __init__(
         self,
         parent: QObject | None = None,
+        *,
+        settings_manager: ApplicationStateManager,
     ) -> None:
         """Initialize the controller.
 
         Args:
             parent: Parent QObject for proper Qt lifecycle management
+            settings_manager: Settings manager for persistence
         """
         super().__init__(parent)
+        self._settings_manager = settings_manager
         self._current_rom_path: str = ""
         self._current_rom_size: int = 0
 
@@ -127,10 +132,7 @@ class ROMSessionController(QObject):
             Path to last ROM if it exists, None otherwise
         """
         try:
-            from core.app_context import get_app_context
-
-            settings = get_app_context().application_state_manager
-            last_rom = settings.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "")
+            last_rom = self._settings_manager.get(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "")
 
             if last_rom and isinstance(last_rom, str) and Path(last_rom).exists():
                 logger.debug(f"Found last used ROM: {last_rom}")
@@ -219,11 +221,8 @@ class ROMSessionController(QObject):
             filename: Path to the ROM file
         """
         try:
-            from core.app_context import get_app_context
-
-            settings = get_app_context().application_state_manager
-            settings.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
-            settings.set_last_used_directory(str(Path(filename).parent))
+            self._settings_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
+            self._settings_manager.set_last_used_directory(str(Path(filename).parent))
             logger.debug(f"Saved ROM to settings: {filename}")
         except Exception:
             logger.exception("Error saving ROM to settings")

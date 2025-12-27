@@ -206,8 +206,12 @@ def rom_extraction_panel(qtbot, managers_initialized):
     from core.app_context import get_app_context
     from ui.rom_extraction_panel import ROMExtractionPanel
 
-    extraction_manager = get_app_context().core_operations_manager
-    panel = ROMExtractionPanel(extraction_manager=extraction_manager)
+    context = get_app_context()
+    panel = ROMExtractionPanel(
+        extraction_manager=context.core_operations_manager,
+        state_manager=context.application_state_manager,
+        rom_cache=context.rom_cache,
+    )
     qtbot.addWidget(panel)
     panel.show()
 

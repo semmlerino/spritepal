@@ -83,7 +83,7 @@ class BatchThumbnailWorker(QObject):
     finished = Signal()
     """Emitted when worker finishes all requests."""
 
-    def __init__(self, rom_path: str, rom_extractor: ROMExtractor | None = None, parent: QObject | None = None):
+    def __init__(self, rom_path: str, rom_extractor: ROMExtractor, parent: QObject | None = None):
         """
         Initialize the batch thumbnail worker.
 
@@ -95,10 +95,6 @@ class BatchThumbnailWorker(QObject):
         super().__init__(parent)
 
         self.rom_path = rom_path
-        if rom_extractor is None:
-            from core.app_context import get_app_context
-
-            rom_extractor = get_app_context().rom_extractor
         self.rom_extractor = rom_extractor
         self.tile_renderer = TileRenderer()
 
@@ -725,7 +721,7 @@ class ThumbnailWorkerController(QObject):
         self._thread: QThread | None = None
         self._cleanup_called = False
 
-    def start_worker(self, rom_path: str, rom_extractor: ROMExtractor | None = None) -> None:
+    def start_worker(self, rom_path: str, rom_extractor: ROMExtractor) -> None:
         """Start worker with proper thread management."""
         if self._thread and self._thread.isRunning():
             logger.warning("Worker already running, stopping first")

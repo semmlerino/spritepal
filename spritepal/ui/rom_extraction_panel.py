@@ -30,12 +30,13 @@ from ui.common.file_dialogs import browse_for_open_file
 from ui.common.signal_utils import safe_disconnect
 
 if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.rom_extractor import ROMExtractor
     from core.rom_validator import ROMHeader
+    from core.services.rom_cache import ROMCache
     from core.types import SpritePreset
 
-# ExtractionManager accessed via get_app_context().core_operations_manager
 from core.managers.workflow_state_manager import ExtractionState
 from ui.controllers import (
     ExtractionParamsController,
@@ -90,36 +91,38 @@ class ROMExtractionPanel(QWidget):
         parent: QWidget | None = None,
         *,
         extraction_manager: CoreOperationsManager,
+        state_manager: ApplicationStateManager,
+        rom_cache: ROMCache,
     ) -> None:
         super().__init__(parent)
 
         self.rom_path = ""
         self.sprite_locations: dict[str, Mapping[str, object]] = {}
-        # Use injected extraction manager
+        # Use injected dependencies
         self.extraction_manager = extraction_manager
+        self.state_manager = state_manager
+        self.rom_cache = rom_cache
         self.rom_extractor: ROMExtractor = self.extraction_manager.get_rom_extractor()
         self.rom_size = 0  # Track ROM size for slider limits
         self._current_header: ROMHeader | None = None  # Stored header for preset matching
 
         # Controllers for extraction logic
         self._params_controller = ExtractionParamsController(parent=self)
-        self._rom_session = ROMSessionController(parent=self)
+        self._rom_session = ROMSessionController(parent=self, settings_manager=self.state_manager)
 
-        # State manager for coordinating operations (ApplicationStateManager)
-        from core.app_context import get_app_context
-
-        context = get_app_context()
-        self.state_manager = context.application_state_manager
+        # Connect state manager signals
         self.state_manager.workflow_state_changed.connect(self._on_state_changed)
 
         # Initialize extracted components
         self._worker_orchestrator = ROMWorkerOrchestrator(
             self,
-            rom_cache=context.rom_cache,
+            rom_cache=self.rom_cache,
             settings_manager=self.state_manager,
         )
         self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
-        self._scan_controller = ScanController(state_manager=self.state_manager, parent=self)
+        self._scan_controller = ScanController(
+            parent=self, cache=self.rom_cache, state_manager=self.state_manager
+        )
         self._scan_controller.sprite_selected.connect(self._add_selected_sprite)
         self.scan_worker = None
 
@@ -212,9 +215,7 @@ class ROMExtractionPanel(QWidget):
         Args:
             layout: Layout to add controls to
         """
-        from core.app_context import get_app_context
-
-        self.rom_file_widget = ROMFileWidget(rom_cache=get_app_context().rom_cache)
+        self.rom_file_widget = ROMFileWidget(rom_cache=self.rom_cache)
         self.rom_file_widget.browse_clicked.connect(self._browse_rom)
         self.rom_file_widget.partial_scan_detected.connect(self._on_partial_scan_detected)
         layout.addWidget(self.rom_file_widget)
@@ -360,11 +361,8 @@ class ROMExtractionPanel(QWidget):
                 self.rom_size = ROM_SIZE_4MB  # Default 4MB
 
             # Save to settings
-            from core.app_context import get_app_context
-
-            settings = get_app_context().application_state_manager
-            settings.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
-            settings.set_last_used_directory(str(Path(filename).parent))
+            self.state_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, filename)
+            self.state_manager.set_last_used_directory(str(Path(filename).parent))
             logger.debug(f"Saved ROM to settings: {filename}")
 
             # Read ROM header asynchronously using orchestrator
@@ -535,10 +533,7 @@ class ROMExtractionPanel(QWidget):
 
         # Check cache status first (fast operation)
         try:
-            from core.app_context import get_app_context
-
-            rom_cache = get_app_context().rom_cache
-            cached_locations = rom_cache.get_sprite_locations(self.rom_path)
+            cached_locations = self.rom_cache.get_sprite_locations(self.rom_path)
             self._is_sprites_from_cache = bool(cached_locations)
         except Exception:
             self._is_sprites_from_cache = False

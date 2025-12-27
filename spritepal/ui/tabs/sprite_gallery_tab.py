@@ -402,7 +402,7 @@ class SpriteGalleryTab(QWidget):
             offset: Sprite offset
             priority: Request priority (lower = higher priority)
         """
-        if not self.rom_path:
+        if not self.rom_path or not self.rom_extractor:
             return
 
         # Create controller if needed
