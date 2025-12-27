@@ -82,6 +82,20 @@ class SpriteInfo(TypedDict):
 
     Consolidates duplicate definitions from rom_extractor.py, sprite_finder.py,
     and scan_controller.py (SpriteInfoDict).
+
+    Required fields (always present after scan):
+        offset: Raw byte offset in ROM
+        offset_hex: Hexadecimal string representation (e.g., "0x8000")
+        compressed_size: Size of compressed sprite data in bytes
+        decompressed_size: Size after HAL decompression
+        tile_count: Number of 8x8 tiles in sprite
+        alignment: Memory alignment info (e.g., "word", "page")
+        quality: Decompression quality score (0.0-1.0)
+
+    Optional fields (context-dependent):
+        size_limit_used: Present when scan used size limit heuristic
+        size: Alternative size field (deprecated, use compressed_size)
+        name: Present when sprite has a known name from config
     """
 
     offset: int
@@ -91,7 +105,7 @@ class SpriteInfo(TypedDict):
     tile_count: int
     alignment: str
     quality: float
-    # Optional fields (from SpriteInfoDict)
+    # Optional fields - see docstring for when each is present
     size_limit_used: NotRequired[int]
     size: NotRequired[int]
     name: NotRequired[str]
@@ -167,8 +181,33 @@ CacheStats: TypeAlias = dict[str, int | float]
 
 # Navigation types (for smart sprite discovery)
 NavigationHint: TypeAlias = dict[str, object]
-SpriteLocation: TypeAlias = dict[str, object]
-RegionMap: TypeAlias = dict[str, object]
+
+
+class SpriteLocationData(TypedDict):
+    """Typed sprite location data matching SpritePointer structure.
+
+    This TypedDict mirrors the SpritePointer dataclass from core/rom_injector.py
+    for use in serialization and type-safe dict access.
+
+    Required fields:
+        offset: Raw byte offset in ROM where sprite data begins
+        bank: SNES memory bank number (0x00-0xFF)
+        address: Address within bank (0x0000-0xFFFF)
+
+    Optional fields:
+        compressed_size: Size of compressed data if known
+        offset_variants: Alternative offsets for sprite variations
+    """
+
+    offset: int
+    bank: int
+    address: int
+    compressed_size: NotRequired[int | None]
+    offset_variants: NotRequired[list[int] | None]
+
+
+# Backwards compatibility alias
+SpriteLocation: TypeAlias = SpriteLocationData
 
 
 # Literal types for mode values and status
@@ -258,7 +297,6 @@ __all__ = [
     "ROMData",
     "ROMExtractionParams",
     "ROMHeaderInfo",
-    "RegionMap",
     "ScanParams",
     "SearchResults",
     "SettingsValue",
@@ -267,6 +305,7 @@ __all__ = [
     "SourceType",
     "SpriteInfo",
     "SpriteLocation",
+    "SpriteLocationData",
     "SpriteOffset",
     "SpritePreset",
     "SpriteSearchResult",
