@@ -7,6 +7,8 @@ off the main thread to prevent UI freezes, especially on slow storage.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -21,6 +23,46 @@ if TYPE_CHECKING:
     from core.rom_injector import ROMInjector
 
 logger = get_logger(__name__)
+
+
+def _normalize_sprite_locations(
+    locations: Mapping[str, object],
+) -> list[dict[str, object]]:
+    """Convert dict[str, SpritePointer] to list[dict] for UI consumption.
+
+    The core layer returns sprite locations as dict[str, SpritePointer] where
+    SpritePointer is a dataclass. UI code (format_sprite_list) expects
+    list[Mapping[str, object]] and calls .get() on items. This function
+    normalizes the data for UI consumption.
+
+    Args:
+        locations: Dictionary mapping sprite names to SpritePointer objects
+
+    Returns:
+        List of dicts with 'name', 'offset', 'compressed_size', 'offset_variants' keys
+    """
+    result: list[dict[str, object]] = []
+    for name, pointer in locations.items():
+        if is_dataclass(pointer) and not isinstance(pointer, type):
+            # Convert dataclass to dict and add name
+            entry: dict[str, object] = asdict(pointer)
+            entry["name"] = name
+        elif hasattr(pointer, "offset"):
+            # Fallback for duck-typed objects with offset attribute
+            # Type ignore: we verified hasattr above, pyright can't narrow object type
+            entry = {
+                "name": name,
+                "offset": pointer.offset,  # pyright: ignore[reportAttributeAccessIssue]
+                "bank": getattr(pointer, "bank", 0),
+                "address": getattr(pointer, "address", 0),
+                "compressed_size": getattr(pointer, "compressed_size", None),
+                "offset_variants": getattr(pointer, "offset_variants", None),
+            }
+        else:
+            # Already a dict-like or unknown type - just wrap with name
+            entry = {"name": name}
+        result.append(entry)
+    return result
 
 
 class ROMInfoLoaderWorker(BaseWorker):
@@ -106,11 +148,10 @@ class ROMInfoLoaderWorker(BaseWorker):
             locations = self.extraction_manager.get_known_sprite_locations(self.rom_path)
             results["sprite_locations"] = locations
 
-            if locations:
-                self.sprite_locations_loaded.emit(locations)
-                logger.debug(f"Loaded {len(locations)} sprite locations")
-            else:
-                self.sprite_locations_loaded.emit({})
+            # Normalize to list[dict] for UI consumption (format_sprite_list expects .get())
+            normalized = _normalize_sprite_locations(locations) if locations else []
+            self.sprite_locations_loaded.emit(normalized)
+            logger.debug(f"Loaded {len(normalized)} sprite locations")
 
             self.emit_progress(90, f"Loaded {len(locations)} sprite locations")
 
