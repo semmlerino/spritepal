@@ -80,293 +80,68 @@ local vram_addr = (base_bytes / 2) + table_word + (tile_index * 32)  -- Don't do
 
 ## 3. Savestate Format (MSS Files)
 
-**NOTE**: Savestate formats may vary between Mesen2 versions/builds. These observations
-are from our Dec 2025 testing on Mesen2 2.1.1+137ae7c (Windows) and may not apply universally.
+**⚠️ BUILD-SPECIFIC - We explored this approach but found the tile hash database (Section 13) more reliable.**
 
-### 3.1 File Structure (Observed)
-```
-Offset 0x00-0x02: "MSS" header (3 bytes)
-Offset 0x03: Version byte (0x01 in our samples)
-Offset 0x04-0x22: Header/metadata (exact structure unknown)
-~Offset 0x23: zlib compressed data typically starts around here
-```
-
-### 3.2 Decompression Code
-
-**Note:** This is note-quality code for understanding the format. The header scan heuristic
-can false-positive on certain data patterns. Use defensively.
-
-```python
-import zlib
-
-def decompress_savestate(path: str) -> bytes | None:
-    """Decompress Mesen2 savestate. Returns None if zlib header not found."""
-    with open(path, 'rb') as f:
-        data = f.read()
-
-    # Scan for zlib header bytes (0x78 followed by valid compression level)
-    # In our samples, found around offset 0x23, but scan to be safe
-    zlib_start = None
-    for i in range(4, min(100, len(data) - 1)):
-        if data[i] == 0x78 and data[i+1] in [0x01, 0x5E, 0x9C, 0xDA]:
-            zlib_start = i
-            break
-
-    if zlib_start is None:
-        return None  # No zlib header found
-
-    # Decompress
-    decompressed = zlib.decompress(data[zlib_start:])
-    return decompressed
-```
-
-**Automation caveats:** Savestates may contain multiple compressed streams, false-positive
-zlib headers, or even non-zlib compression in other builds. For automation, always validate
-the decompressed blob by matching a known VRAM tile hash/pattern (or a known palette entry)
-
-### 3.3 VRAM Location in Savestate
-
-**⚠️ BUILD-SPECIFIC:** In Mesen2 2.1.1+137ae7c, the decompressed blob appears to contain a raw
-VRAM dump where VRAM byte-address equals blob offset. This alignment is **not guaranteed** across
-Mesen versions—always verify by checking for known tile patterns.
-
-- VRAM data found at offset 0x6A00 in decompressed savestate (in our build)
-- 64KB total VRAM size in SNES
-- Target mushroom sprite at VRAM $6A00-$6A80 (byte addresses)
- - Validation idea: hash a known 8×8 tile from VRAM and confirm it matches a known ROM tile hash
+**Quick reference (Mesen2 2.1.1+137ae7c):**
+- MSS files: "MSS" header (3 bytes) + zlib-compressed blob starting ~offset 0x23
+- Scan for zlib header `0x78` followed by `0x01|0x5E|0x9C|0xDA`, then `zlib.decompress()`
+- Decompressed blob may contain raw VRAM where byte-address = blob offset (not guaranteed)
+- Always validate by matching a known tile hash—don't assume offsets are stable across builds
 
 ---
 
-## 4. Address Translation Formula
+## 4. Address Translation Notes
 
-### 4.1 Mesen2 Debugger PRG-ROM View (SPECIAL CASE)
+> **🚫 Mesen2 PRG-ROM View (−$300000 trick):** Debugger artifact only. Do NOT use in code. For real SA-1 mapping, see Section 8.2.
 
-> **🚫 DO NOT BUILD LOGIC ON THIS**
->
-> This −$300000 trick is a **Mesen debugger artifact** we used during a single debugging
-> session to correlate runtime addresses with file offsets. It is NOT cartridge mapping
-> and will break if applied as a general rule.
-
-**What we used it for:** Temporary correlation during interactive debugger sessions to
-find where in the ROM file a sprite came from. We then used the real SA-1 mapping
-(Section 13.2) for all actual code.
-
-When viewing addresses in Mesen2's PRG-ROM memory type/debugger view:
-```
-File Offset = Mesen PRG-ROM View Address - 0x300000
-```
-
-**Examples we observed (debugger-specific, not generalizable):**
-- Mesen PRG view $3D2238 → File offset $0D2238
-- Mesen PRG view $57D800 → File offset $27D800
-
-**For real CPU→ROM mapping:** Use Section 13.2 (SA-1 ROM Mapping) instead.
-
-### 4.2 Validation Method
-Used exhal tool to confirm sprites exist at calculated ROM offsets
+**Validation:** We confirmed ROM offsets by extracting with `exhal` and visually verifying sprites.
 
 ---
 
-## 5. DMA Monitoring Challenges
+## 5. DMA Monitoring (Dead End)
 
-### 5.1 VRAM Address Reading Issue
-**Observation**: Reading VRAM address from $2116/$2117 during our DMA callback returned $0000.
+**Tried:** Reading $2116/$2117 during DMA callbacks to get VRAM destination. Always returned $0000.
 
-```lua
--- This approach returned 0 in our testing
-function on_dma_enable_write(address, value)
-    local vram_addr_low = emu.read(0x2116, emu.memType.snesMemory)
-    local vram_addr_high = emu.read(0x2117, emu.memType.snesMemory)
-    local vram_addr = (vram_addr_low | (vram_addr_high << 8)) * 2
-    -- vram_addr was 0 - but why?
-end
-```
+**Why it failed:** Timing issues, wrong memType, or registers already cleared by the time callback fires.
 
-### 5.2 Possible Explanations (Not Verified)
+**Untested alternative:** Hook *writes* to $2116/$2117 and cache values instead of reading during DMA. See `docs/mesen2/MESEN2_LUA_API_LEARNINGS_DO_NOT_DELETE.md` for callback helpers.
 
-1. **Timing**: We're reading after DMA has cleared/modified the registers
-2. **Wrong memType**: Registers might need `snesRegister` instead of `snesMemory` in some builds
-3. **Read-only shadow**: $2116/$2117 may not be readable in the same way they're written
-4. **Game behavior**: The game may set these via a path we're not sampling
-
-### 5.3 Better Approach: Cache Writes
-
-Instead of reading registers during DMA, **hook writes to $2116/$2117 and cache the last value**:
-
-```lua
-local cached_vram_addr = 0
-
--- Cache writes to VRAM address registers
-emu.addMemoryCallback(function(addr, value)
-    if addr == 0x2116 then
-        cached_vram_addr = (cached_vram_addr & 0xFF00) | value
-    elseif addr == 0x2117 then
-        cached_vram_addr = (cached_vram_addr & 0x00FF) | (value << 8)
-    end
-end, emu.callbackType.write, 0x2116, 0x2117)
-
--- Now use cached_vram_addr in DMA callback
-```
-
-**We did not test this approach.** It avoids "read after the fact" ambiguity. Also see
-`docs/mesen2/MESEN2_LUA_API_LEARNINGS_DO_NOT_DELETE.md` for callback signature differences
-and the `add_memory_callback_compat` helper (some builds accept a `memType` fifth argument).
+**Resolution:** We abandoned DMA tracing in favor of the tile hash database (Section 18).
 
 ---
 
-## 6. Mushroom Sprite Findings
+## 6. Investigation History (Condensed)
 
-### 6.1 Location Confirmed
-- **VRAM Address**: $6A00-$6A80
-- **Sprite Size**: 16x16 pixels
-- **Tile Index**: $A0
-- **Palette**: 3
+This section summarizes approaches we tried before arriving at the tile hash database solution.
 
-### 6.2 Savestate Comparison Results
-```
-Before.mss (no mushroom) vs Sprite.mss (mushroom visible):
-- 120 bytes differ at VRAM $6A00
-- Pattern found: 87 7E 87 7E... (repeating)
-- This appears to be fill/initialization data, not actual sprite graphics
-```
+### 6.1 Mushroom Sprite Investigation
 
-### 6.3 ROM Search Results
-- Searched for 87 7E pattern - not found as graphics data
-- Found potential compressed sprite at ROM $3033C4 (131 bytes)
-- When extracted with exhal, doesn't match mushroom appearance
+**Goal:** Track a specific in-game mushroom sprite back to its ROM offset.
 
----
+**What we tried:**
+- Savestate comparison (Before.mss vs Sprite.mss) → Found VRAM $6A00 changed but showed fill pattern (87 7E), not actual graphics
+- Pattern search in ROM → No direct matches; HAL compression obscures data
+- DMA monitoring → Couldn't reliably read VRAM destination (see Section 5)
 
-## 7. Working Code Patterns
+**Why it didn't work:** By the time data reaches VRAM, it's already decompressed. The SA-1 coprocessor handles decompression invisibly to main CPU callbacks.
 
-### 7.1 Successful Savestate Loading in Lua
-```lua
--- Read savestate file
-local f = io.open(SAVESTATE_PATH, "rb")
-local state_bytes = f:read("*a")
-f:close()
+### 6.2 Key Insight
 
--- Load from exec callback
-local load_ref
-load_ref = emu.addMemoryCallback(function(address, value)
-    if not state_loaded then
-        state_loaded = true
-        emu.loadSavestate(state_bytes)
-        -- remove_memory_callback_compat is defined in the Mesen2 Lua API learnings doc
-        remove_memory_callback_compat(load_ref, emu.callbackType.exec, 0x8000, 0xFFFF)
-    end
-end, emu.callbackType.exec, 0x8000, 0xFFFF)
-```
+> "Focusing too much on cataloging, and not enough on the bridge between sprite you can see and ROM position"
 
-### 7.2 Successful Sprite Extraction
-```bash
-# Using exhal tool
-./tools/exhal "roms/Kirby Super Star (USA).sfc" 0x280000 sprite.bin
-# Other known good offsets: 0x1B0000 (Kirby), 0x1A0000 (enemies), 0x180000 (items)
-```
+**Resolution:** Instead of tracing runtime data flow, we pre-built a tile hash database from known ROM offsets (Section 13) and match VRAM captures against it.
 
-### 7.3 Sprite Visualization (4bpp SNES format)
-```python
-def decode_4bpp_tile(tile_data):
-    # Each tile is 8x8 pixels, 32 bytes
-    pixels = []
-    for y in range(8):
-        row_offset = y * 2
-        byte1 = tile_data[row_offset]
-        byte2 = tile_data[row_offset + 1]
-        byte3 = tile_data[row_offset + 16]
-        byte4 = tile_data[row_offset + 17]
-        
-        for x in range(8):
-            bit = 7 - x
-            pixel = ((byte1 >> bit) & 1) | \
-                    (((byte2 >> bit) & 1) << 1) | \
-                    (((byte3 >> bit) & 1) << 2) | \
-                    (((byte4 >> bit) & 1) << 3)
-            pixels.append(pixel)
-    return pixels
-```
+### 6.3 Working Code Patterns (Reference)
+
+**4bpp tile decode:** Each 8×8 tile is 32 bytes. Bitplanes are interleaved: bytes 0-15 hold planes 0-1, bytes 16-31 hold planes 2-3. See `core/tile_renderer.py` for implementation.
+
+**Savestate loading in Lua:** Must use exec callback, not direct call. See `docs/mesen2/MESEN2_LUA_API_LEARNINGS_DO_NOT_DELETE.md`.
 
 ---
 
-## 8. Key Files Created
+## 7. CONFIRMED WORKING SPRITE OFFSETS (December 2025)
 
-1. **Lua Scripts**:
-   - `mushroom_entering_monitor.lua` - Monitors room transition for sprite loading
-   - `mushroom_monitor_sprite_state.lua` - Monitors sprite when already visible
-   - `vram_write_monitor.lua` - Direct VRAM write monitoring
-
-2. **Python Scripts**:
-   - `find_mushroom_in_savestate.py` - Compares savestates to find sprite data
-   - `search_rom_for_mushroom.py` - Searches ROM for sprite patterns
-   - `visualize_sprite.py` - Converts binary to PNG
-
-3. **Data Files**:
-   - `mushroom_sprite_candidate_006A00.bin` - Extracted VRAM data
-   - Savestates: `Before.mss`, `Entering.mss`, `Sprite.mss`
-
----
-
-## 9. Unresolved Challenges
-
-### 9.1 Sprite Loading Mechanism
-- The 87 7E pattern suggests we're seeing initialized/cleared VRAM, not the actual sprite
-- Need to catch the exact moment when real sprite data is written
-- Sprite might be cached elsewhere and copied during screen refresh
-
-### 9.2 DMA Monitoring
-- Cannot reliably read VRAM destination address during DMA
-- Need alternative approach to track sprite transfers
-
-### 9.3 Compression
-- Mushroom sprite likely HAL compressed in ROM
-- Need to identify correct compression markers and offsets
-
----
-
-## 10. Next Steps Recommendations
-
-1. **Try Different Savestate Timing**:
-   - Create savestate during sprite animation frame
-   - Capture at different points in room transition
-
-2. **Monitor Different Memory Regions**:
-   - WRAM where sprites might be cached
-   - OAM (Object Attribute Memory) for sprite metadata
-
-3. **Pattern Matching Approach**:
-   - Extract actual mushroom pixels from screenshot
-   - Search ROM for those specific patterns
-   - Consider different compression methods
-
-4. **Manual Analysis**:
-   - Use Mesen2 debugger GUI to manually trace sprite loading
-   - Set breakpoints on VRAM writes to $6A00
-
-5. **Alternative Extraction** ✅ RESOLVED:
-   - ~~Try extracting all potential sprites in $300000-$310000 range~~ **Wrong region**
-   - **CORRECT**: Scan **0x180000-0x200000** range - this is where sprites actually are
-   - See Section 12 for confirmed working offsets
-
----
-
-## 11. Critical Insights
-
-1. **The Bridge Problem**: User correctly identified the core issue - "focusing too much on cataloging, and not enough on the bridge between sprite you can see and rom position"
-
-2. **Savestate Approach Works**: Comparing savestates successfully identified where sprite should be in VRAM
-
-3. **Timing is Everything**: Sprite loading happens at specific moments (room transitions, spawn events) - must catch exact timing
-
-4. **Tool Limitations**: Mesen2 Lua API has build-specific quirks; see `docs/mesen2/MESEN2_LUA_API_LEARNINGS_DO_NOT_DELETE.md`
-
-5. **Address Translation (Debugger-Specific)**: The Mesen PRG-ROM view trick (−0x300000) worked for specific debugger sessions; it is not cartridge mapping. See Section 13.2 for the real SA-1 ROM mapping.
-
----
-
-## 12. CONFIRMED WORKING SPRITE OFFSETS (December 2025)
-
-### 12.1 Successful Sprite Extraction Workflow
+### 7.1 Successful Sprite Extraction Workflow
 
 **What finally worked:**
 1. Use `exhal` tool directly on ROM at offsets in the **0x180000-0x1C0000 region**
@@ -383,7 +158,7 @@ renderer = TileRenderer()
 img = renderer.render_tiles(data, width_tiles=16, height_tiles=22, palette_index=8)
 ```
 
-### 12.2 Known Working ROM Offsets
+### 7.2 Known Working ROM Offsets
 
 | Offset | Content | Size | Tiles | Notes |
 |--------|---------|------|-------|-------|
@@ -393,22 +168,25 @@ img = renderer.render_tiles(data, width_tiles=16, height_tiles=22, palette_index
 | 0x190000 | Background tiles | 15,488 bytes | 484 | Trees, terrain, environment |
 | 0x1C0000 | Background gradients | 11,392 bytes | 356 | Sky/water textures |
 | 0x280000 | Sprites | 1,185 bytes | 37 | Valid sprite data |
-| 0xE0000 | Title screen/fonts | 57,290 bytes | 1,790 | "KIRBY" text, UI fonts |
+| 0x110000 | Extra sprites | 3,696 bytes | 115 | Valid HAL data |
+| 0x120000 | Extra sprites | 2,952 bytes | 92 | Valid HAL data |
+| 0x140000 | Extra sprites | ~3,000 bytes | ~90 | Valid HAL data |
+| 0x0E0000 | Title screen/fonts | 57,290 bytes | 1,790 | "KIRBY" text, UI fonts |
 
-### 12.3 Offsets That Need Care
+### 7.3 Offsets That Need Care
 
 | Offset | Notes |
 |--------|-------|
 | 0x0C8000 | Not valid HAL-compressed data at this exact offset |
 | 0x0C0000, 0x0CC100, 0x07B500 | Pass validation metrics - may need correct palette/arrangement |
 
-### 12.4 Why Previous "Perfect Score" Extractions Failed
+### 7.4 Why Previous "Perfect Score" Extractions Failed
 
 The SpriteFinder validation metrics (coherence, entropy, edges, diversity) detect **structurally sprite-like** data but cannot distinguish real game art from random data that happens to have similar properties.
 
 **Key insight**: Visual verification is essential. Validation scores alone are insufficient.
 
-### 12.5 Recommended Scan Strategy
+### 7.5 Recommended Scan Strategy
 
 1. **Start with known good region**: 0x180000-0x200000
 2. **Scan in 0x4000 (16KB) steps** within sprite areas
@@ -416,7 +194,7 @@ The SpriteFinder validation metrics (coherence, entropy, edges, diversity) detec
 4. **Verify visually** with grayscale render before applying palettes
 5. **Good compression ratios**: 10:1 to 30:1 indicate real sprite data
 
-### 12.6 Palette Reference
+### 7.6 Palette Reference
 
 | Palette | Use For |
 |---------|---------|
@@ -432,16 +210,16 @@ The SpriteFinder validation metrics (coherence, entropy, edges, diversity) detec
 
 ---
 
-## 13. KIRBY SUPER STAR SA-1 MEMORY MAPPING (CRITICAL)
+## 8. KIRBY SUPER STAR SA-1 MEMORY MAPPING (CRITICAL)
 
-### 13.1 SA-1 Overview
+### 8.1 SA-1 Overview
 
 Kirby Super Star (USA) uses the **SA-1 enhancement chip**:
 - ROM Header map mode: **$23** (SA-1)
 - ROM type: **$35** (SA-1 + RAM + Battery)
 - ROM size: 4MB (0x400000 bytes)
 
-### 13.2 SA-1 ROM Mapping Formula
+### 8.2 SA-1 ROM Mapping Formula
 
 **CPU Address → ROM Offset:**
 ```
@@ -455,7 +233,7 @@ CPU $E00000 → ROM $200000
 CPU $F00000 → ROM $300000
 ```
 
-### 13.3 Verified ROM Access Examples
+### 8.3 Verified ROM Access Examples
 
 | ROM Offset | SA-1 CPU Address | Content |
 |------------|------------------|---------|
@@ -466,7 +244,7 @@ CPU $F00000 → ROM $300000
 | $200000 | $E00000 | Backgrounds |
 | $300000 | $F00000 | Music/SFX |
 
-### 13.4 Why Standard LoROM Mapping Fails
+### 8.4 Why Standard LoROM Mapping Fails
 
 Standard LoROM uses banks $00-$3F at $8000-$FFFF:
 - CPU $368000 should map to ROM $1B0000
@@ -474,7 +252,7 @@ Standard LoROM uses banks $00-$3F at $8000-$FFFF:
 
 SA-1 games use banks $C0-$FF for direct ROM access, not banks $00-$3F.
 
-### 13.5 Callback Registration for SA-1 ROM Reads
+### 8.5 Callback Registration for SA-1 ROM Reads
 
 ```lua
 -- To monitor reads from ROM $1A0000-$1FFFFF:
@@ -483,7 +261,7 @@ emu.addMemoryCallback(function(addr, value)
     -- Verify actual address width on your build before doing bank math.
     local rom_offset = ((addr >> 16) - 0xC0) << 16 | (addr & 0xFFFF)
     -- Process rom_offset
-end, emu.callbackType.read, 0xDA0000, 0xDFFFFF, emu.memType.snesMemory)
+end, emu.callbackType.read, 0xDA0000, 0xDFFFFF, emu.memType.snesMemory)  -- memType optional on some builds
 ```
 
 **Address-width caveat:** Mesen2 may pass 16-bit or linearized addresses depending on
@@ -491,9 +269,9 @@ end, emu.callbackType.read, 0xDA0000, 0xDFFFFF, emu.memType.snesMemory)
 
 ---
 
-## 14. SPRITE GRAPHICS DATA FLOW (SA-1 Games)
+## 9. SPRITE GRAPHICS DATA FLOW (SA-1 Games)
 
-### 14.1 The Decompression Pipeline
+### 9.1 The Decompression Pipeline
 
 ```
 ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
@@ -502,7 +280,7 @@ ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
    (use sa1Memory)    (runs own code)           (can trace DMA)
 ```
 
-### 14.2 Why We Can't Easily Track ROM→VRAM
+### 9.2 Why We Can't Easily Track ROM→VRAM
 
 1. **SA-1 coprocessor handles decompression** - runs independently from main CPU
 2. **Callbacks on `snesMemory` only capture main CPU activity** - SA-1 ROM reads require
@@ -512,7 +290,7 @@ ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
 **Note**: SA-1 activity is not truly "invisible" - it requires using `emu.memType.sa1Memory`
 callbacks instead of main CPU callbacks. We did not explore this approach in depth.
 
-### 14.3 DMA Observations
+### 9.3 DMA Observations
 
 From 900 frames of Kirby Super Star (observed behavior, not a universal law):
 ```
@@ -528,7 +306,7 @@ of a full 24-bit address. Don't generalize from these numbers.
 the "ROM→VRAM" entries above may be incomplete addresses. Sprite data isn't visible at the
 DMA stage because decompression happens earlier (SA-1 → WRAM → DMA → VRAM).
 
-### 14.4 Practical Implication
+### 9.4 Practical Implication
 
 **In this game, we could not trace ROM offsets via DMA monitoring alone.**
 
@@ -539,9 +317,9 @@ Alternative approaches (what we used instead):
 
 ---
 
-## 15. WORKING SPRITE CAPTURE SYSTEM
+## 10. WORKING SPRITE CAPTURE SYSTEM
 
-### 15.1 F9 Hotkey Capture Script
+### 10.1 F9 Hotkey Capture Script
 
 Located at: `mesen2_integration/lua_scripts/mesen2_sprite_capture.lua`
 
@@ -551,7 +329,7 @@ Located at: `mesen2_integration/lua_scripts/mesen2_sprite_capture.lua`
 - Sprite palettes (8 palettes × 16 colors)
 - OBSEL settings (sprite sizes, tile base)
 
-### 15.2 Output Format
+### 10.2 Output Format
 
 ```json
 {
@@ -572,13 +350,13 @@ Located at: `mesen2_integration/lua_scripts/mesen2_sprite_capture.lua`
 }
 ```
 
-### 15.3 Exchange Directory
+### 10.3 Exchange Directory
 
 Files written to: `mesen2_exchange/`
 - `sprite_capture_<timestamp>.json` - Full capture data
 - `capture_summary.txt` - Human-readable summary
 
-### 15.4 OAM Entry Structure (SNES)
+### 10.4 OAM Entry Structure (SNES)
 
 ```
 Main table (544 bytes total):
@@ -597,7 +375,7 @@ High table (bytes 512-543):
 **Addressing note:** In Mesen2, OAM is byte-addressed. `emu.read(i, emu.memType.snesSpriteRam)`
 returns a byte; the high table starts at byte offset 0x200.
 
-### 15.5 OBSEL Sprite Size Table
+### 10.5 OBSEL Sprite Size Table
 
 | size_select | Small | Large |
 |-------------|-------|-------|
@@ -612,16 +390,16 @@ returns a byte; the high table starts at byte offset 0x200.
 
 ---
 
-## 16. TESTRUNNER MODE (Headless Automation)
+## 11. TESTRUNNER MODE (Headless Automation)
 
-### 16.1 Command Line Usage
+### 11.1 Command Line Usage
 
 ```bash
 # From PowerShell (NOT cmd.exe - cmd doesn't work from WSL)
 powershell.exe -Command "cd 'C:\path\to\spritepal'; .\tools\mesen2\Mesen2.exe --testrunner 'roms\game.sfc' 'script.lua'"
 ```
 
-### 16.2 Script Requirements for Testrunner
+### 11.2 Script Requirements for Testrunner
 
 ```lua
 -- Script MUST call emu.stop() to exit
@@ -635,7 +413,7 @@ emu.addEventCallback(function()
 end, emu.eventType.endFrame)
 ```
 
-### 16.3 File I/O in Testrunner
+### 11.3 File I/O in Testrunner
 
 ```lua
 -- MUST use full Windows paths (not WSL paths)
@@ -644,7 +422,7 @@ f:write("content")
 f:close()
 ```
 
-### 16.4 Headless Screenshot Capture
+### 11.4 Headless Screenshot Capture
 
 `emu.takeScreenshot()` returns PNG bytes and works in `--testrunner` mode.
 
@@ -657,9 +435,9 @@ file:close()
 
 ---
 
-## 17. VRAM WORD-ADDRESSING (CRITICAL BUG FIX)
+## 12. VRAM WORD-ADDRESSING (CRITICAL BUG FIX)
 
-### 17.1 The Problem
+### 12.1 The Problem
 
 **SNES VRAM is word-addressed (16-bit), NOT byte-addressed!**
 
@@ -671,7 +449,7 @@ end
 -- Result: Each "byte" is actually a 16-bit word, giving wrong data
 ```
 
-### 17.2 The Fix
+### 12.2 The Fix
 
 ```lua
 -- CORRECT: VRAM is word-addressed
@@ -683,14 +461,14 @@ for i = 0, 15 do  -- 16 words = 32 bytes
 end
 ```
 
-### 17.3 How to Detect the Bug
+### 12.3 How to Detect the Bug
 
 If captured tile data shows every other byte missing/zero, byte-swapped words, or repeating
 2-byte patterns, double-check word addressing and stride. A strictly sequential
 `00 01 02 03 ...` pattern usually indicates you're accidentally emitting a loop index or
 address counter, not VRAM bytes.
 
-### 17.4 Follow-up Diagnostic: VRAM vs OAM Tile Mapping
+### 12.4 Follow-up Diagnostic: VRAM vs OAM Tile Mapping
 
 - Full VRAM dumps contained tiles that matched the ROM hash database, so VRAM reads and hashing are working.
 - OAM-derived tiles from the same capture still produced no hash matches.
@@ -699,9 +477,9 @@ address counter, not VRAM bytes.
 
 ---
 
-## 18. TILE HASH DATABASE (IMPLEMENTED)
+## 13. TILE HASH DATABASE (IMPLEMENTED)
 
-### 18.1 Purpose
+### 13.1 Purpose
 
 Instead of parsing complex game pointer tables, we:
 1. Pre-extract tiles from known ROM offsets (decompress with HAL)
@@ -710,7 +488,7 @@ Instead of parsing complex game pointer tables, we:
 4. When VRAM tiles are captured, hash and lookup to find ROM source candidates
 5. Aggregate votes across the capture to produce a **ranked** set of ROM offsets
 
-### 18.2 Implementation Files
+### 13.2 Implementation Files
 
 ```
 core/mesen_integration/
@@ -719,7 +497,7 @@ core/mesen_integration/
 ├── gfx_pointer_table.py       # ROM pointer table analysis (partial)
 ```
 
-### 18.3 Usage
+### 13.3 Usage
 
 ```python
 from core.mesen_integration import TileHashDatabase, CaptureToROMMapper
@@ -737,7 +515,7 @@ print(f"Primary ROM offset (top vote): ${result.primary_rom_offset:06X}")
 print(f"Offset summary: {result.rom_offset_summary}")
 ```
 
-### 18.4 Database Statistics (Kirby Super Star)
+### 13.4 Database Statistics (Kirby Super Star)
 
 | ROM Offset | Description | Tiles | Unique Hashes |
 |------------|-------------|-------|---------------|
@@ -750,7 +528,7 @@ print(f"Offset summary: {result.rom_offset_summary}")
 | $0E0000 | Title screen/fonts | 1790 | ~950 |
 | **Total** | | **3936** | **2643** |
 
-### 18.5 Collision Handling (Required)
+### 13.5 Collision Handling (Required)
 
 Tile hashes are **not unique**. Many tiles are solid fills or common patterns and appear
 in multiple ROM regions. Treat matching as a **voting problem**:
@@ -761,78 +539,30 @@ in multiple ROM regions. Treat matching as a **voting problem**:
 
 ---
 
-## 19. GFX POINTER TABLE ANALYSIS
+## 14. GFX POINTER TABLE (Limited Use)
 
-### 19.1 Location
+**Location:** GFX pointer table at ROM $3F0002, level pointers at $3F000C.
 
-- **GFX pointer table**: $FF:0002 (ROM $3F0002)
-- **Level pointer table**: $FF:000C (ROM $3F000C)
+**Finding:** 24-bit pointers to sprite banks exist (e.g., $040A4A → CPU $DA0000 → ROM $1A0000), but **no clean "sprite ID → ROM offset" mapping** exists. The SA-1 coprocessor makes tracing impractical.
 
-### 19.2 Structure
-
-The table at $3F0002 contains 16-bit values that appear to be **relative offsets**
-within bank $3F, not absolute addresses:
-
-```
-$3F0002: 0596 089C 013F 0102 0043 0022 002A 0038
-$3F0012: 0040 0044 0056 0068 006A 006C 0076 007C
-```
-
-### 19.3 Sprite Address References Found
-
-24-bit pointers to sprite banks exist throughout the ROM. Examples at $040A4A:
-
-```
-$040A4A: CPU $DA0000 -> ROM $1A0000 (Enemy sprites)
-$040A56: CPU $DC0000 -> ROM $1C0000 (Backgrounds)
-$0409B4: CPU $D80000 -> ROM $180000 (Items/UI)
-```
-
-### 19.4 Limitation
-
-**No clean mapping from "sprite ID" → ROM offset exists in the pointer table.**
-The game uses complex graphics loading via SA-1 coprocessor that is not easily traced.
-
-The tile hash database approach (Section 18) is more practical.
+**Recommendation:** Use the tile hash database (Section 13) instead of parsing pointer tables.
 
 ---
 
-## 20. ADDITIONAL SPRITE OFFSETS (DISCOVERED)
+## 15. COMPLETE WORKFLOW
 
-### 20.1 Extra Sprite Blocks
-
-| ROM Offset | Size (bytes) | Tiles | Notes |
-|------------|--------------|-------|-------|
-| $110000 | 3,696 | 115 | Valid HAL data |
-| $120000 | 2,952 | 92 | Valid HAL data |
-| $140000 | ~3,000 | ~90 | Valid HAL data |
-
-### 20.2 How to Add to Database
-
-```python
-additional_offsets = [
-    (0x110000, "Extra sprites 1"),
-    (0x120000, "Extra sprites 2"),
-]
-db.build_database(additional_offsets=additional_offsets)
-```
-
----
-
-## 21. COMPLETE WORKFLOW
-
-### 21.1 Setup (One-time)
+### 15.1 Setup (One-time)
 
 1. Run `TileHashDatabase.build_database()` on the ROM
 2. Save database JSON for reuse
 
-### 21.2 During Gameplay
+### 15.2 During Gameplay
 
 1. Run Mesen 2 with `mesen2_sprite_capture.lua`
 2. Press **F9** to capture visible sprites
 3. Lua writes `sprite_capture.json` to exchange directory
 
-### 21.3 In SpritePal
+### 15.3 In SpritePal
 
 1. Load `sprite_capture.json` with `MesenCaptureParser`
 2. Use `CaptureToROMMapper` to find ROM offsets
@@ -841,7 +571,7 @@ db.build_database(additional_offsets=additional_offsets)
 
 ---
 
-## 22. GLOSSARY
+## 16. GLOSSARY
 
 Quick reference for terms used throughout this document. See Section 2 for address conventions.
 
@@ -861,12 +591,12 @@ Quick reference for terms used throughout this document. See Section 2 for addre
 
 ---
 
-## 23. TILE HASH DATABASE ASSUMPTIONS
+## 17. TILE HASH DATABASE ASSUMPTIONS
 
-The tile hash database (Section 18) was built with these assumptions. Violating them
+The tile hash database (Section 13) was built with these assumptions. Violating them
 produces hash mismatches.
 
-### 23.1 Hash Computation
+### 17.1 Hash Computation
 
 | Property | Value | Notes |
 |----------|-------|-------|
@@ -875,15 +605,15 @@ produces hash mismatches.
 | Flip normalization | **None** | Horizontally/vertically flipped tiles have different hashes |
 | Palette independence | **Yes** | Hashes ignore palette; same tile with different palette = same hash |
 
-### 23.2 Multi-Tile Sprites
+### 17.2 Multi-Tile Sprites
 
 | Property | Value | Notes |
 |----------|-------|-------|
 | 16×16 sprites | Hashed as 4 separate 8×8 tiles | Each tile in the 2×2 grid is independent |
-| Tile order | 16×16: TL, TR, BL, BR; 32×32+: 16×16 block layout | See Section 24.4 |
+| Tile order | 16×16: TL, TR, BL, BR; 32×32+: 16×16 block layout | See Section 18.4 |
 | Combined hash | Not used | We match individual tiles, not sprite groups |
 
-### 23.3 Known Limitations
+### 17.3 Known Limitations
 
 1. **No flip detection:** A sprite flipped horizontally in-game won't match its unflipped ROM source.
 2. **No partial matches:** If VRAM contains corrupted or partially loaded tiles, no match.
@@ -891,11 +621,11 @@ produces hash mismatches.
 
 ---
 
-## 24. OAM TILE → VRAM ADDRESS MATH (CANONICAL)
+## 18. OAM TILE → VRAM ADDRESS MATH (CANONICAL)
 
 This is the formula for converting an OAM sprite entry to a VRAM tile address. **All values are in VRAM word addresses** (what `emu.read(addr, snesVideoRam)` expects).
 
-### 24.1 The Formula
+### 18.1 The Formula
 
 ```lua
 -- CANONICAL: All arithmetic in VRAM word addresses
@@ -910,7 +640,7 @@ local tile_word  = tile_index * 16                 -- Each tile = 32 bytes = 16 
 local vram_word = base_word + table_word + tile_word
 ```
 
-### 24.2 Worked Example
+### 18.2 Worked Example
 
 Given capture data:
 - OBSEL = 0x02 (name_base = 2)
@@ -926,7 +656,7 @@ vram_word  = 0x2000 + 0x1000 + 0x0400 = 0x3400
 vram_byte  = 0x3400 * 2 = 0x6800  (for hex dumps/humans)
 ```
 
-### 24.3 Common Mistakes
+### 18.3 Common Mistakes
 
 | Mistake | Symptom | Fix |
 |---------|---------|-----|
@@ -935,7 +665,7 @@ vram_byte  = 0x3400 * 2 = 0x6800  (for hex dumps/humans)
 | Forgetting tile_hi_bit | Wrong pattern table entirely | Always extract bit 0 from OAM attr |
 | Using name_base << 14 | Off-by-2x | Use `name_base * 0x1000` (word address) |
 
-### 24.4 For 16×16 and Larger Sprites
+### 18.4 For 16×16 and Larger Sprites
 
 For sprites larger than 8×8, OAM specifies the **top-left tile**. Derive subtiles:
 
@@ -981,9 +711,9 @@ If this layout doesn't match, log known tiles to derive the true ordering.
 
 ---
 
-## 25. CGRAM (PALETTE) FORMAT
+## 19. CGRAM (PALETTE) FORMAT
 
-### 25.1 SNES Color Format
+### 19.1 SNES Color Format
 
 CGRAM entries are **15-bit BGR** (not RGB):
 
@@ -993,12 +723,12 @@ Bit:  15  14-10   9-5    4-0
           (5b)   (5b)   (5b)
 ```
 
-### 25.2 Addressing in Mesen2
+### 19.2 Addressing in Mesen2
 
 Observed behavior: `emu.read(addr, emu.memType.snesCgRam)` returns a byte and CGRAM is
 byte-addressed. Each color is two bytes at `color_index * 2` (little-endian).
 
-### 25.3 Conversion Code
+### 19.3 Conversion Code
 
 ```python
 def cgram_to_rgb(cgram_word: int) -> tuple[int, int, int]:
@@ -1010,7 +740,7 @@ def cgram_to_rgb(cgram_word: int) -> tuple[int, int, int]:
     return (r5 << 3) | (r5 >> 2), (g5 << 3) | (g5 >> 2), (b5 << 3) | (b5 >> 2)
 ```
 
-### 25.4 Sprite Palettes
+### 19.4 Sprite Palettes
 
 Sprites use CGRAM entries 128-255 (palettes 8-15). Each OAM palette index (0-7) maps to:
 ```
@@ -1019,19 +749,19 @@ cgram_index = 128 + (oam_palette * 16) + color_index
 
 ---
 
-## 26. GENERALITY TAGS
+## 20. GENERALITY TAGS
 
-### 26.1 GENERAL (Applies to Most SNES Games)
+### 20.1 GENERAL (Applies to Most SNES Games)
 
 - VRAM word-addressing for `emu.read(..., snesVideoRam)`
-- OAM tile → VRAM formula (Section 24)
+- OAM tile → VRAM formula (Section 18)
 - CGRAM 15-bit BGR format
 - `emu.callbackType` values (observed: write=1, exec=2; re-check per build)
 - `emu.memType.snes*` naming convention
 - OAM structure (544 bytes, high table format)
 - OBSEL size modes table
 
-### 26.2 KIRBY SUPER STAR / SA-1 SPECIFIC
+### 20.2 KIRBY SUPER STAR / SA-1 SPECIFIC
 
 - Working ROM offsets ($1A0000, $1B0000, etc.)
 - SA-1 bank mapping ($C0-$FF → ROM)
@@ -1040,7 +770,7 @@ cgram_index = 128 + (oam_palette * 16) + color_index
 - Tile hash database contents
 - Mushroom sprite findings
 
-### 26.3 BUILD-SPECIFIC (Mesen2 2.1.1+137ae7c)
+### 20.3 BUILD-SPECIFIC (Mesen2 2.1.1+137ae7c)
 
 - Savestate format/offsets
 - `emu.loadSavestate()` only from exec callbacks
@@ -1050,13 +780,10 @@ cgram_index = 128 + (oam_palette * 16) + color_index
 ---
 
 *Last Updated: December 29, 2025*
-- Added Address & Units Rules section (Section 2)
-- Added glossary (Section 22)
-- Added tile hash database assumptions (Section 23)
-- Added canonical OAM→VRAM formula (Section 24)
-- Added CGRAM format (Section 25)
-- Added generality tags (Section 26)
-- Fixed OBSEL tile index bit from 0x2000→0x1000 words
-- Strengthened warnings throughout
+- Condensed document from ~1060 lines to ~790 lines
+- Merged investigation dead-ends into Section 6 (Investigation History)
+- Condensed savestate, DMA monitoring, and pointer table sections
+- Renumbered sections 1-20 for consistency
+- Fixed internal section references
 
 **DO NOT DELETE - This document contains critical technical discoveries essential for the sprite discovery workflow**
