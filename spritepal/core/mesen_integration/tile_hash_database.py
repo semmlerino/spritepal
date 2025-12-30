@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from core.hal_compression import HALCompressor
+from core.rom_validator import ROMHeaderError, ROMValidator
+from utils.rom_utils import detect_smc_offset_from_size
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -90,6 +92,25 @@ class TileHashDatabase:
         self._hal = HALCompressor()
         self._hash_to_match: dict[str, list[TileMatch]] = {}
         self._blocks: list[ROMSpriteBlock] = []
+        self._rom_header_offset = 0
+        self._rom_checksum: int | None = None
+        self._rom_title: str | None = None
+        self._rom_size = self.rom_path.stat().st_size if self.rom_path.exists() else 0
+
+        if self.rom_path.exists():
+            try:
+                header, smc_offset = ROMValidator.validate_rom_header(str(self.rom_path))
+                self._rom_header_offset = smc_offset
+                self._rom_checksum = header.checksum
+                self._rom_title = header.title
+            except ROMHeaderError as exc:
+                self._rom_header_offset = detect_smc_offset_from_size(self._rom_size)
+                logger.warning(
+                    "ROM header validation failed for %s (%s). Using size-based SMC detection (%d bytes).",
+                    self.rom_path,
+                    exc,
+                    self._rom_header_offset,
+                )
 
     def build_database(
         self,
@@ -115,6 +136,8 @@ class TileHashDatabase:
         self._blocks.clear()
 
         logger.info(f"Building tile database from {len(offsets)} ROM offsets")
+        if self._rom_header_offset:
+            logger.info(f"Adjusting ROM offsets by {self._rom_header_offset} bytes for SMC header")
 
         for i, (offset, description) in enumerate(offsets):
             if callable(progress_callback):
@@ -131,10 +154,11 @@ class TileHashDatabase:
 
     def _index_offset(self, rom_offset: int, description: str) -> int:
         """Index tiles from a single ROM offset."""
+        file_offset = rom_offset + self._rom_header_offset
         try:
-            data = self._hal.decompress_from_rom(str(self.rom_path), rom_offset)
+            data = self._hal.decompress_from_rom(str(self.rom_path), file_offset)
         except Exception as e:
-            logger.debug(f"Failed to decompress ${rom_offset:06X}: {e}")
+            logger.warning(f"Failed to decompress ${rom_offset:06X}: {e}")
             return 0
 
         if len(data) < BYTES_PER_TILE:
@@ -274,6 +298,12 @@ class TileHashDatabase:
         """
         data = {
             "rom_path": str(self.rom_path),
+            "metadata": {
+                "rom_title": self._rom_title,
+                "rom_checksum": self._rom_checksum,
+                "rom_size": self._rom_size,
+                "rom_header_offset": self._rom_header_offset,
+            },
             "blocks": [
                 {
                     "rom_offset": b.rom_offset,
@@ -299,6 +329,23 @@ class TileHashDatabase:
 
         self._hash_to_match.clear()
         self._blocks.clear()
+        metadata = data.get("metadata", {})
+        if metadata and self.rom_path.exists():
+            expected_checksum = metadata.get("rom_checksum")
+            expected_header_offset = metadata.get("rom_header_offset")
+            if expected_checksum is not None and self._rom_checksum is not None:
+                if expected_checksum != self._rom_checksum:
+                    logger.warning(
+                        "Tile DB ROM checksum mismatch (db=0x%04X, rom=0x%04X).",
+                        expected_checksum,
+                        self._rom_checksum,
+                    )
+            if expected_header_offset is not None and expected_header_offset != self._rom_header_offset:
+                logger.warning(
+                    "Tile DB header offset mismatch (db=%s, rom=%s).",
+                    expected_header_offset,
+                    self._rom_header_offset,
+                )
 
         for block_data in data["blocks"]:
             block = ROMSpriteBlock(

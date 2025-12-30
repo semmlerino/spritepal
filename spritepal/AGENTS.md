@@ -43,7 +43,6 @@ Run from `spritepal/`:
   - `Mesen2/Core/Debugger/ScriptingContext.cpp`
   - `Mesen2/UI/Utilities/TestRunner.cs`
   - `Mesen2/UI/Utilities/CommandLineHelper.cs`
-  - `docs/LuaApi.cpp` (local snapshot for quick reference)
 - If behavior is still unclear, capture a headless screenshot with `emu.takeScreenshot()` to
   ground truth the state before drawing conclusions.
 - Probe-first workflow: run `mesen2_integration/lua_scripts/mesen2_preflight_probe.lua` and inspect

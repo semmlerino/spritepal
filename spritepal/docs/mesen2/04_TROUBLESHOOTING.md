@@ -39,6 +39,8 @@ python3 scripts/analyze_capture_quality.py mesen2_exchange/door_transition_captu
 - Fix:
   - Compare `matched_tiles` vs `scored_tiles`
   - Check unique-byte distribution and odd-byte sanity for the capture
+  - If VRAM diff shows WRAM staging, compare WRAM tiles to VRAM/DB:
+    `python3 scripts/analyze_wram_staging.py --capture ... --wram ... --database ... --rom ...`
   - Expand the tile DB with offsets from the relevant state
   - Verify the ROM header/CRC and capture timing (e.g., later frames)
 
@@ -56,6 +58,10 @@ python3 scripts/analyze_capture_quality.py mesen2_exchange/door_transition_captu
 ### Symptom: Matches exist but sprites are mirrored
 - Likely cause: flip normalization disabled
 - Fix: ensure lookup includes N/H/V/HV flips
+
+### Symptom: Scores drop sharply when flips are enabled
+- Likely cause: flip-variant lookups inflate candidate counts and reduce weights
+- Fix: keep flip lookup optional and use it only for targeted debugging
 
 ## Guardrail
 If capture tiles are invalid (half-zero or wrong length), **stop** and fix capture first.

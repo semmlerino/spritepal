@@ -34,6 +34,8 @@ These match the default tile DB (`TileHashDatabase.KNOWN_SPRITE_OFFSETS`):
 - Current pipeline assumes **4bpp** sprite tiles (32 bytes).
 - ROM offsets assume a **headerless** ROM image. If the file has a 512-byte copier
   header, offsets shift by `0x200` and must be adjusted or stripped.
+  - Tile DB build now auto-adjusts for SMC headers and stores the header offset in metadata;
+    rebuild the DB if you switch ROM files.
 
 ## Caveats
 - SA-1 ROM address mapping can vary by configuration; validate against `emu.cpuType.sa1` probes

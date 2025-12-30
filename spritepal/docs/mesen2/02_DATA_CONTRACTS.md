@@ -60,8 +60,9 @@ This document defines the **canonical schema** for capture and mapping data.
 ## Tile Hash Contract (4bpp)
 - Tile size: **32 bytes** (4bpp). Sprites (OBJ) are always 4bpp; other bpp modes apply to BG tiles.
 - Hash algorithm: **MD5** over raw 32-byte tile data.
-- Flip normalization: lookup includes **N/H/V/HV** variants; candidates are de-duplicated by
-  `(rom_offset, tile_index)`.
+- Flip normalization: optional lookup mode that tests **N/H/V/HV** variants; candidates are
+  de-duplicated by `(rom_offset, tile_index)`. Default mapping uses **unflipped** tiles
+  because OAM flip bits are applied at render time.
 - Low-information tiles may be ignored during scoring (**<= 2 unique byte values**).
 
 ## Mapper Output (CaptureMapResult)
@@ -69,3 +70,10 @@ These fields are produced by `CaptureToROMMapper.map_capture()` for diagnostics 
 - `matched_tiles`: tiles with any hash hits (including low-info tiles)
 - `scored_tiles`: tiles that contributed positive weight to scoring
 - `ignored_low_info_tiles`: tiles ignored due to low-information heuristic
+
+## tile_hash_database.json
+Database files include metadata to guard against ROM/header mismatches.
+- `metadata.rom_title` (string | null)
+- `metadata.rom_checksum` (int | null)
+- `metadata.rom_size` (int)
+- `metadata.rom_header_offset` (int): 0 or 512 (SMC header)

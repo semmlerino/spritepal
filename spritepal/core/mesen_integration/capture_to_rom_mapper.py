@@ -123,6 +123,7 @@ class CaptureToROMMapper:
         self,
         rom_path: str | Path,
         database_path: str | Path | None = None,
+        include_flips: bool = False,
     ):
         """
         Initialize mapper.
@@ -130,10 +131,12 @@ class CaptureToROMMapper:
         Args:
             rom_path: Path to ROM file
             database_path: Optional path to pre-built tile hash database JSON
+            include_flips: If True, hash lookups include H/V/HV variants
         """
         self.rom_path = Path(rom_path)
         self.database_path = Path(database_path) if database_path else None
         self._db: TileHashDatabase | None = None
+        self.include_flips = include_flips
 
     def build_database(
         self,
@@ -236,7 +239,7 @@ class CaptureToROMMapper:
 
         for tile in entry.tiles:
             tile_bytes = tile.data_bytes
-            matches = self._db.lookup_tile_matches(tile_bytes, include_flips=True)  # type: ignore[union-attr]
+            matches = self._db.lookup_tile_matches(tile_bytes, include_flips=self.include_flips)  # type: ignore[union-attr]
             tile_matches.append(matches)
             if matches:
                 matched_tiles += 1
@@ -283,7 +286,7 @@ class CaptureToROMMapper:
         """
         if self._db is None:
             raise RuntimeError("Database not built. Call build_database() first.")
-        return self._db.lookup_tile(tile_data, include_flips=True)
+        return self._db.lookup_tile(tile_data, include_flips=self.include_flips)
 
     def get_database_stats(self) -> dict[str, object]:
         """Get tile hash database statistics."""
@@ -328,6 +331,7 @@ class CaptureToROMMapper:
 def create_mapper_for_kirby(
     rom_path: str | Path,
     cache_dir: str | Path | None = None,
+    include_flips: bool = False,
 ) -> CaptureToROMMapper:
     """
     Convenience function to create a mapper for Kirby Super Star.
@@ -343,6 +347,6 @@ def create_mapper_for_kirby(
     if cache_dir:
         db_path = Path(cache_dir) / "kirby_tile_database.json"
 
-    mapper = CaptureToROMMapper(rom_path, db_path)
+    mapper = CaptureToROMMapper(rom_path, db_path, include_flips=include_flips)
     mapper.build_database()
     return mapper

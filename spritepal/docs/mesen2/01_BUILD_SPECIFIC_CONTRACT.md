@@ -39,6 +39,10 @@ the source region (e.g., WRAM/BW-RAM) instead of absolute ROM offsets.
 
 This is an API behavior, not SNES hardware behavior (see `00_STABLE_SNES_FACTS.md`).
 
+## Source of Truth
+- The canonical Lua API implementation lives in `Mesen2/Core/Debugger/LuaApi.cpp`.
+- The old `docs/LuaApi.cpp` snapshot was removed; do not reference it.
+
 ## memType / cpuType Aliases
 Observed aliases in this build:
 - VRAM: `snesVram` or `snesVideoRam`
@@ -53,11 +57,19 @@ via S-CPU I/O registers ($2230-$224F) instead.
 - `--testrunner` expects **exactly one non-.lua file** (the ROM). Any `.lua` files are scripts.
 - No `--loadstate` switch. Load savestates via `emu.loadSavestate()` from an **exec callback**.
 - `emu.loadSavestate()` does **not** trigger `stateLoaded` in this build.
+- If exec-based frame counting stalls, set `FRAME_EVENT=endFrame` in the probe. End-frame callbacks
+  continued to fire after load in the latest run and were required for VRAM diff output.
 
 ## DMA/SA-1 Probe Script
 Use `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` to log:
 - S-CPU DMA/HDMA activity (source/dest and VRAM address)
 - SA-1 DMA control and character conversion register writes
+- VRAM diff + WRAM staging dumps when `VRAM_DIFF=1` (default) and `WRAM_DUMP_ON_VRAM_DIFF=1`
+
+Useful env toggles:
+- `WRAM_DUMP_START` (default `0x2000`) and `WRAM_DUMP_SIZE` (default `0x8000`)
+- `WRAM_DUMP_ABS_START` to force absolute addressing (uses `snesMemory`)
+- `WRAM_WATCH_WRITES=1` for per-frame WRAM write summaries (range defaults to dump window)
 
 ## WSL Interop Notes
 - Use Windows paths in Lua file I/O (`C:\...`).

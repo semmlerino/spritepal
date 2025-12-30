@@ -74,6 +74,8 @@ def _build_mapper(
         return None
 
     if database_path and database_path.exists():
+        if not rom_path:
+            print("WARNING: ROM path not provided; skipping ROM/header verification for database.")
         rom_hint = rom_path or database_path
         mapper = CaptureToROMMapper(rom_hint, database_path)
         mapper.build_database()
