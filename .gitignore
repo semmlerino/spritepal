@@ -246,6 +246,10 @@ mesen2_integration/
 # But keep spritepal docs about Mesen2
 !spritepal/docs/mesen2/
 !spritepal/docs/mesen2/*.md
+# And keep lua scripts for Mesen2 integration
+!spritepal/mesen2_integration/
+!spritepal/mesen2_integration/lua_scripts/
+!spritepal/mesen2_integration/lua_scripts/*.lua
 # And keep Mesen2 source code for reference
 !spritepal/Mesen2/
 !spritepal/Mesen2/Core/
