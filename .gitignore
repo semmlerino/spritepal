@@ -246,6 +246,13 @@ mesen2_integration/
 # But keep spritepal docs about Mesen2
 !spritepal/docs/mesen2/
 !spritepal/docs/mesen2/*.md
+# And keep Mesen2 source code for reference
+!spritepal/Mesen2/
+!spritepal/Mesen2/Core/
+!spritepal/Mesen2/Core/SNES/
+!spritepal/Mesen2/Core/SNES/**
+!spritepal/Mesen2/Core/Debugger/
+!spritepal/Mesen2/Core/Debugger/**
 
 # Extracted/generated sprite directories
 extracted_sprites/
