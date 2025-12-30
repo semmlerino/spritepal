@@ -40,7 +40,12 @@ logger = get_logger(__name__)
 
 @dataclass
 class SpriteCandidate:
-    """Represents a potential sprite found in ROM"""
+    """Represents a potential sprite found in ROM.
+
+    IMPORTANT: The confidence score detects sprite-like structure but CANNOT
+    distinguish real game sprites from structured noise. Visual verification
+    is essential before trusting any extraction result.
+    """
 
     offset: int
     compressed_size: int
@@ -49,6 +54,9 @@ class SpriteCandidate:
     confidence: float
     visual_metrics: dict[str, float]
     preview_path: str | None = None
+    # All candidates require visual verification - confidence scores
+    # cannot distinguish real sprites from structured noise
+    requires_visual_verification: bool = True
 
     def to_dict(self) -> dict[str, object]:
         """Convert to dictionary for JSON serialization."""
@@ -61,6 +69,7 @@ class SpriteCandidate:
             "confidence": round(self.confidence, 3),
             "visual_metrics": {k: round(v, 3) for k, v in self.visual_metrics.items()},
             "preview_path": self.preview_path,
+            "requires_visual_verification": self.requires_visual_verification,
         }
 
 
@@ -375,6 +384,16 @@ class SpriteFinder:
                 tile_count=tile_count,
                 tile_validation_score=tile_confidence,
                 command_analysis_score=command_score,
+            )
+
+        # Note: confidence scores detect sprite-like structure but cannot verify
+        # actual game content - visual verification is essential
+        if final_confidence >= 0.8:
+            logger.debug(
+                "High confidence (%.2f) at 0x%X but visual verification still required - "
+                "scores detect structure, not actual game sprites",
+                final_confidence,
+                offset,
             )
 
         return ScanResult(

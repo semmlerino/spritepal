@@ -47,7 +47,32 @@
           "expected_size": 8192,
           "notes": "Good quality (0.88) - standard sprite block"
         },
-        "_note": "Additional sprites found at offsets: 0x1A8000, 0x318000, 0x3A0000, 0x210000 with quality 0.81-0.85 (offsets aligned to tile boundaries)"
+        "Kirby_Main_Sprites": {
+          "offset": "0x1B0000",
+          "expected_size": 11264,
+          "notes": "CONFIRMED: Kirby character sprites - visually verified Dec 2025"
+        },
+        "Enemy_Sprites": {
+          "offset": "0x1A0000",
+          "expected_size": 11936,
+          "notes": "CONFIRMED: Enemy sprites with eyes - visually verified Dec 2025"
+        },
+        "Items_UI_Graphics": {
+          "offset": "0x180000",
+          "expected_size": 17408,
+          "notes": "CONFIRMED: Items and UI graphics - visually verified Dec 2025"
+        },
+        "Background_Tiles": {
+          "offset": "0x190000",
+          "expected_size": 15488,
+          "notes": "CONFIRMED: Background tiles (trees, terrain) - visually verified Dec 2025"
+        },
+        "Additional_Sprites": {
+          "offset": "0x280000",
+          "expected_size": 1185,
+          "notes": "CONFIRMED: Valid sprite data - visually verified Dec 2025"
+        },
+        "_note": "Offsets 0x180000-0x200000 are the primary sprite region. Visual verification is essential - quality scores alone cannot distinguish real sprites from noise."
       },
       "offset_variants": {
         "Europe": ["0x200000", "0x378000", "0x1D0000", "0x1C0000"],
@@ -97,6 +122,31 @@
           "offset": "0x3D8000",
           "expected_size": 8192,
           "notes": "Good quality (0.88) - standard sprite block"
+        },
+        "Kirby_Main_Sprites": {
+          "offset": "0x1B0000",
+          "expected_size": 11264,
+          "notes": "CONFIRMED: Kirby character sprites - visually verified Dec 2025"
+        },
+        "Enemy_Sprites": {
+          "offset": "0x1A0000",
+          "expected_size": 11936,
+          "notes": "CONFIRMED: Enemy sprites with eyes - visually verified Dec 2025"
+        },
+        "Items_UI_Graphics": {
+          "offset": "0x180000",
+          "expected_size": 17408,
+          "notes": "CONFIRMED: Items and UI graphics - visually verified Dec 2025"
+        },
+        "Background_Tiles": {
+          "offset": "0x190000",
+          "expected_size": 15488,
+          "notes": "CONFIRMED: Background tiles - visually verified Dec 2025"
+        },
+        "Additional_Sprites": {
+          "offset": "0x280000",
+          "expected_size": 1185,
+          "notes": "CONFIRMED: Valid sprite data - visually verified Dec 2025"
         }
       }
     },
@@ -127,6 +177,31 @@
           "offset": "0x1C0000",
           "expected_size": 8192,
           "notes": "High quality (0.94) - standard sprite size"
+        },
+        "Kirby_Main_Sprites": {
+          "offset": "0x1B0000",
+          "expected_size": 11264,
+          "notes": "CONFIRMED: Kirby character sprites - visually verified Dec 2025"
+        },
+        "Enemy_Sprites": {
+          "offset": "0x1A0000",
+          "expected_size": 11936,
+          "notes": "CONFIRMED: Enemy sprites with eyes - visually verified Dec 2025"
+        },
+        "Items_UI_Graphics": {
+          "offset": "0x180000",
+          "expected_size": 17408,
+          "notes": "CONFIRMED: Items and UI graphics - visually verified Dec 2025"
+        },
+        "Background_Tiles": {
+          "offset": "0x190000",
+          "expected_size": 15488,
+          "notes": "CONFIRMED: Background tiles - visually verified Dec 2025"
+        },
+        "Additional_Sprites": {
+          "offset": "0x280000",
+          "expected_size": 1185,
+          "notes": "CONFIRMED: Valid sprite data - visually verified Dec 2025"
         }
       }
     }
@@ -134,13 +209,14 @@
   "scanning_hints": {
     "description": "Tips for finding actual sprite data in ROMs",
     "hints": [
+      "IMPORTANT: Visual verification is essential - quality scores cannot distinguish real sprites from noise",
+      "Render with grayscale first to verify shapes, then apply palettes",
+      "The primary sprite region for Kirby is 0x180000-0x200000",
       "Real sprite data should decompress to multiples of 32 bytes (8x8 tiles in 4bpp)",
       "Character sprites typically show recognizable forms when converted to images",
-      "Sprite data often has moderate entropy (not too random, not too uniform)",
-      "Look for data that produces coherent tile patterns, not random pixels",
       "Kirby sprites should show round body shapes, faces, and character features",
-      "Quality scores above 0.80 typically indicate valid sprite data",
-      "Offsets at round addresses (0x200000, 0x378000) are common for sprite data"
+      "Quality scores above 0.80 may still be noise - always verify visually",
+      "Use palette 8 for Kirby (pink), palette 11 for enemies (green/orange)"
     ]
   },
   "tools_used": {

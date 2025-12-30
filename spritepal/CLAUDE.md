@@ -30,6 +30,59 @@ These rules prevent crashes and test failures. Each has a solution.
 - **Package Manager**: uv
 - **Config**: `pyproject.toml` (ruff, basedpyright, pytest)
 - **Test ROMs**: `roms/` directory contains Kirby Super Star ROMs for testing extraction/injection
+- **Mesen 2**: `tools/mesen2/` - SNES emulator for runtime sprite capture
+
+## Mesen 2 Integration
+
+Mesen 2 is used to capture sprites at runtime from VRAM. Location: `tools/mesen2/`
+
+### Running Mesen 2 with Lua Scripts
+
+**Note:** WSL interop may be disabled. Use batch file or PowerShell from Windows.
+
+```batch
+REM From Windows Command Prompt or double-click run_sprite_capture.bat
+cd C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal
+.\tools\mesen2\Mesen2.exe --testrunner "roms\Kirby Super Star (USA).sfc" "mesen2_integration\lua_scripts\test_sprite_capture.lua"
+```
+
+Or use PowerShell:
+```powershell
+cd 'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal'
+.\tools\mesen2\Mesen2.exe --testrunner 'roms\Kirby Super Star (USA).sfc' 'mesen2_integration\lua_scripts\test_sprite_capture.lua'
+```
+
+**Testrunner mode** (`--testrunner`) runs headless and exits when script calls `emu.stop()`.
+
+### Available Lua Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `gameplay_capture.lua` | Auto-capture at frame 1800 (gameplay with Kirby visible) |
+| `mesen2_sprite_capture.lua` | Manual capture with Start+Select |
+| `test_sprite_capture.lua` | Auto-capture at frame 700 (menu state) |
+| `mesen2_click_extractor.lua` | F9 capture + DMA tracking |
+| `mesen2_sprite_finder_final.lua` | DMA monitoring for ROM offset discovery |
+
+### Quick Capture (Double-click)
+
+- `run_gameplay_capture.bat` - Captures during gameplay (~30 sec)
+- `run_sprite_capture.bat` - Captures at frame 700 (menu state)
+
+### Capture Output
+
+Captures are saved to `mesen2_exchange/` as JSON files:
+- `sprite_capture_[timestamp].json` - OAM entries with VRAM tile data
+- `capture_log.txt` - Debug log
+
+### Processing Captures
+
+```bash
+# Extract sprites from capture
+uv run python scripts/extract_sprite_from_capture.py mesen2_exchange/sprite_capture_*.json
+
+# Output goes to extracted_sprites/
+```
 
 ## Claude Code Workflow
 
@@ -287,7 +340,7 @@ panel.setStyleSheet('QWidget { border: 1px solid red; }')
 | Qt threading rules, error path testing patterns | `docs/testing_guide.md` |
 | Layer boundaries, what imports what | `docs/architecture.md` |
 | Fixture decision tree, RealComponentFactory usage | `tests/README.md` |
-| Sprite format details, ROM structure, compression | `SPRITE_LEARNINGS_DO_NOT_DELETE.md` |
+| Sprite format details, ROM structure, compression | `docs/mesen2/00_STABLE_SNES_FACTS.md`, `docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md` |
 
 ## Project Architecture
 

@@ -29,10 +29,12 @@ from enum import Enum, auto
 VRAM_SPRITE_OFFSET = 0xC000
 
 # Mapping from VRAM addresses to ROM file offsets (game-specific)
-# For Kirby Super Star: VRAM $C000 maps to ROM offset $0C8000 (LoROM)
-# This is where the PPU reads sprite graphics from after DMA transfer
+# NOTE: This maps where sprites appear in VRAM during gameplay (after DMA),
+# NOT where compressed sprite data is stored in the ROM file.
+# For actual ROM extraction offsets, see config/sprite_locations.json
+# The 0x0C8000 offset does NOT contain valid HAL-compressed sprites.
 VRAM_TO_ROM_MAPPING: dict[int, int] = {
-    0xC000: 0x0C8000,  # Standard Kirby sprite location in ROM
+    0xC000: 0x0C8000,  # Runtime VRAM to ROM mapping (LoROM) - not for extraction
 }
 
 VRAM_SPRITE_SIZE = 0x4000  # Default sprite data size (16KB = 512 tiles)
@@ -191,28 +193,26 @@ TILE_ANALYSIS_SAMPLE = 10  # Number of tiles to analyze for quality
 MAX_ALIGNMENT_ERROR = 16  # Maximum bytes of misalignment allowed
 
 # Sprite tile validation threshold
-# When validating extracted sprite data, we sample tiles and check if they
-# exhibit 4bpp tile characteristics (non-empty, reasonable entropy, etc.)
-# This threshold is the minimum percentage of sampled tiles that must pass.
-# 60% allows for some compressed/malformed tiles while rejecting random data.
+# This is a heuristic that reduces obvious garbage but does NOT guarantee
+# real sprite content. Visual verification is essential.
 # Tune LOWER if valid sprites are being rejected (false negatives).
 # Tune HIGHER if garbage data is being accepted (false positives).
 SPRITE_VALIDATION_THRESHOLD = 0.6  # 60% of tiles must pass validation
 
-# HAL compression ratio thresholds
-# HAL typically achieves 30-70% compression on sprite data.
-# Ratios outside 10-90% indicate parser errors or non-sprite data.
-HAL_MIN_COMPRESSION_RATIO = 0.10  # < 10% = parser found 0xFF too early
-HAL_MAX_COMPRESSION_RATIO = 0.90  # > 90% = data isn't actually compressed
+# HAL compression ratio thresholds (empirically chosen)
+# These filter extreme cases but valid sprites may fall outside this range,
+# and invalid data may fall within it. Not a reliable indicator on its own.
+HAL_MIN_COMPRESSION_RATIO = 0.10  # Very low ratio may indicate parser issues
+HAL_MAX_COMPRESSION_RATIO = 0.90  # Very high ratio may indicate uncompressed data
 
 # Tile pattern thresholds for false positive reduction
 # Reject data where too many tiles are blank (all zeros or all 0xFF)
 MAX_BLANK_TILE_RATIO = 0.50  # Max 50% of tiles can be blank
 MIN_UNIQUE_TILE_PATTERNS = 2  # Require at least 2 distinct tile patterns
 
-# Sprite entropy thresholds (unified across all validators)
-# Entropy is Shannon entropy on byte values (0-8 scale)
-# Graphics data typically has moderate entropy - not too uniform, not too random
+# Sprite entropy thresholds (empirically chosen, not proven)
+# These filter obvious extremes but structured noise may still pass.
+# Entropy alone cannot distinguish real sprites from random structured data.
 SPRITE_ENTROPY_MIN = 2.5  # Minimum entropy for sprite data
 SPRITE_ENTROPY_MAX = 7.0  # Maximum entropy for sprite data
 
@@ -365,7 +365,7 @@ def sa1_to_file_offset(mesen2_addr: int, *, has_smc_header: bool = False) -> int
 
     The translation is: file_offset = mesen2_address - 0x300000
 
-    Examples from SPRITE_LEARNINGS_DO_NOT_DELETE.md:
+    Examples from docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md:
     - Mesen2 $3D2238 → ROM $0D2238
     - Mesen2 $57D800 → ROM $27D800
     - Mesen2 $580000 → ROM $280000

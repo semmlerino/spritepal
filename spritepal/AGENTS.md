@@ -36,3 +36,25 @@ Run from `spritepal/`:
 ## Configuration & Environment
 - Tooling config lives in `pyproject.toml` (ruff, basedpyright, pytest).
 - Useful vars: `PYTEST_TIMEOUT_MULTIPLIER`, `SPRITEPAL_EXHAL_PATH`, `SPRITEPAL_INHAL_PATH`, `SPRITEPAL_LEAK_MODE`. Tests set `QT_QPA_PLATFORM=offscreen`.
+
+## Mesen2 Integration Notes
+- For unclear Mesen2 behavior, consult the local source and trace implementation details:
+  - `Mesen2/Core/Debugger/LuaApi.cpp`
+  - `Mesen2/Core/Debugger/ScriptingContext.cpp`
+  - `Mesen2/UI/Utilities/TestRunner.cs`
+  - `Mesen2/UI/Utilities/CommandLineHelper.cs`
+  - `docs/LuaApi.cpp` (local snapshot for quick reference)
+- If behavior is still unclear, capture a headless screenshot with `emu.takeScreenshot()` to
+  ground truth the state before drawing conclusions.
+- Probe-first workflow: run `mesen2_integration/lua_scripts/mesen2_preflight_probe.lua` and inspect
+  `mesen2_exchange/mesen2_preflight_probe.txt` (or `mesen2_exchange/mesen2_preflight_probe_latest.txt`).
+- Headless testrunner example (PowerShell):
+  ```
+  powershell.exe -NoProfile -Command "
+    & 'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\tools\mesen2\Mesen2.exe' --testrunner
+    'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\roms\Kirby Super Star (USA).sfc'
+    'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_integration\lua_scripts\mesen2_preflight_probe.lua'
+  "
+  ```
+- Screenshots are available via `emu.takeScreenshot()` (works in headless testrunner); save PNGs to
+  `mesen2_exchange/` for debugging.

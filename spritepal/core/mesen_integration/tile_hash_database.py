@@ -4,10 +4,10 @@ Tile hash database for mapping VRAM tiles back to ROM offsets.
 Instead of parsing complex game pointer tables, this module:
 1. Extracts tiles from known ROM offsets (decompress with HAL)
 2. Hashes each 8x8 tile (32 bytes for 4bpp SNES format)
-3. Creates a database mapping tile_hash -> (rom_offset, tile_index)
+3. Creates a database mapping tile_hash -> list of (rom_offset, tile_index) matches
 
 When capturing sprites from Mesen 2:
-1. Hash the captured VRAM tiles
+1. Hash the captured VRAM tiles (optionally including H/V/HV flips at lookup time)
 2. Look up each hash to find the source ROM offset
 """
 
@@ -62,9 +62,9 @@ class TileHashDatabase:
         db.build_database()  # Scan known offsets
 
         # Later, when matching VRAM tiles:
-        match = db.lookup_tile(vram_tile_bytes)
-        if match:
-            print(f"Tile from ROM offset {match.rom_offset:X}")
+        matches = db.lookup_tile_matches(vram_tile_bytes)
+        if matches:
+            print(f"Tile candidates: {[m.rom_offset for m in matches]}")
     """
 
     # Known sprite data locations in Kirby Super Star
@@ -88,7 +88,7 @@ class TileHashDatabase:
         """
         self.rom_path = Path(rom_path)
         self._hal = HALCompressor()
-        self._hash_to_match: dict[str, TileMatch] = {}
+        self._hash_to_match: dict[str, list[TileMatch]] = {}
         self._blocks: list[ROMSpriteBlock] = []
 
     def build_database(
@@ -155,42 +155,77 @@ class TileHashDatabase:
 
             block.tile_hashes.append(tile_hash)
 
-            # Only store first occurrence (tiles may repeat)
-            if tile_hash not in self._hash_to_match:
-                self._hash_to_match[tile_hash] = TileMatch(
+            self._hash_to_match.setdefault(tile_hash, []).append(
+                TileMatch(
                     rom_offset=rom_offset,
                     tile_index=tile_idx,
                     description=description,
                 )
+            )
 
         self._blocks.append(block)
         logger.debug(f"Indexed ${rom_offset:06X}: {tile_count} tiles, {description}")
         return tile_count
 
-    def lookup_tile(self, tile_data: bytes) -> TileMatch | None:
+    def lookup_tile(self, tile_data: bytes, include_flips: bool = False) -> TileMatch | None:
         """
         Look up a tile by its data.
 
         Args:
             tile_data: 32 bytes of 4bpp tile data
+            include_flips: Also try H/V/HV flipped variants
 
         Returns:
             TileMatch if found, None otherwise
         """
+        matches = self.lookup_tile_matches(tile_data, include_flips=include_flips)
+        return matches[0] if matches else None
+
+    def lookup_tile_matches(self, tile_data: bytes, include_flips: bool = False) -> list[TileMatch]:
+        """
+        Look up all matches for a tile by its data.
+
+        Args:
+            tile_data: 32 bytes of 4bpp tile data
+            include_flips: Also try H/V/HV flipped variants
+
+        Returns:
+            List of TileMatch candidates (may be empty)
+        """
         if len(tile_data) != BYTES_PER_TILE:
             logger.warning(f"Invalid tile data size: {len(tile_data)}")
-            return None
+            return []
 
-        tile_hash = self._hash_tile(tile_data)
-        return self._hash_to_match.get(tile_hash)
+        hashes = {self._hash_tile(tile_data)}
+        if include_flips:
+            for variant in self._iter_flip_variants(tile_data):
+                hashes.add(self._hash_tile(variant))
 
-    def lookup_tiles(self, tiles_data: list[bytes]) -> list[TileMatch | None]:
-        """Look up multiple tiles at once."""
-        return [self.lookup_tile(t) for t in tiles_data]
+        matches: list[TileMatch] = []
+        for tile_hash in hashes:
+            matches.extend(self._hash_to_match.get(tile_hash, []))
+        return self._dedupe_matches(matches)
+
+    def lookup_tiles(
+        self,
+        tiles_data: list[bytes],
+        include_flips: bool = False,
+    ) -> list[TileMatch | None]:
+        """Look up multiple tiles at once (first match only)."""
+        return [self.lookup_tile(t, include_flips=include_flips) for t in tiles_data]
+
+    def lookup_tiles_matches(
+        self,
+        tiles_data: list[bytes],
+        include_flips: bool = False,
+    ) -> list[list[TileMatch]]:
+        """Look up multiple tiles at once (all candidates)."""
+        return [self.lookup_tile_matches(t, include_flips=include_flips) for t in tiles_data]
 
     def find_rom_offset_for_vram_tiles(
         self,
         vram_tiles: list[bytes],
+        include_flips: bool = False,
     ) -> dict[int, int]:
         """
         Find most likely ROM offset(s) for a set of VRAM tiles.
@@ -204,9 +239,10 @@ class TileHashDatabase:
         offset_counts: dict[int, int] = {}
 
         for tile_data in vram_tiles:
-            match = self.lookup_tile(tile_data)
-            if match:
-                offset_counts[match.rom_offset] = offset_counts.get(match.rom_offset, 0) + 1
+            matches = self.lookup_tile_matches(tile_data, include_flips=include_flips)
+            if matches:
+                for rom_offset in {m.rom_offset for m in matches}:
+                    offset_counts[rom_offset] = offset_counts.get(rom_offset, 0) + 1
 
         return dict(sorted(offset_counts.items(), key=lambda x: -x[1]))
 
@@ -215,6 +251,8 @@ class TileHashDatabase:
         return {
             "total_blocks": len(self._blocks),
             "total_unique_hashes": len(self._hash_to_match),
+            "hashes_with_collisions": sum(1 for matches in self._hash_to_match.values() if len(matches) > 1),
+            "total_matches": sum(len(matches) for matches in self._hash_to_match.values()),
             "total_tiles": sum(b.tile_count for b in self._blocks),
             "blocks": [
                 {
@@ -271,12 +309,13 @@ class TileHashDatabase:
             )
 
             for tile_idx, tile_hash in enumerate(block.tile_hashes):
-                if tile_hash not in self._hash_to_match:
-                    self._hash_to_match[tile_hash] = TileMatch(
+                self._hash_to_match.setdefault(tile_hash, []).append(
+                    TileMatch(
                         rom_offset=block.rom_offset,
                         tile_index=tile_idx,
                         description=block.description,
                     )
+                )
 
             self._blocks.append(block)
 
@@ -287,8 +326,54 @@ class TileHashDatabase:
         """Generate hash for a tile."""
         return hashlib.md5(tile_data).hexdigest()
 
-    def iter_all_matches(self) -> Iterator[tuple[str, TileMatch]]:
-        """Iterate over all hash->match pairs."""
+    @staticmethod
+    def _reverse_byte(value: int) -> int:
+        value = ((value & 0xF0) >> 4) | ((value & 0x0F) << 4)
+        value = ((value & 0xCC) >> 2) | ((value & 0x33) << 2)
+        value = ((value & 0xAA) >> 1) | ((value & 0x55) << 1)
+        return value
+
+    @classmethod
+    def _flip_tile(cls, tile_data: bytes, flip_h: bool, flip_v: bool) -> bytes:
+        if not flip_h and not flip_v:
+            return tile_data
+        if len(tile_data) != BYTES_PER_TILE:
+            return tile_data
+        out = bytearray(BYTES_PER_TILE)
+        for row in range(8):
+            src_row = 7 - row if flip_v else row
+            for plane_offset in (0, 16):
+                b0 = tile_data[plane_offset + (src_row * 2)]
+                b1 = tile_data[plane_offset + (src_row * 2) + 1]
+                if flip_h:
+                    b0 = cls._reverse_byte(b0)
+                    b1 = cls._reverse_byte(b1)
+                out[plane_offset + (row * 2)] = b0
+                out[plane_offset + (row * 2) + 1] = b1
+        return bytes(out)
+
+    @classmethod
+    def _iter_flip_variants(cls, tile_data: bytes) -> list[bytes]:
+        return [
+            cls._flip_tile(tile_data, flip_h=True, flip_v=False),
+            cls._flip_tile(tile_data, flip_h=False, flip_v=True),
+            cls._flip_tile(tile_data, flip_h=True, flip_v=True),
+        ]
+
+    @staticmethod
+    def _dedupe_matches(matches: list[TileMatch]) -> list[TileMatch]:
+        seen: set[tuple[int, int]] = set()
+        deduped: list[TileMatch] = []
+        for match in matches:
+            key = (match.rom_offset, match.tile_index)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(match)
+        return deduped
+
+    def iter_all_matches(self) -> Iterator[tuple[str, list[TileMatch]]]:
+        """Iterate over all hash->matches pairs."""
         yield from self._hash_to_match.items()
 
 

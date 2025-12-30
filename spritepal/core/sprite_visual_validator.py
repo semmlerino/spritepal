@@ -72,7 +72,11 @@ class SpriteVisualValidator:
             confidence = self._calculate_overall_confidence(metrics)
             is_valid = confidence > 0.5
 
-            logger.info(f"Sprite validation: valid={is_valid}, confidence={confidence:.3f}")
+            # Note: "passes_threshold" means structurally reasonable, NOT confirmed sprite
+            logger.info(
+                f"Sprite structural check: passes_threshold={is_valid}, "
+                f"confidence={confidence:.3f} (visual verification still required)"
+            )
             logger.debug(f"Metrics: {metrics}")
 
         except Exception:
@@ -283,6 +287,9 @@ class SpriteVisualValidator:
     def _calculate_overall_confidence(self, metrics: dict[str, float]) -> float:
         """
         Calculate overall confidence score from individual metrics.
+
+        Includes cross-metric validation to penalize suspicious combinations
+        that pass individual metrics but indicate noise rather than real sprites.
         """
         # Weighted average of metrics
         weights = {
@@ -303,8 +310,31 @@ class SpriteVisualValidator:
                 total_weight += weights[metric]
 
         if total_weight > 0:
-            return total_score / total_weight
-        return 0.0
+            confidence = total_score / total_weight
+        else:
+            return 0.0
+
+        # Cross-metric validation: penalize suspicious combinations
+        # that pass individual metrics but indicate noise rather than real sprites
+        coherence = metrics.get("coherence", 0.0)
+        edge_score = metrics.get("edge_score", 0.0)
+        tile_diversity = metrics.get("tile_diversity", 0.0)
+        symmetry = metrics.get("symmetry", 0.0)
+        empty_space = metrics.get("empty_space", 0.0)
+
+        # High edges + low coherence = likely noise (edges everywhere but no structure)
+        if edge_score > 0.7 and coherence < 0.3:
+            confidence *= 0.7  # 30% penalty
+
+        # High diversity + low symmetry + low coherence = likely random data
+        if tile_diversity > 0.8 and symmetry < 0.2 and coherence < 0.3:
+            confidence *= 0.6  # 40% penalty
+
+        # Very high empty space with high edges = repeating pattern or garbage
+        if empty_space > 0.8 and edge_score > 0.6:
+            confidence *= 0.7  # 30% penalty
+
+        return confidence
 
     def validate_tile_data(self, tile_data: bytes, tile_count: int) -> tuple[bool, float]:
         """
@@ -367,5 +397,7 @@ class SpriteVisualValidator:
             logger.debug(f"Rejected: only {len(tile_patterns)} unique tile patterns")
             return False, 0.3
 
-        # All checks passed - high confidence
-        return True, 0.8
+        # Basic structural checks passed - moderate confidence
+        # NOTE: Does NOT verify actual sprite content, only format validity
+        # Structured noise can still pass these checks
+        return True, 0.6

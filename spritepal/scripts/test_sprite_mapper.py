@@ -79,7 +79,11 @@ def main():
     # Paths
     base_dir = Path(__file__).parent.parent
     rom_path = base_dir / "roms" / "Kirby Super Star (USA).sfc"
-    capture_path = base_dir / "mesen2_exchange" / "test_capture.json"
+    capture_path = (
+        Path(sys.argv[1])
+        if len(sys.argv) > 1
+        else base_dir / "mesen2_exchange" / "test_capture.json"
+    )
     discovered_offsets_path = base_dir / "mesen2_integration" / "discovered_sprite_offsets.txt"
     database_output = base_dir / "mesen2_exchange" / "tile_hash_database.json"
 
@@ -118,16 +122,21 @@ def main():
             seen_offsets.add(offset)
             unique_offsets.append((offset, desc))
 
+    known_offsets = {offset for offset, _ in TileHashDatabase.KNOWN_SPRITE_OFFSETS}
+    extra_offsets = [(offset, desc) for offset, desc in unique_offsets if offset not in known_offsets]
     print(f"    Total unique offsets to index: {len(unique_offsets)}")
+    print(f"    Extra offsets beyond defaults: {len(extra_offsets)}")
 
     # Build database
-    tile_count = mapper.build_database(additional_offsets=discovered)
+    tile_count = mapper.build_database(additional_offsets=extra_offsets)
     print(f"    Indexed {tile_count} tiles")
 
     # Get stats
     stats = mapper.get_database_stats()
     print(f"    Total blocks: {stats.get('total_blocks', 0)}")
     print(f"    Unique hashes: {stats.get('total_unique_hashes', 0)}")
+    print(f"    Total matches: {stats.get('total_matches', 0)}")
+    print(f"    Hashes w/ collisions: {stats.get('hashes_with_collisions', 0)}")
 
     # Save database for future use
     if mapper._db:
@@ -156,15 +165,14 @@ def main():
             print("\n    Sample tile data (first entry, first tile):")
             print(f"    {tile_hex[:64]}...")
 
-            # Check for the bug pattern (incrementing even bytes)
-            has_bug_pattern = all(
+            # Heuristic warning: sequential bytes often indicate bad reads or loop-index leakage.
+            has_sequential_prefix = all(
                 tile_hex[i * 2 : i * 2 + 2] == f"{i:02X}" for i in range(min(8, len(tile_hex) // 2))
             )
-            if has_bug_pattern:
-                print("\n    ⚠️  WARNING: Capture has VRAM word-addressing bug!")
-                print("       Even bytes are incrementing (0, 1, 2, 3...) = loop index")
-                print("       This capture was made before the Lua script fix.")
-                print("       Regenerate with fixed test_sprite_capture.lua")
+            if has_sequential_prefix:
+                print("\n    ⚠️  WARNING: Capture data starts with sequential bytes.")
+                print("       This often means a bad VRAM read or loop-index leakage.")
+                print("       Verify VRAM word addressing and re-capture if needed.")
 
     # Map capture to ROM
     print("\n[4] Mapping capture to ROM offsets...")
@@ -172,14 +180,29 @@ def main():
 
     print(f"    Matched entries: {len(result.mapped_entries) - result.unmapped_count}/{len(result.mapped_entries)}")
     print(f"    Unmapped entries: {result.unmapped_count}")
+    print(f"    Tiles with hash hits: {result.matched_tiles}/{result.total_tiles}")
+    print(f"    Tiles contributing to scores: {result.scored_tiles}/{result.total_tiles}")
+    if result.ignored_low_info_tiles:
+        print(f"    Ignored low-info tiles: {result.ignored_low_info_tiles}")
 
     if result.rom_offset_summary:
-        print("\n    ROM offset summary:")
+        print("\n    ROM offset summary (entry votes):")
         for offset, count in list(result.rom_offset_summary.items())[:10]:
-            print(f"      0x{offset:06X}: {count} tiles matched")
+            print(f"      0x{offset:06X}: {count} entries")
+    if result.rom_offset_scores:
+        print("\n    ROM offset scores (weighted):")
+        for offset, score in list(result.rom_offset_scores.items())[:10]:
+            print(f"      0x{offset:06X}: {score:.2f}")
+        print(f"    Primary offset score: {result.primary_rom_offset_score:.2f}")
+        print(f"    Ambiguous: {result.ambiguous}")
+        if result.ambiguity_note:
+            print(f"    Note: {result.ambiguity_note}")
     else:
-        print("\n    No matches found.")
-        print("    This is expected if the capture has the VRAM bug.")
+        print("\n    No scored matches found.")
+        if result.matched_tiles:
+            print("    Hash hits exist but contributed zero weight (likely low-info or collisions).")
+        else:
+            print("    No hash hits; verify VRAM capture integrity and DB coverage.")
 
     # Phase 4: Test individual tile lookup
     print("\n[5] Testing individual tile lookup...")
@@ -187,10 +210,16 @@ def main():
     if mapper._db:
         test_matches = list(mapper._db.iter_all_matches())[:3]
         if test_matches:
-            print(f"    Database has {len(list(mapper._db.iter_all_matches()))} indexed tiles")
+            total_hashes = len(list(mapper._db.iter_all_matches()))
+            print(f"    Database has {total_hashes} unique hashes")
             print("    Sample indexed tiles:")
-            for tile_hash, match in test_matches:
-                print(f"      Hash: {tile_hash[:16]}... -> ROM 0x{match.rom_offset:06X} tile #{match.tile_index}")
+            for tile_hash, matches in test_matches:
+                sample = matches[0]
+                print(
+                    f"      Hash: {tile_hash[:16]}... -> ROM 0x{sample.rom_offset:06X} tile #{sample.tile_index}"
+                )
+                if len(matches) > 1:
+                    print(f"        (+{len(matches) - 1} more candidates)")
 
     print("\n" + "=" * 60)
     print("TEST COMPLETE")
@@ -200,8 +229,8 @@ def main():
         print("\nNext steps:")
         print("1. Run Mesen 2 with the fixed Lua script:")
         print("   mesen2_integration/lua_scripts/test_sprite_capture.lua")
-        print("2. The script auto-captures at frame 700")
-        print("3. Re-run this test to verify matches")
+        print("2. The script auto-captures at your TARGET_FRAME")
+        print("3. Re-run this test with the capture file path")
         return 0
 
     return 0

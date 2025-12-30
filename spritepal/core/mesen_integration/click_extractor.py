@@ -71,6 +71,8 @@ class OBSELConfig:
     name_select: int
     size_select: int
     tile_base_addr: int
+    oam_base_addr: int
+    oam_addr_offset: int
 
 
 @dataclass
@@ -168,6 +170,8 @@ class MesenCaptureParser:
             name_select=obsel_data.get("name_select", 0),
             size_select=obsel_data.get("size_select", 0),
             tile_base_addr=obsel_data.get("tile_base_addr", 0),
+            oam_base_addr=obsel_data.get("oam_base_addr", 0),
+            oam_addr_offset=obsel_data.get("oam_addr_offset", 0),
         )
 
         # Parse OAM entries
@@ -185,6 +189,8 @@ class MesenCaptureParser:
                 )
                 tiles.append(tile)
 
+            tile_page = entry_data.get("tile_page")
+            name_table = tile_page if tile_page is not None else entry_data.get("name_table", 0)
             entry = OAMEntry(
                 id=entry_data.get("id", 0),
                 x=entry_data.get("x", 0),
@@ -196,7 +202,7 @@ class MesenCaptureParser:
                 flip_v=entry_data.get("flip_v", False),
                 palette=entry_data.get("palette", 0),
                 priority=entry_data.get("priority", 0),
-                name_table=entry_data.get("name_table", 0),
+                name_table=name_table,
                 size_large=entry_data.get("size_large", False),
                 tiles=tiles,
             )

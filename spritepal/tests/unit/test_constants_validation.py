@@ -411,7 +411,7 @@ class TestSA1AddressTranslation:
 
     def test_sa1_to_file_offset_basic(self):
         """Test SA-1 address translation with documented example from SPRITE_LEARNINGS."""
-        # From SPRITE_LEARNINGS_DO_NOT_DELETE.md:
+        # From docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md:
         # Mesen2 $3D2238 -> ROM $0D2238
         assert constants.sa1_to_file_offset(0x3D2238) == 0x0D2238
 

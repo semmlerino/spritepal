@@ -229,14 +229,20 @@ def main():
             mapper.build_database()
 
         result = mapper.map_capture(capture)
-        rom_offsets_found = result.rom_offset_summary
+        rom_offsets_found = result.rom_offset_scores or result.rom_offset_summary
 
         if rom_offsets_found:
             print(f"    Matched {len(result.mapped_entries) - result.unmapped_count} entries to ROM offsets:")
-            for offset, count in list(rom_offsets_found.items())[:5]:
-                print(f"      0x{offset:06X}: {count} tiles")
+            if result.rom_offset_scores:
+                for offset, score in list(result.rom_offset_scores.items())[:5]:
+                    print(f"      0x{offset:06X}: {score:.2f} score")
+                if result.ambiguous:
+                    print(f"      Ambiguous: {result.ambiguity_note}")
+            else:
+                for offset, count in list(result.rom_offset_summary.items())[:5]:
+                    print(f"      0x{offset:06X}: {count} tiles")
         else:
-            print("    No ROM matches found (capture may have VRAM bug)")
+            print("    No ROM matches found (verify capture integrity, ROM header, and DB coverage)")
     else:
         print("\n[2] ROM not found - skipping ROM offset mapping")
 

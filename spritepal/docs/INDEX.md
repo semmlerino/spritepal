@@ -28,7 +28,11 @@ This is the central entry point for all SpritePal documentation.
 
 | Document | Purpose |
 |----------|---------|
-| [SPRITE_LEARNINGS_DO_NOT_DELETE.md](../SPRITE_LEARNINGS_DO_NOT_DELETE.md) | Sprite extraction, SNES formats, ROM structure |
+| [docs/mesen2/00_STABLE_SNES_FACTS.md](mesen2/00_STABLE_SNES_FACTS.md) | SNES hardware facts (VRAM, OBJSEL, tiles) |
+| [docs/mesen2/01_BUILD_SPECIFIC_CONTRACT.md](mesen2/01_BUILD_SPECIFIC_CONTRACT.md) | Mesen2 build-specific API contract |
+| [docs/mesen2/02_DATA_CONTRACTS.md](mesen2/02_DATA_CONTRACTS.md) | Capture JSON schema and invariants |
+| [docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md](mesen2/03_GAME_MAPPING_KIRBY_SA1.md) | Kirby Super Star SA-1 mapping notes |
+| [docs/mesen2/04_TROUBLESHOOTING.md](mesen2/04_TROUBLESHOOTING.md) | Fail-fast checks and diagnostics |
 
 ## Quick Reference
 
