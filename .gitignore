@@ -243,6 +243,9 @@ Mesen2/
 mesen2_automation/
 mesen2_integration/
 *.lua.bak
+# But keep spritepal docs about Mesen2
+!spritepal/docs/mesen2/
+!spritepal/docs/mesen2/*.md
 
 # Extracted/generated sprite directories
 extracted_sprites/
