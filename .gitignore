@@ -1,0 +1,85 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+temp/
+
+# SpritePal specific outputs
+output/
+*.dmp
+*.smc
+
+# Test outputs and generated files (organized directories)
+test_output/
+*.pal.json
+*.metadata.json
+
+# Archive directories - historical/deprecated code (keep for reference)
+# archive/ and archive_2025_07_19/ are preserved for historical reference
+# but may contain large files that shouldn't be tracked
+archive_2025_08_09/
+
+# Settings files (user-specific)
+.spritepal_settings.json
+config/test_profiles/
+.testapp_settings.json
+.spritepal-integration-test_settings.json
+.*-test_settings.json
+.*-debug_settings.json
+
+# ROM files for development (large binary files)
+*.sfc
+*.smc
+
+# Generated analysis reports
+typecheck_report_*.json
+import_analysis_report.json
+init_order_issues.json
+.venv/

@@ -1,0 +1,1 @@
+"""SpritePal test suite"""

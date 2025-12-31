@@ -1,0 +1,227 @@
+{
+  "format_version": "1.1",
+  "description": "Known sprite locations for various SNES ROMs",
+  "_note": "Updated with sprite locations discovered through advanced ROM scanning on 2025-01-20",
+  "games": {
+    "KIRBY SUPER STAR": {
+      "checksums": {
+        "USA": "0x8A5C",
+        "Japan": "0x7F4C",
+        "Europe": "0x8B5C",
+        "Europe_Alt": "0xBF51"
+      },
+      "_status": "Europe/Fun Pak sprites discovered via ROM scanner",
+      "sprites": {
+        "High_Quality_Sprite_1": {
+          "offset": "0x200000",
+          "expected_size": 7744,
+          "notes": "Perfect quality score (1.00) - likely main character sprites"
+        },
+        "High_Quality_Sprite_2": {
+          "offset": "0x378000",
+          "expected_size": 3584,
+          "notes": "Very high quality (0.98) - smaller sprite set (112 tiles)"
+        },
+        "High_Quality_Sprite_3": {
+          "offset": "0x1D0000",
+          "expected_size": 8192,
+          "notes": "Excellent quality (0.96) - standard 8KB sprite block - aligned to tile boundary"
+        },
+        "High_Quality_Sprite_4": {
+          "offset": "0x1C0000",
+          "expected_size": 8192,
+          "notes": "High quality (0.94) - standard sprite size"
+        },
+        "Medium_Quality_Set_1": {
+          "offset": "0x398000",
+          "expected_size": 2688,
+          "notes": "Good quality (0.92) - smaller sprite set - aligned to tile boundary"
+        },
+        "Medium_Quality_Set_2": {
+          "offset": "0x1D0000",
+          "expected_size": 8192,
+          "notes": "Good quality (0.90) - alternate offset for sprite 3"
+        },
+        "Medium_Quality_Set_3": {
+          "offset": "0x3D8000",
+          "expected_size": 8192,
+          "notes": "Good quality (0.88) - standard sprite block"
+        },
+        "Kirby_Main_Sprites": {
+          "offset": "0x1B0000",
+          "expected_size": 11264,
+          "notes": "CONFIRMED: Kirby character sprites - visually verified Dec 2025"
+        },
+        "Enemy_Sprites": {
+          "offset": "0x1A0000",
+          "expected_size": 11936,
+          "notes": "CONFIRMED: Enemy sprites with eyes - visually verified Dec 2025"
+        },
+        "Items_UI_Graphics": {
+          "offset": "0x180000",
+          "expected_size": 17408,
+          "notes": "CONFIRMED: Items and UI graphics - visually verified Dec 2025"
+        },
+        "Background_Tiles": {
+          "offset": "0x190000",
+          "expected_size": 15488,
+          "notes": "CONFIRMED: Background tiles (trees, terrain) - visually verified Dec 2025"
+        },
+        "Additional_Sprites": {
+          "offset": "0x280000",
+          "expected_size": 1185,
+          "notes": "CONFIRMED: Valid sprite data - visually verified Dec 2025"
+        },
+        "_note": "Offsets 0x180000-0x200000 are the primary sprite region. Visual verification is essential - quality scores alone cannot distinguish real sprites from noise."
+      },
+      "offset_variants": {
+        "Europe": ["0x200000", "0x378000", "0x1D0000", "0x1C0000"],
+        "_note": "Europe/Fun Pak ROM has different sprite locations than USA version"
+      }
+    },
+    "KIRBY SUPER DELUXE": {
+      "checksums": {
+        "PAL": "0xC6AA",
+        "Japan_Rev": "0x8E5C",
+        "Europe_FunPak": "0xBF51",
+        "USA_Alt": "0x5539"
+      },
+      "_status": "Europe/Fun Pak version uses same sprites as KIRBY SUPER STAR",
+      "sprites": {
+        "High_Quality_Sprite_1": {
+          "offset": "0x200000",
+          "expected_size": 7744,
+          "notes": "Perfect quality score (1.00) - likely main character sprites"
+        },
+        "High_Quality_Sprite_2": {
+          "offset": "0x378000",
+          "expected_size": 3588,
+          "notes": "Very high quality (0.98) - smaller sprite set"
+        },
+        "High_Quality_Sprite_3": {
+          "offset": "0x1D0000",
+          "expected_size": 8192,
+          "notes": "Excellent quality (0.96) - standard 8KB sprite block - aligned to tile boundary"
+        },
+        "High_Quality_Sprite_4": {
+          "offset": "0x1C0000",
+          "expected_size": 8192,
+          "notes": "High quality (0.94) - standard sprite size"
+        },
+        "Medium_Quality_Set_1": {
+          "offset": "0x398000",
+          "expected_size": 2688,
+          "notes": "Good quality (0.92) - smaller sprite set - aligned to tile boundary"
+        },
+        "Medium_Quality_Set_2": {
+          "offset": "0x1D0000",
+          "expected_size": 8192,
+          "notes": "Good quality (0.90) - alternate offset for sprite 3"
+        },
+        "Medium_Quality_Set_3": {
+          "offset": "0x3D8000",
+          "expected_size": 8192,
+          "notes": "Good quality (0.88) - standard sprite block"
+        },
+        "Kirby_Main_Sprites": {
+          "offset": "0x1B0000",
+          "expected_size": 11264,
+          "notes": "CONFIRMED: Kirby character sprites - visually verified Dec 2025"
+        },
+        "Enemy_Sprites": {
+          "offset": "0x1A0000",
+          "expected_size": 11936,
+          "notes": "CONFIRMED: Enemy sprites with eyes - visually verified Dec 2025"
+        },
+        "Items_UI_Graphics": {
+          "offset": "0x180000",
+          "expected_size": 17408,
+          "notes": "CONFIRMED: Items and UI graphics - visually verified Dec 2025"
+        },
+        "Background_Tiles": {
+          "offset": "0x190000",
+          "expected_size": 15488,
+          "notes": "CONFIRMED: Background tiles - visually verified Dec 2025"
+        },
+        "Additional_Sprites": {
+          "offset": "0x280000",
+          "expected_size": 1185,
+          "notes": "CONFIRMED: Valid sprite data - visually verified Dec 2025"
+        }
+      }
+    },
+    "KIRBY'S FUN PAK": {
+      "checksums": {
+        "Europe": "0x8B5C",
+        "Europe_Alt": "0xAE40",
+        "Europe_BF51": "0xBF51"
+      },
+      "_status": "Sprites found via ROM scanner - confirmed working",
+      "sprites": {
+        "High_Quality_Sprite_1": {
+          "offset": "0x200000",
+          "expected_size": 7744,
+          "notes": "Perfect quality score (1.00) - likely main character sprites"
+        },
+        "High_Quality_Sprite_2": {
+          "offset": "0x378000",
+          "expected_size": 3588,
+          "notes": "Very high quality (0.98) - smaller sprite set"
+        },
+        "High_Quality_Sprite_3": {
+          "offset": "0x1D0000",
+          "expected_size": 8192,
+          "notes": "Excellent quality (0.96) - standard 8KB sprite block - aligned to tile boundary"
+        },
+        "High_Quality_Sprite_4": {
+          "offset": "0x1C0000",
+          "expected_size": 8192,
+          "notes": "High quality (0.94) - standard sprite size"
+        },
+        "Kirby_Main_Sprites": {
+          "offset": "0x1B0000",
+          "expected_size": 11264,
+          "notes": "CONFIRMED: Kirby character sprites - visually verified Dec 2025"
+        },
+        "Enemy_Sprites": {
+          "offset": "0x1A0000",
+          "expected_size": 11936,
+          "notes": "CONFIRMED: Enemy sprites with eyes - visually verified Dec 2025"
+        },
+        "Items_UI_Graphics": {
+          "offset": "0x180000",
+          "expected_size": 17408,
+          "notes": "CONFIRMED: Items and UI graphics - visually verified Dec 2025"
+        },
+        "Background_Tiles": {
+          "offset": "0x190000",
+          "expected_size": 15488,
+          "notes": "CONFIRMED: Background tiles - visually verified Dec 2025"
+        },
+        "Additional_Sprites": {
+          "offset": "0x280000",
+          "expected_size": 1185,
+          "notes": "CONFIRMED: Valid sprite data - visually verified Dec 2025"
+        }
+      }
+    }
+  },
+  "scanning_hints": {
+    "description": "Tips for finding actual sprite data in ROMs",
+    "hints": [
+      "IMPORTANT: Visual verification is essential - quality scores cannot distinguish real sprites from noise",
+      "Render with grayscale first to verify shapes, then apply palettes",
+      "The primary sprite region for Kirby is 0x180000-0x200000",
+      "Real sprite data should decompress to multiples of 32 bytes (8x8 tiles in 4bpp)",
+      "Character sprites typically show recognizable forms when converted to images",
+      "Kirby sprites should show round body shapes, faces, and character features",
+      "Quality scores above 0.80 may still be noise - always verify visually",
+      "Use palette 8 for Kirby (pink), palette 11 for enemies (green/orange)"
+    ]
+  },
+  "tools_used": {
+    "rom_scanner": "find_rom_sprites_advanced.py",
+    "quality_metric": "4bpp tile validation + entropy analysis",
+    "date": "2025-01-20"
+  }
+}

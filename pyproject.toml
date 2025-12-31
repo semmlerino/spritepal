@@ -1,0 +1,457 @@
+# SpritePal Local Configuration
+# Single source of truth for all tool configuration when running from spritepal/
+#
+# Usage:
+#   cd spritepal
+#   uv sync --extra dev    # Install dependencies
+#   uv run pytest tests    # Tests
+#   uv run ruff check .    # Linting
+#   uv run basedpyright core ui utils  # Type checking
+
+# ============================================================================
+# Project Configuration (uv)
+# ============================================================================
+[project]
+name = "spritepal"
+version = "0.1.0"
+description = "SNES sprite extraction and editing tool"
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6>=6.6.0",
+    "Pillow>=10.1.0",
+    "numpy>=1.26.0",
+    "psutil>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-qt>=4.2.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-timeout>=2.0.0",
+    "pytest-xdist>=3.5.0",  # Parallel test execution
+    "pytest-benchmark>=4.0.0",  # Performance benchmarking
+    "ruff>=0.3.0",
+    "basedpyright>=1.8.0",
+    "pre-commit>=3.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Package core, ui, utils as top-level modules
+# Imports: from core.X import Y, from ui.X import Y
+packages = ["core", "ui", "utils"]
+
+# ============================================================================
+# Ruff Configuration
+# ============================================================================
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+    "venv",
+    "archive*",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "RUF",    # Ruff-specific rules
+    "N",      # pep8-naming
+    "S",      # flake8-bandit (security)
+    "A",      # flake8-builtins
+    "PT",     # flake8-pytest-style
+    "RSE",    # flake8-raise
+    "RET",    # flake8-return
+    "PIE",    # flake8-pie
+    "PL",     # pylint
+    "TRY",    # tryceratops (exception handling)
+    "PERF",   # perflint (performance)
+    "FURB",   # refurb (modern Python)
+    "LOG",    # flake8-logging
+    "EM",     # flake8-errmsg
+    "G",      # flake8-logging-format
+    "INP",    # flake8-no-pep420 (require __init__.py)
+    "TC",     # flake8-type-checking
+    "ARG",    # flake8-unused-arguments
+    "ERA",    # eradicate (commented-out code)
+    "FBT",    # flake8-boolean-trap
+    "ICN",    # flake8-import-conventions
+    "PYI",    # flake8-pyi (type stub rules)
+    "T20",    # flake8-print (catch debug prints)
+    "DTZ",    # flake8-datetimez (timezone awareness)
+    "FA",     # flake8-future-annotations
+    "SLF",    # flake8-self (private member access)
+    "TD",     # flake8-todos (track TODOs)
+    "FIX",    # flake8-fixme (track FIXMEs)
+    "Q",      # flake8-quotes (quote consistency)
+    "COM",    # flake8-commas (trailing commas)
+    "PTH",    # flake8-use-pathlib (modern path handling)
+]
+
+ignore = [
+    # Formatting (handled by formatter)
+    "E501",     # line length (120 is fine)
+    "W291",     # trailing-whitespace
+    "W293",     # blank-line-with-whitespace
+
+    # Import ordering (Qt apps need delayed imports)
+    "E402",     # module level import not at top
+    "PLC0415",  # import-outside-top-level
+
+    # PEP 695 type parameter syntax (gradual adoption)
+    "UP040",    # TypeAlias vs `type` keyword syntax
+    "UP046",    # Generic[T] vs class Foo[T]: syntax
+    "UP047",    # TypeVar in function vs def foo[T](): syntax
+
+    # Complexity (Qt widgets can be complex)
+    "PLR0912",  # too-many-branches
+    "PLR0915",  # too-many-statements
+    "PLR0911",  # too-many-return-statements
+    "PLR0913",  # too-many-arguments
+    "PLR2004",  # magic-value-comparison
+    "PLR0904",  # too-many-public-methods
+
+    # Style preferences
+    "SIM102",   # collapsible-if
+    "SIM108",   # if-else-block-instead-of-if-exp
+    "SIM117",   # multiple-with-statements
+    "SIM115",   # open-file-with-context-handler
+
+    # Qt-specific patterns
+    "RUF012",   # mutable class default (Qt signals)
+    "RUF059",   # unused-unpacked-variable
+    "ARG001",   # unused-function-argument
+    "ARG002",   # unused-method-argument
+    "ARG003",   # unused-class-method-argument
+    "ARG004",   # unused-static-method-argument
+    "ARG005",   # unused-lambda-argument
+    "B007",     # unused-loop-control-variable
+    # B023 (function-uses-loop-variable) intentionally NOT ignored - catches real closure bugs
+
+    # Security (desktop app, user controls input)
+    "S101",     # assert-used
+    "S108",     # hardcoded temp file
+    "S110",     # try-except-pass
+    "S112",     # try-except-continue
+    "S301",     # suspicious-pickle-usage
+    "S311",     # pseudo-random-generator
+    "S324",     # insecure-hash-function
+    "S603",     # subprocess-without-shell-equals-true
+    "S607",     # start-process-with-partial-path
+
+    # Exceptions
+    "TRY002",   # raise-vanilla-class
+    "TRY003",   # raise-vanilla-args
+    "TRY300",   # consider-else-block
+    "TRY301",   # raise-within-except
+    "TRY400",   # logging-error-instead-of-exception
+    "TRY401",   # verbose-log-message
+    "EM101",    # raw-string-in-exception
+    "EM102",    # f-string-in-exception
+
+    # Boolean trap (Qt APIs use bool params)
+    "FBT001",   # boolean-positional-arg-in-function-definition
+    "FBT002",   # boolean-default-value-positional-argument
+    "FBT003",   # boolean-positional-value-in-function-call
+
+    # Type checking imports
+    "TC001",    # typing-only-first-party-import
+    "TC002",    # typing-only-third-party-import
+    "TC003",    # typing-only-standard-library-import
+    "TC006",    # typing-cast-quotes
+
+    # Naming (Qt uses camelCase)
+    "N802",     # invalid-function-name
+    "N803",     # invalid-argument-name
+    "N806",     # non-lowercase-variable-in-function
+    "N812",     # lowercase-imported-as-non-lowercase
+    "N813",     # camelcase-imported-as-lowercase
+    "N815",     # mixed-case-variable-in-class-scope
+    "N818",     # error-suffix-on-exception-name
+
+    # Other pragmatic ignores
+    "INP001",   # implicit-namespace-package
+    "RET504",   # unnecessary-assign
+    "RET505",   # superfluous-else-return
+    "RET506",   # superfluous-else-raise
+    "PIE790",   # unnecessary-pass
+    "PERF203",  # try-except-in-loop
+    "PERF401",  # manual-list-comprehension
+    "PERF402",  # manual-list-copy
+    "PLW1510",  # subprocess-run-without-check
+    "PLW1641",  # eq-without-hash
+    "PLW2901",  # redefined-loop-name
+    "PLW0603",  # global-statement
+    "PLR1704",  # redefining-argument-with-local-name
+    "G004",     # logging-f-string
+    "G003",     # logging-plus-concat
+    "G201",     # logging-exc-info
+    "PYI024",   # collections-named-tuple
+    "PYI034",   # non-self-return-type
+    "PYI036",   # bad-exit-annotation
+    "PYI041",   # redundant-numeric-union
+    "PYI056",   # unsupported-method-call-on-typevar
+    "E712",     # true-false-comparison
+    "SIM103",   # needless-bool
+    "SIM105",   # suppressible-exception
+    "ERA001",   # commented-out-code
+    "ICN001",   # unconventional-import-alias
+    "RUF034",   # useless-if-else
+    "PIE810",   # call-single-arg-startswith-endswith
+    "LOG015",   # root-logger-call
+    "PT013",    # incorrect-pytest-import
+    "A001",     # shadowing-builtin-variable
+    "A002",     # shadowing-builtin
+    "TRY004",   # type-check-without-type-error
+
+    # New rule relaxations
+    "SLF001",   # private-member-access (Qt often requires this)
+    "TD002",    # missing-todo-author
+    "TD003",    # missing-todo-link
+    "FIX002",   # line-contains-todo (we track TODOs, don't error)
+    "COM812",   # missing-trailing-comma (conflicts with formatter)
+    "Q000",     # bad-quotes-inline-string (handled by formatter)
+    "Q001",     # bad-quotes-multiline-string
+    "Q002",     # bad-quotes-docstring
+    "FA100",    # future-rewritable-type-annotation (gradual migration)
+    "DTZ005",   # datetime.now() without tz (local timestamps are fine)
+    "DTZ007",   # strptime without %z (local parsing is fine)
+
+    # Pathlib (PTH) - gradual adoption
+    "PTH123",   # builtin-open (open() is fine, Path.read_text() not always better)
+    "PTH118",   # os-path-join (too many to fix now, gradual migration)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "E402"]
+"tests/**/*.py" = [
+    "S",        # security (test code)
+    "PLR2004",  # magic values
+    "B017",     # assert raises
+    "B018",     # useless expression
+    "RUF",      # ruff rules
+    "F401",     # unused imports (fixtures)
+    "F821",     # undefined names (skipped test files may have stale refs)
+    "ARG",      # unused arguments (fixtures)
+    "PT",       # pytest style
+    "ERA001",   # commented code
+    "N",        # naming
+    "TD",       # todos (test code often has TODOs)
+    "FIX",      # fixmes
+    "T20",      # print statements (debug in tests is fine)
+]
+"benchmarks/**/*.py" = [
+    "T20",      # print statements (benchmark output)
+    "TD",       # todos
+    "FIX",      # fixmes
+]
+"examples/**/*.py" = [
+    "T20",      # print statements (example output)
+    "TD",       # todos
+    "FIX",      # fixmes
+]
+"docs/**/*.py" = [
+    "T20",      # print statements (documentation examples)
+    "TD",       # todos
+    "FIX",      # fixmes
+]
+"core/console_error_handler.py" = ["T20"]  # Console handler uses print by design
+"core/di_container.py" = ["T20"]  # Example code in __main__ block
+"utils/*error*handler*.py" = ["T20"]  # Error handlers print to stderr
+"**/conftest.py" = ["ARG", "PT", "F401"]
+"mesen2_integration/*.py" = ["E722", "B904", "T201", "T20", "S", "TD", "FIX"]
+"scripts/*.py" = ["E722", "B904", "F401", "T201", "T20", "INP001", "RUF", "TD", "FIX"]
+"compile_hal_tools.py" = ["T201", "T20", "INP001"]  # CLI script that prints to user
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "ui", "utils"]
+force-single-line = false
+combine-as-imports = true
+split-on-trailing-comma = true
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "double"
+
+[tool.ruff.lint.flake8-import-conventions.extend-aliases]
+"numpy" = "np"
+"PIL.Image" = "PILImage"
+
+[tool.ruff.lint.pylint]
+max-args = 10
+max-branches = 15
+max-returns = 8
+max-statements = 60
+
+# ============================================================================
+# Basedpyright Configuration (STRICT)
+# ============================================================================
+[tool.basedpyright]
+include = ["core", "ui", "utils"]
+exclude = [
+    "**/__pycache__",
+    "**/.*",
+    "build",
+    "dist",
+    "tests",
+    "mesen2_integration",
+    "scripts",
+]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+
+# Point to the local venv so basedpyright can find PySide6 stubs
+venvPath = "."
+venv = ".venv"
+
+# STRICT MODE
+typeCheckingMode = "strict"
+
+# Core type safety (all enabled)
+reportMissingImports = true
+reportInvalidTypeForm = true
+reportDuplicateImport = true
+reportIncompatibleMethodOverride = true
+reportIncompatibleVariableOverride = true
+reportInconsistentConstructor = true
+reportUnnecessaryIsInstance = true
+reportUnnecessaryCast = true
+reportUnnecessaryComparison = true
+reportAssertAlwaysTrue = true
+reportSelfClsParameterName = true
+reportInvalidStubStatement = true
+reportIncompleteStub = true
+reportUndefinedVariable = true
+reportUnboundVariable = true
+reportInvalidStringEscapeSequence = true
+reportMatchNotExhaustive = true
+
+# Now errors instead of warnings
+reportUnusedImport = true
+reportUnusedClass = true
+reportUnusedFunction = true
+reportUnusedVariable = true
+reportMissingTypeArgument = true
+reportUnreachable = true
+
+# Stricter checks
+reportMissingParameterType = true
+reportCallInDefaultInitializer = true
+reportImplicitStringConcatenation = false
+reportPrivateImportUsage = true
+reportConstantRedefinition = false
+reportImplicitOverride = true
+reportPropertyTypeMismatch = true
+reportTypeCommentUsage = true
+
+# Additional strict checks (enabled after cleanup)
+reportUnnecessaryTypeIgnoreComment = true  # Catch stale type: ignore comments
+reportDeprecated = true  # Catch deprecated API usage
+reportInvalidTypeVarUse = true  # Catch TypeVar misuse
+
+# Qt-specific relaxations
+reportMissingTypeStubs = false
+reportUnknownParameterType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportUnusedCallResult = false
+reportAny = false
+reportExplicitAny = true  # Catch explicit Any usage; address gradually
+reportPrivateUsage = false
+reportUntypedFunctionDecorator = false
+reportUntypedClassDecorator = false
+reportUntypedBaseClass = false
+reportUntypedNamedTuple = false
+
+# ============================================================================
+# Pytest Configuration
+# ============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+pythonpath = ["."]
+
+# Show extra test summary info
+# -ra: show summary of all non-passing tests
+# --maxfail=3: stop after 3 failures (override with --maxfail=N)
+# --strict-markers: error on unknown markers
+# -n auto: parallel execution with pytest-xdist (use -n 0 for serial debugging)
+# --dist=loadscope: group tests by module/class to minimize fixture setup
+# -m 'not slow and not perf': exclude slow and perf tests by default (run with -m slow, -m perf, or -m "")
+addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -n auto --dist=loadscope -m 'not slow and not perf'"
+
+# Qt-specific settings for pytest-qt
+qt_api = "pyside6"
+
+# Test collection settings
+norecursedirs = [".git", "__pycache__", "*.egg-info", ".pytest_cache", "venv", ".venv"]
+
+# pytest-timeout settings
+# NOTE: This is the GLOBAL test execution timeout (30s per test).
+# This is DIFFERENT from semantic timeouts in tests/fixtures/timeouts.py
+# (worker_timeout, signal_timeout, etc.) which are for Qt signal/event waits.
+# Individual tests needing more time should use @pytest.mark.timeout(60).
+timeout = 30
+timeout_method = "thread"
+
+filterwarnings = [
+    "ignore::DeprecationWarning:PySide6",
+    "ignore::RuntimeWarning:PySide6",
+    "ignore:.*QApplication.*:RuntimeWarning",
+    "ignore:.*QThread.*:RuntimeWarning",
+    # Qt deprecated QMouseEvent constructor
+    "ignore:.*QMouseEvent.*deprecated:DeprecationWarning",
+    # multiprocessing fork warning in multi-threaded process (expected in tests)
+    "ignore:.*multi-threaded.*use of fork.*:DeprecationWarning",
+    # pytest-benchmark warning when running with xdist (expected)
+    "ignore:Benchmarks are automatically disabled:pytest_benchmark.logger.PytestBenchmarkWarning",
+]
+
+# Markers used in the test suite (consolidated from 65 to 16 based on actual usage)
+markers = [
+    # Categorization markers
+    "gui: GUI tests requiring Qt (run with QT_QPA_PLATFORM=offscreen)",
+    "headless: Tests that can run without display",
+    "integration: Integration tests (cross-component)",
+    "benchmark: Performance benchmarking tests",
+    "performance: Performance/timing tests",
+    "perf: Performance tests excluded from default runs (run with -m perf)",
+    "slow: Slow tests (>1s execution time)",
+
+    # Functional markers (affect test behavior)
+    "requires_display: Tests requiring real display (skipped in offscreen mode)",
+    "qt_no_exception_capture: Disable Qt exception capture for this test",
+    "no_manager_setup: Skip manager initialization for this test",
+    "shared_state_safe: REQUIRED when using session_managers fixture",
+    "allows_registry_state: Allow registry state without manager fixtures",
+    "skip_thread_cleanup: Skip thread cleanup verification (requires reason argument)",
+    "real_hal: Use real HAL components (requires exhal binary)",
+    "golden_hal: Verify HAL output against recorded golden checksums",
+    "no_qt: Skip Qt app/thread cleanup for tests that do not use Qt",
+
+    # Execution control
+    "parallel_unsafe: Force test to run serially (has hidden shared state)",
+]

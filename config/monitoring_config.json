@@ -1,0 +1,102 @@
+{
+  "monitoring": {
+    "enabled": true,
+    "environment": "production",
+    "health_check_interval_ms": 60000,
+    "export_format": "json",
+    "retention_hours": 168,
+    "thresholds": {
+      "cpu_percent": {
+        "warning": 50.0,
+        "critical": 80.0
+      },
+      "memory_mb": {
+        "warning": 500.0,
+        "critical": 1000.0
+      },
+      "memory_percent": {
+        "warning": 20.0,
+        "critical": 40.0
+      },
+      "thread_count": {
+        "warning": 50,
+        "critical": 100
+      },
+      "file_descriptors": {
+        "warning": 100,
+        "critical": 200
+      },
+      "operation_duration_ms": {
+        "rom_loading": {
+          "warning": 1000,
+          "critical": 5000
+        },
+        "sprite_extraction": {
+          "warning": 100,
+          "critical": 500
+        },
+        "thumbnail_generation": {
+          "warning": 50,
+          "critical": 200
+        },
+        "cache_lookup": {
+          "warning": 10,
+          "critical": 50
+        }
+      }
+    },
+    "sampling": {
+      "performance_sample_rate": 1.0,
+      "error_sample_rate": 1.0,
+      "usage_sample_rate": 1.0,
+      "health_sample_rate": 1.0
+    },
+    "export": {
+      "enabled": true,
+      "path": "./monitoring_data",
+      "rotation": {
+        "enabled": true,
+        "max_files": 7,
+        "max_size_mb": 100
+      }
+    },
+    "alerts": {
+      "enabled": true,
+      "channels": ["log", "file"],
+      "rules": [
+        {
+          "name": "high_memory_usage",
+          "condition": "memory_percent > 30",
+          "severity": "warning",
+          "cooldown_minutes": 15
+        },
+        {
+          "name": "critical_memory_usage",
+          "condition": "memory_percent > 40",
+          "severity": "critical",
+          "cooldown_minutes": 5
+        },
+        {
+          "name": "high_error_rate",
+          "condition": "error_rate > 0.05",
+          "severity": "warning",
+          "cooldown_minutes": 30
+        },
+        {
+          "name": "slow_operations",
+          "condition": "p95_duration > 2000",
+          "severity": "warning",
+          "cooldown_minutes": 60
+        }
+      ]
+    },
+    "features": {
+      "track_performance": true,
+      "track_errors": true,
+      "track_usage": true,
+      "track_health": true,
+      "generate_reports": true,
+      "auto_cleanup": true
+    }
+  }
+}

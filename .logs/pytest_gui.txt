@@ -1,0 +1,810 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/bin/python3
+cachedir: .pytest_cache
+PySide6 6.10.1 -- Qt runtime 6.10.1 -- Qt compiled 6.10.1
+rootdir: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+configfile: pyproject.toml
+testpaths: tests
+plugins: cov-7.0.0, mock-3.15.1, qt-4.5.0, timeout-2.4.0
+timeout: 30.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 2056 items / 1676 deselected / 4 skipped / 380 selected
+
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_worker_initialization_and_cleanup SKIPPED [  0%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_real_controller_integration SKIPPED [  0%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_idle_detection_prevents_infinite_loop SKIPPED [  0%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_processing_with_auto_stop SKIPPED [  1%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_memory_cleanup_after_processing SKIPPED [  1%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_concurrent_queue_operations SKIPPED [  1%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_stop_request_interrupts_processing SKIPPED [  1%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_cache_functionality_and_limits SKIPPED [  2%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_cleanup_method_comprehensive SKIPPED [  2%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerIntegration::test_error_handling_during_processing SKIPPED [  2%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerPerformance::test_throughput_performance SKIPPED [  2%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerPerformance::test_memory_usage_with_large_cache SKIPPED [  3%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerThreadSafety::test_thread_safety_with_multiple_workers SKIPPED [  3%]
+tests/integration/test_batch_thumbnail_worker_integration.py::TestBatchThumbnailWorkerThreadSafety::test_signal_thread_safety SKIPPED [  3%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_complete_rom_to_fullscreen_workflow PASSED [  3%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_gallery_window_lifecycle_memory_safety PASSED [  4%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_fullscreen_viewer_navigation_workflow PASSED [  4%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_sprite_extraction_end_to_end SKIPPED [  4%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_large_rom_performance_workflow PASSED [  5%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_concurrent_operations_workflow PASSED [  5%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_error_recovery_workflow PASSED [  5%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestUIWorkflowPerformanceIntegration::test_rapid_rom_switching_performance PASSED [  5%]
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestUIWorkflowPerformanceIntegration::test_ui_responsiveness_during_processing PASSED [  6%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_keyboard_navigation_through_all_sprites PASSED [  6%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_edge_cases_single_sprite PASSED [  6%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_empty_sprite_data_handling PASSED [  6%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_info_overlay_toggle PASSED [  7%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_smooth_scaling_toggle PASSED [  7%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_escape_key_closes_viewer PASSED [  7%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_memory_usage_with_large_sprite_set PASSED [  7%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_signal_emissions_accuracy PASSED [  8%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenSpriteViewerIntegration::test_transition_timer_delays_display_update PASSED [  8%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenViewerCleanupIntegration::test_proper_cleanup_on_close PASSED [  8%]
+tests/integration/test_fullscreen_sprite_viewer_integration.py::TestFullscreenViewerCleanupIntegration::test_no_signal_leaks_after_close PASSED [  8%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_window_initialization_and_cleanup PASSED [  9%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_rom_loading_workflow PASSED [  9%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_rom_scanning_with_proper_cleanup PASSED [  9%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_thumbnail_generation_lifecycle PASSED [ 10%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_memory_management_with_large_sprite_set PASSED [ 10%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_worker_cleanup_prevents_thread_leaks PASSED [ 10%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_fullscreen_viewer_integration PASSED [ 10%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_sprite_extraction_workflow PASSED [ 11%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_scan_timeout_handling PASSED [ 11%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_virtual_scrolling_performance PASSED [ 11%]
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_concurrent_worker_management PASSED [ 11%]
+tests/integration/test_gallery_window_integration.py::TestGalleryWindowPerformance::test_thumbnail_generation_performance PASSED [ 12%]
+tests/integration/test_gallery_window_integration.py::TestGalleryWindowPerformance::test_window_resize_performance PASSED [ 12%]
+tests/integration/test_integration_manual_offset.py::TestManualOffsetDialog::test_dialog_creation_and_display PASSED [ 12%]
+tests/integration/test_integration_manual_offset.py::TestManualOffsetDialog::test_slider_navigation PASSED [ 12%]
+tests/integration/test_integration_manual_offset.py::TestManualOffsetDialog::test_manual_offset_input PASSED [ 13%]
+tests/integration/test_integration_manual_offset.py::TestManualOffsetDialog::test_find_sprites_button_click PASSED [ 13%]
+tests/integration/test_integration_manual_offset.py::TestManualOffsetDialog::test_preview_generation_on_offset_change PASSED [ 13%]
+tests/integration/test_integration_manual_offset.py::TestManualOffsetDialog::test_next_prev_navigation PASSED [ 13%]
+tests/integration/test_integration_manual_offset.py::TestSpriteScanDialog::test_sprite_scan_with_results PASSED [ 14%]
+tests/integration/test_integration_manual_offset.py::TestSpriteScanDialog::test_sprite_selection_navigation PASSED [ 14%]
+tests/integration/test_integration_manual_offset.py::TestDialogIntegrationWithPanel::test_dialog_opens_from_panel PASSED [ 14%]
+tests/integration/test_integration_manual_offset.py::TestDialogIntegrationWithPanel::test_dialog_offset_sync_with_panel PASSED [ 15%]
+tests/integration/test_integration_manual_offset.py::TestDialogIntegrationWithPanel::test_multiple_dialog_opens_reuse_singleton PASSED [ 15%]
+tests/integration/test_integration_preview_system.py::TestSimplePreviewCoordinator::test_coordinator_initialization PASSED [ 15%]
+tests/integration/test_integration_preview_system.py::TestSimplePreviewCoordinator::test_preview_request_with_debouncing PASSED [ 15%]
+tests/integration/test_integration_preview_system.py::TestSimplePreviewCoordinator::test_preview_generation_with_real_data SKIPPED [ 16%]
+tests/integration/test_integration_preview_system.py::TestSimplePreviewCoordinator::test_preview_with_hal_decompression SKIPPED [ 16%]
+tests/integration/test_integration_preview_system.py::TestSimplePreviewCoordinator::test_coordinator_cleanup PASSED [ 16%]
+tests/integration/test_integration_preview_system.py::TestSimplePreviewWorker::test_worker_generates_preview SKIPPED [ 16%]
+tests/integration/test_integration_preview_system.py::TestSimplePreviewWorker::test_worker_with_compressed_sprite SKIPPED [ 17%]
+tests/integration/test_integration_preview_system.py::TestPreviewCaching::test_preview_cache_integration PASSED [ 17%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_rom_cache_memory_limits PASSED [ 17%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_thumbnail_cache_memory_management PASSED [ 17%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_weak_references_prevent_leaks PASSED [ 18%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_component_cleanup_releases_memory SKIPPED [ 18%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_large_rom_data_cleanup SKIPPED [ 18%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_pixmap_memory_management SKIPPED [ 18%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_memory_stress_with_repeated_operations SKIPPED [ 19%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_circular_reference_prevention PASSED [ 19%]
+tests/integration/test_memory_management_integration.py::TestMemoryManagementIntegration::test_cache_eviction_policies PASSED [ 19%]
+tests/integration/test_qt_signal_slot_integration.py::TestDialogSignalConnections::test_dialog_signals_exist PASSED [ 20%]
+tests/integration/test_qt_signal_slot_integration.py::TestDialogSignalConnections::test_offset_changed_emission PASSED [ 20%]
+tests/integration/test_qt_signal_slot_integration.py::TestDialogSignalConnections::test_sprite_found_emission PASSED [ 20%]
+tests/integration/test_qt_signal_slot_integration.py::TestDialogSignalConnections::test_multiple_rapid_emissions SKIPPED [ 20%]
+tests/integration/test_qt_signal_slot_integration.py::TestDialogSignalConnections::test_signal_connection_types SKIPPED [ 21%]
+tests/integration/test_qt_signal_slot_integration.py::TestThreadSafetyAndTiming::test_signal_thread_affinity SKIPPED [ 21%]
+tests/integration/test_qt_signal_slot_integration.py::TestThreadSafetyAndTiming::test_worker_thread_signal_emission SKIPPED [ 21%]
+tests/integration/test_qt_signal_slot_integration.py::TestThreadSafetyAndTiming::test_signal_emission_timing SKIPPED [ 21%]
+tests/integration/test_qt_signal_slot_integration.py::TestThreadSafetyAndTiming::test_high_frequency_emissions SKIPPED [ 22%]
+tests/integration/test_qt_signal_slot_integration.py::TestSignalBlockingAndError::test_blocked_signals SKIPPED [ 22%]
+tests/integration/test_qt_signal_slot_integration.py::TestSignalBlockingAndError::test_exception_in_slot SKIPPED [ 22%]
+tests/integration/test_qt_signal_slot_integration.py::TestSignalBlockingAndError::test_deleted_receiver SKIPPED [ 22%]
+tests/integration/test_qt_threading_signals.py::TestCrossThreadSignals::test_queued_connection_cross_thread SKIPPED [ 23%]
+tests/integration/test_qt_threading_signals.py::TestCrossThreadSignals::test_direct_connection_same_thread SKIPPED [ 23%]
+tests/integration/test_qt_threading_signals.py::TestCrossThreadSignals::test_blocking_queued_connection SKIPPED [ 23%]
+tests/integration/test_qt_threading_signals.py::TestSignalParameterMarshalling::test_primitive_types_marshalling SKIPPED [ 23%]
+tests/integration/test_qt_threading_signals.py::TestSignalParameterMarshalling::test_complex_object_marshalling SKIPPED [ 24%]
+tests/integration/test_qt_threading_signals.py::TestThreadAffinity::test_parent_child_thread_affinity SKIPPED [ 24%]
+tests/integration/test_qt_threading_signals.py::TestThreadAffinity::test_object_creation_after_move SKIPPED [ 24%]
+tests/integration/test_qt_threading_signals.py::TestSignalSynchronization::test_wait_condition_pattern SKIPPED [ 25%]
+tests/integration/test_qt_threading_signals.py::TestSignalSynchronization::test_event_loop_synchronization SKIPPED [ 25%]
+tests/integration/test_qt_threading_signals.py::TestDeadlockPrevention::test_signal_emission_outside_lock SKIPPED [ 25%]
+tests/integration/test_qt_threading_signals.py::TestDeadlockPrevention::test_unique_connection_prevents_duplicates SKIPPED [ 25%]
+tests/integration/test_qt_threading_signals.py::TestHighConcurrency::test_multiple_threads_single_receiver SKIPPED [ 26%]
+tests/integration/test_qt_threading_signals.py::TestHighConcurrency::test_signal_storm_handling SKIPPED [ 26%]
+tests/integration/test_sprite_gallery_integration.py::TestSpriteGalleryTab::test_gallery_initialization PASSED [ 26%]
+tests/integration/test_sprite_gallery_integration.py::TestSpriteGalleryTab::test_set_sprites PASSED [ 26%]
+tests/integration/test_sprite_gallery_integration.py::TestSpriteGalleryTab::test_thumbnail_generation PASSED [ 27%]
+tests/integration/test_sprite_gallery_integration.py::TestSpriteGalleryTab::test_gallery_no_stretching_embedded SKIPPEDa) [ 27%]
+tests/integration/test_sprite_gallery_integration.py::TestDetachedGalleryWindow::test_open_detached_gallery PASSED [ 27%]
+tests/integration/test_sprite_gallery_integration.py::TestDetachedGalleryWindow::test_detached_gallery_thumbnails_copied SKIPPED [ 27%]
+tests/integration/test_sprite_gallery_integration.py::TestDetachedGalleryWindow::test_detached_gallery_proper_scrolling SKIPPEDa) [ 28%]
+tests/integration/test_sprite_gallery_integration.py::TestDetachedGalleryWindow::test_detached_window_signals PASSED [ 28%]
+tests/integration/test_sprite_gallery_integration.py::TestDetachedGalleryWindow::test_detached_window_close_cleanup PASSED [ 28%]
+tests/integration/test_sprite_gallery_integration.py::TestGalleryLayoutFixes::test_gallery_columns_update SKIPPED pattern) [ 28%]
+tests/integration/test_sprite_gallery_integration.py::TestGalleryLayoutFixes::test_gallery_force_layout_update SKIPPED pattern) [ 29%]
+tests/integration/test_sprite_gallery_integration.py::TestGalleryLayoutFixes::test_thumbnail_size_change SKIPPED pattern) [ 29%]
+tests/integration/test_sprite_gallery_integration.py::TestGalleryLayoutFixes::test_gallery_filtering SKIPPED pattern) [ 29%]
+tests/integration/test_sprite_gallery_integration.py::TestGalleryCaching::test_cache_save PASSED [ 30%]
+tests/integration/test_sprite_gallery_integration.py::TestGalleryCaching::test_cache_load PASSED [ 30%]
+tests/integration/test_sprite_gallery_integration.py::TestGalleryIntegration::test_complete_workflow PASSED [ 30%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_basic_worker_lifecycle PASSED [ 30%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_worker_replacement_cleanup PASSED [ 31%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_concurrent_worker_cleanup_safety PASSED [ 31%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_signal_disconnection_prevents_leaks PASSED [ 31%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_memory_leak_prevention PASSED [ 31%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_worker_interruption_handling PASSED [ 32%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_cleanup_during_execution PASSED [ 32%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_massive_worker_lifecycle_stress PASSED [ 32%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerManagerPatterns::test_singleton_worker_pattern PASSED [ 32%]
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerManagerPatterns::test_worker_pool_pattern PASSED [ 33%]
+tests/test_base_manager.py::TestBaseManager::test_abstract_class_cannot_be_instantiated PASSED [ 33%]
+tests/test_base_manager.py::TestBaseManager::test_concrete_manager_creation PASSED [ 33%]
+tests/test_base_manager.py::TestBaseManager::test_default_name PASSED    [ 33%]
+tests/test_base_manager.py::TestBaseManager::test_operation_tracking PASSED [ 34%]
+tests/test_base_manager.py::TestBaseManager::test_validation_required PASSED [ 34%]
+tests/test_base_manager.py::TestBaseManager::test_validation_type PASSED [ 34%]
+tests/test_base_manager.py::TestBaseManager::test_validation_file_exists PASSED [ 35%]
+tests/test_base_manager.py::TestBaseManager::test_validation_range PASSED [ 35%]
+tests/test_base_manager.py::TestBaseManager::test_signal_emission PASSED [ 35%]
+tests/test_base_manager.py::TestBaseManager::test_operation_lock PASSED  [ 35%]
+tests/test_base_manager.py::TestBaseManager::test_error_handling_with_operation PASSED [ 36%]
+tests/test_circular_dependency_fix.py::TestCircularDependencyFix::test_main_window_creates_without_controller PASSED [ 36%]
+tests/test_circular_dependency_fix.py::TestCircularDependencyFix::test_controller_created_on_first_access SKIPPEDite. Lazy init
+behavior is verified by test_main_window_creates_without_controller.)    [ 36%]
+tests/test_circular_dependency_fix.py::TestCircularDependencyFix::test_controller_returns_same_instance SKIPPEDite. Caching
+behavior is verified by test_controller_setter_works.)                   [ 36%]
+tests/test_circular_dependency_fix.py::TestCircularDependencyFix::test_controller_setter_works PASSED [ 37%]
+tests/test_circular_dependency_fix.py::TestCircularDependencyFix::test_controller_methods_work_after_lazy_init SKIPPEDite. Method
+dispatch is verified by test_controller_setter_works using mock.)        [ 37%]
+tests/test_circular_dependency_fix.py::TestCircularDependencyFix::test_no_circular_import_at_module_level PASSED [ 37%]
+tests/test_circular_dependency_fix.py::TestCircularDependencyFix::test_main_window_creation_doesnt_hang PASSED [ 37%]
+tests/test_circular_dependency_fix.py::TestCircularDependencyFix::test_multiple_main_windows_independent_controllers SKIPPED Independent
+controllers is an implementation detail - main concern (lazy init) is
+tested.)                                                                 [ 38%]
+tests/test_complete_ui_workflows_integration.py::TestCompleteUIWorkflowsIntegration::test_app_startup_dark_theme_rom_loading_workflow PASSED [ 38%]
+tests/test_complete_ui_workflows_integration.py::TestCompleteUIWorkflowsIntegration::test_manual_offset_dialog_interaction_workflow PASSED [ 38%]
+tests/test_complete_ui_workflows_integration.py::TestCompleteUIWorkflowsIntegration::test_sprite_found_signal_propagation_workflow PASSED [ 38%]
+tests/test_complete_ui_workflows_integration.py::TestCompleteUIWorkflowsIntegration::test_manual_offset_tab_switching_state_preservation_workflow PASSED [ 39%]
+tests/test_complete_ui_workflows_integration.py::TestCompleteUIWorkflowsIntegration::test_window_resize_layout_theme_preservation_workflow PASSED [ 39%]
+tests/test_complete_ui_workflows_integration.py::TestCompleteUIWorkflowsIntegration::test_ui_responsiveness_during_workflows PASSED [ 39%]
+tests/test_complete_ui_workflows_integration.py::TestCompleteUIWorkflowsIntegration::test_error_recovery_in_ui_workflows PASSED [ 40%]
+tests/test_complete_user_workflow_integration.py::TestWorkflowIntegrationPoints::test_signal_flow_integration PASSED [ 40%]
+tests/test_complete_user_workflow_integration.py::TestWorkflowIntegrationPoints::test_ui_state_consistency_during_workflow PASSED [ 40%]
+tests/test_complete_user_workflow_integration.py::TestWorkflowIntegrationPoints::test_component_cleanup_integration PASSED [ 40%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_controller_initialization_real PASSED [ 41%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_controller_ui_signal_connections_real PASSED [ 41%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_extraction_parameter_validation_real PASSED [ 41%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_extraction_parameter_validation_cgram_required_real PASSED [ 41%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_extraction_file_validation_real PASSED [ 42%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_successful_extraction_worker_creation_real PASSED [ 42%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_worker_signal_connections_real PASSED [ 42%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_manager_signal_connections_real PASSED [ 42%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_error_handling_real_validation_errors PASSED [ 43%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_rom_extraction_worker_creation_real PASSED [ 43%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_worker_cleanup_real PASSED [ 43%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_injection_workflow_real PASSED [ 43%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_preview_update_with_offset_real PASSED [ 44%]
+tests/test_controller_real.py::TestExtractionControllerReal::test_controller_real_error_handler_integration PASSED [ 44%]
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_extraction_to_grid_arrangement_workflow_real SKIPPEDng or
+valid test sprites.)                                                     [ 44%]
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_extraction_to_injection_workflow_real PASSED [ 45%]
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_settings_dialog_real_manager_integration PASSED [ 45%]
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_controller_real_manager_coordination PASSED [ 45%]
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_dialog_lifecycle_real_qt_behavior SKIPPEDgeBox mocking or
+valid test sprites.)                                                     [ 45%]
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_real_integration_catches_architectural_bugs PASSED [ 46%]
+tests/test_dark_theme_integration.py::TestApplicationThemeIntegration::test_application_dark_palette_creation PASSED [ 46%]
+tests/test_dark_theme_integration.py::TestApplicationThemeIntegration::test_global_dark_theme_stylesheet_application PASSED [ 46%]
+tests/test_dark_theme_integration.py::TestApplicationThemeIntegration::test_dark_theme_with_real_widgets PASSED [ 46%]
+tests/test_dark_theme_integration.py::TestPreviewWidgetDarkTheme::test_sprite_preview_widget_dark_backgrounds PASSED [ 47%]
+tests/test_dark_theme_integration.py::TestPreviewWidgetDarkTheme::test_zoomable_preview_widget_dark_backgrounds PASSED [ 47%]
+tests/test_dark_theme_integration.py::TestPreviewWidgetDarkTheme::test_preview_label_with_dark_preview_style PASSED [ 47%]
+tests/test_dark_theme_integration.py::TestPreviewWidgetDarkTheme::test_preview_with_mock_pixmap PASSED [ 47%]
+tests/test_dark_theme_integration.py::TestStylesheetIntegration::test_button_styling_integration PASSED [ 48%]
+tests/test_dark_theme_integration.py::TestStylesheetIntegration::test_input_styling_integration PASSED [ 48%]
+tests/test_dark_theme_integration.py::TestStylesheetIntegration::test_group_box_styling_integration PASSED [ 48%]
+tests/test_dark_theme_integration.py::TestStylesheetIntegration::test_nested_widget_styling PASSED [ 48%]
+tests/test_dark_theme_integration.py::TestThemeConsistency::test_color_consistency_across_widgets PASSED [ 49%]
+tests/test_dark_theme_integration.py::TestThemeConsistency::test_theme_performance_with_many_widgets PASSED [ 49%]
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_manual_offset_dialog_creation PASSED [ 49%]
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_settings_dialog_creation PASSED [ 50%]
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_injection_dialog_creation SKIPPED). This is a Qt testing environment
+issue, not a code bug. The dialog works correctly in the actual
+application.)                                                            [ 50%]
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_user_error_dialog_creation PASSED [ 50%]
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_resume_scan_dialog_creation PASSED [ 50%]
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_row_arrangement_dialog_creation PASSED [ 51%]
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_grid_arrangement_dialog_creation PASSED [ 51%]
+tests/test_dialog_instantiation.py::TestDialogMethodCalls::test_manual_offset_dialog_methods PASSED [ 51%]
+tests/test_dialog_instantiation.py::TestInitializationOrder::test_no_overwritten_widgets PASSED [ 51%]
+tests/test_dialog_lifecycle.py::TestDialogLifecycle::test_manual_offset_dialog_normal_lifecycle PASSED [ 52%]
+tests/test_dialog_lifecycle.py::TestDialogLifecycle::test_dialog_with_parent_lifecycle PASSED [ 52%]
+tests/test_dialog_lifecycle.py::TestDialogReopenScenarios::test_non_singleton_dialog_lifecycle PASSED [ 52%]
+tests/test_dialog_lifecycle.py::test_dialog_lifecycle_best_practices PASSED [ 52%]
+tests/test_error_handler.py::TestErrorHandler::test_error_handler_emits_signals PASSED [ 53%]
+tests/test_error_handler.py::TestErrorHandler::test_error_handler_handles_exceptions PASSED [ 53%]
+tests/test_error_handler.py::TestErrorHandler::test_error_handler_singleton PASSED [ 53%]
+tests/test_error_handler.py::TestErrorHandler::test_custom_signal_handlers PASSED [ 53%]
+tests/test_image_utils.py::TestPilToQPixmap::test_valid_image_conversion SKIPPED [ 54%]
+tests/test_image_utils.py::TestPilToQPixmap::test_rgba_image_conversion SKIPPED [ 54%]
+tests/test_image_utils.py::TestPilToQPixmap::test_grayscale_image_conversion SKIPPED [ 54%]
+tests/test_image_utils.py::TestPilToQPixmap::test_none_input SKIPPED     [ 55%]
+tests/test_image_utils.py::TestPilToQPixmap::test_empty_image SKIPPED    [ 55%]
+tests/test_image_utils.py::TestPilToQPixmap::test_very_small_image SKIPPED [ 55%]
+tests/test_image_utils.py::TestPilToQPixmap::test_large_image SKIPPED    [ 55%]
+tests/test_image_utils.py::TestPilToQPixmap::test_save_exception_handling SKIPPED [ 56%]
+tests/test_image_utils.py::TestPilToQPixmap::test_loadfromdata_failure SKIPPED [ 56%]
+tests/test_image_utils.py::TestPilToQPixmap::test_different_image_modes SKIPPED [ 56%]
+tests/test_infrastructure_verification.py::TestInfrastructureVerification::test_05_qt_infrastructure PASSED [ 56%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_manager_initialization_real PASSED [ 57%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_vram_injection_validation_real PASSED [ 57%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_rom_injection_validation_real PASSED [ 57%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_vram_injection_workflow_real PASSED [ 57%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_rom_injection_workflow_real PASSED [ 58%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_worker_lifecycle_management_real PASSED [ 58%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_injection_error_handling_real PASSED [ 58%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_concurrent_injection_prevention_real PASSED [ 58%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_manager_signals_real PASSED [ 59%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_metadata_handling_real PASSED [ 59%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_file_size_validation_real PASSED [ 59%]
+tests/test_injection_manager_refactored.py::TestInjectionManagerReal::test_worker_cleanup_on_manager_deletion_real SKIPPEDern) [ 60%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowStateIntegration::test_real_main_window_creation_and_qt_lifecycle PASSED [ 60%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowStateIntegration::test_real_button_state_management_vs_mocked PASSED [ 60%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowStateIntegration::test_real_signal_propagation_vs_mocked_signals PASSED [ 60%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowStateIntegration::test_real_extraction_parameter_gathering_vs_mocked PASSED [ 61%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowStateIntegration::test_real_error_state_recovery_vs_mocked_error_handling PASSED [ 61%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowStateIntegration::test_real_ui_component_integration_vs_mocked_components PASSED [ 61%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowWorkflowIntegration::test_real_extraction_workflow_end_to_end PASSED [ 61%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowWorkflowIntegration::test_real_session_management_vs_mocked_session PASSED [ 62%]
+tests/test_main_window_state_integration_real.py::TestRealMainWindowWorkflowIntegration::test_real_menu_integration_vs_mocked_menus PASSED [ 62%]
+tests/test_main_window_state_integration_real.py::TestBugDiscoveryRealVsMocked::test_discovered_bug_qt_widget_hierarchy_issues PASSED [ 62%]
+tests/test_main_window_state_integration_real.py::TestBugDiscoveryRealVsMocked::test_discovered_bug_real_signal_connection_timing PASSED [ 62%]
+tests/test_main_window_state_integration_real.py::TestBugDiscoveryRealVsMocked::test_discovered_bug_widget_state_synchronization PASSED [ 63%]
+tests/test_main_window_state_integration_real.py::TestBugDiscoveryRealVsMocked::test_discovered_bug_button_enabled_but_no_action PASSED [ 63%]
+tests/test_navigation.py::test_navigation SKIPPED (Manual test script -
+requires dialog fixture setup)                                           [ 63%]
+tests/test_qt_infrastructure.py::test_qt_gui_functionality PASSED        [ 63%]
+tests/test_recent_ui_improvements_integration.py::TestSpritePalAppDarkThemeIntegration::test_spritepal_app_dark_theme_applied SKIPPEDeady
+exists (managed by pytest-qt))                                           [ 64%]
+tests/test_recent_ui_improvements_integration.py::TestSpritePalAppDarkThemeIntegration::test_spritepal_app_comprehensive_stylesheet_applied SKIPPED [ 64%]
+tests/test_recent_ui_improvements_integration.py::TestSpritePalAppDarkThemeIntegration::test_spritepal_app_with_main_window_size SKIPPEDeady
+exists (managed by pytest-qt))                                           [ 64%]
+tests/test_recent_ui_improvements_integration.py::TestMainWindowIntegration::test_main_window_size_constants PASSED [ 65%]
+tests/test_recent_ui_improvements_integration.py::TestMainWindowIntegration::test_main_window_with_dark_theme_styling PASSED [ 65%]
+tests/test_recent_ui_improvements_integration.py::TestMainWindowIntegration::test_main_window_palette_integration SKIPPEDvia CSS not palette
+API)                                                                     [ 65%]
+tests/test_recent_ui_improvements_integration.py::TestManualOffsetDialogSignalIntegration::test_manual_offset_dialog_has_required_signals PASSED [ 65%]
+tests/test_recent_ui_improvements_integration.py::TestManualOffsetDialogSignalIntegration::test_manual_offset_dialog_offset_changed_signal_emission SKIPPED [ 66%]
+tests/test_recent_ui_improvements_integration.py::TestManualOffsetDialogSignalIntegration::test_manual_offset_dialog_sprite_found_signal_emission SKIPPED [ 66%]
+tests/test_recent_ui_improvements_integration.py::TestManualOffsetDialogSignalIntegration::test_manual_offset_dialog_with_dark_theme PASSED [ 66%]
+tests/test_recent_ui_improvements_integration.py::TestPreviewWidgetDarkBackgrounds::test_dark_preview_style_colors PASSED [ 66%]
+tests/test_recent_ui_improvements_integration.py::TestPreviewWidgetDarkBackgrounds::test_preview_widget_with_dark_background_applied PASSED [ 67%]
+tests/test_recent_ui_improvements_integration.py::TestPreviewWidgetDarkBackgrounds::test_preview_widget_contrast_with_dark_background PASSED [ 67%]
+tests/test_recent_ui_improvements_integration.py::TestButtonStylingWithGradients::test_button_style_generation_with_gradients PASSED [ 67%]
+tests/test_recent_ui_improvements_integration.py::TestButtonStylingWithGradients::test_button_with_gradient_styling_applied PASSED [ 67%]
+tests/test_recent_ui_improvements_integration.py::TestButtonStylingWithGradients::test_multiple_button_styles_consistency PASSED [ 68%]
+tests/test_recent_ui_improvements_integration.py::TestButtonStylingWithGradients::test_button_hover_state_changes PASSED [ 68%]
+tests/test_recent_ui_improvements_integration.py::TestCompleteUserWorkflowIntegration::test_load_rom_open_dialog_change_offset_workflow SKIPPED [ 68%]
+tests/test_recent_ui_improvements_integration.py::TestCompleteUserWorkflowIntegration::test_theme_consistency_across_workflow ERROR [ 68%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of TestCompleteUserWorkflowIntegration.test_theme_consistency_across_workflow _
+core/managers/registry.py:186: in initialize_managers
+    monitoring_manager = MonitoringManager(parent=qt_parent)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+core/managers/monitoring_manager.py:512: in __init__
+    super().__init__("MonitoringManager", parent)
+core/managers/base_manager.py:64: in __init__
+    self._initialize()
+core/managers/monitoring_manager.py:534: in _initialize
+    self._setup_health_monitoring()
+core/managers/monitoring_manager.py:557: in _setup_health_monitoring
+    self._health_check_interval / 1000.0,  # Convert ms to seconds
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: unsupported operand type(s) for /: 'Mock' and 'float'
+
+The above exception was the direct cause of the following exception:
+.venv/lib/python3.13/site-packages/pytestqt/plugin.py:178: in pytest_runtest_setup
+    result = yield
+             ^^^^^
+tests/fixtures/core_fixtures.py:438: in setup_managers
+    initialize_managers("TestApp", settings_path=settings_path)
+core/managers/registry.py:589: in initialize_managers
+    _ensure_registry().initialize_managers(app_name, settings_path, use_consolidated)
+core/managers/registry.py:218: in initialize_managers
+    raise ManagerError(f"Failed to initialize managers: {e}") from e
+E   core.managers.exceptions.ManagerError: Failed to initialize managers: unsupported operand type(s) for /: 'Mock' and 'float'
+---------------------------- Captured stderr setup -----------------------------
+INFO - spritepal.ManagerRegistry - Initializing managers (consolidated=True)...
+DEBUG - spritepal.ManagerRegistry - Using QApplication as Qt parent for managers
+DEBUG - spritepal.ManagerRegistry - Creating ApplicationStateManager...
+INFO - spritepal.managers.ApplicationStateManager - ApplicationStateManager initialized successfully
+DEBUG - spritepal.ManagerRegistry - ApplicationStateManager created successfully
+DEBUG - spritepal.ManagerRegistry - Creating CoreOperationsManager...
+DEBUG - spritepal.core.extractor - SpriteExtractor initialized: offset=0xC000, size=16384, tiles_per_row=16
+DEBUG - spritepal.core.rom_extractor - Initializing ROMExtractor
+INFO - spritepal.core.hal_compression - Initializing HAL compressor
+INFO - spritepal.core.hal_compression - Searching for exhal tool
+DEBUG - spritepal.core.hal_compression - SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG - spritepal.core.hal_compression - Searching 8 locations for exhal
+INFO - spritepal.core.hal_compression - Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO - spritepal.core.hal_compression - Searching for inhal tool
+DEBUG - spritepal.core.hal_compression - SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG - spritepal.core.hal_compression - Searching 8 locations for inhal
+INFO - spritepal.core.hal_compression - Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+DEBUG - spritepal.core.hal_compression - Pool already initialized
+INFO - spritepal.core.hal_compression - HAL process pool enabled for enhanced performance
+DEBUG - spritepal.core.injector - SpriteInjector initialized
+INFO - spritepal.core.hal_compression - Initializing HAL compressor
+INFO - spritepal.core.hal_compression - Searching for exhal tool
+DEBUG - spritepal.core.hal_compression - SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG - spritepal.core.hal_compression - Searching 8 locations for exhal
+INFO - spritepal.core.hal_compression - Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO - spritepal.core.hal_compression - Searching for inhal tool
+DEBUG - spritepal.core.hal_compression - SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG - spritepal.core.hal_compression - Searching 8 locations for inhal
+INFO - spritepal.core.hal_compression - Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO - spritepal.core.hal_compression - HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+DEBUG - spritepal.core.hal_compression - Pool already initialized
+INFO - spritepal.core.hal_compression - HAL process pool enabled for enhanced performance
+INFO - spritepal.core.sprite_config_loader - Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+DEBUG - spritepal.core.rom_injector - ROMInjector initialized with HAL compression support
+INFO - spritepal.core.default_palette_loader - Loaded default palettes: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/default_palettes.json
+INFO - spritepal.core.sprite_config_loader - Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+INFO - spritepal.core.rom_extractor - ROMExtractor initialized with HAL compression and palette extraction support
+INFO - spritepal.managers.CoreOperationsManager - CoreOperationsManager initialized successfully
+DEBUG - spritepal.ManagerRegistry - CoreOperationsManager created successfully
+DEBUG - spritepal.ManagerRegistry - Creating UICoordinatorManager...
+INFO - spritepal.managers.UICoordinatorManager - UICoordinatorManager initialized successfully
+DEBUG - spritepal.ManagerRegistry - UICoordinatorManager created successfully
+DEBUG - spritepal.ManagerRegistry - Creating MonitoringManager...
+INFO - spritepal.managers.MonitoringManager - Initializing MonitoringManager...
+ERROR - spritepal.ManagerRegistry - Manager initialization failed: unsupported operand type(s) for /: 'Mock' and 'float'
+Traceback (most recent call last):
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/registry.py", line 186, in initialize_managers
+    monitoring_manager = MonitoringManager(parent=qt_parent)
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/monitoring_manager.py", line 512, in __init__
+    super().__init__("MonitoringManager", parent)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/base_manager.py", line 64, in __init__
+    self._initialize()
+    ~~~~~~~~~~~~~~~~^^
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/monitoring_manager.py", line 534, in _initialize
+    self._setup_health_monitoring()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/monitoring_manager.py", line 557, in _setup_health_monitoring
+    self._health_check_interval / 1000.0,  # Convert ms to seconds
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~
+TypeError: unsupported operand type(s) for /: 'Mock' and 'float'
+INFO - spritepal.managers.ApplicationStateManager - ApplicationStateManager cleaned up
+DEBUG - spritepal.ManagerRegistry - Cleaned up state manager after initialization failure
+INFO - spritepal.managers.CoreOperationsManager - CoreOperationsManager cleaned up
+DEBUG - spritepal.ManagerRegistry - Cleaned up core_operations manager after initialization failure
+INFO - spritepal.managers.UICoordinatorManager - UICoordinatorManager cleaned up
+DEBUG - spritepal.ManagerRegistry - Cleaned up ui_coordinator manager after initialization failure
+------------------------------ Captured log setup ------------------------------
+INFO     spritepal.ManagerRegistry:registry.py:103 Initializing managers (consolidated=True)...
+DEBUG    spritepal.ManagerRegistry:registry.py:116 Using QApplication as Qt parent for managers
+DEBUG    spritepal.ManagerRegistry:registry.py:126 Creating ApplicationStateManager...
+INFO     spritepal.managers.ApplicationStateManager:application_state_manager.py:114 ApplicationStateManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:133 ApplicationStateManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:136 Creating CoreOperationsManager...
+DEBUG    spritepal.core.extractor:extractor.py:38 SpriteExtractor initialized: offset=0xC000, size=16384, tiles_per_row=16
+DEBUG    spritepal.core.rom_extractor:rom_extractor.py:68 Initializing ROMExtractor
+INFO     spritepal.core.hal_compression:hal_compression.py:818 Initializing HAL compressor
+INFO     spritepal.core.hal_compression:hal_compression.py:845 Searching for exhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:861 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:885 Searching 8 locations for exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:892 Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:845 Searching for inhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:861 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:885 Searching 8 locations for inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:892 Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:822 HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:370 Pool already initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:833 HAL process pool enabled for enhanced performance
+DEBUG    spritepal.core.injector:injector.py:67 SpriteInjector initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:818 Initializing HAL compressor
+INFO     spritepal.core.hal_compression:hal_compression.py:845 Searching for exhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:861 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:885 Searching 8 locations for exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:892 Found exhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal
+INFO     spritepal.core.hal_compression:hal_compression.py:845 Searching for inhal tool
+DEBUG    spritepal.core.hal_compression:hal_compression.py:861 SpritePal directory: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:885 Searching 8 locations for inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:892 Found inhal at location 1/8: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+INFO     spritepal.core.hal_compression:hal_compression.py:822 HAL compressor initialized with exhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/exhal, inhal=/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tools/inhal
+DEBUG    spritepal.core.hal_compression:hal_compression.py:370 Pool already initialized
+INFO     spritepal.core.hal_compression:hal_compression.py:833 HAL process pool enabled for enhanced performance
+INFO     spritepal.core.sprite_config_loader:sprite_config_loader.py:56 Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+DEBUG    spritepal.core.rom_injector:rom_injector.py:61 ROMInjector initialized with HAL compression support
+INFO     spritepal.core.default_palette_loader:default_palette_loader.py:43 Loaded default palettes: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/default_palettes.json
+INFO     spritepal.core.sprite_config_loader:sprite_config_loader.py:56 Loaded sprite config: /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/config/sprite_locations.json
+INFO     spritepal.core.rom_extractor:rom_extractor.py:82 ROMExtractor initialized with HAL compression and palette extraction support
+INFO     spritepal.managers.CoreOperationsManager:core_operations_manager.py:105 CoreOperationsManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:144 CoreOperationsManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:147 Creating UICoordinatorManager...
+INFO     spritepal.managers.UICoordinatorManager:ui_coordinator_manager.py:116 UICoordinatorManager initialized successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:151 UICoordinatorManager created successfully
+DEBUG    spritepal.ManagerRegistry:registry.py:185 Creating MonitoringManager...
+INFO     spritepal.managers.MonitoringManager:monitoring_manager.py:517 Initializing MonitoringManager...
+ERROR    spritepal.ManagerRegistry:registry.py:204 Manager initialization failed: unsupported operand type(s) for /: 'Mock' and 'float'
+Traceback (most recent call last):
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/registry.py", line 186, in initialize_managers
+    monitoring_manager = MonitoringManager(parent=qt_parent)
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/monitoring_manager.py", line 512, in __init__
+    super().__init__("MonitoringManager", parent)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/base_manager.py", line 64, in __init__
+    self._initialize()
+    ~~~~~~~~~~~~~~~~^^
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/monitoring_manager.py", line 534, in _initialize
+    self._setup_health_monitoring()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/core/managers/monitoring_manager.py", line 557, in _setup_health_monitoring
+    self._health_check_interval / 1000.0,  # Convert ms to seconds
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~
+TypeError: unsupported operand type(s) for /: 'Mock' and 'float'
+INFO     spritepal.managers.ApplicationStateManager:application_state_manager.py:133 ApplicationStateManager cleaned up
+DEBUG    spritepal.ManagerRegistry:registry.py:213 Cleaned up state manager after initialization failure
+INFO     spritepal.managers.CoreOperationsManager:core_operations_manager.py:134 CoreOperationsManager cleaned up
+DEBUG    spritepal.ManagerRegistry:registry.py:213 Cleaned up core_operations manager after initialization failure
+INFO     spritepal.managers.UICoordinatorManager:ui_coordinator_manager.py:132 UICoordinatorManager cleaned up
+DEBUG    spritepal.ManagerRegistry:registry.py:213 Cleaned up ui_coordinator manager after initialization failure
+=============================== warnings summary ===============================
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_complete_rom_to_fullscreen_workflow
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_complete_rom_to_fullscreen_workflow
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_complete_rom_to_fullscreen_workflow
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_complete_rom_to_fullscreen_workflow
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_complete_rom_to_fullscreen_workflow
+  /home/gabrielh/.local/share/uv/python/cpython-3.13.3-linux-x86_64-gnu/lib/python3.13/multiprocessing/popen_fork.py:67: DeprecationWarning: This process (pid=285673) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    self.pid = os.fork()
+
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_complete_rom_to_fullscreen_workflow
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_large_rom_performance_workflow
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_rom_scanning_with_proper_cleanup
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/ui/windows/detached_gallery_window.py:1110: RuntimeWarning: Failed to disconnect (None) from signal "error(QString)".
+    signal.disconnect()  # Disconnect all connections
+
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_gallery_window_lifecycle_memory_safety
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_gallery_window_lifecycle_memory_safety': Managers were cleaned up mid-session. Re-initializing from session state. This indicates a test is calling cleanup_managers() directly.
+    fixture_result = next(generator)
+
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_fullscreen_viewer_navigation_workflow
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_fullscreen_viewer_navigation_workflow': Managers were cleaned up mid-session. Re-initializing from session state. This indicates a test is calling cleanup_managers() directly.
+    fixture_result = next(generator)
+
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestCompleteUIWorkflowsIntegration::test_large_rom_performance_workflow
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_large_rom_performance_workflow': Managers were cleaned up mid-session. Re-initializing from session state. This indicates a test is calling cleanup_managers() directly.
+    fixture_result = next(generator)
+
+tests/integration/test_complete_ui_workflows_comprehensive.py::TestUIWorkflowPerformanceIntegration::test_ui_responsiveness_during_processing
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_ui_responsiveness_during_processing': Managers were cleaned up mid-session. Re-initializing from session state. This indicates a test is calling cleanup_managers() directly.
+    fixture_result = next(generator)
+
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_window_initialization_and_cleanup
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_window_initialization_and_cleanup': Managers were cleaned up mid-session. Re-initializing from session state. This indicates a test is calling cleanup_managers() directly.
+    fixture_result = next(generator)
+
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_worker_cleanup_prevents_thread_leaks
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_worker_cleanup_prevents_thread_leaks': Managers were cleaned up mid-session. Re-initializing from session state. This indicates a test is calling cleanup_managers() directly.
+    fixture_result = next(generator)
+
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_fullscreen_viewer_integration
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_fullscreen_viewer_integration': Managers were cleaned up mid-session. Re-initializing from session state. This indicates a test is calling cleanup_managers() directly.
+    fixture_result = next(generator)
+
+tests/integration/test_gallery_window_integration.py::TestDetachedGalleryWindowIntegration::test_concurrent_worker_management
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_concurrent_worker_management': Managers were cleaned up mid-session. Re-initializing from session state. This indicates a test is calling cleanup_managers() directly.
+    fixture_result = next(generator)
+
+tests/integration/test_integration_manual_offset.py: 9 warnings
+tests/test_complete_ui_workflows_integration.py: 8 warnings
+tests/test_dark_theme_integration.py: 17 warnings
+tests/test_recent_ui_improvements_integration.py: 7 warnings
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/pytestqt/qtbot.py:304: DeprecationWarning: waitForWindowShown is deprecated, as the underlying Qt method was obsoleted in Qt 5.0 and removed in Qt 6.0. Its name is imprecise and the pytest-qt wrapper does not raise qtbot.TimeoutError if the window wasn't shown. Please use the qtbot.waitExposed context manager instead.
+    warnings.warn(
+
+tests/integration/test_sprite_gallery_integration.py::TestSpriteGalleryTab::test_gallery_initialization
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:924: UserWarning: Test 'test_gallery_initialization' left ManagerRegistry initialized but didn't use manager fixtures. This could pollute subsequent tests.
+    next(it)
+
+tests/integration/test_sprite_gallery_integration.py::TestSpriteGalleryTab::test_set_sprites
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_set_sprites' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/integration/test_sprite_gallery_integration.py::TestSpriteGalleryTab::test_thumbnail_generation
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_thumbnail_generation' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/integration/test_sprite_gallery_integration.py::TestDetachedGalleryWindow::test_open_detached_gallery
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_open_detached_gallery' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/integration/test_sprite_gallery_integration.py::TestGalleryCaching::test_cache_save
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:924: UserWarning: Test 'test_cache_save' left ManagerRegistry initialized but didn't use manager fixtures. This could pollute subsequent tests.
+    next(it)
+
+tests/integration/test_sprite_gallery_integration.py::TestGalleryCaching::test_cache_load
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_cache_load' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/integration/test_sprite_gallery_integration.py::TestGalleryIntegration::test_complete_workflow
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_complete_workflow' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_basic_worker_lifecycle
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_worker_replacement_cleanup
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_concurrent_worker_cleanup_safety
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_memory_leak_prevention
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_worker_interruption_handling
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_cleanup_during_execution
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_massive_worker_lifecycle_stress
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tests/integration/test_worker_lifecycle_management_integration.py:117: RuntimeWarning: Failed to disconnect (None) from signal "finished_work()".
+    worker.finished_work.disconnect()
+
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_basic_worker_lifecycle
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_worker_replacement_cleanup
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_concurrent_worker_cleanup_safety
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_memory_leak_prevention
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_worker_interruption_handling
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_massive_worker_lifecycle_stress
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tests/integration/test_worker_lifecycle_management_integration.py:118: RuntimeWarning: Failed to disconnect (None) from signal "progress(int)".
+    worker.progress.disconnect()
+
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_basic_worker_lifecycle
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_worker_replacement_cleanup
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_concurrent_worker_cleanup_safety
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_memory_leak_prevention
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_worker_interruption_handling
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_cleanup_during_execution
+tests/integration/test_worker_lifecycle_management_integration.py::TestWorkerLifecycleManagementIntegration::test_massive_worker_lifecycle_stress
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/tests/integration/test_worker_lifecycle_management_integration.py:119: RuntimeWarning: Failed to disconnect (None) from signal "error(QString)".
+    worker.error.disconnect()
+
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_extraction_to_injection_workflow_real
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_extraction_to_injection_workflow_real' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_settings_dialog_real_manager_integration
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_settings_dialog_real_manager_integration' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_controller_real_manager_coordination
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_controller_real_manager_coordination' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_cross_dialog_integration_real.py::TestRealCrossDialogIntegration::test_real_integration_catches_architectural_bugs
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_real_integration_catches_architectural_bugs' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestApplicationThemeIntegration::test_application_dark_palette_creation
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_application_dark_palette_creation' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestApplicationThemeIntegration::test_global_dark_theme_stylesheet_application
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_global_dark_theme_stylesheet_application' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestApplicationThemeIntegration::test_dark_theme_with_real_widgets
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_dark_theme_with_real_widgets' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestPreviewWidgetDarkTheme::test_sprite_preview_widget_dark_backgrounds
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_sprite_preview_widget_dark_backgrounds' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestPreviewWidgetDarkTheme::test_zoomable_preview_widget_dark_backgrounds
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_zoomable_preview_widget_dark_backgrounds' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestPreviewWidgetDarkTheme::test_preview_label_with_dark_preview_style
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_preview_label_with_dark_preview_style' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestPreviewWidgetDarkTheme::test_preview_with_mock_pixmap
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_preview_with_mock_pixmap' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestStylesheetIntegration::test_button_styling_integration
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_button_styling_integration' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestStylesheetIntegration::test_input_styling_integration
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_input_styling_integration' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestStylesheetIntegration::test_group_box_styling_integration
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_group_box_styling_integration' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestStylesheetIntegration::test_nested_widget_styling
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_nested_widget_styling' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestThemeConsistency::test_color_consistency_across_widgets
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_color_consistency_across_widgets' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dark_theme_integration.py::TestThemeConsistency::test_theme_performance_with_many_widgets
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_theme_performance_with_many_widgets' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_settings_dialog_creation
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_settings_dialog_creation' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_user_error_dialog_creation
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_user_error_dialog_creation' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_resume_scan_dialog_creation
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_resume_scan_dialog_creation' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_row_arrangement_dialog_creation
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_row_arrangement_dialog_creation' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_instantiation.py::TestDialogInstantiation::test_grid_arrangement_dialog_creation
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_grid_arrangement_dialog_creation' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_lifecycle.py::TestDialogLifecycle::test_manual_offset_dialog_normal_lifecycle
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_manual_offset_dialog_normal_lifecycle' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_lifecycle.py::TestDialogLifecycle::test_dialog_with_parent_lifecycle
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_dialog_with_parent_lifecycle' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_lifecycle.py::TestDialogReopenScenarios::test_non_singleton_dialog_lifecycle
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_non_singleton_dialog_lifecycle' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_dialog_lifecycle.py::test_dialog_lifecycle_best_practices
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_dialog_lifecycle_best_practices' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_error_handler.py::TestErrorHandler::test_error_handler_emits_signals
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_error_handler_emits_signals' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_error_handler.py::TestErrorHandler::test_error_handler_handles_exceptions
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_error_handler_handles_exceptions' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_error_handler.py::TestErrorHandler::test_error_handler_singleton
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_error_handler_singleton' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_error_handler.py::TestErrorHandler::test_custom_signal_handlers
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_custom_signal_handlers' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+tests/test_infrastructure_verification.py::TestInfrastructureVerification::test_05_qt_infrastructure
+  /mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/.venv/lib/python3.13/site-packages/_pytest/fixtures.py:908: UserWarning: Test 'test_05_qt_infrastructure' started with ManagerRegistry already initialized but doesn't use manager fixtures. This may indicate test pollution from a prior test.
+    fixture_result = next(generator)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_controller_fix_validation.py:19: Creates real MainWindow which crashes in Qt offscreen mode
+SKIPPED [1] tests/test_dialog_real_integration.py:29: Real dialog instantiation fails in Qt offscreen mode
+SKIPPED [1] tests/test_manager_performance_benchmarks_tdd.py:29: could not import 'pytest_benchmark': No module named 'pytest_benchmark'
+SKIPPED [1] tests/test_performance_benchmarks.py:27: could not import 'pytest_benchmark': No module named 'pytest_benchmark'
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:215: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:230: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:263: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:292: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:330: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:361: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:396: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:421: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:444: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:462: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:504: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:534: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:580: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_batch_thumbnail_worker_integration.py:613: Test skipped in WSL environment
+SKIPPED [1] tests/integration/test_complete_ui_workflows_comprehensive.py:363: Temporarily disabled - investigating timeout issue
+SKIPPED [1] tests/integration/test_integration_preview_system.py:85: QThread + waitSignal causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_integration_preview_system.py:126: QThread + waitSignal causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_integration_preview_system.py:239: QThread + waitSignal causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_integration_preview_system.py:285: QThread + waitSignal causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_memory_management_integration.py:272: Complex Qt widgets + EventLoopHelper crash in offscreen mode
+SKIPPED [1] tests/integration/test_memory_management_integration.py:303: Complex Qt widgets + EventLoopHelper crash in offscreen mode
+SKIPPED [1] tests/integration/test_memory_management_integration.py:346: Complex Qt widgets + EventLoopHelper crash in offscreen mode
+SKIPPED [1] tests/integration/test_memory_management_integration.py:377: Complex Qt widgets + EventLoopHelper crash in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:155: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:177: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:210: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:235: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:285: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:319: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:349: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:375: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_signal_slot_integration.py:411: qtbot.wait() causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:168: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:205: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:238: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:300: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:363: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:416: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:431: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:478: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:550: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:588: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:636: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:663: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_qt_threading_signals.py:721: QThread + waitSignal/wait causes segfaults in offscreen mode
+SKIPPED [1] tests/integration/test_sprite_gallery_integration.py:122: Implementation changed - SpriteGalleryWidget no longer uses QScrollArea
+SKIPPED [1] tests/integration/test_sprite_gallery_integration.py:153: Thumbnails are not copied in current virtual scrolling implementation
+SKIPPED [1] tests/integration/test_sprite_gallery_integration.py:161: Implementation changed - SpriteGalleryWidget no longer uses QScrollArea
+SKIPPED [1] tests/integration/test_sprite_gallery_integration.py:227: Implementation changed - gallery now uses virtual scrolling model/view patternDEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391381984 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391382474 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391385474 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391385869 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391386228 being destroyed
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391410756 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391410808 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391410827 being destroyed
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up ROM extraction panel workers
+DEBUG - spritepal.ui.rom_extraction_panel - Cleaning up sprite navigator preview workers
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391418974 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391418997 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391419031 being destroyed
+DEBUG - spritepal.ui.dialogs.manual_offset_unified_integrated - Dialog dialog_1765391419055 being destroyed
+
+SKIPPED [1] tests/integration/test_sprite_gallery_integration.py:231: Implementation changed - gallery now uses virtual scrolling model/view pattern
+SKIPPED [1] tests/integration/test_sprite_gallery_integration.py:235: Implementation changed - gallery now uses virtual scrolling model/view pattern
+SKIPPED [1] tests/integration/test_sprite_gallery_integration.py:239: Implementation changed - gallery now uses virtual scrolling model/view pattern
+SKIPPED [1] tests/test_circular_dependency_fix.py:49: Creates real ExtractionController which causes Qt segfaults in test suite. Lazy init behavior is verified by test_main_window_creates_without_controller.
+SKIPPED [1] tests/test_circular_dependency_fix.py:69: Creates real ExtractionController which causes Qt segfaults in test suite. Caching behavior is verified by test_controller_setter_works.
+SKIPPED [1] tests/test_circular_dependency_fix.py:100: Creates real ExtractionController which causes Qt segfaults in test suite. Method dispatch is verified by test_controller_setter_works using mock.
+SKIPPED [1] tests/test_circular_dependency_fix.py:144: Creates multiple real ExtractionControllers which causes Qt segfaults. Independent controllers is an implementation detail - main concern (lazy init) is tested.
+SKIPPED [1] tests/test_cross_dialog_integration_real.py:81: GridArrangementDialog shows blocking QMessageBox.critical() on sprite load error, causing test suite to hang. Needs QMessageBox mocking or valid test sprites.
+SKIPPED [1] tests/test_cross_dialog_integration_real.py:254: GridArrangementDialog shows blocking QMessageBox.critical() on sprite load error, causing test suite to hang. Needs QMessageBox mocking or valid test sprites.
+SKIPPED [1] tests/test_dialog_instantiation.py:106: InjectionDialog causes segfault during signal connection in _setup_ui(). This is a Qt testing environment issue, not a code bug. The dialog works correctly in the actual application.
+SKIPPED [1] tests/test_image_utils.py:64: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:78: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:90: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:100: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:105: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:114: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:124: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:135: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:148: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_image_utils.py:164: GUI tests skipped in headless environment
+SKIPPED [1] tests/test_injection_manager_refactored.py:345: Deleting manager with active worker causes Qt crash - unsafe test pattern
+SKIPPED [1] tests/test_navigation.py: Manual test script - requires dialog fixture setup
+SKIPPED [1] tests/test_recent_ui_improvements_integration.py:51: Cannot instantiate SpritePalApp (QApplication) when a QApplication already exists (managed by pytest-qt)
+SKIPPED [1] tests/test_recent_ui_improvements_integration.py:75: Cannot instantiate SpritePalApp (QApplication) when a QApplication already exists (managed by pytest-qt)
+SKIPPED [1] tests/test_recent_ui_improvements_integration.py:101: Cannot instantiate SpritePalApp (QApplication) when a QApplication already exists (managed by pytest-qt)
+SKIPPED [1] tests/test_recent_ui_improvements_integration.py:153: Qt stylesheets don't modify QPalette values - visual theme is applied via CSS not palette API
+SKIPPED [1] tests/test_recent_ui_improvements_integration.py:244: Could not test offset signal emission: object of type 'PySide6.QtTest.QSignalSpy' has no len()
+SKIPPED [1] tests/test_recent_ui_improvements_integration.py:281: Could not test sprite_found signal emission: object of type 'PySide6.QtTest.QSignalSpy' has no len()
+SKIPPED [1] tests/test_recent_ui_improvements_integration.py:496: Test expects mocked manager but gets real manager - uses outdated ExtractionAdapter.load_rom_file API
+ERROR tests/test_recent_ui_improvements_integration.py::TestCompleteUserWorkflowIntegration::test_theme_consistency_across_workflow - core.managers.exceptions.ManagerError: Failed to initialize managers: unsupported operand type(s) for /: 'Mock' and 'float'
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+= 183 passed, 82 skipped, 1676 deselected, 115 warnings, 1 error in 72.83s (0:01:12) =

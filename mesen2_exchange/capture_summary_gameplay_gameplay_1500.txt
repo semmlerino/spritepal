@@ -1,0 +1,23 @@
+Sprite Capture Summary
+======================
+Frame: 1500
+OBSEL: $00 (base=0, select=0, size=0, oam_base=0, oam_offset=4096)
+VRAM read mode: word
+Visible sprites: 16
+
+OAM #0: pos=(67,95) tile=$13 size=8x8 pal=0
+OAM #1: pos=(75,95) tile=$04 size=8x8 pal=0
+OAM #2: pos=(83,95) tile=$03 size=8x8 pal=0
+OAM #3: pos=(67,87) tile=$12 size=8x8 pal=0
+OAM #4: pos=(67,79) tile=$02 size=8x8 pal=0
+OAM #5: pos=(75,79) tile=$00 size=16x16 pal=0
+OAM #6: pos=(28,103) tile=$01 size=8x8 pal=6
+OAM #7: pos=(20,103) tile=$00 size=8x8 pal=6
+OAM #8: pos=(32,119) tile=$22 size=8x8 pal=6
+OAM #9: pos=(32,111) tile=$12 size=8x8 pal=6
+OAM #10: pos=(16,111) tile=$10 size=16x16 pal=6
+OAM #11: pos=(188,151) tile=$81 size=16x16 pal=1
+OAM #12: pos=(204,175) tile=$80 size=8x8 pal=1
+OAM #13: pos=(180,183) tile=$80 size=8x8 pal=1
+OAM #14: pos=(180,167) tile=$80 size=8x8 pal=1
+OAM #15: pos=(202,159) tile=$80 size=8x8 pal=1
