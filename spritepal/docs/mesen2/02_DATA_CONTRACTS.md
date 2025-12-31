@@ -7,7 +7,8 @@ This document defines the **canonical schema** for capture and mapping data.
 ### Top-Level
 - `frame` (int): capture frame counter used by the script
 - `timestamp` (int, optional): Unix timestamp
-- `visible_count` (int)
+- `visible_count` (int): count of entries **included in `entries[]`** after the visibility
+  filter (default 224-line overscan exclusion; see `SKIP_VISIBILITY_FILTER` and `VISIBLE_*`)
 - `obsel` (object, required)
 - `entries` (array, required)
 - `palettes` (object, required)
@@ -26,21 +27,27 @@ This document defines the **canonical schema** for capture and mapping data.
 
 ### entries[]
 - `id` (int)
-- `x` (int), `y` (int)
+- `x` (int), `y` (int): pixel coordinates from OAM (x is signed 9-bit, adjusted to
+  -256..255; y is raw 0..255)
 - `tile` (int): OAM tile index (0-255)
-- `width` (int), `height` (int)
+- `width` (int), `height` (int): sprite size in **pixels**
 - `palette` (int)
 - `priority` (int)
 - `flip_h` (bool), `flip_v` (bool)
-- `tile_page` (int, optional): OAM attr bit 0 (tile index bit 8 / second table)
-- `name_table` (int, legacy): same as `tile_page` for backward compatibility
+- `tile_page` (int, required for mapping): OAM attr bit 0 (tile index bit 8 / second table)
+- If `tile_page`/`name_table` is missing, assume 0 and treat the capture as **unsafe for mapping**.
+- `name_table` (int, legacy): same as `tile_page` for backward compatibility (**not** BG nametables)
 - `tiles` (array, required)
 
 ### tiles[]
 - `tile_index` (int): **per-subtile** index (0-255) after row/column wrap
 - `vram_addr` (int, **byte address**)
-- `pos_x` (int), `pos_y` (int)
+- `pos_x` (int), `pos_y` (int): **subtile coordinates** in 8×8 tile units, origin at the
+  sprite’s top-left before flips (not pixels; not screen-space)
 - `data_hex` (string): **exactly 64 hex chars** (32 bytes), uppercase, no separators
+
+Tiles ordering guarantee:
+- `tiles[]` is ordered by `pos_y` then `pos_x` (row-major, pre-flip).
 
 ### palettes
 - Keys: strings "0".."7"
@@ -48,14 +55,41 @@ This document defines the **canonical schema** for capture and mapping data.
 
 ## Validation / Fail-Fast Rules
 - `data_hex` length must be 64 hex chars (32 bytes) for 4bpp.
-- If **all odd bytes are zero** across captured tiles, abort the capture. This indicates a
-  bad VRAM read path and guarantees hash mismatches.
+- If **all odd bytes are zero** across **many tiles**, abort the capture. This is a strong
+  indicator of a bad VRAM read path but not a mathematical impossibility for a single tile.
 - If tiles are not 32 bytes, do not hash them.
+- When using ROM-trace seeds, validate candidate offsets via HAL decompression before
+  indexing; bucket bases are **ranking signals only**.
 
 ## Naming Conventions
+
+### Quick Reference: Address Units
+| Field Name | Unit | Notes |
+|------------|------|-------|
+| `oam_base_addr` | **word** | PPU internal; multiply by 2 for bytes |
+| `oam_addr_offset` | **word** | PPU internal; multiply by 2 for bytes |
+| `tile_base_addr` | **byte** | Ready for VRAM reads |
+| `vram_addr` | **byte** | Ready for VRAM reads |
+| `tiles[].vram_addr` | **byte** | Per-subtile VRAM address |
+
+### Rules
 - Prefer `tile_page` over `name_table`. Treat `name_table` as legacy input only.
+- `tile_page`/`name_table` refer to the **OBJ tile high bit**, not BG nametables.
 - Use `*_addr` units consistently:
   - `*_addr` in **bytes** unless explicitly marked as word address.
+  - Word addresses must be labeled explicitly (e.g., `*_word` or in-field doc text).
+  - In this schema, `oam_base_addr`/`oam_addr_offset` are **word** addresses; `tile_base_addr`
+    and `vram_addr` are **byte** addresses.
+
+### Conversion Formulas
+```python
+# Word → Byte
+byte_addr = word_addr * 2
+tile_base_addr = oam_base_addr * 2  # Example
+
+# Byte → Word (for PPU math)
+word_addr = byte_addr // 2
+```
 
 ## Tile Hash Contract (4bpp)
 - Tile size: **32 bytes** (4bpp). Sprites (OBJ) are always 4bpp; other bpp modes apply to BG tiles.
