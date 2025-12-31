@@ -386,14 +386,18 @@ if vram_read_mode ~= "word" and vram_read_mode ~= "byte" then
     vram_read_mode = nil
 end
 
-local function read_vram_word(word_addr)
+local function read_vram_word(byte_addr)
+    -- Try emu.readWord first (returns 16-bit word)
     if emu.readWord then
-        local ok, word = pcall(emu.readWord, word_addr, MEM.vram)
-        if ok then
+        local ok, word = pcall(emu.readWord, byte_addr, MEM.vram)
+        if ok and word then
             return word
         end
     end
-    return emu.read(word_addr, MEM.vram)
+    -- Fallback: read two consecutive bytes and combine them
+    local lo = emu.read(byte_addr, MEM.vram) or 0
+    local hi = emu.read(byte_addr + 1, MEM.vram) or 0
+    return lo | (hi << 8)
 end
 
 local function read_vram_tile_word(vram_addr)
