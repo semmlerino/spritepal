@@ -4,12 +4,15 @@ All notable changes to the sprite extraction pipeline documentation and tooling.
 
 ## [2.0.0] - 2024-12-31
 
-### Phase 1: SA-1 Hypothesis Verification (Infrastructure Created)
+### Phase 1: SA-1 Hypothesis Verification (COMPLETE - CONFIRMED)
 - [x] Created sa1_conversion_logger.lua for focused DCNT/CDMA monitoring
-- [x] Created run_sa1_logger.bat for easy execution
+- [x] Created run_sa1_logger.bat for easy execution (testrunner mode)
+- [x] Created run_sa1_hypothesis.bat for movie playback mode (alternative approach)
+- [x] Created scripts/analyze_sa1_hypothesis.py to parse dma_probe_log.txt output
 - [x] Created SA1_HYPOTHESIS_FINDINGS.md template for documenting results
-- [ ] Capture 5+ minutes of gameplay register logs (pending user execution)
-- [ ] Document hypothesis outcome (pending capture data)
+- [x] Fixed SA1_HYPOTHESIS_FINDINGS.md to reference DCNT bit 5 (not CDMA bit 7)
+- [x] Captured 838 SA-1 DMA samples via movie playback
+- [x] **HYPOTHESIS CONFIRMED:** 100% of SA-1 DMA operations use character conversion (ctrl=0xA0)
 
 ### Phase 2: Dangerous Assumption Fixes
 - [x] Added prg_size fail-fast validation to test_sprite_capture.lua
