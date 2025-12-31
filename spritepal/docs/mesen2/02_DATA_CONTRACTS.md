@@ -102,7 +102,15 @@ word_addr = byte_addr // 2
 - Flip normalization: optional lookup mode that tests **N/H/V/HV** variants; candidates are
   de-duplicated by `(rom_offset, tile_index)`. Default mapping uses **unflipped** tiles
   because OAM flip bits are applied at render time.
+  - **N (Normal)**: No transform, use tile data as-is
+  - **H (Horizontal flip)**: Mirror each row of pixels left↔right
+  - **V (Vertical flip)**: Reverse row order (top↔bottom)
+  - **HV (Both)**: Apply H then V (equivalent to 180° rotation)
 - Low-information tiles may be ignored during scoring (**<= 2 unique byte values**).
+  - **Rationale**: Tiles with ≤2 unique bytes are typically solid colors, simple gradients,
+    or transparent regions. These tiles have high hash collision rates across different
+    graphics sets (many sprites share blank/shadow tiles) and contribute noise rather than
+    signal to ROM offset scoring. Ignoring them improves match confidence.
 
 ## Mapper Output (CaptureMapResult)
 These fields are produced by `CaptureToROMMapper.map_capture()` for diagnostics and scoring.

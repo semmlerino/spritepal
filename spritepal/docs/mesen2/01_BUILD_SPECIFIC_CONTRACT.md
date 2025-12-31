@@ -22,16 +22,42 @@ Canonical probe script:
 From `Mesen2/Core/Debugger/LuaApi.cpp`:
 - `emu.addMemoryCallback(callback, cb_type, start, end, cpuType?, memType?)`
 - `emu.removeMemoryCallback(id, cb_type, start, end, cpuType?, memType?)`
-  - Current build uses `ForceParamCount(6)`. **ID-only removal is not supported** here.
-  - Rule: always pass **both** `cpuType` and `memType` for add/remove in this build.
+  - Current build uses `ForceParamCount(6)`. **ID-only removal is not supported**.
+  - **All 6 parameters required for removal**:
+    1. `id` — callback reference returned by `addMemoryCallback`
+    2. `cb_type` — `emu.callbackType.read`, `.write`, or `.exec`
+    3. `start` — start address (must match registration)
+    4. `end` — end address (must match registration)
+    5. `cpuType` — e.g., `emu.cpuType.snes`
+    6. `memType` — e.g., `emu.memType.snesWorkRam`
+  - Removal fails silently if parameters don't exactly match the registration.
 
 **Callback type strings** may be accepted but are unreliable. Use enums/integers and verify by
 counting fires.
 
 **Callback address width:** memory callbacks receive `relAddr.Address` (often 16-bit). Do not
 assume a 24-bit CPU address is passed to Lua.
-When full 24-bit context is required, dump `emu.getState()` keys and look for CPU register
-fields (PC/PBR/DBR). If they are missing, treat callback addresses as relative and report
+When full 24-bit context is required, use `emu.getState()` to access CPU registers.
+
+### emu.getState() Key Fields (SNES)
+| Field | Type | Description |
+|-------|------|-------------|
+| `cpu.a` | int | Accumulator (16-bit) |
+| `cpu.x`, `cpu.y` | int | Index registers |
+| `cpu.sp` | int | Stack pointer |
+| `cpu.pc` | int | Program counter (16-bit offset) |
+| `cpu.k` | int | Program bank (PBR, 8-bit) |
+| `cpu.db` | int | Data bank (DBR, 8-bit) |
+| `cpu.d` | int | Direct page register |
+| `cpu.ps` | int | Processor status (flags) |
+| `masterClock` | int | Master clock counter |
+| `frameCount` | int | Frame counter |
+| `scanline` | int | Current scanline |
+| `cycle` | int | Current cycle within scanline |
+
+**Full 24-bit PC**: `(cpu.k << 16) | cpu.pc`
+
+If CPU fields are missing in your build, treat callback addresses as relative and report
 the source region (e.g., WRAM/BW-RAM) instead of absolute ROM offsets.
 
 ## Address Spaces & ROM Trace Semantics
@@ -187,6 +213,33 @@ From `Mesen2/UI/Utilities/CommandLineHelper.cs`:
 
 If you need to verify movie playback visually, **do not** use `--novideo`
 (`run_movie_probe.bat` leaves it off by default).
+
+## Movie Recording Workflow
+To create movies for reproducible sprite capture:
+
+1. **Start recording** (GUI method):
+   - Open ROM in Mesen 2
+   - Navigate to game state you want to capture (specific room/level)
+   - Menu: Tools → Movies → Record Movie
+   - Play through the sequence
+   - Menu: Tools → Movies → Stop Movie
+
+2. **Start recording** (CLI method):
+   ```
+   Mesen2.exe "rom.sfc" --recordMovie="output.mmo"
+   ```
+   Recording stops when you close Mesen 2 or call `emu.stop()` from Lua.
+
+3. **Movie file location**: Default `Documents\Mesen2\Movies\`
+
+4. **Best practices for probe-friendly movies**:
+   - Start from a clean state (no savestate)
+   - Include 2-3 seconds of gameplay before the target sprites appear
+   - Keep movies short (30-60 seconds) to reduce probe time
+   - Test playback before running probes: movies can desync on different ROM revisions
+
+**Note:** There is no `--playMovie` CLI switch. Use the two-step launch pattern
+(see "Movie Playback" above) for automated playback.
 
 ## DMA/SA-1 Probe Script
 Use `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` to log:
@@ -345,3 +398,51 @@ python3 scripts/validate_seed_candidate.py <rom.sfc> \
 - `--auto-map`: Try LoROM/HiROM/SA-1 address conversions if direct offset fails
 - `--tiles N`: Request N tiles of output (may truncate or pad)
 - `--png FILE`: Render decompressed tiles to image for visual inspection
+
+---
+
+## Appendix: Minimal Lua Script Template
+
+Use this template as a starting point for new Mesen 2 Lua scripts:
+
+```lua
+-- Minimal Mesen 2 Lua Script Template
+-- Usage: Mesen2.exe --testrunner "rom.sfc" "script.lua"
+
+local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "."
+local MAX_FRAMES = tonumber(os.getenv("MAX_FRAMES")) or 300
+
+-- Validate API availability (fail-fast)
+assert(emu.read, "emu.read not available")
+assert(emu.memType.snesVideoRam, "snesVideoRam memType not available")
+
+local frame_count = 0
+
+-- End-frame callback: runs once per frame
+local function on_end_frame()
+    frame_count = frame_count + 1
+
+    -- Example: read VRAM byte at address 0x0000
+    local vram_byte = emu.read(0x0000, emu.memType.snesVideoRam)
+
+    -- Example: get CPU state
+    local state = emu.getState()
+    local pc_full = (state.cpu.k << 16) | state.cpu.pc
+
+    if frame_count >= MAX_FRAMES then
+        print(string.format("Stopping after %d frames", frame_count))
+        emu.stop()
+    end
+end
+
+-- Register callback
+emu.addEventCallback(on_end_frame, emu.eventType.endFrame)
+
+print("Script loaded. Running for " .. MAX_FRAMES .. " frames...")
+```
+
+**Key patterns:**
+- Use `os.getenv()` for configurable parameters
+- Validate API availability with `assert()` at script start
+- Use `emu.stop()` to exit cleanly in testrunner mode
+- Access CPU registers via `emu.getState().cpu.*`

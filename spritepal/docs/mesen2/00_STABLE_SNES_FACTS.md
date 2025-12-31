@@ -8,6 +8,16 @@ avoids emulator- or tool-specific behavior.
 - Convert word to byte address with `byte = word * 2`.
 - Any byte addressing you see in a tool/API is an abstraction on top of word-based VRAM.
 
+**Hardware vs API Translation:**
+```
+PPU hardware:  word-addressed, $0000-$7FFF (32K words = 64KB)
+Lua API:       byte-addressed, $0000-$FFFF (64K bytes)
+
+Conversion:    lua_byte_addr = ppu_word_addr * 2
+               ppu_word_addr = lua_byte_addr // 2
+```
+See `01_BUILD_SPECIFIC_CONTRACT.md` § "VRAM Read Semantics" for API-specific behavior.
+
 ## OBJSEL ($2101) Tile Tables
 - `name_base = obsel & 0x07` (bits 0-2)
 - `name_select = (obsel >> 3) & 0x03` (bits 3-4)
@@ -125,3 +135,23 @@ end
   - bits 5-9: Green
   - bits 10-14: Blue
 - Sprite palettes are CGRAM entries 128-255.
+
+## DMA Transfer Modes
+The SNES has 8 DMA channels ($4300-$43x0) with 8 transfer modes configured via the mode
+bits (0-2) of register $43x0. The "A" register is the destination ($21xx).
+
+| Mode | Bytes | Pattern | Description |
+|------|-------|---------|-------------|
+| 0 | 1 | A | Single register (e.g., WRAM $2180) |
+| 1 | 2 | A, A+1 | Two consecutive registers (e.g., VRAM $2118-$2119) |
+| 2 | 2 | A, A | Same register twice |
+| 3 | 4 | A, A+1, A, A+1 | Two registers, repeated |
+| 4 | 4 | A, A+1, A+2, A+3 | Four consecutive registers |
+| 5 | 4 | A, A+1, A, A+1 | Same as mode 3 |
+| 6 | 2 | A, A | Same as mode 2 |
+| 7 | 4 | A, A+1, A+2, A+3 | Same as mode 4 |
+
+**Common usage:**
+- Mode 1: VRAM writes via $2118/$2119 (word writes)
+- Mode 0: WRAM writes via $2180 (byte writes)
+- Mode 1: OAM writes via $2104 (low/high byte pairs)

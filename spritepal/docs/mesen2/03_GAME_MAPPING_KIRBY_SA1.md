@@ -53,7 +53,12 @@ ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
 - DMA typically shows **WRAM→VRAM**, not ROM→VRAM.
 
 ## Recent Observations (Movie Probe)
-These are **run-derived notes** (not rules) and should be re-validated when scripts or ROMs change.
+
+> **⚠️ EXPLORATORY DATA — NOT SPECIFICATIONS**
+>
+> These are **run-derived notes** from specific probe sessions, not stable rules.
+> Re-validate when scripts, ROMs, or Mesen 2 builds change. Values are seeds for
+> investigation, not guaranteed addresses.
 - VRAM diff confirms uploads during gameplay, but **not every VRAM diff frame** shows
   strong WRAM staging overlap.
 - High-overlap frames in recent runs showed staging bytes around **WRAM relative
