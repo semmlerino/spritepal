@@ -29,7 +29,7 @@ This is the central entry point for all SpritePal documentation.
 | Document | Purpose |
 |----------|---------|
 | [docs/mesen2/00_STABLE_SNES_FACTS.md](mesen2/00_STABLE_SNES_FACTS.md) | SNES hardware facts (VRAM, OBJSEL, tiles) |
-| [docs/mesen2/01_BUILD_SPECIFIC_CONTRACT.md](mesen2/01_BUILD_SPECIFIC_CONTRACT.md) | Mesen2 build-specific API contract |
+| [docs/mesen2/01_BUILD_SPECIFIC_CONTRACT.md](mesen2/01_BUILD_SPECIFIC_CONTRACT.md) | Mesen2 build-specific API contract + tool runbook |
 | [docs/mesen2/02_DATA_CONTRACTS.md](mesen2/02_DATA_CONTRACTS.md) | Capture JSON schema and invariants |
 | [docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md](mesen2/03_GAME_MAPPING_KIRBY_SA1.md) | Kirby Super Star SA-1 mapping notes |
 | [docs/mesen2/04_TROUBLESHOOTING.md](mesen2/04_TROUBLESHOOTING.md) | Fail-fast checks and diagnostics |
@@ -48,6 +48,7 @@ This is the central entry point for all SpritePal documentation.
 | Debug singletons | [architecture.md](architecture.md) → Singletons and Cleanup |
 | Trace data flows | [application_flows.md](application_flows.md) |
 | Qt signals/workers | [testing_guide.md](testing_guide.md) → Signal Reference |
+| Run Mesen2 capture pipeline | [docs/mesen2/01_BUILD_SPECIFIC_CONTRACT.md](mesen2/01_BUILD_SPECIFIC_CONTRACT.md) → Runbook |
 
 ### Key Commands
 
@@ -74,4 +75,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: December 27, 2025*
+*Last updated: December 31, 2025*

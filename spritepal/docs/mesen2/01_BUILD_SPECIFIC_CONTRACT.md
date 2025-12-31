@@ -440,6 +440,52 @@ python3 scripts/validate_seed_candidate.py <rom.sfc> \
 - `--tiles N`: Request N tiles of output (may truncate or pad)
 - `--png FILE`: Render decompressed tiles to image for visual inspection
 
+### summarize_wram_overlaps.py
+Location: `scripts/summarize_wram_overlaps.py`
+
+Ranks capture frames by WRAM↔VRAM tile overlap to identify which frames have active
+staging buffers vs background-only or prefetch activity.
+
+```bash
+python3 scripts/summarize_wram_overlaps.py <run_dir> [--top-only]
+```
+
+**Output:**
+- Frame number, overlap percentage, and tile counts
+- Helps identify which WRAM-triggered captures are useful for correlation
+
+**Flags:**
+- `--top-only`: Show only the highest-overlap frames (reduces noise)
+
+### analyze_wram_staging.py
+Location: `scripts/analyze_wram_staging.py`
+
+Compares WRAM dump contents against VRAM capture tiles to find staging buffer ranges
+and validate the decompression pipeline.
+
+```bash
+python3 scripts/analyze_wram_staging.py \
+  --capture <capture.json> \
+  --wram <wram_dump.bin> \
+  --database <tile_hash_database.json> \
+  --rom <rom.sfc> \
+  [--wram-start 0x0000] \
+  [--emit-range] \
+  [--range-pad 0x200] \
+  [--range-align]
+```
+
+**Key options:**
+- `--wram-start`: Override WRAM dump start offset for alignment scans
+- `--emit-range`: Output a suggested WRAM watch range based on substring matches
+- `--range-pad`: Padding to add around discovered ranges
+- `--range-align`: Align emitted range to tile boundaries
+
+**Reports:**
+- Byte-level overlap between WRAM and VRAM tiles
+- Substring match locations (for misaligned staging buffers)
+- Suggested watch ranges for future captures
+
 ---
 
 ## Appendix: Minimal Lua Script Template

@@ -137,3 +137,41 @@ Database files include metadata to guard against ROM/header mismatches.
 - `metadata.rom_checksum` (int | null)
 - `metadata.rom_size` (int)
 - `metadata.rom_header_offset` (int): 0 or 512 (SMC header)
+
+## vram_tile_database.json (Strategy A)
+For SA-1 games with character conversion active, direct ROM→VRAM hash matching fails.
+This database maps VRAM tile hashes to ROM regions via timing correlation instead.
+
+### Top-Level
+- `type` (string): `"vram_based"` — identifies this as a Strategy A database
+- `description` (string): Human-readable description
+- `tiles` (object): Hash → region mapping
+
+### tiles
+Keys are MD5 hashes of 32-byte VRAM tiles (same format as `tile_hash_database.json`).
+
+Each value is an object:
+- `rom_region` (int): ROM file offset of the region accessed when this tile appeared in VRAM
+  (derived from ROM trace timing correlation, not byte-level matching)
+- `confidence` (int): Number of captures where this tile correlated with this region
+- `alternatives` (int): Number of other regions this tile was seen with (lower = more reliable)
+
+### Usage
+```python
+import json
+with open("mesen2_exchange/vram_tile_database.json") as f:
+    db = json.load(f)
+
+# Look up a VRAM tile hash
+tile_hash = "3240cdda6d2c4133059aeb2b0c38c2f2"
+if tile_hash in db["tiles"]:
+    entry = db["tiles"][tile_hash]
+    print(f"ROM region: 0x{entry['rom_region']:06X}")
+    print(f"Confidence: {entry['confidence']}, Alternatives: {entry['alternatives']}")
+```
+
+### Limitations
+- `rom_region` is a **correlation**, not a proven source offset
+- High `alternatives` values indicate ambiguous mappings
+- Works only for tiles captured during the probe runs that built this database
+- Does not replace ROM-based database for games without SA-1 conversion
