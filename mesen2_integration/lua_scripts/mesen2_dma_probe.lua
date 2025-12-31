@@ -976,16 +976,39 @@ local function get_obsel()
     }
 end
 
+-- One-shot diagnostic: tracks which OAM source was used for this capture
+local oam_source_logged = false
+
 -- Read OAM byte: prefer DMA-captured buffer ONLY if it matches this frame
 local function read_oam_byte(offset, frame_id)
     if oam_dma_buffer
         and oam_dma_frame == frame_id
         and offset < OAM_DMA_SIZE
     then
+        if not oam_source_logged then
+            oam_source_logged = true
+            log(string.format("OAM_SOURCE: frame=%d USING_DMA_BUFFER (oam_dma_frame=%d)",
+                frame_id, oam_dma_frame))
+        end
         return oam_dma_buffer[offset + 1] or 0  -- Lua 1-indexed
     end
 
     -- Fallback to direct OAM read
+    if not oam_source_logged then
+        oam_source_logged = true
+        local reason = "unknown"
+        if not oam_dma_buffer then
+            reason = "no_buffer"
+        elseif oam_dma_frame ~= frame_id then
+            reason = string.format("frame_mismatch(dma=%s,capture=%d)",
+                tostring(oam_dma_frame), frame_id)
+        elseif offset >= OAM_DMA_SIZE then
+            reason = "offset_oob"
+        end
+        log(string.format("OAM_SOURCE: frame=%d FALLBACK_DIRECT reason=%s MEM.oam=%s",
+            frame_id, reason, tostring(MEM.oam ~= nil)))
+    end
+
     if MEM.oam then
         local ok, v = pcall(emu.read, offset, MEM.oam)
         if ok and v then return v end
@@ -1160,6 +1183,9 @@ local function dump_vram(path)
 end
 
 local function capture_sprites(frame_id)
+    -- Reset one-shot OAM source diagnostic for this capture
+    oam_source_logged = false
+
     -- Only VRAM and CGRAM are required; OAM can come from DMA buffer
     if not MEM.cgram or not MEM.vram then
         log("ERROR: CGRAM/VRAM memTypes missing; cannot capture sprites")
