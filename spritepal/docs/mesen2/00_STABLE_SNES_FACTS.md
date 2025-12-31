@@ -11,10 +11,11 @@ avoids emulator- or tool-specific behavior.
 ## OBJSEL ($2101) Tile Tables
 - `name_base = obsel & 0x07` (bits 0-2)
 - `name_select = (obsel >> 3) & 0x03` (bits 3-4)
+- `size_select = (obsel >> 5) & 0x07` (bits 5-7) — selects small/large sprite dimensions
 - **OAM base (word address):** `oam_base_word = name_base << 13`
-  - Each step is **0x2000 words = 16KB**.
+  - Each step advances by **0x2000 word addresses** (spanning **16KB** of byte-addressable VRAM).
 - **OAM offset (word address):** `oam_offset_word = (name_select + 1) << 12`
-  - Each step is **0x1000 words = 8KB**.
+  - Each step advances by **0x1000 word addresses** (spanning **8KB** of byte-addressable VRAM).
 - OAM attribute bit 0 is **tile index bit 8 / second table select**, not a background name table.
 - Bit 2 of `name_base` is reserved for a never-implemented VRAM expansion; in practice it
   should be 0. Warn if it is set.
@@ -89,7 +90,10 @@ if x_full >= 256 then
 end
 ```
 
-## Sprite Size Modes (OBSEL Size Select)
+## Sprite Size Modes (OBJSEL bits 5-7)
+The `size_select` field from OBJSEL determines available sprite sizes. Each sprite's high-table
+size bit selects between "small" and "large" for that sprite.
+
 | size_select | Small | Large |
 |-------------|-------|-------|
 | 0 | 8x8 | 16x16 |

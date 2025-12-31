@@ -156,6 +156,30 @@ Useful env toggles:
 
 ROM read traces are written to `rom_trace_log.txt` in `OUTPUT_DIR`.
 
+### rom_trace_log.txt Format
+The ROM trace log uses a line-oriented format. Key line types:
+
+```
+# Header (emitted when ROM tracing starts)
+ROM trace armed frame=1234 prg_size=0x400000 prg_end=0x3FFFFF
+
+# Read entries (one per ROM read during active trace)
+ROM_READ frame=1234 addr=0x1B0456 [pc_sample: cpu.pc=0x8940 cpu.k=0x00 cpu.dbr=0x7E]
+
+# Trace end marker
+ROM trace complete frame=1234 total_reads=156
+```
+
+**Field definitions:**
+- `frame`: Emulator frame counter when event occurred
+- `prg_size`: Size of PRG-ROM in bytes (use to validate seeds)
+- `prg_end`: Last valid PRG-ROM address (`prg_size - 1`)
+- `addr`: ROM memType address of the read (may require mapping conversion)
+- `pc_sample`: Optional CPU state snapshot (when `ROM_TRACE_PC_SAMPLES > 0`)
+
+**Important:** If `prg_size`/`prg_end` are missing from the header, the probe script is
+outdated. Treat all `addr` values as ambiguous and use `--auto-map` validation.
+
 ## WSL Interop Notes
 - Use Windows paths in Lua file I/O (`C:\...`).
 - If launching from WSL, pass env vars via `WSLENV` or `cmd.exe /C "set ..."`.

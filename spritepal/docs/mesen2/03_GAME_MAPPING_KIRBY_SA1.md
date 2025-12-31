@@ -7,6 +7,44 @@ This document is **game-specific**. Do not generalize these assumptions to other
 - ROM mapping for banks $C0-$FF commonly maps to ROM space, but **SA-1 mapping registers can
   change behavior**. Treat mapping formulas as conditional unless verified by probes.
 
+### Address Conversion Reference
+When ROM trace addresses need conversion to file offsets, use these formulas as starting
+points. **SA-1 games can remap banks dynamically**; verify with probes before trusting.
+
+**LoROM (standard, non-SA-1):**
+```python
+# CPU address → file offset (for banks $00-$7D, $80-$FF)
+def lorom_to_file(bank, offset):
+    if offset < 0x8000:
+        return None  # Not ROM space
+    return ((bank & 0x7F) << 15) | (offset & 0x7FFF)
+```
+
+**HiROM (standard, non-SA-1):**
+```python
+# CPU address → file offset (for banks $C0-$FF or $40-$7D)
+def hirom_to_file(bank, offset):
+    return ((bank & 0x3F) << 16) | offset
+```
+
+**SA-1 (Kirby Super Star):**
+SA-1 uses configurable bank registers at $2220-$2223. Default power-on mapping:
+- Banks $C0-$CF → ROM $000000-$0FFFFF (first 1MB)
+- Banks $D0-$DF → ROM $100000-$1FFFFF (second 1MB)
+- Banks $E0-$EF → ROM $200000-$2FFFFF (third 1MB)
+- Banks $F0-$FF → ROM $300000-$3FFFFF (fourth 1MB)
+
+```python
+# SA-1 default mapping (assumes power-on state)
+def sa1_to_file(bank, offset):
+    if 0xC0 <= bank <= 0xFF:
+        return ((bank - 0xC0) << 16) | offset
+    return None  # Needs bank register lookup
+```
+
+**Important:** For Kirby Super Star, prefer `emu.convertAddress()` in Lua or the
+`--auto-map` flag in validation scripts to handle remapped banks correctly.
+
 ## Decompression Pipeline (Observed)
 ```
 ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
@@ -42,8 +80,20 @@ set and re-discover the source via WRAM/DMA traces.
 
 ## SA-1 Character Conversion (Risk)
 SA-1 supports a character conversion DMA mode that can transform bitmap data into SNES
-bitplane tiles on the fly (registers around $2230/$2240). If active, **VRAM tile bytes
-will not match ROM-decompressed bytes**, and hash mapping will fail until this is detected.
+bitplane tiles on the fly. If active, **VRAM tile bytes will not match ROM-decompressed
+bytes**, and hash mapping will fail until this is detected.
+
+### Character Conversion Registers (from Mesen 2 source)
+| Register | Name | Function |
+|----------|------|----------|
+| `$2230` | DCNT | DMA Control — bit 4: auto mode, bit 5: char conversion enable |
+| `$2231` | CDMA | Char conversion params — bits 0-1: format (0=8bpp, 1=4bpp, 2=2bpp), bits 2-4: width |
+| `$223F` | BBF | Bitmap format — bit 7: BWRAM 2bpp mode |
+| `$2240-$2247` | BRF | Bitmap register file 1 (type 2 conversion source) |
+| `$2248-$224F` | BRF | Bitmap register file 2 (type 2 conversion source) |
+
+**Type 1 conversion**: CPU reads from IRAM trigger on-the-fly conversion from BWRAM bitmap.
+**Type 2 conversion**: Writing to BRF registers triggers conversion to IRAM.
 
 Operational playbook:
 - Detect: log SA-1 DMA control (e.g., $2230) and confirm character conversion is enabled.

@@ -75,6 +75,10 @@ Tiles ordering guarantee:
 ### Rules
 - Prefer `tile_page` over `name_table`. Treat `name_table` as legacy input only.
 - `tile_page`/`name_table` refer to the **OBJ tile high bit**, not BG nametables.
+- **Deprecation (`name_table` → `tile_page`)**: The field `name_table` was poorly named
+  (suggests BG nametables). Writers should emit both fields with identical values for
+  backward compatibility. Readers should prefer `tile_page` when both are present.
+  Remove `name_table` support once all captures in `mesen2_exchange/` use `tile_page`.
 - Use `*_addr` units consistently:
   - `*_addr` in **bytes** unless explicitly marked as word address.
   - Word addresses must be labeled explicitly (e.g., `*_word` or in-field doc text).
