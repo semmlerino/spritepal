@@ -1,0 +1,208 @@
+VRAM DMA Transfer Samples
+=========================
+Frame 900, captured 50 VRAM transfers
+
+Transfer #1: ROM $00FFFE, size=16384 bytes
+  Data: 00 00 00 00 A9 CD EF 12 00 00 20 00 00 00 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #2: WRAM $7E2000, size=12 bytes
+  Data: 71 72 73 74 75 76 77 78 79 7A 7B 98 80 81 82 83 
+        84 85 86 87 88 89 8A 8B A8 70 7C 7D 7E 7F 90 91 
+
+Transfer #3: WRAM $7E200C, size=14 bytes
+  Data: 80 81 82 83 84 85 86 87 88 89 8A 8B A8 70 7C 7D 
+        7E 7F 90 91 92 93 94 95 96 97 99 8C 8D 8E 8F A0 
+
+Transfer #4: WRAM $7E201A, size=14 bytes
+  Data: 7C 7D 7E 7F 90 91 92 93 94 95 96 97 99 8C 8D 8E 
+        8F A0 A1 A2 A3 A4 A5 A6 A7 A9 9A 9B 9C 9D 9E 9F 
+
+Transfer #5: WRAM $7E2028, size=12 bytes
+  Data: 8D 8E 8F A0 A1 A2 A3 A4 A5 A6 A7 A9 9A 9B 9C 9D 
+        9E 9F AA AB AC AD AE AF B0 B1 B2 B3 B4 B5 C0 C1 
+
+Transfer #6: WRAM $7E2034, size=6 bytes
+  Data: 9A 9B 9C 9D 9E 9F AA AB AC AD AE AF B0 B1 B2 B3 
+        B4 B5 C0 C1 C2 C3 C4 BC B6 B7 B8 B9 BA BB BD BE 
+
+Transfer #7: WRAM $7E203A, size=6 bytes
+  Data: AA AB AC AD AE AF B0 B1 B2 B3 B4 B5 C0 C1 C2 C3 
+        C4 BC B6 B7 B8 B9 BA BB BD BE BF 6D 6E 6F 67 68 
+
+Transfer #8: WRAM $7E2040, size=6 bytes
+  Data: B0 B1 B2 B3 B4 B5 C0 C1 C2 C3 C4 BC B6 B7 B8 B9 
+        BA BB BD BE BF 6D 6E 6F 67 68 69 6A 6B 6C 01 02 
+
+Transfer #9: WRAM $7E2046, size=6 bytes
+  Data: C0 C1 C2 C3 C4 BC B6 B7 B8 B9 BA BB BD BE BF 6D 
+        6E 6F 67 68 69 6A 6B 6C 01 02 03 04 05 06 07 08 
+
+Transfer #10: WRAM $7E204C, size=6 bytes
+  Data: B6 B7 B8 B9 BA BB BD BE BF 6D 6E 6F 67 68 69 6A 
+        6B 6C 01 02 03 04 05 06 07 08 09 0A 0B 0C 00 0E 
+
+Transfer #11: WRAM $7E2052, size=6 bytes
+  Data: BD BE BF 6D 6E 6F 67 68 69 6A 6B 6C 01 02 03 04 
+        05 06 07 08 09 0A 0B 0C 00 0E 0F 10 11 12 13 14 
+
+Transfer #12: WRAM $7E2058, size=6 bytes
+  Data: 67 68 69 6A 6B 6C 01 02 03 04 05 06 07 08 09 0A 
+        0B 0C 00 0E 0F 10 11 12 13 14 15 16 17 18 19 1A 
+
+Transfer #13: WRAM $7E205E, size=6 bytes
+  Data: 01 02 03 04 05 06 07 08 09 0A 0B 0C 00 0E 0F 10 
+        11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F 20 
+
+Transfer #14: WRAM $7E2064, size=7 bytes
+  Data: 07 08 09 0A 0B 0C 00 0E 0F 10 11 12 13 14 15 16 
+        17 18 19 1A 1B 1C 1D 1E 1F 20 21 22 23 24 25 26 
+
+Transfer #15: WRAM $7E206B, size=12 bytes
+  Data: 0E 0F 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 
+        1E 1F 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 
+
+Transfer #16: WRAM $7E2077, size=12 bytes
+  Data: 1A 1B 1C 1D 1E 1F 20 21 22 23 24 25 26 27 28 29 
+        2A 2B 2C 2D 2E 2F 30 31 32 33 34 35 36 37 38 39 
+
+Transfer #17: WRAM $7E2083, size=12 bytes
+  Data: 26 27 28 29 2A 2B 2C 2D 2E 2F 30 31 32 33 34 35 
+        36 37 38 39 3A 3B 3C 3D 3E 3F 40 41 42 43 44 45 
+
+Transfer #18: WRAM $7E208F, size=10 bytes
+  Data: 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F 40 41 
+        42 43 44 45 46 47 48 49 4A 48 48 4B 4C 4D 4E 4F 
+
+Transfer #19: WRAM $7E2099, size=10 bytes
+  Data: 3C 3D 3E 3F 40 41 42 43 44 45 46 47 48 49 4A 48 
+        48 4B 4C 4D 4E 4F 50 51 52 53 54 48 55 56 57 58 
+
+Transfer #20: WRAM $7E20A3, size=12 bytes
+  Data: 46 47 48 49 4A 48 48 4B 4C 4D 4E 4F 50 51 52 53 
+        54 48 55 56 57 58 59 5A 5B 5C 5D 5E 5F 60 61 62 
+
+Transfer #21: WRAM $7E20AF, size=12 bytes
+  Data: 50 51 52 53 54 48 55 56 57 58 59 5A 5B 5C 5D 5E 
+        5F 60 61 62 63 64 65 66 10 9F 41 C8 53 0F B9 E1 
+
+Transfer #22: WRAM $7E20BB, size=12 bytes
+  Data: 5B 5C 5D 5E 5F 60 61 62 63 64 65 66 10 9F 41 C8 
+        53 0F B9 E1 15 48 F1 4C 87 68 1F 48 4E 0E 5B 4E 
+
+Transfer #23: WRAM $7E2000, size=4384 bytes
+  Data: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+        00 00 00 00 01 00 0F 00 0F 00 1F 00 1E 00 1D 00 
+
+Transfer #24: WRAM $7E2000, size=12608 bytes
+  Data: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+        00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Transfer #25: WRAM $7E2000, size=5120 bytes
+  Data: 3F 00 60 1F CF 30 9F 6F 0F F0 80 7F 00 FF 86 79 
+        00 3F 00 7F 20 FF 20 FF 60 FF 7F FF 7F FF 70 FF 
+
+Transfer #26: ROM $00FFFE, size=13 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #27: ROM $00FFFE, size=13 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #28: ROM $00FFFE, size=13 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #29: ROM $00FFFE, size=13 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #30: ROM $00FFFE, size=6 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #31: ROM $00FFFE, size=6 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #32: ROM $00FFFE, size=6 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #33: ROM $00FFFE, size=6 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #34: ROM $00FFFE, size=6 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #35: ROM $00FFFE, size=6 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #36: ROM $00FFFE, size=6 bytes
+  Data: 00 00 00 00 82 3D E1 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #37: WRAM $7E2000, size=16384 bytes
+  Data: 00 01 02 03 04 05 06 07 00 01 02 03 04 05 06 07 
+        00 01 02 03 04 05 06 07 00 01 02 03 04 05 06 07 
+
+Transfer #38: WRAM $7E2000, size=1024 bytes
+  Data: 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 
+        01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 
+
+Transfer #39: WRAM $7E2000, size=1024 bytes
+  Data: 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 
+        18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 18 
+
+Transfer #40: WRAM $7E2000, size=2912 bytes
+  Data: 80 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+        80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Transfer #41: WRAM $E092B2, size=4096 bytes
+  Data: 0F 10 02 35 27 20 20 0A 08 08 01 0A 03 20 0A 35 
+        10 4F 01 1F 09 11 0A 39 10 08 0F 24 0A 11 12 35 
+
+Transfer #42: ROM $00FFFE, size=16384 bytes
+  Data: 00 00 00 00 E9 1B E6 00 00 00 20 80 1B D0 00 00 
+        9C 0E 30 A9 0F 00 2C 00 23 F0 FB 2C 0E 30 10 F6 
+
+Transfer #43: WRAM $7E2000, size=5 bytes
+  Data: 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 10 
+        11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F 20 
+
+Transfer #44: WRAM $7E2005, size=7 bytes
+  Data: 06 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 
+        16 17 18 19 1A 1B 1C 1D 1E 1F 20 21 22 23 24 25 
+
+Transfer #45: WRAM $7E200C, size=7 bytes
+  Data: 0D 0E 0F 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 
+        1D 1E 1F 20 21 22 23 24 25 26 27 28 29 2A 00 00 
+
+Transfer #46: WRAM $7E2013, size=8 bytes
+  Data: 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F 20 21 22 23 
+        24 25 26 27 28 29 2A 00 00 00 00 00 00 FF 00 FF 
+
+Transfer #47: WRAM $7E201B, size=8 bytes
+  Data: 1C 1D 1E 1F 20 21 22 23 24 25 26 27 28 29 2A 00 
+        00 00 00 00 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 
+
+Transfer #48: WRAM $7E2023, size=7 bytes
+  Data: 24 25 26 27 28 29 2A 00 00 00 00 00 00 FF 00 FF 
+        00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 01 01 0F 
+
+Transfer #49: WRAM $7E2000, size=2752 bytes
+  Data: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+        00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Transfer #50: WRAM $7E2000, size=5696 bytes
+  Data: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+        00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Summary by source bank:
+  Bank $00 (ROM): 13 transfers
+  Bank $E0 (WRAM): 1 transfers
+  Bank $7E (WRAM): 36 transfers

@@ -1,0 +1,172 @@
+01:23:27 SpritePal capture script loaded
+01:23:27 Script running, press F9 during gameplay to capture sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:23:30 F9 pressed - capturing sprites
+01:28:41 SpritePal capture script loaded
+01:28:41 Script running, press F9 during gameplay to capture sprites
+01:28:50 F9 pressed - capturing sprites at frame 1677
+01:28:50 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968130.json
+01:28:50 F9 pressed - capturing sprites at frame 1678
+01:28:50 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968130.json
+01:28:50 F9 pressed - capturing sprites at frame 1679
+01:28:50 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968130.json
+01:28:50 F9 pressed - capturing sprites at frame 1680
+01:28:50 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968130.json
+01:28:50 F9 pressed - capturing sprites at frame 1681
+01:28:50 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968130.json
+01:28:50 F9 pressed - capturing sprites at frame 1682
+01:28:50 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968130.json
+01:28:50 F9 pressed - capturing sprites at frame 1683
+01:28:50 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968130.json
+01:28:50 F9 pressed - capturing sprites at frame 1684
+01:28:50 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968130.json
+01:28:57 F9 pressed - capturing sprites at frame 2109
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2110
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2111
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2112
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2113
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2114
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2115
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2116
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2117
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2118
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2119
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2120
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2121
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:57 F9 pressed - capturing sprites at frame 2122
+01:28:57 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968137.json
+01:28:58 F9 pressed - capturing sprites at frame 2313
+01:28:58 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968138.json
+01:28:58 F9 pressed - capturing sprites at frame 2314
+01:28:58 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968138.json
+01:28:58 F9 pressed - capturing sprites at frame 2315
+01:28:58 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968138.json
+01:28:58 F9 pressed - capturing sprites at frame 2316
+01:28:58 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968138.json
+01:28:58 F9 pressed - capturing sprites at frame 2317
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:28:59 F9 pressed - capturing sprites at frame 2318
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:28:59 F9 pressed - capturing sprites at frame 2319
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:28:59 F9 pressed - capturing sprites at frame 2320
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:28:59 F9 pressed - capturing sprites at frame 2321
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:28:59 F9 pressed - capturing sprites at frame 2322
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:28:59 F9 pressed - capturing sprites at frame 2323
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:28:59 F9 pressed - capturing sprites at frame 2324
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:28:59 F9 pressed - capturing sprites at frame 2325
+01:28:59 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968139.json
+01:29:02 F9 pressed - capturing sprites at frame 2514
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2515
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2516
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2517
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2518
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2519
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2520
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2521
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2522
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:02 F9 pressed - capturing sprites at frame 2523
+01:29:02 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968142.json
+01:29:03 F9 pressed - capturing sprites at frame 2734
+01:29:03 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968143.json
+01:29:03 F9 pressed - capturing sprites at frame 2735
+01:29:03 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968143.json
+01:29:03 F9 pressed - capturing sprites at frame 2736
+01:29:03 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968143.json
+01:29:03 F9 pressed - capturing sprites at frame 2737
+01:29:03 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968143.json
+01:29:03 F9 pressed - capturing sprites at frame 2738
+01:29:03 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968143.json
+01:29:03 F9 pressed - capturing sprites at frame 2739
+01:29:03 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968143.json
+01:29:03 F9 pressed - capturing sprites at frame 2740
+01:29:03 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968143.json
+01:30:01 F9 pressed - capturing sprites at frame 6222
+01:30:01 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968201.json
+01:30:01 F9 pressed - capturing sprites at frame 6223
+01:30:01 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968201.json
+01:30:01 F9 pressed - capturing sprites at frame 6224
+01:30:01 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968201.json
+01:30:01 F9 pressed - capturing sprites at frame 6225
+01:30:01 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968201.json
+01:30:01 F9 pressed - capturing sprites at frame 6226
+01:30:01 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968201.json
+01:30:01 F9 pressed - capturing sprites at frame 6227
+01:30:01 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968201.json
+01:30:11 SpritePal capture script loaded
+01:30:11 Script running, press F9 during gameplay to capture sprites
+01:30:14 F9 pressed - capturing sprites at frame 194
+01:30:14 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968214.json
+01:30:14 F9 pressed - capturing sprites at frame 195
+01:30:14 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968214.json
+01:30:14 F9 pressed - capturing sprites at frame 196
+01:30:14 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968214.json
+01:30:14 F9 pressed - capturing sprites at frame 197
+01:30:14 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968214.json
+01:30:14 F9 pressed - capturing sprites at frame 198
+01:30:14 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968214.json
+01:30:14 F9 pressed - capturing sprites at frame 199
+01:30:14 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1766968214.json
+20:15:30 SpritePal capture script loaded
+20:15:30 Script running, press F9 during gameplay to capture sprites
+20:15:37 F9 key detected at frame 396
+20:15:37 F9 pressed - capturing sprites at frame 396
+20:15:37 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1767035737.json
+20:15:38 F9 key detected at frame 464
+20:15:38 F9 pressed - capturing sprites at frame 464
+20:15:38 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1767035738.json
+20:15:39 F9 key detected at frame 537
+20:15:39 F9 pressed - capturing sprites at frame 537
+20:15:39 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1767035739.json
+20:15:39 F9 key detected at frame 547
+20:15:39 F9 pressed - capturing sprites at frame 547
+20:15:39 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1767035739.json
+20:17:59 SpritePal capture script loaded
+20:17:59 Script running, press Start+Select during gameplay to capture sprites
+20:18:30 Start+Select detected at frame 1822
+20:18:30 F9 pressed - capturing sprites at frame 1822
+20:18:30 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1767035910.json
+20:18:33 Start+Select detected at frame 1950
+20:18:33 F9 pressed - capturing sprites at frame 1950
+20:18:33 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1767035913.json
+20:18:34 Start+Select detected at frame 2014
+20:18:34 F9 pressed - capturing sprites at frame 2014
+20:18:34 Captured 128 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1767035914.json

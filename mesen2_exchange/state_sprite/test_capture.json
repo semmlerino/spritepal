@@ -1,0 +1,2568 @@
+{
+  "frame": 30,
+  "obsel": {
+    "raw": 0,
+    "name_base": 0,
+    "name_select": 0,
+    "size_select": 0,
+    "tile_base_addr": 0
+  },
+  "visible_count": 128,
+  "entries": [
+    {
+      "id": 0,
+      "x": 108,
+      "y": 103,
+      "tile": 12,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 12,
+          "vram_addr": 384,
+          "data_hex": "20000060604040E0E0C0C0E0E0C0C0E0E0C0C0E0E0C0C0FFFFC0C0FFFFFFFF3F"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "x": 116,
+      "y": 110,
+      "tile": 29,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 29,
+          "vram_addr": 928,
+          "data_hex": "00FFFF0000FFFF0000FFFF3E3EC1C18080000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "x": 116,
+      "y": 102,
+      "tile": 13,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 13,
+          "vram_addr": 416,
+          "data_hex": "3F3F3F7F7F7F7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "x": 124,
+      "y": 102,
+      "tile": 14,
+      "width": 16,
+      "height": 16,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 14,
+          "vram_addr": 448,
+          "data_hex": "0000000000000000000000000000000000000000000000FFFF0000FFFFFFFFFF"
+        },
+        {
+          "tile_index": 15,
+          "vram_addr": 480,
+          "data_hex": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF04"
+        },
+        {
+          "tile_index": 30,
+          "vram_addr": 960,
+          "data_hex": "000000000000000000000000000000C0C04040F0F01010F4F40C0CFDFDC2C200"
+        },
+        {
+          "tile_index": 31,
+          "vram_addr": 992,
+          "data_hex": "00FFFF0000FFFF0000FFFF0000FFFFC0C03F3F30300F0F0404030301010000C0"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "x": 132,
+      "y": 125,
+      "tile": 19,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 19,
+          "vram_addr": 608,
+          "data_hex": "C00000F0F00000FCFC0000FCFC0000FCFC0000FCFC0000FCFC0000FCFCC0C03F"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "x": 124,
+      "y": 125,
+      "tile": 4,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 4,
+          "vram_addr": 128,
+          "data_hex": "F2F3F37A7A7B7BBEBEBFBF5E5E5F5F2E2E2F2F161617170A0A0B0B02020303FE"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "x": 116,
+      "y": 125,
+      "tile": 3,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 3,
+          "vram_addr": 96,
+          "data_hex": "FFFFFFFFFFFFFFFEFEFFFFFCFCFFFFF8F8FFFFF0F0FFFFE0E0FFFFC0C0FFFFF2"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "x": 132,
+      "y": 117,
+      "tile": 18,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 18,
+          "vram_addr": 576,
+          "data_hex": "3F20200F0F0C0C030303030303030303030303030303030303030303030303C0"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "x": 132,
+      "y": 109,
+      "tile": 2,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 2,
+          "vram_addr": 64,
+          "data_hex": "8F8F8F9E9E9E9EBDBDBDBDFAFAFAFAF4F4F4F4E8E8E8E8D0D0D0D0A0A0A0A0FF"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "x": 116,
+      "y": 109,
+      "tile": 0,
+      "width": 16,
+      "height": 16,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "tile_index": 1,
+          "vram_addr": 32,
+          "data_hex": "000000000000000000000000000000000000000000000000000000000000008F"
+        },
+        {
+          "tile_index": 16,
+          "vram_addr": 512,
+          "data_hex": "0400000404020204040303040403030404030304040303FCFC0303FCFCFFFFFC"
+        },
+        {
+          "tile_index": 17,
+          "vram_addr": 544,
+          "data_hex": "FCFCFCFEFEFEFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3F"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "x": -5,
+      "y": 88,
+      "tile": 127,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": false,
+      "flip_v": true,
+      "tiles": [
+        {
+          "tile_index": 127,
+          "vram_addr": 4064,
+          "data_hex": "00000001010000070700008F8F00004A4A87870E0ECFCF2626CCCC0404E0E001"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "x": 3,
+      "y": 88,
+      "tile": 127,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": true,
+      "tiles": [
+        {
+          "tile_index": 127,
+          "vram_addr": 4064,
+          "data_hex": "00000001010000070700008F8F00004A4A87870E0ECFCF2626CCCC0404E0E001"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "x": 3,
+      "y": 80,
+      "tile": 127,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 127,
+          "vram_addr": 4064,
+          "data_hex": "00000001010000070700008F8F00004A4A87870E0ECFCF2626CCCC0404E0E001"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "x": -5,
+      "y": 80,
+      "tile": 127,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 127,
+          "vram_addr": 4064,
+          "data_hex": "00000001010000070700008F8F00004A4A87870E0ECFCF2626CCCC0404E0E001"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "x": -33,
+      "y": 109,
+      "tile": 159,
+      "width": 8,
+      "height": 8,
+      "palette": 4,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 159,
+          "vram_addr": 5088,
+          "data_hex": "1EE0E00000FFFF0000FFFF0000FFFF0202FCFC0404F8F80000FCFC0202FCFC44"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "x": -17,
+      "y": 109,
+      "tile": 133,
+      "width": 8,
+      "height": 8,
+      "palette": 4,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 133,
+          "vram_addr": 4256,
+          "data_hex": "0000000000000000000000000000003F3F00003F3F00003F3F00007F7F010100"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "x": -25,
+      "y": 109,
+      "tile": 132,
+      "width": 8,
+      "height": 8,
+      "palette": 4,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 132,
+          "vram_addr": 4224,
+          "data_hex": "FF0303FFFF0F0FFFFF3F3FFFFF3F3FC0C00000C0C00000C0C000008181000000"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "x": -33,
+      "y": 117,
+      "tile": 128,
+      "width": 16,
+      "height": 16,
+      "palette": 4,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 4096,
+          "data_hex": "01FEFE0101FEFE0101FEFE0000FFFF1010EFEF3030CFCFF1F10E0EE1E10E0E00"
+        },
+        {
+          "tile_index": 129,
+          "vram_addr": 4128,
+          "data_hex": "00000000000000000000000000000000000000000000000000000010100000FF"
+        },
+        {
+          "tile_index": 144,
+          "vram_addr": 4608,
+          "data_hex": "FF0000FFFFFFFF000000000000000000000000020203031B1B1C1CFFFFC0C0FF"
+        },
+        {
+          "tile_index": 145,
+          "vram_addr": 4640,
+          "data_hex": "FFFFFF0000FFFF0000FFFF0000FFFF0000FFFF0202FCFC1818E0E0E0E00000FF"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "x": -17,
+      "y": 117,
+      "tile": 130,
+      "width": 16,
+      "height": 16,
+      "palette": 4,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 130,
+          "vram_addr": 4160,
+          "data_hex": "FF0000FFFF00008A8A06060808C6C61A1AA4A48F8F7070EFEF2020CFCF303000"
+        },
+        {
+          "tile_index": 131,
+          "vram_addr": 4192,
+          "data_hex": "00000000000000525200003030000041410000202000003030000030300000FF"
+        },
+        {
+          "tile_index": 146,
+          "vram_addr": 4672,
+          "data_hex": "FF0000FFFFFFFF000000001C1C1C1CDDDDA2A2FFFF0000FFFF1C1CFFFFFFFFFF"
+        },
+        {
+          "tile_index": 147,
+          "vram_addr": 4704,
+          "data_hex": "FFFFFF0000FFFF0000FFFF1C1CE3E3C1C10000000000000000000000000000FF"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "x": 64,
+      "y": 115,
+      "tile": 190,
+      "width": 8,
+      "height": 8,
+      "palette": 3,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 190,
+          "vram_addr": 6080,
+          "data_hex": "FE81813E3EA0A00E0EEBEB0303FCFC0303FCFC0101FEFE81817E7EC2C23C3C80"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "x": 64,
+      "y": 107,
+      "tile": 174,
+      "width": 8,
+      "height": 8,
+      "palette": 3,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 174,
+          "vram_addr": 5568,
+          "data_hex": "106868080874741E1EE1E1BFBFC0C02727101083839C9C1313DCDC0707E8E860"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "x": 72,
+      "y": 107,
+      "tile": 174,
+      "width": 16,
+      "height": 16,
+      "palette": 3,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 174,
+          "vram_addr": 5568,
+          "data_hex": "106868080874741E1EE1E1BFBFC0C02727101083839C9C1313DCDC0707E8E860"
+        },
+        {
+          "tile_index": 175,
+          "vram_addr": 5600,
+          "data_hex": "60000080800000C0C000008080000048480000F8F800003838000010100000FF"
+        },
+        {
+          "tile_index": 190,
+          "vram_addr": 6080,
+          "data_hex": "FE81813E3EA0A00E0EEBEB0303FCFC0303FCFC0101FEFE81817E7EC2C23C3C80"
+        },
+        {
+          "tile_index": 191,
+          "vram_addr": 6112,
+          "data_hex": "807E7E61611E1E1A1A0404000000000000000000000000000000000101000080"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "x": 63,
+      "y": 115,
+      "tile": 178,
+      "width": 8,
+      "height": 8,
+      "palette": 3,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 178,
+          "vram_addr": 5696,
+          "data_hex": "8080808080808080808080808080808080808080808080FFFFFFFFFFFFFFFFFF"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "x": 71,
+      "y": 115,
+      "tile": 177,
+      "width": 8,
+      "height": 8,
+      "palette": 3,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 177,
+          "vram_addr": 5664,
+          "data_hex": "FFFFFF0000FFFF8080FFFF8080FFFF8080FFFF8282FCFC9898E0E0A0A0C0C080"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "x": 79,
+      "y": 115,
+      "tile": 178,
+      "width": 8,
+      "height": 8,
+      "palette": 3,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 178,
+          "vram_addr": 5696,
+          "data_hex": "8080808080808080808080808080808080808080808080FFFFFFFFFFFFFFFFFF"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "x": 79,
+      "y": 123,
+      "tile": 189,
+      "width": 8,
+      "height": 8,
+      "palette": 3,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 189,
+          "vram_addr": 6048,
+          "data_hex": "817E7E84847878909060600000000000000000000000000000000000000000FE"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "x": 63,
+      "y": 123,
+      "tile": 171,
+      "width": 8,
+      "height": 8,
+      "palette": 3,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 171,
+          "vram_addr": 5472,
+          "data_hex": "0601019C9C0303D0D00F0FD8D8878748480707F8F80707BABA44443030C0C0A0"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "x": 71,
+      "y": 123,
+      "tile": 170,
+      "width": 8,
+      "height": 8,
+      "palette": 3,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 170,
+          "vram_addr": 5440,
+          "data_hex": "01020213131C1C9F9FB0B00707282847477070C7C7C8C84C4CA9A9C3C30C0C06"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "x": 181,
+      "y": 72,
+      "tile": 95,
+      "width": 8,
+      "height": 8,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 95,
+          "vram_addr": 11232,
+          "data_hex": "1F1F1F2323C3C30404F8F80000FFFF0000FFFF0000FFFF0000FFFF0000FFFF00"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "x": 173,
+      "y": 72,
+      "tile": 94,
+      "width": 8,
+      "height": 8,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 94,
+          "vram_addr": 11200,
+          "data_hex": "1FE5E5C3C3DDDDF8F8FBFBFFFFFFFFFFFFFFFFFFFFFFFFFFFF3F3FFFFF03031F"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "x": 165,
+      "y": 72,
+      "tile": 93,
+      "width": 8,
+      "height": 8,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 93,
+          "vram_addr": 11168,
+          "data_hex": "3FFFFF9F9FFFFFCFCFFFFF6363FFFF3030FFFF1818FFFF0C0CFFFF0606FFFF1F"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "x": 181,
+      "y": 64,
+      "tile": 79,
+      "width": 8,
+      "height": 8,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 79,
+          "vram_addr": 10720,
+          "data_hex": "00F0F09898E0E09C9CE0E09C9CE0E09C9CE0E09C9CE0E09C9CE0E00000000000"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "x": 181,
+      "y": 56,
+      "tile": 63,
+      "width": 8,
+      "height": 8,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 63,
+          "vram_addr": 10208,
+          "data_hex": "010000616198984848BCBC3434FCFC1212FCFC8A8AFCFC3E3EC1C19999E7E700"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "x": 165,
+      "y": 56,
+      "tile": 61,
+      "width": 16,
+      "height": 16,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 61,
+          "vram_addr": 10144,
+          "data_hex": "03FFFF0000FFFF8080FFFF8080FFFF0000FFFF0000FFFF0000FFFF0000FFFFFC"
+        },
+        {
+          "tile_index": 62,
+          "vram_addr": 10176,
+          "data_hex": "FC7272646406065A5A13131A1A1B1B0F0F0C0C03030000BEBE8080DBDBC3C301"
+        },
+        {
+          "tile_index": 77,
+          "vram_addr": 10656,
+          "data_hex": "008080C1C10303C1C10707C1C10707C9C90707C9C90707C9C907070808060660"
+        },
+        {
+          "tile_index": 78,
+          "vram_addr": 10688,
+          "data_hex": "600808181865651C1C63631C1C63631C1C63631C1C63631C1C63636F6F9E9E00"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "x": 120,
+      "y": 85,
+      "tile": 129,
+      "width": 16,
+      "height": 16,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": true,
+      "tiles": [
+        {
+          "tile_index": 129,
+          "vram_addr": 12320,
+          "data_hex": "403F3F40403F3F40403F3F40403F3F7E7E0000B0B04040F0F000000101000006"
+        },
+        {
+          "tile_index": 130,
+          "vram_addr": 12352,
+          "data_hex": "06F8F80606F8F80C0CF2F23C3CC0C0707080803030C0C03030C8C81818E0E000"
+        },
+        {
+          "tile_index": 145,
+          "vram_addr": 12832,
+          "data_hex": "98E7E77F7F8080FFFF0000FFFF0000FFFF0000FFFF0000FFFF0000FFFF00007F"
+        },
+        {
+          "tile_index": 146,
+          "vram_addr": 12864,
+          "data_hex": "7F3F3F40403F3F1C1C030304040303040403030000030301010000000000007F"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "x": 136,
+      "y": 109,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "x": 112,
+      "y": 117,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "x": 112,
+      "y": 101,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "x": 134,
+      "y": 93,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "x": 183,
+      "y": 224,
+      "tile": 66,
+      "width": 8,
+      "height": 8,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 66,
+          "vram_addr": 10304,
+          "data_hex": "F0F0F078787878BCBCBCBC5E5E5E5E2F2F2F2F171717170B0B0B0B05050505FF"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "x": 183,
+      "y": 224,
+      "tile": 50,
+      "width": 8,
+      "height": 8,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 50,
+          "vram_addr": 9792,
+          "data_hex": "0000000101FFFF0707F8F8FFFF0101F8F808086C6C6C6C83838080BEBE8080FF"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "x": 167,
+      "y": 224,
+      "tile": 48,
+      "width": 8,
+      "height": 8,
+      "palette": 7,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 48,
+          "vram_addr": 9728,
+          "data_hex": "E64545BBBB3B3B3D3D3C3C3D3D3D3D7C7C7C7C7C7C7C7C7F7F7F7F7F7F787820"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "x": 136,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "x": 112,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "x": 112,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "x": 120,
+      "y": 224,
+      "tile": 129,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": true,
+      "tiles": [
+        {
+          "tile_index": 129,
+          "vram_addr": 12320,
+          "data_hex": "403F3F40403F3F40403F3F40403F3F7E7E0000B0B04040F0F000000101000006"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "x": 133,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "x": 136,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "x": 112,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "x": 154,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "x": 153,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": true,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "x": 132,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "x": 210,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "x": 186,
+      "y": 224,
+      "tile": 128,
+      "width": 8,
+      "height": 8,
+      "palette": 1,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 128,
+          "vram_addr": 12288,
+          "data_hex": "3F80803F3F8080FFFF4040BFBF40404040E5E54040AFAF02026D6D0606F8F840"
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "x": 40,
+      "y": 224,
+      "tile": 93,
+      "width": 8,
+      "height": 8,
+      "palette": 2,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 93,
+          "vram_addr": 2976,
+          "data_hex": "76F8F81C1CFEFE0000FEFE0202FCFC0202FCFC0202FCFC0202FCFC0202FCFC7F"
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "x": 32,
+      "y": 224,
+      "tile": 93,
+      "width": 8,
+      "height": 8,
+      "palette": 2,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 93,
+          "vram_addr": 2976,
+          "data_hex": "76F8F81C1CFEFE0000FEFE0202FCFC0202FCFC0202FCFC0202FCFC0202FCFC7F"
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "x": 24,
+      "y": 224,
+      "tile": 92,
+      "width": 8,
+      "height": 8,
+      "palette": 2,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 92,
+          "vram_addr": 2944,
+          "data_hex": "888989202021210C0C0D0D020203030202030302020303020203030202030376"
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 75,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 96,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 97,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": 127,
+      "x": 0,
+      "y": 224,
+      "tile": 0,
+      "width": 8,
+      "height": 8,
+      "palette": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "tiles": [
+        {
+          "tile_index": 0,
+          "vram_addr": 0,
+          "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    }
+  ],
+  "palettes": {
+    "0": [
+      31998,
+      31996,
+      19359,
+      13023,
+      7678,
+      2364,
+      2226,
+      24,
+      4191,
+      6342,
+      0,
+      511,
+      83,
+      8216,
+      30356,
+      31886
+    ],
+    "1": [
+      0,
+      31255,
+      210,
+      440,
+      766,
+      2239,
+      607,
+      0,
+      23898,
+      32064,
+      32672,
+      2183,
+      4450,
+      4706,
+      32767,
+      1023
+    ],
+    "2": [
+      0,
+      32735,
+      17375,
+      14110,
+      9821,
+      4404,
+      21,
+      4191,
+      27384,
+      15626,
+      13447,
+      10243,
+      7380,
+      17,
+      9,
+      0
+    ],
+    "3": [
+      0,
+      32735,
+      24446,
+      16125,
+      11836,
+      6523,
+      5430,
+      17087,
+      9631,
+      2175,
+      1145,
+      115,
+      896,
+      896,
+      1127,
+      0
+    ],
+    "4": [
+      0,
+      32767,
+      25375,
+      21181,
+      13086,
+      735,
+      5629,
+      2389,
+      5,
+      15359,
+      896,
+      32632,
+      32432,
+      32234,
+      25600,
+      5
+    ],
+    "5": [
+      0,
+      32735,
+      11146,
+      800,
+      352,
+      192,
+      31744,
+      32272,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "6": [
+      0,
+      32767,
+      32767,
+      2972,
+      825,
+      661,
+      530,
+      398,
+      1023,
+      32760,
+      30642,
+      25291,
+      16,
+      159,
+      6342,
+      0
+    ],
+    "7": [
+      0,
+      32735,
+      21509,
+      23967,
+      17566,
+      11384,
+      8309,
+      7275,
+      2751,
+      440,
+      1234,
+      1160,
+      32632,
+      32432,
+      32234,
+      0
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "description": "Known sprite locations in Kirby Super Star (USA) ROM",
+  "source": "Various debugging sessions and community documentation",
+  "note": "These addresses should be verified with Mesen 2 tracing",
+  "sprites": [
+    {
+      "name": "Kirby (Main Graphics Bank)",
+      "address": "$98:8000",
+      "rom_offset": "0x0C0000",
+      "verified": true,
+      "notes": "Large graphics bank containing Kirby sprites - 42KB decompressed"
+    },
+    {
+      "name": "Pack Table Entry 0x00",
+      "address": "$E9:9D33",
+      "rom_offset": "0x349D33",
+      "verified": true,
+      "notes": "First pack table entry - 1,164 bytes (corrected SNES address)"
+    },
+    {
+      "name": "Pack Table Entry 0x01",
+      "address": "$EE:FB33",
+      "rom_offset": "0x37B933",
+      "verified": true,
+      "notes": "14,295 bytes of graphics data"
+    },
+    {
+      "name": "Pack Table Entry 0x20",
+      "address": "$B4:D199",
+      "rom_offset": "0x1A5199",
+      "verified": true,
+      "notes": "10,837 bytes of graphics"
+    },
+    {
+      "name": "Pack Table Entry 0x4E (Invalid)",
+      "address": "$B2:9DB2",
+      "rom_offset": "0x191DB2",
+      "verified": false,
+      "notes": "WARNING: This offset returns 0 bytes - not valid HAL compressed data"
+    },
+    {
+      "name": "Placeholder for Cappy",
+      "address": "$00:0000",
+      "rom_offset": "0x000000",
+      "verified": false,
+      "notes": "To be found using Mesen 2 tracing method"
+    },
+    {
+      "name": "Placeholder for Waddle Dee",
+      "address": "$00:0000",
+      "rom_offset": "0x000000",
+      "verified": false,
+      "notes": "Common enemy sprite - location TBD"
+    },
+    {
+      "name": "Placeholder for Meta Knight",
+      "address": "$00:0000",
+      "rom_offset": "0x000000",
+      "verified": false,
+      "notes": "Boss sprite - location TBD"
+    }
+  ],
+  "pack_table": {
+    "location": "$02:B12E",
+    "rom_offset": "0x01312E",
+    "format": "3 bytes per entry (lo/hi/bank)",
+    "entries": 256,
+    "notes": "Master table of compressed graphics packs"
+  },
+  "decompression_routine": {
+    "location": "$00:889A",
+    "notes": "JSL to this address decompresses HAL data"
+  }
+}

@@ -1,0 +1,11 @@
+22:24:41 Script start: target=700 capture_frames=nil savestate=nil door_up=nil-nil dump_vram=true max_frames=nil
+22:24:44 Capturing frame 700 (suffix=)
+22:24:44 Capture complete; stopping
+23:44:34 Script start: target=700 capture_frames=nil savestate=nil door_up=nil-nil dump_vram=true max_frames=nil
+23:44:34 Registered endFrame callback
+23:44:37 Capturing frame 700 (suffix=)
+23:44:37 Capture complete; stopping
+01:35:12 Script start: target=700 capture_frames=nil capture_count=0 capture_first=nil savestate=nil preloaded=false frame_event=endFrame master_clock_fallback=0 master_clock_fps=nil master_clock_max_seconds=nil debug_capture=0 door_up=nil-nil dump_vram=true max_frames=nil
+01:35:12 Registered frame callback: endFrame
+01:35:16 Capturing frame 700 (suffix=)
+01:35:16 Capture complete; stopping

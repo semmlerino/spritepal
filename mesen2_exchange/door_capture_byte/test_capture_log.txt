@@ -1,0 +1,5 @@
+01:54:48 Script start: target=700 capture_frames=2 capture_count=1 capture_first=2 savestate=C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_integration\savestates\Entering.mss preloaded=false frame_event=exec master_clock_fallback=1 master_clock_fps=60 master_clock_max_seconds=10 debug_capture=0 door_up=5-35 dump_vram=false max_frames=10
+01:54:48 Savestate loaded; reset frame counter
+01:54:48 Registered frame callback: exec (frameCount via emu.getState)
+01:54:50 Capturing frame 2 (suffix=_2)
+01:54:50 Capture complete; stopping

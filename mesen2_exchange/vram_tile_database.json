@@ -1,0 +1,4216 @@
+{
+  "type": "vram_based",
+  "description": "VRAM tile hashes correlated with ROM read regions",
+  "tiles": {
+    "3240cdda6d2c4133059aeb2b0c38c2f2": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "322f2edb4360c8fc5b521ebaabac9428": {
+      "rom_region": 2031616,
+      "confidence": 10,
+      "alternatives": 2
+    },
+    "876fa5c98ab964f991a923a26ba6d696": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "efa2ad6bcfd4dc0cef73988a9cd46b54": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "bfef186970f8a04219d1f303d21db039": {
+      "rom_region": 2162688,
+      "confidence": 6,
+      "alternatives": 2
+    },
+    "d52362cb3e9036a8811fd57dbc7b02e2": {
+      "rom_region": 2031616,
+      "confidence": 18,
+      "alternatives": 2
+    },
+    "fa0c7495d61ffefa4d24f027b0e749b0": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "6e6a2f6e73cfca0d81686a212a11c6b1": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "ab4adcd5b542e9ee24eb87dcd5c900f8": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b8b37afc07b087fe4ac2a4e396688e77": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "894f5e272624faf5b6aefa1598fa379e": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "65a133a6a0f73b9eb121b1abaf831d8f": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "b6def890eb4b7226c99687c66f7b7fba": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "48b6bbe00983a6ec40839493978b035f": {
+      "rom_region": 2031616,
+      "confidence": 12,
+      "alternatives": 2
+    },
+    "7f8d157e3915cf76d19dc04a918e38f5": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "05e0ec495efaa2f1f15e2cd0baa57f14": {
+      "rom_region": 2031616,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "8b43fb0d0bc6b754c573eab0fe23a227": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "b7b2a9f9d880c4dd91bb017100bf7f23": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "9d344a14f30ced883c5027f8162e3926": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "a8659aed8e6040877e744fdc2e820209": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 2
+    },
+    "e6fae674dec933827f17e737b2a75bdb": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "4d4ee430df45a33b0be44366acdd0dc8": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7589b61ca0541533c8d8be8558507e06": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 2
+    },
+    "c3d4ec49e025cf497082b21a748f58d7": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 2
+    },
+    "0d8ce6803b05e978df7c05570eff518d": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "fb4ffbcc06948ce726ac65d2e79b2be1": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "0a7ff5dcdf29be2f638888b09f87ca9b": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "61b29a617c08b22ccae8076e53f2d210": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "d40756eaa63202b06421a5fca71e87a7": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "e48b57ceeba35bfd90b283aee0ebdaee": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c0358b9a1ad260d89e82f996648850ee": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "02d4885a79fce20da991cfc8a1a3d50c": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "1161e6fcd280b6ed4eb2da15987ba6f9": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "ea4ce80ee3a7fa9e0a3fc2d45d3052a8": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "266fa82fcef2fc5378fc4abfd5eac4ae": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5c75d047f265750659ca332adc9b36c0": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "faee6f9296984a7a00e25ad41d057334": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "70ff46073ed26ba278365bec8928aabd": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "86bbbb743267de4a65cbc69838cd1aaf": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "2c8b1df3348f452edfc2716c9b3f9a81": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "6d990ec49b10906c808f31f350a2cb2d": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6d55568e74b4b26eecde37cfecb40044": {
+      "rom_region": 2162688,
+      "confidence": 6,
+      "alternatives": 2
+    },
+    "8f6a98e8b0f0e710b57d93447d88013c": {
+      "rom_region": 2031616,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "f7a6bb4fd9ee0cc1aeddd384bfbd8359": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "f6c9edc46263394683b677073dd386ea": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "8c9937ee70bd8b5235cb723a4b30da58": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2f6a77e020a9d033a073e85d4bc08583": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "9fb3adcb28b6d7a50fefbacaa406e005": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "33ad583a8f880cc7c21beebbd1119f31": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b37f885b709c95c92a94ddf21c4eaa29": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e4fbfd5b59376552987789e06a7f1499": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b953077da43aade66af09be2f758cbe2": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7c7da8d96c26820594bdf81a29853cf3": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "a6c4832b4edd12ad743058dd80c08f81": {
+      "rom_region": 2031616,
+      "confidence": 12,
+      "alternatives": 2
+    },
+    "81cf03cb460a8f3aabb3ebb8f25a5e16": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "6e5c48218572667a304cc343b2cd0d5a": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "8d0a818014732ef252f8481772c3870e": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f339d510f374fcb042ab8b1c88d9e8fc": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "eedf81436c206b083efe354af5207fd3": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "0ca221cb23c8a308599ea12ff67b4860": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7b999d07df7237cb05585a7964729976": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f969bba593d7270c699dbb9551ad9aa4": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "245e81dafecaf185aab567abaa69d4a9": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "af3ef96c7bb22a4eb1a4540b9a3fe458": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "47f5dc589c8fc2c3cb272170a7fd3d2f": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "9a75916b9c74b5e3dfe6745f0e498d88": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "12582eb154b012410b0822dc757d9d42": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "fc68ee518156a487de9cd80e875d9ca5": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "0f23186b876efdefb0ad2e04309f335e": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "4ab09a5ca3ee7d0a1e62f9b0ff8f9d54": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "278e41886fd437ca58cffef53e031ded": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 2
+    },
+    "7958e4840d6e9c7d0f3740f9bd859b50": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "00fdbf8bcb9f55d501a97dcc3b5cc87c": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "32df09e7914ff43de74df57d36adcd77": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "eb6e21209b3cbbaa1e2699e202d7fab0": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "db675bfcfb5bef3beb9cad389d9ca1ca": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e40d8364b0daac6f65f5577da6065a97": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "b35ddebc7e5b6e2e87696fe9eb308546": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "627e27283b607a3175a63e17812de057": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "75fc98141d1e9bdbeb850809718c0b47": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "518245ca911db435dde72b331d092296": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "cb341d6ce3643ee4e64e35d0992da6a0": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 2
+    },
+    "cbe8ff854dcda8d52ce271f0a173126a": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "af89a21ef6d0032750810ec6c6ad8815": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "aa1598ded55cca79ca79e467b7361d92": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "9f02f3031a603148753c7c9966a34368": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "86fe3daed0aac6491e1ef3ec16b56f02": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "3d216269bbc7bd75b11b83d2e9b0cefd": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "97a14c7a8398b4366ef09e85c8516d60": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6644b133533556f22ee8e2aa439acbf6": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b57e3ae85cea9b93706dc1dc3bc6ad40": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 2
+    },
+    "da6baa7aab21803af01ebf8ad5848b63": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "a3b324ec3a11d9565588a8e22ae9239d": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6e69063b7cd633a561ac0754ad6f601d": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5524548df00440aa448b1ead322e1108": {
+      "rom_region": 2031616,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "e96b381c794f9ac8473defa0b0deb935": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "dc1c666cf46cca2ff37defe52ea61b1e": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b843b2a9f5e982a1598469dbd8c32b17": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "56040d416dea3af4feafe4a3ab985a12": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2cbcb3ccec230f2b324b04243ce83ab4": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d0c3e0f571e2f9df839940ea550082ea": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "3e81438160f37b2e0cbfcc550657d2ad": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "071a0ab930d98c1fbe64b126dc78cb2f": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "ed997b538220fc91b1fca7b113c6543a": {
+      "rom_region": 2162688,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "a1a54ac105defdce6220a5d2f94fcb3f": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4b5591feae0071b75ae7680411c7214b": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e45797782bbbf06877b9d38e5ddd20f6": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "473d4b2e362ae819aa687875afaa9834": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "ac6b2ec06eb8e538290769ac157eef0f": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d4455b1633522a853224662ce58c5c70": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "03a45d72a8d03a54c86e13562d7bd7e3": {
+      "rom_region": 2162688,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "f9b6f912a69abe63c07797e9e7fcc0f6": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e9757aef1f1c1437deb78bd0eea411ed": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "3b76f298c1b5e564899ef2e84659d4cd": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7bc4fd0690d4a7f21b30aaa67d74e4d8": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4a79f9d4a9e5338c41d9a42db4f7158b": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "32d5b8ec37acec2b4ba84c08928a5452": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d375b9d1e773eea95882c1cb0cc9b459": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "795a4ba964d53da9b2072a68e86d7a62": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e4354845fe95e3bd2b1a5fb18d3df290": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "1725e56d135c65f8e2994b04ba334a0a": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6342bc5413823329e050b34d87be8d39": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b05203fa0e82527f53f77fd47b5dbe47": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "eb2f3ece4acab67dd750d1e716a4bbef": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "bf54daf31335d166927107d4a5d092ad": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "1fae22abb5ada687951df8439f85f443": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d826baff5cabfba2502eec7d667e2bf5": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d30063dccef8d2dbdf05f79259ed0052": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "8f2d71a99eb0ef9cb0ef6394d8510e63": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4bae90a98534c4d3cdf84e995b72cdb1": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "eec54759301e4fd3b686c3de69d2af2a": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "20bf8b4eb54f516078a2c197ed257d98": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "697d5d3980606c3f5888ca4fa4140a4d": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "a89e1c6b7c690497eba0881f03201d1b": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "362931d132c23c96d75adf358bd7e2b2": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "68f350bc30c95b69fc960b864dc85c89": {
+      "rom_region": 2162688,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "8800b2ce8834b88e6f6598c872929ea7": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "485a124e8177137aa4599e2462317548": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d59bca18f7177e622f1c623e598ef4ac": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "90066e8cb78fae9c5031963657d695ab": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "675294b62912c6b569c3924f134dc6b0": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "c1825825622e51d2d80fc0043a5df250": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "386e5c989a592b8204736602666cbd82": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "522df128e73341364c0d33cb8f42d33b": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "398115a0f6c7c37bb8e94e8993f4d704": {
+      "rom_region": 2162688,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "55d469b98a7fe1947a1a2819098903eb": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7383ecff0b09b3552f4099aaba14c147": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "52ccec114e2ddd890e14a7d18c6925cd": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "bd6b691ede473b1d76dc87ff5e0a8ad5": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "a348e4da2114b822a982f3ddd284520d": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b65d64f59a2a1ac209e0452039ad4115": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "0020f29a9a8e15ce23a25ecca19ff334": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "8a4e822d01f979c96da096916a1e0093": {
+      "rom_region": 2162688,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "72a4fc13db9a007fecd4a9212943966e": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d5ac20ad49d6c51ca5fd8e7126050c1d": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "711daf23948b5c445c6dc95831e6a044": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "a4b809d4a5b9cabb3f9eb56c9b54f3e9": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "167e1b7acd8cd2b9a2ceb64d056805c1": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2e744a0e18a5329b7ad5032a7a917000": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "df7c495282f8c4c3d3bcf00098fcc832": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "61d5a984eae1f984480652ce78373d7c": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "225e5c4e50fe6c9e94af033a0f738f0d": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "12f4ec3954f3ebfc82b7237ad9dc8f9f": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "cc38713bbcde0b75829f45fe1d27c5ab": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "477d2de5c6da968ff2b48daa5a8483d2": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "02ffaf857cbb757cb475dc1bd58f022b": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b7d5a02d81ba7a8a8fba5feb068cb051": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "46321bc0beec68929a764f48dcded5d5": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "0d6697b15409307684d6547e68746378": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4b7116754dba92208d0a2522678ac0b9": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7825c759d74bd17afd5db2ac4a4f2634": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "fee4c20571ce0c6d70c881184671dd1c": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "20d5c9c2ea71c441d51f69f9162be4c9": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "cb59b5fceed436b7ab5c0821e10f635e": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "9d8e1b641d29cf01643508d59956d1ad": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e2907f380eb28282decbb713af393859": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f1db41af2a2d8801c1a818640dd237ba": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2f67fb5297fa33c1ddc74e487cbba657": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "8dbfae132ffc52cdbc55baa1ced6d9e5": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "82c010679cdcbb1336507ea8588c8e64": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "96493e1381a5a1fadffab4b11a9f0de1": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "dce6b712c1d7649e58a9979dd4c1b7e4": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b25c05ed0c67c727bda8eafb49bda985": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b6b43bdf7b7c880a63ed3f4e6023cb05": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "98ccccc617bc6d02b6c314948a97a9ed": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "bb2dff7b8efd2c2c05e26d39a87bef47": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "96ab4a371dfab95b369c1fafa49ea67b": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "693472d754c0061bd86decb0b27da09f": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b5484a4904de50c549350aafc01daae8": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "352e52c706f86352431ae29a5f6bf7de": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d918f1dc7d007a1b2116bad6197380b3": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c8f315728a9ead9b2994910766b06a80": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "d8bcaa7f016e3aa4da454e4795803992": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "42934bd9ec6d66bce842b458b5430289": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c946b314b4694a74809f76f92af27bb4": {
+      "rom_region": 2162688,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "25aa421e6dc961139d0859d14f0461b7": {
+      "rom_region": 2162688,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "34b719ba4afe713da6e6065a54663ed2": {
+      "rom_region": 0,
+      "confidence": 17,
+      "alternatives": 1
+    },
+    "55ab098571183e8dd29c4361103530a4": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 1
+    },
+    "131ee31da93a5e5160660dddce13a276": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 1
+    },
+    "03159d6dd0d90d89e332ad67c5a470b9": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 1
+    },
+    "5f4868bb86414085529e304c540cd8c0": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 1
+    },
+    "4896df1236adfd6e72d47362f2e792e5": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 1
+    },
+    "278d5ffe56df3c40dfba4d4cde002450": {
+      "rom_region": 0,
+      "confidence": 7,
+      "alternatives": 1
+    },
+    "1f8e07fd6a6e485d5b78e47f3905b9e1": {
+      "rom_region": 0,
+      "confidence": 5,
+      "alternatives": 1
+    },
+    "f2742b59a8357a3dd776f228e004385b": {
+      "rom_region": 0,
+      "confidence": 7,
+      "alternatives": 1
+    },
+    "d9caf418ce366c967bae2680cd934772": {
+      "rom_region": 0,
+      "confidence": 13,
+      "alternatives": 2
+    },
+    "1481e986c76e79cc337e27e885c2bcee": {
+      "rom_region": 0,
+      "confidence": 13,
+      "alternatives": 2
+    },
+    "43c2fc3633cf6978f928d91f3662016d": {
+      "rom_region": 0,
+      "confidence": 13,
+      "alternatives": 2
+    },
+    "2950711ac2e4afaf79bbc09cfc0f1647": {
+      "rom_region": 0,
+      "confidence": 15,
+      "alternatives": 2
+    },
+    "bf6cac6540208812a072076b16a257a6": {
+      "rom_region": 0,
+      "confidence": 15,
+      "alternatives": 2
+    },
+    "40907e1d67571f5599137e412c5620f9": {
+      "rom_region": 0,
+      "confidence": 15,
+      "alternatives": 2
+    },
+    "a9d052c01132d8d7c9f3a009666c523a": {
+      "rom_region": 0,
+      "confidence": 15,
+      "alternatives": 2
+    },
+    "49e588cf537668a6122a87e0ab25ffcd": {
+      "rom_region": 0,
+      "confidence": 15,
+      "alternatives": 2
+    },
+    "dd8f23e5dab93fd139d5ab71c55b2293": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "5374b4d210093fb922ba0ccbb1a5bfee": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "dc953c0f71974f13485750df7cda04d8": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "c439ce1a175dcc947ae962e4025b5eb8": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "2b6274c98d432149844c6363b903f4a2": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e7230a36bd948dc6f5ec3580d9d8168f": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f21c41b75c8599b42ff5e2e5986f73cc": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d60e6ec7d4aa3d4838a7d47dc2ea6b69": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7d2c256536d6b20ece03281f4e6e83b7": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "c2dbcee5d3ab7f891b62e89a80f98525": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "495a4ac4777847d35962f0bd08f50ff4": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9a515b8023e0e3bcde6b6d72249370b5": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a350a0b4f0e1f92132c3cbfd1ecaf8dd": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ea3713a013117b9d7c5e9f908666c765": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a8c0cfa32928804f46ff8841a33ff1de": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0dea81e975ba4afb533f50e1b36a8d06": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "3f616f2fde72b14d38c450a5adf39214": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9ba742faf6c3ca1d6e470cd1bd7b322c": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "14ce522b3fbd36bfeb6fd639bc54ec9b": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6c44b5de369edeb715846fd89fe3f07c": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9a50f54a910922993bf26c2aa32efcac": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "703c85ec2e36807a5bdf7bef9ac2a911": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1fa0e249e8e42de2c4914a9be0c27359": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 2
+    },
+    "53ae1bb004592509649e07956ee6aecf": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fdaae150cd5eadd784a633dc0098cd33": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "aa5d09ec53e039bc81c9b67fa3b11526": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "f187954c0479ec27797ebb5770c6f220": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "88f43b73a14195a204a3bc3131664595": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "309dd5489c759f238b46d5a6e897c7a1": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "872b1c1d72a0ead04e4647a09cee7074": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bd6a7ef9297a405c9a5481676ca8e429": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "02bba6049bdb3a4cec94693c5a55fa65": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4f196c2681fa94997fd1c7f5eeb6c5fb": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "eec4be39fc518344bcffc9c9e0f1e148": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "5ca3199f24a822bd05894708e52f2c7a": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bd3ebbc2de01a80074069c7f6d32d649": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "5268ffed179cbcf98d568755e0dc872c": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1ddb4ddfb91715487e3b67279794ca33": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7e30f75bdf86e9b6cab94dea2584342d": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "3b18c7e2c0e7bb2c02986cba4504eb31": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "a5645ec1ebc149715ebb053932bab365": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "66a0cefc67055a8b3ebe80c8e72b1232": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "bcb77fccac1348a0597fd755c6e06334": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "9bce652ee545b4d687bd0f034c2b3b66": {
+      "rom_region": 0,
+      "confidence": 5,
+      "alternatives": 1
+    },
+    "4744b72e5f085c1f0fef663b9a452004": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "59f868fd5e6ed2f62645a52c89b0e560": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "5739f833a33fc151d8a4fea7e1e588fa": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9c85f4f682b7d5d83940b51bdf3d103d": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e4eabd9bec15da5702958b5b5a162bd0": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9b62c7ef83e58bb346e4b20b4cb79a45": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7f5abfd4cff77d2327f24845ff2fcfb0": {
+      "rom_region": 0,
+      "confidence": 14,
+      "alternatives": 2
+    },
+    "d6b1dfd67afd3c6bff03b52f92ab2285": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "0e8db7984677dc7a07448fd2acf5541d": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "9a6d3f7853ca5ab2f0fbefe931ed8018": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "dc897f72598d7a59565736b7b4f98520": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "7207517701e0c5d0619a7d82179e7901": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 2
+    },
+    "ca0d5c3d07119c585c18d8442c3aa71f": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 2
+    },
+    "2887783057d0391ae3a981cc7222a069": {
+      "rom_region": 0,
+      "confidence": 6,
+      "alternatives": 2
+    },
+    "27953ab34da6145fb3582ebead660414": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 2
+    },
+    "1786c9b47e855bd62d49c7104525dfaf": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 2
+    },
+    "a2faef2a5422f02e312f139825f92c08": {
+      "rom_region": 0,
+      "confidence": 7,
+      "alternatives": 2
+    },
+    "d338bcfa1abae6c2859406c3ec3545fe": {
+      "rom_region": 0,
+      "confidence": 5,
+      "alternatives": 2
+    },
+    "0704d77728687aad2e059c88bf4700f4": {
+      "rom_region": 0,
+      "confidence": 6,
+      "alternatives": 2
+    },
+    "c07449a940183a7f1fa51fb6fa912c7b": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 2
+    },
+    "6a0935f835076853911a57c14c7a7187": {
+      "rom_region": 0,
+      "confidence": 6,
+      "alternatives": 2
+    },
+    "99709066cf388608be74eb50fb71825b": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 2
+    },
+    "1681a32099aa116d3fa5981e20d247a8": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 2
+    },
+    "341cad9ea9d3bb864ae4f4a41d4b36fb": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 2
+    },
+    "0ef0dd7e652daa8657281d044e7617fa": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 2
+    },
+    "73c0844850777c2b08731cf05c56cfea": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "adf84002a840a205db1e08b4f0e80678": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "197ccd5e4ce16554304a729d13b23e60": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f028cd5ef3396b83ab621ef28b6c47b8": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f109d51bb1f1e5f36389840a98bf4f20": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bba9256d5c5634ca1458cfcf244691d6": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "44c734c0288370937a4b7a3a3345aef2": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e3aee3199bae415d79b307798845cfc7": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "03b72b29162812ce9d288527d540fe93": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1ef45bb80b43e599813fcfa49506cd5f": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "52e12a25097871997fb4c77b2cd235db": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c172795725b7a1e239b672a10f78a3d6": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "171bbb247b4a3239621b6dfa27add9d9": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "51a794b9aeef1f86ba426bc61fa630bc": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8d0f51222d79b9aa0f2a71d4e9a785b6": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "3c2d1c7b0c2730e8a7780c6dec02a1d1": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "b38e4be1486baf712baac46581740298": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7aeb22dc505a0b9eebaa06b6d551556f": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ef17d5eb69addd120c23981560a53a81": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "be78829b353a5e37b949629fb5db44d1": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ff2ac4433bf9121c5ab710cd0d5c6e96": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a0b9b42396eac710f3281154a357d420": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8c841c223016fdaa6b2dbd6a7509ae11": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6b167f33c7d8309aed374da773bc7656": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4aeb80ae5bf8abc0ae2465984701a7bc": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bb58092db9b63dbff9359a0cb5fcc62b": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8272c3da12aa557266ee3df6b4882d04": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "6b884d533b2da068736e952cb29999f4": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "c28d561665403558de3af13c66b15ec2": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "0d489965204bb4864b61d0214ecb4bd1": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "d1be6e856a74b676941654506f457881": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "1dafcaae0e400ebed7d5988045ac49c5": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e64bf64687f4c6055b9021cac26e4d65": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2a808b5d8d1aae719948aeaa34d48b0b": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "021569e7291f670bcb9514a5214621f2": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4edcc2995c9f5c44395cfd2113ea6fd1": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b60353bd9a1d503ae269bbd79fc9e719": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "9e3295751f4ed0c8f01839ee807452c2": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "746ae783e74f6df910b6b00db6d340f3": {
+      "rom_region": 0,
+      "confidence": 10,
+      "alternatives": 1
+    },
+    "0a0d02b9c268f4d7b01352c8471f66ce": {
+      "rom_region": 0,
+      "confidence": 10,
+      "alternatives": 1
+    },
+    "ea18e62d41636a653fbd4640764d1945": {
+      "rom_region": 0,
+      "confidence": 10,
+      "alternatives": 1
+    },
+    "63aa6e9490be16ceeeb95d47fa9276e4": {
+      "rom_region": 0,
+      "confidence": 10,
+      "alternatives": 1
+    },
+    "ff2582a27d973c43453f019af671f002": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "1bc08f1ed9eae373367642a8d2feb29c": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "3ff5bc61263a3afb4cfabab4e0f834e5": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a1453244a06575339a2ecc69a8bdd78b": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "b33c3720ad4619cde92c482f213c0785": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9f88faa7bcab12b5f8e319b576f593d9": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "684d49b5b150f2fb7305a632278083e7": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "cdac526e6bdec449098d02f7f79d510d": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0dcb1a452638a36ed93268998a83b883": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d36dd6908b0886fe3de3ea08bc3250cf": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f8eb5f8b9125116bfc51fe871342506e": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1255d879af9cb7b2e4c8802b4c16437b": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ab1933d487ad06fe2f262c57475fc876": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "4cee7421758bbc959c3415821078d310": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "21b97e8c8f28330daed039d45ce64442": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "b67bddcc51d44481274ab28d856a6daf": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "c6de859e646177874d0d2a3fdf580728": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f5fa69478b0a961524b4c950ddb9fa10": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4627ab6724236bbc136cc529d9347fe1": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4082665fcd970a963a745c1addded108": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "739a6509caeb9acdbe3790958479c195": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2a3a5689b261f9ecb24474c93e8c14aa": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8489ea81fe618ca32cc79fbd78c440b8": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "df2264669339b3e710e3617a44796773": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9268f7e64467a5c3477e1031d59ec24f": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fa8e7dc4346b78e572434e43639566eb": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 1
+    },
+    "12768150ece1b086fadeb8f59abae380": {
+      "rom_region": 0,
+      "confidence": 8,
+      "alternatives": 1
+    },
+    "6c7e4d33c934a39c28ada673311c1e68": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "f364bd00492c51bce1d372fd22e1221c": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "16b8d25a73b0083af368cad6c4ed2659": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "964f7a234e2da4ed5aeb7fc1ac4092a4": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "0893ea10d78f2d94c80f17c9395b5c27": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "9462659381f2e8e78241dc79ed7cc08e": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "80c85392591c52351d5e9696573251a4": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "cb67b5476c1e40d2c313289ad4a65a4d": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "2bac5ac9819b5c537ea4a405388e123b": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "f1d2695a262958d157be588cbf6da0dd": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "650010872eeccd711d6a7c9d2d01bce1": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "76b45c75a02d2c8a2b3da404ff728229": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "fa3c243e36ac05ac4bf40b605158eadb": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "1129faccced96231c82ca530f1e3e67f": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "62edb2ad342726b55ebf3244fa8bedbd": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "db38d6ee7749fcdd3c88f6f4e6c26b7c": {
+      "rom_region": 0,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "9b56f0dffa110e60285a51fd0e9eb7bf": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "712f49cd6b14b90bdb4a19e04cd42335": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "1c9268931b26074a7c11e194a12deb4d": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6e8ae963ff4844f331651df7ae5e4617": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "2042f040a9b38f8158585561a79ad772": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "4b2aa09ab8bf973ba48e6fa0dfe30f04": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "b1cc44e3ff76a1054ac0c6099a0cb52b": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "6ff57b12b1091d553cb7c7c9b5761074": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "41c9782aa7efb8482089c3a051b1a292": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "d8c14a15fa5c1960723fb88fd6dd08ec": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "be9bf624705345ab943737ebad3e976a": {
+      "rom_region": 0,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "aa10f5122bd13d408bc5ca560074e8b2": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6959798e6380ee9360451480544d5baf": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "ac68bbca39e73004df9a6875045a359c": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "13047e5b1f4476709f99f9440db26511": {
+      "rom_region": 0,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e9a06c2f390012fb90c78c008b5e495c": {
+      "rom_region": 0,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ba938e8bdfa7919cf9f4cb80c9bdbf1b": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "22ccd7649bb7abf81f6dcfd52c124af2": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "846b746b5cf1e57433fd6f4db948f3ca": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f8fd08830766729f1a2bade596f05718": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "cb182fb409dfe39e874087b2ff5c2455": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7acde3d3eb8217c77ca78cbcecd27cbb": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2d02145596d2521f12ac34ddbacebe45": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7cdf03c324d35d60635060e7cfea225d": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0593eaaac0fcdf4d74abbba2ca000099": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a3e2d54c66698459ea33d0be979d4d26": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e2e373b879129607c56b0c6ad03fc6ef": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9b02d371dedf38d1d08586daf6f2b623": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6ca1bacfb3f2655ae2b4060f426b1c5b": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "5164b88abcfa6a6620ab8a92b5077d27": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "508eb67a7ca8e05f8aee907863c488a6": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "26b8b77c6e21102a4321b3df540ed3d6": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ac5ec086ae5eb1e0a2a5b15db68fdc20": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "85bb5dc0d7da6de0793df5973b46b86e": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bddbbf37abd5cd5f020bab4c1ca92633": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "582d8a5e471d3016158cdd28a8539b56": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1392e77af21e761acd294e80a40eb99c": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "567f4dafa6558f33706f078c57e9f4be": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "411ab0fc49dece65eb778cf7116f18d7": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "678c91e50be1796fbc98320c51339844": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a90fe3976d90d780e8d7829834eb311c": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0a33a444635ac9fda9934965db90f921": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "232c222041939942b53164c1d190d7c0": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d8f35dfbbb9faf48c5ed69260aad48ce": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2278a5aa4327e9acce8c886ace5419da": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fed4ed1e6be0b42ef4588563fbf632be": {
+      "rom_region": 2031616,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "53e9ddc6a7b5c3ae19f5f89805e529c7": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e12a327a65c92ed6ed8bebbd48b5eac1": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1f3fbe7ca9723a193fa71c46c83bb249": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "48850df32d361e652193df4a0236e0e1": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a618787a591ea37211a634bf0351feca": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "c292d46c2441675dccbbe1d87f468028": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4caa871176e95d338b6c490ee79a62f7": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "46f30bd37f1bcabc52993f03a9dad56e": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4803b2c811ba0af2761f2d5d0a83445f": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "690e051e1e28d9745b0558f7a46d0459": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2e43052e7ead7575a32157ece5100d68": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0f0209ae7edfc99fb13f2ccfc3a9f955": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f95911c4c14b81b1bf24e0d7af1d264f": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f832d2d22299b379767b913e58c04704": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "07646c1648c4e2e56924ca92c0e468e3": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "46859ad860b6c21bbe9616ebc21bb1ba": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bfb086cbbe5f24cb2e2c67ff9ebf4bbc": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "64cbf3b6d8f761e4f6ff386088deea63": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "5e6278b02d63fa6f6e4aba3f22c9a380": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7e7c5057798d2fbdc8a9a64ef6e9bbb9": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "acf1c2b74e27d1893d231d5aa5e4633d": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "08fb40a9bd1434843561d5c1d5047a8e": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4f3562a546fc0b66290a82d1ab60c974": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1997f0157d1de8c20e5fe43463118276": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "48cb769f289ed612f79bcd7cde7e2e85": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "5c5d5bb5111b25c0d93f657e8746f160": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d1e52d42f98843b1848fb3a2709a3fb1": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bae6a5c1c85f8d9c2f84c96a55b8b7e3": {
+      "rom_region": 2031616,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "67a4fb46d76c11baf6b58fc6ea4d2061": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "5d4e33ef21834d342d5a9d9966a909b4": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "14a67baa40310b0fe2983f9545aa1c8e": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fa7f52d7fbb83c2c973599d9bedb4047": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "32e41eb20a0fbac92e1186f09cb91652": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "41e57c3b286bed0bae5a88915cdcc638": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ce8f4f4f6edaba0881fbfe9589e68756": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6d4af92c2bc862cbfbe0f9147deefc5d": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bad64831ae3bf6f1e8e9b5acef4cb2c8": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "39534f101b58acc8fde80707943ea4c3": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "45888e7ea3aa8361a0077f99c096f46d": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ff50ffd88f5a1cc9b8a431abf02bafd6": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4b122135d8c67960b8d890b5df643c54": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a60357448b45c4ba76f86a3e202ec29f": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a6cbec7f6acf9c4c9a5722cb5254884d": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a328f8258b9c8ff57432e10af6c8ae4c": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "5a46d4036b4364cedffc99c51ff42ef0": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "8fddbafbfff3487dc8936630bb927813": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "356ae5957751c1a5c424d03d092bc88f": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e51a01419a47d932d41fd70b24ae444e": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "289a30eff9387e0fb69e22f0925777b7": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d8aef4d165151a467a29b64d80f1387c": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6eedd41754e229b11947b6dd2ae774a0": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f1015d220f11aa694c338441666fd930": {
+      "rom_region": 1966080,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "a9d25b052997fedea84efca34ea9b1e3": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "23b75cbaa59b370a74106814b8f77e5b": {
+      "rom_region": 1966080,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "d5934dbb600f85d362ca0a815de9c0f6": {
+      "rom_region": 1966080,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "0dca7b989efa89e7af55a8f1a650c1cc": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fc0574265aa2d70d80af90fbf564f518": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4e4bdd49db007f5a2dca9668ad714fad": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "87719856a785a17c05f8c8f8d51139fa": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "380605c90245a59acc324a3f16fa5fe4": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "493c16fa3285d1fcff6f41a5a3a70378": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "eb89a738eca133703c6f396c2f8c1d62": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "23fec0c6238d61b5dc96f1aee9176d10": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "00619ab2820c41751446c53789b184b8": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "095ee874926bb90d979902f0ca563833": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "cc331e13b4af15afa919091ea18b105e": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a7424e37ffee18c8528a3c708d31f386": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "5060a3e8e49643a33027825205f2e3ba": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f6f7fb63c751c421ef62a1c77a1bca2a": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9366236322bf0577874c10491034e802": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "019585151be24d96c0d234dca12b3869": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4376c6304a47e3242768da7238368f96": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "729fef0c3f04f4eb527da9e2b6cdc53a": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "97d1f3df5d6d5a86e50a8ad5b770c2cd": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "0bf7b9332d945fce5dd2e0987597a225": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "be9a31ec623f572544b01f7cf430b242": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "af7f72ccb61879acfe5cf477f079eaa6": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "abc620583c88e5d067a34cd268e8e739": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bf177fe0e4db5b3723ea4679e3640ac4": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "982caf8c8c25dd1c9a351ab25a382dda": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "cf60e57ff53485c12ff9218abdac2f69": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a4625f1e40f8fae362ac8c427d5df593": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4dfea2179ac5886a6a2c258c0fd00b18": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d140e45a80d6d5dcf53cc069cbc99981": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9dfe20056ef74c625f33857775de0fcf": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "38f137eb9e6a275453ef7b99b071fe17": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "86b1f78dcd82f15df8fcd2b5ba45e865": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "efb8082127ca0f7cbcd25298e96dc791": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "38c331c83fd98b3ba783781ff3e1adf9": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4012a33f4e041dfd4147a578f7ce3def": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2c3d3534728aa435971e594c524a1542": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "3a6fba5c73f4e0d38e26fb6ee427faca": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0aa8c34eeba36951f030d265b7af8cfb": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "42b7003edefd5a4a81be479c731f6685": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8fb053229c55df63845c4a844e2559e4": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "89233263a99a094cd1346af47a1b5f6d": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a940bb88f5ee58904413dff1578045d9": {
+      "rom_region": 1966080,
+      "confidence": 3,
+      "alternatives": 1
+    },
+    "9f4b063888749401422d8e20b4b38ac4": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2f157862cf7a505a1e106a357f9826c1": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "3f2cff10a52478cce94b116a8da2c478": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "67f0f6f797b14a20bf66658fc6f1b5aa": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "80565c1a044bad6d2765f5da79bc03cd": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "b51776e6379a98fd8ec5ae0010a570d5": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2960f9b1fc0e89d17deba9be92472d59": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8e5fe15af559309790eeb10d6185bfbc": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "dc3265a8a9ea7f3a86850c37cec7e627": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "554b6ff915cbfaa44b2567e0f34c3f6d": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "cdd821bbdb6b2110af5f724394fba253": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e5871fbc157390ef99a0bfc7a60fe4b9": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "319988f8ba773142423f71075f18cad8": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "58f6172de8a64dfa691625792c1795f4": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "04f935a48bb46160b52c3289a31b7637": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4c86c9de8dbe7d8b410ef36fbfc55c19": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "faf0482f8f5854aab09a031e0c1800a5": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4b09b8779255b54dc69c3796c3150451": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "dba8d86275d52f8ee3ec0a523f197440": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "dee6064614b40e955537684c4a11f376": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "49da482875e54fbbb83f01135780a838": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fdb054b49160db2ff5d858569a54d715": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9c505868ad113f895af1f4dd95126121": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "da94b5dff8485cb38892a6d443cfa87f": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7e78ae680701a5d2d03060ed01dbbeab": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bbe936c1d4b8004f223b26dd264824bc": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c56911c03b7f89929658bf3bf8a6b54a": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f58546560f4279cd6c12d80133929088": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6950a766445c1e6a6d9a8933cbd8520e": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "036ccf2b9dff24c0aa847a5d48e1e39c": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bbf2031d271812600c6c5cd6879d30c5": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d24689bd3bc146264efd83f881acd6cf": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "361b16f8caf1703c5a998b81150d07a8": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2d3ed404452e796c09dc07c45479cc6f": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "48d5e2af10310351861f67f90e4e2eba": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c1f2471dd1f8fb0259ff56df91d1fd03": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "643206d808bbbe93a77ba540787ee598": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "c7be4853cc1025c151954a5a5f7454e9": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "75e2b381951ed403c161f864f9f78fd5": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "52bdfe39da5da0937a09e4d0b2966bb5": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1648fddba75f0a26b87f9b6a8f0e6b23": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6cdd70ee6eb3c2822af598080a7b3097": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6136e73324f935af71d3d1eb33c341ac": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4441dec596a24567a800737c9e8908ce": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a3d79891a58d112013e2831ae8b4cc0f": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7bfc5cb3375d2f6e4f7bebb6c09b0c5f": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f27710ef0d42fc1b865d87af30c02608": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e3a9fc3f084e891844dde7a323a7b8d5": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "20573eb8643a064fd6a6fc0b34ef946e": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fe1bf9082ae747ad63e61ec53c9cb850": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e56743ed16f594689e42f1afd6613c5a": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bb61de08458021850343a8d15cf3ceab": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a9946e1d86e764df9eb32b4fa764b158": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "9bf03376be95923f695a4c9b0b388575": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "be03e5d8e421f81cfe7c2a4995165692": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e45ec9e3b23d9b67347c689eb6519f30": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f16c427c2cee7531fb6cdb8b0406eddd": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "70e07acbfaa5d4ef882261b7f4658f69": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "22f56abd6abf4a57d51928517f909416": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "b829213641696e6ac64bfb24f2dc1379": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d38c4709ea41a7167e71ee14af1a7268": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "af2eee0c39bd92c1590dc94bc70f2511": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "c4aaf25b57081988866d92b177729930": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c5d1032610650bbf06d9252793574858": {
+      "rom_region": 1966080,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "97a41e063e4075308fa07874dfe66fc6": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "70c57a2b9d4bd704fb992cda94073af3": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ee7944d7d70ea58b07300607eebc2fc6": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ce7095edb91e04098b263a8cef195eea": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "3ee935241eb368d60f9b2f1728a4e214": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "923b38e22d2f2bb0cf5f2e25bad47178": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6ae3f9e60ee0d3efb21783991a41e899": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "15d2f5b7ea303f1db169fa3177779a18": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ce8044a390e6d0064fe7c6f5414f17d0": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "987bbf17a4d7a83168d8dfbabbc47dce": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "10e908ab7214f08248db8ac04b33273b": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "20c46862ad55d32f1e2b9ae3b4f9eddc": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "69119880f8e37a1dc807317b22172052": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f756f922cdba60fa383042342fb3e7c8": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "c0a4ae88ed756771f3d6a0c64214d43b": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "b8c8cebe68b1c15b1af934552c5db583": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "c894d33f92dfc79ddf5e497fd5268033": {
+      "rom_region": 1966080,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ee9b5c2f25d4ec43ae511b8bb6983c58": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "0b3b4a77f26216c75552f24d2357a677": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "bd530157fe73d9c43731d95e583aa4e5": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5aff96dffbdae9144db2bf5ceef82452": {
+      "rom_region": 2293760,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "068c7ef76cb257abf1bde9bc5f1bb61e": {
+      "rom_region": 2293760,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "bc325fef2422d7530a013eb7bf49ec17": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "cec79e9420bdd11791cf2aea35bf3f2e": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e066bcde3ffb7fd247baddf667e0c22b": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2e68e5a167d3435aa00ebecac3ead8c5": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "3baa77b6c631349cf241412b0eba2538": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "84a89ee28c3cbe1d7cefb7e0ae583222": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "65e4175098110b2ad6c90c7d9596c826": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "ac8ace9eb1e253280c2295c747576076": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "670f110478f39a63a499c7b5566a740f": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "385c9265c4329ea2d3b9c49580649d96": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "9a0aa32c4fa5fa71a9d7d723733fb80c": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "419e193d75effd1769115c791c601fda": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "feb7db4f2712af362a5506aede6a3b41": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "78c23cc7026f0809130d27b6bab0cc8a": {
+      "rom_region": 2293760,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "9c62ef9cc724ab266df9ed7e239aa867": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "61619fa973f5d981d0c16fd2a1dc5ec6": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5e0670fff749af853694249711323713": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "83acfbb1b91bd209f36a5d43a17ff13d": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5b30e63bccf9494bbff2668aa419b7aa": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "3988cba43c31f60d2f2f3828cbaef490": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "3c2df544552cef80d34e6bd8e3044a38": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6896d6213acd6eba899c10a677d6eb84": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "c22605a9e77666e207525dd7d90288e8": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4f864cee3ca8372b6757179055b7ff99": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e7f58c0d884afe85a03d59e51fce4222": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6bbdd7aa27ba97449150b708c787c051": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "bb77219fd66af105cdc7d8c9de9b6963": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "74933935fc6dde7b131fd890e8b7b45e": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "21fa625a04d122bcd0b9ba691b9da502": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6982abdfbd96f158ec78894f92eab93b": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5376943e0393f77a60c77f9c0945d756": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "33ec8e18b7774a7452850656df71709f": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "52097f9d366d1753db31d7f072271375": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6007c17aa50d57d7d7a3ad982800dc90": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7f4ea8101c18102cd8bd1430b2705170": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b5178523d249af1673e2e76c461d187c": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f444259b031217174734117067dc2488": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c2656ec9bf6447168df300a111f821f8": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "da6cf92800769b06b0a27b964d31fc64": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "fb04dd9659022aa2d0b3c7b7c816c22b": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "199a0c61720a9fa5ea5ed65f2688724c": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "783c3695549a46d0f47a23e9594fb28f": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "784bbe49289681c2a1c9fe4177c124bc": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "95a05b9f85e1ffac7b1f1a5c68038e9e": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "ce1c4bf2aad0204e311ec7f30d5f1ecd": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2fc2b3ba2822c631ad2e77f25f6ffb5e": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f2c83d5c0d121cb6e435a11f8979355c": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f662abd96060fc0c97243ad5949c945d": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "04a79f57f9d56268ffbb64b4d31416dd": {
+      "rom_region": 2293760,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "44340b18a62f64be3099c7ce7eec4fc9": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "89447712af473ef6a3ff38327b26e08a": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "bec85b91d12ded474a37f10aa787910a": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "71b72739bbe902f7ed654601947cfd12": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e6b32b2eed779be2925dc37a1afd608e": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2f2c93427413ce39ab858a556718e36d": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "728007baa993da563c721037a17f9ff6": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6a1cf1a5a50d29f27432ab5e64816401": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "645e01125d44e4e5b989679f9da788f4": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "82d9a614718dd64d24c041cd65725e66": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b4340d81f772383104f1d54bffe08bff": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "9f907f02d6b19f6afbfe4cf8fc4a3e8f": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "be842b59024b8b5455b40eb01b48ae4c": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "55f5f64fb614c182cf1435f8a6b2c2a2": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "59c78e8ebbcd53becad3469ca3fa1488": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "ae1d438e7b823534e21f18ceb4b6777b": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "eefaf8129a7b85515613159f6e36dfea": {
+      "rom_region": 2293760,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "d830b3150c1f8ce038c612e321730832": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "96f95014d1e97f4b5e785b4c8f629872": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7a33e4671156cecad2a0e881ca52d9a0": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "a625e48d94877ad157100eec20540e2c": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5fdcdf052a4cd4e657c9273523bafcc3": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "40e95365ded7dfe727d4cf269e3ef613": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "9183aed666a6b41ebcb1053212f45c99": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "0855f0ef8c8f7a48033f30586435d452": {
+      "rom_region": 2293760,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "679c4d2d383cfbc6c3df228169d24f51": {
+      "rom_region": 2293760,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "87f6c94c12572c4e527aa172e1769bb6": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "9682c53a988d1dccb473079fea2b6a40": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b420e7fb1e392349221caf30f0fb3e88": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "30f7e5e50ba6b1b009c98468835acddb": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "09ac8b5dae1246d6b4af5ee658c9fcc2": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "feabac6f17b9e04af5fac9b8e18262a0": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2687250ca65688a48ebbdf99b05c4069": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "742d1ecedbff98d23b89b031686cb750": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7516ecbad3841d134f2dfb01ba574001": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5453e9226b8605cdb98a94ebdd1dd611": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "6840d381c12a6f18ac856a4257bc44e6": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f2ca93031473f35cc3062f89086b5eb4": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "d15161eba705a7c7740429b184827eee": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "0892d6c4b693ccd2d34fa2f6e9b78e06": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "30fa77a7f3ba864e78eaffb708183aed": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "500bc02680c0edcd9e7091778dbc7d2e": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "ab8bd3d1b6db78b8eb3bc62a3ee48657": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "bc25232b48651fb924bd0d8fc61a034a": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "41da434da31879825417c8a61de7a6bd": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "64b3f65e4300b4d57e523bb488884e19": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "d3cb9acf58bcc77be9ea935f157ca9d5": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6f5a2a5f11d776fe099d25690eb9ed06": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "fd14ae5beba9b7b13810f73fbfd4ea4a": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "fcb08724f0691b04052ce63c9787196c": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5fff687de0fb35b043a572b3eb97f80b": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "098cf0a73fe4cd947eb47b6dc690fcd6": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "3528962e137c8a91598908c3f32014ce": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "44c253609732c606c3a1597706c192d6": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4a656edd0515bee7b07a2fbb59cb5c22": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c89dbfae52d055693f0bf4d2ebd931ce": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "25c41ac4552cb190206168f5d9c9ce94": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "8e18ebea84466e18dd2719db077704f8": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "456c92923cef35ca1b17ddee2ed8608f": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "89cb53fc707ab7cb252e62f5b76ae32f": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b8a30b2fe0ffc89e9e3f611c9df0e754": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "cc0bea38d1ba4cc81f12cee0cecc62a4": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "1359d093b73185945745ec4af70394ef": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4a1d5425528d0c4fca34518dec3ea4e5": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "94aee5bf539043350cd4332d0721d344": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "22b0f2298273ceaae575aa26436af776": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "570a41b832908deb8742add8fa3ac23c": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "ec7f52d48a59ca283c26ed842a708c8a": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "60e46ff74d6854035a6c26f002f02ba6": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "8d21ea97d23fa966a8edffc05a0eb4af": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "2964b58356a34f1e6d6f89e6a457d6b5": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "483140100068a9f8bbb27f7d4e95b6e7": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5ba6c9fcc760de37c72f08b3247924f9": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "842156430bdde36e49ea332c68150553": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "aed00af40b770cf58e0ab9325dc2a37e": {
+      "rom_region": 2293760,
+      "confidence": 6,
+      "alternatives": 1
+    },
+    "d8b15ccb237d1f20b597fe7bcb86184b": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "02e40c25124f2d87548410db4f6197d5": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "3c64745a569a20c6bdcfc6a70e15b98b": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "e7834d03b659ceed72ca4897dade832f": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "fa99910ce56094f83afbb03336d2da99": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6d400a1055a3ccfb97a794288efea33e": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "9a42c536b90f35ea7604b050c4ed6377": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "9d4dbc90ccc20b508ef7c97cc8f2ad60": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "a3ad0845c21a51dfd951d6fbc4f3d8f7": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "38141f98deffaf655b715bf706c5046b": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7feb6d699a8f027464f5e61edec2de9f": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7a424db520af89c4e29459d935343ed5": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b594033371bbc6618eaa4739ee375006": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b0fb156074048e6216ce68f33deb4ac5": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "a835ee63303b67293ee4690a40dd0c22": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "100da097ce7dfed40d6ca38ae3e8bbb4": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "5fe6ed14e0ad0d9583935cd32ffb6ae7": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "b73fe047aa626a679e319e5360f76e76": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "d81e8fe18066347b16ba059f4bc1d37d": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "08e3a7b10d6915a9d04165792273746a": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f3f49986b6de2beeb7ccac44705b2149": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "98b6ac089dcc5fca7274c51bb6d6623a": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6dee8454dbff90847c20aed178708f4c": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "6fa96fe66321f54c8e7c8b575b7b70b1": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "35bd0466500d8fd57890dfa71aa7311e": {
+      "rom_region": 2293760,
+      "confidence": 4,
+      "alternatives": 1
+    },
+    "0ae65921b4bf3d8f8254d5e60ad1d498": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "1a6240be4d76d9656384687239c11ca3": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "34bcf672495f0d8cb338c68ddc63829e": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "4ab61da7dffdced931f5d6c7744aef9f": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "398245b0de699556915fd2b8c93cc7cd": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "57ca3e709a2052c4706b0d6dd0e2bbb3": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c8967577f1f217c10c9995aeaed5c62a": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "a0f59d0712e3204bd8b410bb339a155c": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "efbb52feba935abc8825f2cc1a3d28b4": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "90ba0aa56924d8b4512cb5b13e5d7964": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "c73be26fe349df5e5e54693ebb748f81": {
+      "rom_region": 2293760,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "f0d410c803599be6956f269903ca2dcb": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0d7dc4266497100e4831f5b31b6b274f": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d9222902b11d13a1469cb7cfb4b69779": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "93ad1fe0749d3686582c51a9a6d4f685": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fce8e77429eff7dfb8ac85484713a5f7": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "09ca0d459f5756444112c6becce78716": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ca8b0c55a3520fdcd694736e5fe86262": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "760a4f4458faa60590393139cab81e9c": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "b62d258db0fbbb0f37f635cbf9dd6935": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "26d3079df2a20289646ecf1000d98f45": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "318f3c9e4098fc02378dbe85dfdb4ac8": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "71484112285f2acee49cb3522951a8e7": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4193489c7e6b8b90d2bf7312897d51a6": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0cfd6852c53628936d2c00c40293da5e": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e954eb4901d9b4105756af56957beca2": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2c9ddf3337e686a610eff59e84db4e78": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a4d1c217e39b60b81d0798f6bf9783f5": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "92f65f1b5e7fa2d429104eac79285cf4": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ef67a936bf93f2765889d49c305a5bd1": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7be00b85238e32b72d0af19d7586104e": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "577601fcc44fb5a15d2f6f7e9556409e": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "608befd082d27f79e1a41f28348498ee": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "3e8f9df89b6bb87d243d87329ba87e3a": {
+      "rom_region": 1638400,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "7ff83aabf370206ec7dedb6b2044442a": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "e62e813f036ee435c4e929f660b40fae": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "88431aa7c959d0a25364498586e2ad23": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1798724d0b9c18e62a56f5769a9b850d": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "064127405a46a3aec9436e0d30890c1a": {
+      "rom_region": 1638400,
+      "confidence": 2,
+      "alternatives": 1
+    },
+    "913fc856e9818bdf9f8f21056b30c666": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ae80520b5a5da3f1e844bdbc00bdc960": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8fb43472caa1906e71ae897dfd92a559": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "bccbce62e52b11406377fe1bacd874de": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "9778f83bd18ce0b3339229b15d4693fb": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7b5b9ca01e62875a6e43b6c5c1ddceb0": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "13c261c6d6017b47d87a8923867eae3a": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "16d0c712e3f6a002d1574d4dba9b5b5f": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "287a45bbf317daf989d112256ecc973f": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "1aac32be6f56e44eea94ecbfb28273d8": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f346ee32d228529c41657bfbc5c3ed2e": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "b72befc5670e9657ffe053d6ac3182da": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2eac1d2445bf1e247ba5bdce2f04574c": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "be184e25e3d5c2e6dcbf8ac7c3714714": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "17e020a913b0335e8681add055275673": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7bf958e4204780714dde2ec3cf8ed0f7": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "0db059b0e0267c691bb6711668d501db": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d71e6a136029e71c30fa4e7a8d33328f": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8a68b49f6fc03d115b698629ffba9a1e": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "54d479597b3d78e2b786803a176f70a9": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "3687036fa449b8f49364d0837a0072e8": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "95df3530fe087193ba9e99747ad7645e": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "8bc222e01cac22ccb4462aa6cfc3acc1": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ced68a1ac544bc97c1cb0a1c361c1a81": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "99f634c3d3396b272a014226b0d4444a": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "844e3d396494b469a844243feafadf16": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "c2b56d64eb06c434231b2c22abd15c39": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "4d1119e647f5273bf08f9b8bec6397a2": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fea1cbd55d477c53807bc0c837497e49": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "3707dd411b875c79386b3ca1dac0add2": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ded989bc2a45f584a5ac36d41e682f6a": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "63a3df2cbce8330da6cb348c48ea0694": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "91cbb1fcfd2820ca1bb5d3433fb8e909": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d0ff7f9dfe5cfebbbd9790712bde2391": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "10ff85f24169cf17263a2800673fe0a4": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d41da6728b477ee1173148a71898c393": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "2a33a9112bf0d69592df0ebcf11a9ff0": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "464463c523b50b1f2e9e609200b49bbf": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "02b83d7f8831caca5153e0f99f724297": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "d551ba4db92e18f504c7b0c065abfefd": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "199205d648d00243bb3f0b0e023443f9": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "22cfbfc9d7495fc0fc4b908b1c488c98": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "42333682361aba4ab2f51a9f548f5b94": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "26adabfaf2cee3fc5212ed1abfea6fa3": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "f0a9cf346f454760b282c78ecbf4d4b1": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "b76c8af6bfe22a58e572aa7232a1e997": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6f0c4e3e4c156a9ad85995eb13b62808": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "a601c23faef7bcc90db7bc7b1be9edfe": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "42fc96617d3171e6c4d13164e7476244": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "6adc30806257d7c4ea9a913c6a686d43": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fa59080267ab9f545bbad74a6861c188": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "abaa299d843e14e620e10fbc6dc69d25": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "090f04104d28ec065d472ec9ab33be02": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "fcb7f75bed23702af545fa8ea8d52873": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "14f93efd7abf9be69ffaaa9180986b59": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7221f5bb586e591b47d0e7d1b0c793cc": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "7a31e5b8b2fe223da20ce94b08ae414e": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    },
+    "ce3c61b9bccffe78a419e4348a51c12f": {
+      "rom_region": 1638400,
+      "confidence": 1,
+      "alternatives": 1
+    }
+  }
+}

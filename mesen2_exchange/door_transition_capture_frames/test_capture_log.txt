@@ -1,0 +1,9 @@
+16:44:05 Script start: target=700 capture_frames=84,88,103,104,253 capture_count=5 capture_first=84 savestate=C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_integration\savestates\Before.mss preloaded=false frame_event=endFrame master_clock_fallback=0 master_clock_fps=nil master_clock_max_seconds=nil debug_capture=0 door_up=30-120 dump_vram=true max_frames=nil
+16:44:05 Savestate loaded; reset frame counter
+16:44:05 Registered frame callback: endFrame
+16:44:05 Capturing frame 84 (suffix=_84)
+16:44:05 Capturing frame 88 (suffix=_88)
+16:44:05 Capturing frame 103 (suffix=_103)
+16:44:05 Capturing frame 104 (suffix=_104)
+16:44:06 Capturing frame 253 (suffix=_253)
+16:44:06 Capture complete; stopping

@@ -1,0 +1,39 @@
+Sprite Capture Summary
+======================
+Frame: 423
+OBSEL: $00 (base=0, select=0, size=0, oam_base=0, oam_offset=4096)
+VRAM read mode: word
+Visible sprites: 32
+
+OAM #0: pos=(162,191) tile=$AC size=8x8 pal=0
+OAM #1: pos=(86,191) tile=$AC size=8x8 pal=0
+OAM #2: pos=(120,205) tile=$6E size=16x16 pal=0
+OAM #3: pos=(136,205) tile=$6E size=16x16 pal=0
+OAM #4: pos=(104,205) tile=$6E size=16x16 pal=0
+OAM #5: pos=(120,9) tile=$6E size=16x16 pal=0
+OAM #6: pos=(136,9) tile=$6E size=16x16 pal=0
+OAM #7: pos=(104,9) tile=$6E size=16x16 pal=0
+OAM #8: pos=(157,47) tile=$86 size=16x16 pal=0
+OAM #9: pos=(157,63) tile=$86 size=16x16 pal=0
+OAM #10: pos=(157,79) tile=$86 size=16x16 pal=0
+OAM #11: pos=(157,95) tile=$86 size=16x16 pal=0
+OAM #12: pos=(157,111) tile=$86 size=16x16 pal=0
+OAM #13: pos=(157,127) tile=$86 size=16x16 pal=0
+OAM #14: pos=(157,143) tile=$86 size=16x16 pal=0
+OAM #15: pos=(157,159) tile=$86 size=16x16 pal=0
+OAM #16: pos=(157,175) tile=$86 size=16x16 pal=0
+OAM #17: pos=(157,31) tile=$86 size=16x16 pal=0
+OAM #18: pos=(84,47) tile=$86 size=16x16 pal=0
+OAM #19: pos=(84,63) tile=$86 size=16x16 pal=0
+OAM #20: pos=(84,79) tile=$86 size=16x16 pal=0
+OAM #21: pos=(84,95) tile=$86 size=16x16 pal=0
+OAM #22: pos=(84,111) tile=$86 size=16x16 pal=0
+OAM #23: pos=(84,127) tile=$86 size=16x16 pal=0
+OAM #24: pos=(84,143) tile=$86 size=16x16 pal=0
+OAM #25: pos=(84,159) tile=$86 size=16x16 pal=0
+OAM #26: pos=(84,175) tile=$86 size=16x16 pal=0
+OAM #27: pos=(84,31) tile=$86 size=16x16 pal=0
+OAM #28: pos=(88,15) tile=$84 size=16x16 pal=0
+OAM #29: pos=(88,199) tile=$84 size=16x16 pal=0
+OAM #30: pos=(152,15) tile=$84 size=16x16 pal=0
+OAM #31: pos=(152,199) tile=$84 size=16x16 pal=0

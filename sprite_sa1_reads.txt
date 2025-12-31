@@ -1,0 +1,29 @@
+SA-1 Sprite Region Read Tracking
+================================
+Callback registration: OK
+
+Frame 200: 28821 reads so far
+Frame 400: 28821 reads so far
+Frame 800: 28821 reads so far
+
+--- Final Results ---
+Frame 900
+Total reads from sprite region: 28821
+
+Reads by 4KB ROM block:
+  $1E9000: 1617 reads
+  $1EA000: 8192 reads
+  $1EB000: 1215 reads
+  $1EC000: 4139 reads
+  $1ED000: 6719 reads
+  $1F0000: 5200 reads
+  $1F1000: 1739 reads
+
+Top accessed blocks (first 8 bytes):
+  $1EA000 (8192 reads): ED FF E0 28 05 7F 92 EE 
+  $1ED000 (6719 reads): 14 0A F3 21 AF 3D 24 BC 
+  $1F0000 (5200 reads): E4 7E 00 00 6D 36 00 85 
+  $1EC000 (4139 reads): 7F 10 6F 54 7F 44 C0 C0 
+  $1F1000 (1739 reads): 00 A9 CA 1B 62 01 00 00 
+  $1E9000 (1617 reads): EE C2 88 34 1F DD F3 32 
+  $1EB000 (1215 reads): 00 00 00 FA 2C E0 2B E3 

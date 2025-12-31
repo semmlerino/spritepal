@@ -1,0 +1,86 @@
+Sprite Capture Summary
+======================
+Frame: 30
+OBSEL: $00 (base=0, select=0, size=0)
+VRAM read mode: word
+Visible sprites: 79
+
+OAM #1: pos=(158,221) tile=$E6 size=8x8 pal=6
+OAM #2: pos=(-45,108) tile=$A9 size=8x8 pal=2
+OAM #7: pos=(252,124) tile=$EE size=16x16 pal=6
+OAM #8: pos=(-7,119) tile=$9A size=8x8 pal=4
+OAM #9: pos=(157,10) tile=$8E size=16x16 pal=6
+OAM #12: pos=(5,120) tile=$B5 size=8x8 pal=0
+OAM #13: pos=(5,14) tile=$1B size=16x16 pal=5
+OAM #14: pos=(213,112) tile=$3C size=16x16 pal=5
+OAM #15: pos=(68,57) tile=$CD size=8x8 pal=4
+OAM #17: pos=(-17,90) tile=$F9 size=16x16 pal=0
+OAM #23: pos=(9,0) tile=$7C size=8x8 pal=2
+OAM #27: pos=(100,29) tile=$F8 size=16x16 pal=7
+OAM #29: pos=(62,128) tile=$E3 size=8x8 pal=7
+OAM #31: pos=(85,31) tile=$BB size=8x8 pal=5
+OAM #34: pos=(181,106) tile=$45 size=16x16 pal=1
+OAM #35: pos=(248,254) tile=$E4 size=16x16 pal=7
+OAM #38: pos=(155,218) tile=$01 size=8x8 pal=6
+OAM #42: pos=(87,9) tile=$3B size=16x16 pal=4
+OAM #44: pos=(40,171) tile=$64 size=16x16 pal=3
+OAM #47: pos=(254,128) tile=$23 size=16x16 pal=1
+OAM #49: pos=(92,13) tile=$43 size=16x16 pal=3
+OAM #50: pos=(-1,196) tile=$09 size=16x16 pal=6
+OAM #51: pos=(198,103) tile=$53 size=8x8 pal=7
+OAM #53: pos=(251,108) tile=$54 size=8x8 pal=3
+OAM #54: pos=(-20,75) tile=$A1 size=8x8 pal=2
+OAM #56: pos=(49,25) tile=$22 size=8x8 pal=3
+OAM #57: pos=(185,162) tile=$28 size=16x16 pal=7
+OAM #58: pos=(-63,240) tile=$6D size=16x16 pal=3
+OAM #59: pos=(186,249) tile=$13 size=16x16 pal=0
+OAM #60: pos=(206,240) tile=$2D size=8x8 pal=6
+OAM #61: pos=(43,217) tile=$31 size=8x8 pal=2
+OAM #62: pos=(-61,30) tile=$E1 size=16x16 pal=2
+OAM #64: pos=(186,163) tile=$ED size=8x8 pal=7
+OAM #65: pos=(153,142) tile=$D6 size=8x8 pal=0
+OAM #67: pos=(148,144) tile=$A2 size=8x8 pal=4
+OAM #69: pos=(206,77) tile=$04 size=16x16 pal=1
+OAM #70: pos=(85,170) tile=$F2 size=16x16 pal=2
+OAM #71: pos=(151,83) tile=$46 size=16x16 pal=7
+OAM #72: pos=(-12,213) tile=$19 size=8x8 pal=6
+OAM #74: pos=(32,122) tile=$FC size=8x8 pal=2
+OAM #75: pos=(200,161) tile=$85 size=8x8 pal=1
+OAM #76: pos=(-39,58) tile=$15 size=16x16 pal=5
+OAM #77: pos=(215,76) tile=$0D size=16x16 pal=6
+OAM #78: pos=(43,159) tile=$57 size=8x8 pal=2
+OAM #79: pos=(122,185) tile=$61 size=8x8 pal=3
+OAM #81: pos=(-35,170) tile=$86 size=8x8 pal=4
+OAM #82: pos=(48,145) tile=$D8 size=8x8 pal=4
+OAM #83: pos=(161,128) tile=$6B size=8x8 pal=7
+OAM #86: pos=(7,131) tile=$E5 size=16x16 pal=3
+OAM #87: pos=(59,39) tile=$25 size=8x8 pal=0
+OAM #88: pos=(120,57) tile=$E2 size=8x8 pal=5
+OAM #90: pos=(43,62) tile=$0B size=8x8 pal=1
+OAM #91: pos=(127,253) tile=$FE size=16x16 pal=5
+OAM #93: pos=(8,207) tile=$B1 size=16x16 pal=3
+OAM #94: pos=(205,150) tile=$70 size=8x8 pal=5
+OAM #95: pos=(250,125) tile=$B9 size=8x8 pal=4
+OAM #96: pos=(198,107) tile=$D5 size=8x8 pal=3
+OAM #97: pos=(-51,201) tile=$57 size=8x8 pal=0
+OAM #98: pos=(44,208) tile=$0E size=16x16 pal=4
+OAM #99: pos=(166,89) tile=$33 size=16x16 pal=4
+OAM #102: pos=(185,20) tile=$A2 size=16x16 pal=6
+OAM #103: pos=(105,87) tile=$7F size=8x8 pal=0
+OAM #105: pos=(22,62) tile=$96 size=16x16 pal=2
+OAM #106: pos=(82,149) tile=$5B size=8x8 pal=3
+OAM #107: pos=(158,182) tile=$6A size=16x16 pal=7
+OAM #108: pos=(134,245) tile=$24 size=16x16 pal=5
+OAM #109: pos=(-29,252) tile=$6F size=16x16 pal=6
+OAM #110: pos=(122,74) tile=$11 size=8x8 pal=2
+OAM #111: pos=(157,197) tile=$E8 size=16x16 pal=0
+OAM #112: pos=(105,150) tile=$34 size=16x16 pal=4
+OAM #113: pos=(174,2) tile=$33 size=8x8 pal=0
+OAM #114: pos=(98,19) tile=$60 size=8x8 pal=1
+OAM #115: pos=(246,73) tile=$3C size=16x16 pal=2
+OAM #116: pos=(-36,203) tile=$A6 size=16x16 pal=4
+OAM #118: pos=(-42,63) tile=$22 size=8x8 pal=5
+OAM #119: pos=(-11,52) tile=$13 size=16x16 pal=4
+OAM #120: pos=(51,220) tile=$64 size=16x16 pal=2
+OAM #124: pos=(138,165) tile=$03 size=8x8 pal=6
+OAM #127: pos=(45,159) tile=$C8 size=8x8 pal=1

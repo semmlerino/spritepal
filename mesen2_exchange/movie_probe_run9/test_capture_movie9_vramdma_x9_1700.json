@@ -1,0 +1,182 @@
+{
+  "frame": 1700,
+  "obsel": {
+    "raw": 0, "name_base": 0, "name_select": 0,
+    "size_select": 0, "tile_base_addr": 0, "oam_base_addr": 0, "oam_addr_offset": 4096
+  },
+  "visible_count": 17,
+  "entries": [
+    {
+      "id": 0, "x": 188, "y": 105, "tile": 19,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 19, "vram_addr": 608, "pos_x": 0, "pos_y": 0, "data_hex": "0202030303030303030303030303000102010300030003000300030003000000"}
+      ]
+    },
+    {
+      "id": 1, "x": 180, "y": 105, "tile": 4,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 4, "vram_addr": 128, "pos_x": 0, "pos_y": 0, "data_hex": "0101010101010101010101010101010101FE01FE01FE01FE01FE01FE01FE01FE"}
+      ]
+    },
+    {
+      "id": 2, "x": 172, "y": 105, "tile": 3,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 3, "vram_addr": 96, "pos_x": 0, "pos_y": 0, "data_hex": "8080808080808080808080808080808080FF80FF80FF80FF80FF80FF80FF80FF"}
+      ]
+    },
+    {
+      "id": 3, "x": 188, "y": 97, "tile": 18,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 18, "vram_addr": 576, "pos_x": 0, "pos_y": 0, "data_hex": "060607070707070707070707FFFFFEFFFAFDFBFCFBFCFBFCFBFCFBFCFBFCFCFE"}
+      ]
+    },
+    {
+      "id": 4, "x": 188, "y": 89, "tile": 2,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 2, "vram_addr": 64, "pos_x": 0, "pos_y": 0, "data_hex": "F2F37A7BBEBF5E5F2E2F16170A0B0203FEFCF6FC7AFC2AFC12FC0AFC02FC02FC"}
+      ]
+    },
+    {
+      "id": 5, "x": 172, "y": 89, "tile": 0,
+      "width": 16, "height": 16,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 0, "vram_addr": 0, "pos_x": 0, "pos_y": 0, "data_hex": "0000000000000000000000000000000000000000000000000000000000000000"},
+        {"tile_index": 1, "vram_addr": 32, "pos_x": 1, "pos_y": 0, "data_hex": "8F8F9E9EBDBDFAFAF4F4E8E8D0D0A0A0FFFFFFFFFEFFFCFFF8FFF0FFE0FFC0FF"},
+        {"tile_index": 16, "vram_addr": 512, "pos_x": 0, "pos_y": 1, "data_hex": "C040C040C040C040C040C645DF505FA080FF80FF80FF80FF80FF86F898E04000"},
+        {"tile_index": 17, "vram_addr": 544, "pos_x": 1, "pos_y": 1, "data_hex": "0203020302030203C243F213F60FFCC302FC02FC02FC02FCC23C320C06000000"}
+      ]
+    },
+    {
+      "id": 6, "x": 186, "y": 94, "tile": 28,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 28, "vram_addr": 896, "pos_x": 0, "pos_y": 0, "data_hex": "FF0EFE3FFD3EFFBCFFBCBFC0C1FEFF028070C000C00040004000000000009864"}
+      ]
+    },
+    {
+      "id": 7, "x": 178, "y": 94, "tile": 12,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 12, "vram_addr": 384, "pos_x": 0, "pos_y": 0, "data_hex": "FC08FE08FB0CFF08FB0CFB0CFB04FF047000F000F100F000F000F00008F048F0"}
+      ]
+    },
+    {
+      "id": 8, "x": 170, "y": 94, "tile": 11,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 11, "vram_addr": 352, "pos_x": 0, "pos_y": 0, "data_hex": "FF02FE03FE03FF02FF02FE03FF00FE017C00FC00FC00FC00FC00FC00827C42FC"}
+      ]
+    },
+    {
+      "id": 9, "x": 170, "y": 86, "tile": 29,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 29, "vram_addr": 928, "pos_x": 0, "pos_y": 0, "data_hex": "FF03FF0FFFFF7F7F00000000000001000000000000008000FF00FF00FF00FF01"}
+      ]
+    },
+    {
+      "id": 10, "x": 170, "y": 78, "tile": 13,
+      "width": 8, "height": 8,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 13, "vram_addr": 416, "pos_x": 0, "pos_y": 0, "data_hex": "0000000000000000000006051F10DFA000FF00FF00FF00FF00FF06F818E0C000"}
+      ]
+    },
+    {
+      "id": 11, "x": 178, "y": 78, "tile": 14,
+      "width": 16, "height": 16,
+      "palette": 0, "priority": 3, "flip_h": false, "flip_v": false,
+      "name_table": 0, "tile_page": 0,
+      "tiles": [
+        {"tile_index": 14, "vram_addr": 448, "pos_x": 0, "pos_y": 0, "data_hex": "0000000000003E3EBE41FF00FF3EFFFF00FF00FF00FF3EC18000000000000000"},
+        {"tile_index": 15, "vram_addr": 480, "pos_x": 1, "pos_y": 0, "data_hex": "0000000000000000C040F010F40CFDC200FF00FF00FF00FFC03F300F04030100"},
+        {"tile_index": 30, "vram_addr": 960, "pos_x": 0, "pos_y": 1, "data_hex": "FCFCE0E080800000000000003C00F0C003001F007F00FF00FF00FF00FF3FFFFF"},
+        {"tile_index": 31, "vram_addr": 992, "pos_x": 1, "pos_y": 1, "data_hex": "3F200F0C030300000000000000000000C000F000FC00FF00FF00FF00FF00FFC0"}
+      ]
+    },
+    {
+      "id": 12, "x": 188, "y": 97, "tile": 129,
+      "width": 16, "height": 16,
+      "palette": 1, "priority": 3, "flip_h": true, "flip_v": true,
+      "name_table": 1, "tile_page": 1,
+      "tiles": [
+        {"tile_index": 129, "vram_addr": 12320, "pos_x": 0, "pos_y": 0, "data_hex": "1FFF1FFF0FFF0FFF07FF03FF03FF01FFE01FE01FF00FF00FF807FC03FC03FE01"},
+        {"tile_index": 130, "vram_addr": 12352, "pos_x": 1, "pos_y": 0, "data_hex": "FF00FF00FF80FF80FFC1FFE2FFF4FBFCFFFFFFFF7FFF7FFF3EFF1DFE0AFC04F8"},
+        {"tile_index": 145, "vram_addr": 12832, "pos_x": 0, "pos_y": 1, "data_hex": "00FF00FF00FF00FF00FF00FF00FF01FEFF00FF00FF00FF00FF00FF00FF00FF00"},
+        {"tile_index": 146, "vram_addr": 12864, "pos_x": 1, "pos_y": 1, "data_hex": "F7F877F13EE15CE17CC7F887F007F01F08F08870D021A14383434787870F0F0F"}
+      ]
+    },
+    {
+      "id": 13, "x": 204, "y": 121, "tile": 128,
+      "width": 8, "height": 8,
+      "palette": 1, "priority": 3, "flip_h": true, "flip_v": false,
+      "name_table": 1, "tile_page": 1,
+      "tiles": [
+        {"tile_index": 128, "vram_addr": 12288, "pos_x": 0, "pos_y": 0, "data_hex": "000000000000000000000000FCFCFCFCFEFFFEFFFEFFFEFFFEFFFEFFFEFFFEFF"}
+      ]
+    },
+    {
+      "id": 14, "x": 180, "y": 129, "tile": 128,
+      "width": 8, "height": 8,
+      "palette": 1, "priority": 3, "flip_h": true, "flip_v": false,
+      "name_table": 1, "tile_page": 1,
+      "tiles": [
+        {"tile_index": 128, "vram_addr": 12288, "pos_x": 0, "pos_y": 0, "data_hex": "000000000000000000000000FCFCFCFCFEFFFEFFFEFFFEFFFEFFFEFFFEFFFEFF"}
+      ]
+    },
+    {
+      "id": 15, "x": 180, "y": 113, "tile": 128,
+      "width": 8, "height": 8,
+      "palette": 1, "priority": 3, "flip_h": true, "flip_v": false,
+      "name_table": 1, "tile_page": 1,
+      "tiles": [
+        {"tile_index": 128, "vram_addr": 12288, "pos_x": 0, "pos_y": 0, "data_hex": "000000000000000000000000FCFCFCFCFEFFFEFFFEFFFEFFFEFFFEFFFEFFFEFF"}
+      ]
+    },
+    {
+      "id": 16, "x": 202, "y": 105, "tile": 128,
+      "width": 8, "height": 8,
+      "palette": 1, "priority": 3, "flip_h": true, "flip_v": false,
+      "name_table": 1, "tile_page": 1,
+      "tiles": [
+        {"tile_index": 128, "vram_addr": 12288, "pos_x": 0, "pos_y": 0, "data_hex": "000000000000000000000000FCFCFCFCFEFFFEFFFEFFFEFFFEFFFEFFFEFFFEFF"}
+      ]
+    }
+  ],
+  "palettes": {
+    "0": [29417,29425,26239,26110,23868,19608,11311,24,4191,6342,0,10444,32470,32107,5983,540],
+    "1": [32742,31255,210,440,766,2239,607,0,23898,32064,32672,2183,4450,4706,32767,1023],
+    "2": [16760,32767,14815,31,15,24319,480,4450,0,0,0,0,32464,32096,6342,0],
+    "3": [13876,32767,313,735,1023,148,480,4450,0,0,0,32533,32267,32000,6342,0],
+    "4": [32320,32767,30175,26650,11275,31423,480,4450,0,0,0,0,17311,831,6342,0],
+    "5": [6336,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    "6": [2,31647,32447,32039,11647,11638,9490,5294,3175,896,32032,10843,4337,22197,11627,0],
+    "7": [14336,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+  }
+}

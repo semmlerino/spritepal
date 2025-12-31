@@ -1,0 +1,51 @@
+Sprite Capture Summary
+======================
+Frame: 2627
+OBSEL: $00 (base=0, select=0, size=0, oam_base=0, oam_offset=4096)
+VRAM read mode: word
+Visible sprites: 44
+
+OAM #0: pos=(159,40) tile=$E2 size=16x16 pal=1
+OAM #1: pos=(171,15) tile=$E4 size=16x16 pal=1
+OAM #2: pos=(152,12) tile=$E4 size=16x16 pal=1
+OAM #3: pos=(167,105) tile=$40 size=16x16 pal=1
+OAM #4: pos=(190,101) tile=$40 size=16x16 pal=1
+OAM #5: pos=(211,88) tile=$40 size=16x16 pal=1
+OAM #6: pos=(137,100) tile=$0C size=8x8 pal=0
+OAM #7: pos=(129,84) tile=$0E size=16x16 pal=0
+OAM #8: pos=(145,85) tile=$19 size=8x8 pal=1
+OAM #9: pos=(141,88) tile=$19 size=8x8 pal=1
+OAM #10: pos=(155,81) tile=$19 size=8x8 pal=1
+OAM #11: pos=(149,99) tile=$19 size=8x8 pal=1
+OAM #12: pos=(135,112) tile=$19 size=8x8 pal=1
+OAM #13: pos=(113,114) tile=$0A size=16x16 pal=1
+OAM #14: pos=(129,100) tile=$09 size=8x8 pal=0
+OAM #15: pos=(121,100) tile=$1C size=8x8 pal=0
+OAM #16: pos=(121,92) tile=$1D size=8x8 pal=0
+OAM #17: pos=(121,84) tile=$0D size=8x8 pal=0
+OAM #18: pos=(137,114) tile=$13 size=8x8 pal=0
+OAM #19: pos=(129,114) tile=$04 size=8x8 pal=0
+OAM #20: pos=(121,114) tile=$03 size=8x8 pal=0
+OAM #21: pos=(137,106) tile=$12 size=8x8 pal=0
+OAM #22: pos=(137,98) tile=$02 size=8x8 pal=0
+OAM #23: pos=(121,98) tile=$00 size=16x16 pal=0
+OAM #24: pos=(123,73) tile=$33 size=8x8 pal=2
+OAM #25: pos=(115,73) tile=$23 size=8x8 pal=2
+OAM #26: pos=(107,85) tile=$32 size=8x8 pal=2
+OAM #27: pos=(107,77) tile=$22 size=8x8 pal=2
+OAM #28: pos=(115,81) tile=$20 size=16x16 pal=2
+OAM #29: pos=(249,100) tile=$2A size=8x8 pal=6
+OAM #30: pos=(241,100) tile=$29 size=8x8 pal=6
+OAM #31: pos=(233,100) tile=$28 size=8x8 pal=6
+OAM #32: pos=(233,92) tile=$19 size=8x8 pal=6
+OAM #33: pos=(233,84) tile=$09 size=8x8 pal=6
+OAM #34: pos=(241,84) tile=$0A size=16x16 pal=6
+OAM #35: pos=(143,62) tile=$9E size=8x8 pal=4
+OAM #36: pos=(151,62) tile=$8F size=8x8 pal=4
+OAM #37: pos=(159,62) tile=$8E size=8x8 pal=4
+OAM #38: pos=(143,54) tile=$9D size=8x8 pal=4
+OAM #39: pos=(143,46) tile=$8D size=8x8 pal=4
+OAM #40: pos=(151,46) tile=$89 size=16x16 pal=4
+OAM #41: pos=(180,54) tile=$AB size=8x8 pal=1
+OAM #42: pos=(183,38) tile=$A0 size=16x16 pal=1
+OAM #43: pos=(170,38) tile=$A0 size=16x16 pal=1

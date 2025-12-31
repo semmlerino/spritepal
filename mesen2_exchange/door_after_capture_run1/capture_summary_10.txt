@@ -1,0 +1,43 @@
+Sprite Capture Summary
+======================
+Frame: 10
+OBSEL: $00 (base=0, select=0, size=0, oam_base=0, oam_offset=4096)
+VRAM read mode: word
+Visible sprites: 36
+
+OAM #0: pos=(108,103) tile=$0C size=8x8 pal=0
+OAM #1: pos=(116,110) tile=$1D size=8x8 pal=0
+OAM #2: pos=(116,102) tile=$0D size=8x8 pal=0
+OAM #3: pos=(124,102) tile=$0E size=16x16 pal=0
+OAM #4: pos=(132,125) tile=$13 size=8x8 pal=0
+OAM #5: pos=(124,125) tile=$04 size=8x8 pal=0
+OAM #6: pos=(116,125) tile=$03 size=8x8 pal=0
+OAM #7: pos=(132,117) tile=$12 size=8x8 pal=0
+OAM #8: pos=(132,109) tile=$02 size=8x8 pal=0
+OAM #9: pos=(116,109) tile=$00 size=16x16 pal=0
+OAM #10: pos=(-16,125) tile=$79 size=8x8 pal=4
+OAM #11: pos=(-24,125) tile=$78 size=8x8 pal=4
+OAM #12: pos=(-32,125) tile=$77 size=8x8 pal=4
+OAM #13: pos=(-32,117) tile=$7E size=8x8 pal=4
+OAM #14: pos=(-32,109) tile=$6E size=8x8 pal=4
+OAM #15: pos=(-24,109) tile=$6A size=16x16 pal=4
+OAM #16: pos=(73,111) tile=$BE size=8x8 pal=3
+OAM #17: pos=(73,103) tile=$AE size=8x8 pal=3
+OAM #18: pos=(57,103) tile=$AE size=16x16 pal=3
+OAM #19: pos=(74,111) tile=$B2 size=8x8 pal=3
+OAM #20: pos=(66,111) tile=$B1 size=8x8 pal=3
+OAM #21: pos=(58,111) tile=$B2 size=8x8 pal=3
+OAM #22: pos=(58,119) tile=$BD size=8x8 pal=3
+OAM #23: pos=(74,119) tile=$AB size=8x8 pal=3
+OAM #24: pos=(66,119) tile=$AA size=8x8 pal=3
+OAM #25: pos=(197,66) tile=$5F size=8x8 pal=7
+OAM #26: pos=(189,66) tile=$5E size=8x8 pal=7
+OAM #27: pos=(181,66) tile=$5D size=8x8 pal=7
+OAM #28: pos=(197,58) tile=$4F size=8x8 pal=7
+OAM #29: pos=(197,50) tile=$3F size=8x8 pal=7
+OAM #30: pos=(181,50) tile=$3D size=16x16 pal=7
+OAM #31: pos=(120,85) tile=$83 size=16x16 pal=1
+OAM #32: pos=(112,113) tile=$80 size=8x8 pal=1
+OAM #33: pos=(136,121) tile=$80 size=8x8 pal=1
+OAM #34: pos=(136,105) tile=$80 size=8x8 pal=1
+OAM #35: pos=(112,97) tile=$80 size=8x8 pal=1

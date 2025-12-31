@@ -1,0 +1,9 @@
+=== Cappy Entering Monitor ===
+Log file: C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\cappy_entering_log.txt
+Tried savestate path: Entering.mss
+Tried savestate path: ..\..\Entering.mss
+Loaded savestate (193444 bytes) from C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\Entering.mss
+Target VRAM range: $6A00-$6A80
+Awaiting DMA activity...
+Applying Entering.mss savestate
+Savestate applied

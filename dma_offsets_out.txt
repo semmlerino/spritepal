@@ -1,0 +1,8 @@
+Frame 600
+ROM offsets:
+$000060 -> $2101 (3 hits)
+$0000A4 -> OAM (436 hits)
+$00018C -> $2180 (1 hits)
+$0001A3 -> $2180 (1 hits)
+$000500 -> CGRAM (436 hits)
+$007FFE -> $2180 (13 hits)

@@ -1,0 +1,47 @@
+Sprite Capture Summary
+======================
+Frame: 2002
+OBSEL: $00 (base=0, select=0, size=0, oam_base=0, oam_offset=4096)
+VRAM read mode: word
+Visible sprites: 40
+
+OAM #0: pos=(168,50) tile=$8F size=8x8 pal=1
+OAM #1: pos=(160,42) tile=$8F size=8x8 pal=1
+OAM #2: pos=(152,34) tile=$8F size=8x8 pal=1
+OAM #3: pos=(144,26) tile=$8F size=8x8 pal=1
+OAM #4: pos=(139,17) tile=$DF size=8x8 pal=1
+OAM #5: pos=(174,52) tile=$DF size=8x8 pal=1
+OAM #6: pos=(168,42) tile=$8F size=8x8 pal=1
+OAM #7: pos=(144,18) tile=$8F size=8x8 pal=1
+OAM #8: pos=(152,26) tile=$8F size=8x8 pal=1
+OAM #9: pos=(160,34) tile=$8F size=8x8 pal=1
+OAM #10: pos=(180,33) tile=$41 size=8x8 pal=1
+OAM #11: pos=(180,41) tile=$51 size=8x8 pal=1
+OAM #12: pos=(172,41) tile=$50 size=8x8 pal=1
+OAM #13: pos=(164,41) tile=$40 size=8x8 pal=1
+OAM #14: pos=(117,35) tile=$1B size=8x8 pal=0
+OAM #15: pos=(117,27) tile=$0B size=8x8 pal=0
+OAM #16: pos=(125,27) tile=$0C size=16x16 pal=0
+OAM #17: pos=(141,40) tile=$1E size=8x8 pal=1
+OAM #18: pos=(157,43) tile=$0F size=8x8 pal=1
+OAM #19: pos=(149,43) tile=$0E size=8x8 pal=1
+OAM #20: pos=(133,44) tile=$13 size=8x8 pal=0
+OAM #21: pos=(125,44) tile=$04 size=8x8 pal=0
+OAM #22: pos=(117,44) tile=$03 size=8x8 pal=0
+OAM #23: pos=(133,36) tile=$12 size=8x8 pal=0
+OAM #24: pos=(133,28) tile=$02 size=8x8 pal=0
+OAM #25: pos=(117,28) tile=$00 size=16x16 pal=0
+OAM #26: pos=(194,52) tile=$80 size=8x8 pal=1
+OAM #27: pos=(185,49) tile=$80 size=8x8 pal=1
+OAM #28: pos=(203,49) tile=$80 size=8x8 pal=1
+OAM #29: pos=(206,40) tile=$80 size=8x8 pal=1
+OAM #30: pos=(203,31) tile=$80 size=8x8 pal=1
+OAM #31: pos=(194,28) tile=$80 size=8x8 pal=1
+OAM #32: pos=(185,31) tile=$80 size=8x8 pal=1
+OAM #33: pos=(182,40) tile=$80 size=8x8 pal=1
+OAM #34: pos=(188,38) tile=$9E size=8x8 pal=4
+OAM #35: pos=(196,38) tile=$8F size=8x8 pal=4
+OAM #36: pos=(204,38) tile=$8E size=8x8 pal=4
+OAM #37: pos=(188,30) tile=$9D size=8x8 pal=4
+OAM #38: pos=(188,22) tile=$8D size=8x8 pal=4
+OAM #39: pos=(196,22) tile=$89 size=16x16 pal=4

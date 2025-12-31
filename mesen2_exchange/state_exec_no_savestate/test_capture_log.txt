@@ -1,0 +1,7 @@
+00:15:04 Script start: target=700 capture_frames=5,10 savestate=nil preloaded=false frame_event=exec door_up=nil-nil dump_vram=false max_frames=30
+00:15:04 Registered frame callback: exec (frameCount via emu.getState)
+00:15:04 state frame keys: frameCount, ppu.frameCount
+00:15:04 state.frameCount=0
+00:15:16 Capturing frame 5 (suffix=_5)
+00:15:32 Capturing frame 10 (suffix=_10)
+00:15:32 Capture complete; stopping

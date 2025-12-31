@@ -1,0 +1,23 @@
+SA-1 ROM Mapping Test
+=====================
+
+Direct ROM read $1B0000: $24
+
+Testing SA-1 CPU addresses for ROM $1B0000:
+  $DB0000 (SA-1 $DB:$0000 (bank + low)): $24 MATCH!
+  $D1B000 (SA-1 $D1:$B000 (linear high)): $AF no match
+  $DB0000 (SA-1 $D0:$0000 + $B0000): $24 MATCH!
+  $DB0000 (SA-1 $C0:$0000 + $1B0000 (full linear)): $24 MATCH!
+
+
+SA-1 formula verification:
+  ROM $1B0000 -> SA-1 bank $DB, addr $0000 -> CPU $DB0000
+  Read via $DB0000: $24 (expected $24) - CORRECT!
+
+More ROM offset tests:
+  ROM $000000 = $EA, CPU $C00000 = $EA [OK]
+  ROM $100000 = $A9, CPU $D00000 = $A9 [OK]
+  ROM $1A0000 = $E0, CPU $DA0000 = $E0 [OK]
+  ROM $1B0000 = $24, CPU $DB0000 = $24 [OK]
+  ROM $200000 = $27, CPU $E00000 = $27 [OK]
+  ROM $300000 = $01, CPU $F00000 = $01 [OK]

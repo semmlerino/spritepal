@@ -1,0 +1,3 @@
+22:28:39 Script start: target=700 capture_frames=5,10,20,30,40,60,90,120,150,180 savestate=C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_integration\savestates\Before.mss door_up=5-50 dump_vram=true max_frames=220
+22:28:39 Savestate loaded; reset frame counter
+22:28:39 Registered endFrame callback after savestate load

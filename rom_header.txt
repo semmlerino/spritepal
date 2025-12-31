@@ -1,0 +1,17 @@
+Kirby Super Star ROM Header Analysis
+=====================================
+
+Checking LoROM header location ($007FB0):
+  Title: KIRBY SUPER DELUXE   
+  Map mode: $23 (SA-1)
+  ROM type: $35  + SA-1 chip!
+  ROM size: $0C (4096 KB)
+  RAM size: $03 (8 KB)
+
+Checking HiROM header location ($00FFB0):
+  Title: ...n..G..o...........
+  Map mode: $57
+
+SA-1 register check:
+  $2300 (SA-1 status): $00
+  $2220-$2223 (SA-1 banks): 00 00 00 00

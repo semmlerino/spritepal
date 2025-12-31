@@ -1,0 +1,23 @@
+Testing ROM access and address mapping
+
+Test 1: Direct PRG ROM read
+  $1B0000 (PRG ROM): $24
+
+Test 2: LoROM CPU address mapping
+  $368000 (CPU/LoROM): $24
+
+Test 3: Values match? YES
+
+Test 4: First 16 bytes at $1B0000:
+  24 00 0A 01 01 02 02 05 04 0B 04 0F 00 1F 88 00 
+
+Test 5: Address conversions
+  CPU $368000 -> ROM $000000 (type=nil)
+  CPU $008000 -> ROM $000000 (type=nil)
+  CPU $348000 -> ROM $000000 (type=nil)
+  CPU $3F8000 -> ROM $000000 (type=nil)
+
+Test 6: Memory callback registration
+  snesMemory $008000-$00FFFF: OK
+
+Callback count after 120 frames: 24880

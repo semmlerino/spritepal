@@ -1,0 +1,3 @@
+22:27:42 Script start: target=700 capture_frames=5 savestate=nil door_up=nil-nil dump_vram=true max_frames=10
+22:27:42 Capturing frame 5 (suffix=_5)
+22:27:42 Capture complete; stopping

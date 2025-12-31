@@ -1,0 +1,7 @@
+Sprite Capture Summary
+======================
+Frame: 263
+OBSEL: $00 (base=0, select=0, size=0, oam_base=0, oam_offset=4096)
+VRAM read mode: word
+Visible sprites: 0
+

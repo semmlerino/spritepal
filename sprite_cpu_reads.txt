@@ -1,0 +1,6 @@
+Frame 900
+Total reads from sprite region: 0
+
+Reads by 4KB ROM block:
+
+First bytes of each accessed block:

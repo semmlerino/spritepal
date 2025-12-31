@@ -1,0 +1,224 @@
+# Mesen 2 Sprite Extraction Toolkit
+
+Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
+
+## 🎯 Quick Start
+
+### 1. Interactive Guided Workflow
+```bash
+python trace_sprite_guide.py
+```
+This walks you through the entire process step-by-step.
+
+### 2. Direct Extraction (when you have a SNES address)
+```bash
+# Extract from a specific SNES address
+python mesen2_sprite_extractor.py $95:B000
+
+# Scan nearby if exact offset fails
+python mesen2_sprite_extractor.py $95:B000 --scan
+```
+
+### 3. Batch Extraction (multiple sprites)
+```bash
+# Process multiple sprites from a file
+python batch_sprite_extractor.py known_sprites.json
+```
+
+## 📖 Complete Workflow
+
+### Step 1: Find Sprite in Game
+1. Launch Kirby Super Star in Mesen 2
+2. Navigate to where your target sprite appears
+3. **Pause** when sprite is visible (F5)
+
+### Step 2: Locate in VRAM
+1. Open **Tools > Tile Viewer** (Ctrl+Shift+T)
+2. Select "Type: Sprite"
+3. Click on your sprite's tiles
+4. Note the VRAM address (e.g., $1E00)
+
+### Step 3: Set VRAM Breakpoint
+1. Open **Debug > Debugger** (Ctrl+D)
+2. Add breakpoint:
+   - Memory Type: VRAM
+   - Address: Your VRAM address
+   - Check: Write only
+
+### Step 4: Trigger Loading
+1. Reset to before sprite appears
+2. Resume execution (F5)
+3. Debugger breaks when sprite loads
+
+### Step 5: Find Source Address
+Look for one of these patterns:
+
+**Direct Store:**
+```asm
+LDA $95:B000,X  ; Source address
+STA $2118       ; Write to VRAM
+```
+
+**DMA Transfer (common):**
+```asm
+STA $420B       ; DMA enable
+```
+Check DMA registers:
+- $4304: Bank (XX)
+- $4302-03: Address (YYYY)
+- Combined: $XX:YYYY
+
+### Step 6: Extract Sprite
+```bash
+python mesen2_sprite_extractor.py $XX:YYYY
+```
+
+## 🛠️ Tools Overview
+
+### `mesen2_sprite_extractor.py`
+Main extraction tool that:
+- Converts SNES addresses to ROM offsets
+- Decompresses HAL data with exhal
+- Converts 4bpp tiles to PNG
+- Supports nearby offset scanning
+
+**Usage:**
+```bash
+python mesen2_sprite_extractor.py $95:B000 [--scan] [--range 32]
+```
+
+### `trace_sprite_guide.py`
+Interactive guide that:
+- Walks through each debugging step
+- Validates inputs
+- Saves trace logs
+- Launches extractor automatically
+
+**Usage:**
+```bash
+python trace_sprite_guide.py
+# Follow the prompts
+```
+
+### `batch_sprite_extractor.py`
+Batch processor that:
+- Extracts multiple sprites at once
+- Generates HTML report with previews
+- Saves JSON results
+
+**Input formats:**
+
+JSON:
+```json
+[
+  {"name": "Cappy", "address": "$95:B000", "notes": "Enemy"},
+  {"name": "Kirby", "address": "$C0:0000", "notes": "Hero"}
+]
+```
+
+Text:
+```
+$95:B000 Cappy # Enemy sprite
+$C0:0000 Kirby # Main character
+```
+
+**Usage:**
+```bash
+python batch_sprite_extractor.py sprites.json
+python batch_sprite_extractor.py addresses.txt --report my_sprites
+```
+
+## 📊 Known Sprites
+
+See `known_sprites.json` for verified sprite locations:
+- Kirby main graphics: $98:0000 (0x0C0000)
+- Various pack table entries
+- Placeholders for sprites to be found
+
+## 🔧 Technical Details
+
+### SNES Address Formats
+- Mesen 2: `$XX:YYYY`
+- Continuous: `XXYYYY`
+- With prefix: `0xXXYYYY`
+
+### LoROM Conversion
+```python
+ROM_offset = (Bank & 0x7F) * 0x8000 + (Address - 0x8000)
+```
+
+### HAL Compression
+- Tool: `exhal` (ExHAL decompressor)
+- Format: Custom HAL Laboratory compression
+- Limit: 64KB default (some sprites larger)
+
+### 4bpp Tile Format
+- 32 bytes per 8×8 tile
+- 4 bits per pixel (16 colors)
+- Converter: `snes4bpp_to_png.py`
+
+## 📁 Output Structure
+```
+extracted_sprites/
+├── sprite_XXXXXX.bin     # Decompressed binary
+├── sprite_XXXXXX.png     # Converted image
+├── trace_logs/           # Debug session logs
+└── reports/              # Batch extraction reports
+    ├── report.json
+    └── report.html
+```
+
+## 🐛 Troubleshooting
+
+### "Decompressed to 0 bytes"
+- Invalid compressed data at offset
+- Try `--scan` to search nearby
+- Verify address with Mesen 2
+
+### "Output would exceed 64KB"
+- Some sprites are > 64KB
+- May need modified exhal
+- Or split extraction
+
+### "Can't find sprite in VRAM"
+- Ensure sprite is on-screen
+- Check Sprite vs Background tiles
+- Try OAM Viewer for sprite info
+
+### "Breakpoint doesn't trigger"
+- Sprite may already be loaded
+- Reset to before sprite appears
+- Check VRAM range is correct
+
+## 📚 References
+
+- [KirbyTrace.md](../KirbyTrace.md) - Detailed tracing methodology
+- [Data Crystal Wiki](https://datacrystal.tcrf.net/wiki/Kirby_Super_Star) - ROM info
+- [SNESdev Wiki](https://snes.nesdev.org/wiki/Memory_map) - SNES memory
+
+## ✨ Example Session
+
+```bash
+# 1. Use guided workflow
+$ python trace_sprite_guide.py
+> Which sprite? Cappy
+> VRAM address? $1E00
+> SNES address found? $95:B000
+
+# 2. Extract sprite
+$ python mesen2_sprite_extractor.py $95:B000
+ROM loaded: Kirby Super Star (USA).sfc (4,194,304 bytes)
+SNES Address: $95:B000
+ROM Offset: 0x0AB000
+Extracting from ROM offset 0x0AB000...
+✓ Decompressed 2,048 bytes (64 tiles)
+✓ Created sprite_0AB000.png
+
+# 3. View results
+$ ls extracted_sprites/
+sprite_0AB000.bin  sprite_0AB000.png  trace_logs/
+```
+
+---
+
+*Toolkit for Kirby Super Star sprite extraction via Mesen 2 debugging*

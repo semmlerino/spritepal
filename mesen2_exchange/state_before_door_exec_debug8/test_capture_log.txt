@@ -1,0 +1,11 @@
+00:27:00 Script start: target=700 capture_frames=5,10,15 savestate=C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_integration\savestates\Before.mss preloaded=false frame_event=exec door_up=5-35 dump_vram=false max_frames=30
+00:27:00 Registered frame callback: exec (frameCount via emu.getState)
+00:27:00 state frame keys: frameCount, ppu.frameCount
+00:27:00 state scanline keys: ppu.scanline
+00:27:00 state.frameCount=0
+00:27:00 state["ppu.frameCount"]=0
+00:27:00 state["ppu.scanline"]=0
+00:27:00 Savestate loaded; reset frame counter
+00:27:00 post-load exec_tick frameCount=59780 scanline=225 masterClock=2882393034
+00:27:00 post-load exec_tick frameCount=59780 scanline=225 masterClock=2882393056
+00:27:00 post-load exec_tick frameCount=59780 scanline=225 masterClock=2882393086

@@ -1,0 +1,136 @@
+=== Callback Signature Probe ===
+Lua version: Lua 5.4
+memType.nesSecondarySpriteRam = 52
+memType.pceDebug = 266
+memType.pceSpriteRamVdc2 = 66
+memType.smsVideoRam = 72
+memType.gbaBootRom = 76
+memType.gameboyDebug = 263
+memType.smsMemory = 11
+memType.pceArcadeCardRam = 62
+memType.gbCartRam = 40
+memType.nesMemory = 8
+memType.snesMemory = 0
+memType.gameboyMemory = 7
+memType.nesChrRom = 55
+memType.gbHighRam = 41
+memType.wsMemory = 13
+memType.wsWorkRam = 84
+memType.nesWorkRam = 47
+memType.cx4Debug = 261
+memType.wsPort = 89
+memType.nesPrgRom = 45
+memType.sufamiTurboSecondCartRam = 37
+memType.pceSpriteRam = 65
+memType.gbBootRom = 42
+memType.nesChrRam = 54
+memType.smsWorkRam = 69
+memType.spcRam = 21
+memType.pcePaletteRam = 67
+memType.sa1InternalRam = 27
+memType.spcMemory = 1
+memType.gbVideoRam = 43
+memType.bsxPsRam = 30
+memType.sufamiTurboSecondCart = 36
+memType.nesInternalRam = 46
+memType.none = 90
+memType.pceMemory = 10
+memType.nesDebug = 264
+memType.wsBootRom = 87
+memType.snesCgRam = 19
+memType.wsInternalEeprom = 88
+memType.necDspDebug = 259
+memType.spcRom = 22
+memType.smsBootRom = 71
+memType.snesSpriteRam = 18
+memType.sufamiTurboFirmware = 35
+memType.wsCartEeprom = 86
+memType.dspDataRom = 25
+memType.snesRegister = 20
+memType.spcDebug = 257
+memType.gbaMemory = 12
+memType.wsCartRam = 85
+memType.gbSpriteRam = 44
+memType.nesNametableRam = 49
+memType.smsDebug = 267
+memType.gbaPaletteRam = 82
+memType.gbaVideoRam = 80
+memType.snesSaveRam = 16
+memType.gbaPrgRom = 75
+memType.nesPpuDebug = 265
+memType.gbaExtWorkRam = 79
+memType.snesWorkRam = 15
+memType.gsuWorkRam = 28
+memType.necDspMemory = 3
+memType.gbaIntWorkRam = 78
+memType.gbWorkRam = 39
+memType.gbaSpriteRam = 81
+memType.wsDebug = 269
+memType.st018PrgRom = 32
+memType.gsuDebug = 260
+memType.smsPort = 74
+memType.smsPaletteRam = 73
+memType.snesPrgRom = 14
+memType.smsCartRam = 70
+memType.smsPrgRom = 68
+memType.bsxMemoryPack = 31
+memType.pceVideoRamVdc2 = 64
+memType.st018DataRom = 33
+memType.dspDataRam = 26
+memType.pceSaveRam = 58
+memType.pceCardRam = 60
+memType.cx4Memory = 5
+memType.pceAdpcmRam = 61
+memType.nesSpriteRam = 51
+memType.pceWorkRam = 57
+memType.pcePrgRom = 56
+memType.nesPaletteRam = 53
+memType.st018Memory = 6
+memType.nesMapperRam = 50
+memType.cx4DataRam = 29
+memType.snesVideoRam = 17
+memType.sa1Memory = 2
+memType.dspProgramRom = 24
+memType.st018Debug = 262
+memType.nesPpuMemory = 9
+memType.spcDspRegisters = 23
+memType.gsuMemory = 4
+memType.snesDebug = 256
+memType.gbaDebug = 268
+memType.pceVideoRam = 63
+memType.st018WorkRam = 34
+memType.gbPrgRom = 38
+memType.nesSaveRam = 48
+memType.sa1Debug = 258
+memType.pceCdromRam = 59
+memType.gbaSaveRam = 77
+memType.wsPrgRom = 83
+callbackType.read = 0
+callbackType.exec = 2
+callbackType.write = 1
+cpuType.pce = 9
+cpuType.sms = 10
+cpuType.cx4 = 5
+cpuType.ws = 12
+cpuType.necDsp = 2
+cpuType.st018 = 6
+cpuType.sa1 = 3
+cpuType.gsu = 4
+cpuType.snes = 0
+cpuType.nes = 8
+cpuType.gameboy = 7
+cpuType.gba = 11
+cpuType.spc = 1
+register enum_exec_cpu (cpuType=true memType=false) -> true
+register enum_exec_cpu_mem (cpuType=true memType=true) -> true
+register enum_exec_mem_only (cpuType=false memType=true) -> true
+register enum_exec_nocpu (cpuType=false memType=false) -> true
+register string_exec_cpu (cpuType=true memType=false) -> true
+register string_exec_nocpu (cpuType=false memType=false) -> true
+--- Results after 60 frames ---
+enum_exec_cpu: fired=699549 first_addr=32772 max_addr=54940
+enum_exec_cpu_mem: fired=699549 first_addr=32772 max_addr=54940
+enum_exec_mem_only: fired=699549 first_addr=32772 max_addr=54940
+enum_exec_nocpu: fired=699549 first_addr=32772 max_addr=54940
+string_exec_cpu: fired=8233 first_addr=65534 max_addr=65534
+string_exec_nocpu: fired=8233 first_addr=65534 max_addr=65534

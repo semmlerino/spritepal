@@ -1,0 +1,8 @@
+13:28:29 Script start: target=700 capture_frames=5,10,15,20 capture_count=4 capture_first=5 savestate=C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_integration\savestates\Sprite.mss preloaded=false frame_event=exec master_clock_fallback=1 master_clock_fps=60 master_clock_max_seconds=40 debug_capture=0 door_up=5-35 dump_vram=false max_frames=240
+13:28:29 Savestate loaded; reset frame counter
+13:28:29 Registered frame callback: exec (frameCount via emu.getState)
+13:28:38 Capturing frame 5 (suffix=_5)
+13:28:50 Capturing frame 10 (suffix=_10)
+13:29:02 Capturing frame 15 (suffix=_15)
+13:29:16 Capturing frame 20 (suffix=_20)
+13:29:16 Capture complete; stopping
