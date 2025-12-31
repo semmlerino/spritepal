@@ -147,8 +147,8 @@ python3 scripts/analyze_capture_quality.py mesen2_exchange/door_transition_captu
   - Tiles match many offsets (collisions) so scores never separate
   - DB coverage mismatch (correct capture, wrong source blocks indexed)
   - SA-1 character conversion active (VRAM tiles not equal to ROM-decompressed bytes)
-    - **Confirmed for Kirby Super Star**: only 1.5% hash match rate during gameplay
-    - See `03_GAME_MAPPING_KIRBY_SA1.md` → "Confirmed: SA-1 Conversion Active"
+    - **Kirby Super Star**: only 1.5% hash match rate during gameplay (strongly suggests conversion)
+    - See `03_GAME_MAPPING_KIRBY_SA1.md` → "Strongly Suggested: SA-1 Conversion Active"
 - Fix:
   - Compare `matched_tiles` vs `scored_tiles`
   - Check unique-byte distribution and odd-byte sanity for the capture

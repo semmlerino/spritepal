@@ -385,9 +385,9 @@ local function is_visible(entry)
     return true
 end
 
-local vram_read_mode = os.getenv("VRAM_READ_MODE")  -- "word" or "byte", auto-detected per build
+local vram_read_mode = os.getenv("VRAM_READ_MODE")  -- "word" or "byte", default "word"
 if vram_read_mode ~= "word" and vram_read_mode ~= "byte" then
-    vram_read_mode = nil
+    vram_read_mode = "word"  -- Default to word mode; byte mode broken in some Mesen2 builds
 end
 
 local function read_vram_word(byte_addr)
@@ -410,8 +410,9 @@ local function read_vram_tile_word(vram_addr)
 
     for i = 0, 15 do
         local word = read_vram_word(vram_addr + (i * 2))
-        tile_data[i * 2 + 1] = word & 0xFF
-        tile_data[i * 2 + 2] = (word >> 8) & 0xFF
+        -- Mesen2 readWord returns big-endian; swap bytes for correct tile order
+        tile_data[i * 2 + 1] = (word >> 8) & 0xFF
+        tile_data[i * 2 + 2] = word & 0xFF
         if tile_data[i * 2 + 2] ~= 0 then
             high_nonzero = true
         end

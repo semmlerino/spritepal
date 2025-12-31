@@ -49,7 +49,8 @@ def sa1_to_file(bank, offset):
 ```
 ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
 ```
-- Main CPU callbacks do **not** see SA-1 decompression.
+- **Tooling limitation:** S-CPU (`emu.cpuType.snes`) memory callbacks do **not** see SA-1 work.
+  To observe SA-1 activity, use `emu.cpuType.sa1` callbacks or infer from DMA/WRAM staging.
 - DMA typically shows **WRAM→VRAM**, not ROM→VRAM.
 
 **What this means for the pipeline:**
@@ -63,7 +64,7 @@ ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
 ```
 VRAM tile captured
     │
-    ├─► Is game using SA-1 character conversion?
+    ├─► Is game using SA-1 character conversion or staging transforms?
     │       YES → Hash mapping FAILS (use Strategy A: VRAM-based DB)
     │       NO  ↓
     │
@@ -82,7 +83,7 @@ VRAM tile captured
 ```
 
 **Expected failures (not bugs):**
-- SA-1 character conversion active (Kirby Super Star: 1.5% match rate)
+- SA-1 character conversion or similar staging transform (Kirby Super Star: 1.5% match rate)
 - Tiles composed at runtime from multiple sources
 - Post-decompression palette remapping or effects
 - Low-entropy tiles (solid colors, gradients)
@@ -173,8 +174,9 @@ emu.addMemoryCallback(function(addr, value)
 end, emu.callbackType.write, 0x2230, 0x2230, emu.cpuType.snes)
 ```
 
-### Confirmed: SA-1 Conversion Active in Kirby Super Star (Dec 2025)
-Testing confirmed that SA-1 character conversion is **active during gameplay**:
+### Strongly Suggested: SA-1 Conversion Active in Kirby Super Star (Dec 2025)
+Evidence strongly suggests SA-1 character conversion (or similar staging transform) is **active during gameplay**.
+To **confirm the mechanism**, log $2230/$2231 register writes and verify the mode bit. See "Detecting Character Conversion" above.
 
 | Test | Result |
 |------|--------|

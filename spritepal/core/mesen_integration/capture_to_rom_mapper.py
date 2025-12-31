@@ -65,7 +65,9 @@ class MappedOAMEntry:
     @property
     def is_confident(self) -> bool:
         """True if we have high confidence in the ROM offset."""
-        return self.scored_percentage >= 50 and self.scored_tiles >= 1
+        if self.ambiguous:
+            return False
+        return self.scored_tiles >= MIN_MATCHED_TILES and self.best_score >= MIN_SCORE
 
 
 @dataclass

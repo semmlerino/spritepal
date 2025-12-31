@@ -43,7 +43,7 @@ This folder documents the Mesen 2 sprite capture and ROM mapping pipeline for Sp
 ### Debug "no matches" or low scores
 1. Follow [04 § Diagnostic Priority](04_TROUBLESHOOTING.md#diagnostic-priority-start-here) flowchart
 2. Check capture integrity first (odd bytes, data_hex length)
-3. For Kirby: expect ~1.5% match rate due to SA-1 character conversion
+3. For Kirby: expect ~1.5% match rate (suggests SA-1 character conversion or staging transform)
 
 ### Find ROM offsets for new sprites
 1. Run DMA probe with ROM tracing enabled
@@ -58,7 +58,7 @@ This folder documents the Mesen 2 sprite capture and ROM mapping pipeline for Sp
 
 ## Key Constraints
 
-- **Kirby Super Star uses SA-1 character conversion** — direct ROM→VRAM hash matching fails (~1.5% rate). Use Strategy A (VRAM-based DB with timing correlation).
+- **Kirby Super Star: ~1.5% hash match rate** — strongly suggests SA-1 character conversion or similar staging transform. Confirm via $2230/$2231 register trace. Use Strategy A (VRAM-based DB with timing correlation).
 - **`emu.readWord()` returns big-endian** — byte swap required for VRAM tile reads.
 - **ROM trace addresses are seeds, not exact offsets** — always validate via HAL decompression.
 

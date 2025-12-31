@@ -47,6 +47,8 @@ Run from `spritepal/`:
   ground truth the state before drawing conclusions.
 - Probe-first workflow: run `mesen2_integration/lua_scripts/mesen2_preflight_probe.lua` and inspect
   `mesen2_exchange/mesen2_preflight_probe.txt` (or `mesen2_exchange/mesen2_preflight_probe_latest.txt`).
+- Movie playback: `.mmo` files only play once a ROM is already running (see `LoadRomHelper.LoadFile`).
+  Use a second Mesen2 launch to pass the `.mmo` to the running instance (SingleInstance IPC).
 - Headless testrunner example (PowerShell):
   ```
   powershell.exe -NoProfile -Command "

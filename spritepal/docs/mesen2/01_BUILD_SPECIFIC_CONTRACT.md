@@ -181,6 +181,51 @@ if result and result.memType == emu.memType.snesPrgRom then
 end
 ```
 
+### Worked Examples (SA-1 / LoROM / Header Handling)
+
+**SA-1 (Kirby Super Star) — ROM offset to CPU address:**
+```
+Input:  0x1B0000 (snesPrgRom)
+Output: $DB0000 (snesMemory, S-CPU view)
+
+Why: SA-1 default mapping: banks $C0-$FF → ROM $000000-$3FFFFF
+     0x1B0000 is in the second 1MB (banks $D0-$DF)
+     $D0 + (0x1B - 0x10) = $DB, so CPU address is $DB:0000
+```
+
+**SA-1 — CPU address to ROM offset (reverse):**
+```
+Input:  $DB0000 (snesMemory)
+Output: 0x1B0000 (snesPrgRom)
+```
+
+**LoROM (hypothetical) — ROM offset to CPU address:**
+```
+Input:  0x018000 (snesPrgRom, assuming LoROM)
+Output: $038000 (snesMemory)
+
+Why: LoROM maps odd banks to ROM: bank 03 offset $8000+ → ROM ((03 & 7F) << 15) | (8000 & 7FFF)
+     = 0x018000
+```
+
+**Header handling:**
+- `emu.convertAddress()` operates on **headerless** ROM addresses
+- If your ROM file has a 512-byte SMC header, subtract 0x200 from file offsets before conversion
+- The tile database stores `rom_header_offset` in metadata for this purpose
+
+```lua
+-- Example: file offset → headerless ROM offset → CPU address
+local file_offset = 0x1B0200  -- from hex editor
+local header_offset = 512      -- SMC header
+local rom_offset = file_offset - header_offset  -- 0x1B0000
+local result = emu.convertAddress(rom_offset, emu.memType.snesPrgRom)
+```
+
+**Failure cases (returns nil):**
+- Address outside ROM bounds (>= `emu.getMemorySize(snesPrgRom)`)
+- Unmapped bank in current mapping configuration
+- Invalid memType/cpuType combination
+
 **Caveats:**
 - Returns `nil` for unmapped addresses or failed conversions
 - SA-1 bank remapping affects results; probe dynamically if banks change

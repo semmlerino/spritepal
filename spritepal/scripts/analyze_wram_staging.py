@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -22,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.mesen_integration import MesenCaptureParser
 from core.mesen_integration.capture_to_rom_mapper import LOW_INFO_UNIQUE_BYTES
 from core.mesen_integration.tile_hash_database import BYTES_PER_TILE
+from utils.logging_config import setup_logging
 
 
 def _hash_tile(tile_data: bytes) -> str:
@@ -54,6 +56,61 @@ def _format_ratio(value: int, total: int) -> str:
     return f"{value}/{total} ({value / total:.1%})"
 
 
+def _parse_wram_start(text: str | None, wram_path: Path) -> int:
+    if text:
+        value = text.strip()
+        if value.lower().startswith("0x"):
+            return int(value, 16)
+        return int(value)
+    match = re.search(r"start_([0-9A-Fa-f]+)", wram_path.name)
+    if match:
+        return int(match.group(1), 16)
+    return 0
+
+
+def best_alignment_overlap(wram: bytes, vram_tiles: list[bytes]) -> tuple[int, int]:
+    def h32(b: bytes) -> str:
+        return hashlib.md5(b).hexdigest()
+
+    vhash = [h32(t) for t in vram_tiles]
+    high = [i for i, t in enumerate(vram_tiles) if _unique_count(t) > LOW_INFO_UNIQUE_BYTES]
+
+    best_offset = 0
+    best_hits = -1
+    for offset in range(BYTES_PER_TILE):
+        blob = wram[offset:]
+        tile_count = len(blob) // BYTES_PER_TILE
+        wset = {h32(blob[i * BYTES_PER_TILE : (i + 1) * BYTES_PER_TILE]) for i in range(tile_count)}
+        hits = sum(1 for i in high if vhash[i] in wset)
+        if hits > best_hits:
+            best_hits = hits
+            best_offset = offset
+    return best_offset, max(best_hits, 0)
+
+
+def find_high_info_tiles_anywhere(
+    wram: bytes, vram_tiles: list[bytes], wram_base: int, find_all: bool = False
+) -> list[tuple[int, int, int]]:
+    matches: list[tuple[int, int, int]] = []
+    for idx, tile in enumerate(vram_tiles):
+        unique_count = _unique_count(tile)
+        if unique_count <= LOW_INFO_UNIQUE_BYTES:
+            continue
+        if not find_all:
+            pos = wram.find(tile)
+            if pos != -1:
+                matches.append((idx, unique_count, wram_base + pos))
+            continue
+        start = 0
+        while True:
+            pos = wram.find(tile, start)
+            if pos == -1:
+                break
+            matches.append((idx, unique_count, wram_base + pos))
+            start = pos + 1
+    return matches
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Compare WRAM staging dumps to VRAM capture tiles and ROM DB hashes."
@@ -62,9 +119,28 @@ def main() -> None:
     parser.add_argument("--wram", required=True, type=Path, help="Path to wram_dump_*.bin")
     parser.add_argument("--database", type=Path, help="Path to tile_hash_database.json")
     parser.add_argument("--rom", type=Path, help="Path to ROM (for reporting only)")
-    parser.add_argument("--wram-start", default="0x2000", help="WRAM start offset for reporting")
+    parser.add_argument("--wram-start", help="WRAM start offset for reporting (default: parse filename)")
     parser.add_argument("--top", type=int, default=10, help="Top unmatched VRAM tiles to show")
+    parser.add_argument("--max-substring", type=int, default=10, help="Max substring matches to print")
+    parser.add_argument(
+        "--emit-range",
+        action="store_true",
+        help="Print a suggested WRAM watch range based on substring matches",
+    )
+    parser.add_argument(
+        "--range-pad",
+        type=lambda value: int(value, 0),
+        default=0,
+        help="Pad bytes around suggested WRAM range (default: 0)",
+    )
+    parser.add_argument(
+        "--range-align",
+        action="store_true",
+        help="Align suggested WRAM range to 32-byte boundaries",
+    )
     args = parser.parse_args()
+
+    setup_logging(log_level="WARNING")
 
     capture_path = args.capture
     wram_path = args.wram
@@ -92,15 +168,7 @@ def main() -> None:
         print(f"WARNING: WRAM dump size not aligned ({len(wram_data)} bytes, remainder {remainder})")
     wram_tiles = _iter_tiles_from_bytes(wram_data)
 
-    wram_start = args.wram_start
-    if isinstance(wram_start, str):
-        wram_start = wram_start.strip()
-        if wram_start.lower().startswith("0x"):
-            wram_start_value = int(wram_start, 16)
-        else:
-            wram_start_value = int(wram_start)
-    else:
-        wram_start_value = int(wram_start)
+    wram_start_value = _parse_wram_start(args.wram_start, wram_path)
 
     vram_hashes = [_hash_tile(tile) for tile in vram_tiles]
     wram_hashes = [_hash_tile(tile) for tile in wram_tiles]
@@ -146,6 +214,43 @@ def main() -> None:
             f"(high-info {_format_ratio(vram_high_hits_in_db, len(vram_high_info))})"
         )
         print(f"WRAM tiles present in DB: {_format_ratio(wram_hits_in_db, len(wram_tiles))}")
+
+    best_offset, best_hits = best_alignment_overlap(wram_data, vram_tiles)
+    print(f"Best 32-byte alignment offset: {best_offset} (high-info hits {best_hits})")
+
+    substring_matches = find_high_info_tiles_anywhere(wram_data, vram_tiles, wram_start_value)
+    if substring_matches:
+        print(f"High-info VRAM tiles found as substring in WRAM: {len(substring_matches)}")
+        for tile_idx, unique_count, addr in substring_matches[: args.max_substring]:
+            entry_idx, tile = vram_tile_meta[tile_idx]
+            print(
+                f"  entry {entry_idx:03d} tile {tile.tile_index} vram=0x{tile.vram_addr:04X} "
+                f"wram=0x{addr:06X} unique={unique_count}"
+            )
+    else:
+        print("High-info VRAM tiles found as substring in WRAM: 0")
+
+    if args.emit_range:
+        range_matches = find_high_info_tiles_anywhere(
+            wram_data, vram_tiles, wram_start_value, find_all=True
+        )
+        if range_matches:
+            min_addr = min(addr for _, _, addr in range_matches)
+            max_addr = max(addr for _, _, addr in range_matches) + BYTES_PER_TILE - 1
+            if args.range_pad:
+                min_addr = max(0, min_addr - args.range_pad)
+                max_addr = max_addr + args.range_pad
+            if args.range_align:
+                min_addr = (min_addr // BYTES_PER_TILE) * BYTES_PER_TILE
+                max_addr = ((max_addr + BYTES_PER_TILE) // BYTES_PER_TILE) * BYTES_PER_TILE - 1
+            size = max_addr - min_addr + 1
+            print(
+                "Suggested WRAM watch range: "
+                f"start=0x{min_addr:06X} end=0x{max_addr:06X} size=0x{size:05X}"
+            )
+            print(f"WRAM_WATCH_START=0x{min_addr:06X} WRAM_WATCH_END=0x{max_addr:06X}")
+        else:
+            print("Suggested WRAM watch range: none (no substring matches)")
 
     unmatched = []
     for idx, tile in enumerate(vram_tiles):
