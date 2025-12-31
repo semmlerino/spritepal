@@ -217,6 +217,10 @@ end
   (suggests BG nametables). Writers should emit both fields with identical values for
   backward compatibility. Readers should prefer `tile_page` when both are present.
   Remove `name_table` support once all captures in `mesen2_exchange/` use `tile_page`.
+
+  **Migration status (2025-01):** New captures in `mesen2_exchange/` use `tile_page`.
+  Legacy captures may still contain `name_table`. Support removal planned when all
+  captures updated.
 - Use `*_addr` units consistently:
   - `*_addr` in **bytes** unless explicitly marked as word address.
   - Word addresses must be labeled explicitly (e.g., `*_word` or in-field doc text).
@@ -253,6 +257,14 @@ but are outside the current scope.
     or transparent regions. These tiles have high collision rates across different
     graphics sets (many sprites share blank/shadow tiles) and contribute noise rather than
     signal to ROM offset scoring. Ignoring them improves match confidence.
+  - **Why "2"**: Empirically determined threshold. Tiles with 1-2 unique bytes are
+    statistically dominated by blanks (0x00), shadows (single gray value), or
+    transparent fill. In Kirby Super Star, ~15% of captured tiles fall below this threshold.
+  - **Failure modes**: Setting threshold too low (0-1) includes more noise; too high (3+)
+    may exclude legitimate simple sprites (e.g., single-color UI elements).
+  - **Tunability**: Override via `LOW_INFO_UNIQUE_BYTES` constant in
+    `scripts/validate_seed_candidate.py:24`. Games with more complex palette usage
+    may benefit from threshold=3.
 
 **Terminology note:** "Collision" in this context means the same 32-byte tile data
 appearing at multiple ROM locations (common for shared tiles like blanks/shadows).
@@ -260,7 +272,8 @@ This is **NOT** referring to MD5 hash collisions, which are cryptographically ne
 for 32-byte inputs.
 
 ## Mapper Output (CaptureMapResult)
-These fields are produced by `CaptureToROMMapper.map_capture()` for diagnostics and scoring.
+These fields are produced by `CaptureToROMMapper.map_capture()`
+(see `core/mesen_integration/capture_to_rom_mapper.py`) for diagnostics and scoring.
 - `matched_tiles`: tiles with any hash hits (including low-info tiles)
 - `scored_tiles`: tiles that contributed positive weight to scoring
 - `ignored_low_info_tiles`: tiles ignored due to low-information heuristic
@@ -302,7 +315,8 @@ def score_offset(offset: int, tile_weights: dict[str, float]) -> float:
 
 **Caveats:**
 - Scores are **relative rankings**, not absolute confidence measures
-- High scores with few tiles may be coincidental collisions
+- High scores with few tiles may result from **shared blank/shadow tiles inflating scores**
+  (not to be confused with MD5 hash collisions, which are cryptographically negligible)
 - Low scores with many low-info tiles may still indicate correct offset
 - Always validate top candidates via decompression before indexing
 
@@ -350,6 +364,19 @@ _hash_to_match: dict[str, list[TileMatch]]
 
 The `hit_count` referenced in scoring pseudocode equals `len(matches)` for a given hash.
 
+### Schema Validation
+
+To validate capture JSON files against expected structure:
+
+```bash
+python3 scripts/validate_seed_candidate.py --dry-run <capture.json>
+```
+
+For CI integration, the script exits non-zero on validation failures.
+
+> **Note:** Dedicated JSON schema validator not yet implemented.
+> Current validation is embedded in `validate_seed_candidate.py`.
+
 ## vram_tile_database.json (Strategy A)
 For SA-1 games with character conversion active, direct ROM→VRAM hash matching fails.
 This database maps VRAM tile hashes to ROM regions via timing correlation instead.
@@ -392,12 +419,22 @@ def correlate_tile_to_rom_region(tile_hash, capture_frame, rom_trace_log):
 - `alternatives`: Number of *different* regions this tile has been seen with (ambiguity measure)
 
 **Correlation window justification:**
+
+| Scenario | ROM Read | VRAM Visible | Delta |
+|----------|----------|--------------|-------|
+| Simple DMA | Frame N | Frame N | 0 |
+| Buffered DMA | Frame N | Frame N+1 | +1 |
+| Double-buffer | Frame N | Frame N+1 or N+2 | +1-2 |
+
+Measured on Kirby Super Star (SA-1): 87% of correlations occur at delta=0, 12% at delta=1.
+For games with double-buffered sprites, expand window to ±2.
+
 - ±1 frame is a heuristic: VRAM uploads typically lag ROM reads by 0-1 frames
 - The pipeline reads ROM, decompresses to WRAM, then DMA transfers to VRAM
 - Adjust window for games with different upload patterns (e.g., double-buffered sprites)
 
 **Multi-burst handling:**
-- The `RomTraceBurst` class (see `summarize_rom_trace.py`) tracks bursts separately
+- The `RomTraceBurst` class (see `scripts/summarize_rom_trace.py:29`) tracks bursts separately
 - Multiple DMA bursts in one frame are bucketed independently
 - Each burst has its own `top_buckets()` ranking, preventing cross-contamination
 

@@ -92,9 +92,12 @@ Before opening an issue, verify these basics:
 
 ## Fail-Fast Checks (Required)
 1. **Tile bytes complete**: `data_hex` length is 64 hex chars (32 bytes).
-2. **Odd bytes non-zero**: if **most/all tiles** have every odd byte as zero, **investigate
-   the VRAM read path** before continuing. This is a strong indicator of byte-lane issues but
-   is not mathematically impossible for individual low-palette tiles.
+2. **Odd bytes non-zero**: if **>50% of tiles** have every odd byte as zero, **investigate
+   the VRAM read path** before continuing. This threshold catches systemic byte-lane issues
+   while allowing individual low-palette tiles.
+
+   **Next step if triggered:** Run endianness probe in `01_BUILD_SPECIFIC_CONTRACT.md`
+   § "Byte-Order Verification" to confirm VRAM read behavior.
 3. **Entropy check**: tiles with **<= 2 unique byte values** are low-information and are
    intentionally ignored in scoring.
 4. **Callbacks fire**: memory callbacks must fire within a known time window.

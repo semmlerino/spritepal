@@ -2,6 +2,10 @@
 
 This document is **game-specific**. Do not generalize these assumptions to other SNES titles.
 
+> **Note on "confidence" terminology:** Throughout SpritePal documentation, "confidence" refers
+> to observation count (integer), NOT statistical probability. See
+> `02_DATA_CONTRACTS.md#what-confidence-means` for the canonical definition.
+
 ## Cartridge / CPU
 - Kirby Super Star uses the **SA-1** coprocessor.
 - ROM mapping for banks $C0-$FF commonly maps to ROM space, but **SA-1 mapping registers can
@@ -217,6 +221,11 @@ Operational playbook:
   implementing SA-1 character conversion algorithm in Python, (3) matching pre-conversion bitmaps
   to ROM. This is a potential future enhancement but is not currently supported.
 
+> **Pipeline note:** IRAM is used internally by SA-1 character conversion hardware
+> but is **not directly read** by this capture/mapping tooling. Our pipeline captures
+> VRAM post-conversion. The conversion algorithm discussion above is for understanding
+> why direct ROM→VRAM matching may fail, not for implementing IRAM reads.
+
 ### Detecting Character Conversion (Operational)
 
 To confirm SA-1 character conversion is active:
@@ -364,9 +373,32 @@ tile_count = len(tile_data) // 32
 - Compressed size may differ from original → may need pointer table updates
 
 ### Build Compilers
+
+The `compile_hal_tools.py` script builds exhal/inhal binaries for HAL compression:
+
 ```bash
-python compile_hal_tools.py  # Auto-detect platform and compile
+python compile_hal_tools.py          # Build for current platform
+python compile_hal_tools.py --check  # Check if tools exist
+python compile_hal_tools.py --clean  # Remove compiled binaries
+python compile_hal_tools.py --force  # Rebuild even if tools exist
 ```
+
+**What it builds:**
+- `exhal` / `exhal.exe` - HAL decompression (ROM extraction)
+- `inhal` / `inhal.exe` - HAL compression (ROM injection)
+
+**Platform requirements:**
+- Linux/macOS: gcc or clang, make (`sudo apt-get install build-essential`)
+- Windows: MinGW-w64 (gcc) or Visual Studio
+
+**Expected outputs:** Binaries are placed in `tools/` directory with a `.platform_*` marker file.
+
+**Failure modes:**
+- Exit 1: Compiler not found
+- Exit 2: Source files not found
+- Exit 3: Compilation failed (check error output)
+
+**Source location:** `../archive/obsolete_test_images/ultrathink/`
 
 ## Tooling Assumptions
 - Uses HAL decompression via `core/hal_compression.py`.
