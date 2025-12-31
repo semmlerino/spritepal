@@ -159,34 +159,34 @@ local last_sa1_dma_irq = nil
 -- Consolidated configuration table to stay under Lua's 200 local variable limit
 local CFG = {
     -- VRAM settings
-    log_vram_memory_writes = os.getenv("CFG.log_vram_memory_writes") == "1",
-    max_vram_write_log = tonumber(os.getenv("CFG.max_vram_write_log")) or 20,
+    log_vram_memory_writes = os.getenv("LOG_VRAM_MEMORY_WRITES") == "1",
+    max_vram_write_log = tonumber(os.getenv("MAX_VRAM_WRITE_LOG")) or 20,
     vram_diff_enabled = os.getenv("VRAM_DIFF") ~= "0",
     vram_size = 0x10000,
-    vram_coarse_step = tonumber(os.getenv("CFG.vram_coarse_step")) or 16,
-    vram_page_size = tonumber(os.getenv("CFG.vram_page_size")) or 0x0400,
-    vram_page_log_limit = tonumber(os.getenv("CFG.vram_page_log_limit")) or 12,
+    vram_coarse_step = tonumber(os.getenv("VRAM_COARSE_STEP")) or 16,
+    vram_page_size = tonumber(os.getenv("VRAM_PAGE_SIZE")) or 0x0400,
+    vram_page_log_limit = tonumber(os.getenv("VRAM_PAGE_LOG_LIMIT")) or 12,
     -- General
-    heartbeat_every = tonumber(os.getenv("CFG.heartbeat_every")) or 0,
-    skip_visibility_filter = os.getenv("CFG.skip_visibility_filter") == "1",
+    heartbeat_every = tonumber(os.getenv("HEARTBEAT_EVERY")) or 0,
+    skip_visibility_filter = os.getenv("SKIP_VISIBILITY_FILTER") == "1",
     -- WRAM dump settings
-    wram_dump_on_vram_diff = os.getenv("CFG.wram_dump_on_vram_diff") ~= "0",
-    wram_dump_start = os.getenv("CFG.wram_dump_start") or "0x0000",
-    wram_dump_abs_start = os.getenv("CFG.wram_dump_abs_start"),
-    wram_dump_size = tonumber(os.getenv("CFG.wram_dump_size")) or 0x20000,
-    wram_dump_prev = os.getenv("CFG.wram_dump_prev") ~= "0",
+    wram_dump_on_vram_diff = os.getenv("WRAM_DUMP_ON_VRAM_DIFF") ~= "0",
+    wram_dump_start = os.getenv("WRAM_DUMP_START") or "0x0000",
+    wram_dump_abs_start = os.getenv("WRAM_DUMP_ABS_START"),
+    wram_dump_size = tonumber(os.getenv("WRAM_DUMP_SIZE")) or 0x20000,
+    wram_dump_prev = os.getenv("WRAM_DUMP_PREV") ~= "0",
     -- WRAM watch settings
-    wram_watch_writes = os.getenv("CFG.wram_watch_writes") ~= "0",
-    wram_watch_sample_limit = tonumber(os.getenv("CFG.wram_watch_sample_limit")) or 8,
-    wram_watch_start = os.getenv("CFG.wram_watch_start"),
-    wram_watch_end = os.getenv("CFG.wram_watch_end"),
-    wram_watch_capture_threshold = tonumber(os.getenv("CFG.wram_watch_capture_threshold")) or 0,
-    wram_watch_pc_samples = tonumber(os.getenv("CFG.wram_watch_pc_samples")) or 0,
+    wram_watch_writes = os.getenv("WRAM_WATCH_WRITES") ~= "0",
+    wram_watch_sample_limit = tonumber(os.getenv("WRAM_WATCH_SAMPLE_LIMIT")) or 8,
+    wram_watch_start = os.getenv("WRAM_WATCH_START"),
+    wram_watch_end = os.getenv("WRAM_WATCH_END"),
+    wram_watch_capture_threshold = tonumber(os.getenv("WRAM_WATCH_CAPTURE_THRESHOLD")) or 0,
+    wram_watch_pc_samples = tonumber(os.getenv("WRAM_WATCH_PC_SAMPLES")) or 0,
     -- ROM trace settings
-    rom_trace_on_wram_write = os.getenv("CFG.rom_trace_on_wram_write") == "1",
-    rom_trace_max_reads = tonumber(os.getenv("CFG.rom_trace_max_reads")) or 200,
-    rom_trace_max_frames = tonumber(os.getenv("CFG.rom_trace_max_frames")) or 1,
-    rom_trace_pc_samples = tonumber(os.getenv("CFG.rom_trace_pc_samples")) or 8,
+    rom_trace_on_wram_write = os.getenv("ROM_TRACE_ON_WRAM_WRITE") == "1",
+    rom_trace_max_reads = tonumber(os.getenv("ROM_TRACE_MAX_READS")) or 200,
+    rom_trace_max_frames = tonumber(os.getenv("ROM_TRACE_MAX_FRAMES")) or 1,
+    rom_trace_pc_samples = tonumber(os.getenv("ROM_TRACE_PC_SAMPLES")) or 8,
     -- Visibility
     visible_y_exclude_start = parse_int(os.getenv("VISIBLE_Y_EXCLUDE_START"), 224),
     visible_y_exclude_end = parse_int(os.getenv("VISIBLE_Y_EXCLUDE_END"), 240),
@@ -217,8 +217,8 @@ local CFG = {
     periodic_capture_interval = tonumber(os.getenv("PERIODIC_CAPTURE_INTERVAL")) or 1800,
 }
 -- Dependent config values
-CFG.wram_dump_start_frame = tonumber(os.getenv("CFG.wram_dump_start_FRAME")) or CFG.capture_start_frame
-CFG.wram_dump_start_seconds = tonumber(os.getenv("CFG.wram_dump_start_SECONDS")) or CFG.capture_start_seconds
+CFG.wram_dump_start_frame = tonumber(os.getenv("WRAM_DUMP_START_FRAME")) or CFG.capture_start_frame
+CFG.wram_dump_start_seconds = tonumber(os.getenv("WRAM_DUMP_START_SECONDS")) or CFG.capture_start_seconds
 CFG.dma_dump_start_frame = tonumber(os.getenv("DMA_DUMP_START_FRAME")) or CFG.capture_start_frame
 CFG.dma_dump_start_seconds = tonumber(os.getenv("DMA_DUMP_START_SECONDS")) or CFG.capture_start_seconds
 
