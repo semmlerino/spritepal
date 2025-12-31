@@ -88,16 +88,18 @@ SA-1 supports a character conversion DMA mode that can transform bitmap data int
 bitplane tiles on the fly. If active, **VRAM tile bytes will not match ROM-decompressed
 bytes**, and hash mapping will fail until this is detected.
 
-### Character Conversion Registers (from Mesen 2 source)
-| Register | Name | Function |
-|----------|------|----------|
-| `$2230` | DCNT | DMA Control — bit 4: auto mode, bit 5: char conversion enable |
-| `$2231` | CDMA | Char conversion params — bits 0-1: format (0=8bpp, 1=4bpp, 2=2bpp), bits 2-4: width |
-| `$223F` | BBF | Bitmap format — bit 7: BWRAM 2bpp mode |
-| `$2240-$2247` | BRF | Bitmap register file 1 (type 2 conversion source) |
-| `$2248-$224F` | BRF | Bitmap register file 2 (type 2 conversion source) |
+### Character Conversion Registers
+Source: https://wiki.superfamicom.org/sa-1-registers (verify against emulator source if behavior differs)
 
-**Type 1 conversion**: CPU reads from IRAM trigger on-the-fly conversion from BWRAM bitmap.
+| Register | Name | Bitfield | Function |
+|----------|------|----------|----------|
+| `$2230` | DCNT | `CPMT-DSS` | C:DMA enable, P:priority(0=CPU,1=DMA), M:mode(0=normal,1=char), T:type(0=SA1→IRAM,1=BW→IRAM), D:dest(0=IRAM,1=BWRAM), SS:source(00=ROM,01=BWRAM,10=IRAM) |
+| `$2231` | CDMA | `E--SSSCC` | E:completion flag (SNES sets), SSS:width(2^n chars), CC:bpp(00=8,01=4,10=2) |
+| `$223F` | BBF | `C-------` | C:color mode (0=16-color, 1=4-color) |
+| `$2240-$2247` | BRF | data | Bitmap register file 1 (type 2 conversion source) |
+| `$2248-$224F` | BRF | data | Bitmap register file 2 (type 2 conversion source) |
+
+**Type 1 conversion**: SA-1 CPU reads from IRAM trigger on-the-fly conversion from BWRAM bitmap.
 **Type 2 conversion**: Writing to BRF registers triggers conversion to IRAM.
 
 Operational playbook:
@@ -106,6 +108,35 @@ Operational playbook:
 - Strategy A: build a database from **post-conversion VRAM tiles** (screen capture based).
 - Strategy B: capture the source bitmap + conversion params and reproduce conversion offline
   before hashing.
+
+### Confirmed: SA-1 Conversion Active in Kirby Super Star (Dec 2025)
+Testing confirmed that SA-1 character conversion is **active during gameplay**:
+
+| Test | Result |
+|------|--------|
+| ROM tiles (HAL-decompressed 0x1B0000) | 352 tiles, clear Kirby sprites visible |
+| VRAM capture (frame 2012, gameplay) | 66 tiles, character sprites visible |
+| Hash match rate | **1.5%** (only blank/trivial tiles matched) |
+| ROM trace hot regions | 0x160000 (175K reads), 0x1B0000 (78K reads) |
+
+**Visual inspection** shows both ROM and VRAM contain recognizable sprites, but byte-level
+hashes do not match. This indicates VRAM tile bytes are not a direct copy of decompressed
+ROM data. Possible causes include:
+- SA-1 character conversion (bitmap→bitplane transformation)
+- Post-decompression processing (palette remapping, effects)
+- Dynamic tile composition from multiple sources
+- Decompression into a staging format different from final 4bpp layout
+
+The pipeline's low match rate (1.5%) is consistent with character conversion being active,
+but this is a working hypothesis, not a confirmed mechanism.
+
+**ROM regions accessed during gameplay:**
+- `0x160000` (175K reads) - NOT in bootstrap DB, likely level-specific graphics
+- `0x1B0000` (78K reads) - IN DB but tiles don't hash-match due to conversion
+- `0x210000`, `0x2D0000` - Additional graphics sets
+
+**Recommended approach:** Strategy A (VRAM-based database) with ROM offset correlation via
+timing/DMA traces. Direct ROM→VRAM hash matching will not work for this game.
 
 ## Bootstrap Sprite Offsets (Seed Only)
 These offsets are **initial seeds** used to populate the tile DB. They are not exhaustive

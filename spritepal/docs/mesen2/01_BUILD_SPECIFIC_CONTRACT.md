@@ -32,8 +32,25 @@ From `Mesen2/Core/Debugger/LuaApi.cpp`:
     6. `memType` — e.g., `emu.memType.snesWorkRam`
   - Removal fails silently if parameters don't exactly match the registration.
 
-**Callback type strings** may be accepted but are unreliable. Use enums/integers and verify by
-counting fires.
+**Callback type enum values** (from `ScriptingContext.h:12-17`):
+- `emu.callbackType.read` = 0
+- `emu.callbackType.write` = 1
+- `emu.callbackType.exec` = 2
+
+String-based callback types may be accepted but are unreliable. Use enums and verify by
+counting callback fires.
+
+**Event type enum values** (from `EventType.h:3-16`):
+- `emu.eventType.nmi` — NMI interrupt
+- `emu.eventType.irq` — IRQ interrupt
+- `emu.eventType.startFrame` — Start of frame
+- `emu.eventType.endFrame` — End of frame (most reliable for captures)
+- `emu.eventType.reset` — Console reset
+- `emu.eventType.scriptEnded` — Script termination
+- `emu.eventType.inputPolled` — Input polling occurred
+- `emu.eventType.stateLoaded` — Savestate loaded (file-based only; see Testrunner CLI section)
+- `emu.eventType.stateSaved` — Savestate saved
+- `emu.eventType.codeBreak` — Debugger breakpoint hit
 
 **Callback address width:** memory callbacks receive `relAddr.Address` (often 16-bit). Do not
 assume a 24-bit CPU address is passed to Lua.
@@ -90,6 +107,15 @@ space (and document which direction you used).
 ## VRAM Read Semantics (Current Build)
 - `emu.read(addr, emu.memType.snesVideoRam)` is **byte-addressed**.
 - `emu.readWord(addr, emu.memType.snesVideoRam)` expects a **byte address**.
+- **CRITICAL**: `emu.readWord()` returns **big-endian** words (high byte in bits 15:8).
+  To get the correct byte order for SNES tile data:
+  ```lua
+  local word = emu.readWord(byte_addr, emu.memType.snesVideoRam)
+  local byte0 = (word >> 8) & 0xFF   -- first byte in memory (from high byte of returned word)
+  local byte1 = word & 0xFF          -- second byte in memory (from low byte of returned word)
+  ```
+- Byte-by-byte reads (`emu.read`) may be broken in some builds (all odd bytes = 0).
+  Force word mode and swap bytes as shown above.
 
 This is an API behavior, not SNES hardware behavior (see `00_STABLE_SNES_FACTS.md`).
 
@@ -133,19 +159,34 @@ end
 - The old `docs/LuaApi.cpp` snapshot was removed; do not reference it.
 
 ## memType / cpuType Names
-Memory type names in this build (no aliases exist):
-- VRAM: `snesVideoRam`
-- OAM: `snesSpriteRam`
-- CGRAM: `snesCgRam`
 
-Main CPU key is `emu.cpuType.snes` (no `cpu` key on this build).
-SA-1 memory exists in the enum (`sa1`/`sa1Memory` in some builds); if unavailable, probe
-via S-CPU I/O registers ($2230-$224F) instead.
+**Naming convention:** Mesen2 lowercases the first character of C++ enum names when exposing them
+to Lua. For example, `SnesVideoRam` in `MemoryType.h` becomes `snesVideoRam` in Lua
+(see `LuaApi.cpp:170-171`).
+
+Memory type names in this build (no aliases exist):
+- VRAM: `snesVideoRam` (from `MemoryType::SnesVideoRam`)
+- OAM: `snesSpriteRam` (from `MemoryType::SnesSpriteRam`)
+- CGRAM: `snesCgRam` (from `MemoryType::SnesCgRam`)
+- WRAM: `snesWorkRam` (from `MemoryType::SnesWorkRam`)
+- PRG-ROM: `snesPrgRom` (from `MemoryType::SnesPrgRom`)
+
+Main CPU key is `emu.cpuType.snes` (from `CpuType::Snes`; no `cpu` alias exists).
+
+**SA-1 types available:**
+- `emu.cpuType.sa1` (from `CpuType::Sa1`)
+- `emu.memType.sa1Memory` (from `MemoryType::Sa1Memory`) — SA-1's view of CPU address space
+- `emu.memType.sa1InternalRam` (from `MemoryType::Sa1InternalRam`) — SA-1 IRAM (2KB)
+
+If SA-1 types are unavailable in your build, probe via S-CPU I/O registers ($2220-$224F).
 
 ## Testrunner CLI (Current Build)
 - `--testrunner` expects **exactly one non-.lua file** (the ROM). Any `.lua` files are scripts.
 - No `--loadstate` switch. Load savestates via `emu.loadSavestate()` from an **exec callback**.
 - `emu.loadSavestate()` does **not** trigger `stateLoaded` in this build.
+  - **Source verification:** `LuaApi::LoadSavestate` (LuaApi.cpp:1057-1069) uses the stream-based
+    `SaveStateManager::LoadState(istream&)` which does not call `ProcessEvent(EventType::StateLoaded)`.
+    Only the file-based `LoadState(string filepath)` (SaveStateManager.cpp:235) triggers the event.
 - If exec-based frame counting stalls, set `FRAME_EVENT=endFrame` in the probe. End-frame callbacks
   continued to fire after load in the latest run and were required for VRAM diff output.
 

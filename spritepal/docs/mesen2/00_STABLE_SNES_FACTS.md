@@ -144,14 +144,16 @@ bits (0-2) of register $43x0. The "A" register is the destination ($21xx).
 |------|-------|---------|-------------|
 | 0 | 1 | A | Single register (e.g., WRAM $2180) |
 | 1 | 2 | A, A+1 | Two consecutive registers (e.g., VRAM $2118-$2119) |
-| 2 | 2 | A, A | Same register twice |
-| 3 | 4 | A, A+1, A, A+1 | Two registers, repeated |
-| 4 | 4 | A, A+1, A+2, A+3 | Four consecutive registers |
-| 5 | 4 | A, A+1, A, A+1 | Same as mode 3 |
-| 6 | 2 | A, A | Same as mode 2 |
-| 7 | 4 | A, A+1, A+2, A+3 | Same as mode 4 |
+| 2 | 2 | A, A | Same register twice (e.g., OAM, CGRAM) |
+| 3 | 4 | A, A, A+1, A+1 | Two registers, paired writes (e.g., scroll positions) |
+| 4 | 4 | A, A+1, A+2, A+3 | Four consecutive registers (e.g., window) |
+| 5 | 4 | A, A+1, A, A+1 | Two registers, alternating (undocumented) |
+| 6 | 2 | A, A | Same as mode 2 (undocumented) |
+| 7 | 4 | A, A, A+1, A+1 | Same as mode 3 (undocumented) |
+
+Source: https://snes.nesdev.org/wiki/DMA
 
 **Common usage:**
 - Mode 1: VRAM writes via $2118/$2119 (word writes)
 - Mode 0: WRAM writes via $2180 (byte writes)
-- Mode 1: OAM writes via $2104 (low/high byte pairs)
+- Mode 2: OAM writes via $2104, CGRAM writes via $2122

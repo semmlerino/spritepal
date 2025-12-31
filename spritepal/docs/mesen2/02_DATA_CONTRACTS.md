@@ -29,10 +29,14 @@ This document defines the **canonical schema** for capture and mapping data.
 - `id` (int)
 - `x` (int), `y` (int): pixel coordinates from OAM (x is signed 9-bit, adjusted to
   -256..255; y is raw 0..255)
+  - **Y coordinate nuances**: Y=0 places sprite at top of visible area. Some games use
+    224-line mode (overscan default), others use 239/240-line modes. The visibility
+    filter assumes 224 lines by default; adjust `VISIBLE_Y_EXCLUDE_*` for extended modes.
 - `tile` (int): OAM tile index (0-255)
 - `width` (int), `height` (int): sprite size in **pixels**
-- `palette` (int)
-- `priority` (int)
+- `palette` (int): 0-7, selects CGRAM palette (sprite palettes are 128-255)
+- `priority` (int): 0-3, higher values render in front of lower priority sprites
+  (within sprite priority; BG layer priority interactions are separate)
 - `flip_h` (bool), `flip_v` (bool)
 - `tile_page` (int, required for mapping): OAM attr bit 0 (tile index bit 8 / second table)
 - If `tile_page`/`name_table` is missing, assume 0 and treat the capture as **unsafe for mapping**.
@@ -48,10 +52,19 @@ This document defines the **canonical schema** for capture and mapping data.
 
 Tiles ordering guarantee:
 - `tiles[]` is ordered by `pos_y` then `pos_x` (row-major, pre-flip).
+- **Off-screen subtiles**: `tiles[]` includes ALL subtiles of a multi-tile sprite,
+  even if some are partially or fully off-screen. The visibility filter operates on
+  the sprite's anchor position (x, y), not individual subtiles. This ensures complete
+  tile data for hash matching.
 
 ### palettes
 - Keys: strings "0".."7"
 - Values: arrays of 16 ints, **15-bit BGR** words, little-endian `lo | (hi << 8)`
+- **Palette endianness**: Values are stored as native ints after conversion from
+  SNES CGRAM format. The capture script reads CGRAM and converts to `lo | (hi << 8)`.
+  This matches SNES hardware byte order. The emulator's `emu.readWord()` endianness
+  quirk (see `01_BUILD_SPECIFIC_CONTRACT.md`) does NOT apply to these values—they
+  are already normalized during capture.
 
 ## Validation / Fail-Fast Rules
 - `data_hex` length must be 64 hex chars (32 bytes) for 4bpp.

@@ -23,7 +23,8 @@ Follow this flowchart **in order**. Fix issues at each step before proceeding.
 ├─────────────────────────────────────────────────────────────────────────┤
 │  4. oam_base_addr / oam_addr_offset logged? ─────── NO → Fix capture   │
 │  5. tile_page (attr bit 0) captured? ──────────── NO → Add to capture  │
-│  6. Tile address formula matches Mesen 2? ───────── NO → Fix formula   │
+│  6. Tile address formula matches hardware? ──────── NO → Fix formula   │
+│     (See 00_STABLE_SNES_FACTS.md for canonical formula)                │
 │                                                                         │
 │  All YES? → Proceed to Step 3                                          │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -94,6 +95,21 @@ python3 scripts/analyze_capture_quality.py mesen2_exchange/door_transition_captu
   - Re-check OBSEL values and `tile_page` usage
   - Confirm ROM header/CRC and expand DB offsets if capture is otherwise valid
 
+### Symptom: All/most even bytes are zero, odd bytes have data
+- Cause: `emu.readWord()` returns **big-endian**, not little-endian. The byte swap was inverted.
+- Example: tile `00D0009A0064...` has zeros at positions 0,2,4,... and data at 1,3,5,...
+- Fix: In `read_vram_tile_word()`, swap the byte extraction order:
+  ```lua
+  -- WRONG: assumes little-endian word
+  tile_data[i * 2 + 1] = word & 0xFF
+  tile_data[i * 2 + 2] = (word >> 8) & 0xFF
+
+  -- CORRECT: Mesen2 returns big-endian words
+  tile_data[i * 2 + 1] = (word >> 8) & 0xFF
+  tile_data[i * 2 + 2] = word & 0xFF
+  ```
+- See also: `01_BUILD_SPECIFIC_CONTRACT.md` → "VRAM Read Semantics"
+
 ### Symptom: No VRAM DMA observed
 - Important: lack of observed DMA **does not prove** VRAM uploads are absent.
   - VRAM can change via CPU writes to $2118/$2119 or via callback blind spots.
@@ -107,6 +123,8 @@ python3 scripts/analyze_capture_quality.py mesen2_exchange/door_transition_captu
   - Tiles match many offsets (collisions) so scores never separate
   - DB coverage mismatch (correct capture, wrong source blocks indexed)
   - SA-1 character conversion active (VRAM tiles not equal to ROM-decompressed bytes)
+    - **Confirmed for Kirby Super Star**: only 1.5% hash match rate during gameplay
+    - See `03_GAME_MAPPING_KIRBY_SA1.md` → "Confirmed: SA-1 Conversion Active"
 - Fix:
   - Compare `matched_tiles` vs `scored_tiles`
   - Check unique-byte distribution and odd-byte sanity for the capture
