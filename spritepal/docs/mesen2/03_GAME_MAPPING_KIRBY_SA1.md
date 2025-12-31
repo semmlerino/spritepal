@@ -114,6 +114,11 @@ and will not cover every room or state.
 - 0x280000: Additional sprites
 - 0x0E0000: Title screen/fonts
 
+**Discovery method:** These offsets were found via ROM trace probing during gameplay.
+The `summarize_rom_trace.py` script bucketed PRG-ROM reads and these addresses appeared
+consistently during sprite-heavy frames. Validate with `validate_seed_candidate.py`
+before relying on them for new states.
+
 ## Injection Strategy (After Mapping)
 Once a ROM offset is confirmed, choose the edit path based on the storage pipeline:
 - **Raw tiles in ROM**: patch 32-byte tiles directly at the ROM offset.

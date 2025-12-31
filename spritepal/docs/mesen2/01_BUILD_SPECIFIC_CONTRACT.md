@@ -106,11 +106,11 @@ end
 - The canonical Lua API implementation lives in `Mesen2/Core/Debugger/LuaApi.cpp`.
 - The old `docs/LuaApi.cpp` snapshot was removed; do not reference it.
 
-## memType / cpuType Aliases
-Observed aliases in this build:
-- VRAM: `snesVram` or `snesVideoRam`
-- OAM: `snesOam` or `snesSpriteRam`
-- CGRAM: `snesCgram` or `snesCgRam`
+## memType / cpuType Names
+Memory type names in this build (no aliases exist):
+- VRAM: `snesVideoRam`
+- OAM: `snesSpriteRam`
+- CGRAM: `snesCgRam`
 
 Main CPU key is `emu.cpuType.snes` (no `cpu` key on this build).
 SA-1 memory exists in the enum (`sa1`/`sa1Memory` in some builds); if unavailable, probe
