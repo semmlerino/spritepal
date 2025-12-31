@@ -65,7 +65,7 @@ end
 local exec_count = 0
 local frame_count = 0
 local start_master = nil
-local last_master = nil
+local _last_master = nil  -- luacheck: ignore (reserved for future use)
 local clock_rate = initial_state and initial_state.clockRate or nil
 local target_master_delta = clock_rate and (clock_rate * PROBE_SECONDS) or nil
 local done = false
@@ -94,7 +94,7 @@ local function exec_tick()
         if start_master == nil then
             start_master = state.masterClock
         end
-        last_master = state.masterClock
+        _last_master = state.masterClock
         if target_master_delta and (state.masterClock - start_master) >= target_master_delta then
             finalize("masterClock_threshold")
             return

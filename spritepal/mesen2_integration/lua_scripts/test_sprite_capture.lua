@@ -1,5 +1,7 @@
 -- Test version: Auto-capture at a target frame (configurable via env)
-local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
+local DEFAULT_OUTPUT = "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\"
+    .. "spritepal\\mesen2_exchange\\"
+local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or DEFAULT_OUTPUT
 local TARGET_FRAME = tonumber(os.getenv("TARGET_FRAME")) or 700
 local SKIP_INPUT = os.getenv("SKIP_INPUT") == "1"
 local SAVESTATE_PATH = os.getenv("SAVESTATE_PATH")
@@ -134,7 +136,9 @@ local function remove_memory_callback_compat(callback_id, cb_type, start_addr, e
             return true
         end
         if cpu_type ~= nil and mem_type ~= nil then
-            if pcall(emu.removeMemoryCallback, callback_id, cb_type, start_addr or 0, end_addr or 0, cpu_type, mem_type) then
+            local ok = pcall(emu.removeMemoryCallback, callback_id, cb_type,
+            start_addr or 0, end_addr or 0, cpu_type, mem_type)
+        if ok then
                 return true
             end
         end

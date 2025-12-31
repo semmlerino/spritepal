@@ -61,7 +61,7 @@ end
 local function read_dma_channel(channel)
     local base = DMA_BASE + (channel * 0x10)
 
-    local control = emu.read(base + 0x00, emu.memType.snesMemory)
+    local _control = emu.read(base + 0x00, emu.memType.snesMemory)  -- luacheck: ignore
     local dest_reg = emu.read(base + 0x01, emu.memType.snesMemory)
     local src_low = emu.read(base + 0x02, emu.memType.snesMemory)
     local src_mid = emu.read(base + 0x03, emu.memType.snesMemory)
@@ -536,7 +536,7 @@ local function init()
     emu.log("Watch for 'DMA[CB]:' or 'DMA[POLL]:' messages in log.")
 end
 
-local function cleanup()
+local function _cleanup()  -- luacheck: ignore (reserved for cleanup hook)
     emu.log("Cleaning up...")
 
     if callbacks.dma then

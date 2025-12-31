@@ -1,5 +1,7 @@
 -- DMA/SA-1 probe for sprite upload diagnostics (headless-safe)
-local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
+local DEFAULT_OUTPUT = "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\"
+    .. "spritepal\\mesen2_exchange\\"
+local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or DEFAULT_OUTPUT
 local SAVESTATE_PATH = os.getenv("SAVESTATE_PATH")
 local PRELOADED_STATE = os.getenv("PRELOADED_STATE") == "1"
 local FRAME_EVENT = os.getenv("FRAME_EVENT")
@@ -60,7 +62,7 @@ end
 
 local cpu_type = emu.cpuType and (emu.cpuType.snes or emu.cpuType.cpu) or nil
 
-local function add_memory_callback_compat(callback, cb_type, start_addr, end_addr, cpu_type, mem_type)
+local function add_memory_callback_compat(callback, cb_type, start_addr, end_addr, _cb_cpu_type, mem_type)
     if cpu_type ~= nil and mem_type ~= nil then
         local ok, id = pcall(emu.addMemoryCallback, callback, cb_type, start_addr, end_addr, cpu_type, mem_type)
         if ok then
@@ -187,7 +189,7 @@ elseif not wram_mem_type then
 end
 local wram_watch_start = parse_int(WRAM_WATCH_START, wram_base)
 local wram_watch_end = parse_int(WRAM_WATCH_END, wram_watch_start + WRAM_DUMP_SIZE - 1)
-local last_wram_dump_frame = nil
+local _last_wram_dump_frame = nil  -- luacheck: ignore (reserved for future use)
 local prev_wram_snapshot = nil
 local prev_wram_frame = nil
 local wram_write_counts = {snes = 0, sa1 = 0}
@@ -1012,7 +1014,7 @@ local function poll_vram_diff(frame_id, current_snapshot)
             local snapshot = capture_wram_snapshot()
             write_wram_snapshot(frame_id, "curr", snapshot, frame_id)
         end
-        last_wram_dump_frame = frame_id
+        _last_wram_dump_frame = frame_id
     end
     if CAPTURE_ON_VRAM_DIFF and capture_allowed(frame_id) then
         write_capture_snapshot("vramdiff", frame_id)
@@ -1104,12 +1106,12 @@ local function log_dma_channel(channel, value)
             local chunk_len = 0
             local chunk_size = 4096
             for i = 0, das - 1 do
-                local value = emu.read((src + i) & 0xFFFFFF, dma_read_mem)
-                if value == nil then
-                    value = 0
+                local read_val = emu.read((src + i) & 0xFFFFFF, dma_read_mem)
+                if read_val == nil then
+                    read_val = 0
                 end
                 chunk_len = chunk_len + 1
-                chunk[chunk_len] = string.char(value & 0xFF)
+                chunk[chunk_len] = string.char(read_val & 0xFF)
                 if chunk_len >= chunk_size then
                     f:write(table.concat(chunk))
                     chunk = {}
@@ -1161,8 +1163,9 @@ local function log_sa1_dma(reason)
     local auto_conv = (ctrl & 0x10) ~= 0
     local src_dev = ctrl & 0x03
     local dest_dev = (ctrl >> 2) & 0x01
-    log(string.format(
-        "SA1 DMA (%s): ctrl=0x%02X enabled=%s char_conv=%s auto=%s src_dev=%d dest_dev=%d src=0x%06X dest=0x%06X size=0x%04X",
+    local sa1_fmt = "SA1 DMA (%s): ctrl=0x%02X enabled=%s char_conv=%s auto=%s "
+        .. "src_dev=%d dest_dev=%d src=0x%06X dest=0x%06X size=0x%04X"
+    log(string.format(sa1_fmt,
         reason,
         ctrl,
         tostring(enabled),
@@ -1510,7 +1513,9 @@ add_memory_callback_compat(on_sa1_ctrl_write, emu.callbackType.write, 0x2230, 0x
 add_memory_callback_compat(on_sa1_dma_reg_write, emu.callbackType.write, 0x2231, 0x2239, cpu_type, MEM.cpu)
 add_memory_callback_compat(on_sa1_bitmap_write, emu.callbackType.write, 0x2240, 0x224F, cpu_type, MEM.cpu)
 
-local sa1_cpu_type = emu.cpuType and (emu.cpuType.sa1 or emu.cpuType.SA1 or emu.cpuType.sa1Cpu or emu.cpuType.sa1cpu) or nil
+local sa1_cpu_type = emu.cpuType
+    and (emu.cpuType.sa1 or emu.cpuType.SA1 or emu.cpuType.sa1Cpu or emu.cpuType.sa1cpu)
+    or nil
 if ROM_TRACE_ON_WRAM_WRITE then
     if not MEM.prg then
         log("WARNING: ROM trace enabled but no PRG-ROM memType resolved")

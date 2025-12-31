@@ -280,7 +280,9 @@ emu.addEventCallback(function()
                 entry.name_table, entry.name_table))
             f:write('      "tiles": [\n')
             for tidx, tile in ipairs(entry.tile_data) do
-                f:write(string.format('        {"tile_index": %d, "vram_addr": %d, "pos_x": %d, "pos_y": %d, "data_hex": "%s"}',
+                local tile_fmt = '        {"tile_index": %d, "vram_addr": %d, '
+                .. '"pos_x": %d, "pos_y": %d, "data_hex": "%s"}'
+            f:write(string.format(tile_fmt,
                     tile.tile_index, tile.vram_addr, tile.pos_x, tile.pos_y, tile.data_hex))
                 if tidx < #entry.tile_data then f:write(',') end
                 f:write('\n')

@@ -22,7 +22,7 @@ local state = {
 local DMA_ENABLE = 0x420B
 local HDMA_ENABLE = 0x420C
 local DMA_BASE = 0x4300
-local OBSEL = 0x2101
+local _OBSEL = 0x2101  -- luacheck: ignore (documented constant)
 local VRAM_ADDR_L = 0x2116
 local VRAM_ADDR_H = 0x2117
 

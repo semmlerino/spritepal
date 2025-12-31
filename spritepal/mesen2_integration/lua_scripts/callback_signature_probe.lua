@@ -1,5 +1,6 @@
 -- Callback signature probe for Mesen2 testrunner mode
-local OUTPUT_PATH = "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\callback_signature_probe.txt"
+local OUTPUT_PATH = "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\"
+    .. "spritepal\\mesen2_exchange\\callback_signature_probe.txt"
 
 local function write_line(line)
     local f = io.open(OUTPUT_PATH, "a")
