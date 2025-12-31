@@ -18,6 +18,47 @@ Conversion:    lua_byte_addr = ppu_word_addr * 2
 ```
 See `01_BUILD_SPECIFIC_CONTRACT.md` § "VRAM Read Semantics" for API-specific behavior.
 
+### VMAIN Register ($2115) - Address Control
+
+The VMAIN register controls VRAM address increment and translation behavior:
+
+```
+Bit:    7      6  5  4   3  2   1  0
+        I      -  -  -   T  T   S  S
+        │                └─┬─┘  └─┬─┘
+        │                  │      └─ Step: 00=1, 01=32, 10=128
+        │                  └──────── Translation mode (address remapping)
+        └─────────────────────────── Increment after: 0=$2118, 1=$2119
+```
+
+**Increment Step (bits 1-0):**
+| Value | Step | Use Case |
+|-------|------|----------|
+| 00 | 1 word | Sequential tile data |
+| 01 | 32 words | 8x8 tile column writes |
+| 10 | 128 words | 32-column tilemap writes |
+| 11 | 128 words | Same as 10 |
+
+**Address Translation / Remapping (bits 3-2):**
+
+These modes rearrange address bits for optimized tilemap writes. The translation
+applies to the logical address before accessing physical VRAM.
+
+| Mode | Translation | Effect |
+|------|-------------|--------|
+| 00 | None | `addr` used directly |
+| 01 | 8-bit rotate | `addr[8:0] = {addr[5:0], addr[8:6]}` |
+| 10 | 9-bit rotate | `addr[9:0] = {addr[6:0], addr[9:7]}` |
+| 11 | 10-bit rotate | `addr[10:0] = {addr[7:0], addr[10:8]}` |
+
+**Why this matters for capture pipelines:**
+- Lua API `emu.read()` uses **physical VRAM addresses** (no translation)
+- Most games use mode 00 (no remapping) for tile data
+- If sprites appear corrupted or mis-aligned, check if the game uses non-zero
+  translation modes for tilemap writes (rare for sprite data, common for BG maps)
+
+Source: https://snes.nesdev.org/wiki/PPU_registers
+
 ## OBJSEL ($2101) Tile Tables
 - `name_base = obsel & 0x07` (bits 0-2)
   - **Note:** Bit 2 is reserved for a planned 128KB VRAM expansion (never implemented).
@@ -268,3 +309,49 @@ Source: https://snes.nesdev.org/wiki/DMA
 - Mode 1: VRAM writes via $2118/$2119 (word writes)
 - Mode 0: WRAM writes via $2180 (byte writes)
 - Mode 2: OAM writes via $2104, CGRAM writes via $2122
+
+---
+
+## Glossary
+
+### BW-RAM (Bitmap Work RAM)
+SA-1 cartridge-side RAM (up to 256KB) used for expanded data storage. Accessible by both
+the main SNES CPU and the SA-1 coprocessor. In SA-1 games like Kirby Super Star, BW-RAM
+often holds decompressed graphics, level data, or work buffers before DMA to VRAM.
+Not to be confused with WRAM (main system Work RAM at $7E0000-$7FFFFF).
+
+### HDMA (H-Blank DMA)
+DMA transfers that occur during the horizontal blanking period of each scanline.
+Unlike general-purpose DMA (which runs during VBlank or when explicitly triggered),
+HDMA can modify PPU registers **mid-frame** to create effects like:
+- Gradient backgrounds (palette changes per scanline)
+- Wavy distortion effects (scroll position changes)
+- Window shape animation
+
+HDMA is configured via registers $4300-$43x0 with the HDMA enable register at $420C.
+Each bit of $420C enables one of 8 HDMA channels.
+
+**Key difference from DMA:** Regular DMA halts the CPU and transfers a block of data.
+HDMA transfers a small amount per scanline without halting execution, driven by a
+table in memory specifying per-scanline values.
+
+### Overscan / Display Modes
+The SNES supports multiple vertical display modes controlled by $2133 (SETINI):
+
+| Mode | Visible Lines | Total Lines | Notes |
+|------|---------------|-------------|-------|
+| 224-line (default) | 224 | 262 (NTSC) / 312 (PAL) | Most common |
+| 239-line | 239 | 262 (NTSC) | Rarely used |
+| 240-line (interlaced) | 240 | 525 (interlaced) | Hi-res mode |
+
+**Overscan region** (Y coordinates 224-239 in 224-line mode):
+- These scanlines exist but are hidden outside the safe display area
+- Sprites with Y coordinates in this range are effectively off-screen
+- Some TVs display partial overscan; emulators typically crop it
+
+**Sprite Y coordinate wrapping:**
+- Y=0 is the top of the visible area
+- Y values 240-255 wrap to the *top* of the display (Y=240 appears at scanline -16)
+- This allows sprites to smoothly scroll off the top of the screen
+
+Source: https://snes.nesdev.org/wiki/Rendering_overview

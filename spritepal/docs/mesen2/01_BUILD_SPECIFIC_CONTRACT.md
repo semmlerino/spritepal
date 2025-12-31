@@ -107,38 +107,50 @@ space (and document which direction you used).
 ## VRAM Read Semantics (Current Build)
 - `emu.read(addr, emu.memType.snesVideoRam)` is **byte-addressed**.
 - `emu.readWord(addr, emu.memType.snesVideoRam)` expects a **byte address**.
-- **CRITICAL**: `emu.readWord()` returns **big-endian** words (high byte in bits 15:8).
-  To get the correct byte order for SNES tile data:
+- **Working pattern**: The capture scripts use byte-swapped word reads for tile data:
   ```lua
   local word = emu.readWord(byte_addr, emu.memType.snesVideoRam)
-  local byte0 = (word >> 8) & 0xFF   -- first byte in memory (from high byte of returned word)
-  local byte1 = word & 0xFF          -- second byte in memory (from low byte of returned word)
+  local byte0 = (word >> 8) & 0xFF   -- position 0 in tile data
+  local byte1 = word & 0xFF          -- position 1 in tile data
   ```
 - Byte-by-byte reads (`emu.read`) may be broken in some builds (all odd bytes = 0).
   Force word mode and swap bytes as shown above.
 
 This is an API behavior, not SNES hardware behavior (see `00_STABLE_SNES_FACTS.md`).
 
-> ⚠️ **Build-Specific Behavior**
+> ⚠️ **Build-Specific Behavior — Source Code vs Empirical Results**
 >
-> The `emu.readWord()` big-endian behavior and any VMAIN manipulation are
-> **Mesen2 API quirks**, not SNES hardware requirements. On real hardware,
-> VMAIN ($2115) controls increment timing per the PPU spec
-> (see [SNESdev VRAM](https://snes.nesdev.org/wiki/VRAM)).
-> Do not generalize these workarounds to other emulators or hardware.
+> **Source code analysis** (`MemoryDumper.cpp:397-402`) shows `GetMemoryValue16()` uses
+> standard little-endian byte order: `return (msb << 8) | lsb` where `lsb` is from
+> address and `msb` from address+1.
+>
+> **Empirical observation**: The capture scripts (`mesen2_dma_probe.lua:613-615`) use
+> byte swap and produce valid, hash-matchable tile data. This apparent contradiction
+> may be due to:
+> - VRAM-specific access patterns or timing
+> - Interaction between Lua API and internal VRAM storage
+> - Build-specific behavior in the tested version
+>
+> **Why it works**: The byte swap is applied consistently to both captures and
+> database entries, so hashes match regardless of absolute byte order. The tile
+> data is internally consistent even if not in "standard" SNES byte order.
+>
+> **Recommendation**: Re-run `verify_endianness.lua` when upgrading Mesen2 builds.
+> If results differ, update scripts accordingly. Do not generalize these workarounds
+> to other emulators or hardware.
 
 ### Which Memory Types Are Affected?
 
-The big-endian `emu.readWord()` behavior has been **verified** for:
-- `snesVideoRam` (VRAM) — confirmed, byte swap required
+The byte-swap pattern has been **tested** for:
+- `snesVideoRam` (VRAM) — capture scripts use byte swap, produces valid data
 
-**Not verified** (assume same behavior but test first):
+**Not tested** (verify before assuming same behavior):
 - `snesSpriteRam` (OAM)
 - `snesCgRam` (CGRAM)
 - `snesWorkRam` (WRAM)
 - `snesPrgRom` (PRG-ROM)
 
-When reading from a new memory type, verify byte order before assuming.
+Use `verify_endianness.lua` to test new memory types before building pipelines.
 
 ### Side Effects of PPU Register Access
 

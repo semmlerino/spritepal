@@ -45,6 +45,58 @@ def sa1_to_file(bank, offset):
 **Important:** For Kirby Super Star, prefer `emu.convertAddress()` in Lua or the
 `--auto-map` flag in validation scripts to handle remapped banks correctly.
 
+### Logging SA-1 Bank Register Changes
+
+To understand dynamic bank remapping during gameplay, log writes to $2220-$2223:
+
+```lua
+-- SA-1 Bank Register Logger
+-- Usage: Run with ROM to see bank remapping during gameplay
+
+local bank_names = { [0x2220] = "CXB", [0x2221] = "DXB", [0x2222] = "EXB", [0x2223] = "FXB" }
+
+local function log_bank_write(addr, value)
+    local reg_name = bank_names[addr] or string.format("$%04X", addr)
+    local bank_range = ({
+        [0x2220] = "$C0-$CF",
+        [0x2221] = "$D0-$DF",
+        [0x2222] = "$E0-$EF",
+        [0x2223] = "$F0-$FF"
+    })[addr]
+
+    -- Value bits: 0-2 = ROM block (0-7, each 1MB), bit 7 = HiROM mode
+    local rom_block = value & 0x07
+    local hirom = (value & 0x80) ~= 0
+    local rom_start = rom_block * 0x100000
+
+    print(string.format("Frame %d: %s ($%04X) = $%02X → banks %s map to ROM $%06X-%06X%s",
+        emu.getState().ppu.frameCount, reg_name, addr, value,
+        bank_range, rom_start, rom_start + 0x0FFFFF,
+        hirom and " (HiROM)" or ""))
+end
+
+-- Register callbacks for all 4 bank registers
+for addr = 0x2220, 0x2223 do
+    emu.addMemoryCallback(function(a, v) log_bank_write(a, v) end,
+        emu.callbackType.write, addr, addr, emu.cpuType.snes)
+end
+
+print("SA-1 bank register logger active")
+```
+
+**What to look for:**
+- If banks never change from power-on defaults, the static `sa1_to_file()` formula works
+- If banks change mid-game, note the frame and context (level load, boss intro, etc.)
+- Use `emu.convertAddress()` instead of manual math when banks are dynamic
+
+**Power-on defaults (CXB=0, DXB=1, EXB=2, FXB=3):**
+```
+$2220 (CXB) = $00 → $C0-$CF maps to ROM $000000-$0FFFFF
+$2221 (DXB) = $01 → $D0-$DF maps to ROM $100000-$1FFFFF
+$2222 (EXB) = $02 → $E0-$EF maps to ROM $200000-$2FFFFF
+$2223 (FXB) = $03 → $F0-$FF maps to ROM $300000-$3FFFFF
+```
+
 ## Decompression Pipeline (Observed)
 ```
 ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
@@ -88,30 +140,43 @@ VRAM tile captured
 - Post-decompression palette remapping or effects
 - Low-entropy tiles (solid colors, gradients)
 
-## Recent Observations (Movie Probe)
+---
+
+<details>
+<summary><strong>📋 Exploratory Notes: Movie Probe Observations (Dec 2024)</strong></summary>
 
 > **⚠️ EXPLORATORY DATA — NOT SPECIFICATIONS**
 >
 > These are **run-derived notes** from specific probe sessions, not stable rules.
 > Re-validate when scripts, ROMs, or Mesen 2 builds change. Values are seeds for
 > investigation, not guaranteed addresses.
+
+**WRAM Staging Patterns:**
 - VRAM diff confirms uploads during gameplay, but **not every VRAM diff frame** shows
   strong WRAM staging overlap.
 - High-overlap frames in recent runs showed staging bytes around **WRAM relative
   0x0051xx–0x005E20**. Use this range as a starting point for WRAM watchers/dumps.
 - `analyze_wram_staging.py --emit-range` suggests a broader watch window of roughly
   **0x004E00–0x00603F** (relative) when padding/aligning for gameplay captures.
+
+**Frame-Specific Observations:**
 - WRAM-write-triggered captures can separate **buffer fill** from **VRAM usage**:
   - Frame ~1765: **100% VRAM↔WRAM overlap**, staging range **0x001E20–0x00549F**.
   - Frame ~842: **near-zero overlap** (WRAM writes likely unrelated or prefetch).
 - WRAM write CPU samples (S-CPU) show execution in **bank $00** with
   `cpu.pc` in the **$893D–$89E9** range (LoROM offsets **0x00093D–0x0009E9**),
   `cpu.k=0x00`, `cpu.dbr=0x7E`. These are likely the routines filling the staging buffer.
+
+**Interpretation Notes:**
 - Frames with near-zero WRAM overlap are likely **non-staging frames** (BG-only, reused tiles,
   or uploads outside the dump window), not necessarily capture failures.
 - The current tile DB coverage is small; **high-info VRAM tiles often have zero DB hits**.
   Expand coverage using DMA source dumps or WRAM staging ranges found in the probe.
 - Heavy logging slows playback; **time-based gating** and multi-minute runs are expected.
+
+</details>
+
+---
 
 ## Graphics Set Variability (Room Headers)
 Kirby Super Star uses room/level graphics headers that select **sprite graphics sets** per

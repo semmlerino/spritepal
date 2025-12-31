@@ -2,7 +2,46 @@
 
 This document defines the **canonical schema** for capture and mapping data.
 
+## Schema Versioning
+
+All JSON data files should include a `schema_version` field at the top level:
+
+```json
+{
+  "schema_version": "1.0",
+  "frame": 1800,
+  ...
+}
+```
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | Dec 2024 | Initial documented schema |
+
+**Version format:** `MAJOR.MINOR`
+- **MAJOR** bump: Breaking changes (removed fields, changed semantics)
+- **MINOR** bump: Additive changes (new optional fields)
+
+**Backward compatibility:**
+- Readers should accept files without `schema_version` (assume 1.0)
+- Readers should ignore unknown fields (forward compatibility)
+- Writers should always include `schema_version`
+
+---
+
 ## Global Conventions
+
+### Terminology: `tile_page` (not `name_table`)
+
+The field `tile_page` refers to OAM attribute bit 0 (tile index bit 8 / second OBJ table select).
+
+**Canonical name:** `tile_page`
+**Legacy alias:** `name_table` (deprecated, accepted for backward compatibility)
+
+The legacy name `name_table` was misleading because it suggests BG nametables, which are
+unrelated. The OAM bit selects between two 256-tile OBJ regions, not background tile maps.
+
+Writers should emit `tile_page`. Readers should accept both, preferring `tile_page` when present.
 
 ### Address Unit Suffix Rule
 - `*_addr` or no suffix = **byte address** (ready for API calls)
@@ -25,6 +64,7 @@ arrays use list[int] unless explicitly noted. Never use base64.
 ## sprite_capture*.json
 
 ### Top-Level
+- `schema_version` (string, recommended): Schema version (e.g., "1.0"). See Schema Versioning above.
 - `frame` (int): capture frame counter used by the script
 - `timestamp` (int, optional): Unix timestamp
 - `visible_count` (int): count of entries **included in `entries[]`** after the visibility
