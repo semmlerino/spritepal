@@ -5,7 +5,30 @@ local MEM = {
     oam = emu.memType.snesOam or emu.memType.snesSpriteRam,
     vram = emu.memType.snesVram or emu.memType.snesVideoRam,
     cgram = emu.memType.snesCgram or emu.memType.snesCgRam,
+    prgRom = emu.memType.snesPrgRom or emu.memType.prgRom,
 }
+
+-- PRG ROM size fail-fast validation
+local prg_size = nil
+if MEM.prgRom then
+    local ok, size = pcall(emu.getMemorySize, MEM.prgRom)
+    if ok and size and size > 0 then
+        prg_size = size
+    end
+end
+if not prg_size or prg_size == 0 then
+    error([[
+PRG ROM size unavailable. Cannot proceed.
+
+Possible causes:
+1. ROM not loaded - ensure game is running before starting capture
+2. Memory type not exposed - verify Mesen2 build supports prgRom
+3. Lua API limitation - check Mesen2 version compatibility
+
+Do not use fallback values. Fix the root cause.
+]])
+end
+print(string.format("PRG ROM size validated: 0x%X bytes (%d KB)", prg_size, prg_size / 1024))
 
 local SIZE_TABLE = {
     [0] = {8, 8, 16, 16}, [1] = {8, 8, 32, 32}, [2] = {8, 8, 64, 64},

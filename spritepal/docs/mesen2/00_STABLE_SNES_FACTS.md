@@ -44,12 +44,48 @@ Bit:    7      6  5  4   3  2   1  0
 These modes rearrange address bits for optimized tilemap writes. The translation
 applies to the logical address before accessing physical VRAM.
 
-| Mode | Translation | Effect |
-|------|-------------|--------|
-| 00 | None | `addr` used directly |
-| 01 | 8-bit rotate | `addr[8:0] = {addr[5:0], addr[8:6]}` |
-| 10 | 9-bit rotate | `addr[9:0] = {addr[6:0], addr[9:7]}` |
-| 11 | 10-bit rotate | `addr[10:0] = {addr[7:0], addr[10:8]}` |
+Reference: https://snes.nesdev.org/wiki/PPU_registers#VMAIN
+
+```
+Mode 00 (No remapping):
+  Address bits unchanged.
+  Input:  fedcba9876543210
+  Output: fedcba9876543210
+
+Mode 01 (8-bit rotation):
+  Bits 8:6 moved to bits 2:0
+  Input:  rrrrrrrrBBBccccc  (r=remaining, B=bits 8-6, c=bits 5-0)
+  Output: rrrrrrrrcccccBBB
+
+Mode 10 (9-bit rotation):
+  Bits 9:7 moved to bits 2:0
+  Input:  rrrrrrrrBBBcccccc  (r=remaining, B=bits 9-7, c=bits 6-0)
+  Output: rrrrrrrrccccccBBB
+
+Mode 11 (10-bit rotation):
+  Bits 10:8 moved to bits 2:0
+  Input:  rrrrrrrBBBccccccc  (r=remaining, B=bits 10-8, c=bits 7-0)
+  Output: rrrrrrrcccccccBBB
+```
+
+**Worked Example (Mode 01):**
+```
+Input address:  0x1234 = 0001001000110100
+Decompose:      rrrrrrrr BBB ccccc
+                00010010 001 10100
+
+Move BBB to end:
+Output:         00010010 10100 001
+                = 0001001010100001
+                = 0x12A1
+```
+
+| Mode | Summary | Typical Use |
+|------|---------|-------------|
+| 00 | No remapping | Tile data, sequential access |
+| 01 | Rotate bits 8:6 to 2:0 | 8x8 tile row optimization |
+| 10 | Rotate bits 9:7 to 2:0 | 16x8 tilemap optimization |
+| 11 | Rotate bits 10:8 to 2:0 | 32-column tilemap optimization |
 
 **Why this matters for capture pipelines:**
 - Most games use mode 00 (no remapping) for tile data
@@ -57,12 +93,14 @@ applies to the logical address before accessing physical VRAM.
   translation modes for tilemap writes (rare for sprite data, common for BG maps)
 - See `01_BUILD_SPECIFIC_CONTRACT.md` § "VRAM Read Semantics" for API behavior
 
-Source: https://snes.nesdev.org/wiki/PPU_registers
-
 ## OBJSEL ($2101) Tile Tables
 - `name_base = obsel & 0x07` (bits 0-2)
-  - **Note:** Bit 2 is reserved for a planned 128KB VRAM expansion (never implemented).
-    Practical values are **0-3**. Values 4-7 may work on emulators but are non-standard.
+  - **Valid values:** 0-3. Each step = 0x2000 word addresses within 64KB VRAM.
+  - **Values 4-7:** **UNDEFINED BEHAVIOR.**
+    - Hardware: Likely wraps/mirrors within 64KB VRAM (not verified on real hardware).
+    - Emulators: Behavior varies between implementations.
+    - Pipeline: Reject captures with `name_base >= 4` and log a warning.
+  - SNES VRAM is fixed at 64KB. Claims about "128KB expansion" are speculation.
 - `name_select = (obsel >> 3) & 0x03` (bits 3-4)
 - `size_select = (obsel >> 5) & 0x07` (bits 5-7) — selects small/large sprite dimensions
 - **OAM base (word address):** `oam_base_word = name_base << 13`

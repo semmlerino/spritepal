@@ -109,6 +109,65 @@ python3 scripts/analyze_capture_quality.py mesen2_exchange/door_transition_captu
   --database mesen2_exchange/tile_hash_database.json
 ```
 
+## Success Criteria (Provisional)
+
+These thresholds are heuristics for evaluating capture quality. Cross-reference with
+register logs and game state to interpret results correctly.
+
+| Metric | Non-SA1 Game Expected | SA1 + Conversion Expected |
+|--------|----------------------|--------------------------|
+| Tile hash hit rate | >70% | <10% |
+| Low-info tile % | 10-30% | 10-30% |
+| Top ROM bucket concentration | >50% | Variable |
+| WRAM/VRAM overlap | >50% | <10% |
+| Odd-byte non-zero % | >95% | >95% |
+
+**Interpretation:**
+- **High hash hit rate + low ROM bucket concentration**: Many tiles match many offsets
+  (collisions), use timing correlation to disambiguate.
+- **Low hash hit rate + high WRAM/VRAM overlap**: Tiles changed between capture and DB
+  build, or DB offsets incomplete.
+- **Low hash hit rate + low WRAM/VRAM overlap + SA-1 game**: Expected when character
+  conversion is active. Proceed with Strategy A.
+
+## Timing Correlation Failure Modes
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Low top-bucket count, buckets tied | Multi-region frame (sprites from multiple ROM areas) | Use per-burst bucketing |
+| High confidence, wrong ROM region | Hash collision (common tiles match many offsets) | Cross-reference with timing; require top-2 bucket separation |
+| Correlation off by 1-2 frames | Double buffering / VBlank timing | Widen correlation window to ±2 frames |
+| Hot bucket has no graphics | Pointer table reads, not tile data | Filter by 32-byte alignment; validate via decompression |
+| All buckets have similar counts | Heavy ROM access across regions | Increase `ROM_TRACE_MAX_READS`; use per-frame bursts |
+| Capture has tiles, trace is empty | ROM trace callback not firing | Check callback registration; verify memory type |
+
+## WARNING: WRAM Staging Analysis Limitations
+
+> **CRITICAL:** WRAM staging analysis (`analyze_wram_staging.py`) is ONLY valid for:
+> - Static assets (UI elements, fonts)
+> - Non-converted tile data
+
+**When tile conversion/transformation is active:**
+- WRAM contains SOURCE data (bitmap or compressed format)
+- VRAM contains OUTPUT data (converted bitplane format)
+- Hash comparison will show **ZERO OVERLAP**
+
+**This is expected behavior, not a bug.**
+
+| Scenario | Expected WRAM/VRAM Overlap |
+|----------|---------------------------|
+| SA-1 conversion INACTIVE | >50% (tiles match) |
+| SA-1 conversion ACTIVE | <10% (format differs) |
+| UI/font-only capture | Variable (depends on game) |
+
+**If you see zero overlap between WRAM and VRAM dumps:**
+1. Check if SA-1 conversion is active (see `SA1_HYPOTHESIS_FINDINGS.md`)
+2. If conversion active: zero overlap is correct, use Strategy A (timing correlation)
+3. If conversion NOT active: investigate other causes:
+   - Frame timing (WRAM dump after buffer reuse)
+   - Wrong WRAM range (staging buffer elsewhere)
+   - Compression variant (not HAL format)
+
 ## Common Symptoms
 
 ### Symptom: No matches for any tiles

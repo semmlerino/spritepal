@@ -6,6 +6,25 @@ This document is **game-specific**. Do not generalize these assumptions to other
 > to observation count (integer), NOT statistical probability. See
 > `02_DATA_CONTRACTS.md#what-confidence-means` for the canonical definition.
 
+## Golden Test ROM
+
+All development and testing was performed with this specific ROM file:
+
+| Property | Value |
+|----------|-------|
+| **Filename** | `Kirby Super Star (USA).sfc` |
+| **Format** | Headerless SFC (no 512-byte copier header) |
+| **Size** | 4,194,304 bytes (4 MB) |
+| **SHA256** | `4e095fbbdec4a16b075d7140385ff68b259870ca9e3357f076dfff7f3d1c4a62` |
+
+**Verification command:**
+```bash
+sha256sum "roms/Kirby Super Star (USA).sfc"
+```
+
+> **Important:** ROM offsets, database entries, and test results are specific to this ROM.
+> Different revisions, regions, or headered ROMs will have different offsets.
+
 ## Cartridge / CPU
 - Kirby Super Star uses the **SA-1** coprocessor.
 - ROM mapping for banks $C0-$FF commonly maps to ROM space, but **SA-1 mapping registers can

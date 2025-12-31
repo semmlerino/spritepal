@@ -17,6 +17,7 @@ All JSON data files should include a `schema_version` field at the top level:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | Dec 2024 | Initial documented schema |
+| 2.0 | Dec 2024 | Renamed fields: oam_base_addr→obj_tile_base_word, oam_addr_offset→obj_tile_offset_word, confidence→observation_count |
 
 **Version format:** `MAJOR.MINOR`
 - **MAJOR** bump: Breaking changes (removed fields, changed semantics)
@@ -117,6 +118,34 @@ Tiles ordering guarantee:
   even if some are partially or fully off-screen. The visibility filter operates on
   the sprite's anchor position (x, y), not individual subtiles. This ensures complete
   tile data for hash matching.
+
+### Tile Hash Byte Order
+
+Tiles are stored as 32 bytes in sequential VRAM order (after byte-swap correction).
+The hash database uses MD5 or SHA256 of this 32-byte sequence.
+
+**Reconstruction from `emu.readWord()`:**
+
+Due to Mesen2's `readWord()` returning bytes in big-endian order for VRAM, the capture
+script swaps bytes to produce correct sequential order:
+
+| Word Read | `readWord()` Returns | After Swap | DB Position |
+|-----------|---------------------|------------|-------------|
+| addr+0    | 0xCDAB              | AB, CD     | [0], [1]    |
+| addr+2    | 0x1234              | 34, 12     | [2], [3]    |
+| addr+4    | 0x5678              | 78, 56     | [4], [5]    |
+| ...       | ...                 | ...        | ...         |
+| addr+30   | 0xFFEE              | EE, FF     | [30], [31]  |
+
+**Lua extraction pattern:**
+```lua
+local word = emu.readWord(addr, emu.memType.snesVideoRam)
+local byte0 = (word >> 8) & 0xFF   -- First byte (high byte of word)
+local byte1 = word & 0xFF          -- Second byte (low byte of word)
+```
+
+**Verification:** Run `verify_endianness.lua` to confirm this behavior matches your
+Mesen2 build. See `01_BUILD_SPECIFIC_CONTRACT.md` § "VRAM Read Semantics" for details.
 
 ### palettes
 - Keys: strings "0".."7"
