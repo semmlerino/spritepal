@@ -369,11 +369,10 @@ local function reset_staging_rom_reads()
     staging_active = false
 end
 
--- Record a ROM read during staging fill
-local function record_staging_rom_read(bank, addr)
+-- Record a PRG ROM read during staging (address is PRG file offset)
+local function record_staging_rom_read(prg_offset)
     if not staging_active then return end
-    local key = (bank * 0x10000) + addr
-    staging_rom_reads[key] = (staging_rom_reads[key] or 0) + 1
+    staging_rom_reads[prg_offset] = (staging_rom_reads[prg_offset] or 0) + 1
     staging_rom_read_count = staging_rom_read_count + 1
 end
 
@@ -412,11 +411,10 @@ local function get_staging_rom_runs()
     return runs
 end
 
--- Format ROM address as bank:offset
-local function format_rom_addr(full_addr)
-    local bank = (full_addr >> 16) & 0xFF
-    local addr = full_addr & 0xFFFF
-    return string.format("%02X:%04X", bank, addr)
+-- Format PRG offset as hex (NOT a SNES bus address)
+-- These are file offsets into the PRG ROM, not bank:addr
+local function format_prg_offset(prg_offset)
+    return string.format("0x%06X", prg_offset)
 end
 
 -- Count keys in a map (Lua # operator doesn't work on maps)
@@ -435,9 +433,9 @@ local function log_staging_rom_reads(frame, vram_addr, dma_size)
     local runs_str_parts = {}
     for _, run in ipairs(runs) do
         if run.start == run.stop then
-            runs_str_parts[#runs_str_parts + 1] = format_rom_addr(run.start)
+            runs_str_parts[#runs_str_parts + 1] = format_prg_offset(run.start)
         else
-            runs_str_parts[#runs_str_parts + 1] = format_rom_addr(run.start) .. "-" .. format_rom_addr(run.stop)
+            runs_str_parts[#runs_str_parts + 1] = format_prg_offset(run.start) .. "-" .. format_prg_offset(run.stop)
         end
     end
     local runs_str = table.concat(runs_str_parts, ",")
@@ -452,18 +450,16 @@ local function log_staging_rom_reads(frame, vram_addr, dma_size)
 
     local unique_count = count_map_keys(staging_rom_reads)
     log(string.format(
-        "STAGING_ROM_READS: frame=%d pc=%s vram=0x%04X size=%d runs=[%s] unique=%d total=%d",
+        "STAGING_ROM_READS: frame=%d pc=%s vram_word=0x%04X size=%d prg_runs=[%s] unique=%d total=%d",
         frame, pc_str, vram_addr, dma_size, runs_str, unique_count, staging_rom_read_count
     ))
 end
 
 -- PRG/ROM read callback during staging
+-- Note: address is PRG file offset (0 to prg_size-1), NOT a SNES bus address
 local function on_staging_rom_read(address, value)
     if not staging_active then return end
-    -- Extract bank from full address
-    local bank = (address >> 16) & 0xFF
-    local addr = address & 0xFFFF
-    record_staging_rom_read(bank, addr)
+    record_staging_rom_read(address)
 end
 
 local function record_staging_write(addr, pc_snapshot)
@@ -967,22 +963,31 @@ local function get_obsel()
     }
 end
 
--- Read OAM byte: prefer DMA-captured buffer, fallback to MEM.oam
-local function read_oam_byte(offset)
-    if oam_dma_buffer and offset < OAM_DMA_SIZE then
-        return oam_dma_buffer[offset + 1]  -- Lua 1-indexed
+-- Read OAM byte: prefer DMA-captured buffer ONLY if it matches this frame
+local function read_oam_byte(offset, frame_id)
+    if oam_dma_buffer
+        and oam_dma_frame == frame_id
+        and offset < OAM_DMA_SIZE
+    then
+        return oam_dma_buffer[offset + 1] or 0  -- Lua 1-indexed
     end
-    return emu.read(offset, MEM.oam)
+
+    -- Fallback to direct OAM read
+    if MEM.oam then
+        local ok, v = pcall(emu.read, offset, MEM.oam)
+        if ok and v then return v end
+    end
+    return 0
 end
 
-local function parse_oam_entry(index)
+local function parse_oam_entry(index, frame_id)
     local base = index * 4
-    local x_low = read_oam_byte(base + 0)
-    local y = read_oam_byte(base + 1)
-    local tile = read_oam_byte(base + 2)
-    local attr = read_oam_byte(base + 3)
+    local x_low = read_oam_byte(base + 0, frame_id)
+    local y = read_oam_byte(base + 1, frame_id)
+    local tile = read_oam_byte(base + 2, frame_id)
+    local attr = read_oam_byte(base + 3, frame_id)
 
-    local hi_byte = read_oam_byte(0x200 + math.floor(index / 4))
+    local hi_byte = read_oam_byte(0x200 + math.floor(index / 4), frame_id)
     local hi_bit_pos = (index % 4) * 2
     local x_bit9 = (hi_byte >> hi_bit_pos) & 1
     local size_bit = (hi_byte >> (hi_bit_pos + 1)) & 1
@@ -1140,7 +1145,7 @@ local function dump_vram(path)
     f:close()
 end
 
-local function capture_sprites()
+local function capture_sprites(frame_id)
     if not MEM.oam or not MEM.cgram or not MEM.vram then
         log("ERROR: OAM/CGRAM/VRAM memTypes missing; cannot capture sprites")
         return nil, {}, 0, {}, 0, 0
@@ -1153,7 +1158,7 @@ local function capture_sprites()
     local odd_nonzero_tiles = 0
 
     for i = 0, 127 do
-        local entry = parse_oam_entry(i)
+        local entry = parse_oam_entry(i, frame_id)
         if is_visible(entry) then
             visible_count = visible_count + 1
             local width, height = get_sprite_size(obsel, entry.size_large)
@@ -1224,7 +1229,7 @@ local function write_capture_snapshot(tag, frame_id)
     end
     capture_count = capture_count + 1
 
-    local obsel, entries, visible_count, palettes, tile_count, odd_nonzero_tiles = capture_sprites()
+    local obsel, entries, visible_count, palettes, tile_count, odd_nonzero_tiles = capture_sprites(frame_id)
     if not obsel then
         return
     end
@@ -1575,12 +1580,23 @@ local function log_dma_channel(channel, value)
     -- OAM DMA capture: BBAD=0x04 ($2104 = OAMDATA)
     -- Capture the DMA source buffer as authoritative OAM for this frame
     if direction == "A->B" and bbad == 0x04 and das >= OAM_DMA_SIZE then
+        -- Read OAMADDR ($2102/$2103) to check if we're writing from start
+        local oamaddr_lo = emu.read(0x2102, emu.memType.snesRegister) or 0
+        local oamaddr_hi = emu.read(0x2103, emu.memType.snesRegister) or 0
+        local oamaddr = oamaddr_lo + ((oamaddr_hi & 0x01) * 256)
+
         local oam_bytes = {}
         local read_ok = true
+        local nil_count = 0
         for i = 0, OAM_DMA_SIZE - 1 do
             local addr = src + i
             local ok, val = pcall(emu.read, addr, dma_read_mem or emu.memType.snesMemory)
             if ok then
+                -- Treat nil as 0 and count it
+                if val == nil then
+                    val = 0
+                    nil_count = nil_count + 1
+                end
                 oam_bytes[i + 1] = val
             else
                 read_ok = false
@@ -1591,9 +1607,12 @@ local function log_dma_channel(channel, value)
             oam_dma_buffer = oam_bytes
             oam_dma_frame = get_canonical_frame()
             log(string.format(
-                "OAM_DMA_CAPTURE: frame=%d src=0x%06X size=%d",
-                oam_dma_frame, src, das
+                "OAM_DMA_CAPTURE: frame=%d src=0x%06X das=%d read=%d oamaddr=%d nils=%d",
+                oam_dma_frame, src, das, OAM_DMA_SIZE, oamaddr, nil_count
             ))
+            if oamaddr ~= 0 then
+                log(string.format("WARNING: OAM DMA starts at OAMADDR=%d, not 0 (index assumptions may be off)", oamaddr))
+            end
         end
     end
 
