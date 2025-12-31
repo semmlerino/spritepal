@@ -156,32 +156,38 @@ local last_master_clock = nil
 local last_state_frame = nil
 local last_sa1_dma_irq = nil
 
-local LOG_VRAM_MEMORY_WRITES = os.getenv("LOG_VRAM_MEMORY_WRITES") == "1"
-local MAX_VRAM_WRITE_LOG = tonumber(os.getenv("MAX_VRAM_WRITE_LOG")) or 20
-local VRAM_DIFF_ENABLED = os.getenv("VRAM_DIFF") ~= "0"
-local VRAM_SIZE = 0x10000
-local VRAM_COARSE_STEP = tonumber(os.getenv("VRAM_COARSE_STEP")) or 16
-local VRAM_PAGE_SIZE = tonumber(os.getenv("VRAM_PAGE_SIZE")) or 0x0400
-local VRAM_PAGE_LOG_LIMIT = tonumber(os.getenv("VRAM_PAGE_LOG_LIMIT")) or 12
-local HEARTBEAT_EVERY = tonumber(os.getenv("HEARTBEAT_EVERY")) or 0
-local WRAM_DUMP_ON_VRAM_DIFF = os.getenv("WRAM_DUMP_ON_VRAM_DIFF") ~= "0"
-local WRAM_DUMP_START = os.getenv("WRAM_DUMP_START") or "0x0000"
-local WRAM_DUMP_ABS_START = os.getenv("WRAM_DUMP_ABS_START")
-local WRAM_DUMP_SIZE = tonumber(os.getenv("WRAM_DUMP_SIZE")) or 0x20000
-local WRAM_DUMP_PREV = os.getenv("WRAM_DUMP_PREV") ~= "0"
-local WRAM_WATCH_WRITES = os.getenv("WRAM_WATCH_WRITES") ~= "0"
-local WRAM_WATCH_SAMPLE_LIMIT = tonumber(os.getenv("WRAM_WATCH_SAMPLE_LIMIT")) or 8
-local WRAM_WATCH_START = os.getenv("WRAM_WATCH_START")
-local WRAM_WATCH_END = os.getenv("WRAM_WATCH_END")
-local WRAM_WATCH_CAPTURE_THRESHOLD = tonumber(os.getenv("WRAM_WATCH_CAPTURE_THRESHOLD")) or 0
-local WRAM_WATCH_PC_SAMPLES = tonumber(os.getenv("WRAM_WATCH_PC_SAMPLES")) or 0
-local ROM_TRACE_ON_WRAM_WRITE = os.getenv("ROM_TRACE_ON_WRAM_WRITE") == "1"
-local ROM_TRACE_MAX_READS = tonumber(os.getenv("ROM_TRACE_MAX_READS")) or 200
-local ROM_TRACE_MAX_FRAMES = tonumber(os.getenv("ROM_TRACE_MAX_FRAMES")) or 1
-local ROM_TRACE_PC_SAMPLES = tonumber(os.getenv("ROM_TRACE_PC_SAMPLES")) or 8
-local SKIP_VISIBILITY_FILTER = os.getenv("SKIP_VISIBILITY_FILTER") == "1"
--- Consolidated configuration tables to stay under Lua's 200 local variable limit
+-- Consolidated configuration table to stay under Lua's 200 local variable limit
 local CFG = {
+    -- VRAM settings
+    log_vram_memory_writes = os.getenv("CFG.log_vram_memory_writes") == "1",
+    max_vram_write_log = tonumber(os.getenv("CFG.max_vram_write_log")) or 20,
+    vram_diff_enabled = os.getenv("VRAM_DIFF") ~= "0",
+    vram_size = 0x10000,
+    vram_coarse_step = tonumber(os.getenv("CFG.vram_coarse_step")) or 16,
+    vram_page_size = tonumber(os.getenv("CFG.vram_page_size")) or 0x0400,
+    vram_page_log_limit = tonumber(os.getenv("CFG.vram_page_log_limit")) or 12,
+    -- General
+    heartbeat_every = tonumber(os.getenv("CFG.heartbeat_every")) or 0,
+    skip_visibility_filter = os.getenv("CFG.skip_visibility_filter") == "1",
+    -- WRAM dump settings
+    wram_dump_on_vram_diff = os.getenv("CFG.wram_dump_on_vram_diff") ~= "0",
+    wram_dump_start = os.getenv("CFG.wram_dump_start") or "0x0000",
+    wram_dump_abs_start = os.getenv("CFG.wram_dump_abs_start"),
+    wram_dump_size = tonumber(os.getenv("CFG.wram_dump_size")) or 0x20000,
+    wram_dump_prev = os.getenv("CFG.wram_dump_prev") ~= "0",
+    -- WRAM watch settings
+    wram_watch_writes = os.getenv("CFG.wram_watch_writes") ~= "0",
+    wram_watch_sample_limit = tonumber(os.getenv("CFG.wram_watch_sample_limit")) or 8,
+    wram_watch_start = os.getenv("CFG.wram_watch_start"),
+    wram_watch_end = os.getenv("CFG.wram_watch_end"),
+    wram_watch_capture_threshold = tonumber(os.getenv("CFG.wram_watch_capture_threshold")) or 0,
+    wram_watch_pc_samples = tonumber(os.getenv("CFG.wram_watch_pc_samples")) or 0,
+    -- ROM trace settings
+    rom_trace_on_wram_write = os.getenv("CFG.rom_trace_on_wram_write") == "1",
+    rom_trace_max_reads = tonumber(os.getenv("CFG.rom_trace_max_reads")) or 200,
+    rom_trace_max_frames = tonumber(os.getenv("CFG.rom_trace_max_frames")) or 1,
+    rom_trace_pc_samples = tonumber(os.getenv("CFG.rom_trace_pc_samples")) or 8,
+    -- Visibility
     visible_y_exclude_start = parse_int(os.getenv("VISIBLE_Y_EXCLUDE_START"), 224),
     visible_y_exclude_end = parse_int(os.getenv("VISIBLE_Y_EXCLUDE_END"), 240),
     visible_x_min = parse_int(os.getenv("VISIBLE_X_MIN"), -64),
@@ -211,8 +217,8 @@ local CFG = {
     periodic_capture_interval = tonumber(os.getenv("PERIODIC_CAPTURE_INTERVAL")) or 1800,
 }
 -- Dependent config values
-CFG.wram_dump_start_frame = tonumber(os.getenv("WRAM_DUMP_START_FRAME")) or CFG.capture_start_frame
-CFG.wram_dump_start_seconds = tonumber(os.getenv("WRAM_DUMP_START_SECONDS")) or CFG.capture_start_seconds
+CFG.wram_dump_start_frame = tonumber(os.getenv("CFG.wram_dump_start_FRAME")) or CFG.capture_start_frame
+CFG.wram_dump_start_seconds = tonumber(os.getenv("CFG.wram_dump_start_SECONDS")) or CFG.capture_start_seconds
 CFG.dma_dump_start_frame = tonumber(os.getenv("DMA_DUMP_START_FRAME")) or CFG.capture_start_frame
 CFG.dma_dump_start_seconds = tonumber(os.getenv("DMA_DUMP_START_SECONDS")) or CFG.capture_start_seconds
 
@@ -233,11 +239,11 @@ local STATE = {
 local ROM_TRACE_LOG_FILE = OUTPUT_DIR .. "rom_trace_log.txt"
 
 if not MEM.vram then
-    VRAM_DIFF_ENABLED = false
+    CFG.vram_diff_enabled = false
 end
 
-local wram_dump_start = parse_int(WRAM_DUMP_START, 0x0000)
-local wram_dump_abs_start = parse_int(WRAM_DUMP_ABS_START, nil)
+local wram_dump_start = parse_int(CFG.wram_dump_start, 0x0000)
+local wram_dump_abs_start = parse_int(CFG.wram_dump_abs_start, nil)
 local wram_mem_type = MEM.wram
 local wram_base = wram_dump_start
 local wram_address_mode = "relative"
@@ -250,8 +256,8 @@ elseif not wram_mem_type then
     wram_base = 0x7E0000 + wram_dump_start
     wram_address_mode = "absolute"
 end
-local wram_watch_start = parse_int(WRAM_WATCH_START, wram_base)
-local wram_watch_end = parse_int(WRAM_WATCH_END, wram_watch_start + WRAM_DUMP_SIZE - 1)
+local wram_watch_start = parse_int(CFG.wram_watch_start, wram_base)
+local wram_watch_end = parse_int(CFG.wram_watch_end, wram_watch_start + CFG.wram_dump_size - 1)
 local _last_wram_dump_frame = nil  -- luacheck: ignore (reserved for future use)
 local prev_wram_snapshot = nil
 local prev_wram_frame = nil
@@ -735,10 +741,10 @@ end
 -- get_cpu_state_snapshot() moved to line ~295
 
 local function arm_rom_trace(label)
-    if not ROM_TRACE_ON_WRAM_WRITE or rom_trace_active then
+    if not CFG.rom_trace_on_wram_write or rom_trace_active then
         return
     end
-    local threshold = WRAM_WATCH_CAPTURE_THRESHOLD
+    local threshold = CFG.wram_watch_capture_threshold
     if threshold < 1 then
         threshold = 1
     end
@@ -746,12 +752,12 @@ local function arm_rom_trace(label)
         return
     end
     local frame_id = last_state_frame or frame_count
-    local max_frames = ROM_TRACE_MAX_FRAMES
+    local max_frames = CFG.rom_trace_max_frames
     if max_frames < 1 then
         max_frames = 1
     end
     rom_trace_active = true
-    rom_trace_remaining = ROM_TRACE_MAX_READS
+    rom_trace_remaining = CFG.rom_trace_max_reads
     rom_trace_end_frame = frame_id + max_frames - 1
     rom_trace_arm_frame = frame_id
     rom_trace_label = label
@@ -764,7 +770,7 @@ local function arm_rom_trace(label)
         tostring(label),
         prg_size_text,
         prg_end_text,
-        ROM_TRACE_MAX_READS,
+        CFG.rom_trace_max_reads,
         max_frames
     ))
     log(string.format(
@@ -824,7 +830,7 @@ local function read_vram_byte(addr)
             log("ERROR: VRAM read returned nil; disabling VRAM diff")
             STATE.vram_read_error_logged = true
         end
-        VRAM_DIFF_ENABLED = false
+        CFG.vram_diff_enabled = false
         return 0
     end
     return value
@@ -835,7 +841,7 @@ local function hash_stride(start_addr, size, step)
     local prime = 16777619
     for i = 0, size - 1, step do
         local b = read_vram_byte(start_addr + i)
-        if not VRAM_DIFF_ENABLED then
+        if not CFG.vram_diff_enabled then
             return h
         end
         h = (bxor(h, b) * prime) % 4294967296
@@ -848,7 +854,7 @@ local function hash_block(start_addr, size)
     local prime = 16777619
     for i = 0, size - 1 do
         local b = read_vram_byte(start_addr + i)
-        if not VRAM_DIFF_ENABLED then
+        if not CFG.vram_diff_enabled then
             return h
         end
         h = (bxor(h, b) * prime) % 4294967296
@@ -859,10 +865,10 @@ end
 local function record_wram_write(label, address)
     wram_write_counts[label] = wram_write_counts[label] + 1
     local samples = wram_write_samples[label]
-    if #samples < WRAM_WATCH_SAMPLE_LIMIT then
+    if #samples < CFG.wram_watch_sample_limit then
         samples[#samples + 1] = string.format("0x%06X", address)
     end
-    if WRAM_WATCH_PC_SAMPLES > 0 and wram_write_cpu_samples[label] < WRAM_WATCH_PC_SAMPLES then
+    if CFG.wram_watch_pc_samples > 0 and wram_write_cpu_samples[label] < CFG.wram_watch_pc_samples then
         wram_write_cpu_samples[label] = wram_write_cpu_samples[label] + 1
         local snapshot = get_cpu_state_snapshot()
         if snapshot then
@@ -879,7 +885,7 @@ local function record_wram_write(label, address)
             ))
         end
     end
-    if ROM_TRACE_ON_WRAM_WRITE then
+    if CFG.rom_trace_on_wram_write then
         arm_rom_trace(label)
     end
 end
@@ -892,7 +898,7 @@ local function capture_wram_snapshot()
     local chunk = {}
     local chunk_len = 0
     local chunk_size = 4096
-    for i = 0, WRAM_DUMP_SIZE - 1 do
+    for i = 0, CFG.wram_dump_size - 1 do
         local value = emu.read(wram_base + i, wram_mem_type)
         if value == nil then
             value = 0
@@ -912,7 +918,7 @@ local function capture_wram_snapshot()
 end
 
 local function write_wram_snapshot(frame_id, label, snapshot, source_frame, force)
-    if not WRAM_DUMP_ON_VRAM_DIFF and not force then
+    if not CFG.wram_dump_on_vram_diff and not force then
         return
     end
     if not snapshot then
@@ -923,7 +929,7 @@ local function write_wram_snapshot(frame_id, label, snapshot, source_frame, forc
         tag = tag .. "_f" .. tostring(source_frame)
     end
     local path = OUTPUT_DIR
-        .. string.format("wram_dump_%s_%s_start_%06X_size_%05X.bin", tostring(frame_id), tag, wram_base, WRAM_DUMP_SIZE)
+        .. string.format("wram_dump_%s_%s_start_%06X_size_%05X.bin", tostring(frame_id), tag, wram_base, CFG.wram_dump_size)
     local f = io.open(path, "wb")
     if not f then
         log("ERROR: failed to open WRAM dump: " .. path)
@@ -938,7 +944,7 @@ local function write_wram_snapshot(frame_id, label, snapshot, source_frame, forc
         tag,
         wram_address_mode,
         wram_base,
-        WRAM_DUMP_SIZE,
+        CFG.wram_dump_size,
         path
     ))
 end
@@ -1053,7 +1059,7 @@ local function get_sprite_size(obsel, is_large)
 end
 
 local function is_visible(entry)
-    if SKIP_VISIBILITY_FILTER then
+    if CFG.skip_visibility_filter then
         return true
     end
     if entry.y >= CFG.visible_y_exclude_start and entry.y < CFG.visible_y_exclude_end then
@@ -1399,11 +1405,11 @@ local function write_capture_snapshot(tag, frame_id)
 end
 
 local function init_page_hashes()
-    if not VRAM_DIFF_ENABLED then
+    if not CFG.vram_diff_enabled then
         return
     end
-    for base = 0, VRAM_SIZE - 1, VRAM_PAGE_SIZE do
-        STATE.last_page_hash[base] = hash_block(base, VRAM_PAGE_SIZE)
+    for base = 0, CFG.vram_size - 1, CFG.vram_page_size do
+        STATE.last_page_hash[base] = hash_block(base, CFG.vram_page_size)
     end
     STATE.last_page_initialized = true
 end
@@ -1411,14 +1417,14 @@ end
 local function refine_changed_pages(frame_id)
     local changed = 0
     local logged = 0
-    for base = 0, VRAM_SIZE - 1, VRAM_PAGE_SIZE do
-        local h = hash_block(base, VRAM_PAGE_SIZE)
+    for base = 0, CFG.vram_size - 1, CFG.vram_page_size do
+        local h = hash_block(base, CFG.vram_page_size)
         local prev = STATE.last_page_hash[base]
         if prev == nil then
             STATE.last_page_hash[base] = h
         elseif h ~= prev then
             changed = changed + 1
-            if logged < VRAM_PAGE_LOG_LIMIT then
+            if logged < CFG.vram_page_log_limit then
                 log(string.format(
                     "VRAM diff: frame=%s clock=%s page=0x%04X %08X->%08X",
                     tostring(frame_id),
@@ -1442,10 +1448,10 @@ local function refine_changed_pages(frame_id)
 end
 
 local function poll_vram_diff(frame_id, current_snapshot)
-    if not VRAM_DIFF_ENABLED then
+    if not CFG.vram_diff_enabled then
         return
     end
-    local coarse = hash_stride(0, VRAM_SIZE, VRAM_COARSE_STEP)
+    local coarse = hash_stride(0, CFG.vram_size, CFG.vram_coarse_step)
     if not vram_diff_allowed(frame_id) then
         STATE.last_coarse_hash = coarse
         return
@@ -1486,8 +1492,8 @@ local function poll_vram_diff(frame_id, current_snapshot)
     ))
     STATE.last_coarse_hash = coarse
     refine_changed_pages(frame_id)
-    if WRAM_DUMP_ON_VRAM_DIFF and wram_dump_allowed(frame_id) then
-        if WRAM_DUMP_PREV and prev_wram_snapshot ~= nil then
+    if CFG.wram_dump_on_vram_diff and wram_dump_allowed(frame_id) then
+        if CFG.wram_dump_prev and prev_wram_snapshot ~= nil then
             write_wram_snapshot(frame_id, "prev", prev_wram_snapshot, prev_wram_frame)
         end
         if current_snapshot ~= nil then
@@ -2004,7 +2010,7 @@ local function on_sa1_bitmap_write(address)
 end
 
 local function log_wram_writes(frame_id)
-    if not WRAM_WATCH_WRITES then
+    if not CFG.wram_watch_writes then
         return false
     end
     local triggered = false
@@ -2022,7 +2028,7 @@ local function log_wram_writes(frame_id)
                 wram_watch_end,
                 sample_text
             ))
-            if CFG.capture_on_wram_write and count >= WRAM_WATCH_CAPTURE_THRESHOLD then
+            if CFG.capture_on_wram_write and count >= CFG.wram_watch_capture_threshold then
                 triggered = true
             end
         end
@@ -2115,7 +2121,7 @@ local function on_end_frame()
     end
 
     local current_snapshot = nil
-    if WRAM_DUMP_ON_VRAM_DIFF and WRAM_DUMP_PREV and wram_dump_allowed(last_state_frame or frame_count) then
+    if CFG.wram_dump_on_vram_diff and CFG.wram_dump_prev and wram_dump_allowed(last_state_frame or frame_count) then
         current_snapshot = capture_wram_snapshot()
     end
     poll_vram_diff(last_state_frame or frame_count, current_snapshot)
@@ -2212,7 +2218,7 @@ local function on_end_frame()
         STATE.next_periodic_capture_frame = frame_count + CFG.periodic_capture_interval
     end
 
-    if HEARTBEAT_EVERY > 0 and (frame_count % HEARTBEAT_EVERY) == 0 then
+    if CFG.heartbeat_every > 0 and (frame_count % CFG.heartbeat_every) == 0 then
         log(string.format("Heartbeat frame=%d masterClock=%s", frame_count, tostring(last_master_clock)))
     end
 
@@ -2381,7 +2387,7 @@ else
     log("INFO: SA-1 cpuType not available; SA-1 DMA monitoring limited to S-CPU writes")
 end
 
-if ROM_TRACE_ON_WRAM_WRITE then
+if CFG.rom_trace_on_wram_write then
     if not MEM.prg then
         log("WARNING: ROM trace enabled but no PRG-ROM memType resolved")
     else
@@ -2403,7 +2409,7 @@ if ROM_TRACE_ON_WRAM_WRITE then
                 end
                 rom_trace_remaining = rom_trace_remaining - 1
                 local extra = ""
-                if ROM_TRACE_PC_SAMPLES > 0 and rom_trace_pc_samples < ROM_TRACE_PC_SAMPLES then
+                if CFG.rom_trace_pc_samples > 0 and rom_trace_pc_samples < CFG.rom_trace_pc_samples then
                     rom_trace_pc_samples = rom_trace_pc_samples + 1
                     local snapshot = get_cpu_state_snapshot()
                     if snapshot then
@@ -2466,7 +2472,7 @@ if ROM_TRACE_ON_WRAM_WRITE then
         end
     end
 end
-if WRAM_WATCH_WRITES then
+if CFG.wram_watch_writes then
     if not wram_mem_type then
         log("WARNING: WRAM watch enabled but no WRAM memType resolved")
     else
@@ -2588,7 +2594,7 @@ end
 if MEM.vram then
     add_memory_callback_compat(function(address, value)
         vram_mem_write_count = vram_mem_write_count + 1
-        if LOG_VRAM_MEMORY_WRITES and vram_mem_write_logged < MAX_VRAM_WRITE_LOG then
+        if CFG.log_vram_memory_writes and vram_mem_write_logged < CFG.max_vram_write_log then
             vram_mem_write_logged = vram_mem_write_logged + 1
             log(string.format(
                 "VRAM mem write: frame=%s clock=%s addr=0x%04X value=0x%02X",
@@ -2605,20 +2611,20 @@ refresh_vram_addr()
 refresh_vram_inc()
 log(string.format(
     "WRAM config: dump=%s prev=%s watch=%s memType=%s mode=%s base=0x%06X size=0x%05X range=0x%06X-0x%06X",
-    tostring(WRAM_DUMP_ON_VRAM_DIFF),
-    tostring(WRAM_DUMP_PREV),
-    tostring(WRAM_WATCH_WRITES),
+    tostring(CFG.wram_dump_on_vram_diff),
+    tostring(CFG.wram_dump_prev),
+    tostring(CFG.wram_watch_writes),
     tostring(wram_mem_type),
     wram_address_mode,
     wram_base,
-    WRAM_DUMP_SIZE,
+    CFG.wram_dump_size,
     wram_watch_start,
     wram_watch_end
 ))
 log(string.format(
     "WRAM env: WATCH_START=%s WATCH_END=%s",
-    tostring(WRAM_WATCH_START),
-    tostring(WRAM_WATCH_END)
+    tostring(CFG.wram_watch_start),
+    tostring(CFG.wram_watch_end)
 ))
 log(string.format(
     "Staging watch: enabled=%s range=0x%04X-0x%04X pc_samples=%d history_frames=%d",
@@ -2630,7 +2636,7 @@ log(string.format(
 ))
 log(string.format(
     "Visibility filter: enabled=%s y_exclude=%d-%d x_range=%d..%d",
-    tostring(not SKIP_VISIBILITY_FILTER),
+    tostring(not CFG.skip_visibility_filter),
     CFG.visible_y_exclude_start,
     CFG.visible_y_exclude_end,
     CFG.visible_x_min,
@@ -2640,13 +2646,13 @@ local prg_size_text = rom_trace_prg_size and string.format("0x%X", rom_trace_prg
 local prg_end_text = rom_trace_prg_end and string.format("0x%06X", rom_trace_prg_end) or "nil"
 log(string.format(
     "ROM trace: enabled=%s memType=%s prg_size=%s prg_end=%s max_reads=%d max_frames=%d pc_samples=%d",
-    tostring(ROM_TRACE_ON_WRAM_WRITE),
+    tostring(CFG.rom_trace_on_wram_write),
     tostring(MEM.prg),
     prg_size_text,
     prg_end_text,
-    ROM_TRACE_MAX_READS,
-    ROM_TRACE_MAX_FRAMES,
-    ROM_TRACE_PC_SAMPLES
+    CFG.rom_trace_max_reads,
+    CFG.rom_trace_max_frames,
+    CFG.rom_trace_pc_samples
 ))
 log("DMA probe start: frame_event=" .. tostring(FRAME_EVENT) .. " max_frames=" .. tostring(MAX_FRAMES))
 
