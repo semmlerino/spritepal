@@ -66,6 +66,30 @@ python3 scripts/summarize_rom_trace.py <run_dir> --bucket-size 0x1000 --top 5
 python3 scripts/validate_seed_candidate.py <rom> --seed <addr> --auto-map --png test.png
 ```
 
+## Minimal Reproduction Checklist
+
+Before opening an issue, verify these basics:
+
+### Environment
+- [ ] Mesen2 build matches `01_BUILD_SPECIFIC_CONTRACT.md` tested version
+- [ ] ROM file is headerless `.sfc` (not `.smc` with 512-byte header, or zipped)
+- [ ] WSL interop working (if applicable): `cmd.exe /c echo hello` succeeds
+- [ ] Output directory exists and is writable
+
+### Capture Artifacts
+- [ ] `sprite_capture_*.json` files created in `mesen2_exchange/`
+- [ ] `data_hex` fields are exactly 64 characters
+- [ ] Odd bytes are not all zero (run `analyze_capture_quality.py`)
+
+### Database
+- [ ] `tile_hash_database.json` exists and matches ROM (check `metadata.rom_checksum`)
+- [ ] Database has entries for the game state being captured
+
+### Scoring
+- [ ] `matched_tiles > 0` (tiles found in DB)
+- [ ] `scored_tiles > 0` (high-info tiles contributing to score)
+- [ ] If both are zero, check for SA-1 character conversion
+
 ## Fail-Fast Checks (Required)
 1. **Tile bytes complete**: `data_hex` length is 64 hex chars (32 bytes).
 2. **Odd bytes non-zero**: if **most/all tiles** have every odd byte as zero, **investigate

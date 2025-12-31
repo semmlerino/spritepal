@@ -119,6 +119,37 @@ space (and document which direction you used).
 
 This is an API behavior, not SNES hardware behavior (see `00_STABLE_SNES_FACTS.md`).
 
+> ⚠️ **Build-Specific Behavior**
+>
+> The `emu.readWord()` big-endian behavior and any VMAIN manipulation are
+> **Mesen2 API quirks**, not SNES hardware requirements. On real hardware,
+> VMAIN ($2115) controls increment timing per the PPU spec
+> (see [SNESdev VRAM](https://snes.nesdev.org/wiki/VRAM)).
+> Do not generalize these workarounds to other emulators or hardware.
+
+### Which Memory Types Are Affected?
+
+The big-endian `emu.readWord()` behavior has been **verified** for:
+- `snesVideoRam` (VRAM) — confirmed, byte swap required
+
+**Not verified** (assume same behavior but test first):
+- `snesSpriteRam` (OAM)
+- `snesCgRam` (CGRAM)
+- `snesWorkRam` (WRAM)
+- `snesPrgRom` (PRG-ROM)
+
+When reading from a new memory type, verify byte order before assuming.
+
+### Side Effects of PPU Register Access
+
+Reading/writing PPU registers from Lua **may affect emulator state**:
+- VRAM address ($2116/$2117) changes affect subsequent reads
+- VMAIN ($2115) changes affect increment behavior
+- Reading $2139/$213A (VRAM data) may trigger address increment
+
+**Best practice:** Save and restore PPU state if your script modifies registers.
+This is an emulator interaction concern, not a SNES hardware limitation.
+
 ## emu.convertAddress() (Current Build)
 Converts addresses between memory types and CPU address space.
 

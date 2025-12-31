@@ -52,6 +52,41 @@ ROM (HAL compressed) → SA-1 CPU decompresses → WRAM buffer → DMA → VRAM
 - Main CPU callbacks do **not** see SA-1 decompression.
 - DMA typically shows **WRAM→VRAM**, not ROM→VRAM.
 
+**What this means for the pipeline:**
+- Direct ROM tile hashes → VRAM comparison **will fail** (when SA-1 CC is active)
+- Strategy A (VRAM-based DB) required for mapping in this game
+- ROM trace correlation provides region hints, not byte-level matches
+- Injection must target **pre-conversion source**, not VRAM
+
+## When Does Hash Mapping Work? (Decision Tree)
+
+```
+VRAM tile captured
+    │
+    ├─► Is game using SA-1 character conversion?
+    │       YES → Hash mapping FAILS (use Strategy A: VRAM-based DB)
+    │       NO  ↓
+    │
+    ├─► Is tile data direct ROM copy after decompression?
+    │       NO (runtime composition, effects, staging transforms)
+    │           → Hash mapping FAILS
+    │       YES ↓
+    │
+    ├─► Is correct ROM offset in database?
+    │       NO  → Expand DB with validated seeds
+    │       YES ↓
+    │
+    └─► Is tile high-information (>2 unique bytes)?
+            NO  → Match exists but score is zero (by design)
+            YES → MATCH with positive score
+```
+
+**Expected failures (not bugs):**
+- SA-1 character conversion active (Kirby Super Star: 1.5% match rate)
+- Tiles composed at runtime from multiple sources
+- Post-decompression palette remapping or effects
+- Low-entropy tiles (solid colors, gradients)
+
 ## Recent Observations (Movie Probe)
 
 > **⚠️ EXPLORATORY DATA — NOT SPECIFICATIONS**
@@ -108,6 +143,32 @@ Operational playbook:
 - Strategy A: build a database from **post-conversion VRAM tiles** (screen capture based).
 - Strategy B: capture the source bitmap + conversion params and reproduce conversion offline
   before hashing.
+
+### Detecting Character Conversion (Operational)
+
+To confirm SA-1 character conversion is active:
+
+1. **Log $2230 writes** (DCNT register):
+   - Bit 5 (M) = 1 indicates character conversion mode enabled
+   - Use `emu.addMemoryCallback` on write to $2230
+
+2. **Log $2231 writes** (CDMA register):
+   - Bits 0-1 (CC) indicate bpp: 00=8bpp, 01=4bpp, 10=2bpp
+   - Bit 7 (E) is completion flag (set by SNES, not SA-1)
+
+3. **Compare hash match rates**:
+   - <10% match rate strongly suggests conversion is active
+   - >80% match rate suggests direct ROM→VRAM copy
+
+```lua
+-- Example: Log character conversion enable
+emu.addMemoryCallback(function(addr, value)
+    local mode_bit = (value >> 5) & 1
+    if mode_bit == 1 then
+        print("SA-1 character conversion ENABLED")
+    end
+end, emu.callbackType.write, 0x2230, 0x2230, emu.cpuType.snes)
+```
 
 ### Confirmed: SA-1 Conversion Active in Kirby Super Star (Dec 2025)
 Testing confirmed that SA-1 character conversion is **active during gameplay**:
@@ -229,6 +290,16 @@ python compile_hal_tools.py  # Auto-detect platform and compile
   before trusting bank-based calculations.
 - DMA source addresses may be incomplete if only low 16 bits are captured.
 - Verify ROM revision/CRC when results look implausible; offsets are not portable across variants.
+
+### Common Misconceptions
+
+**"If I can see a sprite, its tiles should exist verbatim in ROM"**
+- FALSE for: SA-1 character conversion, runtime composition, palette effects
+- TRUE for: Direct decompression without post-processing (rare in SA-1 games)
+
+**"A high hash match score proves correct ROM offset"**
+- FALSE if: Low-entropy tiles dominate, or collisions inflate scores
+- TRUE if: Multiple high-info tiles consistently map to same offset
 
 ## Golden Test (Create Once Mapping Works)
 Define a single capture (savestate + frame) that reliably maps to a known offset, and record:

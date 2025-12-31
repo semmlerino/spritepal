@@ -2,6 +2,24 @@
 
 This document defines the **canonical schema** for capture and mapping data.
 
+## Global Conventions
+
+### Address Unit Suffix Rule
+- `*_addr` or no suffix = **byte address** (ready for API calls)
+- `*_word` = **word address** (multiply by 2 for bytes)
+
+**Legacy exceptions** (predating this convention):
+- `oam_base_addr`, `oam_addr_offset` are **word addresses** despite `_addr` suffix
+- These are documented in the Quick Reference table; new fields must use `_word` suffix
+
+### Byte Array Encoding
+All byte arrays in JSON use **list[int]** (0-255 values), never base64.
+- `data_hex`: hex string (64 chars = 32 bytes)
+- `palettes[n]`: list of 16 ints (15-bit BGR words)
+- Future byte arrays: list[int] unless explicitly noted
+
+---
+
 ## sprite_capture*.json
 
 ### Top-Level
@@ -85,6 +103,20 @@ Tiles ordering guarantee:
 | `vram_addr` | **byte** | Ready for VRAM reads |
 | `tiles[].vram_addr` | **byte** | Per-subtile VRAM address |
 
+### Value Ranges
+
+| Field | Type | Range | Notes |
+|-------|------|-------|-------|
+| `entries[].x` | int | -256..255 | Signed 9-bit |
+| `entries[].y` | int | 0..255 | Unsigned 8-bit |
+| `entries[].tile` | int | 0..255 | OAM tile index |
+| `entries[].palette` | int | 0..7 | CGRAM palette (128-255) |
+| `entries[].priority` | int | 0..3 | Higher = in front |
+| `entries[].tile_page` | int | 0..1 | Second table select |
+| `obsel.name_base` | int | 0..7 | OBJSEL bits 0-2 |
+| `obsel.name_select` | int | 0..3 | OBJSEL bits 3-4 |
+| `obsel.size_select` | int | 0..7 | OBJSEL bits 5-7 |
+
 ### Rules
 - Prefer `tile_page` over `name_table`. Treat `name_table` as legacy input only.
 - `tile_page`/`name_table` refer to the **OBJ tile high bit**, not BG nametables.
@@ -109,8 +141,12 @@ tile_base_addr = oam_base_addr * 2  # Example
 word_addr = byte_addr // 2
 ```
 
-## Tile Hash Contract (4bpp)
-- Tile size: **32 bytes** (4bpp). Sprites (OBJ) are always 4bpp; other bpp modes apply to BG tiles.
+## Tile Hash Contract (4bpp, OBJ-Only)
+
+**Scope:** This pipeline handles **OBJ sprites only**. BG tiles support 2/4/8bpp
+but are outside the current scope.
+
+- Tile size: **32 bytes** (4bpp). SNES OBJ sprites are always 4bpp.
 - Hash algorithm: **MD5** over raw 32-byte tile data.
 - Flip normalization: optional lookup mode that tests **N/H/V/HV** variants; candidates are
   de-duplicated by `(rom_offset, tile_index)`. Default mapping uses **unflipped** tiles
@@ -130,6 +166,47 @@ These fields are produced by `CaptureToROMMapper.map_capture()` for diagnostics 
 - `matched_tiles`: tiles with any hash hits (including low-info tiles)
 - `scored_tiles`: tiles that contributed positive weight to scoring
 - `ignored_low_info_tiles`: tiles ignored due to low-information heuristic
+
+## Scoring Algorithm (CaptureToROMMapper)
+
+### Tile Classification
+1. **High-information tile**: >2 unique byte values in 32-byte tile data
+2. **Low-information tile**: ≤2 unique byte values (ignored in scoring)
+
+### Per-Tile Weight
+```python
+def tile_weight(tile_data: bytes, hit_count: int) -> float:
+    unique_bytes = len(set(tile_data))
+    if unique_bytes <= 2:
+        return 0.0  # Low-info: ignore
+    if hit_count == 0:
+        return 0.0  # No match
+    # Inverse of collision count: fewer hits = more distinctive
+    return 1.0 / hit_count
+```
+
+### Offset Scoring
+```python
+def score_offset(offset: int, tile_weights: dict[str, float]) -> float:
+    return sum(
+        tile_weights[hash]
+        for hash in tiles_at_offset[offset]
+        if hash in tile_weights
+    )
+```
+
+### Result Fields
+- `matched_tiles`: tiles with ≥1 DB hits (includes low-info)
+- `scored_tiles`: tiles with positive weight contribution
+- `ignored_low_info_tiles`: tiles skipped due to ≤2 unique bytes
+- `top_offset`: highest-scoring ROM offset
+- `confidence`: ratio of scored_tiles to total high-info tiles
+
+**Caveats:**
+- Scores are **relative rankings**, not absolute confidence measures
+- High scores with few tiles may be coincidental collisions
+- Low scores with many low-info tiles may still indicate correct offset
+- Always validate top candidates via decompression before indexing
 
 ## tile_hash_database.json
 Database files include metadata to guard against ROM/header mismatches.
@@ -175,3 +252,13 @@ if tile_hash in db["tiles"]:
 - High `alternatives` values indicate ambiguous mappings
 - Works only for tiles captured during the probe runs that built this database
 - Does not replace ROM-based database for games without SA-1 conversion
+
+## rom_trace_log.txt
+
+ROM trace logs are line-oriented text files. See `01_BUILD_SPECIFIC_CONTRACT.md`
+§ "rom_trace_log.txt Format" for field definitions.
+
+**Key invariants:**
+- `addr` values are `snesPrgRom` memType addresses (may need mapping conversion)
+- If `prg_size` is present in header, `addr < prg_size` implies linear file offset
+- If `prg_size` is absent, treat all addresses as ambiguous

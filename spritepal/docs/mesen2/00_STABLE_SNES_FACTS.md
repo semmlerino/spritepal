@@ -57,6 +57,19 @@ backgrounds, not sprites.
   - Bit 1: Size select (small/large)
   - Attribute bit 0 is the **tile high bit** (selects the second OBJ tile table).
 
+### OAM Attribute Byte (Byte 3) Bit Layout
+```
+Bit:    7    6    5    4    3    2    1    0
+        V    H    P    P    C    C    C    t
+        │    │    └─┬──┘    └───┬───┘    │
+        │    │      │           │        └─ Tile high bit (second table select)
+        │    │      │           └────────── Palette (0-7, CGRAM 128-255)
+        │    │      └────────────────────── Priority (0-3)
+        │    └───────────────────────────── Horizontal flip
+        └────────────────────────────────── Vertical flip
+```
+Source: https://snes.nesdev.org/wiki/OAM
+
 ### OAM High Table Extraction (Worked Example)
 The high table packs 4 sprites' worth of data into each byte (2 bits per sprite).
 
@@ -98,6 +111,12 @@ if x_full >= 256 then
 end
 ```
 
+**Coordinate ranges:**
+- X: signed 9-bit, range **-256 to +255** (off-screen left/right)
+- Y: unsigned 8-bit, range **0 to 255** (Y=0 is top of visible area)
+
+In JSON captures, `x` is exported as signed int; `y` is raw unsigned.
+
 ## Sprite Size Modes (OBJSEL bits 5-7)
 The `size_select` field from OBJSEL determines available sprite sizes. Each sprite's high-table
 size bit selects between "small" and "large" for that sprite.
@@ -128,6 +147,19 @@ for ty = 0, tiles_h - 1 do
     end
 end
 ```
+
+**Hardware reference:** Subtiles wrap within a 16×16 tile grid (256 tiles total per table).
+Source: https://snes.nesdev.org/wiki/OAM
+
+### Flip Behavior (Subtile Reordering)
+
+When `flip_h` or `flip_v` are set in OAM:
+- **flip_h**: Subtile columns are mirrored (rightmost becomes leftmost)
+- **flip_v**: Subtile rows are mirrored (bottom becomes top)
+- **Both**: 180° rotation of subtile grid
+
+The PPU applies flips at **render time**. OAM tile index and VRAM data are unchanged.
+Capture scripts record pre-flip subtile order; apply flips when reconstructing images.
 
 ## CGRAM Format (Palettes)
 - 15-bit BGR (often called **BGR555**), little-endian:
