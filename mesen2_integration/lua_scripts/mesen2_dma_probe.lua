@@ -367,7 +367,11 @@ local function reset_staging_rom_reads()
     staging_rom_read_count = 0
     staging_first_pc = nil
     staging_active = false
+    last_staging_write_frame = nil
 end
+
+-- Track frame of last staging write (for frame-gating PRG reads)
+local last_staging_write_frame = nil
 
 -- Record a PRG ROM read during staging (address is PRG file offset)
 local function record_staging_rom_read(prg_offset)
@@ -457,8 +461,13 @@ end
 
 -- PRG/ROM read callback during staging
 -- Note: address is PRG file offset (0 to prg_size-1), NOT a SNES bus address
+-- Frame-gated: only record if we're in the same frame as the staging write
 local function on_staging_rom_read(address, value)
     if not staging_active then return end
+    -- Frame-gate: ignore PRG reads from different frames (reduces noise)
+    if last_staging_write_frame and get_canonical_frame() ~= last_staging_write_frame then
+        return
+    end
     record_staging_rom_read(address)
 end
 
@@ -470,6 +479,9 @@ local function record_staging_write(addr, pc_snapshot)
         staging_active = true
         staging_first_pc = pc_snapshot
     end
+
+    -- Track frame of last staging write (for frame-gating PRG reads)
+    last_staging_write_frame = frame
 
     -- Initialize stats for new frame
     if staging_current_frame ~= frame then
@@ -646,6 +658,7 @@ end
 local oam_dma_buffer = nil      -- Raw 544-byte OAM from last DMA
 local oam_dma_frame = nil       -- Frame when OAM was captured
 local OAM_DMA_SIZE = 544        -- 512 bytes low table + 32 bytes high table
+local OAM_DMA_MIN_SIZE = 512    -- Minimum: just the low table (some games skip high table)
 
 local pending_dma_capture = false
 local pending_dma_count = 0
@@ -1030,17 +1043,18 @@ local function is_visible(entry)
 end
 
 local function read_vram_word(byte_addr)
-    -- Try emu.readWord first (returns 16-bit word)
+    -- Try emu.readWord first (returns 16-bit word in big-endian format)
     if emu.readWord then
         local ok, word = pcall(emu.readWord, byte_addr, MEM.vram)
         if ok and word then
             return word
         end
     end
-    -- Fallback: read two consecutive bytes and combine them
-    local lo = emu.read(byte_addr, MEM.vram) or 0
-    local hi = emu.read(byte_addr + 1, MEM.vram) or 0
-    return lo | (hi << 8)
+    -- Fallback: read two consecutive bytes and combine as big-endian (like emu.readWord)
+    -- First byte goes in high bits so read_vram_tile_word's swap logic works correctly
+    local first_byte = emu.read(byte_addr, MEM.vram) or 0
+    local second_byte = emu.read(byte_addr + 1, MEM.vram) or 0
+    return (first_byte << 8) | second_byte
 end
 
 local function read_vram_tile_word(vram_addr)
@@ -1146,8 +1160,9 @@ local function dump_vram(path)
 end
 
 local function capture_sprites(frame_id)
-    if not MEM.oam or not MEM.cgram or not MEM.vram then
-        log("ERROR: OAM/CGRAM/VRAM memTypes missing; cannot capture sprites")
+    -- Only VRAM and CGRAM are required; OAM can come from DMA buffer
+    if not MEM.cgram or not MEM.vram then
+        log("ERROR: CGRAM/VRAM memTypes missing; cannot capture sprites")
         return nil, {}, 0, {}, 0, 0
     end
 
@@ -1579,16 +1594,19 @@ local function log_dma_channel(channel, value)
 
     -- OAM DMA capture: BBAD=0x04 ($2104 = OAMDATA)
     -- Capture the DMA source buffer as authoritative OAM for this frame
-    if direction == "A->B" and bbad == 0x04 and das >= OAM_DMA_SIZE then
+    -- Accept transfers >= 512 bytes (low table only) - some games skip high table
+    if direction == "A->B" and bbad == 0x04 and das >= OAM_DMA_MIN_SIZE then
         -- Read OAMADDR ($2102/$2103) to check if we're writing from start
         local oamaddr_lo = emu.read(0x2102, emu.memType.snesRegister) or 0
         local oamaddr_hi = emu.read(0x2103, emu.memType.snesRegister) or 0
         local oamaddr = oamaddr_lo + ((oamaddr_hi & 0x01) * 256)
 
+        -- Capture min(das, 544) bytes, pad with zeros if needed
+        local capture_size = math.min(das, OAM_DMA_SIZE)
         local oam_bytes = {}
         local read_ok = true
         local nil_count = 0
-        for i = 0, OAM_DMA_SIZE - 1 do
+        for i = 0, capture_size - 1 do
             local addr = src + i
             local ok, val = pcall(emu.read, addr, dma_read_mem or emu.memType.snesMemory)
             if ok then
@@ -1603,12 +1621,23 @@ local function log_dma_channel(channel, value)
                 break
             end
         end
-        if read_ok and #oam_bytes == OAM_DMA_SIZE then
+        -- Pad to 544 bytes if we only got 512 (high table missing)
+        if read_ok and #oam_bytes >= OAM_DMA_MIN_SIZE then
+            for i = #oam_bytes + 1, OAM_DMA_SIZE do
+                oam_bytes[i] = 0
+            end
             oam_dma_buffer = oam_bytes
-            oam_dma_frame = get_canonical_frame()
+            -- OAM DMA fires during vblank, before on_end_frame() increments frame_count.
+            -- Adjust by +1 if using frame_count (not last_state_frame) so the buffer
+            -- matches the capture call that happens after the frame_count increment.
+            local f = get_canonical_frame()
+            if last_state_frame == nil then
+                f = f + 1
+            end
+            oam_dma_frame = f
             log(string.format(
                 "OAM_DMA_CAPTURE: frame=%d src=0x%06X das=%d read=%d oamaddr=%d nils=%d",
-                oam_dma_frame, src, das, OAM_DMA_SIZE, oamaddr, nil_count
+                oam_dma_frame, src, das, capture_size, oamaddr, nil_count
             ))
             if oamaddr ~= 0 then
                 log(string.format("WARNING: OAM DMA starts at OAMADDR=%d, not 0 (index assumptions may be off)", oamaddr))
