@@ -42,7 +42,7 @@ Follow this flowchart **in order**. Fix issues at each step before proceeding.
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                     STEP 4: ADVANCED DIAGNOSIS                         │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  10. SA-1 char conversion active? ───────────────── YES → Strategy A/B │
+│  10. SA-1 char conversion active? ───────────────── YES → Use Strategy A │
 │  11. WRAM staging overlap > 0? ──────────────────── NO → Wrong frame   │
 │  12. ROM trace seeds valid? ─────────────────────── NO → Validate seed │
 │                                                                         │

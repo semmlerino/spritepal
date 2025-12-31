@@ -140,9 +140,12 @@ Source: https://wiki.superfamicom.org/sa-1-registers (verify against emulator so
 Operational playbook:
 - Detect: log SA-1 DMA control (e.g., $2230) and confirm character conversion is enabled.
 - If active: treat ROM→VRAM byte equality as invalid.
-- Strategy A: build a database from **post-conversion VRAM tiles** (screen capture based).
-- Strategy B: capture the source bitmap + conversion params and reproduce conversion offline
-  before hashing.
+- **Strategy A** (implemented): build a database from **post-conversion VRAM tiles** (screen
+  capture based). Match VRAM hashes to ROM regions via timing correlation, not byte equality.
+- **Strategy B** (NOT IMPLEMENTED): capture the source bitmap + conversion params and reproduce
+  conversion offline before hashing. Would require: (1) logging BRF register writes, (2)
+  implementing SA-1 character conversion algorithm in Python, (3) matching pre-conversion bitmaps
+  to ROM. This is a potential future enhancement but is not currently supported.
 
 ### Detecting Character Conversion (Operational)
 
@@ -301,9 +304,57 @@ python compile_hal_tools.py  # Auto-detect platform and compile
 - FALSE if: Low-entropy tiles dominate, or collisions inflate scores
 - TRUE if: Multiple high-info tiles consistently map to same offset
 
-## Golden Test (Create Once Mapping Works)
-Define a single capture (savestate + frame) that reliably maps to a known offset, and record:
-- Capture file path
-- Expected ROM offset(s)
-- ROM hash (CRC32 or SHA1)
-Keep this as a regression sanity check before expanding the DB.
+## Golden Test (Regression Baseline)
+
+A golden test is a reproducible capture that validates the pipeline end-to-end. Create one once
+mapping works reliably, then run it before major changes.
+
+### Golden Test Specification
+
+Create `mesen2_exchange/golden_test.json`:
+```json
+{
+  "name": "kirby_spring_breeze_gameplay",
+  "description": "Kirby visible in Spring Breeze, frame ~1800",
+  "rom": {
+    "filename": "Kirby Super Star (USA).sfc",
+    "sha256": "<rom_sha256_hash>",
+    "header_offset": 0
+  },
+  "capture": {
+    "script": "gameplay_capture.lua",
+    "savestate": null,
+    "target_frame": 1800
+  },
+  "expectations": {
+    "min_visible_sprites": 5,
+    "min_high_info_tiles": 10,
+    "known_rom_regions": ["0x1B0000", "0x160000"],
+    "min_match_rate": 0.01
+  }
+}
+```
+
+### Running the Golden Test
+
+```bash
+# 1. Capture (from Windows or via WSL interop)
+.\tools\mesen2\Mesen2.exe --testrunner "roms\Kirby Super Star (USA).sfc" \
+    "mesen2_integration\lua_scripts\gameplay_capture.lua"
+
+# 2. Validate capture integrity
+python3 scripts/analyze_capture_quality.py mesen2_exchange/sprite_capture_*.json
+
+# 3. Check expectations (manual for now)
+#    - visible_count >= min_visible_sprites
+#    - High-info tiles >= min_high_info_tiles
+#    - ROM trace regions include known_rom_regions
+
+# 4. If all pass, the pipeline is healthy
+```
+
+### When to Run
+- Before expanding the tile database
+- After upgrading Mesen 2 builds
+- After modifying capture scripts
+- Before releasing changes to the mapping pipeline

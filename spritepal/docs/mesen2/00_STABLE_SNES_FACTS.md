@@ -151,12 +151,51 @@ end
 **Hardware reference:** Subtiles wrap within a 16×16 tile grid (256 tiles total per table).
 Source: https://snes.nesdev.org/wiki/OAM
 
+**Example: 32x32 sprite (4 subtiles) starting at tile index 0x45:**
+```
+Tile grid (16x16 tiles per table):
+       col 0   1   2   3   4   5   6   7  ...  F
+row 0  [00] [01] [02] [03] [04] [05] [06] [07] ... [0F]
+row 1  [10] [11] [12] [13] [14] [15] [16] [17] ... [1F]
+row 2  [20] [21] [22] [23] [24] [25] [26] [27] ... [2F]
+row 3  [30] [31] [32] [33] [34] [35] [36] [37] ... [3F]
+row 4  [40] [41] [42] [43] [44] [45] [46] [47] ... [4F]  ← OAM tile=0x45
+row 5  [50] [51] [52] [53] [54] [55] [56] [57] ... [5F]
+...
+
+32x32 sprite uses 4 subtiles (2x2 grid):
+  +------+------+
+  | 0x45 | 0x46 |   ← row 4, cols 5-6
+  +------+------+
+  | 0x55 | 0x56 |   ← row 5, cols 5-6
+  +------+------+
+
+Wrapping example: tile index 0x4F with 32x32 sprite:
+  +------+------+
+  | 0x4F | 0x40 |   ← col F wraps to col 0 (same row)
+  +------+------+
+  | 0x5F | 0x50 |
+  +------+------+
+```
+
 ### Flip Behavior (Subtile Reordering)
 
 When `flip_h` or `flip_v` are set in OAM:
 - **flip_h**: Subtile columns are mirrored (rightmost becomes leftmost)
 - **flip_v**: Subtile rows are mirrored (bottom becomes top)
 - **Both**: 180° rotation of subtile grid
+
+**Visual example (32x32 sprite, tiles labeled A-D):**
+```
+Original (no flip):     flip_h:             flip_v:             flip_h + flip_v:
+  +---+---+              +---+---+           +---+---+           +---+---+
+  | A | B |              | B | A |           | C | D |           | D | C |
+  +---+---+              +---+---+           +---+---+           +---+---+
+  | C | D |              | D | C |           | A | B |           | B | A |
+  +---+---+              +---+---+           +---+---+           +---+---+
+
+VRAM tile data is unchanged. Subtile grid order changes at render time.
+```
 
 The PPU applies flips at **render time**. OAM tile index and VRAM data are unchanged.
 Capture scripts record pre-flip subtile order; apply flips when reconstructing images.

@@ -373,6 +373,31 @@ outdated. Treat all `addr` values as ambiguous and use `--auto-map` validation.
 - Use Windows paths in Lua file I/O (`C:\...`).
 - If launching from WSL, pass env vars via `WSLENV` or `cmd.exe /C "set ..."`.
 
+## Lua Script Quick Reference
+
+| Script | Purpose | Key Env Vars |
+|--------|---------|--------------|
+| `mesen2_preflight_probe.lua` | Validate API availability on new builds | `OUTPUT_PATH`, `PROBE_SECONDS`, `TARGET_FRAMES` |
+| `mesen2_dma_probe.lua` | DMA/SA-1 diagnostics, VRAM diff, WRAM staging | `OUTPUT_DIR`, `MAX_FRAMES`, `VRAM_DIFF`, `WRAM_DUMP_*`, `ROM_TRACE_*` |
+| `gameplay_capture.lua` | Auto-capture at frame 1800 (gameplay with Kirby visible) | — |
+| `mesen2_sprite_capture.lua` | Manual F9 hotkey capture | — |
+| `test_sprite_capture.lua` | Auto-capture at configurable frame (default 700) | `TARGET_FRAME`, `OUTPUT_DIR`, `SAVESTATE_PATH`, `CAPTURE_FRAMES` |
+| `mesen2_click_extractor.lua` | F9 capture + DMA tracking for ROM offset discovery | — |
+| `mesen2_sprite_finder_final.lua` | DMA monitoring for ROM offset correlation | — |
+| `callback_signature_probe.lua` | Debug callback parameter signatures | — |
+| `snes9x_sprite_dumper.lua` | Legacy: SNES9x compatibility (not Mesen 2) | — |
+
+**Python support scripts** (in `scripts/`):
+
+| Script | Purpose |
+|--------|---------|
+| `analyze_capture_quality.py` | Validate capture integrity (odd-byte sanity, entropy) |
+| `summarize_rom_trace.py` | Bucket ROM trace addresses, identify seeds |
+| `validate_seed_candidate.py` | Test if ROM offset contains valid HAL-compressed data |
+| `summarize_wram_overlaps.py` | Rank frames by WRAM↔VRAM tile overlap |
+| `analyze_wram_staging.py` | Compare WRAM dump to VRAM tiles, find staging ranges |
+| `extract_sprite_from_capture.py` | Extract sprites from capture JSON to PNG |
+
 ## Support Scripts
 
 ### mesen2_preflight_probe.lua
