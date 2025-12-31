@@ -67,6 +67,41 @@ space (and document which direction you used).
 
 This is an API behavior, not SNES hardware behavior (see `00_STABLE_SNES_FACTS.md`).
 
+## emu.convertAddress() (Current Build)
+Converts addresses between memory types and CPU address space.
+
+**Signature:** `emu.convertAddress(address, memType?, cpuType?)`
+
+**Parameters:**
+- `address` (int, required): Address to convert
+- `memType` (MemoryType, optional): Source memory type (defaults to current CPU's default)
+- `cpuType` (CpuType, optional): Target CPU type for relative→absolute (defaults to current)
+
+**Returns:** Table `{ address = int, memType = int }` or `nil` if conversion fails.
+
+**Behavior:**
+- If `memType` is **relative** (e.g., CPU address space): returns absolute address in ROM/RAM
+- If `memType` is **absolute** (e.g., `snesPrgRom`): returns relative CPU bus address
+
+**Example:**
+```lua
+-- Convert PRG-ROM offset to CPU address
+local result = emu.convertAddress(0x1B0000, emu.memType.snesPrgRom, emu.cpuType.snes)
+if result then
+    print(string.format("CPU address: $%06X", result.address))
+end
+
+-- Convert CPU address to ROM offset
+local result = emu.convertAddress(0xDB0000, emu.memType.snesMemory, emu.cpuType.snes)
+if result and result.memType == emu.memType.snesPrgRom then
+    print(string.format("ROM offset: 0x%06X", result.address))
+end
+```
+
+**Caveats:**
+- Returns `nil` for unmapped addresses or failed conversions
+- SA-1 bank remapping affects results; probe dynamically if banks change
+
 ## Source of Truth
 - The canonical Lua API implementation lives in `Mesen2/Core/Debugger/LuaApi.cpp`.
 - The old `docs/LuaApi.cpp` snapshot was removed; do not reference it.
@@ -87,6 +122,35 @@ via S-CPU I/O registers ($2230-$224F) instead.
 - `emu.loadSavestate()` does **not** trigger `stateLoaded` in this build.
 - If exec-based frame counting stalls, set `FRAME_EVENT=endFrame` in the probe. End-frame callbacks
   continued to fire after load in the latest run and were required for VRAM diff output.
+
+## Runbook (Movie + ROM Trace Flow)
+Minimal end-to-end flow to get a validated seed:
+
+1) Run Mesen2 with ROM + Lua and then send the `.mmo` (two-step launch):
+```
+set OUTPUT_DIR=C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\movie_probe_run
+set WRAM_WATCH_WRITES=1
+set WRAM_WATCH_CAPTURE_THRESHOLD=200
+set ROM_TRACE_ON_WRAM_WRITE=1
+set ROM_TRACE_MAX_READS=500
+set ROM_TRACE_MAX_FRAMES=2
+set ROM_TRACE_PC_SAMPLES=8
+call run_movie_probe.bat --no-pause
+```
+
+2) Summarize ROM trace buckets and pick a seed:
+```
+python3 scripts/summarize_rom_trace.py mesen2_exchange/movie_probe_run --bucket-size 0x1000 --top 5
+```
+
+3) Validate the seed against likely mappings (HAL decompression + tile heuristics):
+```
+python3 scripts/validate_seed_candidate.py roms/Kirby\ Super\ Star\ (USA).sfc \
+  --seed 0xFCC455 --auto-map --tiles 256 --png out.png
+```
+
+If the validator returns no plausible candidates, treat the seed as ambiguous and try the
+alternate seed (run-start) from the summarizer output.
 
 ## Movie Playback (Non-Testrunner)
 `--testrunner` cannot load `.mmo` files (only one non-.lua file is allowed). Movie playback
@@ -161,13 +225,13 @@ The ROM trace log uses a line-oriented format. Key line types:
 
 ```
 # Header (emitted when ROM tracing starts)
-ROM trace armed frame=1234 prg_size=0x400000 prg_end=0x3FFFFF
+ROM trace armed: frame=1234 label=snes prg_size=0x400000 prg_end=0x3FFFFF max_reads=500 max_frames=2
 
 # Read entries (one per ROM read during active trace)
-ROM_READ frame=1234 addr=0x1B0456 [pc_sample: cpu.pc=0x8940 cpu.k=0x00 cpu.dbr=0x7E]
+ROM read (snes): frame=1234 addr=0x1B0456 value=0x9A remaining=499 PC=0x8940 K=0x00 DBR=0x7E
 
 # Trace end marker
-ROM trace complete frame=1234 total_reads=156
+ROM trace complete: frame=1234 start=1234 label=snes
 ```
 
 **Field definitions:**
@@ -175,7 +239,7 @@ ROM trace complete frame=1234 total_reads=156
 - `prg_size`: Size of PRG-ROM in bytes (use to validate seeds)
 - `prg_end`: Last valid PRG-ROM address (`prg_size - 1`)
 - `addr`: ROM memType address of the read (may require mapping conversion)
-- `pc_sample`: Optional CPU state snapshot (when `ROM_TRACE_PC_SAMPLES > 0`)
+- `PC/K/DBR`: Optional CPU state snapshot (when `ROM_TRACE_PC_SAMPLES > 0`)
 
 **Important:** If `prg_size`/`prg_end` are missing from the header, the probe script is
 outdated. Treat all `addr` values as ambiguous and use `--auto-map` validation.

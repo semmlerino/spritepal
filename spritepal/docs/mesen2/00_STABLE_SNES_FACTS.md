@@ -17,8 +17,6 @@ avoids emulator- or tool-specific behavior.
 - **OAM offset (word address):** `oam_offset_word = (name_select + 1) << 12`
   - Each step advances by **0x1000 word addresses** (spanning **8KB** of byte-addressable VRAM).
 - OAM attribute bit 0 is **tile index bit 8 / second table select**, not a background name table.
-- Bit 2 of `name_base` is reserved for a never-implemented VRAM expansion; in practice it
-  should be 0. Warn if it is set.
 
 ## OAM Tile Address (Hardware Formula)
 ```

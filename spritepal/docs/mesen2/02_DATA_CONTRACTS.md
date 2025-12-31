@@ -82,8 +82,9 @@ Tiles ordering guarantee:
 - Use `*_addr` units consistently:
   - `*_addr` in **bytes** unless explicitly marked as word address.
   - Word addresses must be labeled explicitly (e.g., `*_word` or in-field doc text).
-  - In this schema, `oam_base_addr`/`oam_addr_offset` are **word** addresses; `tile_base_addr`
-    and `vram_addr` are **byte** addresses.
+  - **Legacy exception:** `oam_base_addr`/`oam_addr_offset` are **word** addresses (predates
+    this convention). New fields should use `*_word` suffix for word addresses.
+  - `tile_base_addr` and `vram_addr` are **byte** addresses (correct naming).
 
 ### Conversion Formulas
 ```python
