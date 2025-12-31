@@ -115,8 +115,8 @@ end
 
 -- Check if sprite is visible on screen (roughly)
 local function is_visible(entry)
-    -- Y=240-255 or Y=0 with specific conditions means off-screen
-    if entry.y >= 225 and entry.y < 240 then return false end
+    -- Y in overscan zone [224, 240) means off-screen (canonical spec)
+    if entry.y >= 224 and entry.y < 240 then return false end
     -- X completely off left
     if entry.x <= -64 then return false end
     -- X completely off right
@@ -127,7 +127,7 @@ end
 -- Read a single 4bpp 8x8 tile from VRAM
 -- Mesen2 Lua exposes VRAM as byte-addressed memory.
 -- A 4bpp tile is 32 bytes = 16 words.
-local vram_read_mode = nil  -- "word" or "byte", auto-detected per build
+local vram_read_mode = "word"  -- Force word mode; byte mode broken in some Mesen2 builds
 
 local function read_vram_word(byte_addr)
     -- Try emu.readWord first (returns 16-bit word)
@@ -149,8 +149,9 @@ local function read_vram_tile_word(vram_addr)
 
     for i = 0, 15 do
         local word = read_vram_word(vram_addr + (i * 2))
-        tile_data[i * 2 + 1] = word & 0xFF
-        tile_data[i * 2 + 2] = (word >> 8) & 0xFF
+        -- Mesen2 readWord returns big-endian; swap bytes for correct tile order
+        tile_data[i * 2 + 1] = (word >> 8) & 0xFF
+        tile_data[i * 2 + 2] = word & 0xFF
         if tile_data[i * 2 + 2] ~= 0 then
             high_nonzero = true
         end

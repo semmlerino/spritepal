@@ -13,10 +13,12 @@ This document defines the **canonical schema** for capture and mapping data.
 - These are documented in the Quick Reference table; new fields must use `_word` suffix
 
 ### Byte Array Encoding
-All byte arrays in JSON use **list[int]** (0-255 values), never base64.
-- `data_hex`: hex string (64 chars = 32 bytes)
-- `palettes[n]`: list of 16 ints (15-bit BGR words)
-- Future byte arrays: list[int] unless explicitly noted
+Binary data in JSON uses one of two formats:
+- **Hex string**: `data_hex` fields use uppercase hex (e.g., `"3F00A1..."`, 64 chars = 32 bytes)
+- **list[int]**: `palettes[n]` and other multi-word arrays use lists of ints (0-255 or 0-65535)
+
+**Convention:** Tile data uses hex strings (`data_hex`) for compactness. Palettes and future
+arrays use list[int] unless explicitly noted. Never use base64.
 
 ---
 
@@ -53,8 +55,9 @@ All byte arrays in JSON use **list[int]** (0-255 values), never base64.
 - `tile` (int): OAM tile index (0-255)
 - `width` (int), `height` (int): sprite size in **pixels**
 - `palette` (int): 0-7, selects CGRAM palette (sprite palettes are 128-255)
-- `priority` (int): 0-3, higher values render in front of lower priority sprites
-  (within sprite priority; BG layer priority interactions are separate)
+- `priority` (int): 0-3, OBJ priority level for **OBJ vs BG layer** interaction only.
+  **Does NOT determine sprite-sprite ordering**; OAM index resolves overlaps (lower index = in front).
+  See `00_STABLE_SNES_FACTS.md` § "Sprite Overlap Ordering" for details.
 - `flip_h` (bool), `flip_v` (bool)
 - `tile_page` (int, required for mapping): OAM attr bit 0 (tile index bit 8 / second table)
 - If `tile_page`/`name_table` is missing, assume 0 and treat the capture as **unsafe for mapping**.
@@ -84,6 +87,47 @@ Tiles ordering guarantee:
   quirk (see `01_BUILD_SPECIFIC_CONTRACT.md`) does NOT apply to these values—they
   are already normalized during capture.
 
+### Visibility Filter Predicate
+
+The visibility filter determines which sprites from OAM are included in `entries[]`.
+This is the **exact boolean check** used:
+
+```lua
+-- Default values (configurable via env vars)
+local VISIBLE_X_MIN = -64       -- VISIBLE_X_MIN
+local VISIBLE_X_MAX = 256       -- VISIBLE_X_MAX
+local VISIBLE_Y_EXCLUDE_START = 224  -- VISIBLE_Y_EXCLUDE_START
+local VISIBLE_Y_EXCLUDE_END = 240    -- VISIBLE_Y_EXCLUDE_END (exclusive)
+
+function is_sprite_visible(x, y)
+    -- X is signed 9-bit (-256 to +255), already converted from OAM
+    -- Y is unsigned 8-bit (0 to 255)
+
+    -- X must be within horizontal bounds (exclusive comparison)
+    if x <= VISIBLE_X_MIN or x >= VISIBLE_X_MAX then
+        return false
+    end
+
+    -- Y must NOT be in the overscan exclusion zone [START, END)
+    if y >= VISIBLE_Y_EXCLUDE_START and y < VISIBLE_Y_EXCLUDE_END then
+        return false
+    end
+
+    return true
+end
+```
+
+**Environment variables:**
+- `SKIP_VISIBILITY_FILTER=1`: Include all 128 OAM entries (no filtering)
+- `VISIBLE_X_MIN`, `VISIBLE_X_MAX`: Horizontal visibility bounds (default -64..256, exclusive)
+- `VISIBLE_Y_EXCLUDE_START`, `VISIBLE_Y_EXCLUDE_END`: Overscan exclusion zone (default 224..240, half-open [start, end))
+
+**Notes:**
+- Filter operates on **sprite anchor** (x, y), not individual subtile positions
+- Sprite dimensions are NOT considered—partially visible sprites are included
+- Y=0 is top of visible area; overscan exclusion handles hidden sprites at screen bottom
+- For 239-line or 240-line modes, adjust `VISIBLE_Y_EXCLUDE_*` accordingly
+
 ## Validation / Fail-Fast Rules
 - `data_hex` length must be 64 hex chars (32 bytes) for 4bpp.
 - If **all odd bytes are zero** across **many tiles**, abort the capture. This is a strong
@@ -93,6 +137,10 @@ Tiles ordering guarantee:
   indexing; bucket bases are **ranking signals only**.
 
 ## Naming Conventions
+
+> **Legacy naming trap:** `oam_base_addr` and `oam_addr_offset` use the `_addr` suffix
+> but are **word addresses** (multiply by 2 for bytes). New code should validate units
+> at runtime or use explicit `*_word` suffixes. See "Legacy exceptions" in Global Conventions.
 
 ### Quick Reference: Address Units
 | Field Name | Unit | Notes |
@@ -111,7 +159,7 @@ Tiles ordering guarantee:
 | `entries[].y` | int | 0..255 | Unsigned 8-bit |
 | `entries[].tile` | int | 0..255 | OAM tile index |
 | `entries[].palette` | int | 0..7 | CGRAM palette (128-255) |
-| `entries[].priority` | int | 0..3 | Higher = in front |
+| `entries[].priority` | int | 0..3 | OBJ vs BG layer priority (not sprite-sprite) |
 | `entries[].tile_page` | int | 0..1 | Second table select |
 | `obsel.name_base` | int | 0..7 | OBJSEL bits 0-2 |
 | `obsel.name_select` | int | 0..3 | OBJSEL bits 3-4 |
@@ -157,9 +205,14 @@ but are outside the current scope.
   - **HV (Both)**: Apply H then V (equivalent to 180° rotation)
 - Low-information tiles may be ignored during scoring (**<= 2 unique byte values**).
   - **Rationale**: Tiles with ≤2 unique bytes are typically solid colors, simple gradients,
-    or transparent regions. These tiles have high hash collision rates across different
+    or transparent regions. These tiles have high collision rates across different
     graphics sets (many sprites share blank/shadow tiles) and contribute noise rather than
     signal to ROM offset scoring. Ignoring them improves match confidence.
+
+**Terminology note:** "Collision" in this context means the same 32-byte tile data
+appearing at multiple ROM locations (common for shared tiles like blanks/shadows).
+This is **NOT** referring to MD5 hash collisions, which are cryptographically negligible
+for 32-byte inputs.
 
 ## Mapper Output (CaptureMapResult)
 These fields are produced by `CaptureToROMMapper.map_capture()` for diagnostics and scoring.
@@ -209,15 +262,111 @@ def score_offset(offset: int, tile_weights: dict[str, float]) -> float:
 - Always validate top candidates via decompression before indexing
 
 ## tile_hash_database.json
-Database files include metadata to guard against ROM/header mismatches.
-- `metadata.rom_title` (string | null)
-- `metadata.rom_checksum` (int | null)
-- `metadata.rom_size` (int)
+
+### Schema
+```json
+{
+    "rom_path": "path/to/rom.sfc",
+    "metadata": {
+        "rom_title": "Kirby Super Star",
+        "rom_checksum": 1234567890,
+        "rom_size": 4194304,
+        "rom_header_offset": 0
+    },
+    "blocks": [
+        {
+            "rom_offset": 1769472,
+            "description": "Kirby sprites (0x1B0000)",
+            "tile_count": 352,
+            "hashes": ["d41d8cd98f00b204e9800998ecf8427e", "..."]
+        }
+    ]
+}
+```
+
+### Fields
+- `rom_path` (string): Path to ROM file used to build database
+- `metadata.rom_title` (string | null): ROM internal title
+- `metadata.rom_checksum` (int | null): ROM checksum for validation
+- `metadata.rom_size` (int): ROM file size in bytes
 - `metadata.rom_header_offset` (int): 0 or 512 (SMC header)
+- `blocks[]`: Array of indexed ROM regions
+  - `rom_offset` (int): File offset where decompression started
+  - `description` (string): Human-readable label
+  - `tile_count` (int): Number of 32-byte tiles in this block
+  - `hashes` (array of string): MD5 hashes (32 hex chars each), indexed by tile position
+
+### Runtime Lookup Structure
+When loaded, the database builds an internal reverse index (not stored in JSON):
+```python
+_hash_to_match: dict[str, list[TileMatch]]
+# TileMatch = (rom_offset, tile_index, confidence, description)
+```
+
+The `hit_count` referenced in scoring pseudocode equals `len(matches)` for a given hash.
 
 ## vram_tile_database.json (Strategy A)
 For SA-1 games with character conversion active, direct ROM→VRAM hash matching fails.
 This database maps VRAM tile hashes to ROM regions via timing correlation instead.
+
+### Timing Correlation Algorithm
+
+**Overview:** When VRAM tiles don't match ROM-decompressed bytes directly, we correlate
+*when* a tile appears in VRAM with *which ROM regions* were accessed during the same
+time window.
+
+**Data sources:**
+- VRAM diff: detects frames where VRAM changed (new tiles uploaded)
+- ROM trace: logs PRG-ROM read addresses during the same frames
+- WRAM staging: optional, identifies intermediate buffers
+
+**Correlation algorithm (implemented in `analyze_wram_staging.py` and DMA probes):**
+
+```python
+# Pseudocode for timing correlation
+def correlate_tile_to_rom_region(tile_hash, capture_frame, rom_trace_log):
+    # 1. Find ROM reads within the correlation window (same frame ± 1)
+    relevant_reads = [
+        read for read in rom_trace_log
+        if abs(read.frame - capture_frame) <= 1
+    ]
+
+    # 2. Bucket reads by 4KB region (0x1000 alignment)
+    region_counts = Counter(read.addr >> 12 for read in relevant_reads)
+
+    # 3. Pick the region with the most reads
+    if region_counts:
+        top_region = max(region_counts, key=region_counts.get)
+        return top_region << 12  # Return base address
+    return None
+```
+
+**How fields are derived:**
+- `rom_region`: Base address of the 4KB bucket with the most ROM reads during capture frame
+- `confidence`: Number of captures where this tile → region correlation held
+- `alternatives`: Number of *different* regions this tile has been seen with (ambiguity measure)
+
+**Correlation window justification:**
+- ±1 frame is a heuristic: VRAM uploads typically lag ROM reads by 0-1 frames
+- The pipeline reads ROM, decompresses to WRAM, then DMA transfers to VRAM
+- Adjust window for games with different upload patterns (e.g., double-buffered sprites)
+
+**Multi-burst handling:**
+- The `RomTraceBurst` class (see `summarize_rom_trace.py`) tracks bursts separately
+- Multiple DMA bursts in one frame are bucketed independently
+- Each burst has its own `top_buckets()` ranking, preventing cross-contamination
+
+**What "confidence" means:**
+- `confidence` is an observation count (integer), NOT a statistical probability
+- Higher count = more captures where this tile→region correlation held
+- `alternatives` field indicates ambiguity (multiple regions seen for same tile)
+- A tile with high confidence but also high alternatives is unreliable
+
+**Limitations and failure modes:**
+- Correlation ≠ causation: the region accessed may be metadata/pointers, not tile data
+- Pointer/table reads can dominate buckets if `ROM_TRACE_MAX_READS` clips early
+- Use first-read address or run-start within hot bucket as seed, not bucket base
+- Always validate via HAL decompression before treating `rom_region` as a tile source
 
 ### Top-Level
 - `type` (string): `"vram_based"` — identifies this as a Strategy A database

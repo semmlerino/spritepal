@@ -20,6 +20,8 @@ See `01_BUILD_SPECIFIC_CONTRACT.md` § "VRAM Read Semantics" for API-specific be
 
 ## OBJSEL ($2101) Tile Tables
 - `name_base = obsel & 0x07` (bits 0-2)
+  - **Note:** Bit 2 is reserved for a planned 128KB VRAM expansion (never implemented).
+    Practical values are **0-3**. Values 4-7 may work on emulators but are non-standard.
 - `name_select = (obsel >> 3) & 0x03` (bits 3-4)
 - `size_select = (obsel >> 5) & 0x07` (bits 5-7) — selects small/large sprite dimensions
 - **OAM base (word address):** `oam_base_word = name_base << 13`
@@ -113,9 +115,47 @@ end
 
 **Coordinate ranges:**
 - X: signed 9-bit, range **-256 to +255** (off-screen left/right)
-- Y: unsigned 8-bit, range **0 to 255** (Y=0 is top of visible area)
+- Y: unsigned 8-bit, range **0 to 255**
+  - Y=0 is top of visible area
+  - Y ∈ [224, 240): Overscan region (hidden on 224-line displays; 16 lines)
+  - Y ∈ [240, 255]: Effectively off-screen top (sprites wrap to top of next frame)
 
 In JSON captures, `x` is exported as signed int; `y` is raw unsigned.
+
+## Sprite Overlap Ordering
+
+**Sprite-sprite ordering is determined by OAM index**, not by the priority bits in the OAM attribute byte.
+Lower OAM index = appears in front when sprites overlap on the same scanline.
+
+- OAM index 0 appears in front of index 1, which appears in front of index 2, etc.
+- The priority field (bits 4-5 of OAM attribute byte) affects **OBJ vs BG layer** ordering only.
+- Priority 3 renders OBJ in front of all BG layers; Priority 0 renders OBJ behind all BG layers.
+
+**Common misconception:** The priority field does NOT determine which sprite "wins" when two
+sprites overlap. Only OAM slot order matters for sprite-sprite overlap.
+
+Source: https://snes.nesdev.org/wiki/OAM
+
+**Implications for capture pipelines:**
+- When reconstructing composites, render sprites in reverse OAM index order (highest index first)
+- Priority bits are still important for determining visibility relative to backgrounds
+- If comparing visible sprites to captures, expect the lower-indexed sprite's pixels to dominate
+
+### Priority Rotation ($2103)
+
+By default, OAM 0 has highest priority (appears in front). The SNES supports **priority rotation**
+via the OAMADDH register ($2103):
+
+- **Bit 7 of $2103 (OAMADDH)**: When set during VBlank, the sprite at the OAM address specified
+  in bits 1-7 becomes the "first" sprite (highest priority) instead of OAM 0.
+- This effectively rotates which OAM index is treated as highest priority.
+- Without priority rotation (bit 7 = 0), OAM 0 is always highest priority.
+
+**Pipeline scope:** SpritePal capture/mapping does not track priority rotation state.
+The "lower index = in front" rule applies to **default behavior only**. For games that use
+priority rotation, sprite overlap ordering in captures may not match rendered output.
+
+Source: https://snes.nesdev.org/wiki/PPU_registers
 
 ## Sprite Size Modes (OBJSEL bits 5-7)
 The `size_select` field from OBJSEL determines available sprite sizes. Each sprite's high-table
