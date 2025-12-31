@@ -1,3 +1,0 @@
-"""
-Pixel editor view components
-"""

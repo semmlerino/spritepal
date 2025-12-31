@@ -1,7 +1,0 @@
-{
-    "version": 1,
-    "generated_by": "mock_hal",
-    "generated_date": "2025-12-16",
-    "note": "Regenerate with real HAL using: uv run pytest tests/test_hal_golden.py --regenerate-golden",
-    "entries": {}
-}
