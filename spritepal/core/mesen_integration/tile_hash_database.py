@@ -21,8 +21,8 @@ from pathlib import Path
 
 from core.hal_compression import HALCompressor
 from core.rom_validator import ROMHeaderError, ROMValidator
-from utils.rom_utils import detect_smc_offset_from_size
 from utils.logging_config import get_logger
+from utils.rom_utils import detect_smc_offset_from_size
 
 logger = get_logger(__name__)
 
