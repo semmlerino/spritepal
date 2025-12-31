@@ -64,15 +64,19 @@ local function log_bank_write(addr, value)
         [0x2223] = "$F0-$FF"
     })[addr]
 
-    -- Value bits: 0-2 = ROM block (0-7, each 1MB), bit 7 = HiROM mode
+    -- Value bits: 0-2 = ROM block (0-7, each 1MB)
+    -- Bit 7: Controls offset mode for LOW banks only ($00-$3F, $80-$BF)
+    --        0 = use base offset (LoROM-style), 1 = use block-based offset
+    --        Has NO effect on HIGH banks ($C0-$FF) which always use block offset
+    -- Source: Mesen2/Core/SNES/Coprocessors/SA1/Sa1.cpp:UpdatePrgRomMappings()
     local rom_block = value & 0x07
-    local hirom = (value & 0x80) ~= 0
+    local low_bank_mode = (value & 0x80) ~= 0  -- Only affects low bank mapping
     local rom_start = rom_block * 0x100000
 
-    print(string.format("Frame %d: %s ($%04X) = $%02X → banks %s map to ROM $%06X-%06X%s",
+    print(string.format("Frame %d: %s ($%04X) = $%02X → HIGH banks %s map to ROM $%06X-%06X%s",
         emu.getState().ppu.frameCount, reg_name, addr, value,
         bank_range, rom_start, rom_start + 0x0FFFFF,
-        hirom and " (HiROM)" or ""))
+        low_bank_mode and " (bit7: low-bank offset enabled)" or ""))
 end
 
 -- Register callbacks for all 4 bank registers
@@ -239,9 +243,26 @@ emu.addMemoryCallback(function(addr, value)
 end, emu.callbackType.write, 0x2230, 0x2230, emu.cpuType.snes)
 ```
 
-### Strongly Suggested: SA-1 Conversion Active in Kirby Super Star (Dec 2025)
-Evidence strongly suggests SA-1 character conversion (or similar staging transform) is **active during gameplay**.
-To **confirm the mechanism**, log $2230/$2231 register writes and verify the mode bit. See "Detecting Character Conversion" above.
+**CPU Context Note:** $2230/$2231 are SA-1 registers written by the **S-CPU** (not SA-1 CPU).
+Using `emu.cpuType.snes` is correct for detecting when the S-CPU configures character conversion.
+To observe the actual conversion execution by SA-1, use `emu.cpuType.sa1` callbacks on destination
+addresses (e.g., IRAM reads that trigger type 1 conversion).
+
+**Dual-CPU Logging Pattern:**
+```lua
+-- S-CPU writes to $2230 (config)
+emu.addMemoryCallback(log_config, emu.callbackType.write, 0x2230, 0x2230, emu.cpuType.snes)
+-- SA-1 reads from BRF registers (type 2 conversion source)
+emu.addMemoryCallback(log_sa1_read, emu.callbackType.read, 0x2240, 0x224F, emu.cpuType.sa1)
+```
+
+### Working Hypothesis: SA-1 Conversion Active in Kirby Super Star
+
+> **Status:** Unconfirmed. Evidence is correlational (1.5% hash match rate).
+> **Required for confirmation:** $2230/$2231 register logging showing char conversion mode bit set during sprite decompression.
+>
+> SA-1 character conversion (or similar staging transform) appears **active during gameplay**.
+> To **confirm the mechanism**, log $2230/$2231 register writes and verify the mode bit. See "Detecting Character Conversion" above.
 
 | Test | Result |
 |------|--------|
@@ -378,7 +399,7 @@ mapping works reliably, then run it before major changes.
 
 ### Golden Test Specification
 
-Create `mesen2_exchange/golden_test.json`:
+The golden test file is at `mesen2_exchange/golden_test.json`:
 ```json
 {
   "name": "kirby_spring_breeze_gameplay",

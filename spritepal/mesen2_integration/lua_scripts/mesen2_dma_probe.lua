@@ -830,6 +830,7 @@ local function write_capture_snapshot(tag, frame_id)
         return
     end
     f:write("{\n")
+    f:write('  "schema_version": "1.0",\n')
     f:write(string.format('  "frame": %d,\n', frame_id))
     f:write('  "obsel": {\n')
     f:write(string.format('    "raw": %d, "name_base": %d, "name_select": %d,\n',

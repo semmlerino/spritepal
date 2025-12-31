@@ -633,6 +633,7 @@ local function write_capture(frame)
         return
     end
     f:write("{\n")
+    f:write('  "schema_version": "1.0",\n')
     f:write(string.format('  "frame": %d,\n', frame))
     f:write('  "obsel": {\n')
     f:write(string.format('    "raw": %d, "name_base": %d, "name_select": %d,\n',

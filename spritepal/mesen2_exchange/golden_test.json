@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "name": "kirby_spring_breeze_gameplay",
+  "description": "Kirby visible in Spring Breeze, frame ~1800. Use for regression testing after pipeline changes.",
+  "rom": {
+    "filename": "Kirby Super Star (USA).sfc",
+    "sha256": "4e095fbbdec4a16b075d7140385ff68b259870ca9e3357f076dfff7f3d1c4a62",
+    "header_offset": 0
+  },
+  "capture": {
+    "script": "gameplay_capture.lua",
+    "savestate": null,
+    "target_frame": 1800
+  },
+  "expectations": {
+    "min_visible_sprites": 5,
+    "min_high_info_tiles": 10,
+    "known_rom_regions": ["0x1B0000", "0x160000"],
+    "min_match_rate": 0.01,
+    "notes": "Match rate is low (1-2%) due to suspected SA-1 character conversion. See 03_GAME_MAPPING_KIRBY_SA1.md for details."
+  },
+  "validation_history": [
+    {
+      "date": "2025-12-31",
+      "result": "baseline",
+      "notes": "Initial golden test created based on documented observations"
+    }
+  ]
+}

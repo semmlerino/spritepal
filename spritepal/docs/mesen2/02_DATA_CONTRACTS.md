@@ -127,6 +127,11 @@ Tiles ordering guarantee:
   quirk (see `01_BUILD_SPECIFIC_CONTRACT.md`) does NOT apply to these values—they
   are already normalized during capture.
 
+> **Verification:** Run `verify_endianness.lua` with CGRAM test mode to confirm:
+> - CGRAM byte pairs are read as expected for your Mesen2 build
+> - The script tests `emu.readWord()` on `emu.memType.snesCgRam` and reports byte order
+> - If CGRAM behaves differently from VRAM, update capture scripts accordingly
+
 ### Visibility Filter Predicate
 
 The visibility filter determines which sprites from OAM are included in `entries[]`.

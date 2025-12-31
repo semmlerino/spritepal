@@ -314,6 +314,7 @@ local function capture_sprites()
 
     -- Write JSON manually (Lua doesn't have native JSON)
     f:write("{\n")
+    f:write('  "schema_version": "1.0",\n')
     f:write(string.format('  "timestamp": %d,\n', timestamp))
     f:write(string.format('  "frame": %d,\n', frame))
     f:write('  "obsel": {\n')

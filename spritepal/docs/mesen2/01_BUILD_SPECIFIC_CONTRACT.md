@@ -139,6 +139,23 @@ This is an API behavior, not SNES hardware behavior (see `00_STABLE_SNES_FACTS.m
 > If results differ, update scripts accordingly. Do not generalize these workarounds
 > to other emulators or hardware.
 
+> **Trust this first:** Run `verify_endianness.lua` before assuming byte order behavior.
+> This is the authoritative test for your specific Mesen2 build.
+
+**Concrete Test Output Example (Mesen2 v2.x):**
+```
+VRAM address: $0000
+  emu.read($0000) = $AB
+  emu.read($0001) = $CD
+  emu.readWord($0000) = $CDAB (little-endian: lsb=$AB, msb=$CD → $CDAB)
+
+To get bytes in tile order: byte0 = (word >> 8) & 0xFF, byte1 = word & 0xFF
+Result: byte0=$CD, byte1=$AB (swapped from address order)
+```
+
+This output shows that `readWord()` returns bytes in little-endian order, but tile data
+expects high-byte-first within each word pair. The swap in capture scripts compensates.
+
 ### Which Memory Types Are Affected?
 
 The byte-swap pattern has been **tested** for:
@@ -443,6 +460,7 @@ outdated. Treat all `addr` values as ambiguous and use `--auto-map` validation.
 | `mesen2_sprite_finder_final.lua` | DMA monitoring for ROM offset correlation | — |
 | `callback_signature_probe.lua` | Debug callback parameter signatures | — |
 | `snes9x_sprite_dumper.lua` | Legacy: SNES9x compatibility (not Mesen 2) | — |
+| `verify_endianness.lua` | Empirically verify `emu.readWord()` byte order for any memory type. **Run first after Mesen2 upgrade.** | `OUTPUT_PATH`, `TARGET_FRAME` |
 
 **Python support scripts** (in `scripts/`):
 

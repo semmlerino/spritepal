@@ -101,6 +101,55 @@ local function verify_endianness()
     end
     log("")
 
+    -- Test CGRAM (Color RAM / Palette)
+    log("=== CGRAM (Palette) Verification ===")
+    local cgram_addr = 0x0000  -- First palette entry
+    local cgram_byte0 = emu.read(cgram_addr, emu.memType.snesCgRam)
+    local cgram_byte1 = emu.read(cgram_addr + 1, emu.memType.snesCgRam)
+    local cgram_word = emu.readWord(cgram_addr, emu.memType.snesCgRam)
+
+    log(string.format("CGRAM Address 0x%04X:", cgram_addr))
+    log(string.format("  emu.read(addr)     = 0x%02X", cgram_byte0))
+    log(string.format("  emu.read(addr+1)   = 0x%02X", cgram_byte1))
+    log(string.format("  emu.readWord(addr) = 0x%04X", cgram_word))
+
+    local cgram_low = cgram_word & 0xFF
+    local cgram_high = (cgram_word >> 8) & 0xFF
+
+    if cgram_low == cgram_byte0 and cgram_high == cgram_byte1 then
+        log("  -> CGRAM: LITTLE-ENDIAN")
+    elseif cgram_high == cgram_byte0 and cgram_low == cgram_byte1 then
+        log("  -> CGRAM: BIG-ENDIAN")
+    else
+        log("  -> CGRAM: INCONCLUSIVE (may be zero data)")
+    end
+    log("")
+
+    -- Test OAM (Sprite RAM)
+    log("=== OAM (Sprite RAM) Verification ===")
+    -- OAM is 544 bytes: 512 bytes for 128 sprites + 32 bytes for high table
+    local oam_addr = 0x0000  -- First sprite entry
+    local oam_byte0 = emu.read(oam_addr, emu.memType.snesSpriteRam)
+    local oam_byte1 = emu.read(oam_addr + 1, emu.memType.snesSpriteRam)
+    local oam_word = emu.readWord(oam_addr, emu.memType.snesSpriteRam)
+
+    log(string.format("OAM Address 0x%04X:", oam_addr))
+    log(string.format("  emu.read(addr)     = 0x%02X", oam_byte0))
+    log(string.format("  emu.read(addr+1)   = 0x%02X", oam_byte1))
+    log(string.format("  emu.readWord(addr) = 0x%04X", oam_word))
+
+    local oam_low = oam_word & 0xFF
+    local oam_high = (oam_word >> 8) & 0xFF
+
+    if oam_low == oam_byte0 and oam_high == oam_byte1 then
+        log("  -> OAM: LITTLE-ENDIAN")
+    elseif oam_high == oam_byte0 and oam_low == oam_byte1 then
+        log("  -> OAM: BIG-ENDIAN")
+    else
+        log("  -> OAM: INCONCLUSIVE (may be zero data)")
+    end
+    log("")
+
     -- Summary
     log("=== CONCLUSION ===")
     log("If VRAM shows LITTLE-ENDIAN: the documentation is WRONG")

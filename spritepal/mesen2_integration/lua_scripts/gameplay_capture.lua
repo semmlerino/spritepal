@@ -257,6 +257,7 @@ emu.addEventCallback(function()
 
         local f = io.open(OUTPUT_DIR .. "gameplay_capture.json", "w")
         f:write("{\n")
+        f:write('  "schema_version": "1.0",\n')
         f:write(string.format('  "frame": %d,\n', fr))
         f:write(string.format('  "visible_count": %d,\n', visible_count))
         f:write('  "obsel": {\n')
