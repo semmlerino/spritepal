@@ -107,6 +107,9 @@ space (and document which direction you used).
 ## VRAM Read Semantics (Current Build)
 - `emu.read(addr, emu.memType.snesVideoRam)` is **byte-addressed**.
 - `emu.readWord(addr, emu.memType.snesVideoRam)` expects a **byte address**.
+- Mesen2 Lua API uses **physical VRAM addresses** — no VMAIN translation is applied.
+  Games using non-zero VMAIN modes (address bit rotation) will have logical vs physical
+  address mismatches that the API does not resolve.
 - **Working pattern**: The capture scripts use byte-swapped word reads for tile data:
   ```lua
   local word = emu.readWord(byte_addr, emu.memType.snesVideoRam)

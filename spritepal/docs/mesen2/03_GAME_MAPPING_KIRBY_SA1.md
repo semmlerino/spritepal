@@ -426,8 +426,8 @@ python compile_hal_tools.py --force  # Rebuild even if tools exist
 
 ## Golden Test (Regression Baseline)
 
-A golden test is a reproducible capture that validates the pipeline end-to-end. Create one once
-mapping works reliably, then run it before major changes.
+A golden test is a reproducible capture that validates the pipeline end-to-end. The baseline
+file below should be validated before major changes. Update it when mapping reliability improves.
 
 ### Golden Test Specification
 

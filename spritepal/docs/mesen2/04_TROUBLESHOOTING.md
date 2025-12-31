@@ -12,7 +12,7 @@ Follow this flowchart **in order**. Fix issues at each step before proceeding.
 │                     STEP 1: CAPTURE INTEGRITY                          │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  1. data_hex length = 64 chars? ────────────────── NO → Fix tile read  │
-│  2. Most tiles have odd bytes ≠ 0? ──────────────── NO → Fix VRAM path │
+│  2. >50% tiles have odd bytes ≠ 0? ─────────────── NO → Fix VRAM path │
 │  3. Callbacks firing? ───────────────────────────── NO → Run preflight │
 │                                                                         │
 │  All YES? → Proceed to Step 2                                          │
@@ -123,19 +123,17 @@ python3 scripts/analyze_capture_quality.py mesen2_exchange/door_transition_captu
   - Confirm ROM header/CRC and expand DB offsets if capture is otherwise valid
 
 ### Symptom: All/most even bytes are zero, odd bytes have data
-- Cause: `emu.readWord()` returns **big-endian**, not little-endian. The byte swap was inverted.
+- Cause: Byte extraction order in `read_vram_tile_word()` is wrong for tile data format.
 - Example: tile `00D0009A0064...` has zeros at positions 0,2,4,... and data at 1,3,5,...
-- Fix: In `read_vram_tile_word()`, swap the byte extraction order:
+- Why: SNES 4bpp tile format expects high-byte-first within each word pair. The extraction
+  order must match this, regardless of the API's native byte order.
+- Fix: Use the byte-swap pattern in `01_BUILD_SPECIFIC_CONTRACT.md` § "VRAM Read Semantics":
   ```lua
-  -- WRONG: assumes little-endian word
-  tile_data[i * 2 + 1] = word & 0xFF
-  tile_data[i * 2 + 2] = (word >> 8) & 0xFF
-
-  -- CORRECT: Mesen2 returns big-endian words
-  tile_data[i * 2 + 1] = (word >> 8) & 0xFF
-  tile_data[i * 2 + 2] = word & 0xFF
+  local word = emu.readWord(byte_addr, emu.memType.snesVideoRam)
+  local byte0 = (word >> 8) & 0xFF   -- position 0 in tile data
+  local byte1 = word & 0xFF          -- position 1 in tile data
   ```
-- See also: `01_BUILD_SPECIFIC_CONTRACT.md` → "VRAM Read Semantics"
+- Verify: Run `verify_endianness.lua` after any Mesen2 upgrade to confirm behavior.
 
 ### Symptom: No VRAM DMA observed
 - Important: lack of observed DMA **does not prove** VRAM uploads are absent.

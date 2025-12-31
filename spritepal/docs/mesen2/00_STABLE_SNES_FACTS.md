@@ -52,10 +52,10 @@ applies to the logical address before accessing physical VRAM.
 | 11 | 10-bit rotate | `addr[10:0] = {addr[7:0], addr[10:8]}` |
 
 **Why this matters for capture pipelines:**
-- Lua API `emu.read()` uses **physical VRAM addresses** (no translation)
 - Most games use mode 00 (no remapping) for tile data
 - If sprites appear corrupted or mis-aligned, check if the game uses non-zero
   translation modes for tilemap writes (rare for sprite data, common for BG maps)
+- See `01_BUILD_SPECIFIC_CONTRACT.md` § "VRAM Read Semantics" for API behavior
 
 Source: https://snes.nesdev.org/wiki/PPU_registers
 
