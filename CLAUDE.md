@@ -84,6 +84,31 @@ uv run python scripts/extract_sprite_from_capture.py mesen2_exchange/sprite_capt
 # Output goes to extracted_sprites/
 ```
 
+### Frame Analysis: Cutscenes vs Gameplay
+
+When analyzing Mesen2 capture logs (DMA traces, staging summaries, etc.), **pay attention to frame numbers**:
+
+| Frame Range | Scene Type | Relevance |
+|-------------|------------|-----------|
+| 0-500 | Boot/logos | Ignore |
+| 500-1200 | Menus/cutscenes | Low - different sprite behavior |
+| **1500+** | **Gameplay** | **High - this is what we care about** |
+
+**Why this matters:**
+- Cutscene sprites often use different data paths (100% S-CPU, simpler formats)
+- Gameplay sprites show SA-1 involvement (~50% of ROM reads)
+- ROM→VRAM mapping for sprite extraction must be validated on **gameplay frames**
+- Conclusions drawn from cutscene-only data may not apply to gameplay
+
+**When grepping logs, filter for gameplay:**
+```bash
+# Gameplay frames only (1500+)
+grep "frame=1[5-9][0-9][0-9]\|frame=[2-9][0-9][0-9][0-9]" dma_probe_log.txt
+
+# Sprite VRAM region (0x4000-0x5FFF)
+grep "vram_word=0x4\|vram_word=0x5" dma_probe_log.txt
+```
+
 ## Claude Code Workflow
 
 When editing this repo, follow these rules:
