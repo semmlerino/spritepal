@@ -114,6 +114,18 @@ def main() -> int:
         default=16,
         help="Step size for two-plane scanning (default: 16 bytes)",
     )
+    parser.add_argument(
+        "--json-max-matches",
+        type=int,
+        default=200,
+        help="Max rom_matches in JSON output (default: 200). Use 0 for unlimited.",
+    )
+    parser.add_argument(
+        "--json-max-mapping",
+        type=int,
+        default=50,
+        help="Max staging_to_rom mappings in JSON output (default: 50). Use 0 for unlimited.",
+    )
 
     args = parser.parse_args()
 
@@ -176,6 +188,16 @@ def main() -> int:
 
     # Generate output
     if args.json:
+        # Apply configurable limits (0 = unlimited)
+        rom_matches = (
+            results.rom_matches
+            if args.json_max_matches == 0
+            else results.rom_matches[: args.json_max_matches]
+        )
+        staging_items = list(results.staging_to_rom_mapping.items())
+        if args.json_max_mapping != 0:
+            staging_items = staging_items[: args.json_max_mapping]
+
         output_data = {
             "summary": results.get_summary(),
             "database_stats": pipeline.get_database_stats(),
@@ -191,11 +213,11 @@ def main() -> int:
                     "rom_description": m.rom_description,
                     "flip_variant": m.flip_variant,
                 }
-                for m in results.rom_matches[:200]  # Limit output size
+                for m in rom_matches
             ],
             "staging_to_rom": {
                 f"0x{staging:06X}": [f"0x{rom:06X}" for rom in rom_offsets]
-                for staging, rom_offsets in list(results.staging_to_rom_mapping.items())[:50]
+                for staging, rom_offsets in staging_items
             },
         }
         output = json.dumps(output_data, indent=2)

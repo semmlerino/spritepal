@@ -25,6 +25,10 @@ set STAGING_WATCH_PC_SAMPLES=8
 REM Track ROM reads during staging fills (shows source data)
 set STAGING_ROM_READS_ENABLED=1
 
+REM NEW: PC-gated read tracking (only count reads from known copy routines)
+REM Set to 1 to filter noise; keep at 0 for discovery mode
+set STAGING_PC_GATING=0
+
 REM ==== PERIODIC CAPTURES (for correlation) ====
 set PERIODIC_CAPTURE_ENABLED=1
 set PERIODIC_CAPTURE_START=1500
@@ -69,10 +73,11 @@ echo (the sprite staging buffer before DMA to VRAM).
 echo.
 echo Expected output in dma_probe_log.txt:
 echo   STAGING_SUMMARY: frame=X ... pcs=[PC1,PC2,...] pattern=...
-echo   STAGING_ROM_READS: frame=X ... prg_runs=[...]
+echo   STAGING_CAUSAL: frame=X ... pairs=N prg_runs=[...] cpus={...}
 echo.
 echo The "pcs" field tells you which code addresses write the staging buffer.
-echo The "prg_runs" field shows ROM read bursts that correlate with fills.
+echo STAGING_CAUSAL shows PRG reads that directly precede staging writes.
+echo The "read-^>write_pcs" field shows PC at read time vs write time.
 echo.
 echo Output: %OUTPUT_DIR%
 echo Frames: %MAX_FRAMES%
@@ -97,7 +102,10 @@ echo ===========================================================================
 echo.
 echo After completion, look for:
 echo   grep "STAGING_SUMMARY" mesen2_exchange/dma_probe_log.txt
-echo   grep "STAGING_ROM_READS" mesen2_exchange/dma_probe_log.txt
+echo   grep "STAGING_CAUSAL" mesen2_exchange/dma_probe_log.txt   (the actionable data)
+echo.
+echo For gameplay frames only (1500+):
+echo   grep "STAGING_CAUSAL.*frame=1[5-9]" mesen2_exchange/dma_probe_log.txt
 echo.
 if /i "%~1"=="--no-pause" goto :eof
 pause

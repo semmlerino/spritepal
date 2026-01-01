@@ -351,10 +351,38 @@ local staging_current_stats = nil
 
 -- ROM read tracking during staging fills
 local staging_active = false
-local staging_rom_reads = {}  -- [bank:addr] = count
-local staging_rom_read_count = 0
 local staging_first_pc = nil  -- PC that started the fill
-local staging_rom_read_cpu_counts = {}  -- [cpu_label] = count (e.g., "snes", "sa1")
+
+-- ============================================================================
+-- CAUSAL READ→WRITE TRACKING
+-- Track which PRG reads actually feed staging writes (not just correlation)
+-- ============================================================================
+local last_prg_read = {
+    snes = nil,  -- {addr = prg_offset, frame = frame, seq = sequence_number, read_pc = pc}
+    sa1 = nil
+}
+local read_sequence = 0  -- Global sequence counter for ordering
+
+-- Known staging copy routine PCs (for PC-gated filtering)
+-- These are discovered from log analysis; add more as we learn them
+-- Format: [pc_lo_16bit] = true (we ignore bank for now since they're all bank 0)
+local STAGING_COPY_PCS = {
+    [0x893D] = true,
+    [0x8952] = true,
+    [0x8966] = true,
+    [0x897A] = true,
+    -- Add more as discovered from STAGING_CAUSAL logs
+}
+-- Enable PC-gating via env var (default off for discovery mode)
+local STAGING_PC_GATING_ENABLED = os.getenv("STAGING_PC_GATING") == "1"
+
+-- Read→write pairs for this staging fill
+-- Format: {read_prg = offset, write_wram = addr, cpu = "snes"|"sa1", pc = pc, k = k}
+local staging_read_write_pairs = {}
+
+-- Summary: which PRG regions fed writes (aggregated)
+-- Format: [prg_offset] = {count = N, cpus = {snes = n1, sa1 = n2}}
+local staging_prg_sources = {}
 
 local function init_staging_stats()
     return {
@@ -372,127 +400,146 @@ local function init_staging_stats()
     }
 end
 
--- Reset ROM read tracking for new staging fill
-local function reset_staging_rom_reads()
-    staging_rom_reads = {}
-    staging_rom_read_count = 0
+-- Reset staging tracking for new fill
+local function reset_staging_tracking()
     staging_first_pc = nil
     staging_active = false
     last_staging_write_frame = nil
-    staging_rom_read_cpu_counts = {}
+    -- Reset causal tracking
+    last_prg_read.snes = nil
+    last_prg_read.sa1 = nil
+    staging_read_write_pairs = {}
+    staging_prg_sources = {}
 end
 
 -- Track frame of last staging write (for frame-gating PRG reads)
 local last_staging_write_frame = nil
 
--- Record a PRG ROM read during staging (address is PRG file offset)
-local function record_staging_rom_read(prg_offset, cpu_label)
-    if not staging_active then return end
-    staging_rom_reads[prg_offset] = (staging_rom_reads[prg_offset] or 0) + 1
-    staging_rom_read_count = staging_rom_read_count + 1
-    if cpu_label then
-        staging_rom_read_cpu_counts[cpu_label] = (staging_rom_read_cpu_counts[cpu_label] or 0) + 1
-    end
-end
-
--- Summarize ROM reads as contiguous runs
-local function get_staging_rom_runs()
-    -- Collect and sort all addresses
-    local addrs = {}
-    for key, _ in pairs(staging_rom_reads) do
-        addrs[#addrs + 1] = key
-    end
-    if #addrs == 0 then
-        return {}
-    end
-    table.sort(addrs)
-
-    -- Build runs of contiguous addresses
-    local runs = {}
-    local run_start = addrs[1]
-    local run_end = addrs[1]
-
-    for i = 2, #addrs do
-        local addr = addrs[i]
-        if addr == run_end + 1 then
-            -- Extend current run
-            run_end = addr
-        else
-            -- End current run, start new one
-            runs[#runs + 1] = {start = run_start, stop = run_end}
-            run_start = addr
-            run_end = addr
-        end
-    end
-    -- Don't forget last run
-    runs[#runs + 1] = {start = run_start, stop = run_end}
-
-    return runs
-end
-
 -- Format PRG offset as hex (NOT a SNES bus address)
--- These are file offsets into the PRG ROM, not bank:addr
 local function format_prg_offset(prg_offset)
     return string.format("0x%06X", prg_offset)
 end
 
--- Count keys in a map (Lua # operator doesn't work on maps)
-local function count_map_keys(t)
-    local n = 0
-    for _ in pairs(t) do n = n + 1 end
-    return n
-end
-
--- Log ROM reads summary when DMA fires
-local function log_staging_rom_reads(frame, vram_addr, dma_size)
+-- Log CAUSAL read→write summary (the actionable data)
+-- This shows which PRG offsets were actually paired with staging writes
+local function log_staging_causal_summary(frame, vram_addr, dma_size)
     if not STAGING_ROM_READS_ENABLED or not staging_active then return end
-    if staging_rom_read_count == 0 then return end
 
-    local runs = get_staging_rom_runs()
-    local runs_str_parts = {}
+    local pair_count = #staging_read_write_pairs
+    if pair_count == 0 then
+        log(string.format(
+            "STAGING_CAUSAL: frame=%d vram_word=0x%04X NO_PAIRS (writes not preceded by PRG reads)",
+            frame, vram_addr
+        ))
+        return
+    end
+
+    -- Aggregate PRG sources into runs (similar to old format)
+    local prg_addrs = {}
+    for addr, _ in pairs(staging_prg_sources) do
+        prg_addrs[#prg_addrs + 1] = addr
+    end
+    table.sort(prg_addrs)
+
+    -- Build runs from sorted addresses
+    local runs = {}
+    if #prg_addrs > 0 then
+        local run_start = prg_addrs[1]
+        local run_end = prg_addrs[1]
+        for i = 2, #prg_addrs do
+            local addr = prg_addrs[i]
+            if addr == run_end + 1 then
+                run_end = addr
+            else
+                runs[#runs + 1] = {start = run_start, stop = run_end}
+                run_start = addr
+                run_end = addr
+            end
+        end
+        runs[#runs + 1] = {start = run_start, stop = run_end}
+    end
+
+    -- Format runs
+    local runs_parts = {}
     for _, run in ipairs(runs) do
         if run.start == run.stop then
-            runs_str_parts[#runs_str_parts + 1] = format_prg_offset(run.start)
+            runs_parts[#runs_parts + 1] = format_prg_offset(run.start)
         else
-            runs_str_parts[#runs_str_parts + 1] = format_prg_offset(run.start) .. "-" .. format_prg_offset(run.stop)
+            local size = run.stop - run.start + 1
+            runs_parts[#runs_parts + 1] = string.format(
+                "%s-%s(%d)",
+                format_prg_offset(run.start),
+                format_prg_offset(run.stop),
+                size
+            )
         end
     end
-    local runs_str = table.concat(runs_str_parts, ",")
+    local runs_str = table.concat(runs_parts, ",")
     if #runs_str > 200 then
         runs_str = string.sub(runs_str, 1, 200) .. "..."
     end
 
-    local pc_str = "unknown"
-    if staging_first_pc then
-        pc_str = string.format("%02X:%04X", staging_first_pc.k or 0, staging_first_pc.pc or 0)
+    -- Count by CPU
+    local cpu_totals = {}
+    for _, src in pairs(staging_prg_sources) do
+        for cpu, cnt in pairs(src.cpus) do
+            cpu_totals[cpu] = (cpu_totals[cpu] or 0) + cnt
+        end
     end
-
-    local unique_count = count_map_keys(staging_rom_reads)
-
-    -- Format CPU counts
     local cpu_parts = {}
-    for cpu, cnt in pairs(staging_rom_read_cpu_counts) do
+    for cpu, cnt in pairs(cpu_totals) do
         cpu_parts[#cpu_parts + 1] = cpu .. "=" .. cnt
     end
     local cpu_str = #cpu_parts > 0 and table.concat(cpu_parts, ",") or "none"
 
+    -- Sample a few PC addresses from pairs (show both read and write PCs)
+    local pc_samples = {}
+    for i = 1, math.min(4, pair_count) do
+        local p = staging_read_write_pairs[i]
+        -- Format: "read_pc->write_pc"
+        pc_samples[#pc_samples + 1] = string.format(
+            "%02X:%04X->%02X:%04X",
+            p.k, p.read_pc, p.k, p.write_pc
+        )
+    end
+    local pc_str = table.concat(pc_samples, ",")
+
     log(string.format(
-        "STAGING_ROM_READS: frame=%d pc=%s vram_word=0x%04X size=%d prg_runs=[%s] unique=%d total=%d cpus={%s}",
-        frame, pc_str, vram_addr, dma_size, runs_str, unique_count, staging_rom_read_count, cpu_str
+        "STAGING_CAUSAL: frame=%d vram_word=0x%04X size=%d pairs=%d prg_runs=[%s] cpus={%s} read->write_pcs=[%s]",
+        frame, vram_addr, dma_size, pair_count, runs_str, cpu_str, pc_str
     ))
 end
 
 -- PRG/ROM read callback factory during staging
 -- Note: address is PRG file offset (0 to prg_size-1), NOT a SNES bus address
 -- Frame-gated: only record if we're in the same frame as the staging write
+-- Captures PC at read time for causal read→write pairing
 local function make_staging_rom_reader(cpu_label)
     return function(address, value)
         if not staging_active then return end
-        -- Frame-gate: ignore PRG reads from different frames (reduces noise)
-        if last_staging_write_frame and get_canonical_frame() ~= last_staging_write_frame then
+        -- Frame-gate: ignore PRG reads from different frames
+        local frame = get_canonical_frame()
+        if last_staging_write_frame and frame ~= last_staging_write_frame then
             return
         end
-        record_staging_rom_read(address, cpu_label)
+
+        -- Get PC at time of read (for analysis and optional PC-gating)
+        local pc_snapshot = get_cpu_state_snapshot()
+        local read_pc = pc_snapshot and pc_snapshot.pc_val or 0
+
+        -- Optional PC-gating: only count reads from known copy routines
+        if STAGING_PC_GATING_ENABLED and not STAGING_COPY_PCS[read_pc] then
+            return
+        end
+
+        -- Record as "last read" for this CPU (for causal pairing)
+        read_sequence = read_sequence + 1
+        last_prg_read[cpu_label] = {
+            addr = address,
+            frame = frame,
+            seq = read_sequence,
+            read_pc = read_pc
+        }
     end
 end
 
@@ -565,6 +612,52 @@ local function record_staging_write(addr, pc_snapshot)
             pc = pc_snapshot.pc_val or 0,
             k = pc_snapshot.k_val or 0,
         }
+    end
+
+    -- ========================================================================
+    -- CAUSAL READ→WRITE PAIRING
+    -- Find the most recent PRG read (across both CPUs) and pair it with this write
+    -- ========================================================================
+    if STAGING_ROM_READS_ENABLED then
+        local best_read = nil
+        local best_cpu = nil
+        local best_seq = -1
+
+        -- Find most recent read (highest sequence number, same frame)
+        for cpu, last in pairs(last_prg_read) do
+            if last and last.frame == frame and last.seq > best_seq then
+                best_read = last
+                best_cpu = cpu
+                best_seq = last.seq
+            end
+        end
+
+        if best_read then
+            -- Record the pair (keep recent pairs, limit to prevent memory growth)
+            if #staging_read_write_pairs < 1000 then
+                staging_read_write_pairs[#staging_read_write_pairs + 1] = {
+                    read_prg = best_read.addr,
+                    read_pc = best_read.read_pc or 0,  -- PC at time of PRG read
+                    write_wram = addr,
+                    write_pc = pc_snapshot and pc_snapshot.pc_val or 0,  -- PC at time of write
+                    cpu = best_cpu,
+                    k = pc_snapshot and pc_snapshot.k_val or 0
+                }
+            end
+
+            -- Aggregate: track which PRG offsets are sources
+            local prg_addr = best_read.addr
+            if not staging_prg_sources[prg_addr] then
+                staging_prg_sources[prg_addr] = {count = 0, cpus = {}}
+            end
+            local src = staging_prg_sources[prg_addr]
+            src.count = src.count + 1
+            src.cpus[best_cpu] = (src.cpus[best_cpu] or 0) + 1
+
+            -- Clear the read so it can't be double-paired
+            -- (next write needs a new read to pair with)
+            last_prg_read[best_cpu] = nil
+        end
     end
 end
 
@@ -1631,14 +1724,13 @@ local function log_dma_channel(channel, value)
         end
 
         -- Log staging buffer write summary when DMA fires from staging range
-        -- This tells us HOW the staging buffer was filled (sequential burst vs scattered)
         if STAGING_WATCH_ENABLED and a1b == 0x7E then
             local src_in_staging = (a1t >= STAGING_WATCH_START and a1t <= STAGING_WATCH_END)
             if src_in_staging then
                 log_staging_summary_for_dma(src, das, captured_vmadd)
-                -- Log ROM reads that occurred during this staging fill
-                log_staging_rom_reads(get_canonical_frame(), captured_vmadd, das)
-                reset_staging_rom_reads()
+                -- Log causal read→write summary (which PRG reads fed staging writes)
+                log_staging_causal_summary(get_canonical_frame(), captured_vmadd, das)
+                reset_staging_tracking()
             end
         end
     end

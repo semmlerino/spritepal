@@ -58,7 +58,7 @@ This folder documents the Mesen 2 sprite capture and ROM mapping pipeline for Sp
 
 ## Key Constraints
 
-- **Kirby Super Star: ~1.5% hash match rate** — strongly suggests SA-1 character conversion or similar staging transform. Confirm via $2230/$2231 register trace. Use Strategy A (VRAM-based DB with timing correlation).
+- **Kirby Super Star: 0% verbatim match rate for gameplay tiles** — Sprite DMAs come from WRAM 0x7E:2000, not cart ROM directly. CCDMA is NOT active for sprites. The transform occurs during WRAM staging (mechanism TBD). See `CHANGELOG.md` entry 2.6.0.
 - **Tile data requires byte swap** — extract high byte first for SNES tile format. Verify with `verify_endianness.lua`.
 - **ROM trace addresses are seeds, not exact offsets** — always validate via HAL decompression.
 

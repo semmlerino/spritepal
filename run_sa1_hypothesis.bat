@@ -34,6 +34,14 @@ REM ==== DMA/SA-1 LOGGING ====
 REM Keep SA-1 and DMA logging enabled (critical for correlation)
 set HEARTBEAT_EVERY=1000
 
+REM ==== DMA SOURCE VS VRAM COMPARISON (NEW) ====
+REM Critical test: does source buffer == VRAM after DMA?
+REM If equal: transformation happened BEFORE staging
+REM If not equal: CCDMA or mid-transform territory
+set DMA_COMPARE_ENABLED=1
+set DMA_COMPARE_MAX=100
+set DMA_COMPARE_SAMPLE_BYTES=64
+
 REM Disable event-triggered captures (use periodic instead)
 set VRAM_DIFF=0
 set WRAM_DUMP_ON_VRAM_DIFF=0
@@ -61,7 +69,8 @@ echo ===========================================================================
 echo.
 echo This run will capture during movie playback:
 echo   - DMA events (dma_probe_log.txt) for timing correlation
-echo   - Sprite captures every 30 seconds starting at frame 2000
+echo   - DMA source vs VRAM comparison (DMA_COMPARE lines)
+echo   - Sprite captures every 12.5 seconds starting at frame 1500
 echo.
 echo Output: %OUTPUT_DIR%
 echo Frames: %MAX_FRAMES% (~2.75 minutes)

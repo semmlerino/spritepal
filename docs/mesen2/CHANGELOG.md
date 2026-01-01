@@ -2,6 +2,331 @@
 
 All notable changes to the sprite extraction pipeline documentation and tooling.
 
+---
+
+## Reconciliation of Contradictory Findings (2026-01-01)
+
+Earlier changelog entries contain contradictions due to over-generalization from
+single captures. This section clarifies the correct, scoped interpretations.
+
+### 1. "100% HAL-compressed / no uncompressed assets" (v2.4.0) — FALSE
+
+**v2.4.0 claimed:** "There are NO uncompressed sprite assets in the ROM."
+
+**v2.5.2 found:** Tiles exist as raw uncompressed data around ROM 0x3CA000, with
+65 strong matches and 1 perfect 32/32 match.
+
+**Correct statement:** ROM contains a **mix** of HAL-compressed blocks and raw
+uncompressed tile data. Raw byte searches are unreliable without verification,
+but not "always wrong."
+
+### 2. "Planes 0+2 only" (v2.4.0) — SCENE-SPECIFIC, NOT GENERAL
+
+**v2.4.0 claimed:** 98.3% of tiles use only planes 0+2.
+
+**v2.6.0 found:** Gameplay captures show 0/177 "planes 0+2 only"; >90% use all 4 planes.
+
+**Correct statement:** Menu/cutscene captures show planes 0+2 dominance. Gameplay
+sprites use full 4bpp. Always tag findings by scene type (menu vs gameplay).
+
+### 3. "CCDMA drives sprite tiles" (SA1_HYPOTHESIS_FINDINGS) — MISATTRIBUTION
+
+**Earlier claimed:** SA-1 character conversion explains sprite upload bytes.
+
+**Corrected:** CCDMA events were for other transfers. Sprite DMAs are WRAM→VRAM
+(plain SNES DMA). CCDMA only applies to BW-RAM/cart ROM sources.
+
+### 4. "0/24 transforms" (v2.6.0) vs "65 tiles match well" (v2.5.2)
+
+These are different tile sets from different captures. Neither is universal.
+The "0/24" was from frame 1500 gameplay; the "65 matches" were from earlier
+captures with different tile content.
+
+**Correct statement:** Match rates vary by scene, tile class, and ROM region.
+No single rate applies to "all Kirby tiles."
+
+### 5. Technical Wording Error (v2.4.0)
+
+**v2.4.0 said:** "values 0, 1, 4, 5 - the low 2 bits of the 4-bit palette index"
+
+**Correct:** These values mean bits 1 and 3 are zero (only bits 0 and 2 vary).
+Not "low 2 bits." The 4-color conclusion is correct; the bit description was wrong.
+
+### 6. "No $2230 writes → no CCDMA" — WEAK INFERENCE
+
+Not seeing register writes may be an instrumentation gap. The valid logic is:
+WRAM→VRAM sprite DMAs imply no CCDMA **on that transfer** (CCDMA doesn't apply
+to WRAM sources).
+
+---
+
+**Guidance for future findings:** Tag every observation by:
+- **Scene type:** menu, cutscene, gameplay, boss, etc.
+- **Tile class:** OBJ (sprite), BG (background), UI
+- **Evidence strength:** observed (direct measurement) vs inferred (reasoning)
+
+---
+
+## [2.6.0] - 2026-01-01
+
+### Major Corrections: DMA Source Analysis and Transform Search
+
+**Key Finding: Sprite DMAs Come From WRAM, Not Cart ROM**
+
+Analysis of DMA log around frame 1500 revealed:
+
+| DMA Target | Source | Purpose |
+|------------|--------|---------|
+| VRAM 0x4000+ (sprites) | WRAM 0x7E:2000 | Sprite tiles |
+| VRAM 0x6000+ (BG) | Cart ROM $ED:xxxx, $EE:xxxx | Background tiles |
+
+**Implication:** CCDMA (SA-1 character conversion) is NOT in play for sprite tiles.
+CCDMA only applies to BW-RAM/cart ROM sources. WRAM→VRAM is plain SNES DMA copying
+already-final planar bytes.
+
+**Transform Search (Frame 1500 Gameplay OBJ Tiles):**
+
+Tested 24 non-empty tiles from frame 1500 gameplay capture:
+
+| Transform | Result |
+|-----------|--------|
+| Verbatim 32 bytes | 0/24 |
+| Byte-pair swap (word endianness) | 0/24 |
+| Bitmap nibble encoding (both orders) | 0/24 |
+| All 24 plane permutations | 0/24 |
+| H/V/HV flips | 0/24 |
+| Half-tiles in DMA source regions | 0/24 |
+
+*Note: This does not contradict v2.5.2's 65 partial matches—those were different
+tiles from different captures. Match rates are scene-dependent.*
+
+**Plane Usage Verification (Gameplay Captures):**
+
+Analyzed 177 unique tiles across frames 1500-5250:
+
+| Metric | Value |
+|--------|-------|
+| Tiles using all 4 planes | >90% |
+| Tiles "planes 0+2 only" | 0/177 |
+| Tiles with pixel values > 5 | 177/177 |
+
+**Conclusion:** The "planes 0+2 only" observation was specific to menu/cutscene
+captures. Gameplay sprites use full 4bpp with all planes active.
+
+**OAM→VRAM Math Verified:**
+
+```
+vram_addr = tile_index * 32 + (tile_page * 0x2000)
+```
+
+All tiles in frame 1500 capture obey this formula with no exceptions.
+
+**Revised Data Flow (Gameplay OBJ Tiles, Frame 1500):**
+
+```
+ROM (mix: HAL blocks + raw regions like 0x3CA000)
+    ↓ (decompression/copy - unknown location)
+    ↓ (transform - unknown, possibly runtime assembly)
+WRAM 0x7E:2000 (final planar format)
+    ↓ (plain SNES DMA, no conversion)
+VRAM 0x4000+ (sprite tiles)
+```
+
+**Scope note:** The "0/24 transforms" result is for 24 tiles from frame 1500
+gameplay capture. Earlier captures (v2.5.2) showed 65 tiles with strong ROM
+matches. Match rates are scene-dependent, not universal.
+
+**Open Question:** What code writes to WRAM 0x2000? This is the missing link.
+
+**Documentation Updated:**
+- SA1_HYPOTHESIS_FINDINGS.md: Added corrections section at top
+
+---
+
+## [2.5.2] - 2024-12-31
+
+### Discovery: Byte-Swap Bug in Capture Script + Corrected Analysis
+
+**Bug Found:** The Lua capture script was reading VRAM with byte-swapped order:
+- Capture data: `FD 3E FD 3F FE 3F...`
+- Actual VRAM:  `3E FD 3F FD 3F FE...`
+
+All previous ROM searches used the incorrect byte order.
+
+**Corrected Search Results:**
+
+With correct byte order (from VRAM dump, not capture):
+- VRAM 0x0020 → ROM 0x3CA5AB (16-byte match)
+- VRAM 0x0040 → ROM 0x3CA5CB (16-byte match)
+
+**But these are still false positives:**
+
+| ROM Offset | HAL Decompress | First Tile | Matches VRAM? |
+|------------|----------------|------------|---------------|
+| 0x3CA5AB | 1,277 bytes (39 tiles) | All zeros | **No** |
+| 0x3CA5CB | 23,289 bytes (727 tiles) | All zeros | **No** |
+
+The VRAM tile bytes happen to coincide with valid HAL block headers, but the
+decompressed content (zeros) doesn't match the actual VRAM sprite data.
+
+**CORRECTION: Tiles Found in Raw ROM (Not HAL Compressed):**
+
+After discovering the byte-swap bug, searched raw ROM with correct byte order:
+
+| Metric | Value |
+|--------|-------|
+| VRAM tiles with planes 0+1 ROM match | **65** |
+| Average byte match (32 bytes) | **25.8/32 (80.8%)** |
+| High matches (≥28/32 bytes) | **35/65** |
+| Perfect 32/32 matches | **1** (VRAM 0x0980 → ROM 0x3CAC03) |
+
+**Key Finding:** Tiles exist as **raw uncompressed data** around ROM 0x3CA000,
+NOT inside HAL blocks. The HAL decompressor was a red herring for these tiles.
+
+**Remaining byte differences (planes 2+3 only):**
+
+Example VRAM 0x0020 vs ROM 0x3CA5AB:
+- Bytes 0-15 (planes 0+1): 16/16 exact match
+- Bytes 16-19 (planes 2+3 row 0): `23 FF E0 26` → `FF FF FF FF`
+- Bytes 20-31 (planes 2+3 rows 1-7): 12/12 exact match
+
+The first row of planes 2+3 is modified at runtime (set to 0xFF).
+
+**Next Step (per user guidance):** Stop reasoning from ROM matches.
+Trace the actual DMA source buffer to localize where transformation occurs.
+
+---
+
+## [2.5.1] - 2024-12-31
+
+### Observation: 0% Verbatim Match for Non-Trivial Sprite Tiles
+
+**Confirmed Observation:** For capture frame 2000, **38/38 non-trivial VRAM tiles
+have 0 verbatim matches** in:
+- (a) Raw ROM scan (4MB)
+- (b) Outputs produced by our current HAL decompressor pipeline
+
+**Analysis of gameplay capture (frame 2000):**
+
+| Category | Count | Result |
+|----------|-------|--------|
+| Total VRAM tiles | 52 | - |
+| Trivial patterns (≤2 unique bytes) | 14 | False positive matches only |
+| Non-trivial sprite tiles | 38 | **0% verbatim match** |
+
+**False Positive Verification:**
+
+Initial raw ROM search found 3 "matches" at:
+- ROM $034D3F → Pattern: `01 01 01 01 01 01...` (trivial fill)
+- ROM $034BBF → Pattern: `80 80 80 80 80 80...` (trivial fill)
+- ROM $3CA5AB → Inside HAL compressed data stream (coincidental bytes)
+
+All were trivial repeating patterns or coincidental byte sequences—NOT actual
+sprite graphics.
+
+**Falsified Hypothesis:**
+
+Tested whether VRAM planes 2+3 = ROM planes 2+3 OR ROM planes 0+1:
+- Result: **FAILS** on all test cases
+- Byte differences: 14-16/16 bytes differ from prediction
+- This specific simple OR mapping is not the transformation used
+
+Note: This only rules out one specific mapping. Other possibilities remain:
+- Different plane ordering or interleaving
+- 2bpp ↔ 4bpp packing
+- Per-row/per-tile shuffles, XOR, or masks
+- Byte/bit endianness transforms
+
+**Leading Hypotheses (Not Yet Proven):**
+
+The final VRAM tiles are likely produced via one of:
+1. **Runtime transformation** in WRAM/BW-RAM staging buffers
+2. **Component assembly** from multiple smaller source pieces (metatiles)
+3. **Different compression path** not covered by our current HAL decoder
+4. **Format permutation** (bitplane swizzle, bit reversal, etc.) we haven't tested
+
+**WRAM Staging Buffer Analysis:**
+
+Searched WRAM staging buffers for ROM patterns:
+
+| Buffer | Address | Content | ROM Match |
+|--------|---------|---------|-----------|
+| Kirby sprite staging | $7E:2000 | 87% non-zero, 188 unique values | Inside HAL compressed stream (false positive) |
+| Sparkle staging | $7E:3400 | 79% non-zero, 27 unique values | None |
+| Primary DMA staging | $7E:F382 | 99% non-zero, 223 unique values | None |
+
+Note: This shows staging buffers don't match raw ROM, but does not prove where
+the transformation occurs.
+
+**Next Steps (Actionable):**
+
+1. **Trace DMA source → VRAM** - Capture WRAM staging buffer at DMA trigger time
+   and diff against VRAM. If they match, transformation is before staging.
+
+2. **Test additional format permutations** - Bitplane swizzles, 2bpp modes, XOR masks
+
+3. **Search for metatile tables** - Look for pointer tables that reference tile
+   components to assemble into final sprites
+
+**Path Forward for SpritePal:**
+
+Current verbatim ROM-matching approach does not work for this capture. Options:
+
+1. **Visual perceptual matching** - Image similarity against rendered screenshots
+2. **Metatile reverse-engineering** - Find OAM assembly tables
+3. **Test simpler games** - Games without SA-1 may use direct HAL → VRAM paths
+4. **BG tile focus** - The 2.5% HAL matches were BG tiles, which may be extractable
+
+---
+
+## [2.5.0] - 2024-12-31
+
+### Critical Finding: Runtime-Generated Sprite Tiles
+
+**Problem:** Even with 188,920 unique tiles indexed from HAL blocks, only 2.5% of
+gameplay VRAM tiles match. Sprite tiles are NOT stored directly in ROM.
+
+**Evidence:**
+
+| Metric | Value |
+|--------|-------|
+| Unique HAL tiles indexed | 188,920 |
+| Non-empty VRAM tiles | 511 |
+| Tiles matching HAL | 13 (2.5%) |
+| Tiles NOT matching | 498 (97.5%) |
+
+**Matched tiles** (mostly BG, not sprites):
+- VRAM $04A0 → HAL $006800
+- VRAM $0560 → HAL $370000
+- VRAM $0740 → HAL $368000
+
+**Unmatched tiles** (sprite data at low VRAM addresses):
+- VRAM $0020-$00C0 contain sprite graphics
+- None match any HAL block output
+- None match raw ROM bytes either (searched 4MB)
+
+**Root Cause Analysis:**
+
+Kirby Super Star's sprite system is more complex than assumed:
+
+1. **Component-based rendering** - Sprites may be assembled from smaller pieces
+2. **Runtime palette manipulation** - SA-1 may modify tile data during transfer
+3. **Animation compositing** - Multiple source tiles blended to create frames
+4. **Dynamic effects** - Star/sparkle effects are procedurally generated
+
+**Verified by exhaustive search:**
+- Searched all HAL blocks (3,247 valid blocks)
+- Searched raw ROM (4MB) for 32-byte patterns
+- Best partial matches only 13-19/32 bytes (coincidental similarity)
+
+**Implication:** Direct ROM → VRAM tile correlation is NOT possible for Kirby
+Super Star sprites. Alternative approaches needed:
+- Capture sprite component pieces before SA-1 processing
+- Trace ROM read patterns during sprite decompression
+- Use visual matching against rendered screenshots
+
+---
+
 ## [2.4.0] - 2024-12-31
 
 ### Finding: Two-Plane 4bpp Tiles (All Graphics HAL-Compressed)
@@ -65,7 +390,7 @@ This suggests these sprites use a 4-color subset of the 16-color sprite palette.
 
 **Problem:** 0% ROM match rate across all captures despite comprehensive scanning.
 
-**Root Cause:** All existing captures are from menu/cutscene screens (frames 199-6227),
+**Root Cause:** All existing captures were from menu/cutscene screens (frames 199-6227),
 NOT actual gameplay. Menu graphics (fonts, UI) are stored differently:
 - Possibly uncompressed in ROM
 - In different HAL blocks than sprite data at $1B0000
@@ -73,15 +398,33 @@ NOT actual gameplay. Menu graphics (fonts, UI) are stored differently:
 
 **Evidence:**
 - HAL-decompressed ROM tiles have all 4 planes populated (verified)
-- VRAM tiles only use planes 0+2 (98.3% of captured tiles)
-- Game zeros planes 1+3 at runtime (confirmed by plane analysis)
-- Planes 0+2 comparison still yields 0% matches → wrong graphics captured
+- Menu/cutscene VRAM tiles only use planes 0+2 (98.3% of captured tiles)
+- Gameplay VRAM tiles use ALL 4 planes (verified at frame 2000)
+
+### Unified Capture Workflow (Implemented)
+
+**Solution:** Integrated periodic sprite capture into `mesen2_dma_probe.lua`:
+
+| Environment Variable | Default | Purpose |
+|---------------------|---------|---------|
+| `PERIODIC_CAPTURE_ENABLED` | 0 | Set to "1" to enable |
+| `PERIODIC_CAPTURE_START` | 2000 | Frame to start captures |
+| `PERIODIC_CAPTURE_INTERVAL` | 1800 | Frames between captures (30s @ 60fps) |
+
+**Single batch file workflow:** `run_sa1_hypothesis.bat` now captures both:
+1. DMA events (`dma_probe_log.txt`) for timing correlation
+2. Periodic sprite snapshots (`test_capture_gameplay_*.json`) for ROM matching
+
+**Gameplay Capture Results (frame 2000):**
+- 44 visible sprites captured
+- Tile data uses ALL 4 bitplanes (unlike menu captures)
+- Example tile: `FD3EFD3FFE3FFE3F...` (non-zero odd bytes = planes 1+3 active)
+- Kirby with Cutter ability, Waddle Doo enemy, Spring Breeze level
 
 **Next Steps:**
-- [ ] Capture during actual gameplay (Kirby running around, enemies visible)
-- [ ] Verify OBJ sprites vs BG tiles in Mesen's viewers during capture
-- [ ] Re-run ROM matching with gameplay captures
-- [ ] If gameplay sprites match, confirm menu assets are stored separately
+- [ ] Run ROM correlation with gameplay captures
+- [ ] Verify match rate improvement with full 4-plane tiles
+- [ ] If successful, document the menu vs gameplay graphics difference
 
 ---
 

@@ -1,5 +1,12 @@
 # 03 Game Mapping: Kirby Super Star (SA-1)
 
+> **CORRECTION (2026-01-01):** Some sections of this document incorrectly assumed
+> SA-1 CCDMA (character conversion) is active for sprite tiles. Analysis shows
+> sprite tile DMAs come from **WRAM 0x7E:2000**, not cart ROM, so CCDMA is not
+> in play. See `SA1_HYPOTHESIS_FINDINGS.md` for corrections and `CHANGELOG.md`
+> entry 2.6.0 for details. The "SA-1 Character Conversion" section below should
+> be read with this context.
+
 This document is **game-specific**. Do not generalize these assumptions to other SNES titles.
 
 > **Note on "confidence" terminology:** Throughout SpritePal documentation, "confidence" refers
