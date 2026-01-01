@@ -1,8 +1,65 @@
-# SA-1 Conversion Hypothesis: CONFIRMED
+# SA-1 Conversion Hypothesis: REQUIRES REVISION
 
-> **Status:** VERIFIED
-> **Last Updated:** 2024-12-31
-> **Captured By:** Gabriel (via run_sa1_hypothesis.bat)
+> **Status:** PARTIALLY INCORRECT - SEE CORRECTIONS BELOW
+> **Last Updated:** 2026-01-01
+> **Original Analysis:** 2024-12-31
+> **Corrections By:** Claude (based on DMA log analysis)
+
+## CORRECTIONS (2026-01-01)
+
+The original conclusions below contain errors. Key corrections:
+
+### 1. CCDMA Is NOT Active For Sprite Tiles
+
+**Original claim:** "100% of SA-1 DMA operations use character conversion"
+
+**Correction:** The $2230 register writes observed were for *other* DMA operations,
+not the sprite tile transfers. Analysis of SNES_DMA_VRAM entries around frame 1500
+shows:
+
+- Sprite tile DMAs come from **WRAM bank $7E** (addresses like 0x7E:2000)
+- Cart ROM DMAs (banks $ED/$EE) go to VRAM 0x6000+ (BG tiles, not sprites)
+- **CCDMA only applies to BW-RAM/cart ROM sources**, not WRAM
+
+When DMA source is WRAM, the data is already in final SNES 4bpp format - no
+conversion occurs during transfer.
+
+### 2. "WRAM Staging Irrelevant" Is Wrong
+
+**Original claim:** "WRAM staging analysis is irrelevant"
+
+**Correction:** WRAM staging is **central** to understanding the data flow:
+
+- Sprite tiles are staged at WRAM 0x7E:2000 (already in planar format)
+- Then DMA'd to VRAM 0x4000+ (sprite tile area)
+- The key question is: **what writes to WRAM 0x2000?**
+
+### 3. Transform Search Results
+
+A comprehensive transform search was performed (2026-01-01):
+
+| Transform | Tiles Matched |
+|-----------|---------------|
+| Verbatim 32 bytes | 0/24 |
+| Byte-pair swap | 0/24 |
+| Bitmap nibble encoding | 0/24 |
+| All 24 plane permutations | 0/24 |
+| H/V/HV flips | 0/24 |
+
+**Conclusion:** The VRAM tiles do not exist verbatim in ROM under any common
+transform. This suggests runtime assembly or a more complex transform chain.
+
+### 4. Plane Usage Verification
+
+Analysis of gameplay captures (frames 1500-5250):
+
+- **0/177 tiles** are "planes 0+2 only"
+- **>90%** use all 4 planes with pixel values > 5
+- The "planes 0+2" observation was specific to menu/cutscene captures
+
+---
+
+## Original Analysis (Below - Partially Incorrect)
 
 ## Background
 
