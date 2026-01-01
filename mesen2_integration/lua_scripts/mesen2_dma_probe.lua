@@ -324,7 +324,11 @@ local function get_cpu_state_snapshot()
         k_key = k_key,
         k_val = k_val or 0,
         dbr_key = dbr_key,
-        dbr_val = dbr_val or 0
+        dbr_val = dbr_val or 0,
+        -- Aliases for downstream code that uses .pc/.k/.dbr
+        pc = pc_val or 0,
+        k = k_val or 0,
+        dbr = dbr_val or 0
     }
 end
 
@@ -350,6 +354,7 @@ local staging_active = false
 local staging_rom_reads = {}  -- [bank:addr] = count
 local staging_rom_read_count = 0
 local staging_first_pc = nil  -- PC that started the fill
+local staging_rom_read_cpu_counts = {}  -- [cpu_label] = count (e.g., "snes", "sa1")
 
 local function init_staging_stats()
     return {
@@ -374,16 +379,20 @@ local function reset_staging_rom_reads()
     staging_first_pc = nil
     staging_active = false
     last_staging_write_frame = nil
+    staging_rom_read_cpu_counts = {}
 end
 
 -- Track frame of last staging write (for frame-gating PRG reads)
 local last_staging_write_frame = nil
 
 -- Record a PRG ROM read during staging (address is PRG file offset)
-local function record_staging_rom_read(prg_offset)
+local function record_staging_rom_read(prg_offset, cpu_label)
     if not staging_active then return end
     staging_rom_reads[prg_offset] = (staging_rom_reads[prg_offset] or 0) + 1
     staging_rom_read_count = staging_rom_read_count + 1
+    if cpu_label then
+        staging_rom_read_cpu_counts[cpu_label] = (staging_rom_read_cpu_counts[cpu_label] or 0) + 1
+    end
 end
 
 -- Summarize ROM reads as contiguous runs
@@ -459,22 +468,32 @@ local function log_staging_rom_reads(frame, vram_addr, dma_size)
     end
 
     local unique_count = count_map_keys(staging_rom_reads)
+
+    -- Format CPU counts
+    local cpu_parts = {}
+    for cpu, cnt in pairs(staging_rom_read_cpu_counts) do
+        cpu_parts[#cpu_parts + 1] = cpu .. "=" .. cnt
+    end
+    local cpu_str = #cpu_parts > 0 and table.concat(cpu_parts, ",") or "none"
+
     log(string.format(
-        "STAGING_ROM_READS: frame=%d pc=%s vram_word=0x%04X size=%d prg_runs=[%s] unique=%d total=%d",
-        frame, pc_str, vram_addr, dma_size, runs_str, unique_count, staging_rom_read_count
+        "STAGING_ROM_READS: frame=%d pc=%s vram_word=0x%04X size=%d prg_runs=[%s] unique=%d total=%d cpus={%s}",
+        frame, pc_str, vram_addr, dma_size, runs_str, unique_count, staging_rom_read_count, cpu_str
     ))
 end
 
--- PRG/ROM read callback during staging
+-- PRG/ROM read callback factory during staging
 -- Note: address is PRG file offset (0 to prg_size-1), NOT a SNES bus address
 -- Frame-gated: only record if we're in the same frame as the staging write
-local function on_staging_rom_read(address, value)
-    if not staging_active then return end
-    -- Frame-gate: ignore PRG reads from different frames (reduces noise)
-    if last_staging_write_frame and get_canonical_frame() ~= last_staging_write_frame then
-        return
+local function make_staging_rom_reader(cpu_label)
+    return function(address, value)
+        if not staging_active then return end
+        -- Frame-gate: ignore PRG reads from different frames (reduces noise)
+        if last_staging_write_frame and get_canonical_frame() ~= last_staging_write_frame then
+            return
+        end
+        record_staging_rom_read(address, cpu_label)
     end
-    record_staging_rom_read(address)
 end
 
 local function record_staging_write(addr, pc_snapshot)
@@ -2568,21 +2587,42 @@ if STAGING_WATCH_ENABLED then
             if ok then prg_size = size end
 
             if prg_size > 0 then
-                local prg_ref = add_memory_callback_compat(
-                    on_staging_rom_read,
+                -- Register S-CPU PRG read callback
+                local snes_prg_ref = add_memory_callback_compat(
+                    make_staging_rom_reader("snes"),
                     emu.callbackType.read,
                     0,
                     prg_size - 1,
                     cpu_type,
                     MEM.prg
                 )
-                if prg_ref then
+                if snes_prg_ref then
                     log(string.format(
-                        "INFO: PRG read callback registered for staging ROM tracking: 0-0x%X (%d bytes)",
+                        "INFO: PRG read callback registered for S-CPU staging ROM tracking: 0-0x%X (%d bytes)",
                         prg_size - 1, prg_size
                     ))
                 else
-                    log("WARNING: failed to register PRG read callback for staging")
+                    log("WARNING: failed to register PRG read callback for S-CPU staging")
+                end
+
+                -- Register SA-1 PRG read callback if available
+                if sa1_cpu_type then
+                    local sa1_prg_ref = add_memory_callback_compat(
+                        make_staging_rom_reader("sa1"),
+                        emu.callbackType.read,
+                        0,
+                        prg_size - 1,
+                        sa1_cpu_type,
+                        MEM.prg
+                    )
+                    if sa1_prg_ref then
+                        log(string.format(
+                            "INFO: PRG read callback registered for SA-1 staging ROM tracking: 0-0x%X (%d bytes)",
+                            prg_size - 1, prg_size
+                        ))
+                    else
+                        log("INFO: SA-1 PRG read callback not available (expected on non-SA1 ROMs)")
+                    end
                 end
             else
                 log("WARNING: PRG size is 0, cannot register ROM read callback")
