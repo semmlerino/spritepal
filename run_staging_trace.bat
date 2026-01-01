@@ -29,6 +29,11 @@ REM PC-gated read tracking (only count reads from known copy routines)
 REM Default ON for production runs; set to 0 for discovering new copy routine PCs
 set STAGING_PC_GATING=1
 
+REM WRAM intermediate buffer tracking (PRG -> WRAM buffer -> staging)
+REM WARNING: EXPENSIVE - fires on every WRAM read (~120KB coverage)
+REM Only enable when investigating intermediate buffer patterns
+set STAGING_WRAM_TRACKING=0
+
 REM ==== PERIODIC CAPTURES (for correlation) ====
 set PERIODIC_CAPTURE_ENABLED=1
 set PERIODIC_CAPTURE_START=1500

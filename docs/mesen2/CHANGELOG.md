@@ -67,6 +67,81 @@ to WRAM sources).
 
 ---
 
+## [2.7.0] - 2026-01-01
+
+### Staging Buffer Write Tracking System
+
+**New Feature: STAGING_CAUSAL Tracking**
+
+Added comprehensive staging buffer write tracking to answer "What writes to WRAM 0x2000?"
+
+**New Batch File:** `run_staging_trace.bat`
+- Traces S-CPU code that writes to WRAM $7E:2000-$2FFF (sprite staging area)
+- Captures causal PRG read → staging write pairs
+- Reports quality metrics for credibility assessment
+
+**New Environment Variables:**
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `STAGING_WATCH_ENABLED` | 0 | Enable staging buffer write monitoring |
+| `STAGING_WATCH_START` | 0x2000 | Start of staging buffer region |
+| `STAGING_WATCH_END` | 0x2FFF | End of staging buffer region |
+| `STAGING_CAUSAL_ENABLED` | 0 | Track PRG read → staging write pairs |
+| `STAGING_PC_GATING` | 0 | Only count reads from known copy routine PCs |
+| `STAGING_WRAM_TRACKING` | 0 | Track WRAM reads (expensive, opt-in) |
+
+**New Log Formats:**
+
+```
+STAGING_SUMMARY: frame=X src=0x7E2000 size=N vram=0xNNNN pattern=SEQUENTIAL_BURST writes=N pcs=[...]
+STAGING_CAUSAL: frame=X vram_word=0xNNNN size=N pairs=N quality=HIGH unique_prg=N max_run=N coverage=0.XX prg_runs=[...] cpus={...} read->write_pcs=[...]
+```
+
+**Quality Metrics (new):**
+
+- `unique_prg` - Number of unique PRG addresses read
+- `max_run` - Longest contiguous PRG run (indicates real data vs code)
+- `coverage` - unique_prg / dma_size (high = direct copy, low = decompression)
+- `quality=HIGH/MED/LOW` - Assessment of data credibility
+
+**Quality Thresholds:**
+- `HIGH`: max_run >= 64 AND coverage > 0.5 (likely real tile data)
+- `MED`: max_run >= 32 OR coverage > 0.3
+- `LOW`: everything else (likely code/noise or decompression)
+
+**Technical Improvements:**
+
+1. **Session-based pairing** - Pairs PRG reads with staging writes across frame boundaries
+   (fixes false NO_PAIRS when read is frame N, write is frame N+1)
+
+2. **Bank $01 PC support** - Added gameplay-discovered copy routine PCs:
+   - `$01:8FA9` - Most common gameplay staging writer
+   - `$01:9927` - Secondary gameplay routine
+   - `$01:E409` - Additional gameplay routine
+
+3. **Instruction-fetch filter** - Rejects PRG reads that are opcode fetches (within 4 bytes of PC)
+   to prevent false positives from copy loop code being "matched"
+
+4. **SNES→PRG mapping** - Added `snes_to_prg_offset()` for LoROM address conversion
+
+**Initial Findings (Gameplay Frames 1500+):**
+
+| Metric | Value |
+|--------|-------|
+| Total STAGING_CAUSAL entries | 165 |
+| WITH pairs | 46 (28%) |
+| NO_PAIRS | 119 (72%) |
+
+The high NO_PAIRS rate suggests staging writes are NOT fed by direct PRG reads.
+Likely data flow: `PRG → SA-1 decompression → WRAM buffer → staging $2000 → VRAM`
+
+**Known Limitation:** WRAM read tracking (to find intermediate buffers) is expensive
+(~120KB callback coverage) and disabled by default. Enable with `STAGING_WRAM_TRACKING=1`
+only when investigating intermediate buffer patterns.
+
+---
+
 ## [2.6.0] - 2026-01-01
 
 ### Major Corrections: DMA Source Analysis and Transform Search

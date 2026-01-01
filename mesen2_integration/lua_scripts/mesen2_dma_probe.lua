@@ -243,6 +243,12 @@ local STAGING_START_FRAME = tonumber(os.getenv("STAGING_START_FRAME")) or 0
 -- Env var kept as STAGING_CAUSAL_ENABLED for backwards compat
 local STAGING_CAUSAL_ENABLED = os.getenv("STAGING_CAUSAL_ENABLED") == "1"
 
+-- WRAM read tracking: detect intermediate buffer pattern (PRG → WRAM → staging)
+-- WARNING: This is EXPENSIVE - callbacks fire on every WRAM read (~120KB coverage)
+-- Only enable when specifically investigating WRAM intermediate buffers
+-- Default OFF to avoid freezing the emulator
+local STAGING_WRAM_TRACKING_ENABLED = os.getenv("STAGING_WRAM_TRACKING") == "1"
+
 -- Per-frame staging write stats
 local staging_frame_stats = {}  -- [frame] = {stats}
 local staging_current_frame = nil
@@ -255,23 +261,34 @@ local staging_first_pc = nil  -- PC that started the fill
 -- ============================================================================
 -- CAUSAL READ→WRITE TRACKING
 -- Track which PRG reads actually feed staging writes (not just correlation)
+-- Also track WRAM reads to detect intermediate buffer pattern:
+--   PRG → WRAM buffer → staging ($7E:2000) → VRAM
 -- ============================================================================
 local last_prg_read = {
     snes = nil,  -- {addr = prg_offset, frame = frame, seq = sequence_number, read_pc = pc, read_k = bank}
     sa1 = nil
 }
-local read_sequence = 0  -- Global sequence counter for ordering
+-- WRAM read tracking: what the staging copy routine reads FROM
+-- This reveals if staging is fed from another WRAM buffer (not direct PRG)
+local last_wram_read = {
+    snes = nil,  -- {addr = wram_addr, frame = frame, seq = sequence_number, read_pc = pc, read_k = bank}
+    sa1 = nil
+}
+local read_sequence = 0  -- Global sequence counter for ordering (shared between PRG and WRAM reads)
 
 -- Known staging copy routine PCs (for PC-gated filtering)
 -- These are discovered from log analysis; add more as we learn them
 -- Format: [(k<<16)|pc] = true (24-bit addressing: bank + PC)
 local STAGING_COPY_PCS = {
+    -- Bank $00 routines (cutscenes, some gameplay)
     [0x00893D] = true,  -- Bank $00, PC $893D
     [0x008952] = true,  -- Bank $00, PC $8952
     [0x008966] = true,  -- Bank $00, PC $8966
     [0x00897A] = true,  -- Bank $00, PC $897A
-    -- Gameplay may use bank $01 - add as discovered from STAGING_CAUSAL logs
-    -- e.g., [0x01893D] = true for bank $01
+    -- Bank $01 routines (gameplay - discovered from STAGING_SUMMARY logs)
+    [0x018FA9] = true,  -- Bank $01, PC $8FA9 (most common gameplay staging writer)
+    [0x019927] = true,  -- Bank $01, PC $9927
+    [0x01E409] = true,  -- Bank $01, PC $E409
 }
 -- Enable PC-gating via env var (default off for discovery mode)
 local STAGING_PC_GATING_ENABLED = os.getenv("STAGING_PC_GATING") == "1"
@@ -284,6 +301,13 @@ local staging_pair_total = 0  -- True count (not capped like the pairs array)
 -- Summary: which PRG regions fed writes (aggregated)
 -- Format: [prg_offset] = {count = N, cpus = {snes = n1, sa1 = n2}}
 local staging_prg_sources = {}
+
+-- Summary: which WRAM regions the staging writer reads FROM (aggregated)
+-- This reveals if staging is fed from an intermediate WRAM buffer
+-- Format: [wram_offset] = {count = N, cpus = {snes = n1, sa1 = n2}}
+local staging_wram_sources = {}
+local staging_wram_read_write_pairs = {}
+local staging_wram_pair_total = 0
 
 local function init_staging_stats()
     return {
@@ -306,20 +330,60 @@ local function reset_staging_tracking()
     staging_first_pc = nil
     staging_active = false
     last_staging_write_frame = nil
-    -- Reset causal tracking
+    staging_session_start_seq = nil
+    -- Reset PRG causal tracking
     last_prg_read.snes = nil
     last_prg_read.sa1 = nil
     staging_read_write_pairs = {}
     staging_pair_total = 0
     staging_prg_sources = {}
+    -- Reset WRAM read tracking
+    last_wram_read.snes = nil
+    last_wram_read.sa1 = nil
+    staging_wram_read_write_pairs = {}
+    staging_wram_pair_total = 0
+    staging_wram_sources = {}
 end
 
--- Track frame of last staging write (for frame-gating PRG reads)
+-- Track frame of last staging write (for logging)
 local last_staging_write_frame = nil
+
+-- Session-based gating: sequence number when staging session started
+-- Reads with seq >= this value are part of the current session
+local staging_session_start_seq = nil
 
 -- Format PRG offset as hex (NOT a SNES bus address)
 local function format_prg_offset(prg_offset)
     return string.format("0x%06X", prg_offset)
+end
+
+-- Convert SNES bus address (bank:offset) to PRG file offset
+-- Returns nil if address doesn't map to ROM (e.g., WRAM, registers)
+-- Uses LoROM mapping: banks $00-$7D, $80-$FF with $8000-$FFFF offset
+-- SA-1 bank remapping is NOT applied here (would need sa1_bank_state)
+local function snes_to_prg_offset(bank, offset)
+    -- Only $8000-$FFFF maps to ROM in LoROM
+    if offset < 0x8000 then return nil end
+
+    -- Banks $7E-$7F are WRAM, not ROM
+    if bank == 0x7E or bank == 0x7F then return nil end
+
+    -- LoROM mapping: strip high bit of bank, multiply by 32KB, add offset within bank
+    local effective_bank = bank & 0x7F  -- Mirror $80+ to $00+
+    local prg_offset = effective_bank * 0x8000 + (offset - 0x8000)
+
+    return prg_offset
+end
+
+-- Check if a PRG read is likely an instruction fetch (not data)
+-- Returns true if the read address is within FETCH_WINDOW bytes of where PC maps to PRG
+local FETCH_WINDOW = 4  -- Opcodes are 1-3 bytes, allow small margin
+local function is_likely_instruction_fetch(prg_addr, read_k, read_pc)
+    local pc_prg = snes_to_prg_offset(read_k, read_pc)
+    if not pc_prg then return false end  -- PC not in ROM? (unlikely but safe)
+
+    local distance = math.abs(prg_addr - pc_prg)
+    return distance <= FETCH_WINDOW
 end
 
 -- Log CAUSAL read→write summary (the actionable data)
@@ -361,6 +425,19 @@ local function log_staging_causal_summary(frame, vram_addr, dma_size)
         end
         runs[#runs + 1] = {start = run_start, stop = run_end}
     end
+
+    -- Compute quality metrics
+    local unique_prg_bytes = #prg_addrs
+    local max_run_len = 0
+    local sum_run_len = 0
+    for _, run in ipairs(runs) do
+        local len = run.stop - run.start + 1
+        sum_run_len = sum_run_len + len
+        if len > max_run_len then max_run_len = len end
+    end
+    -- Coverage: how much of DMA size is accounted for by unique PRG reads
+    -- High coverage (> 0.8) suggests direct ROM copy; low suggests decompression/synthesis
+    local coverage_ratio = dma_size > 0 and (unique_prg_bytes / dma_size) or 0
 
     -- Format runs
     local runs_parts = {}
@@ -407,25 +484,98 @@ local function log_staging_causal_summary(frame, vram_addr, dma_size)
     end
     local pc_str = table.concat(pc_samples, ",")
 
+    -- Quality assessment: is this likely real data or code/noise?
+    -- High quality = max_run >= 64 AND coverage > 0.5
+    local quality = "LOW"
+    if max_run_len >= 64 and coverage_ratio > 0.5 then
+        quality = "HIGH"
+    elseif max_run_len >= 32 or coverage_ratio > 0.3 then
+        quality = "MED"
+    end
+
     log(string.format(
-        "STAGING_CAUSAL: frame=%d vram_word=0x%04X size=%d pairs=%d prg_runs=[%s] cpus={%s} read->write_pcs=[%s]",
-        frame, vram_addr, dma_size, staging_pair_total, runs_str, cpu_str, pc_str
+        "STAGING_CAUSAL: frame=%d vram_word=0x%04X size=%d pairs=%d quality=%s unique_prg=%d max_run=%d coverage=%.2f prg_runs=[%s] cpus={%s} read->write_pcs=[%s]",
+        frame, vram_addr, dma_size, staging_pair_total, quality, unique_prg_bytes, max_run_len, coverage_ratio, runs_str, cpu_str, pc_str
+    ))
+end
+
+-- Log WRAM source summary (the intermediate buffer detection data)
+-- This shows which WRAM regions the staging writer reads FROM
+local function log_staging_wram_source_summary(frame, vram_addr, dma_size)
+    if not STAGING_CAUSAL_ENABLED or not staging_active then return end
+    if staging_wram_pair_total == 0 then return end  -- No WRAM reads detected, skip
+
+    local pairs_logged = #staging_wram_read_write_pairs
+
+    -- Aggregate WRAM sources into runs
+    local wram_addrs = {}
+    for addr, _ in pairs(staging_wram_sources) do
+        wram_addrs[#wram_addrs + 1] = addr
+    end
+    table.sort(wram_addrs)
+
+    -- Build runs from sorted addresses
+    local runs = {}
+    if #wram_addrs > 0 then
+        local run_start = wram_addrs[1]
+        local run_end = wram_addrs[1]
+        for i = 2, #wram_addrs do
+            local addr = wram_addrs[i]
+            if addr == run_end + 1 then
+                run_end = addr
+            else
+                runs[#runs + 1] = {start = run_start, stop = run_end}
+                run_start = addr
+                run_end = addr
+            end
+        end
+        runs[#runs + 1] = {start = run_start, stop = run_end}
+    end
+
+    -- Format runs
+    local runs_parts = {}
+    for _, run in ipairs(runs) do
+        if run.start == run.stop then
+            runs_parts[#runs_parts + 1] = string.format("0x%06X", run.start)
+        else
+            local size = run.stop - run.start + 1
+            runs_parts[#runs_parts + 1] = string.format("0x%06X-0x%06X(%d)", run.start, run.stop, size)
+        end
+    end
+    local runs_str = table.concat(runs_parts, ",")
+    if #runs_str > 200 then
+        runs_str = string.sub(runs_str, 1, 200) .. "..."
+    end
+
+    -- Count by CPU
+    local cpu_totals = {}
+    for _, src in pairs(staging_wram_sources) do
+        for cpu, cnt in pairs(src.cpus) do
+            cpu_totals[cpu] = (cpu_totals[cpu] or 0) + cnt
+        end
+    end
+    local cpu_parts = {}
+    for cpu, cnt in pairs(cpu_totals) do
+        cpu_parts[#cpu_parts + 1] = cpu .. "=" .. cnt
+    end
+    local cpu_str = #cpu_parts > 0 and table.concat(cpu_parts, ",") or "none"
+
+    log(string.format(
+        "STAGING_WRAM_SOURCE: frame=%d vram_word=0x%04X size=%d wram_pairs=%d wram_runs=[%s] cpus={%s}",
+        frame, vram_addr, dma_size, staging_wram_pair_total, runs_str, cpu_str
     ))
 end
 
 -- PRG/ROM read callback factory during staging
 -- Note: address is PRG file offset (0 to prg_size-1), NOT a SNES bus address
--- Frame-gated: only record if we're in the same frame as the staging write
+-- Session-gated: pairing filters by seq >= staging_session_start_seq
 -- Captures PC at read time for causal read→write pairing
 local function make_staging_rom_reader(cpu_label)
     return function(address, value)
         -- Note: We do NOT check staging_active here. This allows capturing the PRG read
         -- that happens immediately before the first staging write (fixes first-byte miss).
-        -- The frame-gate below prevents noise from other frames once staging starts.
+        -- Session-based filtering happens in pairing (seq >= staging_session_start_seq).
         local frame = get_canonical_frame()
-        if last_staging_write_frame and frame ~= last_staging_write_frame then
-            return
-        end
 
         -- Get PC at time of read (for analysis and optional PC-gating)
         local pc_snapshot = get_cpu_state_snapshot()
@@ -439,9 +589,47 @@ local function make_staging_rom_reader(cpu_label)
             return
         end
 
+        -- CRITICAL: Filter out instruction fetches
+        -- Mesen's PRG read callbacks fire for ALL reads including opcode fetches.
+        -- Without this filter, we'd "pair" the copy loop's own code with staging writes.
+        if is_likely_instruction_fetch(address, read_k, read_pc) then
+            return
+        end
+
         -- Record as "last read" for this CPU (for causal pairing)
         read_sequence = read_sequence + 1
         last_prg_read[cpu_label] = {
+            addr = address,
+            frame = frame,
+            seq = read_sequence,
+            read_pc = read_pc,
+            read_k = read_k
+        }
+    end
+end
+
+-- WRAM read callback factory during staging
+-- Tracks what the staging copy routine READS from WRAM (not the staging area itself)
+-- This reveals if staging is fed from an intermediate WRAM buffer
+local function make_staging_wram_reader(cpu_label)
+    return function(address, value)
+        -- Only track during active staging session
+        if not staging_active then return end
+
+        local frame = get_canonical_frame()
+        local pc_snapshot = get_cpu_state_snapshot()
+        local read_pc = pc_snapshot and pc_snapshot.pc_val or 0
+        local read_k = pc_snapshot and pc_snapshot.k_val or 0
+
+        -- Optional PC-gating: only count reads from known copy routines
+        local full_pc = (read_k << 16) | read_pc
+        if STAGING_PC_GATING_ENABLED and not STAGING_COPY_PCS[full_pc] then
+            return
+        end
+
+        -- Record as "last WRAM read" for this CPU (for causal pairing)
+        read_sequence = read_sequence + 1
+        last_wram_read[cpu_label] = {
             addr = address,
             frame = frame,
             seq = read_sequence,
@@ -458,9 +646,19 @@ local function record_staging_write(addr, pc_snapshot)
     if STAGING_CAUSAL_ENABLED and not staging_active then
         staging_active = true
         staging_first_pc = pc_snapshot
+        -- Start session: include any reads that already happened (for first-byte case)
+        -- Use the minimum seq of pending reads, or current seq if none
+        local min_seq = read_sequence
+        if last_prg_read.snes and last_prg_read.snes.seq then
+            min_seq = math.min(min_seq, last_prg_read.snes.seq)
+        end
+        if last_prg_read.sa1 and last_prg_read.sa1.seq then
+            min_seq = math.min(min_seq, last_prg_read.sa1.seq)
+        end
+        staging_session_start_seq = min_seq
     end
 
-    -- Track frame of last staging write (for frame-gating PRG reads)
+    -- Track frame of last staging write (for logging)
     last_staging_write_frame = frame
 
     -- Initialize stats for new frame
@@ -525,15 +723,16 @@ local function record_staging_write(addr, pc_snapshot)
     -- ========================================================================
     -- CAUSAL READ→WRITE PAIRING
     -- Find the most recent PRG read (across both CPUs) and pair it with this write
+    -- Session-based: accepts reads with seq >= staging_session_start_seq
     -- ========================================================================
-    if STAGING_CAUSAL_ENABLED then
+    if STAGING_CAUSAL_ENABLED and staging_session_start_seq then
         local best_read = nil
         local best_cpu = nil
         local best_seq = -1
 
-        -- Find most recent read (highest sequence number, same frame)
+        -- Find most recent read (highest sequence number, within session)
         for cpu, last in pairs(last_prg_read) do
-            if last and last.frame == frame and last.seq > best_seq then
+            if last and last.seq >= staging_session_start_seq and last.seq > best_seq then
                 best_read = last
                 best_cpu = cpu
                 best_seq = last.seq
@@ -569,6 +768,50 @@ local function record_staging_write(addr, pc_snapshot)
             -- Clear the read so it can't be double-paired
             -- (next write needs a new read to pair with)
             last_prg_read[best_cpu] = nil
+        end
+
+        -- ====================================================================
+        -- WRAM READ→STAGING WRITE PAIRING
+        -- Find what WRAM address the staging writer read from (intermediate buffer detection)
+        -- ====================================================================
+        local best_wram_read = nil
+        local best_wram_cpu = nil
+        local best_wram_seq = -1
+
+        for cpu, last in pairs(last_wram_read) do
+            if last and last.seq >= staging_session_start_seq and last.seq > best_wram_seq then
+                best_wram_read = last
+                best_wram_cpu = cpu
+                best_wram_seq = last.seq
+            end
+        end
+
+        if best_wram_read then
+            staging_wram_pair_total = staging_wram_pair_total + 1
+
+            if #staging_wram_read_write_pairs < 1000 then
+                staging_wram_read_write_pairs[#staging_wram_read_write_pairs + 1] = {
+                    read_wram = best_wram_read.addr,
+                    read_pc = best_wram_read.read_pc or 0,
+                    read_k = best_wram_read.read_k or 0,
+                    write_wram = addr,
+                    write_pc = pc_snapshot and pc_snapshot.pc_val or 0,
+                    write_k = pc_snapshot and pc_snapshot.k_val or 0,
+                    cpu = best_wram_cpu
+                }
+            end
+
+            -- Aggregate: track which WRAM offsets are sources
+            local wram_addr = best_wram_read.addr
+            if not staging_wram_sources[wram_addr] then
+                staging_wram_sources[wram_addr] = {count = 0, cpus = {}}
+            end
+            local src = staging_wram_sources[wram_addr]
+            src.count = src.count + 1
+            src.cpus[best_wram_cpu] = (src.cpus[best_wram_cpu] or 0) + 1
+
+            -- Clear the read so it can't be double-paired
+            last_wram_read[best_wram_cpu] = nil
         end
     end
 end
@@ -794,6 +1037,8 @@ local function log_dma_channel(channel, value)
                 log_staging_summary_for_dma(src, das, captured_vmadd)
                 -- Log causal read→write summary (which PRG reads fed staging writes)
                 log_staging_causal_summary(get_canonical_frame(), captured_vmadd, das)
+                -- Log WRAM source summary (if staging reads from intermediate WRAM buffer)
+                log_staging_wram_source_summary(get_canonical_frame(), captured_vmadd, das)
                 reset_staging_tracking()
             end
         end
@@ -1446,6 +1691,67 @@ if STAGING_WATCH_ENABLED then
             else
                 log("WARNING: PRG size is 0, cannot register ROM read callback")
             end
+        end
+
+        -- Register WRAM read callbacks for intermediate buffer detection
+        -- Track reads from WRAM OUTSIDE the staging buffer (0x2000-0x33FF)
+        -- This reveals if staging is fed from another WRAM buffer
+        -- GATED by STAGING_WRAM_TRACKING because callbacks are expensive (~120KB coverage)
+        if wram_mem_type and STAGING_WRAM_TRACKING_ENABLED then
+            -- Compute WRAM read ranges (excluding staging buffer)
+            local wram_read_ranges = {}
+            if wram_address_mode == "absolute" then
+                -- Absolute addressing: $7E:0000 to $7E:1FFF and $7E:3400+
+                wram_read_ranges = {
+                    {start = 0x7E0000, stop = 0x7E0000 + STAGING_WATCH_START - 1},  -- Before staging
+                    {start = 0x7E0000 + STAGING_WATCH_END + 1, stop = 0x7E0000 + 0x1FFFF},  -- After staging
+                }
+            else
+                -- Relative addressing: 0x0000 to 0x1FFF and 0x3400+
+                wram_read_ranges = {
+                    {start = 0, stop = STAGING_WATCH_START - 1},  -- Before staging
+                    {start = STAGING_WATCH_END + 1, stop = 0x1FFFF},  -- After staging (128KB WRAM)
+                }
+            end
+
+            for _, range in ipairs(wram_read_ranges) do
+                local wram_read_ref = add_memory_callback_compat(
+                    make_staging_wram_reader("snes"),
+                    emu.callbackType.read,
+                    range.start,
+                    range.stop,
+                    cpu_type,
+                    wram_mem_type
+                )
+                if wram_read_ref then
+                    log(string.format(
+                        "INFO: WRAM read callback registered for S-CPU: 0x%06X-0x%06X",
+                        range.start, range.stop
+                    ))
+                end
+            end
+
+            -- Also try SA-1 WRAM reads
+            if sa1_cpu_type then
+                for _, range in ipairs(wram_read_ranges) do
+                    local sa1_wram_ref = add_memory_callback_compat(
+                        make_staging_wram_reader("sa1"),
+                        emu.callbackType.read,
+                        range.start,
+                        range.stop,
+                        sa1_cpu_type,
+                        wram_mem_type
+                    )
+                    if sa1_wram_ref then
+                        log(string.format(
+                            "INFO: WRAM read callback registered for SA-1: 0x%06X-0x%06X",
+                            range.start, range.stop
+                        ))
+                    end
+                end
+            end
+        elseif wram_mem_type and not STAGING_WRAM_TRACKING_ENABLED then
+            log("INFO: WRAM read tracking disabled (STAGING_WRAM_TRACKING=0). Set STAGING_WRAM_TRACKING=1 to enable.")
         end
     end
 end

@@ -34,6 +34,12 @@ conversion occurs during transfer.
 - Then DMA'd to VRAM 0x4000+ (sprite tile area)
 - The key question is: **what writes to WRAM 0x2000?**
 
+**Update (2026-01-01):** The STAGING_CAUSAL tracking system (v2.7.0) directly answers this:
+- 72% of staging writes have NO direct PRG read preceding them
+- 28% have pairs, but many are low-quality (code fetches, not data)
+- Likely data flow: `PRG → decompression → WRAM buffer → staging $2000 → VRAM`
+- See `run_staging_trace.bat` and CHANGELOG.md § 2.7.0
+
 ### 3. Transform Search Results
 
 A comprehensive transform search was performed (2026-01-01):

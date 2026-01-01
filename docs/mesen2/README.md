@@ -45,6 +45,13 @@ This folder documents the Mesen 2 sprite capture and ROM mapping pipeline for Sp
 2. Check capture integrity first (odd bytes, data_hex length)
 3. For Kirby: expect ~1.5% match rate (suggests SA-1 character conversion or staging transform)
 
+### Trace staging buffer writes (Kirby Super Star)
+1. Run: `run_staging_trace.bat` (Windows) or set env vars manually
+2. Wait for ~2000 frames to complete
+3. Analyze: `grep "STAGING_CAUSAL" mesen2_exchange/dma_probe_log.txt`
+4. Look for `quality=HIGH` entries with large `max_run` values
+5. See [CHANGELOG § 2.7.0](CHANGELOG.md) for full env var reference
+
 ### Find ROM offsets for new sprites
 1. Run DMA probe with ROM tracing enabled
 2. Summarize: `python3 scripts/summarize_rom_trace.py <run_dir>`
@@ -58,9 +65,11 @@ This folder documents the Mesen 2 sprite capture and ROM mapping pipeline for Sp
 
 ## Key Constraints
 
-- **Kirby Super Star: 0% verbatim match rate for gameplay tiles** — Sprite DMAs come from WRAM 0x7E:2000, not cart ROM directly. CCDMA is NOT active for sprites. The transform occurs during WRAM staging (mechanism TBD). See `CHANGELOG.md` entry 2.6.0.
+- **Kirby Super Star: 0% verbatim match rate for gameplay tiles** — Sprite DMAs come from WRAM 0x7E:2000, not cart ROM directly. CCDMA is NOT active for sprites. The transform occurs during WRAM staging. See `CHANGELOG.md` entries 2.6.0 and 2.7.0.
+- **STAGING_CAUSAL tracking shows 72% NO_PAIRS** — Most staging writes are NOT preceded by direct PRG reads, suggesting decompression or WRAM-to-WRAM copy. See `CHANGELOG.md` entry 2.7.0.
 - **Tile data requires byte swap** — extract high byte first for SNES tile format. Verify with `verify_endianness.lua`.
 - **ROM trace addresses are seeds, not exact offsets** — always validate via HAL decompression.
+- **Quality metrics required** — Only trust `prg_runs` with `quality=HIGH` (max_run >= 64, coverage > 0.5). Low quality matches are likely code fetches.
 
 ## Archived Documentation
 
