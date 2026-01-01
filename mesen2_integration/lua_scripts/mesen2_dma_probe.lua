@@ -16,9 +16,6 @@ local MASTER_CLOCK_FALLBACK = os.getenv("MASTER_CLOCK_FALLBACK")
 local MASTER_CLOCK_FPS = tonumber(os.getenv("MASTER_CLOCK_FPS"))
 local MASTER_CLOCK_MAX_SECONDS = tonumber(os.getenv("MASTER_CLOCK_MAX_SECONDS"))
 local MAX_FRAMES = tonumber(os.getenv("MAX_FRAMES")) or 300
-local SKIP_INPUT = os.getenv("SKIP_INPUT") == "1"
-local DOOR_UP_START = tonumber(os.getenv("DOOR_UP_START"))
-local DOOR_UP_END = tonumber(os.getenv("DOOR_UP_END"))
 
 if not FRAME_EVENT or FRAME_EVENT == "" then
     FRAME_EVENT = SAVESTATE_PATH and "exec" or "endFrame"
@@ -79,13 +76,6 @@ local function log(msg)
     end
 end
 
-local function set_input(input_state, port)
-    local ok, err = pcall(emu.setInput, input_state, port or 0)
-    if not ok then
-        log("setInput failed: " .. tostring(err))
-    end
-end
-
 local MEM = {
     cpu = emu.memType.snesMemory or emu.memType.cpuMemory or emu.memType.cpu or emu.memType.CpuMemory,
     cpu_debug = emu.memType.snesMemoryDebug or emu.memType.cpuMemoryDebug or emu.memType.cpuDebug,
@@ -143,50 +133,22 @@ local function parse_int(value, default_value)
     return tonumber(text) or default_value
 end
 
-local vram_word_addr = 0
 local vram_inc_mode = 0
 local vram_inc_value = 1
-local vram_trans = 0
-local vram_write_count = 0
-local vram_write_2118 = 0
-local vram_write_2119 = 0
-local vram_mem_write_count = 0
-local vram_mem_write_logged = 0
 local last_master_clock = nil
 local last_state_frame = nil
 local last_sa1_dma_irq = nil
 
 -- Consolidated configuration table to stay under Lua's 200 local variable limit
 local CFG = {
-    -- VRAM settings
-    log_vram_memory_writes = os.getenv("LOG_VRAM_MEMORY_WRITES") == "1",
-    max_vram_write_log = tonumber(os.getenv("MAX_VRAM_WRITE_LOG")) or 20,
-    vram_diff_enabled = os.getenv("VRAM_DIFF") ~= "0",
-    vram_size = 0x10000,
-    vram_coarse_step = tonumber(os.getenv("VRAM_COARSE_STEP")) or 16,
-    vram_page_size = tonumber(os.getenv("VRAM_PAGE_SIZE")) or 0x0400,
-    vram_page_log_limit = tonumber(os.getenv("VRAM_PAGE_LOG_LIMIT")) or 12,
     -- General
     heartbeat_every = tonumber(os.getenv("HEARTBEAT_EVERY")) or 0,
     skip_visibility_filter = os.getenv("SKIP_VISIBILITY_FILTER") == "1",
     -- WRAM dump settings
-    wram_dump_on_vram_diff = os.getenv("WRAM_DUMP_ON_VRAM_DIFF") ~= "0",
     wram_dump_start = os.getenv("WRAM_DUMP_START") or "0x0000",
     wram_dump_abs_start = os.getenv("WRAM_DUMP_ABS_START"),
     wram_dump_size = tonumber(os.getenv("WRAM_DUMP_SIZE")) or 0x20000,
     wram_dump_prev = os.getenv("WRAM_DUMP_PREV") ~= "0",
-    -- WRAM watch settings
-    wram_watch_writes = os.getenv("WRAM_WATCH_WRITES") ~= "0",
-    wram_watch_sample_limit = tonumber(os.getenv("WRAM_WATCH_SAMPLE_LIMIT")) or 8,
-    wram_watch_start = os.getenv("WRAM_WATCH_START"),
-    wram_watch_end = os.getenv("WRAM_WATCH_END"),
-    wram_watch_capture_threshold = tonumber(os.getenv("WRAM_WATCH_CAPTURE_THRESHOLD")) or 0,
-    wram_watch_pc_samples = tonumber(os.getenv("WRAM_WATCH_PC_SAMPLES")) or 0,
-    -- ROM trace settings
-    rom_trace_on_wram_write = os.getenv("ROM_TRACE_ON_WRAM_WRITE") == "1",
-    rom_trace_max_reads = tonumber(os.getenv("ROM_TRACE_MAX_READS")) or 200,
-    rom_trace_max_frames = tonumber(os.getenv("ROM_TRACE_MAX_FRAMES")) or 1,
-    rom_trace_pc_samples = tonumber(os.getenv("ROM_TRACE_PC_SAMPLES")) or 8,
     -- Visibility
     visible_y_exclude_start = parse_int(os.getenv("VISIBLE_Y_EXCLUDE_START"), 224),
     visible_y_exclude_end = parse_int(os.getenv("VISIBLE_Y_EXCLUDE_END"), 240),
@@ -198,49 +160,15 @@ local CFG = {
     dma_compare_enabled = os.getenv("DMA_COMPARE_ENABLED") ~= "0",
     dma_compare_max = tonumber(os.getenv("DMA_COMPARE_MAX")) or 50,
     dma_compare_sample_bytes = tonumber(os.getenv("DMA_COMPARE_SAMPLE_BYTES")) or 32,
-    capture_on_vram_diff = os.getenv("CAPTURE_ON_VRAM_DIFF") ~= "0",
-    capture_on_vram_dma = os.getenv("CAPTURE_ON_VRAM_DMA") ~= "0",
-    capture_on_wram_write = os.getenv("CAPTURE_ON_WRAM_WRITE") ~= "0",
-    capture_screenshot = os.getenv("CAPTURE_SCREENSHOT") ~= "0",
-    capture_dump_vram = os.getenv("CAPTURE_DUMP_VRAM") ~= "0",
-    capture_dump_wram = os.getenv("CAPTURE_DUMP_WRAM") ~= "0",
-    capture_max = tonumber(os.getenv("CAPTURE_MAX")) or 20,
-    capture_tag_prefix = os.getenv("CAPTURE_TAG_PREFIX") or "probe",
-    capture_start_frame = tonumber(os.getenv("CAPTURE_START_FRAME")) or 0,
-    capture_start_seconds = tonumber(os.getenv("CAPTURE_START_SECONDS")) or 0,
-    capture_min_interval = tonumber(os.getenv("CAPTURE_MIN_INTERVAL")) or 0,
-    capture_min_interval_seconds = tonumber(os.getenv("CAPTURE_MIN_INTERVAL_SECONDS")) or 0,
-    vram_diff_start_frame = tonumber(os.getenv("VRAM_DIFF_START_FRAME")) or 0,
-    vram_diff_start_seconds = tonumber(os.getenv("VRAM_DIFF_START_SECONDS")) or 0,
-    periodic_capture_enabled = os.getenv("PERIODIC_CAPTURE_ENABLED") == "1",
-    periodic_capture_start = tonumber(os.getenv("PERIODIC_CAPTURE_START")) or 2000,
-    periodic_capture_interval = tonumber(os.getenv("PERIODIC_CAPTURE_INTERVAL")) or 1800,
 }
 -- Dependent config values
-CFG.wram_dump_start_frame = tonumber(os.getenv("WRAM_DUMP_START_FRAME")) or CFG.capture_start_frame
-CFG.wram_dump_start_seconds = tonumber(os.getenv("WRAM_DUMP_START_SECONDS")) or CFG.capture_start_seconds
-CFG.dma_dump_start_frame = tonumber(os.getenv("DMA_DUMP_START_FRAME")) or CFG.capture_start_frame
-CFG.dma_dump_start_seconds = tonumber(os.getenv("DMA_DUMP_START_SECONDS")) or CFG.capture_start_seconds
+CFG.wram_dump_start_frame = tonumber(os.getenv("WRAM_DUMP_START_FRAME")) or 0
+CFG.dma_dump_start_frame = tonumber(os.getenv("DMA_DUMP_START_FRAME")) or 0
 
 -- Runtime state table
 local STATE = {
-    next_periodic_capture_frame = CFG.periodic_capture_start,
-    periodic_capture_count = 0,
-    last_coarse_hash = nil,
-    last_page_hash = {},
-    last_page_initialized = false,
     vram_read_error_logged = false,
-    vram_diff_initialized = false,
-    vram_diff_armed = false,
-    script_start_time = os.time(),
-    last_capture_frame = nil,
-    last_capture_time = nil,
 }
-local ROM_TRACE_LOG_FILE = OUTPUT_DIR .. "rom_trace_log.txt"
-
-if not MEM.vram then
-    CFG.vram_diff_enabled = false
-end
 
 local wram_dump_start = parse_int(CFG.wram_dump_start, 0x0000)
 local wram_dump_abs_start = parse_int(CFG.wram_dump_abs_start, nil)
@@ -256,14 +184,6 @@ elseif not wram_mem_type then
     wram_base = 0x7E0000 + wram_dump_start
     wram_address_mode = "absolute"
 end
-local wram_watch_start = parse_int(CFG.wram_watch_start, wram_base)
-local wram_watch_end = parse_int(CFG.wram_watch_end, wram_watch_start + CFG.wram_dump_size - 1)
-local _last_wram_dump_frame = nil  -- luacheck: ignore (reserved for future use)
-local prev_wram_snapshot = nil
-local prev_wram_frame = nil
-local wram_write_counts = {snes = 0, sa1 = 0}
-local wram_write_samples = {snes = {}, sa1 = {}}
-local wram_write_cpu_samples = {snes = 0, sa1 = 0}
 local dma_read_mem = MEM.cpu_debug or MEM.cpu
 local dma_dump_count = 0
 local dma_compare_count = 0
@@ -772,154 +692,8 @@ local function on_staging_write(address, value)
 end
 -- ============================================================================
 
--- OAM DMA capture: store OAM from DMA source buffer instead of MEM.oam timing
-local oam_dma_buffer = nil      -- Raw 544-byte OAM from last DMA
-local oam_dma_frame = nil       -- Frame when OAM was captured
-local OAM_DMA_SIZE = 544        -- 512 bytes low table + 32 bytes high table
-local OAM_DMA_MIN_SIZE = 512    -- Minimum: just the low table (some games skip high table)
-
-local pending_dma_capture = false
-local pending_dma_count = 0
-local capture_count = 0
--- frame_count and get_canonical_frame() moved to line ~286
-
-local rom_trace_active = false
-local rom_trace_remaining = 0
-local rom_trace_end_frame = nil
-local rom_trace_arm_frame = nil
-local rom_trace_label = nil
-local rom_trace_pc_samples = 0
-local rom_trace_prg_size = nil
-local rom_trace_prg_end = nil
-
-local function bxor(a, b)
-    if bit32 and bit32.bxor then
-        return bit32.bxor(a, b)
-    end
-    if bit and bit.bxor then
-        return bit.bxor(a, b)
-    end
-    local res = 0
-    local bitval = 1
-    local aa = a
-    local bb = b
-    for _ = 0, 31 do
-        local abit = aa % 2
-        local bbit = bb % 2
-        if abit ~= bbit then
-            res = res + bitval
-        end
-        aa = (aa - abit) / 2
-        bb = (bb - bbit) / 2
-        bitval = bitval * 2
-    end
-    return res
-end
-
-local function vram_diff_allowed(frame_id)
-    if CFG.vram_diff_start_frame > 0 and frame_id < CFG.vram_diff_start_frame then
-        return false
-    end
-    if CFG.vram_diff_start_seconds > 0 and (os.time() - STATE.script_start_time) < CFG.vram_diff_start_seconds then
-        return false
-    end
-    return true
-end
-
-local function capture_allowed(frame_id)
-    if CFG.capture_start_frame > 0 and frame_id < CFG.capture_start_frame then
-        return false
-    end
-    if CFG.capture_start_seconds > 0 and (os.time() - STATE.script_start_time) < CFG.capture_start_seconds then
-        return false
-    end
-    if CFG.capture_min_interval > 0 and STATE.last_capture_frame and (frame_id - STATE.last_capture_frame) < CFG.capture_min_interval then
-        return false
-    end
-    if CFG.capture_min_interval_seconds > 0 and STATE.last_capture_time and
-        (os.time() - STATE.last_capture_time) < CFG.capture_min_interval_seconds then
-        return false
-    end
-    return true
-end
-
-local function log_rom(msg)
-    local f = io.open(ROM_TRACE_LOG_FILE, "a")
-    if f then
-        f:write(os.date("%H:%M:%S") .. " " .. msg .. "\n")
-        f:close()
-    end
-end
--- get_cpu_state_snapshot() moved to line ~295
-
-local function arm_rom_trace(label)
-    if not CFG.rom_trace_on_wram_write or rom_trace_active then
-        return
-    end
-    local threshold = CFG.wram_watch_capture_threshold
-    if threshold < 1 then
-        threshold = 1
-    end
-    if (wram_write_counts[label] or 0) < threshold then
-        return
-    end
-    local frame_id = last_state_frame or frame_count
-    local max_frames = CFG.rom_trace_max_frames
-    if max_frames < 1 then
-        max_frames = 1
-    end
-    rom_trace_active = true
-    rom_trace_remaining = CFG.rom_trace_max_reads
-    rom_trace_end_frame = frame_id + max_frames - 1
-    rom_trace_arm_frame = frame_id
-    rom_trace_label = label
-    rom_trace_pc_samples = 0
-    local prg_size_text = rom_trace_prg_size and string.format("0x%X", rom_trace_prg_size) or "nil"
-    local prg_end_text = rom_trace_prg_end and string.format("0x%06X", rom_trace_prg_end) or "nil"
-    log_rom(string.format(
-        "ROM trace armed: frame=%s label=%s prg_size=%s prg_end=%s max_reads=%d max_frames=%d",
-        tostring(frame_id),
-        tostring(label),
-        prg_size_text,
-        prg_end_text,
-        CFG.rom_trace_max_reads,
-        max_frames
-    ))
-    log(string.format(
-        "ROM trace armed: frame=%s label=%s prg_size=%s prg_end=%s",
-        tostring(frame_id),
-        tostring(label),
-        prg_size_text,
-        prg_end_text
-    ))
-end
-
-local function rom_trace_allowed(frame_id)
-    if not rom_trace_active then
-        return false
-    end
-    if rom_trace_remaining <= 0 then
-        return false
-    end
-    if rom_trace_end_frame ~= nil and frame_id > rom_trace_end_frame then
-        rom_trace_active = false
-        log_rom(string.format(
-            "ROM trace expired: frame=%s start=%s label=%s remaining=%d",
-            tostring(frame_id),
-            tostring(rom_trace_arm_frame),
-            tostring(rom_trace_label),
-            rom_trace_remaining
-        ))
-        return false
-    end
-    return true
-end
-
 local function wram_dump_allowed(frame_id)
     if CFG.wram_dump_start_frame > 0 and frame_id < CFG.wram_dump_start_frame then
-        return false
-    end
-    if CFG.wram_dump_start_seconds > 0 and (os.time() - STATE.script_start_time) < CFG.wram_dump_start_seconds then
         return false
     end
     return true
@@ -929,77 +703,7 @@ local function dma_dump_allowed(frame_id)
     if CFG.dma_dump_start_frame > 0 and frame_id < CFG.dma_dump_start_frame then
         return false
     end
-    if CFG.dma_dump_start_seconds > 0 and (os.time() - STATE.script_start_time) < CFG.dma_dump_start_seconds then
-        return false
-    end
     return true
-end
-
-local function read_vram_byte(addr)
-    local value = emu.read(addr, MEM.vram)
-    if value == nil then
-        if not STATE.vram_read_error_logged then
-            log("ERROR: VRAM read returned nil; disabling VRAM diff")
-            STATE.vram_read_error_logged = true
-        end
-        CFG.vram_diff_enabled = false
-        return 0
-    end
-    return value
-end
-
-local function hash_stride(start_addr, size, step)
-    local h = 2166136261
-    local prime = 16777619
-    for i = 0, size - 1, step do
-        local b = read_vram_byte(start_addr + i)
-        if not CFG.vram_diff_enabled then
-            return h
-        end
-        h = (bxor(h, b) * prime) % 4294967296
-    end
-    return h
-end
-
-local function hash_block(start_addr, size)
-    local h = 2166136261
-    local prime = 16777619
-    for i = 0, size - 1 do
-        local b = read_vram_byte(start_addr + i)
-        if not CFG.vram_diff_enabled then
-            return h
-        end
-        h = (bxor(h, b) * prime) % 4294967296
-    end
-    return h
-end
-
-local function record_wram_write(label, address)
-    wram_write_counts[label] = wram_write_counts[label] + 1
-    local samples = wram_write_samples[label]
-    if #samples < CFG.wram_watch_sample_limit then
-        samples[#samples + 1] = string.format("0x%06X", address)
-    end
-    if CFG.wram_watch_pc_samples > 0 and wram_write_cpu_samples[label] < CFG.wram_watch_pc_samples then
-        wram_write_cpu_samples[label] = wram_write_cpu_samples[label] + 1
-        local snapshot = get_cpu_state_snapshot()
-        if snapshot then
-            log(string.format(
-                "WRAM write CPU (%s): addr=0x%06X %s=0x%04X %s=0x%02X %s=0x%02X",
-                label,
-                address,
-                snapshot.pc_key or "PC",
-                snapshot.pc_val or 0,
-                snapshot.k_key or "K",
-                snapshot.k_val or 0,
-                snapshot.dbr_key or "DBR",
-                snapshot.dbr_val or 0
-            ))
-        end
-    end
-    if CFG.rom_trace_on_wram_write then
-        arm_rom_trace(label)
-    end
 end
 
 local function capture_wram_snapshot()
@@ -1029,10 +733,8 @@ local function capture_wram_snapshot()
     return table.concat(chunks)
 end
 
-local function write_wram_snapshot(frame_id, label, snapshot, source_frame, force)
-    if not CFG.wram_dump_on_vram_diff and not force then
-        return
-    end
+local function write_wram_snapshot(frame_id, label, snapshot, source_frame)
+    -- Always write when called - caller decides when to call
     if not snapshot then
         return
     end
@@ -1061,580 +763,14 @@ local function write_wram_snapshot(frame_id, label, snapshot, source_frame, forc
     ))
 end
 
-local SIZE_TABLE = {
-    [0] = {8, 8, 16, 16},
-    [1] = {8, 8, 32, 32},
-    [2] = {8, 8, 64, 64},
-    [3] = {16, 16, 32, 32},
-    [4] = {16, 16, 64, 64},
-    [5] = {32, 32, 64, 64},
-    [6] = {16, 32, 32, 64},
-    [7] = {16, 32, 32, 32},
-}
-
-local vram_read_mode = os.getenv("VRAM_READ_MODE")
-if vram_read_mode ~= "word" and vram_read_mode ~= "byte" then
-    vram_read_mode = "word"  -- Default to word mode; byte mode broken in some Mesen2 builds
-end
-
-local function get_obsel()
-    local obsel = emu.read(0x2101, MEM.cpu)
-    local name_base = (obsel & 0x07)
-    local name_select = (obsel >> 3) & 0x03
-    local oam_base_addr = name_base << 13
-    local oam_addr_offset = (name_select + 1) << 12
-    return {
-        raw = obsel,
-        name_base = name_base,
-        name_select = name_select,
-        size_select = (obsel >> 5) & 0x07,
-        oam_base_addr = oam_base_addr,
-        oam_addr_offset = oam_addr_offset,
-        tile_base_addr = oam_base_addr * 2,
-    }
-end
-
--- One-shot diagnostic: tracks which OAM source was used for this capture
-local oam_source_logged = false
-
--- Read OAM byte: prefer DMA-captured buffer ONLY if it matches this frame
-local function read_oam_byte(offset, frame_id)
-    if oam_dma_buffer
-        and oam_dma_frame == frame_id
-        and offset < OAM_DMA_SIZE
-    then
-        if not oam_source_logged then
-            oam_source_logged = true
-            log(string.format("OAM_SOURCE: frame=%d USING_DMA_BUFFER (oam_dma_frame=%d)",
-                frame_id, oam_dma_frame))
-        end
-        return oam_dma_buffer[offset + 1] or 0  -- Lua 1-indexed
-    end
-
-    -- Fallback to direct OAM read
-    if not oam_source_logged then
-        oam_source_logged = true
-        local reason = "unknown"
-        if not oam_dma_buffer then
-            reason = "no_buffer"
-        elseif oam_dma_frame ~= frame_id then
-            reason = string.format("frame_mismatch(dma=%s,capture=%d)",
-                tostring(oam_dma_frame), frame_id)
-        elseif offset >= OAM_DMA_SIZE then
-            reason = "offset_oob"
-        end
-        log(string.format("OAM_SOURCE: frame=%d FALLBACK_DIRECT reason=%s MEM.oam=%s",
-            frame_id, reason, tostring(MEM.oam ~= nil)))
-    end
-
-    if MEM.oam then
-        local ok, v = pcall(emu.read, offset, MEM.oam)
-        if ok and v then return v end
-    end
-    return 0
-end
-
-local function parse_oam_entry(index, frame_id)
-    local base = index * 4
-    local x_low = read_oam_byte(base + 0, frame_id)
-    local y = read_oam_byte(base + 1, frame_id)
-    local tile = read_oam_byte(base + 2, frame_id)
-    local attr = read_oam_byte(base + 3, frame_id)
-
-    local hi_byte = read_oam_byte(0x200 + math.floor(index / 4), frame_id)
-    local hi_bit_pos = (index % 4) * 2
-    local x_bit9 = (hi_byte >> hi_bit_pos) & 1
-    local size_bit = (hi_byte >> (hi_bit_pos + 1)) & 1
-
-    local x = x_low + (x_bit9 * 256)
-    if x >= 256 then
-        x = x - 512
-    end
-
-    return {
-        id = index,
-        x = x,
-        y = y,
-        tile = tile,
-        name_table = (attr & 0x01),
-        palette = (attr >> 1) & 0x07,
-        priority = (attr >> 4) & 0x03,
-        flip_h = ((attr >> 6) & 0x01) == 1,
-        flip_v = ((attr >> 7) & 0x01) == 1,
-        size_large = size_bit == 1,
-    }
-end
-
-local function get_sprite_size(obsel, is_large)
-    local sizes = SIZE_TABLE[obsel.size_select] or {8, 8, 16, 16}
-    return is_large and sizes[3] or sizes[1], is_large and sizes[4] or sizes[2]
-end
-
-local function is_visible(entry)
-    if CFG.skip_visibility_filter then
-        return true
-    end
-    if entry.y >= CFG.visible_y_exclude_start and entry.y < CFG.visible_y_exclude_end then
-        return false
-    end
-    if entry.x <= CFG.visible_x_min or entry.x >= CFG.visible_x_max then
-        return false
-    end
-    return true
-end
-
-local function read_vram_word(byte_addr)
-    -- Try emu.readWord first (returns 16-bit word in big-endian format)
-    if emu.readWord then
-        local ok, word = pcall(emu.readWord, byte_addr, MEM.vram)
-        if ok and word then
-            return word
-        end
-    end
-    -- Fallback: read two consecutive bytes and combine as big-endian (like emu.readWord)
-    -- First byte goes in high bits so read_vram_tile_word's swap logic works correctly
-    local first_byte = emu.read(byte_addr, MEM.vram) or 0
-    local second_byte = emu.read(byte_addr + 1, MEM.vram) or 0
-    return (first_byte << 8) | second_byte
-end
-
-local function read_vram_tile_word(vram_addr)
-    local tile_data = {}
-    local high_nonzero = false
-
-    for i = 0, 15 do
-        local word = read_vram_word(vram_addr + (i * 2))
-        -- Mesen2 readWord returns big-endian; swap bytes for correct tile order
-        tile_data[i * 2 + 1] = (word >> 8) & 0xFF
-        tile_data[i * 2 + 2] = word & 0xFF
-        if tile_data[i * 2 + 2] ~= 0 then
-            high_nonzero = true
-        end
-    end
-
-    return tile_data, high_nonzero
-end
-
-local function read_vram_tile_byte(vram_addr)
-    local tile_data = {}
-    local odd_nonzero = false
-
-    for i = 0, 31 do
-        local b = emu.read(vram_addr + i, MEM.vram)
-        tile_data[i + 1] = b
-        if (i % 2 == 1) and b ~= 0 then
-            odd_nonzero = true
-        end
-    end
-
-    return tile_data, odd_nonzero
-end
-
-local function looks_like_index_leak(tile_data)
-    local matches = 0
-    for i = 0, 15 do
-        local expected = i
-        local expected_mod = i % 8
-        local value = tile_data[i * 2 + 1]
-        if value == expected or value == expected_mod then
-            matches = matches + 1
-        end
-    end
-    return matches >= 12
-end
-
-local function read_vram_tile(vram_addr)
-    if vram_read_mode == "word" then
-        local tile_data = read_vram_tile_word(vram_addr)
-        return tile_data
-    end
-    if vram_read_mode == "byte" then
-        local tile_data = read_vram_tile_byte(vram_addr)
-        return tile_data
-    end
-
-    local word_data, high_nonzero = read_vram_tile_word(vram_addr)
-    if high_nonzero and not looks_like_index_leak(word_data) then
-        vram_read_mode = "word"
-        return word_data
-    end
-
-    local byte_data, odd_nonzero = read_vram_tile_byte(vram_addr)
-    if odd_nonzero or looks_like_index_leak(word_data) then
-        vram_read_mode = "byte"
-        return byte_data
-    end
-
-    vram_read_mode = "byte"
-    return byte_data
-end
-
-local function tile_to_vram_addr(tile_idx, use_second_table, obsel)
-    local word_addr = obsel.oam_base_addr + (tile_idx << 4)
-    if use_second_table then
-        word_addr = word_addr + obsel.oam_addr_offset
-    end
-    word_addr = word_addr & 0x7FFF
-    return word_addr << 1
-end
-
-local function dump_vram(path)
-    local size_bytes = 0x10000
-    if emu.getMemorySize then
-        local ok, size = pcall(emu.getMemorySize, MEM.vram)
-        if ok and type(size) == "number" and size > 0 then
-            size_bytes = size
-        end
-    end
-
-    local f = io.open(path, "wb")
-    if not f then
-        return
-    end
-
-    for i = 0, size_bytes - 1 do
-        local b = emu.read(i, MEM.vram)
-        f:write(string.char(b))
-    end
-
-    f:close()
-end
-
-local function capture_sprites(frame_id)
-    -- Reset one-shot OAM source diagnostic for this capture
-    oam_source_logged = false
-
-    -- Only VRAM and CGRAM are required; OAM can come from DMA buffer
-    if not MEM.cgram or not MEM.vram then
-        log("ERROR: CGRAM/VRAM memTypes missing; cannot capture sprites")
-        return nil, {}, 0, {}, 0, 0
-    end
-
-    local obsel = get_obsel()
-    local entries = {}
-    local visible_count = 0
-    local tile_count = 0
-    local odd_nonzero_tiles = 0
-
-    for i = 0, 127 do
-        local entry = parse_oam_entry(i, frame_id)
-        if is_visible(entry) then
-            visible_count = visible_count + 1
-            local width, height = get_sprite_size(obsel, entry.size_large)
-            entry.width = width
-            entry.height = height
-            entry.tile_data = {}
-
-            local tiles_x, tiles_y = width / 8, height / 8
-            local tile_row = (entry.tile >> 4) & 0x0F
-            local tile_col = entry.tile & 0x0F
-            local use_second_table = entry.name_table == 1
-            for ty = 0, tiles_y - 1 do
-                local row = (tile_row + ty) & 0x0F
-                for tx = 0, tiles_x - 1 do
-                    local col = (tile_col + tx) & 0x0F
-                    local tile_index = (row << 4) | col
-                    local vram_addr = tile_to_vram_addr(tile_index, use_second_table, obsel)
-                    local tile_bytes = read_vram_tile(vram_addr)
-                    tile_count = tile_count + 1
-                    local has_odd_nonzero = false
-                    for idx = 2, #tile_bytes, 2 do
-                        if tile_bytes[idx] ~= 0 then
-                            has_odd_nonzero = true
-                            break
-                        end
-                    end
-                    if has_odd_nonzero then
-                        odd_nonzero_tiles = odd_nonzero_tiles + 1
-                    end
-                    local hex = ""
-                    for _, b in ipairs(tile_bytes) do
-                        hex = hex .. string.format("%02X", b)
-                    end
-                    table.insert(entry.tile_data, {
-                        tile_index = tile_index,
-                        vram_addr = vram_addr,
-                        pos_x = tx,
-                        pos_y = ty,
-                        data_hex = hex,
-                    })
-                end
-            end
-            table.insert(entries, entry)
-        end
-    end
-
-    local palettes = {}
-    for pal_idx = 0, 7 do
-        local colors = {}
-        for col = 0, 15 do
-            local cgram_addr = 0x100 + (pal_idx * 32) + (col * 2)
-            local lo = emu.read(cgram_addr, MEM.cgram)
-            local hi = emu.read(cgram_addr + 1, MEM.cgram)
-            table.insert(colors, lo + (hi * 256))
-        end
-        palettes[pal_idx] = colors
-    end
-
-    return obsel, entries, visible_count, palettes, tile_count, odd_nonzero_tiles
-end
-
-local function write_capture_snapshot(tag, frame_id)
-    if capture_count >= CFG.capture_max then
-        return
-    end
-    if not capture_allowed(frame_id) then
-        return
-    end
-    capture_count = capture_count + 1
-
-    local obsel, entries, visible_count, palettes, tile_count, odd_nonzero_tiles = capture_sprites(frame_id)
-    if not obsel then
-        return
-    end
-    -- Note: odd_nonzero_tiles==0 can happen with valid tiles (e.g., 2-plane data)
-    -- Log a warning but don't abort - let the capture proceed for analysis
-    if tile_count > 0 and odd_nonzero_tiles == 0 then
-        log("WARNING: All VRAM tiles have zero odd-byte data (may be 2-plane or empty tiles)")
-    end
-
-    local suffix = "_" .. CFG.capture_tag_prefix .. "_" .. tag .. "_" .. tostring(frame_id)
-    log("Capturing sprite snapshot " .. suffix)
-
-    if CFG.capture_screenshot and emu.takeScreenshot then
-        local png_data = emu.takeScreenshot()
-        if png_data then
-            local sf = io.open(OUTPUT_DIR .. "test_frame" .. suffix .. ".png", "wb")
-            if sf then
-                sf:write(png_data)
-                sf:close()
-            end
-        end
-    end
-
-    if CFG.capture_dump_vram then
-        dump_vram(OUTPUT_DIR .. "test_vram_dump" .. suffix .. ".bin")
-    end
-    if CFG.capture_dump_wram and wram_mem_type then
-        local snapshot = capture_wram_snapshot()
-        if snapshot then
-            write_wram_snapshot(frame_id, "capture", snapshot, frame_id, true)
-        end
-    end
-
-    local f = io.open(OUTPUT_DIR .. "test_capture" .. suffix .. ".json", "w")
-    if not f then
-        log("Failed to open capture json output")
-        return
-    end
-    f:write("{\n")
-    f:write('  "schema_version": "1.0",\n')
-    f:write(string.format('  "frame": %d,\n', frame_id))
-    f:write('  "obsel": {\n')
-    f:write(string.format('    "raw": %d, "name_base": %d, "name_select": %d,\n',
-        obsel.raw, obsel.name_base, obsel.name_select))
-    f:write(string.format(
-        '    "size_select": %d, "tile_base_addr": %d, "oam_base_addr": %d, "oam_addr_offset": %d\n',
-        obsel.size_select, obsel.tile_base_addr, obsel.oam_base_addr, obsel.oam_addr_offset))
-    f:write('  },\n')
-    f:write(string.format('  "visible_count": %d,\n', visible_count))
-    f:write('  "entries": [\n')
-
-    for idx, entry in ipairs(entries) do
-        f:write('    {\n')
-        f:write(string.format('      "id": %d, "x": %d, "y": %d, "tile": %d,\n',
-            entry.id, entry.x, entry.y, entry.tile))
-        f:write(string.format('      "width": %d, "height": %d,\n', entry.width, entry.height))
-        f:write(string.format('      "palette": %d, "priority": %d, "flip_h": %s, "flip_v": %s,\n',
-            entry.palette, entry.priority, entry.flip_h and "true" or "false", entry.flip_v and "true" or "false"))
-        f:write(string.format('      "name_table": %d, "tile_page": %d,\n',
-            entry.name_table, entry.name_table))
-        f:write('      "tiles": [\n')
-        for tidx, tile in ipairs(entry.tile_data) do
-            f:write(string.format(
-                '        {"tile_index": %d, "vram_addr": %d, "pos_x": %d, "pos_y": %d, "data_hex": "%s"}',
-                tile.tile_index,
-                tile.vram_addr,
-                tile.pos_x,
-                tile.pos_y,
-                tile.data_hex
-            ))
-            if tidx < #entry.tile_data then
-                f:write(',')
-            end
-            f:write('\n')
-        end
-        f:write('      ]\n')
-        f:write('    }')
-        if idx < #entries then
-            f:write(',')
-        end
-        f:write('\n')
-    end
-    f:write('  ],\n')
-
-    f:write('  "palettes": {\n')
-    for pi = 0, 7 do
-        f:write(string.format('    "%d": [', pi))
-        for ci, c in ipairs(palettes[pi]) do
-            f:write(tostring(c))
-            if ci < 16 then
-                f:write(',')
-            end
-        end
-        f:write(']')
-        if pi < 7 then
-            f:write(',')
-        end
-        f:write('\n')
-    end
-    f:write('  }\n')
-    f:write('}\n')
-    f:close()
-
-    local s = io.open(OUTPUT_DIR .. "capture_summary" .. suffix .. ".txt", "w")
-    if not s then
-        log("Failed to open capture summary output")
-        return
-    end
-    s:write("Sprite Capture Summary\n")
-    s:write("======================\n")
-    s:write(string.format("Frame: %d\n", frame_id))
-    s:write(string.format(
-        "OBSEL: $%02X (base=%d, select=%d, size=%d, oam_base=%d, oam_offset=%d)\n",
-        obsel.raw, obsel.name_base, obsel.name_select, obsel.size_select, obsel.oam_base_addr, obsel.oam_addr_offset))
-    s:write(string.format("VRAM read mode: %s\n", vram_read_mode or "auto"))
-    s:write(string.format("Visible sprites: %d\n\n", visible_count))
-
-    for _, entry in ipairs(entries) do
-        s:write(string.format("OAM #%d: pos=(%d,%d) tile=$%02X size=%dx%d pal=%d\n",
-            entry.id, entry.x, entry.y, entry.tile, entry.width, entry.height, entry.palette))
-    end
-    s:close()
-
-    STATE.last_capture_frame = frame_id
-    STATE.last_capture_time = os.time()
-end
-
-local function init_page_hashes()
-    if not CFG.vram_diff_enabled then
-        return
-    end
-    for base = 0, CFG.vram_size - 1, CFG.vram_page_size do
-        STATE.last_page_hash[base] = hash_block(base, CFG.vram_page_size)
-    end
-    STATE.last_page_initialized = true
-end
-
-local function refine_changed_pages(frame_id)
-    local changed = 0
-    local logged = 0
-    for base = 0, CFG.vram_size - 1, CFG.vram_page_size do
-        local h = hash_block(base, CFG.vram_page_size)
-        local prev = STATE.last_page_hash[base]
-        if prev == nil then
-            STATE.last_page_hash[base] = h
-        elseif h ~= prev then
-            changed = changed + 1
-            if logged < CFG.vram_page_log_limit then
-                log(string.format(
-                    "VRAM diff: frame=%s clock=%s page=0x%04X %08X->%08X",
-                    tostring(frame_id),
-                    tostring(last_master_clock),
-                    base,
-                    prev,
-                    h
-                ))
-                logged = logged + 1
-            end
-            STATE.last_page_hash[base] = h
-        end
-    end
-    if changed > 0 then
-        log(string.format(
-            "VRAM diff summary: frame=%s changed_pages=%d",
-            tostring(frame_id),
-            changed
-        ))
-    end
-end
-
-local function poll_vram_diff(frame_id, current_snapshot)
-    if not CFG.vram_diff_enabled then
-        return
-    end
-    local coarse = hash_stride(0, CFG.vram_size, CFG.vram_coarse_step)
-    if not vram_diff_allowed(frame_id) then
-        STATE.last_coarse_hash = coarse
-        return
-    end
-    if STATE.last_coarse_hash == nil then
-        STATE.last_coarse_hash = coarse
-        if not STATE.last_page_initialized then
-            init_page_hashes()
-        end
-        if not STATE.vram_diff_initialized then
-            STATE.vram_diff_initialized = true
-            log(string.format(
-                "VRAM diff baseline: frame=%s clock=%s hash=%08X",
-                tostring(frame_id),
-                tostring(last_master_clock),
-                coarse
-            ))
-        end
-        return
-    end
-    if not STATE.vram_diff_armed then
-        if not STATE.last_page_initialized then
-            init_page_hashes()
-        end
-        STATE.last_coarse_hash = coarse
-        STATE.vram_diff_armed = true
-        return
-    end
-    if coarse == STATE.last_coarse_hash then
-        return
-    end
-    log(string.format(
-        "VRAM diff coarse change: frame=%s clock=%s %08X->%08X",
-        tostring(frame_id),
-        tostring(last_master_clock),
-        STATE.last_coarse_hash,
-        coarse
-    ))
-    STATE.last_coarse_hash = coarse
-    refine_changed_pages(frame_id)
-    if CFG.wram_dump_on_vram_diff and wram_dump_allowed(frame_id) then
-        if CFG.wram_dump_prev and prev_wram_snapshot ~= nil then
-            write_wram_snapshot(frame_id, "prev", prev_wram_snapshot, prev_wram_frame)
-        end
-        if current_snapshot ~= nil then
-            write_wram_snapshot(frame_id, "curr", current_snapshot, frame_id)
-        else
-            local snapshot = capture_wram_snapshot()
-            write_wram_snapshot(frame_id, "curr", snapshot, frame_id)
-        end
-        _last_wram_dump_frame = frame_id
-    end
-    if CFG.capture_on_vram_diff and capture_allowed(frame_id) then
-        write_capture_snapshot("vramdiff", frame_id)
-    end
-end
 
 local function read8(addr)
     return emu.read(addr, MEM.cpu)
 end
 
-local function refresh_vram_addr()
-    local lo = read8(0x2116)
-    local hi = read8(0x2117)
-    vram_word_addr = lo | (hi << 8)
-end
-
 local function refresh_vram_inc()
     local vmain = read8(0x2115)
     local inc_sel = vmain & 0x03
-    local trans = (vmain >> 2) & 0x03
     vram_inc_mode = (vmain >> 7) & 0x01
     local inc_lookup = {
         [0] = 1,
@@ -1643,10 +779,11 @@ local function refresh_vram_inc()
         [3] = 128,
     }
     vram_inc_value = inc_lookup[inc_sel] or 1
-    vram_trans = trans
 end
 
 local function log_dma_channel(channel, value)
+    -- Refresh VMAIN-based values before logging (since we removed on_vmain_write callback)
+    refresh_vram_inc()
     -- Use SHADOWED values captured as registers were written (before DMA runs)
     -- This avoids reading post-DMA state where DAS=0 and VMADD may have changed
     local shadow = dma_shadow[channel]
@@ -1735,59 +872,6 @@ local function log_dma_channel(channel, value)
         end
     end
 
-    -- OAM DMA capture: BBAD=0x04 ($2104 = OAMDATA)
-    -- Capture the DMA source buffer as authoritative OAM for this frame
-    -- Accept transfers >= 512 bytes (low table only) - some games skip high table
-    if direction == "A->B" and bbad == 0x04 and das >= OAM_DMA_MIN_SIZE then
-        -- Read OAMADDR ($2102/$2103) to check if we're writing from start
-        local oamaddr_lo = emu.read(0x2102, emu.memType.snesRegister) or 0
-        local oamaddr_hi = emu.read(0x2103, emu.memType.snesRegister) or 0
-        local oamaddr = oamaddr_lo + ((oamaddr_hi & 0x01) * 256)
-
-        -- Capture min(das, 544) bytes, pad with zeros if needed
-        local capture_size = math.min(das, OAM_DMA_SIZE)
-        local oam_bytes = {}
-        local read_ok = true
-        local nil_count = 0
-        for i = 0, capture_size - 1 do
-            local addr = src + i
-            local ok, val = pcall(emu.read, addr, dma_read_mem or emu.memType.snesMemory)
-            if ok then
-                -- Treat nil as 0 and count it
-                if val == nil then
-                    val = 0
-                    nil_count = nil_count + 1
-                end
-                oam_bytes[i + 1] = val
-            else
-                read_ok = false
-                break
-            end
-        end
-        -- Pad to 544 bytes if we only got 512 (high table missing)
-        if read_ok and #oam_bytes >= OAM_DMA_MIN_SIZE then
-            for i = #oam_bytes + 1, OAM_DMA_SIZE do
-                oam_bytes[i] = 0
-            end
-            oam_dma_buffer = oam_bytes
-            -- OAM DMA fires during vblank, before on_end_frame() increments frame_count.
-            -- Adjust by +1 if using frame_count (not last_state_frame) so the buffer
-            -- matches the capture call that happens after the frame_count increment.
-            local f = get_canonical_frame()
-            if last_state_frame == nil then
-                f = f + 1
-            end
-            oam_dma_frame = f
-            log(string.format(
-                "OAM_DMA_CAPTURE: frame=%d src=0x%06X das=%d read=%d oamaddr=%d nils=%d",
-                oam_dma_frame, src, das, capture_size, oamaddr, nil_count
-            ))
-            if oamaddr ~= 0 then
-                log(string.format("WARNING: OAM DMA starts at OAMADDR=%d, not 0 (index assumptions may be off)", oamaddr))
-            end
-        end
-    end
-
     local frame_id = last_state_frame or frame_count
     if CFG.dma_dump_on_vram and direction == "A->B" and (bbad == 0x18 or bbad == 0x19) then
         if not dma_dump_allowed(frame_id) then
@@ -1834,20 +918,6 @@ local function log_dma_channel(channel, value)
             f:close()
             log("DMA dump saved: " .. path)
         end
-        if CFG.capture_on_vram_dma and capture_allowed(frame_id) then
-            pending_dma_capture = true
-            pending_dma_count = pending_dma_count + 1
-        end
-    end
-end
-
-local function advance_vram_addr(wrote_high_byte)
-    if vram_inc_mode == 0 and not wrote_high_byte then
-        vram_word_addr = (vram_word_addr + vram_inc_value) & 0x7FFF
-        return
-    end
-    if vram_inc_mode == 1 and wrote_high_byte then
-        vram_word_addr = (vram_word_addr + vram_inc_value) & 0x7FFF
     end
 end
 
@@ -2006,18 +1076,7 @@ local function on_hdma_enable(address)
     end
 end
 
-local function on_vmain_write(address)
-    refresh_vram_inc()
-    log(string.format(
-        "VMAIN write: vmain=0x%02X inc=%d mode=%d trans=%d",
-        read8(0x2115),
-        vram_inc_value,
-        vram_inc_mode,
-        vram_trans
-    ))
-end
-
--- FIXED: Shadow VMADD from writes (don't read back $2116/$2117 which can return 0/open-bus)
+-- Shadow VMADD from writes (don't read back $2116/$2117 which can return open-bus)
 local vmadd_lo, vmadd_hi = 0, 0
 local function on_vram_addr_write(address, value)
     -- Capture the WRITTEN value, not a readback
@@ -2026,9 +1085,7 @@ local function on_vram_addr_write(address, value)
     else -- 0x2117
         vmadd_hi = value & 0xFF
     end
-    vram_word_addr = vmadd_lo | (vmadd_hi << 8)
-    vram_addr_shadow = vram_word_addr
-    log(string.format("VRAM addr write: word=0x%04X (byte=0x%04X)", vram_word_addr, (vram_word_addr * 2) & 0xFFFF))
+    vram_addr_shadow = vmadd_lo | (vmadd_hi << 8)
 end
 
 -- Callback to shadow DMA channel register writes (before $420B triggers DMA)
@@ -2056,31 +1113,6 @@ local function on_dma_reg_write(address, value)
             shadow.das_hi = value
         end
     end
-end
-
-local function on_vram_data_write(address, value)
-    local wrote_high = address == 0x2119
-    local word_addr = vram_word_addr
-    local byte_addr = (word_addr * 2) & 0xFFFF
-    vram_write_count = vram_write_count + 1
-    if wrote_high then
-        vram_write_2119 = vram_write_2119 + 1
-    else
-        vram_write_2118 = vram_write_2118 + 1
-    end
-    log(string.format(
-        "VRAM write: frame=%s clock=%s reg=0x%04X value=0x%02X word=0x%04X byte=0x%04X inc=%d mode=%d trans=%d",
-        tostring(last_state_frame or frame_count),
-        tostring(last_master_clock),
-        address,
-        value & 0xFF,
-        word_addr,
-        byte_addr,
-        vram_inc_value,
-        vram_inc_mode,
-        vram_trans
-    ))
-    advance_vram_addr(wrote_high)
 end
 
 local function on_sa1_ctrl_write(address)
@@ -2118,38 +1150,6 @@ local function on_sa1_bitmap_write(address)
     if (sa1_state.ctrl & 0x20) ~= 0 then
         log(string.format("SA1 bitmap register write: 0x%04X", address))
     end
-end
-
-local function log_wram_writes(frame_id)
-    if not CFG.wram_watch_writes then
-        return false
-    end
-    local triggered = false
-    local function emit(label)
-        local count = wram_write_counts[label] or 0
-        if count > 0 then
-            local samples = wram_write_samples[label] or {}
-            local sample_text = #samples > 0 and table.concat(samples, ",") or "none"
-            log(string.format(
-                "Frame %d WRAM writes (%s) count=%d range=0x%06X-0x%06X samples=%s",
-                frame_id,
-                label,
-                count,
-                wram_watch_start,
-                wram_watch_end,
-                sample_text
-            ))
-            if CFG.capture_on_wram_write and count >= CFG.wram_watch_capture_threshold then
-                triggered = true
-            end
-        end
-        wram_write_counts[label] = 0
-        wram_write_samples[label] = {}
-        wram_write_cpu_samples[label] = 0
-    end
-    emit("snes")
-    emit("sa1")
-    return triggered
 end
 
 local state_loaded = PRELOADED_STATE
@@ -2223,22 +1223,6 @@ local function on_end_frame()
     -- FIXED: Process pending DMA comparisons at frame end (after all DMAs have completed)
     process_pending_dma_compares()
 
-    if not SKIP_INPUT and SAVESTATE_PATH and DOOR_UP_START and DOOR_UP_END then
-        if frame_count >= DOOR_UP_START and frame_count <= DOOR_UP_END then
-            set_input({up = true}, 0)
-        else
-            set_input({}, 0)
-        end
-    end
-
-    local current_snapshot = nil
-    if CFG.wram_dump_on_vram_diff and CFG.wram_dump_prev and wram_dump_allowed(last_state_frame or frame_count) then
-        current_snapshot = capture_wram_snapshot()
-    end
-    poll_vram_diff(last_state_frame or frame_count, current_snapshot)
-    prev_wram_snapshot = current_snapshot
-    prev_wram_frame = last_state_frame or frame_count
-
     local sa1_irq = read8(0x2301)
     if sa1_irq ~= last_sa1_dma_irq then
         log(string.format("SA1 DMA IRQ flag: 0x%02X", sa1_irq))
@@ -2280,68 +1264,8 @@ local function on_end_frame()
     prev_m_bit = m_bit
     prev_char_conv_irq = char_conv_irq
 
-    if pending_dma_capture and CFG.capture_on_vram_dma then
-        local tag = "vramdma"
-        if pending_dma_count > 1 then
-            tag = tag .. "_x" .. tostring(pending_dma_count)
-        end
-        if capture_allowed(last_state_frame or frame_count) then
-            write_capture_snapshot(tag, last_state_frame or frame_count)
-        end
-        pending_dma_capture = false
-        pending_dma_count = 0
-    end
-
-    if vram_write_count > 0 then
-        log(string.format(
-            "Frame %d VRAM writes: %d (2118=%d 2119=%d) masterClock=%s",
-            frame_count,
-            vram_write_count,
-            vram_write_2118,
-            vram_write_2119,
-            tostring(last_master_clock)
-        ))
-        vram_write_count = 0
-        vram_write_2118 = 0
-        vram_write_2119 = 0
-    end
-    if vram_mem_write_count > 0 then
-        log(string.format(
-            "Frame %d VRAM memType writes: %d (logged=%d)",
-            frame_count,
-            vram_mem_write_count,
-            vram_mem_write_logged
-        ))
-        vram_mem_write_count = 0
-        vram_mem_write_logged = 0
-    end
-
-    local wram_triggered = log_wram_writes(frame_count)
-    if wram_triggered and CFG.capture_on_wram_write and capture_allowed(frame_count) then
-        write_capture_snapshot("wramwrite", frame_count)
-    end
-
-    -- Periodic sprite captures for gameplay correlation
-    if CFG.periodic_capture_enabled and frame_count >= STATE.next_periodic_capture_frame then
-        STATE.periodic_capture_count = STATE.periodic_capture_count + 1
-        log(string.format("PERIODIC_CAPTURE: frame=%d capture_num=%d", frame_count, STATE.periodic_capture_count))
-        write_capture_snapshot("gameplay", frame_count)
-        STATE.next_periodic_capture_frame = frame_count + CFG.periodic_capture_interval
-    end
-
     if CFG.heartbeat_every > 0 and (frame_count % CFG.heartbeat_every) == 0 then
         log(string.format("Heartbeat frame=%d masterClock=%s", frame_count, tostring(last_master_clock)))
-    end
-
-    if rom_trace_active and rom_trace_end_frame ~= nil and frame_count > rom_trace_end_frame then
-        rom_trace_active = false
-        log_rom(string.format(
-            "ROM trace frame limit reached: frame=%d start=%s label=%s remaining=%d",
-            frame_count,
-            tostring(rom_trace_arm_frame),
-            tostring(rom_trace_label),
-            rom_trace_remaining
-        ))
     end
 
     if frame_count >= MAX_FRAMES then
@@ -2476,9 +1400,7 @@ add_memory_callback_compat(on_dma_enable, emu.callbackType.write, 0x420B, 0x420B
 add_memory_callback_compat(on_hdma_enable, emu.callbackType.write, 0x420C, 0x420C, cpu_type, MEM.cpu)
 -- Shadow DMA channel registers as they are written (before $420B triggers DMA)
 add_memory_callback_compat(on_dma_reg_write, emu.callbackType.write, 0x4300, 0x437F, cpu_type, MEM.cpu)
-add_memory_callback_compat(on_vmain_write, emu.callbackType.write, 0x2115, 0x2115, cpu_type, MEM.cpu)
 add_memory_callback_compat(on_vram_addr_write, emu.callbackType.write, 0x2116, 0x2117, cpu_type, MEM.cpu)
-add_memory_callback_compat(on_vram_data_write, emu.callbackType.write, 0x2118, 0x2119, cpu_type, MEM.cpu)
 add_memory_callback_compat(on_sa1_bank_write, emu.callbackType.write, 0x2220, 0x2225, cpu_type, MEM.cpu)
 add_memory_callback_compat(on_sa1_ctrl_write, emu.callbackType.write, 0x2230, 0x2230, cpu_type, MEM.cpu)
 add_memory_callback_compat(on_sa1_dma_reg_write, emu.callbackType.write, 0x2231, 0x2239, cpu_type, MEM.cpu)
@@ -2496,128 +1418,6 @@ if sa1_cpu_type then
     log("INFO: SA-1 CPU callback registered for $2230 (DCNT)")
 else
     log("INFO: SA-1 cpuType not available; SA-1 DMA monitoring limited to S-CPU writes")
-end
-
-if CFG.rom_trace_on_wram_write then
-    if not MEM.prg then
-        log("WARNING: ROM trace enabled but no PRG-ROM memType resolved")
-    else
-        local prg_size = 0
-        if emu.getMemorySize then
-            local ok, size = pcall(emu.getMemorySize, MEM.prg)
-            if ok and size and size > 0 then
-                prg_size = size
-            end
-        end
-        local prg_end = prg_size > 0 and (prg_size - 1) or 0xFFFFFF
-        rom_trace_prg_size = prg_size > 0 and prg_size or nil
-        rom_trace_prg_end = prg_end
-        local function make_prg_reader(label)
-            return function(address, value)
-                local frame_id = last_state_frame or frame_count
-                if not rom_trace_allowed(frame_id) then
-                    return
-                end
-                rom_trace_remaining = rom_trace_remaining - 1
-                local extra = ""
-                if CFG.rom_trace_pc_samples > 0 and rom_trace_pc_samples < CFG.rom_trace_pc_samples then
-                    rom_trace_pc_samples = rom_trace_pc_samples + 1
-                    local snapshot = get_cpu_state_snapshot()
-                    if snapshot then
-                        extra = string.format(
-                            " %s=0x%04X %s=0x%02X %s=0x%02X",
-                            snapshot.pc_key or "PC",
-                            snapshot.pc_val or 0,
-                            snapshot.k_key or "K",
-                            snapshot.k_val or 0,
-                            snapshot.dbr_key or "DBR",
-                            snapshot.dbr_val or 0
-                        )
-                    end
-                end
-                log_rom(string.format(
-                    "ROM read (%s): frame=%s addr=0x%06X value=0x%02X remaining=%d%s",
-                    label,
-                    tostring(frame_id),
-                    address,
-                    value & 0xFF,
-                    rom_trace_remaining,
-                    extra
-                ))
-                if rom_trace_remaining <= 0 then
-                    rom_trace_active = false
-                    log_rom(string.format(
-                        "ROM trace complete: frame=%s start=%s label=%s",
-                        tostring(frame_id),
-                        tostring(rom_trace_arm_frame),
-                        tostring(rom_trace_label)
-                    ))
-                end
-            end
-        end
-        local snes_prg_ref = add_memory_callback_compat(
-            make_prg_reader("snes"),
-            emu.callbackType.read,
-            0x000000,
-            prg_end,
-            cpu_type,
-            MEM.prg
-        )
-        if not snes_prg_ref then
-            log("WARNING: failed to register PRG-ROM read trace for S-CPU")
-        end
-        if sa1_cpu_type then
-            local sa1_prg_ref = add_memory_callback_compat(
-                make_prg_reader("sa1"),
-                emu.callbackType.read,
-                0x000000,
-                prg_end,
-                sa1_cpu_type,
-                MEM.prg
-            )
-            if not sa1_prg_ref then
-                log("WARNING: failed to register PRG-ROM read trace for SA-1")
-            end
-        else
-            log("INFO: SA-1 cpuType not available; ROM trace limited to S-CPU")
-        end
-    end
-end
-if CFG.wram_watch_writes then
-    if not wram_mem_type then
-        log("WARNING: WRAM watch enabled but no WRAM memType resolved")
-    else
-        local snes_ref = add_memory_callback_compat(
-            function(address, value)
-                record_wram_write("snes", address)
-            end,
-            emu.callbackType.write,
-            wram_watch_start,
-            wram_watch_end,
-            cpu_type,
-            wram_mem_type
-        )
-        if not snes_ref then
-            log("WARNING: failed to register WRAM write watch for S-CPU")
-        end
-        if sa1_cpu_type then
-            local sa1_ref = add_memory_callback_compat(
-                function(address, value)
-                    record_wram_write("sa1", address)
-                end,
-                emu.callbackType.write,
-                wram_watch_start,
-                wram_watch_end,
-                sa1_cpu_type,
-                wram_mem_type
-            )
-            if not sa1_ref then
-                log("WARNING: failed to register WRAM write watch for SA-1")
-            end
-        else
-            log("INFO: SA-1 cpuType not available; WRAM watch limited to S-CPU")
-        end
-    end
 end
 
 -- Register staging buffer write watch (rolling log for DMA source analysis)
@@ -2723,40 +1523,13 @@ if STAGING_WATCH_ENABLED then
     end
 end
 
-if MEM.vram then
-    add_memory_callback_compat(function(address, value)
-        vram_mem_write_count = vram_mem_write_count + 1
-        if CFG.log_vram_memory_writes and vram_mem_write_logged < CFG.max_vram_write_log then
-            vram_mem_write_logged = vram_mem_write_logged + 1
-            log(string.format(
-                "VRAM mem write: frame=%s clock=%s addr=0x%04X value=0x%02X",
-                tostring(last_state_frame or frame_count),
-                tostring(last_master_clock),
-                address,
-                value & 0xFF
-            ))
-        end
-    end, emu.callbackType.write, 0x0000, 0xFFFF, cpu_type, MEM.vram)
-end
-
-refresh_vram_addr()
 refresh_vram_inc()
 log(string.format(
-    "WRAM config: dump=%s prev=%s watch=%s memType=%s mode=%s base=0x%06X size=0x%05X range=0x%06X-0x%06X",
-    tostring(CFG.wram_dump_on_vram_diff),
-    tostring(CFG.wram_dump_prev),
-    tostring(CFG.wram_watch_writes),
+    "WRAM config: memType=%s mode=%s base=0x%06X size=0x%05X",
     tostring(wram_mem_type),
     wram_address_mode,
     wram_base,
-    CFG.wram_dump_size,
-    wram_watch_start,
-    wram_watch_end
-))
-log(string.format(
-    "WRAM env: WATCH_START=%s WATCH_END=%s",
-    tostring(CFG.wram_watch_start),
-    tostring(CFG.wram_watch_end)
+    CFG.wram_dump_size
 ))
 log(string.format(
     "Staging watch: enabled=%s range=0x%04X-0x%04X pc_samples=%d history_frames=%d",
@@ -2773,18 +1546,6 @@ log(string.format(
     CFG.visible_y_exclude_end,
     CFG.visible_x_min,
     CFG.visible_x_max
-))
-local prg_size_text = rom_trace_prg_size and string.format("0x%X", rom_trace_prg_size) or "nil"
-local prg_end_text = rom_trace_prg_end and string.format("0x%06X", rom_trace_prg_end) or "nil"
-log(string.format(
-    "ROM trace: enabled=%s memType=%s prg_size=%s prg_end=%s max_reads=%d max_frames=%d pc_samples=%d",
-    tostring(CFG.rom_trace_on_wram_write),
-    tostring(MEM.prg),
-    prg_size_text,
-    prg_end_text,
-    CFG.rom_trace_max_reads,
-    CFG.rom_trace_max_frames,
-    CFG.rom_trace_pc_samples
 ))
 log("DMA probe start: frame_event=" .. tostring(FRAME_EVENT) .. " max_frames=" .. tostring(MAX_FRAMES))
 
