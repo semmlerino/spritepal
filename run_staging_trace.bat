@@ -22,12 +22,12 @@ set STAGING_WATCH_START=0x2000
 set STAGING_WATCH_END=0x2FFF
 set STAGING_WATCH_PC_SAMPLES=8
 
-REM Track ROM reads during staging fills (shows source data)
-set STAGING_ROM_READS_ENABLED=1
+REM Track causal PRG read -> staging write pairs (shows ROM source data)
+set STAGING_CAUSAL_ENABLED=1
 
-REM NEW: PC-gated read tracking (only count reads from known copy routines)
-REM Set to 1 to filter noise; keep at 0 for discovery mode
-set STAGING_PC_GATING=0
+REM PC-gated read tracking (only count reads from known copy routines)
+REM Default ON for production runs; set to 0 for discovering new copy routine PCs
+set STAGING_PC_GATING=1
 
 REM ==== PERIODIC CAPTURES (for correlation) ====
 set PERIODIC_CAPTURE_ENABLED=1

@@ -257,27 +257,29 @@ local staging_first_pc = nil  -- PC that started the fill
 -- Track which PRG reads actually feed staging writes (not just correlation)
 -- ============================================================================
 local last_prg_read = {
-    snes = nil,  -- {addr = prg_offset, frame = frame, seq = sequence_number, read_pc = pc}
+    snes = nil,  -- {addr = prg_offset, frame = frame, seq = sequence_number, read_pc = pc, read_k = bank}
     sa1 = nil
 }
 local read_sequence = 0  -- Global sequence counter for ordering
 
 -- Known staging copy routine PCs (for PC-gated filtering)
 -- These are discovered from log analysis; add more as we learn them
--- Format: [pc_lo_16bit] = true (we ignore bank for now since they're all bank 0)
+-- Format: [(k<<16)|pc] = true (24-bit addressing: bank + PC)
 local STAGING_COPY_PCS = {
-    [0x893D] = true,
-    [0x8952] = true,
-    [0x8966] = true,
-    [0x897A] = true,
-    -- Add more as discovered from STAGING_CAUSAL logs
+    [0x00893D] = true,  -- Bank $00, PC $893D
+    [0x008952] = true,  -- Bank $00, PC $8952
+    [0x008966] = true,  -- Bank $00, PC $8966
+    [0x00897A] = true,  -- Bank $00, PC $897A
+    -- Gameplay may use bank $01 - add as discovered from STAGING_CAUSAL logs
+    -- e.g., [0x01893D] = true for bank $01
 }
 -- Enable PC-gating via env var (default off for discovery mode)
 local STAGING_PC_GATING_ENABLED = os.getenv("STAGING_PC_GATING") == "1"
 
 -- Read→write pairs for this staging fill
--- Format: {read_prg = offset, write_wram = addr, cpu = "snes"|"sa1", pc = pc, k = k}
+-- Format: {read_prg, read_pc, read_k, write_wram, write_pc, write_k, cpu}
 local staging_read_write_pairs = {}
+local staging_pair_total = 0  -- True count (not capped like the pairs array)
 
 -- Summary: which PRG regions fed writes (aggregated)
 -- Format: [prg_offset] = {count = N, cpus = {snes = n1, sa1 = n2}}
@@ -308,6 +310,7 @@ local function reset_staging_tracking()
     last_prg_read.snes = nil
     last_prg_read.sa1 = nil
     staging_read_write_pairs = {}
+    staging_pair_total = 0
     staging_prg_sources = {}
 end
 
@@ -324,14 +327,15 @@ end
 local function log_staging_causal_summary(frame, vram_addr, dma_size)
     if not STAGING_CAUSAL_ENABLED or not staging_active then return end
 
-    local pair_count = #staging_read_write_pairs
-    if pair_count == 0 then
+    -- Use staging_pair_total for accurate count (array is capped at 1000)
+    if staging_pair_total == 0 then
         log(string.format(
             "STAGING_CAUSAL: frame=%d vram_word=0x%04X NO_PAIRS (writes not preceded by PRG reads)",
             frame, vram_addr
         ))
         return
     end
+    local pairs_logged = #staging_read_write_pairs
 
     -- Aggregate PRG sources into runs (similar to old format)
     local prg_addrs = {}
@@ -391,21 +395,21 @@ local function log_staging_causal_summary(frame, vram_addr, dma_size)
     end
     local cpu_str = #cpu_parts > 0 and table.concat(cpu_parts, ",") or "none"
 
-    -- Sample a few PC addresses from pairs (show both read and write PCs)
+    -- Sample a few PC addresses from pairs (show both read and write PCs with their banks)
     local pc_samples = {}
-    for i = 1, math.min(4, pair_count) do
+    for i = 1, math.min(4, pairs_logged) do
         local p = staging_read_write_pairs[i]
-        -- Format: "read_pc->write_pc"
+        -- Format: "read_bank:read_pc->write_bank:write_pc"
         pc_samples[#pc_samples + 1] = string.format(
             "%02X:%04X->%02X:%04X",
-            p.k, p.read_pc, p.k, p.write_pc
+            p.read_k or 0, p.read_pc, p.write_k or 0, p.write_pc
         )
     end
     local pc_str = table.concat(pc_samples, ",")
 
     log(string.format(
         "STAGING_CAUSAL: frame=%d vram_word=0x%04X size=%d pairs=%d prg_runs=[%s] cpus={%s} read->write_pcs=[%s]",
-        frame, vram_addr, dma_size, pair_count, runs_str, cpu_str, pc_str
+        frame, vram_addr, dma_size, staging_pair_total, runs_str, cpu_str, pc_str
     ))
 end
 
@@ -415,8 +419,9 @@ end
 -- Captures PC at read time for causal read→write pairing
 local function make_staging_rom_reader(cpu_label)
     return function(address, value)
-        if not staging_active then return end
-        -- Frame-gate: ignore PRG reads from different frames
+        -- Note: We do NOT check staging_active here. This allows capturing the PRG read
+        -- that happens immediately before the first staging write (fixes first-byte miss).
+        -- The frame-gate below prevents noise from other frames once staging starts.
         local frame = get_canonical_frame()
         if last_staging_write_frame and frame ~= last_staging_write_frame then
             return
@@ -425,9 +430,12 @@ local function make_staging_rom_reader(cpu_label)
         -- Get PC at time of read (for analysis and optional PC-gating)
         local pc_snapshot = get_cpu_state_snapshot()
         local read_pc = pc_snapshot and pc_snapshot.pc_val or 0
+        local read_k = pc_snapshot and pc_snapshot.k_val or 0
 
         -- Optional PC-gating: only count reads from known copy routines
-        if STAGING_PC_GATING_ENABLED and not STAGING_COPY_PCS[read_pc] then
+        -- Uses 24-bit key: (bank << 16) | pc
+        local full_pc = (read_k << 16) | read_pc
+        if STAGING_PC_GATING_ENABLED and not STAGING_COPY_PCS[full_pc] then
             return
         end
 
@@ -437,7 +445,8 @@ local function make_staging_rom_reader(cpu_label)
             addr = address,
             frame = frame,
             seq = read_sequence,
-            read_pc = read_pc
+            read_pc = read_pc,
+            read_k = read_k
         }
     end
 end
@@ -532,15 +541,19 @@ local function record_staging_write(addr, pc_snapshot)
         end
 
         if best_read then
-            -- Record the pair (keep recent pairs, limit to prevent memory growth)
+            -- Always count pairs (even if we don't store details beyond cap)
+            staging_pair_total = staging_pair_total + 1
+
+            -- Record the pair details (capped to prevent memory growth, but total is accurate)
             if #staging_read_write_pairs < 1000 then
                 staging_read_write_pairs[#staging_read_write_pairs + 1] = {
                     read_prg = best_read.addr,
                     read_pc = best_read.read_pc or 0,  -- PC at time of PRG read
+                    read_k = best_read.read_k or 0,    -- Bank at time of PRG read
                     write_wram = addr,
                     write_pc = pc_snapshot and pc_snapshot.pc_val or 0,  -- PC at time of write
-                    cpu = best_cpu,
-                    k = pc_snapshot and pc_snapshot.k_val or 0
+                    write_k = pc_snapshot and pc_snapshot.k_val or 0,    -- Bank at time of write
+                    cpu = best_cpu
                 }
             end
 
@@ -647,7 +660,7 @@ local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
     end
 
     log(string.format(
-        "STAGING_SUMMARY: frame=%d src=0x%06X size=%d vram=0x%04X pattern=%s writes=%d unique=%d seq=%d jumps=%d range=0x%04X-0x%04X frames=%d%s",
+        "STAGING_SUMMARY: frame=%d src=0x%06X size=%d vram=0x%04X pattern=%s writes=%d unique=%d seq=%d jumps=%d range=0x%06X-0x%06X frames=%d%s",
         frame,
         src_addr,
         src_size,
