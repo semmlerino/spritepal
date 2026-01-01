@@ -143,17 +143,6 @@ local last_sa1_dma_irq = nil
 local CFG = {
     -- General
     heartbeat_every = tonumber(os.getenv("HEARTBEAT_EVERY")) or 0,
-    skip_visibility_filter = os.getenv("SKIP_VISIBILITY_FILTER") == "1",
-    -- WRAM dump settings
-    wram_dump_start = os.getenv("WRAM_DUMP_START") or "0x0000",
-    wram_dump_abs_start = os.getenv("WRAM_DUMP_ABS_START"),
-    wram_dump_size = tonumber(os.getenv("WRAM_DUMP_SIZE")) or 0x20000,
-    wram_dump_prev = os.getenv("WRAM_DUMP_PREV") ~= "0",
-    -- Visibility
-    visible_y_exclude_start = parse_int(os.getenv("VISIBLE_Y_EXCLUDE_START"), 224),
-    visible_y_exclude_end = parse_int(os.getenv("VISIBLE_Y_EXCLUDE_END"), 240),
-    visible_x_min = parse_int(os.getenv("VISIBLE_X_MIN"), -64),
-    visible_x_max = parse_int(os.getenv("VISIBLE_X_MAX"), 256),
     dma_dump_on_vram = os.getenv("DMA_DUMP_ON_VRAM") ~= "0",
     dma_dump_max = tonumber(os.getenv("DMA_DUMP_MAX")) or 20,
     dma_dump_min_size = tonumber(os.getenv("DMA_DUMP_MIN_SIZE")) or 1,
@@ -162,26 +151,14 @@ local CFG = {
     dma_compare_sample_bytes = tonumber(os.getenv("DMA_COMPARE_SAMPLE_BYTES")) or 32,
 }
 -- Dependent config values
-CFG.wram_dump_start_frame = tonumber(os.getenv("WRAM_DUMP_START_FRAME")) or 0
 CFG.dma_dump_start_frame = tonumber(os.getenv("DMA_DUMP_START_FRAME")) or 0
 
--- Runtime state table
-local STATE = {
-    vram_read_error_logged = false,
-}
-
-local wram_dump_start = parse_int(CFG.wram_dump_start, 0x0000)
-local wram_dump_abs_start = parse_int(CFG.wram_dump_abs_start, nil)
+-- WRAM memory type resolution (used by staging watch)
 local wram_mem_type = MEM.wram
-local wram_base = wram_dump_start
 local wram_address_mode = "relative"
-if wram_dump_abs_start ~= nil then
+if not wram_mem_type then
+    -- Fallback: use CPU memory with absolute WRAM addresses
     wram_mem_type = MEM.cpu
-    wram_base = wram_dump_abs_start
-    wram_address_mode = "absolute"
-elseif not wram_mem_type then
-    wram_mem_type = MEM.cpu
-    wram_base = 0x7E0000 + wram_dump_start
     wram_address_mode = "absolute"
 end
 local dma_read_mem = MEM.cpu_debug or MEM.cpu
@@ -262,7 +239,9 @@ local STAGING_WATCH_END = tonumber(os.getenv("STAGING_WATCH_END") or "0x33FF", 1
 local STAGING_WATCH_PC_SAMPLES = tonumber(os.getenv("STAGING_WATCH_PC_SAMPLES")) or 4
 local STAGING_HISTORY_FRAMES = tonumber(os.getenv("STAGING_HISTORY_FRAMES")) or 3
 local STAGING_START_FRAME = tonumber(os.getenv("STAGING_START_FRAME")) or 0
-local STAGING_ROM_READS_ENABLED = os.getenv("STAGING_ROM_READS_ENABLED") == "1"
+-- Causal read→write tracking: pairs PRG reads with staging writes
+-- Env var kept as STAGING_CAUSAL_ENABLED for backwards compat
+local STAGING_CAUSAL_ENABLED = os.getenv("STAGING_CAUSAL_ENABLED") == "1"
 
 -- Per-frame staging write stats
 local staging_frame_stats = {}  -- [frame] = {stats}
@@ -343,7 +322,7 @@ end
 -- Log CAUSAL read→write summary (the actionable data)
 -- This shows which PRG offsets were actually paired with staging writes
 local function log_staging_causal_summary(frame, vram_addr, dma_size)
-    if not STAGING_ROM_READS_ENABLED or not staging_active then return end
+    if not STAGING_CAUSAL_ENABLED or not staging_active then return end
 
     local pair_count = #staging_read_write_pairs
     if pair_count == 0 then
@@ -467,7 +446,7 @@ local function record_staging_write(addr, pc_snapshot)
     local frame = get_canonical_frame()
 
     -- Activate ROM read tracking on first write (if enabled)
-    if STAGING_ROM_READS_ENABLED and not staging_active then
+    if STAGING_CAUSAL_ENABLED and not staging_active then
         staging_active = true
         staging_first_pc = pc_snapshot
     end
@@ -538,7 +517,7 @@ local function record_staging_write(addr, pc_snapshot)
     -- CAUSAL READ→WRITE PAIRING
     -- Find the most recent PRG read (across both CPUs) and pair it with this write
     -- ========================================================================
-    if STAGING_ROM_READS_ENABLED then
+    if STAGING_CAUSAL_ENABLED then
         local best_read = nil
         local best_cpu = nil
         local best_seq = -1
@@ -692,77 +671,12 @@ local function on_staging_write(address, value)
 end
 -- ============================================================================
 
-local function wram_dump_allowed(frame_id)
-    if CFG.wram_dump_start_frame > 0 and frame_id < CFG.wram_dump_start_frame then
-        return false
-    end
-    return true
-end
-
 local function dma_dump_allowed(frame_id)
     if CFG.dma_dump_start_frame > 0 and frame_id < CFG.dma_dump_start_frame then
         return false
     end
     return true
 end
-
-local function capture_wram_snapshot()
-    if not wram_mem_type then
-        return nil
-    end
-    local chunks = {}
-    local chunk = {}
-    local chunk_len = 0
-    local chunk_size = 4096
-    for i = 0, CFG.wram_dump_size - 1 do
-        local value = emu.read(wram_base + i, wram_mem_type)
-        if value == nil then
-            value = 0
-        end
-        chunk_len = chunk_len + 1
-        chunk[chunk_len] = string.char(value & 0xFF)
-        if chunk_len >= chunk_size then
-            chunks[#chunks + 1] = table.concat(chunk)
-            chunk = {}
-            chunk_len = 0
-        end
-    end
-    if chunk_len > 0 then
-        chunks[#chunks + 1] = table.concat(chunk)
-    end
-    return table.concat(chunks)
-end
-
-local function write_wram_snapshot(frame_id, label, snapshot, source_frame)
-    -- Always write when called - caller decides when to call
-    if not snapshot then
-        return
-    end
-    local tag = label or "curr"
-    if source_frame ~= nil then
-        tag = tag .. "_f" .. tostring(source_frame)
-    end
-    local path = OUTPUT_DIR
-        .. string.format("wram_dump_%s_%s_start_%06X_size_%05X.bin", tostring(frame_id), tag, wram_base, CFG.wram_dump_size)
-    local f = io.open(path, "wb")
-    if not f then
-        log("ERROR: failed to open WRAM dump: " .. path)
-        return
-    end
-    f:write(snapshot)
-    f:close()
-
-    log(string.format(
-        "WRAM dump: frame=%s label=%s mode=%s base=0x%06X size=0x%05X path=%s",
-        tostring(frame_id),
-        tag,
-        wram_address_mode,
-        wram_base,
-        CFG.wram_dump_size,
-        path
-    ))
-end
-
 
 local function read8(addr)
     return emu.read(addr, MEM.cpu)
@@ -1473,7 +1387,7 @@ if STAGING_WATCH_ENABLED then
         end
 
         -- Register PRG read callback for ROM read tracking during staging fills
-        if STAGING_ROM_READS_ENABLED and MEM.prg then
+        if STAGING_CAUSAL_ENABLED and MEM.prg then
             local prg_size = 0
             local ok, size = pcall(emu.getMemorySize, MEM.prg)
             if ok then prg_size = size end
@@ -1525,27 +1439,12 @@ end
 
 refresh_vram_inc()
 log(string.format(
-    "WRAM config: memType=%s mode=%s base=0x%06X size=0x%05X",
-    tostring(wram_mem_type),
-    wram_address_mode,
-    wram_base,
-    CFG.wram_dump_size
-))
-log(string.format(
     "Staging watch: enabled=%s range=0x%04X-0x%04X pc_samples=%d history_frames=%d",
     tostring(STAGING_WATCH_ENABLED),
     STAGING_WATCH_START,
     STAGING_WATCH_END,
     STAGING_WATCH_PC_SAMPLES,
     STAGING_HISTORY_FRAMES
-))
-log(string.format(
-    "Visibility filter: enabled=%s y_exclude=%d-%d x_range=%d..%d",
-    tostring(not CFG.skip_visibility_filter),
-    CFG.visible_y_exclude_start,
-    CFG.visible_y_exclude_end,
-    CFG.visible_x_min,
-    CFG.visible_x_max
 ))
 log("DMA probe start: frame_event=" .. tostring(FRAME_EVENT) .. " max_frames=" .. tostring(MAX_FRAMES))
 
