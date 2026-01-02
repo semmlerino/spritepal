@@ -244,7 +244,9 @@ local CFG = {
 CFG.dma_dump_start_frame = tonumber(os.getenv("DMA_DUMP_START_FRAME")) or 0
 -- v2.3: DMA log start frame - skip ALL DMA logging until this frame to prevent timeout
 -- Defaults to STAGING_START_FRAME - 10 (so we have some context before staging starts)
-CFG.dma_log_start_frame = tonumber(os.getenv("DMA_LOG_START_FRAME")) or math.max(0, STAGING_START_FRAME - 10)
+-- Note: STAGING_START_FRAME not yet defined here, so read env directly
+local _staging_start = tonumber(os.getenv("STAGING_START_FRAME")) or 0
+CFG.dma_log_start_frame = tonumber(os.getenv("DMA_LOG_START_FRAME")) or math.max(0, _staging_start - 10)
 
 -- WRAM memory type resolution (used by staging watch)
 local wram_mem_type = MEM.wram
