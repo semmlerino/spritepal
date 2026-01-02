@@ -28,9 +28,9 @@ set STAGING_START_FRAME=1500
 REM v2.1: Per-frame cap (default 2048) - prevents timeout on heavy frames
 REM set STAGING_MAX_WRITES_PER_FRAME=2048
 
-REM v2.1: Sentinel sampling (0=full range, 0x40=every 64 bytes = 64x fewer callbacks)
-REM Only enable if still timing out after STAGING_START_FRAME
-REM set STAGING_SENTINEL_STEP=0x40
+REM v2.1: Sentinel sampling (0=full range, 32=every 32 bytes = ~128 callbacks instead of 4096)
+REM ACTIVE: Prevents init-time timeout during callback registration
+set STAGING_SENTINEL_STEP=32
 
 REM Track causal PRG read -> staging write pairs (shows ROM source data)
 set STAGING_CAUSAL_ENABLED=1
@@ -48,8 +48,8 @@ set STAGING_WRAM_TRACKING=0
 REM ==== WRAM SOURCE TRACKING (THE KEY FEATURE) ====
 REM Tracks what WRAM region the staging writer READS FROM
 REM This reveals the intermediate buffer that feeds the staging area
-REM Start narrow (0x0000-0x1FFF), widen if you get no pairs
-set STAGING_WRAM_SOURCE=1
+REM DISABLED: Re-enable with narrower range after staging works (init-time timeout mitigation)
+set STAGING_WRAM_SOURCE=0
 set STAGING_WRAM_SRC_START=0x0000
 set STAGING_WRAM_SRC_END=0x1FFF
 
