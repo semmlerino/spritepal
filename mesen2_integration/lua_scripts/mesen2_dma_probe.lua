@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.2"
+local LOG_VERSION = "2.3"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -242,6 +242,9 @@ local CFG = {
 }
 -- Dependent config values
 CFG.dma_dump_start_frame = tonumber(os.getenv("DMA_DUMP_START_FRAME")) or 0
+-- v2.3: DMA log start frame - skip ALL DMA logging until this frame to prevent timeout
+-- Defaults to STAGING_START_FRAME - 10 (so we have some context before staging starts)
+CFG.dma_log_start_frame = tonumber(os.getenv("DMA_LOG_START_FRAME")) or math.max(0, STAGING_START_FRAME - 10)
 
 -- WRAM memory type resolution (used by staging watch)
 local wram_mem_type = MEM.wram
@@ -1056,6 +1059,8 @@ local function refresh_vram_inc()
 end
 
 local function log_dma_channel(channel, value)
+    -- v2.3: Skip logging until DMA_LOG_START_FRAME to prevent timeout
+    if frame_count < CFG.dma_log_start_frame then return end
     -- Refresh VMAIN-based values before logging (since we removed on_vmain_write callback)
     refresh_vram_inc()
     -- Use SHADOWED values captured as registers were written (before DMA runs)
@@ -1238,6 +1243,8 @@ local function refresh_sa1_bank_state()
 end
 
 local function log_sa1_banks(reason)
+    -- v2.3: Skip logging until DMA_LOG_START_FRAME to prevent timeout
+    if frame_count < CFG.dma_log_start_frame then return end
     refresh_sa1_bank_state()
     local fmt = "SA1_BANKS (%s): frame=%d run=%s cxb=0x%02X dxb=0x%02X exb=0x%02X fxb=0x%02X bmaps=0x%02X bmap=0x%02X"
     log(string.format(fmt,
@@ -1359,6 +1366,8 @@ local function on_dma_enable(address, value)
 end
 
 local function on_hdma_enable(address)
+    -- v2.3: Skip logging until DMA_LOG_START_FRAME to prevent timeout
+    if frame_count < CFG.dma_log_start_frame then return end
     local value = read8(0x420C)
     if value ~= 0 then
         log(string.format("HDMA enable=0x%02X", value))
@@ -1870,6 +1879,10 @@ end
 -- (init-time registration causes timeout even with sparse sentinels)
 if STAGING_WATCH_ENABLED then
     log("INFO: Staging watch will be registered lazily at frame=" .. tostring(STAGING_START_FRAME - 2))
+end
+-- v2.3: DMA logging deferred to prevent timeout (logs at init were eating the entire 1s budget)
+if CFG.dma_log_start_frame > 0 then
+    log("INFO: DMA/HDMA/SA1 logging deferred until frame=" .. tostring(CFG.dma_log_start_frame))
 end
 if STAGING_WRAM_SOURCE_ENABLED then
     log("INFO: WRAM source tracking will be registered lazily at frame=" .. tostring(STAGING_START_FRAME - 2))
