@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.9"
+local LOG_VERSION = "2.10"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -406,6 +406,13 @@ local fill_session_prg_reads = {}      -- Ring buffer of {addr, pc, k} during fi
 local fill_session_prg_head = 0
 local FILL_SESSION_RING_SIZE = 256     -- Enough for typical fill operations
 local fill_session_prg_total = 0       -- Total PRG reads during session (may exceed ring size)
+
+-- v2.10: Buffer byte capture for content validation
+-- Captures actual bytes written to source buffer during fill session
+-- Used to compare against ROM bytes at candidate PRG addresses
+local fill_session_buffer_bytes = {}   -- [offset_from_start] = byte value
+local fill_session_buffer_min = nil    -- Min address written
+local fill_session_buffer_max = nil    -- Max address written
 
 -- v2.9: Forward declarations for fill session functions (called before definition)
 local log_fill_session_summary
@@ -1653,6 +1660,20 @@ local function on_buffer_write(address, value)
         fill_session_prg_reads = {}
         fill_session_prg_head = 0
         fill_session_prg_total = 0
+        -- v2.10: Reset buffer byte capture
+        fill_session_buffer_bytes = {}
+        fill_session_buffer_min = nil
+        fill_session_buffer_max = nil
+    end
+
+    -- v2.10: Capture the written byte (keyed by absolute address for simplicity)
+    -- This lets us compare against ROM bytes later
+    fill_session_buffer_bytes[address] = value
+    if not fill_session_buffer_min or address < fill_session_buffer_min then
+        fill_session_buffer_min = address
+    end
+    if not fill_session_buffer_max or address > fill_session_buffer_max then
+        fill_session_buffer_max = address
     end
 
     -- Initialize or rotate frame stats
@@ -1803,6 +1824,34 @@ log_fill_session_summary = function(frame, vram_addr, dma_size)
         max_run,
         prg_runs_str
     ))
+
+    -- v2.10: Dump buffer bytes for content validation
+    -- Log the actual bytes written to source buffer during this fill session
+    if fill_session_buffer_min and fill_session_buffer_max then
+        local byte_count = 0
+        local hex_parts = {}
+        -- Iterate over address range and collect bytes
+        for addr = fill_session_buffer_min, fill_session_buffer_max do
+            local b = fill_session_buffer_bytes[addr]
+            if b then
+                table.insert(hex_parts, string.format("%02X", b))
+                byte_count = byte_count + 1
+            else
+                -- Gap in written addresses - mark with placeholder
+                table.insert(hex_parts, "--")
+            end
+        end
+        local hex_str = table.concat(hex_parts, "")
+        -- Log with address range and byte count
+        log(string.format(
+            "FILL_BUFFER_BYTES: frame=%d addr_range=0x%04X-0x%04X bytes=%d hex=%s",
+            frame,
+            fill_session_buffer_min,
+            fill_session_buffer_max,
+            byte_count,
+            hex_str
+        ))
+    end
 end
 
 -- v2.9: Reset fill session state (called when staging DMA fires)
@@ -1812,6 +1861,10 @@ reset_fill_session = function()
     fill_session_prg_reads = {}
     fill_session_prg_head = 0
     fill_session_prg_total = 0
+    -- v2.10: Clear buffer byte capture
+    fill_session_buffer_bytes = {}
+    fill_session_buffer_min = nil
+    fill_session_buffer_max = nil
 end
 
 local function log_buffer_write_summary(frame)

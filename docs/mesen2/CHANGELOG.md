@@ -67,6 +67,29 @@ to WRAM sources).
 
 ---
 
+## [2.15.0] - 2026-01-02
+
+### Buffer Byte Capture for Content Validation (v2.10)
+
+**Context:** FILL_SESSION shows PRG runs during buffer fill, but "big PRG runs" alone
+can be coincidence. Need content validation to prove the linkage.
+
+**New Feature:**
+- Captures actual bytes written to source buffer (0x1530-0x161A) during each fill session
+- Dumps bytes as hex string at session end: `FILL_BUFFER_BYTES`
+- Enables direct comparison: ROM bytes at PRG addresses vs buffer bytes
+
+**Output:** `FILL_BUFFER_BYTES: frame=X addr_range=0xAAAA-0xBBBB bytes=N hex=...`
+
+**What this enables:**
+- If bytes match ROM → direct copy loop, ROM offset confirmed
+- If bytes don't match → decompression/transformation, PRG run is compressed source
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.9 → v2.10)
+
+---
+
 ## [2.14.1] - 2026-01-02
 
 ### FILL_SESSION Bug Fix and Initial Findings
