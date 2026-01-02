@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "1.8"
+local LOG_VERSION = "1.9"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -461,8 +461,8 @@ local staging_wram_pair_total = 0
 local function init_staging_stats()
     return {
         count = 0,
-        unique_addrs = {},  -- set: addr -> true
-        unique_count = 0,
+        -- NOTE: unique_addrs hash table REMOVED in v1.9 (caused 28K+ hash ops per staging fill)
+        -- Uniqueness is now estimated from (max_addr - min_addr + 1) in get_staging_summary()
         min_addr = nil,
         max_addr = nil,
         last_addr = nil,
@@ -830,11 +830,8 @@ local function record_staging_write(addr, pc_snapshot)
     local stats = staging_current_stats
     stats.count = stats.count + 1
 
-    -- Track unique addresses
-    if not stats.unique_addrs[addr] then
-        stats.unique_addrs[addr] = true
-        stats.unique_count = stats.unique_count + 1
-    end
+    -- NOTE: unique_addrs tracking REMOVED in v1.9 (per-write hash ops were the timeout cause)
+    -- Uniqueness is estimated from range in get_staging_summary()
 
     -- Track min/max
     if stats.min_addr == nil or addr < stats.min_addr then
@@ -876,7 +873,6 @@ end
 local function get_staging_summary(src_addr, src_size)
     -- Collect stats from recent frames that overlap with DMA source range
     local total_count = 0
-    local total_unique = 0
     local total_sequential = 0
     local total_jumps = 0
     local all_pcs = {}
@@ -892,7 +888,6 @@ local function get_staging_summary(src_addr, src_size)
         if stats.count > 0 then
             frames_with_writes = frames_with_writes + 1
             total_count = total_count + stats.count
-            total_unique = total_unique + stats.unique_count
             total_sequential = total_sequential + stats.sequential_count
             total_jumps = total_jumps + stats.jump_count
 
@@ -927,10 +922,18 @@ local function get_staging_summary(src_addr, src_size)
         pattern = "MIXED"
     end
 
+    -- Estimate unique addresses from range (v1.9: removed per-write hash tracking)
+    -- For SEQUENTIAL_BURST: unique ≈ range size (accurate)
+    -- For SCATTERED_CHUNKS: unique ≤ range size (conservative estimate)
+    local estimated_unique = 0
+    if min_addr and max_addr then
+        estimated_unique = max_addr - min_addr + 1
+    end
+
     return {
         pattern = pattern,
         total_writes = total_count,
-        unique_addrs = total_unique,
+        unique_addrs = estimated_unique,
         sequential = total_sequential,
         jumps = total_jumps,
         min_addr = min_addr,
