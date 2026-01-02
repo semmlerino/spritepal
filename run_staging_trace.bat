@@ -50,10 +50,10 @@ set STAGING_WRAM_TRACKING=0
 REM ==== WRAM SOURCE TRACKING (THE KEY FEATURE) ====
 REM Tracks what WRAM region the staging writer READS FROM
 REM This reveals the intermediate buffer that feeds the staging area
-REM DISABLED: Re-enable with narrower range after staging works (init-time timeout mitigation)
-set STAGING_WRAM_SOURCE=0
-set STAGING_WRAM_SRC_START=0x0000
-set STAGING_WRAM_SRC_END=0x1FFF
+REM Now safe with increased ScriptTimeout (set to 5+ seconds in Mesen2)
+set STAGING_WRAM_SOURCE=1
+set STAGING_WRAM_SRC_START=0x3000
+set STAGING_WRAM_SRC_END=0x7FFF
 
 REM Ring buffer size (32 is enough for typical copy loops)
 set STAGING_RING_SIZE=32
