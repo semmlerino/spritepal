@@ -3,6 +3,36 @@
 This is a fail-fast diagnostic flow. **Do not expand the tile DB or relax filters** until
 VRAM capture integrity is verified.
 
+---
+
+## Lua Script Timeout (Common Issue)
+
+**Symptom:** `Maximum execution time (1 seconds) exceeded` error, script dies before frame 1.
+
+**Cause:** Mesen2's Lua timeout is cumulative across all callback execution. Heavy callback
+activity (DMA logging, staging watch registration) can exceed the 1-second default budget.
+
+**Fix:**
+
+1. **Increase ScriptTimeout in Mesen2:**
+   ```
+   Tools -> Script Window -> Settings -> Script Timeout -> 5 (or higher)
+   ```
+
+2. **Use v2.3+ of mesen2_dma_probe.lua** which defers heavy operations:
+   - Lazy registration: Staging callbacks register at frame 1498, not init
+   - Deferred logging: DMA/HDMA/SA1 logs start at frame 1490, not frame 0
+
+**Verification:** After increasing timeout, log should show:
+```
+INFO: Staging watch will be registered lazily at frame=1498
+INFO: DMA/HDMA/SA1 logging deferred until frame=1490
+```
+
+**Mesen2 Source Reference:** `ScriptingContext.cpp:128-130`, `SettingTypes.h:857`
+
+---
+
 ## Diagnostic Priority (Start Here)
 
 Follow this flowchart **in order**. Fix issues at each step before proceeding.
