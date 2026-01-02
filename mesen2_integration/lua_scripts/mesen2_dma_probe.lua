@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "1.6"
+local LOG_VERSION = "1.7"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -396,8 +396,8 @@ local wram_src_ring_head = {
 
 local read_sequence = 0  -- Global sequence counter for ordering (shared between PRG and WRAM reads)
 
--- Entry counters for ring buffers (to skip scanning empty buffers)
-local wram_src_ring_count = 0  -- Total entries ever added to WRAM source ring buffer
+-- Flag to skip scanning empty ring buffer (reset in reset_staging_tracking)
+local wram_src_seen_any = 0  -- Nonzero if we've pushed to WRAM source ring buffer this session
 
 -- Helper: push to ring buffer
 local function push_ring(buffer, head_table, cpu_label, entry)
@@ -407,7 +407,7 @@ local function push_ring(buffer, head_table, cpu_label, entry)
 end
 
 -- Helper: find best read from ring buffer (most recent with seq >= min_seq)
-local function find_best_read_from_rings(ring_buffers, ring_heads, min_seq)
+local function find_best_read_from_rings(ring_buffers, min_seq)
     local best_read = nil
     local best_cpu = nil
     local best_seq = -1
@@ -509,7 +509,7 @@ local function reset_staging_tracking()
     staging_wram_pair_total = 0
     staging_wram_sources = {}
     -- Reset ring buffer count (gate for hot-path scanning)
-    wram_src_ring_count = 0
+    wram_src_seen_any = 0
 end
 
 -- Track frame of last staging write (for logging)
@@ -753,21 +753,23 @@ local STAGING_WRAM_PREARM = os.getenv("STAGING_WRAM_PREARM") == "1"
 local function make_staging_wram_source_reader(cpu_label)
     return function(address, value)
         -- GATE: Only track reads when staging session is active (or prearm enabled)
-        -- This prevents emu.getState() from being called millions of times during idle.
         if not staging_active and not STAGING_WRAM_PREARM then
             return
         end
 
         local frame = get_canonical_frame()
 
-        local pc_snapshot = get_cpu_state_snapshot()
-        local read_pc = pc_snapshot and pc_snapshot.pc_val or 0
-        local read_k = pc_snapshot and pc_snapshot.k_val or 0
+        -- Only fetch PC when PC-gating is enabled (saves expensive emu.getState() overhead)
+        -- Default mode: address-only tracking (fast), PC-gating mode: fetch PC and filter
+        local read_pc, read_k = 0, 0
+        if STAGING_PC_GATING_ENABLED then
+            local pc_snapshot = get_cpu_state_snapshot()
+            if not pc_snapshot then return end
+            read_pc = pc_snapshot.pc_val or 0
+            read_k = pc_snapshot.k_val or 0
 
-        -- Optional PC-gating: only count reads from known copy routines
-        local full_pc = (read_k << 16) | read_pc
-        if STAGING_PC_GATING_ENABLED and not STAGING_COPY_PCS[full_pc] then
-            return
+            local full_pc = (read_k << 16) | read_pc
+            if not STAGING_COPY_PCS[full_pc] then return end
         end
 
         -- Normalize to relative WRAM offset (0x00000-0x1FFFF) for consistent aggregation
@@ -785,7 +787,7 @@ local function make_staging_wram_source_reader(cpu_label)
             read_pc = read_pc,
             read_k = read_k
         })
-        wram_src_ring_count = wram_src_ring_count + 1
+        wram_src_seen_any = wram_src_seen_any + 1
     end
 end
 
@@ -869,8 +871,8 @@ local function record_staging_write(addr, pc_snapshot)
     -- PERFORMANCE: Only scan if WRAM source tracking is enabled AND ring buffer has entries
     -- NOTE: PRG ring buffer scan removed - PRG read callbacks are permanently disabled
     -- ========================================================================
-    if STAGING_WRAM_SOURCE_ENABLED and staging_session_start_seq and wram_src_ring_count > 0 then
-        local best_wram_read, best_wram_cpu = find_best_read_from_rings(wram_src_ring_buffer, wram_src_ring_head, staging_session_start_seq)
+    if STAGING_WRAM_SOURCE_ENABLED and staging_session_start_seq and wram_src_seen_any > 0 then
+        local best_wram_read, best_wram_cpu = find_best_read_from_rings(wram_src_ring_buffer, staging_session_start_seq)
 
         if best_wram_read then
             staging_wram_pair_total = staging_wram_pair_total + 1
