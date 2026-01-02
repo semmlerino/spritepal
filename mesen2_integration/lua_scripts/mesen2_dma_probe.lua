@@ -1,8 +1,26 @@
 -- DMA/SA-1 probe for sprite upload diagnostics (headless-safe)
 -- =============================================================================
 -- INSTRUMENTATION CONTRACT v1.1
+--
+-- SECTION MAP:
+--   1. BOOTSTRAP & CONFIG    - Version, output dirs, env var parsing
+--   2. LOGGING SERVICE       - Log file init/close, log() function
+--   3. MEMORY TYPE RESOLUTION- MEM table, CPU types
+--   4. UTILITIES             - parse_int, get_cpu_state_snapshot, callbacks
+--   5. DMA TRACKER           - Shadow registers, VRAM addr, channel logging
+--   6. SA-1 TRACKER          - Bank mapping, CCDMA detection
+--   7. STAGING BUFFER WATCHER- Ring buffers, causal pairing, summaries
+--   8. DMA COMPARISON        - Deferred VRAM verification (at frame end)
+--   9. FRAME DETECTION       - Frame counter, endFrame/exec callbacks
+--  10. CALLBACK REGISTRATION - Wire up all callbacks
+--  11. INITIALIZATION        - Final setup, error handling
 -- =============================================================================
-local LOG_VERSION = "1.3"
+
+-- =============================================================================
+-- SECTION 1: BOOTSTRAP & CONFIG
+-- Environment variables, output paths, version info
+-- =============================================================================
+local LOG_VERSION = "1.4"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -34,6 +52,11 @@ end
 os.execute('mkdir "' .. OUTPUT_DIR:gsub("\\", "\\\\") .. '" 2>NUL')
 
 local LOG_FILE = OUTPUT_DIR .. "dma_probe_log.txt"
+
+-- =============================================================================
+-- SECTION 2: LOGGING SERVICE
+-- Log file management and the core log() function
+-- =============================================================================
 
 -- Get ROM info for header (best effort - may not have SHA256)
 -- Note: MEM may not be defined yet when this is first called, so check for it
@@ -110,6 +133,11 @@ end
 -- Initialize log file immediately
 init_log_file()
 
+-- =============================================================================
+-- SECTION 3: MEMORY TYPE RESOLUTION
+-- Resolve emu.memType and emu.cpuType constants for callback registration
+-- =============================================================================
+
 -- Memory type names verified from Mesen2/Core/Shared/MemoryType.h
 -- LuaApi.cpp lowercases the first letter: SnesPrgRom -> snesPrgRom
 local MEM = {
@@ -150,6 +178,11 @@ local cpu_type = emu.cpuType and emu.cpuType.snes or nil
 local sa1_cpu_type = emu.cpuType and emu.cpuType.sa1 or nil
 
 log(string.format("CPU types resolved: snes=%s sa1=%s", tostring(cpu_type), tostring(sa1_cpu_type)))
+
+-- =============================================================================
+-- SECTION 4: UTILITIES
+-- Helper functions: parse_int, get_cpu_state_snapshot, callback registration
+-- =============================================================================
 
 local function add_memory_callback_compat(callback, cb_type, start_addr, end_addr, cb_cpu_type, mem_type)
     -- FIXED: Actually use the requested cpuType parameter instead of ignoring it
@@ -220,6 +253,12 @@ local dma_read_mem = MEM.cpu_debug or MEM.cpu
 local dma_dump_count = 0
 local dma_compare_count = 0
 
+-- =============================================================================
+-- SECTION 5: DMA TRACKER
+-- Shadow DMA channel registers, VRAM address tracking, DMA channel logging
+-- Hot paths: on_dma_enable (per-DMA), on_dma_reg_write (per-register)
+-- =============================================================================
+
 -- DMA register shadowing: capture values AS THEY ARE WRITTEN (before $420B triggers DMA)
 -- This avoids reading post-DMA state where DAS=0 and VMADD may have changed
 local dma_shadow = {}
@@ -284,10 +323,11 @@ local function get_cpu_state_snapshot()
     }
 end
 
--- ============================================================================
--- STAGING BUFFER WRITE TRACKING (Rolling Log)
--- Tracks writes to DMA source range ($7E:2000) to diagnose fill patterns
--- ============================================================================
+-- =============================================================================
+-- SECTION 7: STAGING BUFFER WATCHER
+-- Ring buffers, read→write pairing, summary logging for DMA source analysis
+-- Hot paths: on_staging_write (per-write), make_staging_wram_source_reader (per-read)
+-- =============================================================================
 local STAGING_WATCH_ENABLED = os.getenv("STAGING_WATCH_ENABLED") == "1"
 local STAGING_WATCH_START = tonumber(os.getenv("STAGING_WATCH_START") or "0x2000", 16) or 0x2000
 local STAGING_WATCH_END = tonumber(os.getenv("STAGING_WATCH_END") or "0x2FFF", 16) or 0x2FFF
@@ -481,35 +521,6 @@ local function format_prg_offset(prg_offset)
     return string.format("0x%06X", prg_offset)
 end
 
--- Convert SNES bus address (bank:offset) to PRG file offset
--- Returns nil if address doesn't map to ROM (e.g., WRAM, registers)
--- Uses LoROM mapping: banks $00-$7D, $80-$FF with $8000-$FFFF offset
--- SA-1 bank remapping is NOT applied here (would need sa1_bank_state)
-local function snes_to_prg_offset(bank, offset)
-    -- Only $8000-$FFFF maps to ROM in LoROM
-    if offset < 0x8000 then return nil end
-
-    -- Banks $7E-$7F are WRAM, not ROM
-    if bank == 0x7E or bank == 0x7F then return nil end
-
-    -- LoROM mapping: strip high bit of bank, multiply by 32KB, add offset within bank
-    local effective_bank = bank & 0x7F  -- Mirror $80+ to $00+
-    local prg_offset = effective_bank * 0x8000 + (offset - 0x8000)
-
-    return prg_offset
-end
-
--- Check if a PRG read is likely an instruction fetch (not data)
--- Returns true if the read address is within FETCH_WINDOW bytes of where PC maps to PRG
-local FETCH_WINDOW = 4  -- Opcodes are 1-3 bytes, allow small margin
-local function is_likely_instruction_fetch(prg_addr, read_k, read_pc)
-    local pc_prg = snes_to_prg_offset(read_k, read_pc)
-    if not pc_prg then return false end  -- PC not in ROM? (unlikely but safe)
-
-    local distance = math.abs(prg_addr - pc_prg)
-    return distance <= FETCH_WINDOW
-end
-
 -- Log CAUSAL read→write summary (the actionable data)
 -- This shows which PRG offsets were actually paired with staging writes
 local function log_staging_causal_summary(frame, vram_addr, dma_size)
@@ -627,7 +638,7 @@ end
 -- This shows which WRAM regions the staging writer reads FROM
 -- Includes quality metrics: unique_wram, max_run, coverage, quality
 local function log_staging_wram_source_summary(frame, vram_addr, dma_size)
-    if not STAGING_CAUSAL_ENABLED or not staging_active then return end
+    if not STAGING_WRAM_SOURCE_ENABLED or not staging_active then return end
     if staging_wram_pair_total == 0 then
         -- Explicit log for zero pairs - helps distinguish "feature off" from "no matches in range"
         if STAGING_WRAM_SOURCE_ENABLED then
@@ -728,49 +739,6 @@ local function log_staging_wram_source_summary(frame, vram_addr, dma_size)
         "STAGING_WRAM_SOURCE: frame=%d vram_word=0x%04X size=%d wram_pairs=%d quality=%s unique_wram=%d max_run=%d coverage=%.2f top=[%s] wram_runs=[%s] cpus={%s}",
         frame, vram_addr, dma_size, staging_wram_pair_total, quality, unique_wram_bytes, max_run_len, coverage_ratio, top_str, runs_str, cpu_str
     ))
-end
-
--- PRG/ROM read callback factory during staging
--- Note: address is PRG file offset (0 to prg_size-1), NOT a SNES bus address
--- Session-gated: pairing filters by seq >= staging_session_start_seq
--- Captures PC at read time for causal read→write pairing
--- Uses RING BUFFER to capture multiple reads (not just last one)
-local function make_staging_rom_reader(cpu_label)
-    return function(address, value)
-        -- Note: We do NOT check staging_active here. This allows capturing the PRG read
-        -- that happens immediately before the first staging write (fixes first-byte miss).
-        -- Session-based filtering happens in pairing (seq >= staging_session_start_seq).
-        local frame = get_canonical_frame()
-
-        -- Get PC at time of read (for analysis and optional PC-gating)
-        local pc_snapshot = get_cpu_state_snapshot()
-        local read_pc = pc_snapshot and pc_snapshot.pc_val or 0
-        local read_k = pc_snapshot and pc_snapshot.k_val or 0
-
-        -- Optional PC-gating: only count reads from known copy routines
-        -- Uses 24-bit key: (bank << 16) | pc
-        local full_pc = (read_k << 16) | read_pc
-        if STAGING_PC_GATING_ENABLED and not STAGING_COPY_PCS[full_pc] then
-            return
-        end
-
-        -- CRITICAL: Filter out instruction fetches
-        -- Mesen's PRG read callbacks fire for ALL reads including opcode fetches.
-        -- Without this filter, we'd "pair" the copy loop's own code with staging writes.
-        if is_likely_instruction_fetch(address, read_k, read_pc) then
-            return
-        end
-
-        -- Push to ring buffer (for causal pairing)
-        read_sequence = read_sequence + 1
-        push_ring(prg_ring_buffer, prg_ring_head, cpu_label, {
-            addr = address,
-            frame = frame,
-            seq = read_sequence,
-            read_pc = read_pc,
-            read_k = read_k
-        })
-    end
 end
 
 -- WRAM SOURCE read callback factory during staging
@@ -1218,6 +1186,12 @@ local function log_dma_channel(channel, value)
     end
 end
 
+-- =============================================================================
+-- SECTION 6: SA-1 TRACKER
+-- Bank mapping state, CCDMA detection, SA-1 DMA control monitoring
+-- Hot paths: on_sa1_ctrl_write (per-control), on_sa1_bank_write (per-bank)
+-- =============================================================================
+
 local sa1_state = {
     ctrl = 0,
     src = 0,
@@ -1449,6 +1423,11 @@ local function on_sa1_bitmap_write(address)
     end
 end
 
+-- =============================================================================
+-- SECTION 8: DMA COMPARISON
+-- Deferred VRAM verification (runs at frame end after DMA completes)
+-- =============================================================================
+
 local state_loaded = PRELOADED_STATE
 local frame_event_registered = false
 
@@ -1513,6 +1492,11 @@ local function process_pending_dma_compares()
     -- Clear the queue
     pending_dma_compares = {}
 end
+
+-- =============================================================================
+-- SECTION 9: FRAME DETECTION
+-- Frame counter, endFrame/exec callbacks, master clock fallback
+-- =============================================================================
 
 local function on_end_frame()
     frame_count = frame_count + 1
@@ -1696,6 +1680,12 @@ local function load_savestate_if_needed()
     end
 end
 
+-- =============================================================================
+-- SECTION 10: CALLBACK REGISTRATION
+-- Wire up all memory and event callbacks
+-- Order matters: DMA before staging, S-CPU before SA-1
+-- =============================================================================
+
 add_memory_callback_compat(on_dma_enable, emu.callbackType.write, 0x420B, 0x420B, cpu_type, MEM.cpu)
 add_memory_callback_compat(on_hdma_enable, emu.callbackType.write, 0x420C, 0x420C, cpu_type, MEM.cpu)
 -- Shadow DMA channel registers as they are written (before $420B triggers DMA)
@@ -1756,14 +1746,8 @@ if STAGING_WATCH_ENABLED then
             log("INFO: SA-1 staging callback SKIPPED (would cause timeout)")
         end
 
-        -- PRG read callback DISABLED - causes timeout due to extremely high read frequency
-        -- Even S-CPU instruction fetches from ROM trigger this callback millions of times.
-        -- STAGING_SUMMARY and STAGING_WRAM_SOURCE still work without it.
-        -- STAGING_CAUSAL (PRG->staging correlation) requires this but is too expensive.
-        if STAGING_CAUSAL_ENABLED then
-            log("INFO: PRG read callbacks DISABLED (causes timeout - too many ROM reads)")
-            log("INFO: STAGING_CAUSAL will show NO_PAIRS without PRG tracking")
-        end
+        -- PRG read callbacks PERMANENTLY DISABLED: too many ROM reads (M/frame) cause timeout
+        -- STAGING_CAUSAL will show NO_PAIRS; use STAGING_WRAM_SOURCE instead
 
         -- Register WRAM read callbacks for intermediate buffer detection
         -- Track reads from WRAM OUTSIDE the staging buffer (0x2000-0x2FFF)
@@ -1858,20 +1842,9 @@ if STAGING_WATCH_ENABLED then
                 log("WARNING: Failed to register WRAM SOURCE callback for S-CPU")
             end
 
-            -- SA-1 WRAM source callback DISABLED
-            -- Reason: emu.getState() returns the *active* CPU's state, which can be wrong
-            -- when callbacks fire for SA-1. PC samples would be contaminated with SNES PC values.
-            -- Re-enable only after verifying per-CPU state isolation.
+            -- SA-1 WRAM source callback DISABLED: emu.getState() returns wrong CPU's state
             if sa1_cpu_type then
                 log("INFO: SA-1 WRAM SOURCE callback DISABLED (PC state unreliable across CPUs)")
-                -- local sa1_wram_src_ref = add_memory_callback_compat(
-                --     make_staging_wram_source_reader("sa1"),
-                --     emu.callbackType.read,
-                --     src_start,
-                --     src_end,
-                --     sa1_cpu_type,
-                --     wram_mem_type
-                -- )
             end
         elseif wram_mem_type and not STAGING_WRAM_SOURCE_ENABLED then
             log("INFO: WRAM SOURCE tracking disabled (STAGING_WRAM_SOURCE=0). Set STAGING_WRAM_SOURCE=1 to enable.")
@@ -1894,6 +1867,11 @@ if emu.eventType and emu.eventType.scriptEnded then
 else
     log("WARNING: scriptEnded event not available, log may not flush on exit")
 end
+
+-- =============================================================================
+-- SECTION 11: INITIALIZATION
+-- Final setup, error handling, start message
+-- =============================================================================
 
 log("INFO: Callback registration complete, starting final initialization...")
 
