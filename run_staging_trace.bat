@@ -28,9 +28,10 @@ set STAGING_START_FRAME=1500
 REM v2.1: Per-frame cap (default 2048) - prevents timeout on heavy frames
 REM set STAGING_MAX_WRITES_PER_FRAME=2048
 
-REM v2.1: Sentinel sampling (0=full range, 32=every 32 bytes = ~128 callbacks instead of 4096)
-REM ACTIVE: Prevents init-time timeout during callback registration
-set STAGING_SENTINEL_STEP=32
+REM v2.1: Sentinel sampling (0=full range, 256=every 256 bytes = 16 callbacks for init speed)
+REM Ultra-sparse: Trades coverage for init speed. Enough to detect IF staging writes happen.
+REM After confirming frame progression, lower to 128 or 64 for better coverage.
+set STAGING_SENTINEL_STEP=256
 
 REM Track causal PRG read -> staging write pairs (shows ROM source data)
 set STAGING_CAUSAL_ENABLED=1
