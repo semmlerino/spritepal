@@ -67,6 +67,93 @@ to WRAM sources).
 
 ---
 
+## [2.8.0] - 2026-01-02
+
+### Lua Script Timeout Fixes (v2.2 + v2.3)
+
+**Problem:** `mesen2_dma_probe.lua` was timing out with "Maximum execution time (1 seconds) exceeded" before reaching frame 1.
+
+**Root Cause Analysis:**
+
+Mesen2's Lua timeout (`ScriptTimeout`) is cumulative across all callback execution within a batch, not per-callback. At init and frame 0, the script was:
+1. Registering thousands of memory callbacks (staging watch)
+2. Logging hundreds of DMA operations
+
+Both operations consumed the entire 1-second budget before frame 1 could start.
+
+**Solution (Two-Part):**
+
+**v2.2 - Lazy Registration:**
+- Staging and WRAM source callbacks now registered at frame `STAGING_START_FRAME - 2` (not at init)
+- Added `register_staging_callbacks()` and `register_wram_source_callbacks()` functions
+- New log message: `INFO: Staging watch will be registered lazily at frame=1498`
+
+**v2.3 - Deferred DMA Logging:**
+- Added `CFG.dma_log_start_frame` (defaults to `STAGING_START_FRAME - 10`)
+- `log_dma_channel()`, `on_hdma_enable()`, `log_sa1_banks()` skip logging until that frame
+- New log message: `INFO: DMA/HDMA/SA1 logging deferred until frame=1490`
+
+**User Action Required:**
+
+Even with v2.3 fixes, heavy callback activity may still timeout. Increase Mesen2's script timeout:
+
+```
+Tools -> Script Window -> Settings -> Script Timeout -> 5 (or higher)
+```
+
+**Mesen2 Source Reference:**
+- `ScriptingContext.cpp:128-130` - Timeout check in `ExecutionCountHook`
+- `SettingTypes.h:857` - Default `ScriptTimeout = 1`
+- Timer resets at callback batch start, not per-callback
+
+**New Environment Variables:**
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DMA_LOG_START_FRAME` | STAGING_START_FRAME - 10 | Skip DMA logging until this frame |
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.2 → v2.3)
+- `run_staging_trace.bat` (updated comments)
+
+---
+
+## [2.7.1] - 2026-01-01
+
+### Lua Script API Alignment Fix
+
+**Fixed:** `mesen2_dma_probe.lua` MEM table and CPU type definitions now use verified Mesen2 API names.
+
+**Problem:** The script used incorrect fallback names that don't exist in Mesen2's Lua API:
+- `emu.memType.prgRom` → doesn't exist (correct: `snesPrgRom`)
+- `emu.memType.snesVram` → doesn't exist (correct: `snesVideoRam`)
+- `emu.cpuType.cpu` → doesn't exist (correct: `snes`)
+- `emu.cpuType.SA1` → doesn't exist (correct: `sa1`)
+
+**Root Cause:** Mesen2 exposes C++ enums to Lua with the first letter lowercased
+(see `LuaApi.cpp:170-171`). The script had invalid fallbacks that would never match.
+
+**Verification:** Confirmed against Mesen2 source:
+- `Mesen2/Core/Shared/MemoryType.h` - Complete MemoryType enum
+- `Mesen2/Core/Shared/CpuType.h` - Complete CpuType enum
+- `Mesen2/Core/Debugger/LuaApi.cpp` - Enum-to-Lua lowercasing logic
+
+**Changes:**
+1. Simplified MEM table to use only verified names (removed invalid fallbacks)
+2. Added `sa1_iram` field for SA-1 internal RAM access
+3. Removed duplicate `sa1_cpu_type` definition with incorrect fallbacks
+4. Added diagnostic logging at startup to show resolved type values
+
+**New Startup Log:**
+```
+MEM types resolved: cpu=0 prg=20 vram=23 wram=21 oam=24 cgram=25 sa1_iram=33
+CPU types resolved: snes=0 sa1=3
+```
+
+Numbers indicate enum values (or `nil` if resolution failed).
+
+---
+
 ## [2.7.0] - 2026-01-01
 
 ### Staging Buffer Write Tracking System
