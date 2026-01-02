@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.1"
+local LOG_VERSION = "2.2"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -372,6 +372,10 @@ local staging_active = false
 local staging_first_pc = nil  -- PC that started the fill
 -- v2.1: Track writes dropped due to per-frame cap (for diagnostics)
 local staging_dropped_writes = 0
+
+-- v2.2: Lazy registration flags (init-time timeout mitigation)
+local staging_callbacks_registered = false
+local wram_source_callbacks_registered = false
 
 -- ============================================================================
 -- CAUSAL READ→WRITE TRACKING
@@ -1516,6 +1520,113 @@ end
 -- This allows on_end_frame to call it even though it's defined after
 local try_load_savestate
 
+-- v2.2: Lazy staging callback registration (called from on_end_frame)
+local function register_staging_callbacks()
+    if not wram_mem_type then
+        log("WARNING: Staging watch enabled but no WRAM memType resolved")
+        return
+    end
+
+    -- Compute staging watch addresses based on WRAM addressing mode
+    local staging_start, staging_end
+    if wram_address_mode == "absolute" then
+        staging_start = 0x7E0000 + STAGING_WATCH_START
+        staging_end = 0x7E0000 + STAGING_WATCH_END
+    else
+        staging_start = STAGING_WATCH_START
+        staging_end = STAGING_WATCH_END
+    end
+
+    -- Sentinel sampling mode (sparse callbacks) vs full range
+    local snes_staging_ref
+    if STAGING_SENTINEL_STEP > 0 then
+        local sentinel_count = 0
+        for addr = staging_start, staging_end, STAGING_SENTINEL_STEP do
+            local ref = add_memory_callback_compat(
+                on_staging_write,
+                emu.callbackType.write,
+                addr,
+                addr,
+                cpu_type,
+                wram_mem_type
+            )
+            if ref then sentinel_count = sentinel_count + 1 end
+        end
+        snes_staging_ref = sentinel_count > 0
+        if snes_staging_ref then
+            log(string.format(
+                "INFO: Staging SENTINEL watch registered (lazy): 0x%06X-0x%06X step=0x%X (%d callbacks) at frame=%d",
+                staging_start, staging_end, STAGING_SENTINEL_STEP, sentinel_count, frame_count
+            ))
+        else
+            log("WARNING: failed to register sentinel staging watch for S-CPU")
+        end
+    else
+        snes_staging_ref = add_memory_callback_compat(
+            on_staging_write,
+            emu.callbackType.write,
+            staging_start,
+            staging_end,
+            cpu_type,
+            wram_mem_type
+        )
+        if snes_staging_ref then
+            log(string.format(
+                "INFO: Staging watch registered (lazy) for S-CPU: 0x%06X-0x%06X at frame=%d",
+                staging_start, staging_end, frame_count
+            ))
+        else
+            log("WARNING: failed to register staging write watch for S-CPU")
+        end
+    end
+end
+
+-- v2.2: Lazy WRAM source callback registration (called from on_end_frame)
+local function register_wram_source_callbacks()
+    if not wram_mem_type then
+        log("WARNING: WRAM source tracking enabled but no WRAM memType resolved")
+        return
+    end
+
+    if not STAGING_WRAM_TRACKING_ENABLED then
+        return
+    end
+
+    -- Compute WRAM read ranges (excluding staging buffer)
+    local wram_read_ranges = {}
+    if wram_address_mode == "absolute" then
+        wram_read_ranges = {
+            {start = 0x7E0000 + STAGING_WRAM_SRC_START, stop = 0x7E0000 + STAGING_WRAM_SRC_END},
+        }
+    else
+        wram_read_ranges = {
+            {start = STAGING_WRAM_SRC_START, stop = STAGING_WRAM_SRC_END},
+        }
+    end
+
+    for _, range in ipairs(wram_read_ranges) do
+        local wram_read_ref = add_memory_callback_compat(
+            make_staging_wram_source_reader("snes"),
+            emu.callbackType.read,
+            range.start,
+            range.stop,
+            cpu_type,
+            wram_mem_type
+        )
+        if wram_read_ref then
+            log(string.format(
+                "INFO: WRAM source callback registered (lazy) for S-CPU: 0x%06X-0x%06X at frame=%d",
+                range.start, range.stop, frame_count
+            ))
+        else
+            log(string.format(
+                "WARNING: failed to register WRAM source callback for S-CPU: 0x%06X-0x%06X",
+                range.start, range.stop
+            ))
+        end
+    end
+end
+
 local function on_end_frame()
     -- v2.0: Try savestate load if not yet loaded (deferred from init)
     -- Uses forward-declared try_load_savestate; eliminates permanent exec callback
@@ -1524,6 +1635,19 @@ local function on_end_frame()
     end
 
     frame_count = frame_count + 1
+
+    -- v2.2: Lazy registration (init-time timeout mitigation)
+    -- Register expensive callbacks at STAGING_START_FRAME - 2 instead of init
+    if STAGING_START_FRAME > 0 and frame_count == (STAGING_START_FRAME - 2) then
+        if STAGING_WATCH_ENABLED and not staging_callbacks_registered then
+            register_staging_callbacks()
+            staging_callbacks_registered = true
+        end
+        if STAGING_WRAM_SOURCE_ENABLED and not wram_source_callbacks_registered then
+            register_wram_source_callbacks()
+            wram_source_callbacks_registered = true
+        end
+    end
 
     -- FIXED: Process pending DMA comparisons at frame end (after all DMAs have completed)
     process_pending_dma_compares()
@@ -1742,177 +1866,13 @@ else
     log("INFO: SA-1 cpuType not available; SA-1 DMA monitoring limited to S-CPU writes")
 end
 
--- Register staging buffer write watch (rolling log for DMA source analysis)
+-- v2.2: Staging and WRAM source callbacks registered lazily in on_end_frame
+-- (init-time registration causes timeout even with sparse sentinels)
 if STAGING_WATCH_ENABLED then
-    if not wram_mem_type then
-        log("WARNING: Staging watch enabled but no WRAM memType resolved")
-    else
-        -- Compute staging watch addresses based on WRAM addressing mode
-        local staging_start, staging_end
-        if wram_address_mode == "absolute" then
-            staging_start = 0x7E0000 + STAGING_WATCH_START
-            staging_end = 0x7E0000 + STAGING_WATCH_END
-        else
-            staging_start = STAGING_WATCH_START
-            staging_end = STAGING_WATCH_END
-        end
-
-        -- v2.1: Sentinel sampling mode (sparse callbacks) vs full range
-        local snes_staging_ref
-        if STAGING_SENTINEL_STEP > 0 then
-            -- Sentinel mode: register sparse callbacks to reduce callback count
-            local sentinel_count = 0
-            for addr = staging_start, staging_end, STAGING_SENTINEL_STEP do
-                local ref = add_memory_callback_compat(
-                    on_staging_write,
-                    emu.callbackType.write,
-                    addr,
-                    addr,
-                    cpu_type,
-                    wram_mem_type
-                )
-                if ref then sentinel_count = sentinel_count + 1 end
-            end
-            snes_staging_ref = sentinel_count > 0
-            if snes_staging_ref then
-                log(string.format(
-                    "INFO: Staging SENTINEL watch registered: 0x%06X-0x%06X step=0x%X (%d callbacks)",
-                    staging_start, staging_end, STAGING_SENTINEL_STEP, sentinel_count
-                ))
-            else
-                log("WARNING: failed to register sentinel staging watch for S-CPU")
-            end
-        else
-            -- Full range (legacy)
-            snes_staging_ref = add_memory_callback_compat(
-                on_staging_write,
-                emu.callbackType.write,
-                staging_start,
-                staging_end,
-                cpu_type,
-                wram_mem_type
-            )
-            if snes_staging_ref then
-                log(string.format(
-                    "INFO: Staging watch registered for S-CPU: 0x%06X-0x%06X",
-                    staging_start, staging_end
-                ))
-            else
-                log("WARNING: failed to register staging write watch for S-CPU")
-            end
-        end
-
-        -- SA-1 staging callbacks DISABLED - causes timeout due to extremely high write frequency
-        -- SA-1 writes to WRAM constantly during decompression/processing, which overwhelms
-        -- the 1-second Mesen2 Lua execution limit. Staging analysis relies on S-CPU DMA anyway.
-        if sa1_cpu_type then
-            log("INFO: SA-1 staging callback SKIPPED (would cause timeout)")
-        end
-
-        -- PRG read callbacks PERMANENTLY DISABLED: too many ROM reads (M/frame) cause timeout
-        -- STAGING_CAUSAL will show NO_PAIRS; use STAGING_WRAM_SOURCE instead
-
-        -- Register WRAM read callbacks for intermediate buffer detection
-        -- Track reads from WRAM OUTSIDE the staging buffer (0x2000-0x2FFF)
-        -- This reveals if staging is fed from another WRAM buffer
-        -- GATED by STAGING_WRAM_TRACKING because callbacks are expensive (~120KB coverage)
-        if wram_mem_type and STAGING_WRAM_TRACKING_ENABLED then
-            -- Compute WRAM read ranges (excluding staging buffer)
-            local wram_read_ranges = {}
-            if wram_address_mode == "absolute" then
-                -- Absolute addressing: 0 to STAGING_WATCH_START-1, then STAGING_WATCH_END+1 to 0x1FFFF
-                wram_read_ranges = {
-                    {start = 0x7E0000, stop = 0x7E0000 + STAGING_WATCH_START - 1},  -- Before staging
-                    {start = 0x7E0000 + STAGING_WATCH_END + 1, stop = 0x7E0000 + 0x1FFFF},  -- After staging
-                }
-            else
-                -- Relative addressing: 0 to STAGING_WATCH_START-1, then STAGING_WATCH_END+1 to 0x1FFFF
-                wram_read_ranges = {
-                    {start = 0, stop = STAGING_WATCH_START - 1},  -- Before staging
-                    {start = STAGING_WATCH_END + 1, stop = 0x1FFFF},  -- After staging (128KB WRAM)
-                }
-            end
-
-            for _, range in ipairs(wram_read_ranges) do
-                local wram_read_ref = add_memory_callback_compat(
-                    make_staging_wram_source_reader("snes"),
-                    emu.callbackType.read,
-                    range.start,
-                    range.stop,
-                    cpu_type,
-                    wram_mem_type
-                )
-                if wram_read_ref then
-                    log(string.format(
-                        "INFO: WRAM read callback registered for S-CPU: 0x%06X-0x%06X",
-                        range.start, range.stop
-                    ))
-                end
-            end
-
-            -- Also try SA-1 WRAM reads
-            if sa1_cpu_type then
-                for _, range in ipairs(wram_read_ranges) do
-                    local sa1_wram_ref = add_memory_callback_compat(
-                        make_staging_wram_source_reader("sa1"),
-                        emu.callbackType.read,
-                        range.start,
-                        range.stop,
-                        sa1_cpu_type,
-                        wram_mem_type
-                    )
-                    if sa1_wram_ref then
-                        log(string.format(
-                            "INFO: WRAM read callback registered for SA-1: 0x%06X-0x%06X",
-                            range.start, range.stop
-                        ))
-                    end
-                end
-            end
-        elseif wram_mem_type and not STAGING_WRAM_TRACKING_ENABLED then
-            log("INFO: WRAM read tracking (full) disabled (STAGING_WRAM_TRACKING=0)")
-        end
-
-        -- Register WRAM SOURCE callbacks (surgical, focused range)
-        -- This is the KEY feature: track reads from a specific WRAM region
-        -- Use STAGING_WRAM_SOURCE=1 with narrow SRC_START/SRC_END to find intermediate buffer
-        -- Requires STAGING_WATCH_ENABLED=1 (for staging_active flag) but NOT STAGING_CAUSAL_ENABLED
-        if wram_mem_type and STAGING_WRAM_SOURCE_ENABLED then
-            local src_start = STAGING_WRAM_SRC_START
-            local src_end = STAGING_WRAM_SRC_END
-
-            -- Adjust for absolute addressing mode if needed
-            if wram_address_mode == "absolute" then
-                src_start = 0x7E0000 + src_start
-                src_end = 0x7E0000 + src_end
-            end
-
-            -- Register S-CPU WRAM source read callback
-            local snes_wram_src_ref = add_memory_callback_compat(
-                make_staging_wram_source_reader("snes"),
-                emu.callbackType.read,
-                src_start,
-                src_end,
-                cpu_type,
-                wram_mem_type
-            )
-            if snes_wram_src_ref then
-                log(string.format(
-                    "INFO: WRAM SOURCE callback registered for S-CPU: 0x%04X-0x%04X (%d bytes)",
-                    STAGING_WRAM_SRC_START, STAGING_WRAM_SRC_END, STAGING_WRAM_SRC_END - STAGING_WRAM_SRC_START + 1
-                ))
-            else
-                log("WARNING: Failed to register WRAM SOURCE callback for S-CPU")
-            end
-
-            -- SA-1 WRAM source callback DISABLED: emu.getState() returns wrong CPU's state
-            if sa1_cpu_type then
-                log("INFO: SA-1 WRAM SOURCE callback DISABLED (PC state unreliable across CPUs)")
-            end
-        elseif wram_mem_type and not STAGING_WRAM_SOURCE_ENABLED then
-            log("INFO: WRAM SOURCE tracking disabled (STAGING_WRAM_SOURCE=0). Set STAGING_WRAM_SOURCE=1 to enable.")
-        end
-    end
+    log("INFO: Staging watch will be registered lazily at frame=" .. tostring(STAGING_START_FRAME - 2))
+end
+if STAGING_WRAM_SOURCE_ENABLED then
+    log("INFO: WRAM source tracking will be registered lazily at frame=" .. tostring(STAGING_START_FRAME - 2))
 end
 
 -- Register cleanup callback for script end
