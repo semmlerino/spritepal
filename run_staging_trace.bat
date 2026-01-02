@@ -22,17 +22,39 @@ set STAGING_WATCH_START=0x2000
 set STAGING_WATCH_END=0x2FFF
 set STAGING_WATCH_PC_SAMPLES=8
 
+REM v2.1: Skip boot/menu frames - only process gameplay (1500+)
+set STAGING_START_FRAME=1500
+
+REM v2.1: Per-frame cap (default 2048) - prevents timeout on heavy frames
+REM set STAGING_MAX_WRITES_PER_FRAME=2048
+
+REM v2.1: Sentinel sampling (0=full range, 0x40=every 64 bytes = 64x fewer callbacks)
+REM Only enable if still timing out after STAGING_START_FRAME
+REM set STAGING_SENTINEL_STEP=0x40
+
 REM Track causal PRG read -> staging write pairs (shows ROM source data)
 set STAGING_CAUSAL_ENABLED=1
 
 REM PC-gated read tracking (only count reads from known copy routines)
-REM Default ON for production runs; set to 0 for discovering new copy routine PCs
-set STAGING_PC_GATING=1
+REM Default OFF for discovery: we need to find which PCs read from source buffer
+REM Set to 1 only AFTER you've discovered the source PCs
+set STAGING_PC_GATING=0
 
 REM WRAM intermediate buffer tracking (PRG -> WRAM buffer -> staging)
 REM WARNING: EXPENSIVE - fires on every WRAM read (~120KB coverage)
 REM Only enable when investigating intermediate buffer patterns
 set STAGING_WRAM_TRACKING=0
+
+REM ==== WRAM SOURCE TRACKING (THE KEY FEATURE) ====
+REM Tracks what WRAM region the staging writer READS FROM
+REM This reveals the intermediate buffer that feeds the staging area
+REM Start narrow (0x0000-0x1FFF), widen if you get no pairs
+set STAGING_WRAM_SOURCE=1
+set STAGING_WRAM_SRC_START=0x0000
+set STAGING_WRAM_SRC_END=0x1FFF
+
+REM Ring buffer size (32 is enough for typical copy loops)
+set STAGING_RING_SIZE=32
 
 REM ==== PERIODIC CAPTURES (for correlation) ====
 set PERIODIC_CAPTURE_ENABLED=1
@@ -73,16 +95,17 @@ echo ===========================================================================
 echo Staging Buffer Write Trace
 echo ================================================================================
 echo.
-echo This run will trace what S-CPU code writes to WRAM $7E:2000-$2FFF
-echo (the sprite staging buffer before DMA to VRAM).
+echo This run traces the WRAM intermediate buffer that feeds staging.
+echo.
+echo Data flow being traced:
+echo   PRG ROM -^> ??? -^> [source buffer] -^> staging $7E:2000 -^> VRAM
+echo                        ^^^^^^^^^^^^
+echo                     STAGING_WRAM_SOURCE reveals this
 echo.
 echo Expected output in dma_probe_log.txt:
-echo   STAGING_SUMMARY: frame=X ... pcs=[PC1,PC2,...] pattern=...
-echo   STAGING_CAUSAL: frame=X ... pairs=N prg_runs=[...] cpus={...}
-echo.
-echo The "pcs" field tells you which code addresses write the staging buffer.
-echo STAGING_CAUSAL shows PRG reads that directly precede staging writes.
-echo The "read-^>write_pcs" field shows PC at read time vs write time.
+echo   STAGING_WRAM_SOURCE: frame=X wram_pairs=N wram_runs=[...] (THE KEY)
+echo   STAGING_CAUSAL: frame=X pairs=N prg_runs=[...] (likely all NO_PAIRS)
+echo   STAGING_SUMMARY: frame=X pcs=[...] pattern=...
 echo.
 echo Output: %OUTPUT_DIR%
 echo Frames: %MAX_FRAMES%
@@ -107,10 +130,14 @@ echo ===========================================================================
 echo.
 echo After completion, look for:
 echo   grep "STAGING_SUMMARY" mesen2_exchange/dma_probe_log.txt
-echo   grep "STAGING_CAUSAL" mesen2_exchange/dma_probe_log.txt   (the actionable data)
+echo   grep "STAGING_CAUSAL" mesen2_exchange/dma_probe_log.txt   (PRG source tracking)
+echo   grep "STAGING_WRAM_SOURCE" mesen2_exchange/dma_probe_log.txt   (THE KEY DATA)
+echo.
+echo STAGING_WRAM_SOURCE shows what WRAM region feeds the staging buffer.
+echo Once you know the source buffer range, trace who WRITES to it.
 echo.
 echo For gameplay frames only (1500+):
-echo   grep "STAGING_CAUSAL.*frame=1[5-9]" mesen2_exchange/dma_probe_log.txt
+echo   grep "STAGING_WRAM_SOURCE.*frame=1[5-9]" mesen2_exchange/dma_probe_log.txt
 echo.
 if /i "%~1"=="--no-pause" goto :eof
 pause
