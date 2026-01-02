@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "1.9"
+local LOG_VERSION = "2.0"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -39,7 +39,8 @@ local MASTER_CLOCK_MAX_SECONDS = tonumber(os.getenv("MASTER_CLOCK_MAX_SECONDS"))
 local MAX_FRAMES = tonumber(os.getenv("MAX_FRAMES")) or 300
 
 if not FRAME_EVENT or FRAME_EVENT == "" then
-    FRAME_EVENT = SAVESTATE_PATH and "exec" or "endFrame"
+    -- Default to endFrame always; exec is opt-in only (v2.0: per-instruction overhead is too high)
+    FRAME_EVENT = "endFrame"
 end
 if MASTER_CLOCK_FALLBACK == nil then
     MASTER_CLOCK_FALLBACK = FRAME_EVENT == "exec" and "1" or "0"
@@ -231,7 +232,7 @@ local last_sa1_dma_irq = nil
 local CFG = {
     -- General
     heartbeat_every = tonumber(os.getenv("HEARTBEAT_EVERY")) or 0,
-    dma_dump_on_vram = os.getenv("DMA_DUMP_ON_VRAM") ~= "0",
+    dma_dump_on_vram = os.getenv("DMA_DUMP_ON_VRAM") == "1",  -- v2.0: opt-in (was default ON)
     dma_dump_max = tonumber(os.getenv("DMA_DUMP_MAX")) or 20,
     dma_dump_min_size = tonumber(os.getenv("DMA_DUMP_MIN_SIZE")) or 1,
     dma_dump_max_size = tonumber(os.getenv("DMA_DUMP_MAX_SIZE")) or 16384,  -- 16KB max per dump
@@ -1483,7 +1484,17 @@ end
 -- Frame counter, endFrame/exec callbacks, master clock fallback
 -- =============================================================================
 
+-- Forward declaration for try_load_savestate (defined later in file)
+-- This allows on_end_frame to call it even though it's defined after
+local try_load_savestate
+
 local function on_end_frame()
+    -- v2.0: Try savestate load if not yet loaded (deferred from init)
+    -- Uses forward-declared try_load_savestate; eliminates permanent exec callback
+    if SAVESTATE_PATH and not state_loaded then
+        try_load_savestate()
+    end
+
     frame_count = frame_count + 1
 
     -- FIXED: Process pending DMA comparisons at frame end (after all DMAs have completed)
@@ -1646,29 +1657,33 @@ local function register_frame_event()
     end
 end
 
-local function load_savestate_if_needed()
-    if not SAVESTATE_PATH or state_loaded then
-        register_frame_event()
-        return
+-- v2.0: Replace exec-based savestate loading with pcall at init + endFrame retry
+-- This eliminates permanent per-instruction callback overhead
+local savestate_load_attempted = false
+
+-- Assign to forward-declared local (declared in Section 9 before on_end_frame)
+try_load_savestate = function()
+    if savestate_load_attempted or not SAVESTATE_PATH or state_loaded then
+        return false
     end
-    local ref
-    ref = add_memory_callback_compat(function()
-        if state_loaded then
-            return
-        end
+    savestate_load_attempted = true
+
+    if not emu.loadSavestate then
+        log("ERROR: emu.loadSavestate not available")
+        emu.stop(2)
+        return false
+    end
+
+    local ok, err = pcall(emu.loadSavestate, SAVESTATE_PATH)
+    if ok then
         state_loaded = true
-        if emu.loadSavestate then
-            emu.loadSavestate(SAVESTATE_PATH)
-            log("Savestate loaded; reset frame counter")
-            frame_count = 0
-            register_frame_event()
-        else
-            log("ERROR: emu.loadSavestate not available")
-            emu.stop(2)
-        end
-    end, emu.callbackType.exec, 0x0000, 0xFFFF, cpu_type, MEM.cpu)
-    if not ref then
-        log("ERROR: failed to register savestate callback")
+        frame_count = 0
+        log("Savestate loaded; reset frame counter")
+        return true
+    else
+        log("ERROR: savestate load failed: " .. tostring(err))
+        emu.stop(2)
+        return false
     end
 end
 
@@ -1894,11 +1909,12 @@ local init_ok, init_err = pcall(function()
     -- Log initial SA-1 bank register state (per Instrumentation Contract v1.1)
     log_sa1_banks("init")
 
+    -- v2.0: Try savestate load once at init via pcall; if it fails, on_end_frame will retry
+    -- Always register frame event (no longer conditional on savestate success)
     if SAVESTATE_PATH and not PRELOADED_STATE then
-        load_savestate_if_needed()
-    else
-        register_frame_event()
+        try_load_savestate()
     end
+    register_frame_event()
 end)
 if not init_ok then
     log("ERROR: Final initialization failed: " .. tostring(init_err))
