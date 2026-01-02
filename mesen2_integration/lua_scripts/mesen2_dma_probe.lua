@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "1.4"
+local LOG_VERSION = "1.5"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -334,9 +334,9 @@ local STAGING_WATCH_END = tonumber(os.getenv("STAGING_WATCH_END") or "0x2FFF", 1
 local STAGING_WATCH_PC_SAMPLES = tonumber(os.getenv("STAGING_WATCH_PC_SAMPLES")) or 4
 local STAGING_HISTORY_FRAMES = tonumber(os.getenv("STAGING_HISTORY_FRAMES")) or 3
 local STAGING_START_FRAME = tonumber(os.getenv("STAGING_START_FRAME")) or 0
--- Causal read→write tracking: pairs PRG reads with staging writes
--- Env var kept as STAGING_CAUSAL_ENABLED for backwards compat
-local STAGING_CAUSAL_ENABLED = os.getenv("STAGING_CAUSAL_ENABLED") == "1"
+-- STAGING_CAUSAL disabled: PRG read callbacks are permanently off (timeout risk)
+-- Env var STAGING_CAUSAL_ENABLED is ignored. Use STAGING_WRAM_SOURCE instead.
+local STAGING_CAUSAL_ENABLED = false
 
 -- WRAM read tracking: detect intermediate buffer pattern (PRG → WRAM → staging)
 -- WARNING: This is EXPENSIVE - callbacks fire on every WRAM read (~120KB coverage)
@@ -507,6 +507,8 @@ local function reset_staging_tracking()
     staging_wram_read_write_pairs = {}
     staging_wram_pair_total = 0
     staging_wram_sources = {}
+    -- Reset ring buffer count (gate for hot-path scanning)
+    wram_src_ring_count = 0
 end
 
 -- Track frame of last staging write (for logging)
@@ -521,19 +523,14 @@ local function format_prg_offset(prg_offset)
     return string.format("0x%06X", prg_offset)
 end
 
--- Log CAUSAL read→write summary (the actionable data)
--- This shows which PRG offsets were actually paired with staging writes
+-- Log CAUSAL read→write summary (PRG reads → staging writes)
+-- NOTE: STAGING_CAUSAL is permanently disabled (PRG callbacks cause timeout)
+-- This function is retained for reference but always returns early.
 local function log_staging_causal_summary(frame, vram_addr, dma_size)
-    if not STAGING_CAUSAL_ENABLED or not staging_active then return end
+    if not STAGING_CAUSAL_ENABLED then return end  -- Always disabled
 
     -- Use staging_pair_total for accurate count (array is capped at 1000)
-    if staging_pair_total == 0 then
-        log(string.format(
-            "STAGING_CAUSAL: frame=%d vram_word=0x%04X NO_PAIRS (writes not preceded by PRG reads)",
-            frame, vram_addr
-        ))
-        return
-    end
+    if staging_pair_total == 0 or not staging_active then return end
     local pairs_logged = #staging_read_write_pairs
 
     -- Aggregate PRG sources into runs (similar to old format)
@@ -770,10 +767,16 @@ local function make_staging_wram_source_reader(cpu_label)
             return
         end
 
+        -- Normalize to relative WRAM offset (0x00000-0x1FFFF) for consistent aggregation
+        local normalized_addr = address
+        if wram_address_mode == "absolute" then
+            normalized_addr = (address - 0x7E0000) & 0x1FFFF
+        end
+
         -- Push to ring buffer (for causal pairing)
         read_sequence = read_sequence + 1
         push_ring(wram_src_ring_buffer, wram_src_ring_head, cpu_label, {
-            addr = address,
+            addr = normalized_addr,
             frame = frame,
             seq = read_sequence,
             read_pc = read_pc,
@@ -1887,6 +1890,10 @@ local init_ok, init_err = pcall(function()
         STAGING_HISTORY_FRAMES
     ))
     log("DMA probe start: frame_event=" .. tostring(FRAME_EVENT) .. " max_frames=" .. tostring(MAX_FRAMES))
+    -- Warn if user tried to enable STAGING_CAUSAL (env var is now ignored)
+    if os.getenv("STAGING_CAUSAL_ENABLED") == "1" then
+        log("WARNING: STAGING_CAUSAL_ENABLED ignored - PRG read callbacks permanently disabled (timeout risk). Use STAGING_WRAM_SOURCE instead.")
+    end
 
     -- Log initial SA-1 bank register state (per Instrumentation Contract v1.1)
     log_sa1_banks("init")
