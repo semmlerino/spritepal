@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "1.7"
+local LOG_VERSION = "1.8"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -426,17 +426,6 @@ local function find_best_read_from_rings(ring_buffers, min_seq)
     return best_read, best_cpu
 end
 
--- Helper: mark a ring buffer entry as consumed (prevent double-pairing)
-local function consume_ring_entry(ring_buffers, cpu_label, seq)
-    local buffer = ring_buffers[cpu_label]
-    for i = 1, RING_BUFFER_SIZE do
-        if buffer[i] and buffer[i].seq == seq then
-            buffer[i] = nil
-            return
-        end
-    end
-end
-
 -- Known staging copy routine PCs (for PC-gated filtering)
 -- These are discovered from log analysis; add more as we learn them
 -- Format: [(k<<16)|pc] = true (24-bit addressing: bank + PC)
@@ -467,7 +456,6 @@ local staging_prg_sources = {}
 -- This reveals if staging is fed from an intermediate WRAM buffer
 -- Format: [wram_offset] = {count = N, cpus = {snes = n1, sa1 = n2}}
 local staging_wram_sources = {}
-local staging_wram_read_write_pairs = {}
 local staging_wram_pair_total = 0
 
 local function init_staging_stats()
@@ -505,7 +493,6 @@ local function reset_staging_tracking()
     wram_src_ring_buffer.sa1 = {}
     wram_src_ring_head.snes = 0
     wram_src_ring_head.sa1 = 0
-    staging_wram_read_write_pairs = {}
     staging_wram_pair_total = 0
     staging_wram_sources = {}
     -- Reset ring buffer count (gate for hot-path scanning)
@@ -637,18 +624,35 @@ end
 -- Includes quality metrics: unique_wram, max_run, coverage, quality
 local function log_staging_wram_source_summary(frame, vram_addr, dma_size)
     if not STAGING_WRAM_SOURCE_ENABLED or not staging_active then return end
-    if staging_wram_pair_total == 0 then
-        -- Explicit log for zero pairs - helps distinguish "feature off" from "no matches in range"
-        if STAGING_WRAM_SOURCE_ENABLED then
-            log(string.format(
-                "STAGING_WRAM_SOURCE: frame=%d vram_word=0x%04X size=%d NO_WRAM_PAIRS (source not in 0x%04X-0x%04X or not WRAM)",
-                frame, vram_addr, dma_size, STAGING_WRAM_SRC_START, STAGING_WRAM_SRC_END
-            ))
+
+    -- Build source summary from ring buffer ONCE at DMA end (was per-write, now per-DMA)
+    -- This is O(ring_size) instead of O(writes × ring_size) - 4000x faster for 4KB DMAs
+    staging_wram_sources = {}
+    staging_wram_pair_total = 0
+    local min_seq = staging_session_start_seq or 0
+
+    for cpu_label, buffer in pairs(wram_src_ring_buffer) do
+        for i = 1, RING_BUFFER_SIZE do
+            local entry = buffer[i]
+            if entry and entry.seq >= min_seq then
+                local addr = entry.addr
+                if not staging_wram_sources[addr] then
+                    staging_wram_sources[addr] = {count = 0, cpus = {}}
+                end
+                staging_wram_sources[addr].count = staging_wram_sources[addr].count + 1
+                staging_wram_sources[addr].cpus[cpu_label] = (staging_wram_sources[addr].cpus[cpu_label] or 0) + 1
+                staging_wram_pair_total = staging_wram_pair_total + 1
+            end
         end
-        return
     end
 
-    local pairs_logged = #staging_wram_read_write_pairs
+    if staging_wram_pair_total == 0 then
+        log(string.format(
+            "STAGING_WRAM_SOURCE: frame=%d vram_word=0x%04X size=%d NO_WRAM_PAIRS (source not in 0x%04X-0x%04X or not WRAM)",
+            frame, vram_addr, dma_size, STAGING_WRAM_SRC_START, STAGING_WRAM_SRC_END
+        ))
+        return
+    end
 
     -- Aggregate WRAM sources into runs
     local wram_addrs = {}
@@ -865,43 +869,8 @@ local function record_staging_write(addr, pc_snapshot)
         }
     end
 
-    -- ========================================================================
-    -- WRAM SOURCE READ→STAGING WRITE PAIRING (using ring buffers)
-    -- Find what WRAM address the staging writer read from (intermediate buffer detection)
-    -- PERFORMANCE: Only scan if WRAM source tracking is enabled AND ring buffer has entries
-    -- NOTE: PRG ring buffer scan removed - PRG read callbacks are permanently disabled
-    -- ========================================================================
-    if STAGING_WRAM_SOURCE_ENABLED and staging_session_start_seq and wram_src_seen_any > 0 then
-        local best_wram_read, best_wram_cpu = find_best_read_from_rings(wram_src_ring_buffer, staging_session_start_seq)
-
-        if best_wram_read then
-            staging_wram_pair_total = staging_wram_pair_total + 1
-
-            if #staging_wram_read_write_pairs < 1000 then
-                staging_wram_read_write_pairs[#staging_wram_read_write_pairs + 1] = {
-                    read_wram = best_wram_read.addr,
-                    read_pc = best_wram_read.read_pc or 0,
-                    read_k = best_wram_read.read_k or 0,
-                    write_wram = addr,
-                    write_pc = pc_snapshot and pc_snapshot.pc_val or 0,
-                    write_k = pc_snapshot and pc_snapshot.k_val or 0,
-                    cpu = best_wram_cpu
-                }
-            end
-
-            -- Aggregate: track which WRAM offsets are sources
-            local wram_addr = best_wram_read.addr
-            if not staging_wram_sources[wram_addr] then
-                staging_wram_sources[wram_addr] = {count = 0, cpus = {}}
-            end
-            local src = staging_wram_sources[wram_addr]
-            src.count = src.count + 1
-            src.cpus[best_wram_cpu] = (src.cpus[best_wram_cpu] or 0) + 1
-
-            -- Clear the read from ring buffer so it can't be double-paired
-            consume_ring_entry(wram_src_ring_buffer, best_wram_cpu, best_wram_read.seq)
-        end
-    end
+    -- NOTE: WRAM source ring buffer summarization moved to log_staging_wram_source_summary()
+    -- This was per-write O(writes × ring_size); now it's per-DMA O(ring_size) - 4000x faster
 end
 
 local function get_staging_summary(src_addr, src_size)
