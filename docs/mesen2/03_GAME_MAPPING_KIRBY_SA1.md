@@ -212,6 +212,41 @@ VRAM tile captured
 
 ---
 
+## Confirmed Data Flow Chain (v2.9)
+
+> **Added 2026-01-02:** Confirmed via STAGING_WRAM_SOURCE and BUFFER_WRITE_WATCH probes.
+
+The sprite tile data flow in Kirby Super Star is:
+
+```
+ROM (???) → [01:F724 routine] → source buffer (0x1530-0x161A) → staging (0x2000-0x2FFF) → VRAM
+                   ^                        ^                           ^
+           BUFFER_WRITE_WATCH       STAGING_WRAM_SOURCE           STAGING_SUMMARY
+           pcs=01:F724,01:F729      wram_runs=[0x1530-0x161A]     src=0x7E2000
+```
+
+### Confirmed Values
+
+| Component | Address/Value | Confidence |
+|-----------|---------------|------------|
+| **Primary writer routine** | `$01:F724`, `$01:F729` | 100% (observed across multiple gameplay scenarios) |
+| **Source buffer range** | `0x1530-0x161A` (235 bytes) | HIGH (max_run=235 in STAGING_WRAM_SOURCE) |
+| **Staging buffer range** | `0x2000-0x2FFF` (4KB) | HIGH (DMA source address) |
+| **Staging writer PCs** | `$01:90A6`, `$01:99D5` | HIGH (from STAGING_SUMMARY) |
+
+### What's Still Unknown
+
+- **ROM source addresses** — The `01:F724` routine reads from somewhere (ROM, decompressor output, or another WRAM buffer). FILL_SESSION (v2.9) tracks PRG reads during buffer fill to find this.
+- **Decompression involvement** — If HAL compression is used, the ROM addresses will be compressed block pointers, not raw tile data.
+
+### Next Investigation Steps
+
+1. Check `FILL_SESSION` entries for `prg_runs` — these are candidate ROM source regions
+2. Disassemble `$01:F724` to see what address it reads from
+3. If reads from another WRAM buffer, trace that buffer's writer
+
+---
+
 ## Graphics Set Variability (Room Headers)
 Kirby Super Star uses room/level graphics headers that select **sprite graphics sets** per
 room. This means offsets vary by context; a static list of offsets is only a bootstrap

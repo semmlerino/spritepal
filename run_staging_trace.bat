@@ -38,8 +38,9 @@ REM Track causal PRG read -> staging write pairs (shows ROM source data)
 set STAGING_CAUSAL_ENABLED=1
 
 REM PC-gated read tracking (only count reads from known copy routines)
-REM Default OFF for discovery: we need to find which PCs read from source buffer
-REM Set to 1 only AFTER you've discovered the source PCs
+REM v2.5: DISABLED - staging WRITE PCs != WRAM READ PCs (off by 1-3 bytes in copy loop)
+REM Need to discover read PCs first before enabling this
+REM Known write PCs: 01:8FA9, 00:8952, 00:893D (not useful for read gating)
 set STAGING_PC_GATING=0
 
 REM WRAM intermediate buffer tracking (PRG -> WRAM buffer -> staging)
@@ -51,12 +52,31 @@ REM ==== WRAM SOURCE TRACKING (THE KEY FEATURE) ====
 REM Tracks what WRAM region the staging writer READS FROM
 REM This reveals the intermediate buffer that feeds the staging area
 REM Now safe with increased ScriptTimeout (set to 5+ seconds in Mesen2)
+REM v2.7: Full 128KB WRAM ($0000-$1FFFF = banks $7E+$7F)
+REM       Previous 0xFFFF was only 64KB (bank $7E) - missed half of WRAM!
 set STAGING_WRAM_SOURCE=1
-set STAGING_WRAM_SRC_START=0x3000
-set STAGING_WRAM_SRC_END=0x7FFF
+set STAGING_WRAM_SRC_START=0x0000
+set STAGING_WRAM_SRC_END=0x1FFFF
 
-REM Ring buffer size (32 is enough for typical copy loops)
-set STAGING_RING_SIZE=32
+REM Ring buffer size - must be >= largest expected staging DMA
+REM v2.5: Increased to 256 so 64-byte DMAs can reach near-100% coverage
+set STAGING_RING_SIZE=256
+
+REM ==== BUFFER WRITE TRACKING (v2.8) ====
+REM Traces what WRITES to the discovered source buffer region
+REM This is the next rung: ROM -> source buffer -> staging -> VRAM
+REM                            ^^^^^^^^^^^^^^^^^
+REM                         BUFFER_WRITE_WATCH reveals this
+REM
+REM Target: Primary source region discovered in v2.7:
+REM   0x01530-0x0161A (235 bytes) = $7E:1530-$7E:161A
+REM
+REM NOTE: Start with this DISABLED until STAGING_WRAM_SOURCE is confirmed working
+REM Then enable to trace the ROM->source link
+set BUFFER_WRITE_WATCH=1
+set BUFFER_WRITE_START=0x1530
+set BUFFER_WRITE_END=0x161A
+set BUFFER_WRITE_PC_SAMPLES=8
 
 REM ==== PERIODIC CAPTURES (for correlation) ====
 set PERIODIC_CAPTURE_ENABLED=1
@@ -136,7 +156,14 @@ echo   grep "STAGING_CAUSAL" mesen2_exchange/dma_probe_log.txt   (PRG source tra
 echo   grep "STAGING_WRAM_SOURCE" mesen2_exchange/dma_probe_log.txt   (THE KEY DATA)
 echo.
 echo STAGING_WRAM_SOURCE shows what WRAM region feeds the staging buffer.
-echo Once you know the source buffer range, trace who WRITES to it.
+echo.
+echo v2.8: BUFFER_WRITE_WATCH traces who WRITES to the source buffer.
+echo   Set BUFFER_WRITE_WATCH=1, BUFFER_WRITE_START/END to the discovered region
+echo   grep "BUFFER_WRITE_SUMMARY" mesen2_exchange/dma_probe_log.txt
+echo.
+echo v2.9: FILL_SESSION logs PRG/ROM reads ONLY during buffer fill window.
+echo   This is the key: bounded PRG logging = safe, gives ROM offset runs.
+echo   grep "FILL_SESSION" mesen2_exchange/dma_probe_log.txt
 echo.
 echo For gameplay frames only (1500+):
 echo   grep "STAGING_WRAM_SOURCE.*frame=1[5-9]" mesen2_exchange/dma_probe_log.txt

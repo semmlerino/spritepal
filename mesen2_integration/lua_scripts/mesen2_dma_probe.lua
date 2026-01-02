@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.3"
+local LOG_VERSION = "2.9"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -367,6 +367,14 @@ local STAGING_WRAM_SRC_END = parse_int(os.getenv("STAGING_WRAM_SRC_END"), 0x1FFF
 -- Larger buffer captures more context; 32 is enough for typical copy loops
 local RING_BUFFER_SIZE = tonumber(os.getenv("STAGING_RING_SIZE")) or 32
 
+-- v2.8: BUFFER_WRITE_WATCH - trace what writes to the discovered source buffer
+-- This is the next rung: ROM -> source buffer -> staging -> VRAM
+-- Target: primary source region discovered in v2.7 (0x01530-0x0161A)
+local BUFFER_WRITE_WATCH_ENABLED = os.getenv("BUFFER_WRITE_WATCH") == "1"
+local BUFFER_WRITE_START = parse_int(os.getenv("BUFFER_WRITE_START"), 0x1530)
+local BUFFER_WRITE_END = parse_int(os.getenv("BUFFER_WRITE_END"), 0x161A)
+local BUFFER_WRITE_PC_SAMPLES = tonumber(os.getenv("BUFFER_WRITE_PC_SAMPLES")) or 8
+
 -- Per-frame staging write stats
 local staging_frame_stats = {}  -- [frame] = {stats}
 local staging_current_frame = nil
@@ -381,6 +389,28 @@ local staging_dropped_writes = 0
 -- v2.2: Lazy registration flags (init-time timeout mitigation)
 local staging_callbacks_registered = false
 local wram_source_callbacks_registered = false
+
+-- v2.8: Buffer write tracking state
+local buffer_write_callbacks_registered = false
+local buffer_write_frame_stats = {}  -- [frame] = {first_pc, min_addr, max_addr, count, pc_samples}
+local buffer_write_current_frame = nil
+local buffer_write_current_stats = nil
+
+-- v2.9: Fill session tracking (PRG reads during buffer fill)
+-- Session starts on first write to source buffer (0x1530-0x161A)
+-- Session ends when staging DMA fires
+-- Only log PRG reads during active fill session (bounded window = safe)
+local fill_session_active = false
+local fill_session_start_frame = nil
+local fill_session_prg_reads = {}      -- Ring buffer of {addr, pc, k} during fill
+local fill_session_prg_head = 0
+local FILL_SESSION_RING_SIZE = 256     -- Enough for typical fill operations
+local fill_session_prg_total = 0       -- Total PRG reads during session (may exceed ring size)
+
+-- v2.9: Forward declarations for fill session functions (called before definition)
+local log_fill_session_summary
+local reset_fill_session
+local compress_prg_runs
 
 -- ============================================================================
 -- CAUSAL READ→WRITE TRACKING
@@ -623,7 +653,8 @@ local function log_staging_causal_summary(frame, vram_addr, dma_size)
     local pc_str = table.concat(pc_samples, ",")
 
     -- Quality assessment: is this likely real data or code/noise?
-    -- High quality = max_run >= 64 AND coverage > 0.5
+    -- NOTE: max_run_len is capped by STAGING_RING_SIZE - if ring size < 64, HIGH is unreachable
+    -- v2.5: Recommend STAGING_RING_SIZE >= 256 so 64-byte runs can reach HIGH quality
     local quality = "LOW"
     if max_run_len >= 64 and coverage_ratio > 0.5 then
         quality = "HIGH"
@@ -707,6 +738,8 @@ local function log_staging_wram_source_summary(frame, vram_addr, dma_size)
     local coverage_ratio = dma_size > 0 and (unique_wram_bytes / dma_size) or 0
 
     -- Quality assessment
+    -- NOTE: max_run_len is capped by STAGING_RING_SIZE - if ring size < 64, HIGH is unreachable
+    -- v2.5: Recommend STAGING_RING_SIZE >= 256 so 64-byte runs can reach HIGH quality
     local quality = "LOW"
     if max_run_len >= 64 and coverage_ratio > 0.5 then
         quality = "HIGH"
@@ -1153,6 +1186,12 @@ local function log_dma_channel(channel, value)
                 -- Log WRAM source summary (if staging reads from intermediate WRAM buffer)
                 log_staging_wram_source_summary(get_canonical_frame(), captured_vmadd, das)
                 reset_staging_tracking()
+
+                -- v2.9: End fill session and log PRG reads that occurred during buffer fill
+                if BUFFER_WRITE_WATCH_ENABLED and fill_session_active then
+                    log_fill_session_summary(get_canonical_frame(), captured_vmadd, das)
+                    reset_fill_session()
+                end
             end
         end
     end
@@ -1592,15 +1631,295 @@ local function register_staging_callbacks()
     end
 end
 
--- v2.2: Lazy WRAM source callback registration (called from on_end_frame)
-local function register_wram_source_callbacks()
-    if not wram_mem_type then
-        log("WARNING: WRAM source tracking enabled but no WRAM memType resolved")
+-- =============================================================================
+-- v2.8: BUFFER_WRITE_WATCH - Trace what WRITES to the source buffer
+-- This is the next rung: ROM -> source buffer -> staging -> VRAM
+-- =============================================================================
+
+local function on_buffer_write(address, value)
+    if not BUFFER_WRITE_WATCH_ENABLED then return end
+
+    local frame = get_canonical_frame()
+    -- Skip early frames
+    if STAGING_START_FRAME > 0 and frame < STAGING_START_FRAME then
         return
     end
 
-    if not STAGING_WRAM_TRACKING_ENABLED then
+    -- v2.9: Start fill session on first write to source buffer
+    -- PRG read callbacks are gated on this flag (only log during active fill)
+    if not fill_session_active then
+        fill_session_active = true
+        fill_session_start_frame = frame
+        fill_session_prg_reads = {}
+        fill_session_prg_head = 0
+        fill_session_prg_total = 0
+    end
+
+    -- Initialize or rotate frame stats
+    if buffer_write_current_frame ~= frame then
+        -- Archive previous frame stats if any
+        if buffer_write_current_frame and buffer_write_current_stats then
+            buffer_write_frame_stats[buffer_write_current_frame] = buffer_write_current_stats
+        end
+        buffer_write_current_frame = frame
+        buffer_write_current_stats = {
+            count = 0,
+            min_addr = nil,
+            max_addr = nil,
+            pc_samples = {},  -- {k, pc} pairs
+            first_write_pc = nil,
+        }
+    end
+
+    local stats = buffer_write_current_stats
+    stats.count = stats.count + 1
+
+    -- Track address range
+    if not stats.min_addr or address < stats.min_addr then
+        stats.min_addr = address
+    end
+    if not stats.max_addr or address > stats.max_addr then
+        stats.max_addr = address
+    end
+
+    -- Sample PCs (only first N per frame to limit overhead)
+    if #stats.pc_samples < BUFFER_WRITE_PC_SAMPLES then
+        local pc_snapshot = get_cpu_state_snapshot()
+        if pc_snapshot then
+            stats.pc_samples[#stats.pc_samples + 1] = {
+                k = pc_snapshot.k_val or 0,
+                pc = pc_snapshot.pc_val or 0,
+            }
+            if not stats.first_write_pc then
+                stats.first_write_pc = stats.pc_samples[1]
+            end
+        end
+    end
+end
+
+-- v2.9: PRG read callback - only logs during active fill session
+-- This is safe because it's bounded to the fill window (not always-on)
+local function on_fill_session_prg_read(address, value)
+    -- Gate on fill session (the key optimization - only log during buffer fill)
+    if not fill_session_active then
         return
+    end
+
+    -- Push to ring buffer
+    fill_session_prg_total = fill_session_prg_total + 1
+    fill_session_prg_head = (fill_session_prg_head % FILL_SESSION_RING_SIZE) + 1
+
+    -- Get PC for this read (optional - may be expensive)
+    local pc_snapshot = get_cpu_state_snapshot()
+    local k_val, pc_val = 0, 0
+    if pc_snapshot then
+        k_val = pc_snapshot.k_val or 0
+        pc_val = pc_snapshot.pc_val or 0
+    end
+
+    fill_session_prg_reads[fill_session_prg_head] = {
+        addr = address,
+        k = k_val,
+        pc = pc_val,
+    }
+end
+
+-- v2.9: Compress PRG reads into contiguous runs for summary
+compress_prg_runs = function(reads, total_count)
+    if not reads or #reads == 0 then
+        return "NO_READS", 0, 0
+    end
+
+    -- Sort by address for run detection
+    local sorted = {}
+    for i = 1, math.min(#reads, FILL_SESSION_RING_SIZE) do
+        if reads[i] then
+            sorted[#sorted + 1] = reads[i].addr
+        end
+    end
+    if #sorted == 0 then
+        return "NO_READS", 0, 0
+    end
+    table.sort(sorted)
+
+    -- Compress into runs
+    local runs = {}
+    local run_start = sorted[1]
+    local run_end = sorted[1]
+    local unique_count = 1
+
+    for i = 2, #sorted do
+        local addr = sorted[i]
+        if addr == run_end + 1 then
+            -- Extend current run
+            run_end = addr
+        elseif addr > run_end then
+            -- New run (skip duplicates)
+            runs[#runs + 1] = {start = run_start, stop = run_end}
+            run_start = addr
+            run_end = addr
+            unique_count = unique_count + 1
+        end
+        -- else: duplicate, skip
+    end
+    -- Final run
+    runs[#runs + 1] = {start = run_start, stop = run_end}
+
+    -- Format runs
+    local run_strs = {}
+    local max_run_size = 0
+    for _, r in ipairs(runs) do
+        local size = r.stop - r.start + 1
+        if size > max_run_size then max_run_size = size end
+        run_strs[#run_strs + 1] = string.format("0x%06X-0x%06X(%d)", r.start, r.stop, size)
+    end
+
+    return table.concat(run_strs, ","), #runs, max_run_size
+end
+
+-- v2.9: Log fill session summary when staging DMA fires
+log_fill_session_summary = function(frame, vram_addr, dma_size)
+    if not fill_session_active then
+        return
+    end
+
+    local ok, prg_runs_str, num_runs, max_run = pcall(function()
+        return compress_prg_runs(fill_session_prg_reads, fill_session_prg_total)
+    end)
+
+    if not ok then
+        log("WARNING: compress_prg_runs failed: " .. tostring(prg_runs_str))
+        return
+    end
+
+    log(string.format(
+        "FILL_SESSION: frame=%d vram=0x%04X dma_size=%d prg_total=%d prg_unique=%d runs=%d max_run=%d prg_runs=[%s]",
+        frame,
+        vram_addr,
+        dma_size,
+        fill_session_prg_total,
+        math.min(#fill_session_prg_reads, FILL_SESSION_RING_SIZE),
+        num_runs,
+        max_run,
+        prg_runs_str
+    ))
+end
+
+-- v2.9: Reset fill session state (called when staging DMA fires)
+reset_fill_session = function()
+    fill_session_active = false
+    fill_session_start_frame = nil
+    fill_session_prg_reads = {}
+    fill_session_prg_head = 0
+    fill_session_prg_total = 0
+end
+
+local function log_buffer_write_summary(frame)
+    if not BUFFER_WRITE_WATCH_ENABLED then return end
+
+    local stats = buffer_write_frame_stats[frame] or buffer_write_current_stats
+    if not stats or stats.count == 0 then return end
+
+    -- Format PC samples
+    local pc_str = ""
+    if #stats.pc_samples > 0 then
+        local pc_parts = {}
+        for _, p in ipairs(stats.pc_samples) do
+            pc_parts[#pc_parts + 1] = string.format("%02X:%04X", p.k or 0, p.pc or 0)
+        end
+        pc_str = " pcs=[" .. table.concat(pc_parts, ",") .. "]"
+    end
+
+    log(string.format(
+        "BUFFER_WRITE_SUMMARY: frame=%d writes=%d range=0x%06X-0x%06X%s",
+        frame,
+        stats.count,
+        stats.min_addr or 0,
+        stats.max_addr or 0,
+        pc_str
+    ))
+end
+
+local function register_buffer_write_callbacks()
+    if not wram_mem_type then
+        log("WARNING: Buffer write watch enabled but no WRAM memType resolved")
+        return false
+    end
+
+    if not BUFFER_WRITE_WATCH_ENABLED then
+        return false
+    end
+
+    -- Compute buffer write watch addresses based on WRAM addressing mode
+    local buffer_start, buffer_end
+    if wram_address_mode == "absolute" then
+        buffer_start = 0x7E0000 + BUFFER_WRITE_START
+        buffer_end = 0x7E0000 + BUFFER_WRITE_END
+    else
+        buffer_start = BUFFER_WRITE_START
+        buffer_end = BUFFER_WRITE_END
+    end
+
+    local buffer_ref = add_memory_callback_compat(
+        on_buffer_write,
+        emu.callbackType.write,
+        buffer_start,
+        buffer_end,
+        cpu_type,
+        wram_mem_type
+    )
+
+    if buffer_ref then
+        log(string.format(
+            "INFO: Buffer write watch registered (lazy) for S-CPU: 0x%06X-0x%06X at frame=%d",
+            buffer_start, buffer_end, frame_count
+        ))
+
+        -- v2.9: Also register PRG read callback for fill session tracking
+        -- This callback is gated on fill_session_active (only logs during buffer fill = safe)
+        if MEM.prg then
+            local prg_size = emu.getMemorySize(MEM.prg) or 0
+            if prg_size > 0 then
+                local prg_ref = add_memory_callback_compat(
+                    on_fill_session_prg_read,
+                    emu.callbackType.read,
+                    0x000000,
+                    prg_size - 1,
+                    cpu_type,
+                    MEM.prg
+                )
+                if prg_ref then
+                    log(string.format(
+                        "INFO: Fill session PRG read callback registered: 0x%06X-0x%06X at frame=%d",
+                        0, prg_size - 1, frame_count
+                    ))
+                else
+                    log("WARNING: failed to register fill session PRG read callback")
+                end
+            end
+        end
+
+        return true
+    else
+        log(string.format(
+            "WARNING: failed to register buffer write watch for S-CPU: 0x%06X-0x%06X",
+            buffer_start, buffer_end
+        ))
+        return false
+    end
+end
+
+-- v2.2: Lazy WRAM source callback registration (called from on_end_frame)
+-- v2.4 FIX: Was checking wrong flag (STAGING_WRAM_TRACKING_ENABLED instead of STAGING_WRAM_SOURCE_ENABLED)
+local function register_wram_source_callbacks()
+    if not wram_mem_type then
+        log("WARNING: WRAM source tracking enabled but no WRAM memType resolved")
+        return false
+    end
+
+    -- v2.4 FIX: This function is for STAGING_WRAM_SOURCE, not the debug-wide WRAM tracker
+    if not STAGING_WRAM_SOURCE_ENABLED then
+        return false
     end
 
     -- Compute WRAM read ranges (excluding staging buffer)
@@ -1615,6 +1934,7 @@ local function register_wram_source_callbacks()
         }
     end
 
+    local any_registered = false
     for _, range in ipairs(wram_read_ranges) do
         local wram_read_ref = add_memory_callback_compat(
             make_staging_wram_source_reader("snes"),
@@ -1625,6 +1945,7 @@ local function register_wram_source_callbacks()
             wram_mem_type
         )
         if wram_read_ref then
+            any_registered = true
             log(string.format(
                 "INFO: WRAM source callback registered (lazy) for S-CPU: 0x%06X-0x%06X at frame=%d",
                 range.start, range.stop, frame_count
@@ -1636,6 +1957,8 @@ local function register_wram_source_callbacks()
             ))
         end
     end
+
+    return any_registered
 end
 
 local function on_end_frame()
@@ -1655,9 +1978,23 @@ local function on_end_frame()
             staging_callbacks_registered = true
         end
         if STAGING_WRAM_SOURCE_ENABLED and not wram_source_callbacks_registered then
-            register_wram_source_callbacks()
-            wram_source_callbacks_registered = true
+            wram_source_callbacks_registered = register_wram_source_callbacks()
+            if not wram_source_callbacks_registered then
+                log("WARNING: WRAM source callbacks were not registered (will retry next frame)")
+            end
         end
+        -- v2.8: Buffer write watch for tracing source buffer writers
+        if BUFFER_WRITE_WATCH_ENABLED and not buffer_write_callbacks_registered then
+            buffer_write_callbacks_registered = register_buffer_write_callbacks()
+            if not buffer_write_callbacks_registered then
+                log("WARNING: Buffer write callbacks were not registered (will retry next frame)")
+            end
+        end
+    end
+
+    -- v2.8: Log buffer write summary for previous frame (if any activity)
+    if BUFFER_WRITE_WATCH_ENABLED and buffer_write_current_frame and buffer_write_current_frame == frame_count - 1 then
+        log_buffer_write_summary(buffer_write_current_frame)
     end
 
     -- FIXED: Process pending DMA comparisons at frame end (after all DMAs have completed)
@@ -1888,6 +2225,10 @@ if CFG.dma_log_start_frame > 0 then
 end
 if STAGING_WRAM_SOURCE_ENABLED then
     log("INFO: WRAM source tracking will be registered lazily at frame=" .. tostring(STAGING_START_FRAME - 2))
+end
+if BUFFER_WRITE_WATCH_ENABLED then
+    log(string.format("INFO: Buffer write watch (0x%06X-0x%06X) will be registered lazily at frame=%d",
+        BUFFER_WRITE_START, BUFFER_WRITE_END, STAGING_START_FRAME - 2))
 end
 
 -- Register cleanup callback for script end

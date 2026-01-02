@@ -33,6 +33,63 @@ INFO: DMA/HDMA/SA1 logging deferred until frame=1490
 
 ---
 
+## STAGING_WRAM_SOURCE Shows NO_WRAM_PAIRS (v2.4 Fix Required)
+
+**Symptom:** `STAGING_WRAM_SOURCE` log entries all show `NO_WRAM_PAIRS` even though
+you expected WRAM reads to be detected.
+
+**Cause (pre-v2.4):** Bug in `register_wram_source_callbacks()` checked wrong flag
+(`STAGING_WRAM_TRACKING_ENABLED` instead of `STAGING_WRAM_SOURCE_ENABLED`), so
+WRAM read callbacks were never actually registered.
+
+**Fix:** Update to v2.4 of `mesen2_dma_probe.lua`.
+
+**Verification:** After update, log must show this line at lazy registration time:
+```
+INFO: WRAM source callback registered (lazy) for S-CPU: 0x7E8000-0x7EFFFF at frame=1498
+```
+
+If you only see "Staging watch registered" but NOT "WRAM source callback registered",
+WRAM source tracking is not active and all `NO_WRAM_PAIRS` results are meaningless.
+
+---
+
+## FILL_SESSION Not Appearing (v2.9)
+
+**Symptom:** `BUFFER_WRITE_SUMMARY` entries appear with writes, but no `FILL_SESSION`
+entries are logged when staging DMA fires.
+
+**Debug steps:**
+
+1. **Check DEBUG_FILL output:**
+   ```bash
+   grep "DEBUG_FILL" mesen2_exchange/dma_probe_log.txt | head -10
+   ```
+
+2. **Expected output:**
+   ```
+   DEBUG_FILL: frame=1502 BW_ENABLED=true fill_active=true prg_total=1157
+   ```
+
+3. **If `fill_active=false`:** Buffer write callback isn't setting the flag. Check that
+   `BUFFER_WRITE_WATCH=1` is set and the address range (0x1530-0x161A) overlaps actual writes.
+
+4. **If `fill_active=true` but no FILL_SESSION:** Check `DEBUG_FILL_SUMMARY` for errors:
+   ```bash
+   grep "DEBUG_FILL_SUMMARY" mesen2_exchange/dma_probe_log.txt
+   ```
+
+5. **If compress_prg_runs FAILED:** The ring buffer processing has a bug - check the
+   error message for details.
+
+**Verification:** Log should show both:
+```
+INFO: Buffer write watch registered (lazy) for S-CPU: 0x001530-0x00161A at frame=1498
+INFO: Fill session PRG read callback registered: 0x000000-0x3FFFFF at frame=1498
+```
+
+---
+
 ## Diagnostic Priority (Start Here)
 
 Follow this flowchart **in order**. Fix issues at each step before proceeding.

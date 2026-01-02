@@ -67,6 +67,214 @@ to WRAM sources).
 
 ---
 
+## [2.14.1] - 2026-01-02
+
+### FILL_SESSION Bug Fix and Initial Findings
+
+**Bug Fixed:** Lua forward reference error prevented FILL_SESSION from logging.
+- `log_fill_session_summary()`, `reset_fill_session()`, `compress_prg_runs()` were
+  called before their definitions (Lua requires forward declarations)
+- Added forward declarations at line 410-413
+- Changed function definitions to assignment syntax (`func = function()`)
+
+**Initial Trace Results (41 fill sessions captured):**
+
+| PRG Range | Size | SA-1 Bank | Quality |
+|-----------|------|-----------|---------|
+| `0xE13CA7-0xE13D81` | 219 | $E1 | HIGH (max_run=219) |
+| `0xEB3D4B-0xEB3E24` | 218 | $EB | HIGH (max_run=218) |
+| `0xE7DF31-0xE7DFFA` | 202 | $E7 | HIGH (max_run=202) |
+| `0xE98F3B-0xE98FF5` | 187 | $E9 | HIGH (max_run=187) |
+| `0xE9E7B8-0xE9E84E` | 151 | $E9 | HIGH (recurring) |
+
+**Interpretation:** These are SA-1 ROM regions (`$E0-$EF` banks) read during the
+buffer fill window. Large contiguous runs (>64 bytes) are likely compressed sprite
+data sources. Small runs (<10 bytes) are code/vector fetches (noise).
+
+**Next step:** Convert PRG addresses to file offsets, validate with HAL decompression.
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (forward reference fix)
+
+---
+
+## [2.14.0] - 2026-01-02
+
+### FILL_SESSION - Bounded PRG Read Logging (v2.9)
+
+**Context:** v2.8 confirmed primary writer code at `01:F724` and `01:F729` writes
+to source buffer `0x1530-0x161A`. Now we need to trace what ROM regions feed that code.
+
+**Key insight:** Full PRG read logging is prohibitively expensive (causes timeout).
+But we only need PRG reads during the **buffer fill window** (from first write to
+source buffer until staging DMA fires). This bounded window is safe.
+
+**New Feature:**
+- Session starts automatically on first write to source buffer (0x1530-0x161A)
+- During session: PRG/ROM reads are logged into ring buffer (256 entries)
+- Session ends when staging DMA fires (same trigger as STAGING_SUMMARY)
+- Summary logged as `FILL_SESSION` with PRG runs compressed
+
+**Output:** `FILL_SESSION: frame=X vram=0xYYYY dma_size=N prg_total=T prg_unique=U runs=R max_run=M prg_runs=[...]`
+
+**What the runs mean:**
+- `prg_runs=[0x123456-0x123478(35)]` = ROM addresses read during buffer fill
+- These are candidate ROM source regions for the sprite data
+- Convert to file offset using SA-1 bank mapping
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.8 → v2.9)
+- `run_staging_trace.bat` (added FILL_SESSION documentation)
+
+**Usage:**
+1. Keep BUFFER_WRITE_WATCH=1 (enables fill session tracking)
+2. Run the trace
+3. Look for `FILL_SESSION` entries with `prg_runs`
+4. The PRG runs are your candidate ROM source addresses
+
+---
+
+## [2.13.0] - 2026-01-02
+
+### BUFFER_WRITE_WATCH - Trace Source Buffer Writers (v2.8)
+
+**Context:** v2.7 confirmed STAGING_WRAM_SOURCE works (110 entries, 0 NO_WRAM_PAIRS,
+HIGH quality). Discovered primary source buffer: `0x01530-0x0161A` (235 bytes).
+
+**Next rung:** To find the ROM→source buffer link, we need to trace what code
+WRITES to `0x01530-0x0161A`. This is the missing link in the data flow:
+```
+ROM (???) -> source buffer (0x01530) -> staging (0x2000) -> VRAM
+      ^           BUFFER_WRITE_WATCH reveals this
+```
+
+**New Feature:**
+- `BUFFER_WRITE_WATCH=1` - Enable buffer write tracing
+- `BUFFER_WRITE_START=0x1530` - Start of source buffer (default from v2.7 discovery)
+- `BUFFER_WRITE_END=0x161A` - End of source buffer
+- `BUFFER_WRITE_PC_SAMPLES=8` - PC samples to capture per frame
+
+**Output:** `BUFFER_WRITE_SUMMARY: frame=X writes=N range=0xAAAA-0xBBBB pcs=[K:PC,...]`
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.7 → v2.8)
+- `run_staging_trace.bat` (added BUFFER_WRITE_WATCH section, disabled by default)
+
+**Usage:**
+1. Keep STAGING_WRAM_SOURCE=1 to confirm source region
+2. Set BUFFER_WRITE_WATCH=1 to trace writers
+3. Look for `BUFFER_WRITE_SUMMARY` in logs
+4. The `pcs=[]` values tell you which code writes to the source buffer
+
+---
+
+## [2.12.0] - 2026-01-02
+
+### Full 128KB WRAM Coverage (v2.7)
+
+**Problem:** Previous range `$0000-$FFFF` only covered 64KB (bank $7E). The code normalizes
+WRAM to `0x00000-0x1FFFF` (128KB), so we were missing bank $7F entirely.
+
+**Fix:** Extended `STAGING_WRAM_SRC_END` to `0x1FFFF` (full 128KB).
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.6 → v2.7)
+- `run_staging_trace.bat` (STAGING_WRAM_SRC_END=0x1FFFF)
+
+---
+
+## [2.11.0] - 2026-01-02
+
+### PC Gating Disabled - Write PCs ≠ Read PCs (v2.6)
+
+**Problem:** v2.5 enabled PC gating using staging write PCs (`01:8FA9`, `00:8952`, `00:893D`),
+but the WRAM source reader fires on READ instructions which are 1-3 bytes earlier in copy loops.
+Result: only 3 garbage entries vs 107 NO_WRAM_PAIRS (worse than v2.4).
+
+**Fix:** Disabled PC gating until read PCs are discovered. To enable gating later, either:
+- Use PC "slop" window (accept ±8 bytes of known PCs), or
+- Discover actual read PCs first (log top read PCs with gating off)
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.5 → v2.6)
+- `run_staging_trace.bat` (STAGING_PC_GATING=0 with explanation)
+
+---
+
+## [2.10.0] - 2026-01-02
+
+### Improved WRAM Source Coverage (v2.5)
+
+**Run Config Changes** (in `run_staging_trace.bat`, not Lua defaults):
+1. **Expanded range**: `STAGING_WRAM_SRC_START/END` set to `$0000-$FFFF` (was `$8000-$FFFF`)
+2. **PC gating enabled**: `STAGING_PC_GATING=1` to filter reads by known staging writer PCs
+3. **Ring buffer increased**: `STAGING_RING_SIZE=256` (was 32) so 64-byte runs can reach HIGH quality
+4. **Quality threshold notes**: Added Lua comments explaining ring buffer size / quality relationship
+
+**Why NO_WRAM_PAIRS was expected (until this fix):**
+
+The log message `NO_WRAM_PAIRS (source not in 0x0000-0xFFFF or not WRAM)` directly tells you:
+reads outside your configured `STAGING_WRAM_SRC_START/END` range are invisible.
+
+The Lua normalizes WRAM addresses to `0x00000-0x1FFFF` (128KB). With `STAGING_WRAM_SRC_END=0xFFFF`,
+anything in bank $7F (`0x10000-0x1FFFF`) was missed. **Most NO_WRAM_PAIRS are expected while
+the watched range is truncated.**
+
+**Note:** v2.5 still only covers 64KB. See v2.12 for full 128KB fix.
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.4 → v2.5)
+- `run_staging_trace.bat` (updated range, ring size, PC gating)
+
+---
+
+## [2.9.0] - 2026-01-02
+
+### Critical Bug Fix: WRAM Source Tracking Never Activated (v2.4)
+
+**Problem:** `STAGING_WRAM_SOURCE=1` setting was ignored. All `STAGING_WRAM_SOURCE` log
+entries showed `NO_WRAM_PAIRS` even when WRAM reads should have been detected.
+
+**Root Cause:** In `register_wram_source_callbacks()`, line 1602 checked the wrong flag:
+
+```lua
+-- BUG (v2.3): Checked wrong flag
+if not STAGING_WRAM_TRACKING_ENABLED then return end
+
+-- FIX (v2.4): Check correct flag
+if not STAGING_WRAM_SOURCE_ENABLED then return end
+```
+
+`STAGING_WRAM_TRACKING_ENABLED` is for a different debug-wide WRAM tracker, not the
+staging source tracker. This meant WRAM read callbacks were never registered.
+
+Additionally, `wram_source_callbacks_registered` was set to `true` unconditionally after
+calling the function, even when registration failed. This prevented retry on subsequent frames.
+
+**Fix:**
+1. Changed guard from `STAGING_WRAM_TRACKING_ENABLED` to `STAGING_WRAM_SOURCE_ENABLED`
+2. Function now returns `true`/`false` to indicate success
+3. Caller only marks registered if function returned `true`
+4. If registration fails, logs warning and retries next frame
+
+**Verification:** After v2.4, log must show a line like one of these (depends on WRAM addressing mode):
+```
+# Relative mode (common):
+INFO: WRAM source callback registered (lazy) for S-CPU: 0x000000-0x00FFFF at frame=1498
+
+# Absolute mode:
+INFO: WRAM source callback registered (lazy) for S-CPU: 0x7E0000-0x7EFFFF at frame=1498
+```
+
+The range values depend on your `STAGING_WRAM_SRC_START/END` config. If you don't see
+this line at all, WRAM source tracking is not active.
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.3 → v2.4)
+- `run_staging_trace.bat` (updated WRAM range to $8000-$FFFF)
+
+---
+
 ## [2.8.0] - 2026-01-02
 
 ### Lua Script Timeout Fixes (v2.2 + v2.3)
@@ -144,13 +352,15 @@ Tools -> Script Window -> Settings -> Script Timeout -> 5 (or higher)
 3. Removed duplicate `sa1_cpu_type` definition with incorrect fallbacks
 4. Added diagnostic logging at startup to show resolved type values
 
-**New Startup Log:**
+**New Startup Log (example, values vary by Mesen2 build):**
 ```
 MEM types resolved: cpu=0 prg=20 vram=23 wram=21 oam=24 cgram=25 sa1_iram=33
 CPU types resolved: snes=0 sa1=3
 ```
 
-Numbers indicate enum values (or `nil` if resolution failed).
+Numbers indicate enum values resolved at runtime (or `nil` if resolution failed).
+**Note:** These numbers can change between Mesen2 versions. The script resolves them
+dynamically; don't hardcode these values.
 
 ---
 
