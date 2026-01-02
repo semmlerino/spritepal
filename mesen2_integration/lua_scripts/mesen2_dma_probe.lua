@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.0"
+local LOG_VERSION = "2.1"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -336,6 +336,10 @@ local STAGING_WATCH_END = tonumber(os.getenv("STAGING_WATCH_END") or "0x2FFF", 1
 local STAGING_WATCH_PC_SAMPLES = tonumber(os.getenv("STAGING_WATCH_PC_SAMPLES")) or 4
 local STAGING_HISTORY_FRAMES = tonumber(os.getenv("STAGING_HISTORY_FRAMES")) or 3
 local STAGING_START_FRAME = tonumber(os.getenv("STAGING_START_FRAME")) or 0
+-- v2.1: Per-frame cap prevents runaway staging writes from timing out
+local STAGING_MAX_WRITES_PER_FRAME = tonumber(os.getenv("STAGING_MAX_WRITES_PER_FRAME")) or 2048
+-- v2.1: Sentinel sampling: 0 = full range, >0 = step size (e.g., 0x40 = every 64 bytes)
+local STAGING_SENTINEL_STEP = tonumber(os.getenv("STAGING_SENTINEL_STEP") or "0", 16)
 -- STAGING_CAUSAL disabled: PRG read callbacks are permanently off (timeout risk)
 -- Env var STAGING_CAUSAL_ENABLED is ignored. Use STAGING_WRAM_SOURCE instead.
 local STAGING_CAUSAL_ENABLED = false
@@ -366,6 +370,8 @@ local staging_current_stats = nil
 -- ROM read tracking during staging fills
 local staging_active = false
 local staging_first_pc = nil  -- PC that started the fill
+-- v2.1: Track writes dropped due to per-frame cap (for diagnostics)
+local staging_dropped_writes = 0
 
 -- ============================================================================
 -- CAUSAL READ→WRITE TRACKING
@@ -498,6 +504,8 @@ local function reset_staging_tracking()
     staging_wram_sources = {}
     -- Reset ring buffer count (gate for hot-path scanning)
     wram_src_seen_any = 0
+    -- v2.1: Reset per-frame cap counter
+    staging_dropped_writes = 0
 end
 
 -- Track frame of last staging write (for logging)
@@ -757,12 +765,15 @@ local STAGING_WRAM_PREARM = os.getenv("STAGING_WRAM_PREARM") == "1"
 
 local function make_staging_wram_source_reader(cpu_label)
     return function(address, value)
+        -- v2.1: Gate on STAGING_START_FRAME first (fast check)
+        local frame = get_canonical_frame()
+        if STAGING_START_FRAME > 0 and frame < STAGING_START_FRAME then
+            return
+        end
         -- GATE: Only track reads when staging session is active (or prearm enabled)
         if not staging_active and not STAGING_WRAM_PREARM then
             return
         end
-
-        local frame = get_canonical_frame()
 
         -- Only fetch PC when PC-gating is enabled (saves expensive emu.getState() overhead)
         -- Default mode: address-only tracking (fast), PC-gating mode: fetch PC and filter
@@ -963,8 +974,14 @@ local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
         pc_str = " pcs=[" .. table.concat(pc_parts, ",") .. "]"
     end
 
+    -- v2.1: Add dropped writes count if any were capped
+    local dropped_str = ""
+    if staging_dropped_writes > 0 then
+        dropped_str = string.format(" dropped=%d", staging_dropped_writes)
+    end
+
     log(string.format(
-        "STAGING_SUMMARY: frame=%d src=0x%06X size=%d vram=0x%04X pattern=%s writes=%d unique=%d seq=%d jumps=%d range=0x%06X-0x%06X frames=%d%s",
+        "STAGING_SUMMARY: frame=%d src=0x%06X size=%d vram=0x%04X pattern=%s writes=%d unique=%d seq=%d jumps=%d range=0x%06X-0x%06X frames=%d%s%s",
         frame,
         src_addr,
         src_size,
@@ -977,17 +994,28 @@ local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
         summary.min_addr or 0,
         summary.max_addr or 0,
         summary.frames_with_writes,
-        pc_str
+        pc_str,
+        dropped_str
     ))
 end
 
 local function on_staging_write(address, value)
     if not STAGING_WATCH_ENABLED then return end
+    -- v2.1: Gate capture on STAGING_START_FRAME (was logging-only, now callbacks early-exit)
+    local frame = get_canonical_frame()
+    if STAGING_START_FRAME > 0 and frame < STAGING_START_FRAME then
+        return
+    end
+    -- v2.1: Per-frame cap prevents runaway writes from timing out
+    local stats = staging_current_stats
+    if stats and stats.count >= STAGING_MAX_WRITES_PER_FRAME then
+        staging_dropped_writes = staging_dropped_writes + 1
+        return
+    end
     -- OPTIMIZATION: Only call get_cpu_state_snapshot() when we actually need the PC.
     -- PC is needed for: (1) staging_first_pc on first write, (2) PC sampling (first N writes per frame)
     -- After N samples per frame, we skip the expensive emu.getState() call.
     local pc_snapshot = nil
-    local stats = staging_current_stats
     -- Need PC if: not yet active (first write), no stats yet (new frame), or still collecting samples
     local needs_pc = not staging_active
         or not stats
@@ -1729,21 +1757,49 @@ if STAGING_WATCH_ENABLED then
             staging_end = STAGING_WATCH_END
         end
 
-        local snes_staging_ref = add_memory_callback_compat(
-            on_staging_write,
-            emu.callbackType.write,
-            staging_start,
-            staging_end,
-            cpu_type,
-            wram_mem_type
-        )
-        if snes_staging_ref then
-            log(string.format(
-                "INFO: Staging watch registered for S-CPU: 0x%06X-0x%06X",
-                staging_start, staging_end
-            ))
+        -- v2.1: Sentinel sampling mode (sparse callbacks) vs full range
+        local snes_staging_ref
+        if STAGING_SENTINEL_STEP > 0 then
+            -- Sentinel mode: register sparse callbacks to reduce callback count
+            local sentinel_count = 0
+            for addr = staging_start, staging_end, STAGING_SENTINEL_STEP do
+                local ref = add_memory_callback_compat(
+                    on_staging_write,
+                    emu.callbackType.write,
+                    addr,
+                    addr,
+                    cpu_type,
+                    wram_mem_type
+                )
+                if ref then sentinel_count = sentinel_count + 1 end
+            end
+            snes_staging_ref = sentinel_count > 0
+            if snes_staging_ref then
+                log(string.format(
+                    "INFO: Staging SENTINEL watch registered: 0x%06X-0x%06X step=0x%X (%d callbacks)",
+                    staging_start, staging_end, STAGING_SENTINEL_STEP, sentinel_count
+                ))
+            else
+                log("WARNING: failed to register sentinel staging watch for S-CPU")
+            end
         else
-            log("WARNING: failed to register staging write watch for S-CPU")
+            -- Full range (legacy)
+            snes_staging_ref = add_memory_callback_compat(
+                on_staging_write,
+                emu.callbackType.write,
+                staging_start,
+                staging_end,
+                cpu_type,
+                wram_mem_type
+            )
+            if snes_staging_ref then
+                log(string.format(
+                    "INFO: Staging watch registered for S-CPU: 0x%06X-0x%06X",
+                    staging_start, staging_end
+                ))
+            else
+                log("WARNING: failed to register staging write watch for S-CPU")
+            end
         end
 
         -- SA-1 staging callbacks DISABLED - causes timeout due to extremely high write frequency
