@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "1.5"
+local LOG_VERSION = "1.6"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -234,6 +234,7 @@ local CFG = {
     dma_dump_on_vram = os.getenv("DMA_DUMP_ON_VRAM") ~= "0",
     dma_dump_max = tonumber(os.getenv("DMA_DUMP_MAX")) or 20,
     dma_dump_min_size = tonumber(os.getenv("DMA_DUMP_MIN_SIZE")) or 1,
+    dma_dump_max_size = tonumber(os.getenv("DMA_DUMP_MAX_SIZE")) or 16384,  -- 16KB max per dump
     dma_compare_enabled = os.getenv("DMA_COMPARE_ENABLED") ~= "0",
     dma_compare_max = tonumber(os.getenv("DMA_COMPARE_MAX")) or 50,
     dma_compare_sample_bytes = tonumber(os.getenv("DMA_COMPARE_SAMPLE_BYTES")) or 32,
@@ -339,9 +340,9 @@ local STAGING_START_FRAME = tonumber(os.getenv("STAGING_START_FRAME")) or 0
 local STAGING_CAUSAL_ENABLED = false
 
 -- WRAM read tracking: detect intermediate buffer pattern (PRG → WRAM → staging)
--- WARNING: This is EXPENSIVE - callbacks fire on every WRAM read (~120KB coverage)
--- Only enable when specifically investigating WRAM intermediate buffers
--- Default OFF to avoid freezing the emulator
+-- WARNING: DEBUG-ONLY. EXPECT TIMEOUTS. Callbacks fire on every WRAM read (~120KB).
+-- Use only for short, controlled runs investigating intermediate buffer patterns.
+-- Default OFF - will freeze/timeout the emulator under normal use.
 local STAGING_WRAM_TRACKING_ENABLED = os.getenv("STAGING_WRAM_TRACKING") == "1"
 
 -- STAGING_WRAM_SOURCE: Track what WRAM region the staging writer reads FROM
@@ -744,7 +745,9 @@ end
 -- Uses RING BUFFER to capture multiple reads (not just last one)
 --
 -- PERFORMANCE: Gated by staging_active to avoid emu.getState() on every WRAM read (~120KB coverage).
--- Set STAGING_WRAM_PREARM=1 to capture reads before first staging write (expensive, may cause timeout).
+-- STAGING_WRAM_PREARM: Pre-arm WRAM source tracking BEFORE staging_active.
+-- WARNING: This reintroduces the "millions of callbacks" failure mode that caused timeouts.
+-- Use only for short, controlled runs. Keep OFF for normal tracing.
 local STAGING_WRAM_PREARM = os.getenv("STAGING_WRAM_PREARM") == "1"
 
 local function make_staging_wram_source_reader(cpu_label)
@@ -1164,10 +1167,15 @@ local function log_dma_channel(channel, value)
                 log("ERROR: failed to open DMA dump: " .. path)
                 return
             end
+            -- Clamp dump size to avoid timeout (DAS=0 means 0x10000 bytes)
+            local dump_size = math.min(das, CFG.dma_dump_max_size)
+            if dump_size < das then
+                log(string.format("WARNING: DMA dump truncated %d -> %d bytes", das, dump_size))
+            end
             local chunk = {}
             local chunk_len = 0
             local chunk_size = 4096
-            for i = 0, das - 1 do
+            for i = 0, dump_size - 1 do
                 local read_val = emu.read((src + i) & 0xFFFFFF, dma_read_mem)
                 if read_val == nil then
                     read_val = 0
@@ -1616,9 +1624,16 @@ local function register_frame_event()
             local fps = detect_fps(state)
             local ticks_per_frame = clock_rate / fps
             clock_accum = clock_accum + delta
-            while clock_accum >= ticks_per_frame do
+            -- Cap catch-up frames to avoid timeout on lag/breakpoints
+            local max_catchup = 2
+            local n = 0
+            while clock_accum >= ticks_per_frame and n < max_catchup do
                 clock_accum = clock_accum - ticks_per_frame
                 on_end_frame()
+                n = n + 1
+            end
+            if n == max_catchup and clock_accum >= ticks_per_frame then
+                clock_accum = 0  -- Drop backlog; better than timing out
             end
         end
 
@@ -1893,6 +1908,13 @@ local init_ok, init_err = pcall(function()
     -- Warn if user tried to enable STAGING_CAUSAL (env var is now ignored)
     if os.getenv("STAGING_CAUSAL_ENABLED") == "1" then
         log("WARNING: STAGING_CAUSAL_ENABLED ignored - PRG read callbacks permanently disabled (timeout risk). Use STAGING_WRAM_SOURCE instead.")
+    end
+    -- Warn about debug-only modes that can cause timeout
+    if STAGING_WRAM_TRACKING_ENABLED then
+        log("WARNING: STAGING_WRAM_TRACKING=1 active - DEBUG MODE, expect possible timeouts")
+    end
+    if STAGING_WRAM_PREARM then
+        log("WARNING: STAGING_WRAM_PREARM=1 active - high timeout risk, use for short runs only")
     end
 
     -- Log initial SA-1 bank register state (per Instrumentation Contract v1.1)
