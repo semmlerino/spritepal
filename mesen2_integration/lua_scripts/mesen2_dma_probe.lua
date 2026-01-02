@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.10"
+local LOG_VERSION = "2.11"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -414,10 +414,47 @@ local fill_session_buffer_bytes = {}   -- [offset_from_start] = byte value
 local fill_session_buffer_min = nil    -- Min address written
 local fill_session_buffer_max = nil    -- Max address written
 
+-- v2.11: Cold-start detector and populate session
+-- Detects when the tile buffer (0x1530-0x161A) is FIRST populated
+-- Triggers bounded PRG logging only during actual tile data fill
+local POPULATE_ENABLED = parse_bool(os.getenv("POPULATE_ENABLED"), true)
+local POPULATE_HASH_INTERVAL = parse_int(os.getenv("POPULATE_HASH_INTERVAL"), 100)  -- Check hash every N frames
+local POPULATE_CYCLE_BUDGET = parse_int(os.getenv("POPULATE_CYCLE_BUDGET"), 50000)  -- Max cycles to log PRG reads
+local POPULATE_MIN_CHANGE_BYTES = parse_int(os.getenv("POPULATE_MIN_CHANGE_BYTES"), 32)  -- Min bytes changed to trigger
+
+-- Exclude metadata range from triggering (the 12 bytes at 0x157B-0x15BE)
+local POPULATE_EXCLUDE_START = parse_int(os.getenv("POPULATE_EXCLUDE_START"), 0x157B)
+local POPULATE_EXCLUDE_END = parse_int(os.getenv("POPULATE_EXCLUDE_END"), 0x15BE)
+
+-- Cold-start state
+local populate_initial_hash = nil       -- Hash of buffer at first check
+local populate_initial_snapshot = nil   -- Full 235-byte snapshot for diff
+local populate_triggered = false        -- Already triggered populate session?
+local populate_last_hash_frame = 0      -- Last frame we computed hash
+
+-- Populate session state (similar to fill session but triggered by hash change)
+local populate_session_active = false
+local populate_session_start_frame = nil
+local populate_session_start_cycle = nil
+local populate_session_prg_reads = {}   -- Ring buffer of PRG reads during populate
+local populate_session_prg_head = 0
+local POPULATE_RING_SIZE = 512          -- Larger buffer for initial population
+local populate_session_prg_total = 0
+local populate_session_buffer_bytes = {}  -- Bytes written during populate
+local populate_session_write_count = 0
+local populate_session_write_pcs = {}   -- PC samples during populate
+
 -- v2.9: Forward declarations for fill session functions (called before definition)
 local log_fill_session_summary
 local reset_fill_session
 local compress_prg_runs
+
+-- v2.11: Forward declarations for populate session functions
+local compute_buffer_hash
+local take_buffer_snapshot
+local check_buffer_cold_start
+local log_populate_session_summary
+local reset_populate_session
 
 -- ============================================================================
 -- CAUSAL READ→WRITE TRACKING
@@ -1676,6 +1713,28 @@ local function on_buffer_write(address, value)
         fill_session_buffer_max = address
     end
 
+    -- v2.11: Track writes during populate session (cold-start detection)
+    if populate_session_active then
+        -- Get offset within buffer (for cleaner logging)
+        local base_addr = wram_address_mode == "absolute" and 0x7E0000 or 0
+        local offset = address - base_addr
+
+        -- Only track if NOT in metadata exclusion range
+        if offset < POPULATE_EXCLUDE_START or offset > POPULATE_EXCLUDE_END then
+            populate_session_buffer_bytes[offset] = value
+            populate_session_write_count = populate_session_write_count + 1
+
+            -- Sample PCs (limit to first 16 unique)
+            if #populate_session_write_pcs < 16 then
+                local pc_snapshot = get_cpu_state_snapshot()
+                if pc_snapshot then
+                    local pc_key = string.format("%02X:%04X", pc_snapshot.k_val or 0, pc_snapshot.pc_val or 0)
+                    populate_session_write_pcs[pc_key] = (populate_session_write_pcs[pc_key] or 0) + 1
+                end
+            end
+        end
+    end
+
     -- Initialize or rotate frame stats
     if buffer_write_current_frame ~= frame then
         -- Archive previous frame stats if any
@@ -1718,9 +1777,28 @@ local function on_buffer_write(address, value)
     end
 end
 
--- v2.9: PRG read callback - only logs during active fill session
--- This is safe because it's bounded to the fill window (not always-on)
+-- v2.9: PRG read callback - logs during active fill session OR populate session
+-- This is safe because it's bounded to the fill/populate window (not always-on)
 local function on_fill_session_prg_read(address, value)
+    -- v2.11: Also track during populate session (cold-start detection)
+    if populate_session_active then
+        populate_session_prg_total = populate_session_prg_total + 1
+        populate_session_prg_head = (populate_session_prg_head % POPULATE_RING_SIZE) + 1
+
+        local pc_snapshot = get_cpu_state_snapshot()
+        local k_val, pc_val = 0, 0
+        if pc_snapshot then
+            k_val = pc_snapshot.k_val or 0
+            pc_val = pc_snapshot.pc_val or 0
+        end
+
+        populate_session_prg_reads[populate_session_prg_head] = {
+            addr = address,
+            k = k_val,
+            pc = pc_val,
+        }
+    end
+
     -- Gate on fill session (the key optimization - only log during buffer fill)
     if not fill_session_active then
         return
@@ -1865,6 +1943,192 @@ reset_fill_session = function()
     fill_session_buffer_bytes = {}
     fill_session_buffer_min = nil
     fill_session_buffer_max = nil
+end
+
+-- =============================================================================
+-- v2.11: COLD-START DETECTOR AND POPULATE SESSION
+-- Detects when tile buffer is FIRST populated (not metadata updates)
+-- =============================================================================
+
+-- Compute a simple hash of the buffer (DJB2-style, fast enough for Lua)
+compute_buffer_hash = function()
+    if not wram_mem_type then return nil end
+
+    local hash = 5381
+    local base_addr = wram_address_mode == "absolute" and 0x7E0000 or 0
+    local start_addr = base_addr + BUFFER_WRITE_START
+    local end_addr = base_addr + BUFFER_WRITE_END
+
+    for addr = start_addr, end_addr do
+        -- Skip the metadata exclusion range
+        local offset = addr - base_addr
+        if offset < POPULATE_EXCLUDE_START or offset > POPULATE_EXCLUDE_END then
+            local byte = emu.read(addr, wram_mem_type, false) or 0
+            hash = ((hash * 33) + byte) % 0x100000000
+        end
+    end
+    return hash
+end
+
+-- Take a full snapshot of the buffer (for diff analysis)
+take_buffer_snapshot = function()
+    if not wram_mem_type then return nil end
+
+    local snapshot = {}
+    local base_addr = wram_address_mode == "absolute" and 0x7E0000 or 0
+    local start_addr = base_addr + BUFFER_WRITE_START
+    local end_addr = base_addr + BUFFER_WRITE_END
+
+    for addr = start_addr, end_addr do
+        local offset = addr - base_addr
+        -- Include all bytes in snapshot (even metadata, for completeness)
+        snapshot[offset] = emu.read(addr, wram_mem_type, false) or 0
+    end
+    return snapshot
+end
+
+-- Check for cold-start (first real change to tile buffer)
+check_buffer_cold_start = function(frame)
+    if not POPULATE_ENABLED then return end
+    if populate_triggered then return end  -- Already triggered once
+    if not wram_mem_type then return end
+
+    -- Only check every N frames to reduce overhead
+    if frame - populate_last_hash_frame < POPULATE_HASH_INTERVAL then
+        return
+    end
+    populate_last_hash_frame = frame
+
+    local current_hash = compute_buffer_hash()
+    if not current_hash then return end
+
+    -- First check: store initial state
+    if populate_initial_hash == nil then
+        populate_initial_hash = current_hash
+        populate_initial_snapshot = take_buffer_snapshot()
+        log(string.format("POPULATE_INIT: frame=%d initial_hash=0x%08X snapshot_size=%d",
+            frame, current_hash, populate_initial_snapshot and #populate_initial_snapshot or 0))
+        return
+    end
+
+    -- Check if hash changed
+    if current_hash ~= populate_initial_hash then
+        -- Count changed bytes (excluding metadata range)
+        local changed_count = 0
+        local current_snapshot = take_buffer_snapshot()
+        if populate_initial_snapshot and current_snapshot then
+            for offset = BUFFER_WRITE_START, BUFFER_WRITE_END do
+                if offset < POPULATE_EXCLUDE_START or offset > POPULATE_EXCLUDE_END then
+                    local old_byte = populate_initial_snapshot[offset] or 0
+                    local new_byte = current_snapshot[offset] or 0
+                    if old_byte ~= new_byte then
+                        changed_count = changed_count + 1
+                    end
+                end
+            end
+        end
+
+        log(string.format("POPULATE_CHANGE: frame=%d old_hash=0x%08X new_hash=0x%08X changed_bytes=%d",
+            frame, populate_initial_hash, current_hash, changed_count))
+
+        -- Only trigger if enough bytes changed (not just metadata churn)
+        if changed_count >= POPULATE_MIN_CHANGE_BYTES then
+            populate_triggered = true
+            populate_session_active = true
+            populate_session_start_frame = frame
+            populate_session_start_cycle = emu.getState and emu.getState().masterClock or 0
+            populate_session_prg_reads = {}
+            populate_session_prg_head = 0
+            populate_session_prg_total = 0
+            populate_session_buffer_bytes = {}
+            populate_session_write_count = 0
+            populate_session_write_pcs = {}
+
+            log(string.format("POPULATE_SESSION_START: frame=%d changed=%d threshold=%d",
+                frame, changed_count, POPULATE_MIN_CHANGE_BYTES))
+        else
+            -- Update baseline if change was below threshold (metadata only)
+            populate_initial_hash = current_hash
+            populate_initial_snapshot = current_snapshot
+        end
+    end
+end
+
+-- Log populate session summary
+log_populate_session_summary = function(frame, reason)
+    if not populate_session_active then return end
+
+    local ok, prg_runs_str, num_runs, max_run = pcall(function()
+        return compress_prg_runs(populate_session_prg_reads, populate_session_prg_total)
+    end)
+
+    if not ok then
+        prg_runs_str = "ERROR"
+        num_runs = 0
+        max_run = 0
+    end
+
+    -- Format write PCs
+    local pc_parts = {}
+    for pc_key, count in pairs(populate_session_write_pcs) do
+        table.insert(pc_parts, string.format("%s:%d", pc_key, count))
+    end
+    table.sort(pc_parts, function(a, b)
+        local ca = tonumber(a:match(":(%d+)$")) or 0
+        local cb = tonumber(b:match(":(%d+)$")) or 0
+        return ca > cb
+    end)
+    local pcs_str = table.concat(pc_parts, ",", 1, math.min(#pc_parts, 8))
+
+    log(string.format(
+        "POPULATE_SESSION: frame=%d-%d reason=%s writes=%d prg_total=%d prg_unique=%d runs=%d max_run=%d write_pcs=[%s] prg_runs=[%s]",
+        populate_session_start_frame or 0,
+        frame,
+        reason,
+        populate_session_write_count,
+        populate_session_prg_total,
+        math.min(#populate_session_prg_reads, POPULATE_RING_SIZE),
+        num_runs,
+        max_run,
+        pcs_str,
+        prg_runs_str
+    ))
+
+    -- Dump final buffer bytes
+    local snapshot = take_buffer_snapshot()
+    if snapshot then
+        local hex_parts = {}
+        for offset = BUFFER_WRITE_START, BUFFER_WRITE_END do
+            local b = snapshot[offset]
+            if b then
+                table.insert(hex_parts, string.format("%02X", b))
+            else
+                table.insert(hex_parts, "00")
+            end
+        end
+        local hex_str = table.concat(hex_parts, "")
+        log(string.format(
+            "POPULATE_BUFFER_DUMP: frame=%d addr_range=0x%04X-0x%04X bytes=%d hex=%s",
+            frame,
+            BUFFER_WRITE_START,
+            BUFFER_WRITE_END,
+            BUFFER_WRITE_END - BUFFER_WRITE_START + 1,
+            hex_str
+        ))
+    end
+end
+
+-- Reset populate session
+reset_populate_session = function()
+    populate_session_active = false
+    populate_session_start_frame = nil
+    populate_session_start_cycle = nil
+    populate_session_prg_reads = {}
+    populate_session_prg_head = 0
+    populate_session_prg_total = 0
+    populate_session_buffer_bytes = {}
+    populate_session_write_count = 0
+    populate_session_write_pcs = {}
 end
 
 local function log_buffer_write_summary(frame)
@@ -2022,6 +2286,21 @@ local function on_end_frame()
     end
 
     frame_count = frame_count + 1
+
+    -- v2.11: Cold-start detection (check for tile buffer population)
+    if POPULATE_ENABLED and not populate_triggered then
+        check_buffer_cold_start(frame_count)
+    end
+
+    -- v2.11: End populate session after cycle budget or N frames
+    if populate_session_active then
+        local elapsed_frames = frame_count - (populate_session_start_frame or 0)
+        -- End after 100 frames or if we got meaningful data
+        if elapsed_frames >= 100 or populate_session_prg_total >= POPULATE_RING_SIZE then
+            log_populate_session_summary(frame_count, "budget")
+            reset_populate_session()
+        end
+    end
 
     -- v2.2: Lazy registration (init-time timeout mitigation)
     -- Register expensive callbacks at STAGING_START_FRAME - 2 instead of init

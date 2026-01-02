@@ -67,6 +67,49 @@ to WRAM sources).
 
 ---
 
+## [2.16.0] - 2026-01-02
+
+### Cold-Start Detector and Populate Session (v2.11)
+
+**Context:** v2.10 buffer capture showed only 12 bytes written per-frame (metadata at
+0x157B-0x15BE), not the 235 bytes of tile data. The tile data must be populated
+EARLIER (during loading), not per-frame.
+
+**Solution:** Cold-start detection - hash the buffer every N frames, trigger bounded
+PRG logging only when the actual tile data changes (not metadata churn).
+
+**New Features:**
+- `POPULATE_ENABLED=1` - Enable cold-start detection
+- `POPULATE_HASH_INTERVAL=100` - Check buffer hash every N frames
+- `POPULATE_MIN_CHANGE_BYTES=32` - Minimum bytes changed to trigger session
+- `POPULATE_EXCLUDE_START/END` - Exclude metadata range from triggering
+- Hash-based change detection (DJB2-style, excludes metadata range)
+- Bounded populate session with PRG read logging
+- Buffer dump at session end for ROM comparison
+
+**Output:**
+- `POPULATE_INIT` - Initial buffer hash captured
+- `POPULATE_CHANGE` - Buffer content changed (logs byte count)
+- `POPULATE_SESSION_START` - Populate session triggered
+- `POPULATE_SESSION` - Summary with PRG runs and write PCs
+- `POPULATE_BUFFER_DUMP` - Final 235-byte hex dump
+
+**Key Insight:** The 12 bytes at 0x157B-0x15BE are pointers/metadata, not tile data.
+The actual tile data (235 bytes at 0x1530-0x161A) is populated during level loading,
+not per-frame.
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.10 → v2.11)
+- `run_populate_trace.bat` (new - cold-start detection script)
+
+**Usage:**
+1. Run `run_populate_trace.bat` (traces from frame 0)
+2. Look for `POPULATE_SESSION` entries
+3. Check `prg_runs` for ROM source candidates
+4. Use `POPULATE_BUFFER_DUMP` hex to search in ROM
+
+---
+
 ## [2.15.0] - 2026-01-02
 
 ### Buffer Byte Capture for Content Validation (v2.10)
