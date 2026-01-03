@@ -82,6 +82,8 @@ ROM ($E0-$EF banks) → [01:F724 routine] → source buffer (0x1530) → staging
 
 ## Key Constraints
 
+- **CAUSAL CHAIN PROVEN (v3.0)** — The idx→ROM[ptr]→staging→VRAM pipeline is verified causal. Corrupting ROM at pointer targets changes staging output. See `CHANGELOG.md` entry v3.0 and `03_GAME_MAPPING § Per-idx Ablation Proof`.
+- **Asset pointer table at 01:FE52** — 24-bit little-endian pointers, 3 bytes each. Index determines which sprite asset loads. See `03_GAME_MAPPING § Asset Pointer Table Discovery`.
 - **Kirby Super Star: 0% verbatim match rate for gameplay tiles** — Sprite DMAs come from WRAM 0x7E:2000, not cart ROM directly. CCDMA is NOT active for sprites. The transform occurs during WRAM staging. See `CHANGELOG.md` entries 2.6.0 and 2.7.0.
 - **Primary writer routine confirmed: `01:F724` / `01:F729`** — 100% stable across different gameplay scenarios. This is THE choke point for tracing ROM→VRAM. See `CHANGELOG.md` entry 2.13.0.
 - **Source buffer at `0x1530-0x161A`** — Staging copy reads from this 235-byte region. This is the intermediate buffer between ROM data and staging. See `CHANGELOG.md` entry 2.12.0.

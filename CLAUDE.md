@@ -63,11 +63,47 @@ cd 'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal'
 | `test_sprite_capture.lua` | Auto-capture at frame 700 (menu state) |
 | `mesen2_click_extractor.lua` | F9 capture + DMA tracking |
 | `mesen2_sprite_finder_final.lua` | DMA monitoring for ROM offset discovery |
+| `asset_selector_tracer_v3.lua` | Full idx→DMA attribution with session tracking (v3.0) |
+| `per_idx_ablation_v1.lua` | Per-index causal proof via ROM corruption (v3.0) |
 
 ### Quick Capture (Double-click)
 
 - `run_gameplay_capture.bat` - Captures during gameplay (~30 sec)
 - `run_sprite_capture.bat` - Captures at frame 700 (menu state)
+
+### Running with Movie Playback (for Gameplay)
+
+**Problem:** Testrunner mode (`--testrunner`) runs headless with no input, so the game stays in menus/attract mode. To test actual gameplay asset loading, use a movie file (`.mmo`).
+
+**Movie file location:** `C:\Users\gabri\Documents\Mesen2\Movies\Kirby Super Star (USA).mmo`
+
+**Pattern:** Movie files only play once a ROM is already running. Use two Mesen2 launches:
+
+```batch
+@echo off
+set MESEN_EXE=.\tools\mesen2\Mesen2.exe
+set ROM_PATH=roms\Kirby Super Star (USA).sfc
+set LUA_PATH=mesen2_integration\lua_scripts\your_script.lua
+set MOVIE_PATH=C:\Users\gabri\Documents\Mesen2\Movies\Kirby Super Star (USA).mmo
+
+REM 1. Launch ROM with Lua script
+start "" "%MESEN_EXE%" --enableStdout "%ROM_PATH%" "%LUA_PATH%"
+
+REM 2. Wait for ROM to start
+ping -n 6 127.0.0.1 >NUL
+
+REM 3. Send movie file to running instance (SingleInstance IPC)
+start "" "%MESEN_EXE%" "%MOVIE_PATH%"
+```
+
+**Key differences from testrunner:**
+- Uses `--enableStdout` instead of `--testrunner` (keeps window open)
+- Script must call `emu.stop()` to exit when done
+- Movie provides input to navigate menus and enter gameplay
+
+**Example batch files using this pattern:**
+- `run_ablation_test.bat`
+- `run_e9_monitor_movie.bat`
 
 ### Capture Output
 

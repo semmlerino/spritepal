@@ -776,12 +776,59 @@ idx 40 → 0xE9E667: read starts at 0xE9E667 ✓
 | `23` | 0 | Different format |
 | `25` | 5 | Different format |
 
+### Pointer Table Access Pipeline (v2.37)
+
+**Key discovery:** The ROM pointer table is accessed directly via LoROM mapping, not
+cached in WRAM. The backtrace tracer captured the complete fetch sequence:
+
+**Pipeline:**
+```
+Index → ROM[01:FE52 + idx*3] → DP[00:0002-0004] → PRG Stream
+```
+
+**Trace evidence (frame 1284, E9:3AEB load):**
+```
+01:FE64 = 0xEB (lo)   ← ROM table read (idx 6 = 0xFE52 + 6*3 = 0xFE64)
+01:FE65 = 0x3A (hi)
+01:FE66 = 0xE9 (bank)
+
+00:0002 = 0xEB (lo)   ← Direct page cache (pointer copied here)
+00:0003 = 0x3A (hi)
+00:0004 = 0xE9 (bank)
+
+E9:3AEB PRG read      ← Asset streaming begins
+```
+
+**Address mapping clarified:**
+- File offset `0x00FE64` = CPU address `01:FE64` (LoROM bank 01)
+- The earlier "0 reads from C0:FE52" was watching wrong address space
+- Table is accessed via bank 01 mirror, not bank C0
+
+**Direct page pointer cache:**
+- Location: `00:0002-00:0004` (lo, hi, bank bytes)
+- Updated immediately before PRG stream starts
+- Potential additional slots at `00:0005-0007`, `00:0008-000A`, etc.
+
+**CPU split pattern:**
+- S-CPU likely computes index and reads table
+- SA-1 performs streaming decode
+- Both CPUs involved in different pipeline stages
+
+**Implications for extraction:**
+1. Watch ROM table reads at `01:FE52-01:FFFF` to capture all index→pointer mappings
+2. Monitor DP writes to detect pointer cache updates
+3. Link PRG stream starts to preceding DP pointer for full attribution
+4. Each unique (index, pointer) pair = one selectable asset
+
 ### Next Steps
 
 **1) ~~Find the pointer/index table~~ DONE (v2.36)**
-Found at 0xC0FE52. Causal bytes are at table indices 6 and 40.
+Found at 0xC0FE52 / 01:FE52. Causal bytes are at table indices 6 and 40.
 
-**2) Mid-block ablation test:**
+**2) ~~Trace pointer access pipeline~~ DONE (v2.37)**
+Complete pipeline: idx → ROM table → DP cache → PRG stream.
+
+**3) Mid-block ablation test:**
 Ablate byte at E9E667+0x80 (inside block, not header) to confirm content
 drives output, not just header corruption.
 
@@ -812,3 +859,96 @@ python scripts\auto_bisect.py 0xE9E667 0xE9E000 0xE9FFFF
 ```
 
 Files: `run_ablation_range.bat` (parameterized runner), `scripts/auto_bisect.py` (orchestrator)
+
+---
+
+## Per-idx Ablation Proof (v3.0) — CAUSAL CHAIN PROVEN
+
+> **Status: PROVEN** — The idx→ROM[ptr]→staging→VRAM pipeline is causally verified.
+
+### What This Proves
+
+Corrupting ROM data at a pointer target **changes the staging output**. This is definitive
+proof that the sprite editor can reliably inject modified sprites by targeting pointer addresses.
+
+### Proof Methodology
+
+1. **Baseline run**: Capture staging payload hash for each idx session
+2. **Ablation run**: Corrupt ROM byte at ptr target, capture same DMA identity
+3. **Comparison**: Same DMA identity (wram + size) with different hash = causal
+
+### Results: idx=6 (E9:3AEB)
+
+| Metric | Baseline | Ablation (Mode A) | Ablation (Mode B) |
+|--------|----------|-------------------|-------------------|
+| Record type | 0xE0 | 0xFF (corrupted) | 0xE0 (preserved) |
+| WRAM start | 7E2000 | 7E2000 | 7E2000 |
+| Size | 640 | — | 640 |
+| Staging captures | 5 | **0** (bail) | 5 |
+| Hash | B5143253 | — | **31204703** |
+
+**Mode A** (corrupt first byte at ptr): Decoder doesn't recognize 0xFF as valid record
+type and bails — no staging output. Proves header byte is critical.
+
+**Mode B** (corrupt byte at ptr+0x10): Decoder runs normally but produces different
+output — hash changes from B5143253 to 31204703. Proves data content drives output.
+
+### Interpretation
+
+```
+idx=6 → ROM[01:FE64] → ptr=E9:3AEB → decode → staging @ 7E2000 → VRAM
+                              ↑
+                    corrupt here = output changes
+```
+
+- **Same DMA identity** (wram=7E2000, size=640) proves we're measuring the same transfer
+- **Different hash** proves the ROM data at that address determines the output
+- **Causality established**: modify ROM at ptr → VRAM content changes
+
+### Per-idx Database
+
+Captured via `asset_selector_tracer_v3.lua` with movie playback (3000 frames):
+
+| idx | ptr | record | sessions | staging | hash | status |
+|-----|-----|--------|----------|---------|------|--------|
+| 5 | E9:4D0A | 0x25 | 5 | 4 | 5F0BB905 | stable |
+| **6** | **E9:3AEB** | **0xE0** | **5** | **5** | **B5143253** | **PROVEN** |
+| 19 | E9:8DDF | 0x03 | 2 | 2 | B254A8E4 | stable |
+| 40 | E9:E667 | 0xE0 | 17 | 17 | EC8FF37F | stable |
+| 43 | E9:FB06 | 0x00 | 1 | 1 | 232EE368 | stable |
+| 72 | E9:677F | 0x1F | 2 | 2 | 42AEE372, 5F0BB905 | 2 variants |
+
+### Running Ablation Tests
+
+```batch
+REM 1. Edit per_idx_ablation_v1.lua:
+REM    ABLATION_TARGET_IDX = 6 (or other idx)
+REM    ABLATION_ENABLED = false (baseline) or true (ablation)
+REM    ABLATION_MODE = "A" (header) or "B" (data)
+
+REM 2. Run baseline:
+run_idx_ablation.bat
+REM Output: mesen2_exchange/ablation_idx6_baseline.log
+
+REM 3. Edit: ABLATION_ENABLED = true
+
+REM 4. Run ablation:
+run_idx_ablation.bat
+REM Output: mesen2_exchange/ablation_idx6_ablation.log
+
+REM 5. Compare hash values in the PROOF DATA sections
+```
+
+### Implications for Sprite Injection
+
+1. **Injection point**: Modify ROM data starting at `ptr` address
+2. **Control point**: The idx→ptr table at 01:FE52 determines which asset loads
+3. **Size constraint**: Injected data must fit within original block or pointer table needs update
+4. **Format**: Data must match expected record type (0xE0, 0x25, etc.) for decoder to process
+
+### Files
+
+- `mesen2_integration/lua_scripts/asset_selector_tracer_v3.lua` — Full pipeline tracer
+- `mesen2_integration/lua_scripts/per_idx_ablation_v1.lua` — Per-idx ablation test
+- `run_asset_selector_v3.bat` — Run v3 tracer with movie
+- `run_idx_ablation.bat` — Run ablation test

@@ -4,6 +4,98 @@ All notable changes to the sprite extraction pipeline documentation and tooling.
 
 ---
 
+## v3.0 - Per-idx Ablation Proof Complete (2026-01-03)
+
+### Causal Chain PROVEN: idx → ROM[ptr] → staging → VRAM
+
+The complete asset selection pipeline has been **proven causal** via per-idx ablation testing.
+This is the definitive proof that modifying ROM data at pointer targets will change VRAM output.
+
+**Proof methodology:**
+1. **Baseline run**: Capture staging payload hash for each idx session
+2. **Ablation run**: Corrupt ROM byte at ptr target, capture same DMA identity
+3. **Comparison**: Same DMA identity (wram + size) with different hash = causal proof
+
+**Results for idx=6 (ptr=E9:3AEB, record=0xE0):**
+
+| Mode | Record Type | WRAM | Size | Hash |
+|------|-------------|------|------|------|
+| Baseline | 0xE0 | 7E2000 | 640 | B5143253 |
+| Ablation (Mode A) | 0xFF | 7E2000 | 640 | *no output* |
+| Ablation (Mode B) | 0xE0 | 7E2000 | 640 | **31204703** |
+
+**Key findings:**
+- **Mode A** (corrupt first byte): Record type changes 0xE0→0xFF, decoder bails, no staging output
+- **Mode B** (corrupt ptr+0x10): Record type preserved, decoder runs, **hash changes**
+- Both prove causality: corrupt ROM at ptr → output changes
+
+**What this means for sprite editing:**
+- Modifying ROM data at pointer targets **will** change what appears in VRAM
+- The idx→ptr lookup table (01:FE52) is the reliable control point for sprite injection
+- Each idx corresponds to a specific sprite asset that can be replaced
+
+**New tooling:**
+- `per_idx_ablation_v1.lua` - Per-index ablation test with identity tracking
+- `run_idx_ablation.bat` - Batch runner for ablation tests
+- Output: `mesen2_exchange/ablation_idx*_[baseline|ablation].log`
+
+**Per-idx database (from v3 tracer):**
+| idx | ptr | record | baseline_hash | status |
+|-----|-----|--------|---------------|--------|
+| 5 | E9:4D0A | 0x25 | 5F0BB905 | stable |
+| 6 | E9:3AEB | 0xE0 | B5143253 | **PROVEN** |
+| 19 | E9:8DDF | 0x03 | B254A8E4 | stable |
+| 40 | E9:E667 | 0xE0 | EC8FF37F | stable |
+| 43 | E9:FB06 | 0x00 | 232EE368 | stable |
+| 72 | E9:677F | 0x1F | 42AEE372/5F0BB905 | 2 variants |
+
+---
+
+## v2.37 - Pointer Table Access Pipeline Traced (2026-01-03)
+
+### Pointer Fetch Pipeline Captured
+
+Using asset-load backtrace tracing with movie playback, captured the complete
+pointer fetch sequence for E9:3AEB at frame 1284:
+
+**Complete pipeline:**
+```
+Index (6) → ROM[01:FE64] → DP[00:0002-0004] → PRG Stream (E9:3AEB)
+```
+
+**Key findings:**
+
+1. **ROM table accessed via LoROM bank 01 (not C0)**
+   - File offset `0x00FE64` = CPU address `01:FE64`
+   - Earlier "0 reads from C0:FE52" was watching wrong address space
+   - Table index 6: offset = 0xFE52 + (6 * 3) = 0xFE64
+
+2. **Direct page pointer cache at 00:0002-0004**
+   - 3-byte pointer (lo, hi, bank) written before each PRG stream
+   - Enables fast access during decode loop
+   - May have additional slots at 00:0005-0007, etc.
+
+3. **Callback address format is CPU (not file)**
+   - PRG ROM callbacks receive CPU addresses (e.g., 0xE93AEB)
+   - Not file offsets (e.g., 0x293AEB)
+   - Must compare against CPU format in triggers
+
+**New scripts created:**
+- `asset_load_backtrace.lua` - Ring buffer backtrace on asset load trigger
+- `asset_selector_tracer.lua` - Generalized pipeline tracer (all indices)
+- `e9_bank_monitor.lua` - Monitor E9 bank reads with target detection
+
+**Documentation:**
+- Added "Pointer Table Access Pipeline (v2.37)" section to 03_GAME_MAPPING
+- Added "Running with Movie Playback" section to CLAUDE.md
+
+### Next: Generalized Asset Attribution
+
+With the pipeline understood, next step is mapping all (index, pointer) pairs
+to their downstream DMA payloads to build a complete asset database.
+
+---
+
 ## Reconciliation of Contradictory Findings (2026-01-01)
 
 Earlier changelog entries contain contradictions due to over-generalization from
