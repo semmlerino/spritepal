@@ -17,6 +17,7 @@ The tool will:
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -189,10 +190,18 @@ def bisect(target: int, start: int, end: int, baseline_path: Path) -> list[dict]
         else:
             print(f"  CAUSAL - continuing bisection")
 
-        # Save log for this step
+        # Save log for this step (copy instead of rename to avoid lock issues)
         log_backup = SPRITEPAL_DIR / f"bisect_step_{step}_{format_addr(test_start)}_{format_addr(test_end)}.txt"
-        LOG_FILE.rename(log_backup) if LOG_FILE.exists() else None
-        print(f"  Log saved: {log_backup.name}")
+        for attempt in range(3):
+            try:
+                if LOG_FILE.exists():
+                    shutil.copy(LOG_FILE, log_backup)
+                    print(f"  Log saved: {log_backup.name}")
+                break
+            except PermissionError:
+                time.sleep(2)
+        else:
+            print(f"  Warning: Could not save log (file locked)")
 
         # Move to next range
         start, end = next_start, next_end

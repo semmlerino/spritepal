@@ -67,6 +67,24 @@ to WRAM sources).
 
 ---
 
+## [2.29.0] - 2026-01-03
+
+### Both Causal Clusters Bisected to Single Bytes
+
+Completed automated bisection for both identified causal clusters:
+
+| Address | Flips | Reduction | Status |
+|---------|-------|-----------|--------|
+| **0xE9E667** | 17 | 8KB → 1B | Confirmed (dominant cluster) |
+| **0xE93AEB** | 3 | 16KB → 1B | Confirmed (secondary cluster) |
+
+**Key findings:**
+- Two single bytes in bank E9 control the majority of sprite payload variations
+- 0xE9E667 alone accounts for 85% of observed payload_hash flips (17/20)
+- Both are likely control/pointer bytes, not pixel data
+
+---
+
 ## [2.28.0] - 2026-01-03
 
 ### Automated Bisection Tool

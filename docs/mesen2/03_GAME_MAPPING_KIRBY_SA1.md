@@ -600,20 +600,24 @@ When testing new PRG ranges, check for flips in these signature DMAs:
 Full binary search from 16KB to 1 byte identifies the smallest ROM region where
 ablating reads is sufficient to cause payload_hash flips.
 
-| Address | Flips | Flip Frames | Byte Value | Interpretation |
-|---------|-------|-------------|------------|----------------|
-| **0xE93AEB** | 5 | 1681, 1684, 1760, 1769, 1773 | 0xE0 | Control/pointer byte (single byte affecting multiple DMAs) |
+| Address | Flips | Reduction | Interpretation |
+|---------|-------|-----------|----------------|
+| **0xE9E667** | 17 | 8KB → 1B | Dominant cluster - control/pointer byte |
+| **0xE93AEB** | 3 | 16KB → 1B | Secondary cluster - control/pointer byte |
 
-**0xE93AEB Analysis:**
+**0xE9E667 Analysis (dominant cluster):**
+- File offset: 0x29E667 (HiROM: bank E9 → file 0x290000 + offset)
+- Bisection: 8KB (E9E000-E9FFFF) → 1 byte, 17 flips at every step
+- Key insight: Single byte causing 17 payload_hash flips = major control point
+
+**0xE93AEB Analysis (secondary cluster):**
 - File offset: 0x293AEB (HiROM: bank E9 → file 0x290000 + offset)
-- Reduction: 16KB → 1B (16,384x)
-- Context: Structured data, not code - likely sprite metadata table
-- Key insight: Single byte affecting 5 DMAs over 100+ frames = selector/index, NOT pixel data
+- Bisection: 16KB (E90000-E93FFF) → 1 byte
+- Key insight: Single byte affecting multiple DMAs over 100+ frames = selector/index
 
 **Remaining targets for bisection:**
 | Address | Flips | Status |
 |---------|-------|--------|
-| 0xE9E667 | 17 | Pending (highest priority - dominant cluster) |
 | 0xE94D0A | 4 | Pending |
 | 0xE9677F | 1 | Pending |
 | 0xE98DDF | 1 | Pending |
