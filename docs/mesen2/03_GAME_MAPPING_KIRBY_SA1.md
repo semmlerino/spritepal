@@ -688,18 +688,44 @@ Measured contiguous read spans by filtering same-bank reads only:
 - Consistent with single sprite animation frame or small sprite sheet
 - Not tiny per-frame patches, not large scene packs
 
+### Header Analysis (v2.35.1)
+
+Examined block headers and adjacency:
+
+```
+E9E667: E0 49 98 90 4C 48 26 24 13 12 89 89 E4 24 F8 88
+E93AEB: E0 33 00 7F A0 1F 00 7F 82 7D 10 ED 02 F5 02 F8
+```
+
+**Findings:**
+- Both start with `E0` but no obvious length field matches block sizes (488, 585)
+- `E0` is NOT a unique block marker - 888 occurrences in bank E9 alone
+- After E93AEB block ends (0x293D33), next byte is `E0 3F...` (another block!)
+- But decoder JUMPS to 0xE9677F (10KB away) - **pointer-based selection**
+
+**Adjacency test:**
+| Block End | Next Read | Gap | Has E0? |
+|-----------|-----------|-----|---------|
+| E9E84E | E98DDF | -23KB (backwards!) | NO |
+| E93D33 | E9677F | +10KB | NO |
+
+The "next read" addresses (E9677F, E98DDF) are **NOT** asset blocks - they're
+decoder lookup tables (no E0 header). The decoder uses a pointer table to
+select which blocks to decompress.
+
 ### Next Steps
 
-**1) Dump raw block bytes:**
-Extract 488 bytes from 0xE9E667 and 585 bytes from 0xE93AEB.
-Look for compression format signatures.
+**1) Find the pointer/index table:**
+The decoder reads from 0x00841F and jumps to specific blocks. Trace what
+determines which block address is selected.
 
-**2) Check adjacent blocks:**
-The "next asset" addresses may form a contiguous asset table:
-- 0xE93AEB (585B) → 0xE9677F → 0xE98DDF → 0xE9E667 (488B)?
+**2) Mid-block ablation test:**
+Ablate byte at E9E667+0x80 (inside block, not header) to confirm content
+drives output, not just header corruption.
 
 **3) Map blocks to staging regions:**
-Capture staging buffer before/after decode to see which $7E2000-$27FF region each fills
+Capture staging buffer before/after decode to see which $7E2000-$27FF
+region each block fills
 
 **Remaining targets for bisection:**
 | Address | Flips | Status |

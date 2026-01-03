@@ -67,6 +67,29 @@ to WRAM sources).
 
 ---
 
+## [2.35.1] - 2026-01-03
+
+### Header Analysis: Pointer-Based Block Selection
+
+Examined block headers and physical adjacency:
+
+**Headers:**
+```
+E9E667: E0 49 98 90 4C 48 26 24...
+E93AEB: E0 33 00 7F A0 1F 00 7F...
+```
+
+**Findings:**
+- No obvious length field in headers (doesn't match 488/585)
+- E0 is NOT unique - 888 occurrences in bank E9
+- Decoder JUMPS between blocks (E9E84E → E98DDF is -23KB backwards!)
+- "Next read" addresses (E9677F, E98DDF) have no E0 header - they're lookup tables
+
+**Conclusion:** Decoder uses pointer table to select blocks, not sequential reading.
+The 0x00841F reads during decompression are table lookups.
+
+---
+
 ## [2.35.0] - 2026-01-03
 
 ### Block Boundary Analysis: ~500 Byte Sprite Chunks
