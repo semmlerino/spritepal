@@ -1,4 +1,4 @@
--- sprite_rom_finder.lua v5
+-- sprite_rom_finder.lua v6
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset
@@ -6,6 +6,7 @@
 --
 -- v4 fixes: snesMemory callback, VRAM word/byte unit handling, diagnostics
 -- v5 fixes: shadow VMADD (no register readback), no history purge
+-- v6 fixes: shadow DMA channel regs $4300-$437F (post-DMA reads are garbage)
 
 local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local LOG_FILE = OUTPUT_DIR .. "sprite_rom_finder.log"
@@ -240,21 +241,45 @@ local function on_vram_addr_write(address, value)
     vram_addr_shadow = vmadd_lo + (vmadd_hi * 256)
 end
 
+-- FIX #8: Shadow DMA channel registers (post-DMA reads return garbage)
+local dma_shadow = {}
+for ch = 0, 7 do
+    dma_shadow[ch] = { dmap=0, bbad=0, a1tl=0, a1th=0, a1tb=0, dasl=0, dash=0 }
+end
+
+local function on_dma_reg_write(address, value)
+    local offset = address - 0x4300
+    local ch = math.floor(offset / 16)
+    local reg = offset % 16
+    if ch < 0 or ch > 7 then return end
+    local s = dma_shadow[ch]
+    if     reg == 0 then s.dmap = value
+    elseif reg == 1 then s.bbad = value
+    elseif reg == 2 then s.a1tl = value
+    elseif reg == 3 then s.a1th = value
+    elseif reg == 4 then s.a1tb = value
+    elseif reg == 5 then s.dasl = value
+    elseif reg == 6 then s.dash = value
+    end
+end
+
 local function on_dma_enable(addr, value)
+    -- FIX #8: Handle nil value (Mesen may pass nil sometimes)
+    local enable = value
+    if enable == nil then
+        enable = emu.read(0x420B, emu.memType.snesMemory) or 0
+    end
+    enable = enable & 0xFF
+    if enable == 0 then return nil end
+
     for ch = 0, 7 do
-        if (value & (1 << ch)) ~= 0 then
-            local ch_base = 0x4300 + (ch * 0x10)
-
-            local dmap = emu.read(ch_base + 0, emu.memType.snesRegister) or 0
-            local bbad = emu.read(ch_base + 1, emu.memType.snesRegister) or 0
-            local a1tl = emu.read(ch_base + 2, emu.memType.snesRegister) or 0
-            local a1th = emu.read(ch_base + 3, emu.memType.snesRegister) or 0
-            local a1tb = emu.read(ch_base + 4, emu.memType.snesRegister) or 0
-            local dasl = emu.read(ch_base + 5, emu.memType.snesRegister) or 0
-            local dash = emu.read(ch_base + 6, emu.memType.snesRegister) or 0
-
-            local src_addr = a1tl + (a1th * 256) + (a1tb * 65536)
-            local dma_size = dasl + (dash * 256)
+        if (enable & (1 << ch)) ~= 0 then
+            -- Use shadowed registers (post-DMA reads return garbage)
+            local s = dma_shadow[ch]
+            local dmap = s.dmap or 0
+            local bbad = s.bbad or 0
+            local src_addr = (s.a1tl or 0) + ((s.a1th or 0) * 256) + ((s.a1tb or 0) * 65536)
+            local dma_size = (s.dasl or 0) + ((s.dash or 0) * 256)
             if dma_size == 0 then dma_size = 0x10000 end
 
             local direction = (dmap & 0x80) >> 7
@@ -518,11 +543,12 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v5")
+log("SPRITE ROM FINDER v6")
 log("========================================")
 log("v3: LoROM mapping, DP bank filter, staging-only attribution")
 log("v4: snesMemory callback, word/byte lookup, diagnostics")
 log("v5: shadow VMADD, no history purge")
+log("v6: shadow DMA regs $4300-$437F, nil-safe enable")
 log("")
 log("LEFT-CLICK on sprite = lookup ROM offset")
 log("RIGHT-CLICK = clear panel")
@@ -554,6 +580,12 @@ end)
 pcall(function()
     emu.addMemoryCallback(on_vram_addr_write, emu.callbackType.write,
         0x2116, 0x2117, snes_cpu, emu.memType.snesMemory)
+end)
+
+-- FIX #8: Shadow DMA channel registers $4300-$437F
+pcall(function()
+    emu.addMemoryCallback(on_dma_reg_write, emu.callbackType.write,
+        0x4300, 0x437F, snes_cpu, emu.memType.snesMemory)
 end)
 
 emu.addEventCallback(on_frame, emu.eventType.endFrame)

@@ -7,7 +7,7 @@ set LUA_PATH=mesen2_integration\lua_scripts\sprite_rom_finder.lua
 set MOVIE_PATH=C:\Users\gabri\Documents\Mesen2\Movies\Kirby Super Star (USA).mmo
 
 echo ========================================
-echo SPRITE ROM FINDER v5 (Movie Mode)
+echo SPRITE ROM FINDER v6 (Movie Mode)
 echo ========================================
 echo.
 echo LEFT-CLICK on sprite = lookup ROM offset

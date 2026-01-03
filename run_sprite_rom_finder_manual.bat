@@ -6,7 +6,7 @@ set ROM_PATH=roms\Kirby Super Star (USA).sfc
 set LUA_PATH=mesen2_integration\lua_scripts\sprite_rom_finder.lua
 
 echo ========================================
-echo SPRITE ROM FINDER v5 (Manual Play)
+echo SPRITE ROM FINDER v6 (Manual Play)
 echo ========================================
 echo.
 echo LEFT-CLICK on sprite = lookup ROM offset
