@@ -67,6 +67,31 @@ to WRAM sources).
 
 ---
 
+## [2.30.1] - 2026-01-03
+
+### Mesen2 PRG Callback Address Format Fix
+
+**Problem:** Ablation callbacks showed 0 hits even with both S-CPU and SA-1 registered.
+
+**Root cause:** Mesen2 `addMemoryCallback` registration range uses **file offsets**
+(0x000000-0x3FFFFF), but callback receives **CPU addresses** (0xC00000+).
+
+**Fix:** Convert CPU address to file offset for registration:
+```lua
+-- CPU 0xE9E667 → File 0x29E667 (subtract 0xC00000)
+local function cpu_to_file(cpu_addr)
+    if cpu_addr >= 0xC00000 then
+        return cpu_addr - 0xC00000
+    end
+    return cpu_addr
+end
+
+local ABLATION_PRG_START = cpu_to_file(ABLATION_PRG_START_CPU)
+-- Registration uses file offset, callback check uses CPU address
+```
+
+---
+
 ## [2.30.0] - 2026-01-03
 
 ### WRAM Diff Capture for Causal Analysis

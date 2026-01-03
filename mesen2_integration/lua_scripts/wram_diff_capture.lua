@@ -17,10 +17,24 @@ local WRAM_END = 0x7E27FF
 local WRAM_SIZE = WRAM_END - WRAM_START + 1  -- 2048 bytes
 
 -- Ablation config (from env)
+-- NOTE: Addresses are CPU addresses (0xC00000+). Callback receives CPU addresses.
+-- But registration range uses FILE OFFSETS (0-0x3FFFFF for 4MB ROM).
 local ABLATION_ENABLED = (os.getenv("ABLATION_ENABLED") == "1")
-local ABLATION_PRG_START = tonumber(os.getenv("ABLATION_PRG_START") or "0") or 0
-local ABLATION_PRG_END = tonumber(os.getenv("ABLATION_PRG_END") or "0") or 0
+local ABLATION_PRG_START_CPU = tonumber(os.getenv("ABLATION_PRG_START") or "0") or 0
+local ABLATION_PRG_END_CPU = tonumber(os.getenv("ABLATION_PRG_END") or "0") or 0
 local ABLATION_VALUE = tonumber(os.getenv("ABLATION_VALUE") or "0xFF") or 0xFF
+
+-- Convert CPU address to file offset for SA-1 HiROM
+-- CPU 0xC00000-0xFFFFFF maps to file 0x000000-0x3FFFFF
+local function cpu_to_file(cpu_addr)
+    if cpu_addr >= 0xC00000 then
+        return cpu_addr - 0xC00000
+    end
+    return cpu_addr  -- Already a file offset?
+end
+
+local ABLATION_PRG_START = cpu_to_file(ABLATION_PRG_START_CPU)
+local ABLATION_PRG_END = cpu_to_file(ABLATION_PRG_END_CPU)
 
 local log_handle = nil
 local dump_done = false
@@ -71,9 +85,10 @@ local function dump_wram(frame)
 end
 
 -- Ablation callback
+-- NOTE: Callback receives CPU addresses (0xC00000+), so check against CPU range
 local function on_prg_read(address, value)
     if script_stopping then return nil end
-    if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
+    if ABLATION_ENABLED and address >= ABLATION_PRG_START_CPU and address <= ABLATION_PRG_END_CPU then
         ablation_hits = ablation_hits + 1
         if ablation_hits <= 5 then
             log(string.format("ABLATION_HIT: addr=0x%06X frame=%d value=0x%02X->0x%02X",
@@ -108,9 +123,10 @@ local function on_frame()
 end
 
 -- Initialize
-log(string.format("WRAM_DIFF_CAPTURE: start dump_frame=%d wram=0x%04X-0x%04X ablation=%s range=0x%06X-0x%06X",
+log(string.format("WRAM_DIFF_CAPTURE: start dump_frame=%d wram=0x%04X-0x%04X ablation=%s cpu_range=0x%06X-0x%06X file_range=0x%06X-0x%06X",
     DUMP_FRAME, WRAM_START, WRAM_END,
     ABLATION_ENABLED and "ENABLED" or "DISABLED",
+    ABLATION_PRG_START_CPU, ABLATION_PRG_END_CPU,
     ABLATION_PRG_START, ABLATION_PRG_END))
 
 -- CPU type constants
