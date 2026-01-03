@@ -1,13 +1,12 @@
--- sprite_rom_finder.lua v7
+-- sprite_rom_finder.lua v8
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset
 -- RIGHT-CLICK = clear panel
 --
--- v4 fixes: snesMemory callback, VRAM word/byte unit handling, diagnostics
--- v5 fixes: shadow VMADD (no register readback), no history purge
 -- v6 fixes: shadow DMA channel regs $4300-$437F (post-DMA reads are garbage)
--- v7 fixes: session queue (30-frame window) instead of fragile single active_session
+-- v7 fixes: session queue instead of fragile single active_session
+-- v8 fixes: cleaner queue (size cap, 45-frame window, backward iteration)
 
 local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local LOG_FILE = OUTPUT_DIR .. "sprite_rom_finder.log"
@@ -140,11 +139,11 @@ local idx_database = {}
 local pending_tbl = {}
 local pending_dp = {}
 
--- FIX #9: Use a session queue instead of single active_session
--- Sessions survive for SESSION_MAX_AGE frames to handle SA-1 decode latency
-local recent_sessions = {}
+-- FIX #9: Session queue with size cap and time window
 local session_counter = 0
-local SESSION_MAX_AGE = 30  -- frames to keep sessions (tune if needed)
+local recent_sessions = {}
+local RECENT_SESSIONS_MAX = 64
+local SESSION_MATCH_WINDOW = 45  -- frames; tune 30-90 if needed
 
 local function is_valid_ptr(ptr)
     local bank = (ptr >> 16) & 0xFF
@@ -155,31 +154,29 @@ end
 
 local function start_session(ptr, idx)
     session_counter = session_counter + 1
-    table.insert(recent_sessions, { id = session_counter, ptr = ptr, idx = idx, frame = frame_count })
+    table.insert(recent_sessions, {
+        id = session_counter,
+        ptr = ptr,
+        idx = idx,
+        frame = frame_count
+    })
+    if #recent_sessions > RECENT_SESSIONS_MAX then
+        table.remove(recent_sessions, 1)
+    end
 end
 
--- Find most recent session within age limit
-local function find_recent_session()
-    local best = nil
-    local best_frame = -1
-    for i, s in ipairs(recent_sessions) do
-        if (frame_count - s.frame) <= SESSION_MAX_AGE and s.frame > best_frame then
-            best = s
-            best_frame = s.frame
+-- Pick most recent session within window (iterate backwards, break early)
+local function match_recent_session()
+    for i = #recent_sessions, 1, -1 do
+        local s = recent_sessions[i]
+        if (frame_count - s.frame) <= SESSION_MATCH_WINDOW then
+            return s
+        else
+            -- older than window; list is chronological, stop early
+            break
         end
     end
-    return best
-end
-
--- Clean up old sessions
-local function cleanup_sessions()
-    local new_list = {}
-    for _, s in ipairs(recent_sessions) do
-        if (frame_count - s.frame) <= SESSION_MAX_AGE then
-            table.insert(new_list, s)
-        end
-    end
-    recent_sessions = new_list
+    return nil
 end
 
 local function on_table_read(addr, value)
@@ -321,13 +318,13 @@ local function on_dma_enable(addr, value)
                 -- FIX #4: Only attribute staging DMAs
                 local is_staging = (src_addr >= STAGING_START and src_addr <= STAGING_END)
 
-                -- FIX #9: Use session queue - find most recent session within age limit
+                -- FIX #9: Use session queue - match most recent session within window
                 local session_idx, session_ptr, file_off = nil, nil, nil
                 if is_staging then
-                    local session = find_recent_session()
-                    if session then
-                        session_idx = session.idx
-                        session_ptr = session.ptr
+                    local s = match_recent_session()
+                    if s then
+                        session_idx = s.idx
+                        session_ptr = s.ptr
                         if session_ptr then file_off = cpu_to_file_offset(session_ptr) end
                     end
                 end
@@ -447,7 +444,7 @@ local function draw_result_panel()
     end
 end
 
--- Debug: show mouse coords and sprite count
+-- Debug: show mouse coords, sprite count, and session diagnostics
 local function draw_debug_info(mouse)
     local visible_count = 0
     for i = 0, 127 do
@@ -458,10 +455,16 @@ local function draw_debug_info(mouse)
     local vram_count = 0
     for _ in pairs(vram_upload_map) do vram_count = vram_count + 1 end
 
+    local idx_count = 0
+    for _ in pairs(idx_database) do idx_count = idx_count + 1 end
+
     emu.drawString(170, 4, string.format("(%d,%d)", mouse.x, mouse.y), 0x888888, 0x00000000)
     emu.drawString(170, 13, string.format("spr:%d", visible_count), 0x888888, 0x00000000)
     emu.drawString(170, 22, string.format("vram:%d", vram_count), 0x888888, 0x00000000)
     emu.drawString(170, 31, string.format("f:%d", frame_count), 0x888888, 0x00000000)
+    -- Diagnostic: idx_database entries and session count
+    emu.drawString(170, 40, string.format("idx:%d", idx_count), 0x00FF00, 0x00000000)
+    emu.drawString(170, 49, string.format("ses:%d", #recent_sessions), 0x00FF00, 0x00000000)
 end
 
 local function on_left_click(mouse)
@@ -545,10 +548,7 @@ local function on_frame()
     --     end
     -- end
 
-    -- FIX #9: Clean up old sessions periodically
-    if frame_count % 10 == 0 then
-        cleanup_sessions()
-    end
+    -- Session cleanup handled by size cap in start_session()
 
     local mouse = emu.getMouseState()
 
@@ -574,11 +574,11 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v7")
+log("SPRITE ROM FINDER v8")
 log("========================================")
-log("v5: shadow VMADD, no history purge")
 log("v6: shadow DMA regs $4300-$437F")
-log("v7: session queue (30-frame window)")
+log("v7: session queue")
+log("v8: 45-frame window, idx/ses diagnostics")
 log("")
 log("LEFT-CLICK on sprite = lookup ROM offset")
 log("RIGHT-CLICK = clear panel")
