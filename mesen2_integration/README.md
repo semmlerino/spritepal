@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v5)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v9)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,11 +11,12 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v5)
+### Key implementation details (v9)
+- **DMA reg shadowing**: Captures $4300-$437F writes (post-DMA reads return garbage)
 - **VMADD shadowing**: Captures $2116/$2117 writes (reading registers returns garbage)
-- **No history purge**: Tiles loaded once stay in map (enemies reuse tiles for minutes)
+- **Session queue**: 64-entry queue with 45-frame window (handles SA-1 decode latency)
 - **SA-1 LoROM mapping**: `file = (bank - 0xC0) * 0x8000 + (addr - 0x8000)`
-- **Unit handling**: Tries word/byte conversions if exact lookup fails
+- **Debug diagnostics**: Shows `idx:N` and `ses:N` counters on screen
 
 ### Usage
 ```batch
@@ -42,6 +43,8 @@ run_sprite_rom_finder.bat
 - `spr:N` - visible sprite count
 - `vram:N` - tracked VRAM uploads
 - `f:N` - frame count
+- `idx:N` - entries in idx_database (table reads working?)
+- `ses:N` - sessions in queue (DP writes matching?)
 
 ### Technical details
 - **SA-1 LoROM mapping**: `file = (bank - 0xC0) * 0x8000 + (addr - 0x8000)`
