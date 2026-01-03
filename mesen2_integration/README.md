@@ -2,7 +2,61 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Quick Start
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v5)
+
+**One-click ROM offset lookup** - no manual breakpoints needed.
+
+### How it works
+```
+visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
+```
+
+### Key implementation details (v5)
+- **VMADD shadowing**: Captures $2116/$2117 writes (reading registers returns garbage)
+- **No history purge**: Tiles loaded once stay in map (enemies reuse tiles for minutes)
+- **SA-1 LoROM mapping**: `file = (bank - 0xC0) * 0x8000 + (addr - 0x8000)`
+- **Unit handling**: Tries word/byte conversions if exact lookup fails
+
+### Usage
+```batch
+# From spritepal directory, double-click:
+run_sprite_rom_finder.bat
+```
+
+1. **Wait** for movie to reach gameplay (sprites loading)
+2. **Pause** (Space or P) when target sprite is visible
+3. **Left-click** on the sprite
+4. **Read** the panel and console output:
+   - `idx` = asset selector index
+   - `ptr` = CPU address (e.g., `E9:E667`)
+   - `FILE: 0x0NNNNN` = ROM file offset
+
+### Controls
+| Input | Action |
+|-------|--------|
+| Left-click | Lookup ROM source for sprite under cursor |
+| Right-click | Clear info panel |
+
+### Debug info (top-right corner)
+- `(x,y)` - mouse coordinates
+- `spr:N` - visible sprite count
+- `vram:N` - tracked VRAM uploads
+- `f:N` - frame count
+
+### Technical details
+- **SA-1 LoROM mapping**: `file = (bank - 0xC0) * 0x8000 + (addr - 0x8000)`
+- **Session tracking**: Watches `01:FE52` table reads and `00:0002` DP writes
+- **DMA attribution**: Only tags staging WRAM (7E:2000-2FFF) → VRAM transfers
+- **VMADD shadow**: Captures $2116/$2117 writes (register readback is unreliable)
+- **History**: Persistent (no purge) - tiles may be loaded once and reused
+
+### If "Not found" appears
+- Sprite tiles were uploaded before script started tracking
+- **Fix**: Wait for sprite to animate (triggers new DMA), then click again
+
+---
+
+## 🎯 Quick Start (Manual Method)
 
 ### 1. Interactive Guided Workflow
 ```bash
