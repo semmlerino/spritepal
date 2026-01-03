@@ -67,6 +67,50 @@ to WRAM sources).
 
 ---
 
+## [2.30.0] - 2026-01-03
+
+### WRAM Diff Capture for Causal Analysis
+
+Added tools to analyze what the causal bytes (0xE9E667, 0xE93AEB) actually control by
+comparing WRAM staging buffer contents between baseline and ablated runs.
+
+**New Files:**
+- `mesen2_integration/lua_scripts/wram_diff_capture.lua` - Dumps WRAM at target frame
+- `run_wram_diff.bat` - Batch runner for baseline/ablated captures
+- `scripts/compare_wram_dumps.py` - Python diff analyzer with pattern classification
+
+**Key Discovery: SA-1 Reads the Causal Bytes**
+
+Initial WRAM diff showed **0 ablation hits** when only S-CPU callbacks were registered.
+This confirms **0xE9E667 is read by SA-1, not S-CPU**.
+
+Updated `wram_diff_capture.lua` to register callbacks for both CPUs:
+```lua
+local snes_cpu_type = emu.cpuType and emu.cpuType.snes or nil
+local sa1_cpu_type = emu.cpuType and emu.cpuType.sa1 or nil
+-- Register for BOTH CPUs
+```
+
+**Flip Pattern Analysis:**
+- 17 flips all target vram=0x58E0, src=0x7E2000
+- 4-frame cadence: 1795, 1799, 1803, 1807, 1811...
+- Consistent hash change (baseline: 0x5AC344AC → ablated: 0x6C3A828A)
+- Consistent hash pair suggests variant selection, not random corruption
+
+**Usage:**
+```batch
+REM Capture baseline
+run_wram_diff.bat baseline
+
+REM Capture ablated (0xE9E667 corrupted)
+run_wram_diff.bat ablated
+
+REM Compare
+python scripts\compare_wram_dumps.py mesen2_exchange\wram_dump_frame_1795_baseline.bin mesen2_exchange\wram_dump_frame_1795_ablated.bin
+```
+
+---
+
 ## [2.29.0] - 2026-01-03
 
 ### Both Causal Clusters Bisected to Single Bytes
@@ -82,6 +126,7 @@ Completed automated bisection for both identified causal clusters:
 - Two single bytes in bank E9 control the majority of sprite payload variations
 - 0xE9E667 alone accounts for 85% of observed payload_hash flips (17/20)
 - Both are likely control/pointer bytes, not pixel data
+- **0xE9E667 is read by SA-1** (not S-CPU) - confirmed via callback registration
 
 ---
 

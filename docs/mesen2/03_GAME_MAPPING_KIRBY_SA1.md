@@ -608,7 +608,10 @@ ablating reads is sufficient to cause payload_hash flips.
 **0xE9E667 Analysis (dominant cluster):**
 - File offset: 0x29E667 (HiROM: bank E9 → file 0x290000 + offset)
 - Bisection: 8KB (E9E000-E9FFFF) → 1 byte, 17 flips at every step
-- Key insight: Single byte causing 17 payload_hash flips = major control point
+- **Read by SA-1** (not S-CPU) - confirmed via callback registration
+- Flip pattern: vram=0x58E0, 4-frame cadence (1795, 1799, 1803...)
+- Consistent hash change: 0x5AC344AC → 0x6C3A828A (variant selection, not corruption)
+- Key insight: SA-1 reads this byte to select sprite variant/index
 
 **0xE93AEB Analysis (secondary cluster):**
 - File offset: 0x293AEB (HiROM: bank E9 → file 0x290000 + offset)
