@@ -1,4 +1,4 @@
--- sprite_rom_finder.lua v6
+-- sprite_rom_finder.lua v7
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset
@@ -7,6 +7,7 @@
 -- v4 fixes: snesMemory callback, VRAM word/byte unit handling, diagnostics
 -- v5 fixes: shadow VMADD (no register readback), no history purge
 -- v6 fixes: shadow DMA channel regs $4300-$437F (post-DMA reads are garbage)
+-- v7 fixes: session queue (30-frame window) instead of fragile single active_session
 
 local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local LOG_FILE = OUTPUT_DIR .. "sprite_rom_finder.log"
@@ -136,10 +137,14 @@ local VALID_BANKS = {
 }
 
 local idx_database = {}
-local active_session = nil
-local session_counter = 0
 local pending_tbl = {}
 local pending_dp = {}
+
+-- FIX #9: Use a session queue instead of single active_session
+-- Sessions survive for SESSION_MAX_AGE frames to handle SA-1 decode latency
+local recent_sessions = {}
+local session_counter = 0
+local SESSION_MAX_AGE = 30  -- frames to keep sessions (tune if needed)
 
 local function is_valid_ptr(ptr)
     local bank = (ptr >> 16) & 0xFF
@@ -150,7 +155,31 @@ end
 
 local function start_session(ptr, idx)
     session_counter = session_counter + 1
-    active_session = { id = session_counter, ptr = ptr, idx = idx, frame = frame_count }
+    table.insert(recent_sessions, { id = session_counter, ptr = ptr, idx = idx, frame = frame_count })
+end
+
+-- Find most recent session within age limit
+local function find_recent_session()
+    local best = nil
+    local best_frame = -1
+    for i, s in ipairs(recent_sessions) do
+        if (frame_count - s.frame) <= SESSION_MAX_AGE and s.frame > best_frame then
+            best = s
+            best_frame = s.frame
+        end
+    end
+    return best
+end
+
+-- Clean up old sessions
+local function cleanup_sessions()
+    local new_list = {}
+    for _, s in ipairs(recent_sessions) do
+        if (frame_count - s.frame) <= SESSION_MAX_AGE then
+            table.insert(new_list, s)
+        end
+    end
+    recent_sessions = new_list
 end
 
 local function on_table_read(addr, value)
@@ -289,16 +318,18 @@ local function on_dma_enable(addr, value)
                 -- Use shadowed VRAM address (captured from $2116/$2117 writes)
                 local vram_dest = vram_addr_shadow
 
-                -- FIX #4: Only attribute staging DMAs, then clear session
+                -- FIX #4: Only attribute staging DMAs
                 local is_staging = (src_addr >= STAGING_START and src_addr <= STAGING_END)
 
+                -- FIX #9: Use session queue - find most recent session within age limit
                 local session_idx, session_ptr, file_off = nil, nil, nil
-                if is_staging and active_session then
-                    session_idx = active_session.idx
-                    session_ptr = active_session.ptr
-                    if session_ptr then file_off = cpu_to_file_offset(session_ptr) end
-                    -- Clear session after attributing (one session = one upload burst)
-                    active_session = nil
+                if is_staging then
+                    local session = find_recent_session()
+                    if session then
+                        session_idx = session.idx
+                        session_ptr = session.ptr
+                        if session_ptr then file_off = cpu_to_file_offset(session_ptr) end
+                    end
                 end
 
                 local entry = {
@@ -514,9 +545,9 @@ local function on_frame()
     --     end
     -- end
 
-    -- Timeout session (but FIX #4 clears it on staging DMA anyway)
-    if active_session and (frame_count - active_session.frame) >= 4 then
-        active_session = nil
+    -- FIX #9: Clean up old sessions periodically
+    if frame_count % 10 == 0 then
+        cleanup_sessions()
     end
 
     local mouse = emu.getMouseState()
@@ -543,12 +574,11 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v6")
+log("SPRITE ROM FINDER v7")
 log("========================================")
-log("v3: LoROM mapping, DP bank filter, staging-only attribution")
-log("v4: snesMemory callback, word/byte lookup, diagnostics")
 log("v5: shadow VMADD, no history purge")
-log("v6: shadow DMA regs $4300-$437F, nil-safe enable")
+log("v6: shadow DMA regs $4300-$437F")
+log("v7: session queue (30-frame window)")
 log("")
 log("LEFT-CLICK on sprite = lookup ROM offset")
 log("RIGHT-CLICK = clear panel")
