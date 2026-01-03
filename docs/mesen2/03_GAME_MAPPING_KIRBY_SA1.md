@@ -559,7 +559,8 @@ proven causal regions for gameplay sprite tiles.
 |-----------|------|-------|---------------|-------|
 | 0xE90000-0xE93FFF | 16KB | 5 | 0xE93AEB | First hit @ frame 1680, first flip @ 1681 |
 | 0xE94000-0xE97FFF | 16KB | 15 | 0xE9677F, 0xE94D0A | Signature DMAs: 1793, 2003, 2007, 2011, 2015, 2357 |
-| 0xE98000-0xE9FFFF | 32KB | 18 | 0xE9E667 (17x), 0xE98DDF | Every-4-frame pattern @ 0x58E0 |
+| 0xE98000-0xE9BFFF | 16KB | 1 | 0xE98DDF | Isolated hit @ frame 1861 → flip 1862 |
+| 0xE9C000-0xE9FFFF | 16KB | 17 | 0xE9E667 | Dominant cluster, every-4-frame pattern @ 0x58E0 |
 
 ### Non-Causal Regions (Tested)
 
@@ -573,7 +574,7 @@ proven causal regions for gameplay sprite tiles.
 1. **S-CPU reads dominate**: All ABLATION_HITs in E9 were `cpu=snes`, not SA-1
 2. **Timing consistency**: First flip appears exactly one frame after first ABLATION_HIT
 3. **Data substitution**: Flips produce different valid payload states, not random corruption
-4. **Three independent clusters**: E9 contains causal regions across entire bank (lower-lower, lower-upper, upper)
+4. **Four independent clusters**: E9 bisected to 16KB resolution (lower-lower, lower-upper, upper-lower, upper-upper)
 
 ### Signature DMAs for Validation
 

@@ -83,6 +83,10 @@ REM E9 lower-upper (0xE94000-0xE97FFF): CAUSAL - 15 flips
 REM   Hits: 0xE9677F, 0xE94D0A
 REM E9 upper (0xE98000-0xE9FFFF): CAUSAL - 18 flips
 REM   Hits: 0xE9E667 (17x), 0xE98DDF (1x)
+REM E9 upper-lower (0xE98000-0xE9BFFF): CAUSAL - 1 flip
+REM   Hit: 0xE98DDF only (frame 1861 → flip 1862)
+REM E9 upper-upper (0xE9C000-0xE9FFFF): CAUSAL - 17 flips
+REM   Hit: 0xE9E667 only (dominant cluster)
 REM
 REM === 64KB BISECTION OF QUARTER 2.2 ===
 REM Bank E8: 0xE80000-0xE8FFFF
@@ -115,14 +119,23 @@ REM E9 upper: 0xE98000-0xE9FFFF (CAUSAL - 18 flips, see results log)
 REM set ABLATION_PRG_START=0xE98000
 REM set ABLATION_PRG_END=0xE9FFFF
 
-REM === 8KB BISECTION OF E9 UPPER ===
-REM E9 upper-lower: 0xE98000-0xE9BFFF (contains 0xE98DDF)
+REM === 8KB BISECTION OF E9 LOWER-UPPER ===
+REM E9 lower-upper-lower: 0xE94000-0xE95FFF (contains 0xE94D0A - 200x cadence)
+set ABLATION_PRG_START=0xE94000
+set ABLATION_PRG_END=0xE95FFF
+
+REM E9 lower-upper-upper: 0xE96000-0xE97FFF (contains 0xE9677F - 1792→1793 chain)
+REM set ABLATION_PRG_START=0xE96000
+REM set ABLATION_PRG_END=0xE97FFF
+
+REM === 8KB BISECTION OF E9 UPPER (COMPLETE) ===
+REM E9 upper-lower: 0xE98000-0xE9BFFF (CAUSAL - 1 flip, hit: 0xE98DDF)
 REM set ABLATION_PRG_START=0xE98000
 REM set ABLATION_PRG_END=0xE9BFFF
 
-REM E9 upper-upper: 0xE9C000-0xE9FFFF (contains 0xE9E667 - dominant cluster)
-set ABLATION_PRG_START=0xE9C000
-set ABLATION_PRG_END=0xE9FFFF
+REM E9 upper-upper: 0xE9C000-0xE9FFFF (CAUSAL - 17 flips, hit: 0xE9E667)
+REM set ABLATION_PRG_START=0xE9C000
+REM set ABLATION_PRG_END=0xE9FFFF
 
 REM Bank EA: 0xEA0000-0xEAFFFF
 REM set ABLATION_PRG_START=0xEA0000
@@ -241,7 +254,7 @@ echo After run, save log as:
 if "%ABLATION_ENABLED%"=="0" (
     echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_baseline.txt
 ) else (
-    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_E9_upper_upper.txt
+    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_E9_lowerupper_lower.txt
 )
 echo.
 

@@ -80,18 +80,23 @@ regions for sprite staging DMAs.
 3. Compare: same DMA identity (frame, src, size, vram, seq, pcs, range, pattern)
    with different payload_hash = causal region
 
-**Results:**
+**Results (16KB bisection):**
 
 | Range | Size | Flips | Hits | Status |
 |-------|------|-------|------|--------|
 | E90000-E93FFF | 16KB | 5 | 0xE93AEB | CAUSAL |
 | E94000-E97FFF | 16KB | 15 | 0xE9677F, 0xE94D0A | CAUSAL |
-| E98000-E9FFFF | 32KB | 18 | 0xE9E667 (17x), 0xE98DDF | CAUSAL |
+| E98000-E9BFFF | 16KB | 1 | 0xE98DDF | CAUSAL (isolated) |
+| E9C000-E9FFFF | 16KB | 17 | 0xE9E667 | CAUSAL (dominant) |
+
+**E9 Upper 8KB Bisection Complete:**
+- E98000-E9BFFF: 1 flip, hit at 0xE98DDF (frame 1861 → flip 1862)
+- E9C000-E9FFFF: 17 flips, hit at 0xE9E667 only (every-4-frame pattern @ 0x58E0)
 
 **Key Findings:**
 - All hits are S-CPU reads (`cpu=snes`), not SA-1
 - First flip appears exactly one frame after first ABLATION_HIT (timing consistency)
-- Three independent causal clusters identified across entire E9 bank
+- Four independent causal clusters identified at 16KB resolution across E9 bank
 - Payload hash flips are data substitution (different valid states), not random corruption
 
 **Signature DMAs Validated:**
@@ -106,6 +111,8 @@ regions for sprite staging DMAs.
 - `prg_sweep_E9_lower_lower.txt` - 0xE90000-0xE93FFF results
 - `prg_sweep_E9_lower_upper.txt` - 0xE94000-0xE97FFF results
 - `prg_sweep_E9_upper.txt` - 0xE98000-0xE9FFFF results
+- `prg_sweep_E9_upper_lower.txt` - 0xE98000-0xE9BFFF results (1 flip)
+- `prg_sweep_E9_upper_upper.txt` - 0xE9C000-0xE9FFFF results (17 flips)
 
 **Documentation Updated:**
 - `03_GAME_MAPPING_KIRBY_SA1.md` - Added "PRG Ablation: Causal ROM Regions" section
