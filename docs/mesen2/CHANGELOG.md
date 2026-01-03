@@ -67,36 +67,49 @@ to WRAM sources).
 
 ---
 
+## [2.34.0] - 2026-01-03
+
+### PRG Read Trace: Both Causal Bytes Are Stream Starts
+
+**Killer experiment completed.** Logged ROM reads following each causal byte.
+
+**Result:** Both 0xE9E667 and 0xE93AEB are **compressed stream block starts**, not
+control/selector bytes. After reading the trigger byte, SA-1 reads sequentially
+(+1, +2, +3...) through the data block.
+
+| Property | 0xE9E667 | 0xE93AEB |
+|----------|----------|----------|
+| Header byte | 0xE0 | 0xE0 |
+| Read pattern | Sequential | Sequential |
+| CPU | SA-1 | SA-1 |
+| Cadence | 4-frame (animation) | Sparse (on-demand) |
+
+**Key insight:** `0xE0` appears to be a stream header byte for the game's compression
+format. Ablating it corrupts the decoder input → different staging output → hash flip.
+
+**Hierarchy hypothesis DISPROVEN:** The WRAM diff pattern differences (85 ranges vs 35)
+reflect different compressed content, not a two-level selection hierarchy.
+
+**Next steps:** Asset block characterization (boundaries, sizes, compression signatures).
+
+---
+
 ## [2.33.0] - 2026-01-03
 
 ### Observation vs Hypothesis Separation
 
 **Correction:** v2.32 overstated confidence in "two-level hierarchy" interpretation.
-The diff patterns are real, but the semantic interpretation requires validation.
+PRG read trace (v2.34) later disproved this hypothesis entirely.
 
-**What is CONFIRMED:**
+**What was CONFIRMED:**
 1. Both 0xE9E667 and 0xE93AEB are minimal causal bytes (1-byte ablation → hash flip)
 2. Both are read by SA-1, not S-CPU
 3. Both steer a decode/build process (25-29% of staging buffer changes)
 4. Ablation produces identity-matched flips (deterministic selection, not corruption)
 
-**Structural differences (OBSERVED, not INTERPRETED):**
-
-| Metric | 0xE9E667 | 0xE93AEB |
-|--------|----------|----------|
-| Diff ranges | 85 | 35 |
-| Largest range | 139B | 384B |
-| VRAM targets | Single (0x58E0) | Multiple (0x4Cxx, 0x4Fxx) |
-| Flip cadence | 4-frame regular | Irregular |
-
-**HYPOTHESIS (unproven):** These represent a two-level selection hierarchy where
-0xE93AEB affects broader decisions and 0xE9E667 affects narrower decisions.
-
-**Why not yet proven:**
-- Range count vs size could be an artifact of how the builder writes memory
-- Neither byte is tied to a specific semantic field (index? opcode? pointer? length?)
-
-**Next experiment:** Log ROM reads following causal byte read to determine semantic role.
+**What was DISPROVEN (v2.34):**
+- "Two-level hierarchy" hypothesis - both are simply stream starts for different data blocks
+- "Selector/control byte" interpretation - they're data, not control
 
 ---
 

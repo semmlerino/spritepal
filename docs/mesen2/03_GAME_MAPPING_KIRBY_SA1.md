@@ -602,92 +602,96 @@ ablating reads is sufficient to cause payload_hash flips.
 
 | Address | Flips | Reduction | Interpretation |
 |---------|-------|-----------|----------------|
-| **0xE9E667** | 17 | 8KB → 1B | Dominant cluster - control/pointer byte |
-| **0xE93AEB** | 3 | 16KB → 1B | Secondary cluster - control/pointer byte |
+| **0xE9E667** | 17 | 8KB → 1B | Compressed stream block start |
+| **0xE93AEB** | 5 | 16KB → 1B | Compressed stream block start |
 
-**0xE9E667 Analysis (dominant cluster):**
-- File offset: 0x29E667 (HiROM: bank E9 → file 0x290000 + offset)
-- Bisection: 8KB (E9E000-E9FFFF) → 1 byte, 17 flips at every step
-- **Read by SA-1** (not S-CPU) - confirmed via callback registration
-- Flip pattern: vram=0x58E0, 4-frame cadence (1795, 1799, 1803...)
-- Consistent hash change: 0x5AC344AC → 0x6C3A828A (deterministic, not corruption)
+### PRG Read Trace Analysis (v2.34)
 
-**WRAM Diff (frame 1795, ablation vs baseline):**
-- **516 bytes changed (25.2%)** of $7E2000-$27FF staging buffer
-- **85 separate diff ranges** - scattered small edits
-- Largest contiguous diff: **139 bytes** at buffer start (0x2000)
-- Pattern: WIDESPREAD - decode/build process produced different output
+The "killer experiment" logged ROM reads following each causal byte read.
+**Result: Both are sequential stream starts, not control/selector bytes.**
 
-**0xE93AEB Analysis (secondary cluster):**
-- File offset: 0x293AEB (HiROM: bank E9 → file 0x290000 + offset)
-- Bisection: 16KB (E90000-E93FFF) → 1 byte
-- **Read by SA-1** (like 0xE9E667)
-- Flip frames: 1681, 1684, 1760, 1769, 1773 (different cadence than E9E667)
-- VRAM targets: Multiple (0x4C00, 0x4F20, 0x4F40, 0x4F60)
-- Source addr: 0x7E2040 (different from E9E667's 0x7E2000)
-
-**WRAM Diff (frame 1681, ablation vs baseline):**
-- **601 bytes changed (29.4%)** of staging buffer
-- **35 diff ranges** - fewer but larger than E9E667
-- Largest contiguous diff: **384 bytes** at buffer start
-- Pattern: WIDESPREAD - decode/build process produced different output
-
-### Observations (Confirmed)
-
-Both causal bytes share these properties:
-1. **Both are read by SA-1**, not S-CPU (confirmed via CPU-specific callback registration)
-2. **Both steer a decode/build process**, not a simple pointer-to-blob copy
-   (25-29% of staging buffer changes, across many scattered/contiguous regions)
-3. **Ablation produces identity-matched payload_hash flips** (deterministic selection, not corruption)
-
-The structural differences:
-
-| Metric | 0xE9E667 | 0xE93AEB |
-|--------|----------|----------|
-| Flips | 17 | 3-5 |
-| Diff bytes | 516 (25.2%) | 601 (29.4%) |
-| Diff ranges | 85 | 35 |
-| Largest range | 139B | 384B |
-| VRAM targets | Single (0x58E0) | Multiple (0x4Cxx, 0x4Fxx) |
-| Flip cadence | 4-frame (1795, 1799, 1803...) | Irregular (1681, 1684, 1760...) |
-
-### Working Hypothesis (Unproven)
-
-The diff patterns suggest a **two-level selection hierarchy**:
-- **0xE93AEB**: Fewer ranges but larger contiguous blocks → possibly affects an earlier/broader
-  decision (which command stream, base template, or major decoder path)
-- **0xE9E667**: More ranges but smaller scattered edits, 4-frame cadence → possibly affects a
-  more granular decision (animation frame, streaming subset, patch operations)
-
-**Why this is not yet proven:**
-1. Range count vs size could be an artifact of how the builder writes memory (templates vs patches)
-2. Neither byte is tied to a specific semantic field (index? opcode? pointer? length?)
-
-### Experiments to Prove/Disprove Hierarchy
-
-**A) Diff consistency across flips:**
-Compare diffs at multiple flip frames for the same byte. If patterns are consistent
-across occurrences, it's deterministic selection logic, not drift.
-
-```batch
-REM E9E667: compare frame 1795 vs 1799 (same cadence slot)
-run_wram_diff.bat ablated 0xE9E667 1795
-run_wram_diff.bat ablated 0xE9E667 1799
-
-REM E93AEB: compare frame 1681 vs 1769
-run_wram_diff.bat ablated 0xE93AEB 1681
-run_wram_diff.bat ablated 0xE93AEB 1769
+**0xE9E667 Trace:**
 ```
+TRIGGER: frame=1794 addr=0xE9E667 value=0xE0
+  [  1] CPU:00:841F (file:0x00841F) = 0x3B   ← code/polling
+  [  2] CPU:E9:E668 (file:0x29E668) = 0x49   ← sequential +1
+  [  3] CPU:E9:E669 (file:0x29E669) = 0x98   ← sequential +2
+  [  4] CPU:E9:E66A (file:0x29E66A) = 0x90   ← sequential +3
+  ...continues sequentially to E9:E6B9 (100 reads)
+```
+- **Cadence:** Every 4 frames (1794, 1798, 1802...) - 17 triggers total
+- **Pattern:** Pure sequential streaming with periodic 00:841F reads interspersed
 
-**B) Log ROM reads following causal byte (killer experiment):**
-After the SA-1 reads the causal byte, log the next N PRG reads until staging DMA.
-This reveals whether the byte is used as:
-- **Index**: Read, then table lookup nearby
-- **Opcode**: Read, then branch/conditional logic
-- **Pointer part**: Read, then far jump to computed address
-- **Length**: Read, then sequential streaming of N bytes
+**0xE93AEB Trace:**
+```
+TRIGGER: frame=1284 addr=0xE93AEB value=0xE0
+  [  1] CPU:E9:3AEC (file:0x293AEC) = 0x33   ← sequential +1
+  [  2] CPU:E9:3AED (file:0x293AED) = 0x00   ← sequential +2
+  [  3] CPU:E9:3AEE (file:0x293AEE) = 0x7F   ← sequential +3
+  ...continues sequentially to E9:3B3C (100 reads)
+```
+- **Cadence:** Irregular (1284→1288→1293→1298→1680) - sparse with 382-frame gap
+- **Pattern:** Same sequential streaming as E9E667
 
-This is the definitive test to understand the byte's semantic role
+### Confirmed Findings
+
+| Property | 0xE9E667 | 0xE93AEB |
+|----------|----------|----------|
+| **Role** | Stream block start | Stream block start |
+| **Header byte** | 0xE0 | 0xE0 |
+| **Read pattern** | Sequential (E668, E669...) | Sequential (3AEC, 3AED...) |
+| **CPU** | SA-1 | SA-1 |
+| **Cadence** | 4-frame regular (animation) | Irregular/sparse (on-demand) |
+| **Triggers** | 17 in test window | 5 in test window |
+
+**Key insight:** Both addresses are the **first byte of compressed/structured data streams**.
+`0xE0` appears to be a stream header byte for the game's sprite/asset compression format.
+
+Ablating the first byte corrupts the stream header, causing the decoder to produce
+different output → different WRAM staging → payload_hash flip.
+
+### Why WRAM Diff Patterns Differ
+
+The earlier WRAM diff showed:
+- 0xE9E667: 85 ranges, 139B largest
+- 0xE93AEB: 35 ranges, 384B largest
+
+This reflects **different compressed content** in each stream, not a hierarchy:
+- Different source data → different decoder outputs
+- Different patterns of zeros/FFs in resulting buffer
+- Different asset sizes/structures
+
+### Cadence Interpretation
+
+| Address | Cadence | Likely Purpose |
+|---------|---------|----------------|
+| 0xE9E667 | +4 frames exactly | Animation batch refresh / periodic streaming |
+| 0xE93AEB | Sparse with gaps | Loaded on demand (scene transition / asset swap) |
+
+### Next Steps: Asset Block Analysis
+
+Now that we've identified these as stream starts (not control bytes), the focus shifts
+to asset block characterization:
+
+**1) Identify block boundaries:**
+Log contiguous read span from trigger until non-sequential read. This gives block size:
+- Small (~64B): Per-frame patches
+- Medium (~256-1KB): Sprite chunks
+- Large (>1KB): Scene asset packs
+
+**2) Confirm decoder CPU:**
+Both blocks read by SA-1. Verify if SA-1 also writes the decoded output to WRAM,
+or if it hands off to S-CPU.
+
+**3) Check compression signatures:**
+Dump ~256 bytes from each block start. Look for:
+- Length fields (first 2-3 bytes)
+- LZ-style backreferences
+- Bitstream packing markers
+
+**4) Map blocks to staging regions:**
+For each trigger, capture staging buffer before/after decode.
+Determine which $7E2000-$27FF region each block fills
 
 **Remaining targets for bisection:**
 | Address | Flips | Status |
