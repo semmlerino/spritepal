@@ -86,17 +86,18 @@ regions for sprite staging DMAs.
 |-------|------|-------|------|--------|
 | E90000-E93FFF | 16KB | 5 | 0xE93AEB | CAUSAL |
 | E94000-E97FFF | 16KB | 15 | 0xE9677F, 0xE94D0A | CAUSAL |
-| E98000-E9FFFF | 32KB | -- | -- | Pending |
+| E98000-E9FFFF | 32KB | 18 | 0xE9E667 (17x), 0xE98DDF | CAUSAL |
 
 **Key Findings:**
 - All hits are S-CPU reads (`cpu=snes`), not SA-1
 - First flip appears exactly one frame after first ABLATION_HIT (timing consistency)
-- Two independent causal clusters identified in E9 lower half
-- Corruption propagates through decompression/copy into multiple DMAs
+- Three independent causal clusters identified across entire E9 bank
+- Payload hash flips are data substitution (different valid states), not random corruption
 
 **Signature DMAs Validated:**
 - Frame 1681 @ 0x58E0 (after E93AEB hit)
 - Frame 1793 @ 0x5A20 (after E9677F hit)
+- Frame 1795 @ 0x58E0 (after E9E667 hit) — E9 upper
 - Frames 2003, 2007, 2011, 2015 @ 0x58E0 (after E94D0A hits)
 - Frame 2357 @ 0x58E0 (late-game)
 
@@ -104,6 +105,7 @@ regions for sprite staging DMAs.
 - `prg_sweep_baseline_v225.txt` - v2.25 baseline (306 sprite VRAM entries)
 - `prg_sweep_E9_lower_lower.txt` - 0xE90000-0xE93FFF results
 - `prg_sweep_E9_lower_upper.txt` - 0xE94000-0xE97FFF results
+- `prg_sweep_E9_upper.txt` - 0xE98000-0xE9FFFF results
 
 **Documentation Updated:**
 - `03_GAME_MAPPING_KIRBY_SA1.md` - Added "PRG Ablation: Causal ROM Regions" section

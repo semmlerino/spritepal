@@ -81,6 +81,8 @@ REM E9 lower-lower (0xE90000-0xE93FFF): CAUSAL - 5 flips
 REM   Hit: 0xE93AEB only
 REM E9 lower-upper (0xE94000-0xE97FFF): CAUSAL - 15 flips
 REM   Hits: 0xE9677F, 0xE94D0A
+REM E9 upper (0xE98000-0xE9FFFF): CAUSAL - 18 flips
+REM   Hits: 0xE9E667 (17x), 0xE98DDF (1x)
 REM
 REM === 64KB BISECTION OF QUARTER 2.2 ===
 REM Bank E8: 0xE80000-0xE8FFFF
@@ -109,8 +111,17 @@ REM E9 lower-upper: 0xE94000-0xE97FFF (CAUSAL - 15 flips)
 REM set ABLATION_PRG_START=0xE94000
 REM set ABLATION_PRG_END=0xE97FFF
 
-REM E9 upper: 0xE98000-0xE9FFFF (structural test - any causal regions here?)
-set ABLATION_PRG_START=0xE98000
+REM E9 upper: 0xE98000-0xE9FFFF (CAUSAL - 18 flips, see results log)
+REM set ABLATION_PRG_START=0xE98000
+REM set ABLATION_PRG_END=0xE9FFFF
+
+REM === 8KB BISECTION OF E9 UPPER ===
+REM E9 upper-lower: 0xE98000-0xE9BFFF (contains 0xE98DDF)
+REM set ABLATION_PRG_START=0xE98000
+REM set ABLATION_PRG_END=0xE9BFFF
+
+REM E9 upper-upper: 0xE9C000-0xE9FFFF (contains 0xE9E667 - dominant cluster)
+set ABLATION_PRG_START=0xE9C000
 set ABLATION_PRG_END=0xE9FFFF
 
 REM Bank EA: 0xEA0000-0xEAFFFF
@@ -230,7 +241,7 @@ echo After run, save log as:
 if "%ABLATION_ENABLED%"=="0" (
     echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_baseline.txt
 ) else (
-    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_E9_upper.txt
+    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_E9_upper_upper.txt
 )
 echo.
 

@@ -559,6 +559,7 @@ proven causal regions for gameplay sprite tiles.
 |-----------|------|-------|---------------|-------|
 | 0xE90000-0xE93FFF | 16KB | 5 | 0xE93AEB | First hit @ frame 1680, first flip @ 1681 |
 | 0xE94000-0xE97FFF | 16KB | 15 | 0xE9677F, 0xE94D0A | Signature DMAs: 1793, 2003, 2007, 2011, 2015, 2357 |
+| 0xE98000-0xE9FFFF | 32KB | 18 | 0xE9E667 (17x), 0xE98DDF | Every-4-frame pattern @ 0x58E0 |
 
 ### Non-Causal Regions (Tested)
 
@@ -571,8 +572,8 @@ proven causal regions for gameplay sprite tiles.
 
 1. **S-CPU reads dominate**: All ABLATION_HITs in E9 were `cpu=snes`, not SA-1
 2. **Timing consistency**: First flip appears exactly one frame after first ABLATION_HIT
-3. **Propagation**: Corruption fans out through decompression/copy—one hit can affect multiple DMAs
-4. **Two independent clusters**: E9 lower contains at least two distinct causal address clusters
+3. **Data substitution**: Flips produce different valid payload states, not random corruption
+4. **Three independent clusters**: E9 contains causal regions across entire bank (lower-lower, lower-upper, upper)
 
 ### Signature DMAs for Validation
 
@@ -582,6 +583,7 @@ When testing new PRG ranges, check for flips in these signature DMAs:
 |-------|------|------|-------------|
 | 1681 | 0x58E0 | 640 | First flip after E93AEB hit |
 | 1793 | 0x5A20 | 640 | First flip after E9677F hit |
+| 1795 | 0x58E0 | 640 | First flip after E9E667 hit (E9 upper) |
 | 2003, 2007, 2011, 2015 | 0x58E0 | 640 | Periodic after E94D0A hits |
 | 2357 | 0x58E0 | 640 | Late-game signature |
 
@@ -590,3 +592,4 @@ When testing new PRG ranges, check for flips in these signature DMAs:
 - `prg_sweep_baseline_v225.txt` - Baseline (306 sprite VRAM entries)
 - `prg_sweep_E9_lower_lower.txt` - 0xE90000-0xE93FFF (5 flips)
 - `prg_sweep_E9_lower_upper.txt` - 0xE94000-0xE97FFF (15 flips)
+- `prg_sweep_E9_upper.txt` - 0xE98000-0xE9FFFF (18 flips)
