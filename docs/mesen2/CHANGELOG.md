@@ -141,6 +141,48 @@ local ABLATION_PRG_START = ABLATION_PRG_START_RAW  -- No conversion
 ABLATION_CONFIG: enabled=true range=0xEC0000-0xEFFFFF value=0xFF (CPU addresses, no conversion)
 ```
 
+### Per-DMA Ablation Tracking (v2.20)
+
+**Problem:** The existing `corrupted_reads` counter was session-scoped (POPULATE episode),
+not DMA-scoped. This made it impossible to determine if ablated reads were causally
+related to a specific staging DMA's payload_hash.
+
+Example of misleading signal:
+```
+ABLATION_RESULT: frame=1673 corrupted_reads=3756  # Session total, not per-DMA
+STAGING_SUMMARY: frame=1495 payload_hash=0xA5E44A02  # Which reads fed THIS?
+```
+
+**Solution:** Add per-staging-DMA ablation delta tracking.
+
+**New globals:**
+```lua
+local ablation_total = 0           -- Increments on every corrupted read
+local ablation_last_at_staging = 0 -- Snapshot at each STAGING_SUMMARY
+```
+
+**New STAGING_SUMMARY field:**
+```
+STAGING_SUMMARY: ... payload_hash=0xABCD1234 ... ablated=42
+```
+
+Where `ablated=N` is the count of corrupted PRG reads since the previous STAGING_SUMMARY.
+This directly answers: "Were any ablated reads involved in producing THIS payload?"
+
+**Interpretation:**
+- `ablated=0` + hash unchanged → ablation range not touched for this DMA
+- `ablated>0` + hash unchanged → touched but non-causal (pointers, code fetch)
+- `ablated>0` + hash changed → **causal PRG region for staging→VRAM**
+
+**Two data paths identified:**
+1. **Direct ROM→VRAM** (Bank ED/EE → VRAM 0x6000+): BG tiles, no staging buffer
+2. **Staging→VRAM** (Bank C → 0x7E2000 → VRAM 0x4000+): Sprite tiles
+
+Filter for sprite causality testing:
+```bash
+grep "STAGING_SUMMARY.*vram=0x4\|STAGING_SUMMARY.*vram=0x5" dma_probe_log.txt
+```
+
 ---
 
 ## [2.19.0] - 2026-01-02

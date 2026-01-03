@@ -495,6 +495,13 @@ local ABLATION_PRG_START = ABLATION_PRG_START_RAW
 local ABLATION_PRG_END = ABLATION_PRG_END_RAW
 local ablation_corrupted_count = 0
 
+-- v2.20: Per-staging-DMA ablation tracking (not session-scoped)
+-- ablation_total increments on every corrupted read
+-- ablation_last_at_staging snapshots at each STAGING_SUMMARY
+-- delta = ablated reads since last staging DMA (meaningful for causality)
+local ablation_total = 0
+local ablation_last_at_staging = 0
+
 -- Log ablation config at startup
 if ABLATION_ENABLED then
     log(string.format(
@@ -1186,8 +1193,16 @@ local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
         dropped_str = string.format(" dropped=%d", staging_dropped_writes)
     end
 
+    -- v2.20: Per-DMA ablation delta (meaningful for causality testing)
+    local ablation_delta = ablation_total - ablation_last_at_staging
+    ablation_last_at_staging = ablation_total
+    local ablation_str = ""
+    if ABLATION_ENABLED then
+        ablation_str = string.format(" ablated=%d", ablation_delta)
+    end
+
     log(string.format(
-        "STAGING_SUMMARY: frame=%d src=0x%06X size=%d payload_hash=0x%08X vram=0x%04X pattern=%s writes=%d unique=%d seq=%d jumps=%d range=0x%06X-0x%06X frames=%d%s%s",
+        "STAGING_SUMMARY: frame=%d src=0x%06X size=%d payload_hash=0x%08X vram=0x%04X pattern=%s writes=%d unique=%d seq=%d jumps=%d range=0x%06X-0x%06X frames=%d%s%s%s",
         frame,
         src_addr,
         src_size,
@@ -1202,7 +1217,8 @@ local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
         summary.max_addr or 0,
         summary.frames_with_writes,
         pc_str,
-        dropped_str
+        dropped_str,
+        ablation_str
     ))
 end
 
@@ -1990,6 +2006,7 @@ local function on_fill_session_prg_read(address, value)
     -- This ensures PRG corruption affects staging even when BUFFER_WRITE_WATCH=0
     if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
         ablation_corrupted_count = ablation_corrupted_count + 1
+        ablation_total = ablation_total + 1  -- v2.20: per-DMA tracking
         return ABLATION_VALUE  -- CPU sees corrupted byte
     end
 
@@ -2018,8 +2035,10 @@ local function on_fill_session_prg_read(address, value)
 
     -- v2.15: Ablation - corrupt reads in specified range to prove causality
     -- Return modified value to CPU, but we logged the original above
+    -- NOTE: This is likely unreachable (earlier ablation hook returns first), kept for safety
     if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
         ablation_corrupted_count = ablation_corrupted_count + 1
+        ablation_total = ablation_total + 1  -- v2.20: per-DMA tracking
         return ABLATION_VALUE  -- CPU sees corrupted byte
     end
     -- Return nil = no modification (CPU sees original value)
