@@ -594,3 +594,43 @@ When testing new PRG ranges, check for flips in these signature DMAs:
 - `prg_sweep_E9_lower_lower.txt` - 0xE90000-0xE93FFF (5 flips)
 - `prg_sweep_E9_lower_upper.txt` - 0xE94000-0xE97FFF (15 flips)
 - `prg_sweep_E9_upper.txt` - 0xE98000-0xE9FFFF (18 flips)
+
+### Minimal Causal Read Addresses (Bisected to 1 Byte)
+
+Full binary search from 16KB to 1 byte identifies the smallest ROM region where
+ablating reads is sufficient to cause payload_hash flips.
+
+| Address | Flips | Flip Frames | Byte Value | Interpretation |
+|---------|-------|-------------|------------|----------------|
+| **0xE93AEB** | 5 | 1681, 1684, 1760, 1769, 1773 | 0xE0 | Control/pointer byte (single byte affecting multiple DMAs) |
+
+**0xE93AEB Analysis:**
+- File offset: 0x293AEB (HiROM: bank E9 → file 0x290000 + offset)
+- Reduction: 16KB → 1B (16,384x)
+- Context: Structured data, not code - likely sprite metadata table
+- Key insight: Single byte affecting 5 DMAs over 100+ frames = selector/index, NOT pixel data
+
+**Remaining targets for bisection:**
+| Address | Flips | Status |
+|---------|-------|--------|
+| 0xE9E667 | 17 | Pending (highest priority - dominant cluster) |
+| 0xE94D0A | 4 | Pending |
+| 0xE9677F | 1 | Pending |
+| 0xE98DDF | 1 | Pending |
+
+### Automated Bisection Tool
+
+For faster bisection, use the automation tools (v2.28):
+
+```batch
+REM From Windows:
+cd C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal
+
+REM Preview bisection plan:
+python scripts\auto_bisect.py 0xE9E667 0xE9E000 0xE9FFFF --dry-run
+
+REM Run automated bisection (~10 min for 8KB→1B):
+python scripts\auto_bisect.py 0xE9E667 0xE9E000 0xE9FFFF
+```
+
+Files: `run_ablation_range.bat` (parameterized runner), `scripts/auto_bisect.py` (orchestrator)

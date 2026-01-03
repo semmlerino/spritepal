@@ -67,6 +67,85 @@ to WRAM sources).
 
 ---
 
+## [2.28.0] - 2026-01-03
+
+### Automated Bisection Tool
+
+Added automation for PRG ablation binary search to eliminate manual iteration.
+
+**New Files:**
+- `run_ablation_range.bat` - Parameterized ablation runner accepting range arguments
+- `scripts/auto_bisect.py` - Python orchestrator for automated bisection
+
+**Usage:**
+```batch
+REM Dry run to preview plan:
+python scripts\auto_bisect.py 0xE9E667 0xE9E000 0xE9FFFF --dry-run
+
+REM Full automated bisection:
+python scripts\auto_bisect.py 0xE9E667 0xE9E000 0xE9FFFF
+```
+
+**Features:**
+- Automatically bisects toward target address (skips ranges not containing target)
+- Parses log output for flip counts and hit addresses
+- Generates documentation block for results
+- Saves per-step logs for debugging
+- Estimated ~10 minutes for 8KB→1B bisection
+
+**Next target:** 0xE9E667 (17 flips - dominant cluster)
+
+---
+
+## [2.27.0] - 2026-01-03
+
+### 0xE93AEB Bisection Complete: Minimal Causal Read Address
+
+Completed binary search from 16KB to 1 byte for the first causal address.
+
+**Result:** Minimal causal read address (S-CPU): **0xE93AEB**
+- Ablating reads of this 1-byte range is SUFFICIENT to flip payload_hash
+  for 5 identity-matched sprite staging DMAs
+- Single byte affecting multiple tiles suggests control/pointer/selector byte,
+  NOT necessarily raw tile data
+- Reduction: 16KB → 1B (16,384x)
+
+**Bisection Chain:**
+```
+E90000-E93FFF (16KB): CAUSAL
+  E90000-E91FFF (8KB): NOT CAUSAL
+  E92000-E93FFF (8KB): CAUSAL
+    E92000-E92FFF (4KB): NOT CAUSAL
+    E93000-E93FFF (4KB): CAUSAL
+      E93000-E937FF (2KB): NOT CAUSAL
+      E93800-E93FFF (2KB): CAUSAL
+        E93800-E939FF (512B): NOT CAUSAL
+        E93A00-E93BFF (512B): CAUSAL
+          E93A00-E93AFF (256B): CAUSAL
+            E93A80-E93AFF (128B): CAUSAL
+              E93AC0-E93AFF (64B): CAUSAL
+                E93AE0-E93AFF (32B): CAUSAL
+                  E93AE0-E93AEF (16B): CAUSAL
+                    E93AE8-E93AEF (8B): CAUSAL
+                      E93AE8-E93AEB (4B): CAUSAL
+                        E93AEA-E93AEB (2B): CAUSAL
+                          0xE93AEB (1B): CAUSAL - 5 flips
+```
+
+**ROM Analysis:**
+- File offset: 0x293AEB (HiROM: bank E9 → file 0x290000 + offset)
+- Byte value: 0xE0
+- Context shows structured data (likely sprite metadata table), not code
+
+**Key Insight:**
+A single byte affecting 5 different sprite DMAs across 100+ frames indicates this
+is a selector/pointer/index byte controlling which sprite data gets loaded, NOT
+the raw pixel data itself.
+
+**Flip frames:** 1681, 1684, 1760, 1769, 1773
+
+---
+
 ## [2.26.0] - 2026-01-03
 
 ### PRG Ablation Binary Search: E9 Bank Bisection Complete
