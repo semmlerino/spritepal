@@ -67,6 +67,50 @@ to WRAM sources).
 
 ---
 
+## [2.24.0] - 2026-01-03
+
+### Per-CPU Ablation Toggles and SNES Exec Guard
+
+**Features:**
+
+1. **Per-CPU toggles** for isolating causality:
+   - `ABLATE_SNES=0/1` - Enable/disable S-CPU ablation (default: 1)
+   - `ABLATE_SA1=0/1` - Enable/disable SA-1 ablation (default: 1)
+   - Allows testing S-CPU-only or SA-1-only causality paths
+
+2. **SNES exec guard** - Mirrors the SA-1 exec guard to prevent S-CPU code fetch corruption
+   from ablation range. Both CPUs now protected from instruction fetch corruption.
+
+3. **Fixed ABLATION_CONFIG label** - Now accurately shows per-CPU modes:
+   ```
+   ABLATION_CONFIG: enabled=true range=0xE80000-0xE8FFFF value=0xFF (v2.24: S-CPU=exec-guard SA-1=exec-guard)
+   ```
+
+4. **Consolidated exec guard variables** into table to stay under Lua's 200 local variable limit.
+
+**Bank EB Ablation Results:**
+
+Tested Bank EB (0xEB0000-0xEBFFFF) as bisection of Quarter 2.2.
+
+**Result: NO payload_hash flips** - All 4 hashes match baseline exactly.
+
+| Frame | VRAM | Baseline Hash | Bank EB Hash | Match? |
+|-------|------|---------------|--------------|--------|
+| 1681 | 0x58E0 | 0x92FB2C49 | 0x92FB2C49 | YES |
+| 1684 | 0x4C00 | 0x8CE8AD0F | 0x8CE8AD0F | YES |
+| 1760 | 0x4F20 | 0xD5D9BC35 | 0xD5D9BC35 | YES |
+| 1769 | 0x4F40 | 0x8CB81E85 | 0x8CB81E85 | YES |
+
+**Key Finding:** Despite SA1_BURST showing reads from 0xEBBxxx being ablated, Bank EB
+is NOT the causal sub-region for these 4 DMAs. The causal bytes must be in Banks E8, E9, or EA.
+
+**Implication:** The 0xEBBxxx reads may be metadata/pointers rather than actual tile data.
+The decompressor or tile source is elsewhere in Quarter 2.2.
+
+**Next step:** Test Bank E8 (0xE80000-0xE8FFFF) - earlier evidence pointed to 0xE894F4.
+
+---
+
 ## [2.23.1] - 2026-01-03
 
 ### Quarter 2.2 Ablation Results - Causal PRG Region Confirmed

@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.23"  -- v2.23: Fix emu.stop() re-entry bug (script_stopping guard)
+local LOG_VERSION = "2.24"  -- v2.24: Per-CPU toggles (ABLATE_SNES/ABLATE_SA1), SNES exec-guard
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -496,6 +496,13 @@ local ABLATION_PRG_START = ABLATION_PRG_START_RAW
 local ABLATION_PRG_END = ABLATION_PRG_END_RAW
 local ablation_corrupted_count = 0
 
+-- v2.24: Per-CPU ablation toggles - isolate S-CPU vs SA-1 causality
+-- When both enabled: ablates both CPUs (current behavior)
+-- ABLATE_SNES=0, ABLATE_SA1=1: only SA-1 reads ablated
+-- ABLATE_SNES=1, ABLATE_SA1=0: only S-CPU reads ablated
+local ABLATE_SNES = parse_bool(os.getenv("ABLATE_SNES"), true)
+local ABLATE_SA1 = parse_bool(os.getenv("ABLATE_SA1"), true)
+
 -- v2.20: Per-staging-DMA ablation tracking (not session-scoped)
 -- ablation_total increments on every corrupted read
 -- ablation_last_at_staging snapshots at each STAGING_SUMMARY
@@ -510,9 +517,13 @@ local ablation_total_sa1 = 0        -- SA-1 corrupted reads
 local ablation_last_snes = 0        -- Snapshot at STAGING_SUMMARY
 local ablation_last_sa1 = 0         -- Snapshot at STAGING_SUMMARY
 
--- v2.21: SA-1 exec guard - prevent ablation during SA-1 code fetch from ablation range
--- If SA-1 is executing from the ablation range, ablating reads would crash the CPU
-local sa1_exec_in_ablation_range = false
+-- v2.21/v2.24: Exec guards - prevent ablation during code fetch from ablation range
+-- If a CPU is executing from the ablation range, ablating reads would crash it
+-- Consolidated into table to reduce local variable count (Lua 200 limit)
+local exec_guard = {
+    sa1 = false,   -- SA-1 exec guard
+    snes = false,  -- S-CPU exec guard (v2.24)
+}
 
 -- v2.22: SA-1 burst tracking (per-frame) for correlation with staging DMAs
 -- Logs at frame end if any SA-1 reads occurred in ablation range
@@ -526,9 +537,11 @@ local sa1_burst = {
 
 -- Log ablation config at startup
 if ABLATION_ENABLED then
+    local snes_mode = ABLATE_SNES and "exec-guard" or "disabled"
+    local sa1_mode = ABLATE_SA1 and "exec-guard" or "disabled"
     log(string.format(
-        "ABLATION_CONFIG: enabled=true range=0x%06X-0x%06X value=0x%02X (v2.22: SA-1 ungated [exec guard only], S-CPU staging-gated)",
-        ABLATION_PRG_START, ABLATION_PRG_END, ABLATION_VALUE
+        "ABLATION_CONFIG: enabled=true range=0x%06X-0x%06X value=0x%02X (v2.24: S-CPU=%s SA-1=%s)",
+        ABLATION_PRG_START, ABLATION_PRG_END, ABLATION_VALUE, snes_mode, sa1_mode
     ))
 end
 
@@ -2032,12 +2045,19 @@ local function on_fill_session_prg_read(address, value)
 
     -- v2.19: Ablation applies to ANY PRG read during populate session (not just fill session)
     -- This ensures PRG corruption affects staging even when BUFFER_WRITE_WATCH=0
-    -- v2.21: Only ablate S-CPU reads during active staging window (not always-on)
-    if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
-        ablation_corrupted_count = ablation_corrupted_count + 1
-        ablation_total = ablation_total + 1  -- v2.20: per-DMA tracking
-        ablation_total_snes = ablation_total_snes + 1  -- v2.21: S-CPU specific counter
-        return ABLATION_VALUE  -- CPU sees corrupted byte
+    -- v2.24: S-CPU ablation with exec guard and per-CPU toggle
+    if ABLATION_ENABLED and ABLATE_SNES and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
+        -- v2.24: Exec guard - check if S-CPU is executing from ablation range
+        local was_exec = exec_guard.snes
+        exec_guard.snes = false  -- Clear for next read
+
+        if not was_exec then
+            ablation_corrupted_count = ablation_corrupted_count + 1
+            ablation_total = ablation_total + 1  -- v2.20: per-DMA tracking
+            ablation_total_snes = ablation_total_snes + 1  -- v2.21: S-CPU specific counter
+            return ABLATION_VALUE  -- CPU sees corrupted byte
+        end
+        -- Exec guard blocked - don't corrupt, still clear flag
     end
 
     -- Gate on fill session (the key optimization - only log during buffer fill)
@@ -2066,7 +2086,8 @@ local function on_fill_session_prg_read(address, value)
     -- v2.15: Ablation - corrupt reads in specified range to prove causality
     -- Return modified value to CPU, but we logged the original above
     -- NOTE: This is likely unreachable (earlier ablation hook returns first), kept for safety
-    if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
+    -- v2.24: Now also requires ABLATE_SNES toggle (exec guard already cleared above)
+    if ABLATION_ENABLED and ABLATE_SNES and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
         ablation_corrupted_count = ablation_corrupted_count + 1
         ablation_total = ablation_total + 1  -- v2.20: per-DMA tracking
         ablation_total_snes = ablation_total_snes + 1  -- v2.21: S-CPU specific counter
@@ -2080,9 +2101,18 @@ end
 local function on_sa1_exec_in_ablation_range(address, value)
     -- Called when SA-1 executes instruction from ablation range
     -- Set flag so PRG read ablation is disabled for this "tick"
-    sa1_exec_in_ablation_range = true
+    exec_guard.sa1 = true
     -- NOTE: Flag is cleared at start of each SA-1 PRG read callback
     -- This is a heuristic - exec happens before read in most cases
+end
+
+-- v2.24: S-CPU exec callback - track when S-CPU is executing from ablation range
+-- Mirror of SA-1 exec guard for consistency
+local function on_snes_exec_in_ablation_range(address, value)
+    -- Called when S-CPU executes instruction from ablation range
+    -- Set flag so PRG read ablation is disabled for this "tick"
+    exec_guard.snes = true
+    -- NOTE: Flag is cleared at start of each S-CPU PRG read callback
 end
 
 -- v2.22: SA-1 PRG read callback - logs and optionally ablates SA-1 reads from PRG ROM
@@ -2090,16 +2120,18 @@ end
 -- 1. Tracks sa1-specific counter (ablation_total_sa1)
 -- 2. Has exec guard (don't ablate if SA-1 is executing from ablation range)
 -- 3. NO staging gate - SA-1 is upstream producer, ablate unconditionally (exec guard only)
+-- v2.24: Respects ABLATE_SA1 toggle for per-CPU isolation
 local function on_sa1_prg_read(address, value)
     -- Clear exec guard flag at start of each read (will be set by exec callback if needed)
     -- NOTE: This simple approach works because exec callback fires BEFORE the read
     -- that would be part of instruction fetch. For data reads, exec flag is stale (off).
-    local was_exec = sa1_exec_in_ablation_range
-    sa1_exec_in_ablation_range = false
+    local was_exec = exec_guard.sa1
+    exec_guard.sa1 = false
 
     -- v2.22: Ablation for SA-1 (exec guard only, NO staging gate)
     -- SA-1 is likely upstream producer - reads happen before staging_active is set
-    if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
+    -- v2.24: Now respects ABLATE_SA1 toggle
+    if ABLATION_ENABLED and ABLATE_SA1 and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
         -- Track burst statistics for this frame
         sa1_burst.count = sa1_burst.count + 1
         if not sa1_burst.min_addr or address < sa1_burst.min_addr then
@@ -2653,6 +2685,27 @@ local function register_buffer_write_callbacks()
                         "INFO: Fill session PRG read callback registered (S-CPU): 0x%06X-0x%06X at frame=%d",
                         0, prg_size - 1, frame_count
                     ))
+
+                    -- v2.24: Register S-CPU exec callback for ablation range (exec guard)
+                    -- This prevents corrupting code fetch from ablation range
+                    if ABLATION_ENABLED and ABLATE_SNES then
+                        local snes_exec_ref = add_memory_callback_compat(
+                            on_snes_exec_in_ablation_range,
+                            emu.callbackType.exec,
+                            ABLATION_PRG_START,
+                            ABLATION_PRG_END,
+                            cpu_type,
+                            MEM.prg
+                        )
+                        if snes_exec_ref then
+                            log(string.format(
+                                "INFO: S-CPU exec guard registered for ablation range: 0x%06X-0x%06X",
+                                ABLATION_PRG_START, ABLATION_PRG_END
+                            ))
+                        else
+                            log("WARNING: failed to register S-CPU exec guard (ablation may corrupt code)")
+                        end
+                    end
                 else
                     log("WARNING: failed to register fill session PRG read callback (S-CPU)")
                 end
@@ -2679,7 +2732,8 @@ local function register_buffer_write_callbacks()
 
                     -- v2.21: Register SA-1 exec callback for ablation range only (exec guard)
                     -- This prevents corrupting code fetch from ablation range
-                    if ABLATION_ENABLED then
+                    -- v2.24: Also respects ABLATE_SA1 toggle
+                    if ABLATION_ENABLED and ABLATE_SA1 then
                         local sa1_exec_ref = add_memory_callback_compat(
                             on_sa1_exec_in_ablation_range,
                             emu.callbackType.exec,

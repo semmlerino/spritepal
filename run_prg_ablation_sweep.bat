@@ -1,6 +1,7 @@
 @echo off
-REM PRG Ablation Sweep (v2.23)
+REM PRG Ablation Sweep (v2.24)
 REM Binary-search which 1MB PRG chunks causally feed staging DMA payloads
+REM v2.24: Per-CPU toggles (ABLATE_SNES/ABLATE_SA1), SNES exec-guard
 REM v2.23: Fix emu.stop() re-entry bug (script_stopping guard)
 REM v2.22: SA-1 PRG ablation UNGATED (exec guard only) - tests upstream producer hypothesis
 REM
@@ -73,12 +74,14 @@ REM set ABLATION_PRG_END=0xEFFFFF
 REM === RESULTS LOG ===
 REM Chunk 0 (Bank C): TESTED - no payload_hash flips (non-causal for sprite staging)
 REM Quarter 2.2 (0xE80000-0xEBFFFF): CAUSAL - 4 payload_hash flips at frames 1681,1684,1760,1769
-REM   SA1_BURST range: 0xEBB5FC-0xEBB831 (upstream producer, not decompressor label yet)
+REM Bank EB (0xEB0000-0xEBFFFF): TESTED - NO flips despite SA1_BURST reads from 0xEBBxxx
+REM   -> 0xEBBxxx reads are NOT on critical path for these 4 DMAs
+REM   -> Causal bytes must be in E8, E9, or EA
 REM
 REM === 64KB BISECTION OF QUARTER 2.2 ===
-REM Bank E8: 0xE80000-0xE8FFFF
-REM set ABLATION_PRG_START=0xE80000
-REM set ABLATION_PRG_END=0xE8FFFF
+REM Bank E8: 0xE80000-0xE8FFFF (earlier evidence: 0xE894F4 was proven causal)
+set ABLATION_PRG_START=0xE80000
+set ABLATION_PRG_END=0xE8FFFF
 
 REM Bank E9: 0xE90000-0xE9FFFF
 REM set ABLATION_PRG_START=0xE90000
@@ -88,22 +91,22 @@ REM Bank EA: 0xEA0000-0xEAFFFF
 REM set ABLATION_PRG_START=0xEA0000
 REM set ABLATION_PRG_END=0xEAFFFF
 
-REM Bank EB: 0xEB0000-0xEBFFFF (likely hit - SA1_BURST reads 0xEBBxxx)
-set ABLATION_PRG_START=0xEB0000
-set ABLATION_PRG_END=0xEBFFFF
-
-REM === FINER BISECTION (after EB confirmed) ===
-REM 0xEB8000-0xEBFFFF (upper half)
-REM set ABLATION_PRG_START=0xEB8000
+REM Bank EB: 0xEB0000-0xEBFFFF (TESTED: no flips - not causal for 4 flip DMAs)
+REM set ABLATION_PRG_START=0xEB0000
 REM set ABLATION_PRG_END=0xEBFFFF
 
-REM 0xEBB000-0xEBBFFF (1KB around hotspot)
-REM set ABLATION_PRG_START=0xEBB000
-REM set ABLATION_PRG_END=0xEBBFFF
+REM === FINER BISECTION OF E8 (after E8 confirmed) ===
+REM 0xE80000-0xE87FFF (lower 32KB)
+REM set ABLATION_PRG_START=0xE80000
+REM set ABLATION_PRG_END=0xE87FFF
 
-REM 0xEBB400-0xEBB7FF (512B around SA1_BURST center)
-REM set ABLATION_PRG_START=0xEBB400
-REM set ABLATION_PRG_END=0xEBB7FF
+REM 0xE88000-0xE8FFFF (upper 32KB - contains 0xE894F4)
+REM set ABLATION_PRG_START=0xE88000
+REM set ABLATION_PRG_END=0xE8FFFF
+
+REM 0xE89000-0xE89FFF (4KB around 0xE894F4)
+REM set ABLATION_PRG_START=0xE89000
+REM set ABLATION_PRG_END=0xE89FFF
 
 REM Chunk 3: 0xF00000-0xFFFFFF
 REM set ABLATION_PRG_START=0xF00000
@@ -151,7 +154,7 @@ set HEARTBEAT_EVERY=500
 
 echo.
 echo ===============================================
-echo PRG ABLATION SWEEP (v2.23 - emu.stop fix)
+echo PRG ABLATION SWEEP (v2.24 - per-CPU toggles, SNES exec-guard)
 echo ===============================================
 echo.
 echo ABLATION_ENABLED=%ABLATION_ENABLED%
@@ -201,7 +204,7 @@ echo After run, save log as:
 if "%ABLATION_ENABLED%"=="0" (
     echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_baseline.txt
 ) else (
-    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_bank_EB.txt
+    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_bank_E8.txt
 )
 echo.
 
