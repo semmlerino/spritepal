@@ -67,6 +67,115 @@ to WRAM sources).
 
 ---
 
+## [2.23.0] - 2026-01-03
+
+### Fix emu.stop() Re-entry Bug (v2.23)
+
+**Problem:** During ablation runs, the script would "freeze" after reaching MAX_FRAMES.
+Analysis showed "Reached MAX_FRAMES; stopping" logged 1266 times - `emu.stop()` was called
+repeatedly but didn't immediately halt the emulator's frame callbacks.
+
+**Symptoms:**
+- Run exceeds MAX_FRAMES (e.g., 3765 frames when MAX_FRAMES=2500)
+- Log shows repeated "Reached MAX_FRAMES; stopping" messages
+- Script never terminates until manually closed
+
+**Root Cause:** `emu.stop()` doesn't immediately halt Lua callback execution in Mesen2.
+The frame callback continues to be invoked until the emulator fully stops.
+
+**Solution:** Add `script_stopping` guard flag to prevent callback re-entry.
+
+**Implementation:**
+```lua
+local script_stopping = false  -- New guard flag
+
+local function on_end_frame()
+    -- Early exit if already stopping
+    if script_stopping then
+        return
+    end
+
+    -- ... normal frame processing ...
+
+    if frame_count >= MAX_FRAMES then
+        log("Reached MAX_FRAMES; stopping")
+        script_stopping = true  -- Set flag BEFORE emu.stop()
+        emu.stop()
+        return
+    end
+end
+```
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.22 → v2.23)
+- `run_prg_ablation_sweep.bat` (version update)
+
+---
+
+## [2.22.0] - 2026-01-03
+
+### SA-1 PRG Ablation Ungated (v2.22)
+
+**Context:** v2.21 added SA-1 PRG read logging and ablation, but with the same
+`staging_active` gate as S-CPU. Analysis showed SA-1 reads from ablation range
+with `ablated=0` because staging wasn't active when SA-1 read.
+
+**Key Insight:** If SA-1 is an upstream producer (decompression), it reads ROM
+BEFORE staging_active is set. Gating SA-1 ablation to staging is "too late."
+
+**Changes:**
+1. Removed `staging_active` gate from SA-1 ablation (kept exec guard only)
+2. Added SA-1 burst tracking per-frame for correlation with staging DMAs
+3. Added `SA1_BURST` logging at frame end
+
+**New Log Format:**
+```
+SA1_BURST: frame=1500 count=42 ablated=38 exec_blocked=4 range=0xE80000-0xE8FFFF
+```
+
+**Ablation Logic Comparison:**
+| CPU | Staging Gate | Exec Guard | Rationale |
+|-----|--------------|------------|-----------|
+| S-CPU | Yes | No | Downstream consumer - only ablate during staging |
+| SA-1 | **No** | Yes | Upstream producer - ablate unconditionally |
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.21 → v2.22)
+- `run_prg_ablation_sweep.bat` (version update)
+
+---
+
+## [2.21.0] - 2026-01-03
+
+### SA-1 PRG Read Logging and Ablation (v2.21)
+
+**Context:** v2.20 per-DMA ablation showed no payload_hash flips in Quarter 2.2
+(0xE80000-0xEBFFFF) despite this being the suspected causal range. The freeze at
+frame 1595 suggested SA-1 code fetch was being ablated.
+
+**Hypothesis:** SA-1 is upstream producer, reading PRG before S-CPU staging begins.
+Need to track SA-1 PRG reads separately from S-CPU.
+
+**New Features:**
+1. **SA-1 exec guard**: Tracks when SA-1 executes from ablation range
+2. **SA-1 PRG read callback**: Logs and optionally ablates SA-1 reads
+3. **Separate counters**: `ablation_total_sa1` distinct from S-CPU counter
+4. **Updated STAGING_SUMMARY**: Shows both `ablated=N` (S-CPU+SA-1) and `sa1=M`
+
+**New Log Format:**
+```
+STAGING_SUMMARY: ... ablated=42 sa1=38
+```
+
+**Safety:** SA-1 exec guard prevents ablating reads that are code fetch,
+which would cause useless freezes.
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.20 → v2.21)
+- `run_prg_ablation_sweep.bat` (version update)
+
+---
+
 ## [2.20.0] - 2026-01-03
 
 ### Payload Hash: Deterministic Output Signal for PRG Ablation (v2.19)

@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.19"
+local LOG_VERSION = "2.23"  -- v2.23: Fix emu.stop() re-entry bug (script_stopping guard)
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -301,6 +301,7 @@ local pending_dma_compares = {}
 
 -- Frame counter (moved up to be available for staging watch)
 local frame_count = 0
+local script_stopping = false  -- v2.23: Guard to prevent callback re-entry after emu.stop()
 
 -- Canonical frame source (per Instrumentation Contract v1.1)
 -- Use last_state_frame if a savestate was loaded, else use frame_count
@@ -502,10 +503,31 @@ local ablation_corrupted_count = 0
 local ablation_total = 0
 local ablation_last_at_staging = 0
 
+-- v2.21: Separate S-CPU vs SA-1 ablation counters
+-- Both CPUs can read from PRG ROM; SA-1 likely does sprite decompression
+local ablation_total_snes = 0       -- S-CPU corrupted reads
+local ablation_total_sa1 = 0        -- SA-1 corrupted reads
+local ablation_last_snes = 0        -- Snapshot at STAGING_SUMMARY
+local ablation_last_sa1 = 0         -- Snapshot at STAGING_SUMMARY
+
+-- v2.21: SA-1 exec guard - prevent ablation during SA-1 code fetch from ablation range
+-- If SA-1 is executing from the ablation range, ablating reads would crash the CPU
+local sa1_exec_in_ablation_range = false
+
+-- v2.22: SA-1 burst tracking (per-frame) for correlation with staging DMAs
+-- Logs at frame end if any SA-1 reads occurred in ablation range
+local sa1_burst = {
+    count = 0,          -- reads this frame
+    min_addr = nil,     -- first address read
+    max_addr = nil,     -- last address read
+    exec_blocked = 0,   -- reads blocked by exec guard
+    ablated = 0,        -- reads actually ablated
+}
+
 -- Log ablation config at startup
 if ABLATION_ENABLED then
     log(string.format(
-        "ABLATION_CONFIG: enabled=true range=0x%06X-0x%06X value=0x%02X (CPU addresses, no conversion)",
+        "ABLATION_CONFIG: enabled=true range=0x%06X-0x%06X value=0x%02X (v2.22: SA-1 ungated [exec guard only], S-CPU staging-gated)",
         ABLATION_PRG_START, ABLATION_PRG_END, ABLATION_VALUE
     ))
 end
@@ -1193,12 +1215,18 @@ local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
         dropped_str = string.format(" dropped=%d", staging_dropped_writes)
     end
 
-    -- v2.20: Per-DMA ablation delta (meaningful for causality testing)
+    -- v2.21: Per-DMA ablation delta with S-CPU vs SA-1 breakdown
     local ablation_delta = ablation_total - ablation_last_at_staging
+    local ablation_delta_snes = ablation_total_snes - ablation_last_snes
+    local ablation_delta_sa1 = ablation_total_sa1 - ablation_last_sa1
     ablation_last_at_staging = ablation_total
+    ablation_last_snes = ablation_total_snes
+    ablation_last_sa1 = ablation_total_sa1
     local ablation_str = ""
     if ABLATION_ENABLED then
-        ablation_str = string.format(" ablated=%d", ablation_delta)
+        -- v2.21: Show both CPU types for disambiguation
+        ablation_str = string.format(" ablated=%d(snes=%d,sa1=%d)",
+            ablation_delta, ablation_delta_snes, ablation_delta_sa1)
     end
 
     log(string.format(
@@ -2004,9 +2032,11 @@ local function on_fill_session_prg_read(address, value)
 
     -- v2.19: Ablation applies to ANY PRG read during populate session (not just fill session)
     -- This ensures PRG corruption affects staging even when BUFFER_WRITE_WATCH=0
+    -- v2.21: Only ablate S-CPU reads during active staging window (not always-on)
     if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
         ablation_corrupted_count = ablation_corrupted_count + 1
         ablation_total = ablation_total + 1  -- v2.20: per-DMA tracking
+        ablation_total_snes = ablation_total_snes + 1  -- v2.21: S-CPU specific counter
         return ABLATION_VALUE  -- CPU sees corrupted byte
     end
 
@@ -2039,9 +2069,62 @@ local function on_fill_session_prg_read(address, value)
     if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
         ablation_corrupted_count = ablation_corrupted_count + 1
         ablation_total = ablation_total + 1  -- v2.20: per-DMA tracking
+        ablation_total_snes = ablation_total_snes + 1  -- v2.21: S-CPU specific counter
         return ABLATION_VALUE  -- CPU sees corrupted byte
     end
     -- Return nil = no modification (CPU sees original value)
+end
+
+-- v2.21: SA-1 exec callback - track when SA-1 is executing from ablation range
+-- This prevents corrupting code fetch, which causes useless hangs
+local function on_sa1_exec_in_ablation_range(address, value)
+    -- Called when SA-1 executes instruction from ablation range
+    -- Set flag so PRG read ablation is disabled for this "tick"
+    sa1_exec_in_ablation_range = true
+    -- NOTE: Flag is cleared at start of each SA-1 PRG read callback
+    -- This is a heuristic - exec happens before read in most cases
+end
+
+-- v2.22: SA-1 PRG read callback - logs and optionally ablates SA-1 reads from PRG ROM
+-- Key differences from S-CPU callback:
+-- 1. Tracks sa1-specific counter (ablation_total_sa1)
+-- 2. Has exec guard (don't ablate if SA-1 is executing from ablation range)
+-- 3. NO staging gate - SA-1 is upstream producer, ablate unconditionally (exec guard only)
+local function on_sa1_prg_read(address, value)
+    -- Clear exec guard flag at start of each read (will be set by exec callback if needed)
+    -- NOTE: This simple approach works because exec callback fires BEFORE the read
+    -- that would be part of instruction fetch. For data reads, exec flag is stale (off).
+    local was_exec = sa1_exec_in_ablation_range
+    sa1_exec_in_ablation_range = false
+
+    -- v2.22: Ablation for SA-1 (exec guard only, NO staging gate)
+    -- SA-1 is likely upstream producer - reads happen before staging_active is set
+    if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
+        -- Track burst statistics for this frame
+        sa1_burst.count = sa1_burst.count + 1
+        if not sa1_burst.min_addr or address < sa1_burst.min_addr then
+            sa1_burst.min_addr = address
+        end
+        if not sa1_burst.max_addr or address > sa1_burst.max_addr then
+            sa1_burst.max_addr = address
+        end
+
+        -- Always count SA-1 reads in ablation range (for visibility)
+        ablation_total_sa1 = ablation_total_sa1 + 1
+
+        -- Only ablate if SA-1 is NOT executing from this range (exec guard)
+        -- v2.22: Removed staging_active gate - SA-1 is upstream
+        if not was_exec then
+            ablation_total = ablation_total + 1  -- Combined total for backwards compat
+            sa1_burst.ablated = sa1_burst.ablated + 1
+            return ABLATION_VALUE  -- SA-1 sees corrupted byte
+        else
+            sa1_burst.exec_blocked = sa1_burst.exec_blocked + 1
+        end
+    end
+
+    -- No modification
+    return nil
 end
 
 -- v2.9: Compress PRG reads into contiguous runs for summary
@@ -2567,11 +2650,55 @@ local function register_buffer_write_callbacks()
                 )
                 if prg_ref then
                     log(string.format(
-                        "INFO: Fill session PRG read callback registered: 0x%06X-0x%06X at frame=%d",
+                        "INFO: Fill session PRG read callback registered (S-CPU): 0x%06X-0x%06X at frame=%d",
                         0, prg_size - 1, frame_count
                     ))
                 else
-                    log("WARNING: failed to register fill session PRG read callback")
+                    log("WARNING: failed to register fill session PRG read callback (S-CPU)")
+                end
+
+                -- v2.21: Register SA-1 PRG read callback for ablation
+                -- SA-1 likely does sprite decompression; this is the missing piece
+                if sa1_cpu_type then
+                    local sa1_prg_ref = add_memory_callback_compat(
+                        on_sa1_prg_read,
+                        emu.callbackType.read,
+                        0x000000,
+                        prg_size - 1,
+                        sa1_cpu_type,
+                        MEM.prg
+                    )
+                    if sa1_prg_ref then
+                        log(string.format(
+                            "INFO: SA-1 PRG read callback registered: 0x%06X-0x%06X at frame=%d",
+                            0, prg_size - 1, frame_count
+                        ))
+                    else
+                        log("WARNING: failed to register SA-1 PRG read callback")
+                    end
+
+                    -- v2.21: Register SA-1 exec callback for ablation range only (exec guard)
+                    -- This prevents corrupting code fetch from ablation range
+                    if ABLATION_ENABLED then
+                        local sa1_exec_ref = add_memory_callback_compat(
+                            on_sa1_exec_in_ablation_range,
+                            emu.callbackType.exec,
+                            ABLATION_PRG_START,
+                            ABLATION_PRG_END,
+                            sa1_cpu_type,
+                            MEM.prg
+                        )
+                        if sa1_exec_ref then
+                            log(string.format(
+                                "INFO: SA-1 exec guard registered for ablation range: 0x%06X-0x%06X",
+                                ABLATION_PRG_START, ABLATION_PRG_END
+                            ))
+                        else
+                            log("WARNING: failed to register SA-1 exec guard (ablation may corrupt code)")
+                        end
+                    end
+                else
+                    log("WARNING: sa1_cpu_type not resolved; SA-1 PRG reads will not be tracked")
                 end
             end
         end
@@ -2639,6 +2766,11 @@ local function register_wram_source_callbacks()
 end
 
 local function on_end_frame()
+    -- v2.23: Early exit if already stopping (emu.stop() may not halt immediately)
+    if script_stopping then
+        return
+    end
+
     -- v2.0: Try savestate load if not yet loaded (deferred from init)
     -- Uses forward-declared try_load_savestate; eliminates permanent exec callback
     if SAVESTATE_PATH and not state_loaded then
@@ -2646,6 +2778,26 @@ local function on_end_frame()
     end
 
     frame_count = frame_count + 1
+
+    -- v2.22: Log SA-1 burst summary if any reads occurred in ablation range this frame
+    -- This allows correlation: SA-1 burst at frame N → staging DMA at frame N+delta
+    if ABLATION_ENABLED and sa1_burst.count > 0 then
+        log(string.format(
+            "SA1_BURST: frame=%d count=%d ablated=%d exec_blocked=%d range=0x%06X-0x%06X",
+            frame_count - 1,  -- Log for previous frame (just ended)
+            sa1_burst.count,
+            sa1_burst.ablated,
+            sa1_burst.exec_blocked,
+            sa1_burst.min_addr or 0,
+            sa1_burst.max_addr or 0
+        ))
+        -- Reset for next frame
+        sa1_burst.count = 0
+        sa1_burst.min_addr = nil
+        sa1_burst.max_addr = nil
+        sa1_burst.exec_blocked = 0
+        sa1_burst.ablated = 0
+    end
 
     -- v2.11: Cold-start detection (check for tile buffer population)
     if POPULATE_ENABLED and not pop.triggered then
@@ -2799,7 +2951,9 @@ local function on_end_frame()
 
     if frame_count >= MAX_FRAMES then
         log("Reached MAX_FRAMES; stopping")
+        script_stopping = true  -- v2.23: Prevent callback re-entry
         emu.stop()
+        return
     end
 end
 

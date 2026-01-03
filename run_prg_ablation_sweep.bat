@@ -1,6 +1,8 @@
 @echo off
-REM PRG Ablation Sweep (v2.19 Step B)
+REM PRG Ablation Sweep (v2.23)
 REM Binary-search which 1MB PRG chunks causally feed staging DMA payloads
+REM v2.23: Fix emu.stop() re-entry bug (script_stopping guard)
+REM v2.22: SA-1 PRG ablation UNGATED (exec guard only) - tests upstream producer hypothesis
 REM
 REM Protocol:
 REM   1. Run baseline (ABLATION_ENABLED=0) - record payload_hash for target DMAs
@@ -31,8 +33,8 @@ set MAX_FRAMES=2500
 
 REM === ABLATION CONFIG ===
 REM Set to 1 to enable corruption, 0 for baseline
-REM STEP 1: Run baseline first, then switch to 1 for ablation tests
-set ABLATION_ENABLED=0
+REM STEP 2: Baseline done, now ablating Bank C (most accessed for staging fills)
+set ABLATION_ENABLED=1
 
 REM === PRG CHUNKS (uncomment one pair for each run) ===
 REM Baseline: run with ABLATION_ENABLED=0 first
@@ -68,9 +70,12 @@ REM Quarter 2.3: 0xEC0000-0xEFFFFF (direct ROM→VRAM for BG tiles, not staging 
 REM set ABLATION_PRG_START=0xEC0000
 REM set ABLATION_PRG_END=0xEFFFFF
 
-REM === ACTIVE: Chunk 0 for staging path (0xC469F6 seen in FILL_SESSION prg_runs) ===
-set ABLATION_PRG_START=0xC00000
-set ABLATION_PRG_END=0xCFFFFF
+REM === RESULTS LOG ===
+REM Chunk 0 (Bank C): TESTED - no payload_hash flips (non-causal for sprite staging)
+REM
+REM === ACTIVE: Quarter 2.2 (contains proven 0xE894F4 range) ===
+set ABLATION_PRG_START=0xE80000
+set ABLATION_PRG_END=0xEBFFFF
 
 REM PROVEN RANGE (94 bytes, early frames only) - NOT causal for gameplay frames
 REM set ABLATION_PRG_START=0xE894F4
@@ -83,15 +88,15 @@ REM set ABLATION_PRG_END=0xFFFFFF
 set ABLATION_VALUE=0xFF
 
 REM === MINIMAL CONFIG - disable 0x1530 buffer distractions ===
-REM v2.19 FIX: Staging DMAs from 0x7E2000 occur at frame 1495. Lower to catch them.
+REM Staging DMAs from 0x7E2000 occur at frame 1495. Set start to catch them.
 set STAGING_START_FRAME=1490
 set STAGING_WATCH_ENABLED=1
 set STAGING_WATCH_START=0x2000
 set STAGING_WATCH_END=0x2FFF
 set STAGING_WATCH_PC_SAMPLES=4
 
-REM v2.19: Keep BUFFER_WRITE_WATCH=1 to enable PRG callback registration for ablation
-REM The buffer itself is proven irrelevant to staging, but the PRG callback is needed
+REM Keep BUFFER_WRITE_WATCH=1 to enable PRG callback registration for ablation
+REM The buffer itself is proven irrelevant to staging, but the callbacks are needed
 set BUFFER_WRITE_WATCH=1
 set BUFFER_WRITE_START=0x1530
 set BUFFER_WRITE_END=0x161A
@@ -122,7 +127,7 @@ set HEARTBEAT_EVERY=500
 
 echo.
 echo ===============================================
-echo PRG ABLATION SWEEP (v2.19 Step B)
+echo PRG ABLATION SWEEP (v2.23 - emu.stop fix)
 echo ===============================================
 echo.
 echo ABLATION_ENABLED=%ABLATION_ENABLED%
@@ -137,12 +142,13 @@ echo ABLATION_VALUE=0x%ABLATION_VALUE%
 echo.
 echo Noise reduction: BUFFER_WRITE_WATCH=0, READ_COVERAGE_ENABLED=0, STAGING_WRAM_SOURCE=0
 echo.
-echo Quick check after run:
-echo   grep "STAGING_SUMMARY:.*payload_hash" mesen2_exchange/dma_probe_log.txt
+echo Quick check after run (sprite VRAM 0x4000-0x5FFF only):
+echo   grep "STAGING_SUMMARY.*vram=0x4\|STAGING_SUMMARY.*vram=0x5" mesen2_exchange/dma_probe_log.txt ^| head -10
 echo.
-echo Compare baseline vs ablation:
-echo   grep "payload_hash=" baseline.txt ^| head -5
-echo   grep "payload_hash=" ablation_E.txt ^| head -5
+echo Compare baseline vs ablation (match on frame+vram+src+size):
+echo   Baseline: prg_sweep_baseline.txt
+echo   Ablation: mesen2_exchange/dma_probe_log.txt
+echo   Look for payload_hash differences in matching entries
 echo.
 echo ===============================================
 echo.
@@ -168,7 +174,7 @@ echo After run, save log as:
 if "%ABLATION_ENABLED%"=="0" (
     echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_baseline.txt
 ) else (
-    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_chunk_E.txt
+    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_quarter_E82.txt
 )
 echo.
 
