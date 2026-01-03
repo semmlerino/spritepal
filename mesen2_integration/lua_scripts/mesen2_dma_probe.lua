@@ -544,7 +544,7 @@ local sa1_burst = {
     ablated = 0,        -- reads actually ablated
 }
 
--- Log ablation config at startup
+-- Log ablation config at startup (v2.25: always log for diagnostics)
 if ABLATION_ENABLED then
     local snes_mode = ABLATE_SNES and "exec-guard" or "disabled"
     local sa1_mode = ABLATE_SA1 and "exec-guard" or "disabled"
@@ -552,6 +552,9 @@ if ABLATION_ENABLED then
         "ABLATION_CONFIG: enabled=true range=0x%06X-0x%06X value=0x%02X (v2.24: S-CPU=%s SA-1=%s)",
         ABLATION_PRG_START, ABLATION_PRG_END, ABLATION_VALUE, snes_mode, sa1_mode
     ))
+else
+    local raw_val = os.getenv("ABLATION_ENABLED")
+    log(string.format("ABLATION_CONFIG: enabled=false (raw env='%s')", tostring(raw_val)))
 end
 
 -- v2.18: READ_COVERAGE - track what bytes are READ from source buffer

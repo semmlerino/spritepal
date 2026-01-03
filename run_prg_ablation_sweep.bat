@@ -35,7 +35,6 @@ set MAX_FRAMES=2500
 
 REM === ABLATION CONFIG ===
 REM Set to 1 to enable corruption, 0 for baseline
-REM STEP 2: Baseline done, now ablating Bank C (most accessed for staging fills)
 set ABLATION_ENABLED=1
 
 REM === PRG CHUNKS (uncomment one pair for each run) ===
@@ -72,21 +71,47 @@ REM Quarter 2.3: 0xEC0000-0xEFFFFF (direct ROM→VRAM for BG tiles, not staging 
 REM set ABLATION_PRG_START=0xEC0000
 REM set ABLATION_PRG_END=0xEFFFFF
 
-REM === RESULTS LOG ===
-REM Chunk 0 (Bank C): TESTED - no payload_hash flips (non-causal for sprite staging)
-REM Quarter 2.2 (0xE80000-0xEBFFFF): CAUSAL - 4 payload_hash flips at frames 1681,1684,1760,1769
-REM Bank EB (0xEB0000-0xEBFFFF): TESTED - NO flips despite SA1_BURST reads from 0xEBBxxx
-REM   -> 0xEBBxxx reads are NOT on critical path for these 4 DMAs
-REM   -> Causal bytes must be in E8, E9, or EA
+REM === RESULTS LOG (v2.25) ===
+REM Baseline: prg_sweep_baseline_v225.txt (306 sprite VRAM staging entries)
+REM Bank E9 (0xE90000-0xE9FFFF): CAUSAL - 11 payload_hash flips (S-CPU reads)
+REM   First hit: 0xE93AEB @ frame 1680, first flip @ frame 1681
+REM E9 lower (0xE90000-0xE97FFF): CAUSAL - 20 flips
+REM   Hits: 0xE93AEB, 0xE94D0A, 0xE9677F
+REM E9 lower-lower (0xE90000-0xE93FFF): CAUSAL - 5 flips
+REM   Hit: 0xE93AEB only
+REM E9 lower-upper (0xE94000-0xE97FFF): CAUSAL - 15 flips
+REM   Hits: 0xE9677F, 0xE94D0A
 REM
 REM === 64KB BISECTION OF QUARTER 2.2 ===
-REM Bank E8: 0xE80000-0xE8FFFF (earlier evidence: 0xE894F4 was proven causal)
-set ABLATION_PRG_START=0xE80000
-set ABLATION_PRG_END=0xE8FFFF
+REM Bank E8: 0xE80000-0xE8FFFF
+REM set ABLATION_PRG_START=0xE80000
+REM set ABLATION_PRG_END=0xE8FFFF
 
-REM Bank E9: 0xE90000-0xE9FFFF
+REM Bank E9: 0xE90000-0xE9FFFF (CAUSAL - 11 flips, see results log)
 REM set ABLATION_PRG_START=0xE90000
 REM set ABLATION_PRG_END=0xE9FFFF
+
+REM === 32KB BISECTION OF E9 ===
+REM E9 lower: 0xE90000-0xE97FFF (CAUSAL - 20 flips, see results log)
+REM set ABLATION_PRG_START=0xE90000
+REM set ABLATION_PRG_END=0xE97FFF
+
+REM E9 upper: 0xE98000-0xE9FFFF
+REM set ABLATION_PRG_START=0xE98000
+REM set ABLATION_PRG_END=0xE9FFFF
+
+REM === 16KB BISECTION OF E9 LOWER ===
+REM E9 lower-lower: 0xE90000-0xE93FFF (CAUSAL - 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE90000
+REM set ABLATION_PRG_END=0xE93FFF
+
+REM E9 lower-upper: 0xE94000-0xE97FFF (CAUSAL - 15 flips)
+REM set ABLATION_PRG_START=0xE94000
+REM set ABLATION_PRG_END=0xE97FFF
+
+REM E9 upper: 0xE98000-0xE9FFFF (structural test - any causal regions here?)
+set ABLATION_PRG_START=0xE98000
+set ABLATION_PRG_END=0xE9FFFF
 
 REM Bank EA: 0xEA0000-0xEAFFFF
 REM set ABLATION_PRG_START=0xEA0000
@@ -205,7 +230,7 @@ echo After run, save log as:
 if "%ABLATION_ENABLED%"=="0" (
     echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_baseline.txt
 ) else (
-    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_bank_E8.txt
+    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_E9_upper.txt
 )
 echo.
 

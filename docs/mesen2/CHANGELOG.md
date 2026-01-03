@@ -67,6 +67,49 @@ to WRAM sources).
 
 ---
 
+## [2.26.0] - 2026-01-03
+
+### PRG Ablation Binary Search: E9 Bank Bisection Complete
+
+Systematic binary search of Bank E9 (0xE90000-0xE9FFFF) to identify causal PRG
+regions for sprite staging DMAs.
+
+**Methodology:**
+1. Baseline run with ABLATION_ENABLED=0 records payload_hash for each DMA
+2. Ablation run corrupts reads from specific PRG range
+3. Compare: same DMA identity (frame, src, size, vram, seq, pcs, range, pattern)
+   with different payload_hash = causal region
+
+**Results:**
+
+| Range | Size | Flips | Hits | Status |
+|-------|------|-------|------|--------|
+| E90000-E93FFF | 16KB | 5 | 0xE93AEB | CAUSAL |
+| E94000-E97FFF | 16KB | 15 | 0xE9677F, 0xE94D0A | CAUSAL |
+| E98000-E9FFFF | 32KB | -- | -- | Pending |
+
+**Key Findings:**
+- All hits are S-CPU reads (`cpu=snes`), not SA-1
+- First flip appears exactly one frame after first ABLATION_HIT (timing consistency)
+- Two independent causal clusters identified in E9 lower half
+- Corruption propagates through decompression/copy into multiple DMAs
+
+**Signature DMAs Validated:**
+- Frame 1681 @ 0x58E0 (after E93AEB hit)
+- Frame 1793 @ 0x5A20 (after E9677F hit)
+- Frames 2003, 2007, 2011, 2015 @ 0x58E0 (after E94D0A hits)
+- Frame 2357 @ 0x58E0 (late-game)
+
+**Files Added:**
+- `prg_sweep_baseline_v225.txt` - v2.25 baseline (306 sprite VRAM entries)
+- `prg_sweep_E9_lower_lower.txt` - 0xE90000-0xE93FFF results
+- `prg_sweep_E9_lower_upper.txt` - 0xE94000-0xE97FFF results
+
+**Documentation Updated:**
+- `03_GAME_MAPPING_KIRBY_SA1.md` - Added "PRG Ablation: Causal ROM Regions" section
+
+---
+
 ## [2.25.0] - 2026-01-03
 
 ### Critical Bug Fix: Decouple Ablation from BUFFER_WRITE_WATCH

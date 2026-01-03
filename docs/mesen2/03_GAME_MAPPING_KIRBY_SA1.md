@@ -539,3 +539,54 @@ python3 scripts/analyze_capture_quality.py mesen2_exchange/sprite_capture_*.json
 - After upgrading Mesen 2 builds
 - After modifying capture scripts
 - Before releasing changes to the mapping pipeline
+
+## PRG Ablation: Causal ROM Regions for Sprite Staging
+
+PRG ablation (v2.25) identifies which ROM regions causally feed sprite staging DMAs
+by corrupting reads and measuring payload_hash changes. This section documents
+proven causal regions for gameplay sprite tiles.
+
+### Methodology
+
+1. **Baseline run** (ABLATION_ENABLED=0): Record payload_hash for each STAGING_SUMMARY
+2. **Ablation run**: Corrupt reads from a PRG range, compare payload_hash
+3. **Causality criteria**: DMA identity matches (frame, src, size, vram, seq, pcs, range, pattern)
+   but payload_hash differs → that PRG range is causal for that DMA
+
+### Proven Causal Regions (Gameplay Frames 1500+)
+
+| ROM Range | Size | Flips | Hit Addresses | Notes |
+|-----------|------|-------|---------------|-------|
+| 0xE90000-0xE93FFF | 16KB | 5 | 0xE93AEB | First hit @ frame 1680, first flip @ 1681 |
+| 0xE94000-0xE97FFF | 16KB | 15 | 0xE9677F, 0xE94D0A | Signature DMAs: 1793, 2003, 2007, 2011, 2015, 2357 |
+
+### Non-Causal Regions (Tested)
+
+| ROM Range | Size | Result |
+|-----------|------|--------|
+| 0xC00000-0xCFFFFF | 1MB | No flips (Bank C not on sprite path) |
+| 0xEB0000-0xEBFFFF | 64KB | No flips despite SA1_BURST reads |
+
+### Key Observations
+
+1. **S-CPU reads dominate**: All ABLATION_HITs in E9 were `cpu=snes`, not SA-1
+2. **Timing consistency**: First flip appears exactly one frame after first ABLATION_HIT
+3. **Propagation**: Corruption fans out through decompression/copy—one hit can affect multiple DMAs
+4. **Two independent clusters**: E9 lower contains at least two distinct causal address clusters
+
+### Signature DMAs for Validation
+
+When testing new PRG ranges, check for flips in these signature DMAs:
+
+| Frame | VRAM | Size | Description |
+|-------|------|------|-------------|
+| 1681 | 0x58E0 | 640 | First flip after E93AEB hit |
+| 1793 | 0x5A20 | 640 | First flip after E9677F hit |
+| 2003, 2007, 2011, 2015 | 0x58E0 | 640 | Periodic after E94D0A hits |
+| 2357 | 0x58E0 | 640 | Late-game signature |
+
+### Ablation Test Files
+
+- `prg_sweep_baseline_v225.txt` - Baseline (306 sprite VRAM entries)
+- `prg_sweep_E9_lower_lower.txt` - 0xE90000-0xE93FFF (5 flips)
+- `prg_sweep_E9_lower_upper.txt` - 0xE94000-0xE97FFF (15 flips)
