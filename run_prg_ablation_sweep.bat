@@ -1,6 +1,8 @@
 @echo off
-REM PRG Ablation Sweep (v2.25)
+REM PRG Ablation Sweep (v2.28)
 REM Binary-search which 1MB PRG chunks causally feed staging DMA payloads
+REM v2.28: Begin 0xE9E667 bisection (17 flips - dominant cluster)
+REM v2.27: 0xE93AEB bisection complete - minimal causal read address identified
 REM v2.25: Decouple ablation from BUFFER_WRITE_WATCH (critical bug fix)
 REM v2.24: Per-CPU toggles (ABLATE_SNES/ABLATE_SA1), SNES exec-guard
 REM v2.23: Fix emu.stop() re-entry bug (script_stopping guard)
@@ -71,8 +73,9 @@ REM Quarter 2.3: 0xEC0000-0xEFFFFF (direct ROM→VRAM for BG tiles, not staging 
 REM set ABLATION_PRG_START=0xEC0000
 REM set ABLATION_PRG_END=0xEFFFFF
 
-REM === RESULTS LOG (v2.25) ===
+REM === RESULTS LOG (v2.26) ===
 REM Baseline: prg_sweep_baseline_v225.txt (306 sprite VRAM staging entries)
+REM
 REM Bank E9 (0xE90000-0xE9FFFF): CAUSAL - 11 payload_hash flips (S-CPU reads)
 REM   First hit: 0xE93AEB @ frame 1680, first flip @ frame 1681
 REM E9 lower (0xE90000-0xE97FFF): CAUSAL - 20 flips
@@ -87,6 +90,35 @@ REM E9 upper-lower (0xE98000-0xE9BFFF): CAUSAL - 1 flip
 REM   Hit: 0xE98DDF only (frame 1861 → flip 1862)
 REM E9 upper-upper (0xE9C000-0xE9FFFF): CAUSAL - 17 flips
 REM   Hit: 0xE9E667 only (dominant cluster)
+REM
+REM === 0xE93AEB BISECTION CHAIN (v2.27 - COMPLETE) ===
+REM Target: 0xE93AEB @ frame 1680 → flip @ frame 1681 (5 flips total)
+REM
+REM RESULT: Minimal causal read address (S-CPU): 0xE93AEB
+REM   - Ablating reads of this 1-byte range is SUFFICIENT to flip payload_hash
+REM     for 5 identity-matched sprite staging DMAs
+REM   - Single byte affecting multiple tiles suggests control/pointer/selector byte,
+REM     NOT necessarily raw tile data
+REM   - Reduction: 16KB → 1B (16,384x)
+REM
+REM   E9 lower-lower (16KB): E90000-E93FFF CAUSAL
+REM     E90000-E91FFF (8KB): NOT CAUSAL
+REM     E92000-E93FFF (8KB): CAUSAL
+REM       E92000-E92FFF (4KB): NOT CAUSAL
+REM       E93000-E93FFF (4KB): CAUSAL
+REM         E93000-E937FF (2KB): NOT CAUSAL
+REM         E93800-E93FFF (2KB): CAUSAL
+REM           E93800-E939FF (512B): NOT CAUSAL
+REM           E93A00-E93BFF (512B): CAUSAL
+REM             E93A00-E93AFF (256B): CAUSAL
+REM               E93A80-E93AFF (128B): CAUSAL
+REM                 E93AC0-E93AFF (64B): CAUSAL
+REM                   E93AE0-E93AFF (32B): CAUSAL
+REM                     E93AE0-E93AEF (16B): CAUSAL
+REM                       E93AE8-E93AEF (8B): CAUSAL
+REM                         E93AE8-E93AEB (4B): CAUSAL
+REM                           E93AEA-E93AEB (2B): CAUSAL
+REM                             0xE93AEB (1B): CAUSAL - 5 flips
 REM
 REM === 64KB BISECTION OF QUARTER 2.2 ===
 REM Bank E8: 0xE80000-0xE8FFFF
@@ -119,12 +151,148 @@ REM E9 upper: 0xE98000-0xE9FFFF (CAUSAL - 18 flips, see results log)
 REM set ABLATION_PRG_START=0xE98000
 REM set ABLATION_PRG_END=0xE9FFFF
 
-REM === 8KB BISECTION OF E9 LOWER-UPPER ===
-REM E9 lower-upper-lower: 0xE94000-0xE95FFF (contains 0xE94D0A - 200x cadence)
-set ABLATION_PRG_START=0xE94000
-set ABLATION_PRG_END=0xE95FFF
+REM === 8KB BISECTION OF E9 LOWER-LOWER (COMPLETE) ===
+REM E9 lower-lower-lower: 0xE90000-0xE91FFF (NOT CAUSAL - 0 flips, 0 hits)
+REM set ABLATION_PRG_START=0xE90000
+REM set ABLATION_PRG_END=0xE91FFF
 
-REM E9 lower-upper-upper: 0xE96000-0xE97FFF (contains 0xE9677F - 1792→1793 chain)
+REM E9 lower-lower-upper: 0xE92000-0xE93FFF (CAUSAL - 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE92000
+REM set ABLATION_PRG_END=0xE93FFF
+
+REM === 4KB BISECTION OF E92000-E93FFF ===
+REM E92000-E92FFF (lower 4KB - NOT CAUSAL, 0 flips, 0 hits)
+REM set ABLATION_PRG_START=0xE92000
+REM set ABLATION_PRG_END=0xE92FFF
+
+REM E93000-E93FFF (upper 4KB - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93000
+REM set ABLATION_PRG_END=0xE93FFF
+
+REM === 2KB BISECTION OF E93000-E93FFF ===
+REM E93000-E937FF (lower 2KB - NOT CAUSAL, 0 flips, 0 hits)
+REM set ABLATION_PRG_START=0xE93000
+REM set ABLATION_PRG_END=0xE937FF
+
+REM E93800-E93FFF (upper 2KB - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93800
+REM set ABLATION_PRG_END=0xE93FFF
+
+REM === 1KB BISECTION OF E93800-E93FFF ===
+REM E93800-E93BFF (lower 1KB - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93800
+REM set ABLATION_PRG_END=0xE93BFF
+
+REM E93C00-E93FFF (upper 1KB)
+REM set ABLATION_PRG_START=0xE93C00
+REM set ABLATION_PRG_END=0xE93FFF
+
+REM === 512B BISECTION OF E93800-E93BFF ===
+REM E93800-E939FF (lower 512B - NOT CAUSAL, 0 flips, 0 hits)
+REM set ABLATION_PRG_START=0xE93800
+REM set ABLATION_PRG_END=0xE939FF
+
+REM E93A00-E93BFF (upper 512B - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93A00
+REM set ABLATION_PRG_END=0xE93BFF
+
+REM === 256B BISECTION OF E93A00-E93BFF ===
+REM E93A00-E93AFF (lower 256B - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93A00
+REM set ABLATION_PRG_END=0xE93AFF
+
+REM E93B00-E93BFF (upper 256B)
+REM set ABLATION_PRG_START=0xE93B00
+REM set ABLATION_PRG_END=0xE93BFF
+
+REM === 128B BISECTION OF E93A00-E93AFF ===
+REM E93A00-E93A7F (lower 128B - SKIP, 0xE93AEB not in range)
+REM set ABLATION_PRG_START=0xE93A00
+REM set ABLATION_PRG_END=0xE93A7F
+
+REM E93A80-E93AFF (upper 128B - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93A80
+REM set ABLATION_PRG_END=0xE93AFF
+
+REM === 64B BISECTION OF E93A80-E93AFF ===
+REM E93A80-E93ABF (lower 64B - SKIP, 0xE93AEB not in range)
+REM set ABLATION_PRG_START=0xE93A80
+REM set ABLATION_PRG_END=0xE93ABF
+
+REM E93AC0-E93AFF (upper 64B - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93AC0
+REM set ABLATION_PRG_END=0xE93AFF
+
+REM === 32B BISECTION OF E93AC0-E93AFF ===
+REM E93AC0-E93ADF (lower 32B - SKIP, 0xE93AEB not in range)
+REM set ABLATION_PRG_START=0xE93AC0
+REM set ABLATION_PRG_END=0xE93ADF
+
+REM E93AE0-E93AFF (upper 32B - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93AE0
+REM set ABLATION_PRG_END=0xE93AFF
+
+REM === 16B BISECTION OF E93AE0-E93AFF ===
+REM E93AE0-E93AEF (lower 16B - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93AE0
+REM set ABLATION_PRG_END=0xE93AEF
+
+REM E93AF0-E93AFF (upper 16B - SKIP, 0xE93AEB not in range)
+REM set ABLATION_PRG_START=0xE93AF0
+REM set ABLATION_PRG_END=0xE93AFF
+
+REM === 8B BISECTION OF E93AE0-E93AEF ===
+REM E93AE0-E93AE7 (lower 8B - SKIP, 0xE93AEB not in range)
+REM set ABLATION_PRG_START=0xE93AE0
+REM set ABLATION_PRG_END=0xE93AE7
+
+REM E93AE8-E93AEF (upper 8B - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93AE8
+REM set ABLATION_PRG_END=0xE93AEF
+
+REM === 4B BISECTION OF E93AE8-E93AEF ===
+REM E93AE8-E93AEB (lower 4B - CAUSAL, 5 flips, hit: 0xE93AEB)
+REM set ABLATION_PRG_START=0xE93AE8
+REM set ABLATION_PRG_END=0xE93AEB
+
+REM E93AEC-E93AEF (upper 4B - SKIP, 0xE93AEB not in range)
+REM set ABLATION_PRG_START=0xE93AEC
+REM set ABLATION_PRG_END=0xE93AEF
+
+REM === 2B BISECTION OF E93AE8-E93AEB ===
+REM E93AE8-E93AE9 (lower 2B - SKIP, 0xE93AEB not in range)
+REM set ABLATION_PRG_START=0xE93AE8
+REM set ABLATION_PRG_END=0xE93AE9
+
+REM E93AEA-E93AEB (upper 2B - CAUSAL, 5 flips, hit: 0xE93AEB, Common: 100%)
+REM set ABLATION_PRG_START=0xE93AEA
+REM set ABLATION_PRG_END=0xE93AEB
+
+REM === SINGLE BYTE TEST (COMPLETE) ===
+REM 0xE93AEB (1B): Minimal causal read - 5 flips @ frames 1681, 1684, 1760, 1769, 1773
+REM   (Likely control/pointer byte; single read affecting multiple tiles)
+REM set ABLATION_PRG_START=0xE93AEB
+REM set ABLATION_PRG_END=0xE93AEB
+
+REM === 0xE9E667 BISECTION CHAIN (v2.28) ===
+REM Target: 0xE9E667 @ 17 flips (dominant cluster, every ~4 frames)
+REM Starting from E9C000-E9FFFF (16KB confirmed causal)
+REM
+REM 8KB bisection - 0xE9E667 is in E9E000-E9FFFF
+REM E9C000-E9DFFF (lower 8KB - SKIP, 0xE9E667 not in range)
+REM set ABLATION_PRG_START=0xE9C000
+REM set ABLATION_PRG_END=0xE9DFFF
+
+REM E9E000-E9FFFF (upper 8KB - contains 0xE9E667) -- ACTIVE
+set ABLATION_PRG_START=0xE9E000
+set ABLATION_PRG_END=0xE9FFFF
+
+REM === 8KB BISECTION OF E9 LOWER-UPPER (COMPLETE) ===
+REM E9 lower-upper-lower: 0xE94000-0xE95FFF (CAUSAL - 4 flips, hit: 0xE94D0A, 200x cadence)
+REM set ABLATION_PRG_START=0xE94000
+REM set ABLATION_PRG_END=0xE95FFF
+
+REM E9 lower-upper-upper: 0xE96000-0xE97FFF (CAUSAL - 1 flip, hit: 0xE9677F, 1792→1793)
 REM set ABLATION_PRG_START=0xE96000
 REM set ABLATION_PRG_END=0xE97FFF
 
@@ -254,7 +422,7 @@ echo After run, save log as:
 if "%ABLATION_ENABLED%"=="0" (
     echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_baseline.txt
 ) else (
-    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_E9_lowerupper_lower.txt
+    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_E93_upper.txt
 )
 echo.
 
