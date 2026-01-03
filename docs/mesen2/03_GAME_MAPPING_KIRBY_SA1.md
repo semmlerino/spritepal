@@ -713,11 +713,54 @@ The "next read" addresses (E9677F, E98DDF) are **NOT** asset blocks - they're
 decoder lookup tables (no E0 header). The decoder uses a pointer table to
 select which blocks to decompress.
 
+### Asset Pointer Table Discovery (v2.36)
+
+**Critical correction:** The 0x00841F addresses seen in traces are SNES CPU addresses,
+not file offsets. For LoROM: `file_offset = (bank & 0x7F) * 0x8000 + (addr & 0x7FFF)`.
+
+Instead of analyzing 0x00841F directly, we searched the ROM for **pointers TO our
+known causal addresses** (little-endian 24-bit: `67 E6 E9` and `EB 3A E9`).
+
+**Result: Asset pointer table at CPU 0xC0FE52 (file 0x00FE52)**
+
+The table contains packed 24-bit little-endian pointers spanning banks E8, E9, EA, EF:
+
+```
+File 0x00FE52:  53 65 E9  C8 53 E9  99 DE E9  0D 92 E9 ...
+                ↑         ↑         ↑         ↑
+              ptr[0]    ptr[1]    ptr[2]    ptr[3]
+```
+
+**Key entries in the pointer table:**
+
+| Index | Table Offset | Pointer | Notes |
+|-------|--------------|---------|-------|
+| 6 | 0xFE64 | **0xE93AEB** | Causal byte #1 |
+| 19 | 0xFE8B | 0xE98DDF | "Next read" after E9E667 decoded |
+| 40 | 0xFECA | **0xE9E667** | Causal byte #2 |
+
+**Implications:**
+1. The decoder uses **table indices** (not raw addresses) to select compressed assets
+2. Ablating a causal byte corrupts **one specific asset** (the one at that table index)
+3. The "jump backwards" behavior (-23KB from E9E667→E98DDF) is explained: decoder
+   reads entry 40, then entry 19 - they're just non-adjacent in ROM
+4. Table extends from 0xFE52 through at least 0xFFFF (~100+ entries total)
+
+**All remaining bisection targets found in table:**
+| Target | Table Offset | Index | Status |
+|--------|--------------|-------|--------|
+| E94D0A | 0xFE61 | 5 | In main table |
+| E98DDF | 0xFE8B | 19 | In main table |
+| E9677F | 0xFF2A | 72 | In extended table |
+
+**Table structure before 0xFE52:**
+The region 0xFE00-0xFE51 has a different format (`EF XX XX` pattern) - possibly
+a separate table for bank EF assets or a different data type.
+
 ### Next Steps
 
-**1) Find the pointer/index table:**
-The decoder reads from 0x00841F and jumps to specific blocks. Trace what
-determines which block address is selected.
+**1) ~~Find the pointer/index table~~ DONE (v2.36)**
+Found at 0xC0FE52. Causal bytes are at table indices 6 and 40.
 
 **2) Mid-block ablation test:**
 Ablate byte at E9E667+0x80 (inside block, not header) to confirm content

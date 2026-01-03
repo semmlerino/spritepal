@@ -67,6 +67,38 @@ to WRAM sources).
 
 ---
 
+## [2.36] - 2026-01-03
+
+### Asset Pointer Table Discovered
+
+**Critical address mapping correction:** 0x00841F is a SNES CPU address, not a file offset.
+For LoROM: `file_offset = (bank & 0x7F) * 0x8000 + (addr & 0x7FFF)` → 0x00041F.
+
+Instead of analyzing raw 0x00841F, searched ROM for **pointers TO known causal addresses**
+using little-endian 24-bit patterns (`67 E6 E9` for E9E667, `EB 3A E9` for E93AEB).
+
+**Found: Asset pointer table at CPU 0xC0FE52 (file 0x00FE52)**
+
+Table structure:
+- Packed 24-bit little-endian pointers (3 bytes each)
+- Spans banks E8, E9, EA, EF (~60 entries)
+- No length fields - decoder determines block boundaries dynamically
+
+Key entries:
+| Index | Pointer | Significance |
+|-------|---------|--------------|
+| 6 | 0xE93AEB | Causal byte #1 |
+| 19 | 0xE98DDF | "Next read" after E9E667 decoded |
+| 40 | 0xE9E667 | Causal byte #2 |
+
+**Implications:**
+1. Decoder uses table **indices** (0-59+) to select assets, not raw ROM addresses
+2. Each causal byte = one asset entry at known index
+3. "Jump backwards" (E9E667→E98DDF) explained: reading index 40 then index 19
+4. Address 0x00841F seen in traces is decoder code/table, not the asset table
+
+---
+
 ## [2.35.1] - 2026-01-03
 
 ### Header Analysis: Pointer-Based Block Selection
