@@ -67,6 +67,45 @@ to WRAM sources).
 
 ---
 
+## [2.23.1] - 2026-01-03
+
+### Quarter 2.2 Ablation Results - Causal PRG Region Confirmed
+
+**Experiment:** PRG ablation of 0xE80000-0xEBFFFF (Quarter 2.2, 256KB) with v2.23 script.
+
+**Results:** 4 payload_hash flips confirmed at frames 1681, 1684, 1760, 1769.
+
+| Frame | VRAM | Baseline Hash | Ablation Hash | Ablated Count |
+|-------|------|---------------|---------------|---------------|
+| 1681 | 0x58E0 | 0x92FB2C49 | 0x4B32FA70 | snes=1,sa1=0 |
+| 1684 | 0x4C00 | 0x8CE8AD0F | 0xFE30E5F5 | 0 (upstream!) |
+| 1760 | 0x4F20 | 0xD5D9BC35 | 0x4721F51B | 0 (upstream!) |
+| 1769 | 0x4F40 | 0x8CB81E85 | 0xFE00576B | 0 (upstream!) |
+
+**Key Observations:**
+
+1. **Upstream timing proven**: 3 of 4 flips show `ablated=0` at DMA time, meaning the causal
+   PRG read happened BEFORE the staging_active window opened. The corrupted data sat in WRAM
+   until the DMA transferred it to VRAM.
+
+2. **SA-1 as upstream producer**: SA1_BURST entries show reads from 0xEBB5xx-0xEBB8xx range.
+   These reads occur 29-88 frames before the staging DMAs that show hash flips.
+
+3. **Interesting non-causal case**: Frame 1760's other DMA (vram=0x4B20) shows `ablated=18(sa1=18)`
+   but NO hash change - proving those 18 reads happened but weren't causal for that payload.
+
+**SA1_BURST Sample:**
+```
+SA1_BURST: frame=1593 count=3 ablated=3 exec_blocked=0 range=0xEBB641-0xEBB831
+SA1_BURST: frame=1722 count=3 ablated=3 exec_blocked=0 range=0xEBB5FC-0xEBB7EC
+```
+
+**Conclusion:** Quarter 2.2 (0xE80000-0xEBFFFF) is a **proven causal PRG region** for sprite
+staging DMAs. The SA-1 reads from 0xEBBxxx as an upstream producer. Next step: bisect to
+Bank EB (0xEB0000-0xEBFFFF) to narrow from 256KB to 64KB.
+
+---
+
 ## [2.23.0] - 2026-01-03
 
 ### Fix emu.stop() Re-entry Bug (v2.23)

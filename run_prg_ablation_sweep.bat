@@ -72,14 +72,38 @@ REM set ABLATION_PRG_END=0xEFFFFF
 
 REM === RESULTS LOG ===
 REM Chunk 0 (Bank C): TESTED - no payload_hash flips (non-causal for sprite staging)
+REM Quarter 2.2 (0xE80000-0xEBFFFF): CAUSAL - 4 payload_hash flips at frames 1681,1684,1760,1769
+REM   SA1_BURST range: 0xEBB5FC-0xEBB831 (upstream producer, not decompressor label yet)
 REM
-REM === ACTIVE: Quarter 2.2 (contains proven 0xE894F4 range) ===
-set ABLATION_PRG_START=0xE80000
+REM === 64KB BISECTION OF QUARTER 2.2 ===
+REM Bank E8: 0xE80000-0xE8FFFF
+REM set ABLATION_PRG_START=0xE80000
+REM set ABLATION_PRG_END=0xE8FFFF
+
+REM Bank E9: 0xE90000-0xE9FFFF
+REM set ABLATION_PRG_START=0xE90000
+REM set ABLATION_PRG_END=0xE9FFFF
+
+REM Bank EA: 0xEA0000-0xEAFFFF
+REM set ABLATION_PRG_START=0xEA0000
+REM set ABLATION_PRG_END=0xEAFFFF
+
+REM Bank EB: 0xEB0000-0xEBFFFF (likely hit - SA1_BURST reads 0xEBBxxx)
+set ABLATION_PRG_START=0xEB0000
 set ABLATION_PRG_END=0xEBFFFF
 
-REM PROVEN RANGE (94 bytes, early frames only) - NOT causal for gameplay frames
-REM set ABLATION_PRG_START=0xE894F4
-REM set ABLATION_PRG_END=0xE89551
+REM === FINER BISECTION (after EB confirmed) ===
+REM 0xEB8000-0xEBFFFF (upper half)
+REM set ABLATION_PRG_START=0xEB8000
+REM set ABLATION_PRG_END=0xEBFFFF
+
+REM 0xEBB000-0xEBBFFF (1KB around hotspot)
+REM set ABLATION_PRG_START=0xEBB000
+REM set ABLATION_PRG_END=0xEBBFFF
+
+REM 0xEBB400-0xEBB7FF (512B around SA1_BURST center)
+REM set ABLATION_PRG_START=0xEBB400
+REM set ABLATION_PRG_END=0xEBB7FF
 
 REM Chunk 3: 0xF00000-0xFFFFFF
 REM set ABLATION_PRG_START=0xF00000
@@ -135,7 +159,10 @@ if "%ABLATION_ENABLED%"=="0" (
     echo MODE: BASELINE - record payload_hash values
 ) else (
     echo MODE: ABLATION - testing PRG range
-    echo ABLATION_RANGE=0x%ABLATION_PRG_START%-0x%ABLATION_PRG_END%
+    echo.
+    echo   *** ACTIVE RANGE: %ABLATION_PRG_START% - %ABLATION_PRG_END% ***
+    echo.
+    echo   If Lua log shows different range, close this window and reopen!
 )
 echo.
 echo ABLATION_VALUE=0x%ABLATION_VALUE%
@@ -174,7 +201,7 @@ echo After run, save log as:
 if "%ABLATION_ENABLED%"=="0" (
     echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_baseline.txt
 ) else (
-    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_quarter_E82.txt
+    echo   copy mesen2_exchange\dma_probe_log.txt prg_sweep_bank_EB.txt
 )
 echo.
 
