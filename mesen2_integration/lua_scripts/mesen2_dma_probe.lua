@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.11"
+local LOG_VERSION = "2.19"
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -220,6 +220,19 @@ local function parse_int(value, default_value)
         return tonumber(text:sub(3), 16) or default_value
     end
     return tonumber(text) or default_value
+end
+
+local function parse_bool(value, default_value)
+    if value == nil then
+        return default_value
+    end
+    local text = tostring(value):lower()
+    if text == "1" or text == "true" or text == "yes" then
+        return true
+    elseif text == "0" or text == "false" or text == "no" then
+        return false
+    end
+    return default_value
 end
 
 local vram_inc_mode = 0
@@ -422,27 +435,90 @@ local POPULATE_HASH_INTERVAL = parse_int(os.getenv("POPULATE_HASH_INTERVAL"), 10
 local POPULATE_CYCLE_BUDGET = parse_int(os.getenv("POPULATE_CYCLE_BUDGET"), 50000)  -- Max cycles to log PRG reads
 local POPULATE_MIN_CHANGE_BYTES = parse_int(os.getenv("POPULATE_MIN_CHANGE_BYTES"), 32)  -- Min bytes changed to trigger
 
--- Exclude metadata range from triggering (the 12 bytes at 0x157B-0x15BE)
+-- v2.12: Exclude metadata range from triggering
+-- Metadata = pointers/indices at 0x157B-0x15BE (68 bytes)
+-- Tile data = everything else in the buffer range (0x1530-0x161A minus metadata)
+-- Only trigger POPULATE_SESSION when TILE-DATA changes, not metadata churn
 local POPULATE_EXCLUDE_START = parse_int(os.getenv("POPULATE_EXCLUDE_START"), 0x157B)
 local POPULATE_EXCLUDE_END = parse_int(os.getenv("POPULATE_EXCLUDE_END"), 0x15BE)
 
--- Cold-start state
-local populate_initial_hash = nil       -- Hash of buffer at first check
-local populate_initial_snapshot = nil   -- Full 235-byte snapshot for diff
-local populate_triggered = false        -- Already triggered populate session?
-local populate_last_hash_frame = 0      -- Last frame we computed hash
+-- v2.17: Consolidated populate state into single table (Lua 200 local var limit)
+local POPULATE_RING_SIZE = 2048         -- v2.13: Increased to capture full input stream
+local POPULATE_STREAM_MAX = 4096        -- Max bytes to capture in order
+local HEADER_MARKERS = {0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7}
 
--- Populate session state (similar to fill session but triggered by hash change)
-local populate_session_active = false
-local populate_session_start_frame = nil
-local populate_session_start_cycle = nil
-local populate_session_prg_reads = {}   -- Ring buffer of PRG reads during populate
-local populate_session_prg_head = 0
-local POPULATE_RING_SIZE = 512          -- Larger buffer for initial population
-local populate_session_prg_total = 0
-local populate_session_buffer_bytes = {}  -- Bytes written during populate
-local populate_session_write_count = 0
-local populate_session_write_pcs = {}   -- PC samples during populate
+-- v2.17: Multi-session config
+local POPULATE_CHAIN_ENABLED = parse_bool(os.getenv("POPULATE_CHAIN_ENABLED"), true)
+local POPULATE_STABLE_FRAMES = parse_int(os.getenv("POPULATE_STABLE_FRAMES"), 60)
+
+-- Populate state table (reduces local var count by ~25)
+local pop = {
+    -- Cold-start state
+    initial_hash = nil,
+    initial_snapshot = nil,
+    triggered = false,
+    last_hash_frame = 0,
+    -- v2.17: Multi-session chaining
+    session_number = 0,
+    last_session_end_frame = 0,
+    cumulative_offsets = {},
+    stable_since_frame = nil,
+    episode_complete = false,
+    -- Session state
+    session_active = false,
+    session_start_frame = nil,
+    session_start_cycle = nil,
+    prg_reads = {},
+    prg_head = 0,
+    prg_total = 0,
+    buffer_bytes = {},
+    write_count = 0,
+    write_pcs = {},
+    pc_ranges = {},
+    -- v2.14: Stream tracking
+    earliest_prg = nil,
+    header_candidate = nil,
+    stream_bytes = {},
+}
+
+-- v2.15: Ablation config (kept separate for clarity)
+local ABLATION_ENABLED = parse_bool(os.getenv("ABLATION_ENABLED"), false)
+local ABLATION_PRG_START_RAW = parse_int(os.getenv("ABLATION_PRG_START"), 0xE894F4)
+local ABLATION_PRG_END_RAW = parse_int(os.getenv("ABLATION_PRG_END"), 0xE89551)
+local ABLATION_VALUE = parse_int(os.getenv("ABLATION_VALUE"), 0x00)
+
+-- v2.19 FIX: PRG callback receives CPU addresses (0xC00000+), NOT file offsets!
+-- Evidence: prg_runs logs values like 0xC469F6, 0xED04FE which are > 0x3FFFFF (4MB file max).
+-- Mesen2 internally maps the registered range (0-prg_size) to CPU space when invoking callback.
+-- No conversion needed - use CPU addresses directly.
+local ABLATION_PRG_START = ABLATION_PRG_START_RAW
+local ABLATION_PRG_END = ABLATION_PRG_END_RAW
+local ablation_corrupted_count = 0
+
+-- Log ablation config at startup
+if ABLATION_ENABLED then
+    log(string.format(
+        "ABLATION_CONFIG: enabled=true range=0x%06X-0x%06X value=0x%02X (CPU addresses, no conversion)",
+        ABLATION_PRG_START, ABLATION_PRG_END, ABLATION_VALUE
+    ))
+end
+
+-- v2.18: READ_COVERAGE - track what bytes are READ from source buffer
+-- Answers: "not written" ≠ "not used" - staging may read bytes without rewriting them
+-- Uses same source buffer range as BUFFER_WRITE_WATCH (0x1530-0x161A)
+local READ_COVERAGE_ENABLED = parse_bool(os.getenv("READ_COVERAGE_ENABLED"), true)
+local READ_COVERAGE_TILE_SIZE = 32  -- SNES 4bpp tile = 32 bytes
+local read_cov = {
+    -- Per-offset read bitmap (offset relative to BUFFER_WRITE_START)
+    offsets_read = {},  -- [offset] = true if read at least once
+    -- Per-tile stats (8 tiles for 235-byte buffer)
+    tiles_read = {},    -- [tile_index] = count of bytes read in that tile
+    -- Totals
+    total_reads = 0,
+    unique_offsets = 0,
+    -- Report flag (print once at episode complete)
+    reported = false,
+}
 
 -- v2.9: Forward declarations for fill session functions (called before definition)
 local log_fill_session_summary
@@ -890,6 +966,22 @@ local function make_staging_wram_source_reader(cpu_label)
             read_k = read_k
         })
         wram_src_seen_any = wram_src_seen_any + 1
+
+        -- v2.18: READ_COVERAGE - track reads from source buffer
+        -- Check if this read is within the source buffer range (0x1530-0x161A)
+        if READ_COVERAGE_ENABLED and BUFFER_WRITE_WATCH_ENABLED then
+            if normalized_addr >= BUFFER_WRITE_START and normalized_addr <= BUFFER_WRITE_END then
+                local offset = normalized_addr - BUFFER_WRITE_START
+                read_cov.total_reads = read_cov.total_reads + 1
+                if not read_cov.offsets_read[offset] then
+                    read_cov.offsets_read[offset] = true
+                    read_cov.unique_offsets = read_cov.unique_offsets + 1
+                    -- Update per-tile count
+                    local tile_idx = math.floor(offset / READ_COVERAGE_TILE_SIZE)
+                    read_cov.tiles_read[tile_idx] = (read_cov.tiles_read[tile_idx] or 0) + 1
+                end
+            end
+        end
     end
 end
 
@@ -1041,6 +1133,31 @@ local function get_staging_summary(src_addr, src_size)
     }
 end
 
+-- v2.19: Compute a stable hash of the DMA payload currently in WRAM.
+-- This gives a deterministic "output signal" for ablation/binary-search against staging DMAs.
+-- payload_hash changes → you've found a causal PRG region feeding the exact bytes that went to VRAM.
+local function compute_dma_payload_hash(src_24, size)
+    if not wram_mem_type or not size or size <= 0 then return nil end
+
+    local start_addr = src_24
+    if wram_address_mode == "relative" then
+        local bank = (src_24 >> 16) & 0xFF
+        local offs = src_24 & 0xFFFF
+        if bank ~= 0x7E and bank ~= 0x7F then
+            return nil
+        end
+        start_addr = (bank - 0x7E) * 0x10000 + offs
+    end
+
+    -- djb2 hash: hash * 33 + byte
+    local hash = 5381
+    for i = 0, size - 1 do
+        local byte = emu.read(start_addr + i, wram_mem_type, false) or 0
+        hash = ((hash * 33) + byte) % 0x100000000
+    end
+    return hash
+end
+
 local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
     if not STAGING_WATCH_ENABLED then return end
 
@@ -1049,6 +1166,9 @@ local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
     if STAGING_START_FRAME > 0 and frame < STAGING_START_FRAME then return end
 
     local summary = get_staging_summary(src_addr, src_size)
+
+    -- v2.19: Compute payload hash for ablation binary-search
+    local payload_hash = compute_dma_payload_hash(src_addr, src_size)
 
     -- Format PC samples
     local pc_str = ""
@@ -1067,10 +1187,11 @@ local function log_staging_summary_for_dma(src_addr, src_size, vram_addr)
     end
 
     log(string.format(
-        "STAGING_SUMMARY: frame=%d src=0x%06X size=%d vram=0x%04X pattern=%s writes=%d unique=%d seq=%d jumps=%d range=0x%06X-0x%06X frames=%d%s%s",
+        "STAGING_SUMMARY: frame=%d src=0x%06X size=%d payload_hash=0x%08X vram=0x%04X pattern=%s writes=%d unique=%d seq=%d jumps=%d range=0x%06X-0x%06X frames=%d%s%s",
         frame,
         src_addr,
         src_size,
+        payload_hash or 0,
         vram_addr,
         summary.pattern,
         summary.total_writes,
@@ -1689,6 +1810,40 @@ local function on_buffer_write(address, value)
         return
     end
 
+    -- v2.17: Multi-session chaining - trigger on tile-data writes unless episode complete
+    -- Episode complete = buffer stable for POPULATE_STABLE_FRAMES
+    if POPULATE_ENABLED and not pop.episode_complete and not pop.session_active then
+        local base_addr = wram_address_mode == "absolute" and 0x7E0000 or 0
+        local offset = address - base_addr
+        -- Is this a tile-data address? (NOT in metadata exclusion range)
+        if offset < POPULATE_EXCLUDE_START or offset > POPULATE_EXCLUDE_END then
+            -- Tile-data write detected - start new populate session
+            pop.triggered = true
+            pop.session_active = true
+            pop.session_number = pop.session_number + 1
+            pop.session_start_frame = frame
+            pop.session_start_cycle = emu.getState and emu.getState().masterClock or 0
+            pop.prg_reads = {}
+            pop.prg_head = 0
+            pop.prg_total = 0
+            pop.buffer_bytes = {}
+            pop.write_count = 0
+            pop.write_pcs = {}
+            pop.pc_ranges = {}
+            -- v2.14: Initialize stream tracking
+            pop.earliest_prg = nil
+            pop.header_candidate = nil
+            pop.stream_bytes = {}
+            -- v2.17: Reset stability tracking when new session starts
+            pop.stable_since_frame = nil
+            -- Take initial snapshot for comparison at session end
+            pop.initial_snapshot = take_buffer_snapshot()
+            log(string.format("POPULATE_SESSION_START: session=%d frame=%d trigger=TILE_WRITE offset=0x%04X value=0x%02X cumulative_offsets=%d",
+                pop.session_number, frame, offset, value or 0,
+                (function() local c=0; for _ in pairs(pop.cumulative_offsets) do c=c+1 end; return c end)()))
+        end
+    end
+
     -- v2.9: Start fill session on first write to source buffer
     -- PRG read callbacks are gated on this flag (only log during active fill)
     if not fill_session_active then
@@ -1714,22 +1869,32 @@ local function on_buffer_write(address, value)
     end
 
     -- v2.11: Track writes during populate session (cold-start detection)
-    if populate_session_active then
+    if pop.session_active then
         -- Get offset within buffer (for cleaner logging)
         local base_addr = wram_address_mode == "absolute" and 0x7E0000 or 0
         local offset = address - base_addr
 
         -- Only track if NOT in metadata exclusion range
         if offset < POPULATE_EXCLUDE_START or offset > POPULATE_EXCLUDE_END then
-            populate_session_buffer_bytes[offset] = value
-            populate_session_write_count = populate_session_write_count + 1
+            pop.buffer_bytes[offset] = value
+            pop.write_count = pop.write_count + 1
+            -- v2.17: Track cumulative offsets across ALL sessions
+            pop.cumulative_offsets[offset] = true
 
-            -- Sample PCs (limit to first 16 unique)
-            if #populate_session_write_pcs < 16 then
-                local pc_snapshot = get_cpu_state_snapshot()
-                if pc_snapshot then
-                    local pc_key = string.format("%02X:%04X", pc_snapshot.k_val or 0, pc_snapshot.pc_val or 0)
-                    populate_session_write_pcs[pc_key] = (populate_session_write_pcs[pc_key] or 0) + 1
+            -- Track PC with address range (v2.12: enhanced attribution)
+            local pc_snapshot = get_cpu_state_snapshot()
+            if pc_snapshot then
+                local pc_key = string.format("%02X:%04X", pc_snapshot.k_val or 0, pc_snapshot.pc_val or 0)
+                pop.write_pcs[pc_key] = (pop.write_pcs[pc_key] or 0) + 1
+
+                -- v2.12: Track address range per PC
+                if not pop.pc_ranges[pc_key] then
+                    pop.pc_ranges[pc_key] = {min = offset, max = offset, count = 1}
+                else
+                    local r = pop.pc_ranges[pc_key]
+                    if offset < r.min then r.min = offset end
+                    if offset > r.max then r.max = offset end
+                    r.count = r.count + 1
                 end
             end
         end
@@ -1781,9 +1946,9 @@ end
 -- This is safe because it's bounded to the fill/populate window (not always-on)
 local function on_fill_session_prg_read(address, value)
     -- v2.11: Also track during populate session (cold-start detection)
-    if populate_session_active then
-        populate_session_prg_total = populate_session_prg_total + 1
-        populate_session_prg_head = (populate_session_prg_head % POPULATE_RING_SIZE) + 1
+    if pop.session_active then
+        pop.prg_total = pop.prg_total + 1
+        pop.prg_head = (pop.prg_head % POPULATE_RING_SIZE) + 1
 
         local pc_snapshot = get_cpu_state_snapshot()
         local k_val, pc_val = 0, 0
@@ -1792,11 +1957,40 @@ local function on_fill_session_prg_read(address, value)
             pc_val = pc_snapshot.pc_val or 0
         end
 
-        populate_session_prg_reads[populate_session_prg_head] = {
+        -- v2.12: Store actual byte value for input stream dump
+        pop.prg_reads[pop.prg_head] = {
             addr = address,
+            value = value,  -- v2.12: Capture actual PRG byte value
             k = k_val,
             pc = pc_val,
         }
+
+        -- v2.14: Track earliest PRG address (stream start candidate)
+        if not pop.earliest_prg or address < pop.earliest_prg then
+            pop.earliest_prg = address
+        end
+
+        -- v2.14: Track first header marker (E0/E1/etc) as stream start candidate
+        if not pop.header_candidate then
+            for _, marker in ipairs(HEADER_MARKERS) do
+                if value == marker then
+                    pop.header_candidate = {addr = address, value = value}
+                    break
+                end
+            end
+        end
+
+        -- v2.14: Build ordered stream bytes (first N reads in order)
+        if #pop.stream_bytes < POPULATE_STREAM_MAX then
+            pop.stream_bytes[#pop.stream_bytes + 1] = {addr = address, value = value}
+        end
+    end
+
+    -- v2.19: Ablation applies to ANY PRG read during populate session (not just fill session)
+    -- This ensures PRG corruption affects staging even when BUFFER_WRITE_WATCH=0
+    if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
+        ablation_corrupted_count = ablation_corrupted_count + 1
+        return ABLATION_VALUE  -- CPU sees corrupted byte
     end
 
     -- Gate on fill session (the key optimization - only log during buffer fill)
@@ -1821,6 +2015,14 @@ local function on_fill_session_prg_read(address, value)
         k = k_val,
         pc = pc_val,
     }
+
+    -- v2.15: Ablation - corrupt reads in specified range to prove causality
+    -- Return modified value to CPU, but we logged the original above
+    if ABLATION_ENABLED and address >= ABLATION_PRG_START and address <= ABLATION_PRG_END then
+        ablation_corrupted_count = ablation_corrupted_count + 1
+        return ABLATION_VALUE  -- CPU sees corrupted byte
+    end
+    -- Return nil = no modification (CPU sees original value)
 end
 
 -- v2.9: Compress PRG reads into contiguous runs for summary
@@ -1987,79 +2189,44 @@ take_buffer_snapshot = function()
     return snapshot
 end
 
--- Check for cold-start (first real change to tile buffer)
+-- v2.13: Hash-based checking now only logs initial state
+-- Session triggering moved to on_buffer_write (immediate, not reactive)
 check_buffer_cold_start = function(frame)
     if not POPULATE_ENABLED then return end
-    if populate_triggered then return end  -- Already triggered once
     if not wram_mem_type then return end
 
     -- Only check every N frames to reduce overhead
-    if frame - populate_last_hash_frame < POPULATE_HASH_INTERVAL then
+    if frame - pop.last_hash_frame < POPULATE_HASH_INTERVAL then
         return
     end
-    populate_last_hash_frame = frame
+    pop.last_hash_frame = frame
 
     local current_hash = compute_buffer_hash()
     if not current_hash then return end
 
-    -- First check: store initial state
-    if populate_initial_hash == nil then
-        populate_initial_hash = current_hash
-        populate_initial_snapshot = take_buffer_snapshot()
+    -- First check: store initial state (before any writes happen)
+    if pop.initial_hash == nil then
+        pop.initial_hash = current_hash
+        pop.initial_snapshot = take_buffer_snapshot()
         log(string.format("POPULATE_INIT: frame=%d initial_hash=0x%08X snapshot_size=%d",
-            frame, current_hash, populate_initial_snapshot and #populate_initial_snapshot or 0))
+            frame, current_hash, pop.initial_snapshot and #pop.initial_snapshot or 0))
         return
     end
 
-    -- Check if hash changed
-    if current_hash ~= populate_initial_hash then
-        -- Count changed bytes (excluding metadata range)
-        local changed_count = 0
-        local current_snapshot = take_buffer_snapshot()
-        if populate_initial_snapshot and current_snapshot then
-            for offset = BUFFER_WRITE_START, BUFFER_WRITE_END do
-                if offset < POPULATE_EXCLUDE_START or offset > POPULATE_EXCLUDE_END then
-                    local old_byte = populate_initial_snapshot[offset] or 0
-                    local new_byte = current_snapshot[offset] or 0
-                    if old_byte ~= new_byte then
-                        changed_count = changed_count + 1
-                    end
-                end
-            end
-        end
-
-        log(string.format("POPULATE_CHANGE: frame=%d old_hash=0x%08X new_hash=0x%08X changed_bytes=%d",
-            frame, populate_initial_hash, current_hash, changed_count))
-
-        -- Only trigger if enough bytes changed (not just metadata churn)
-        if changed_count >= POPULATE_MIN_CHANGE_BYTES then
-            populate_triggered = true
-            populate_session_active = true
-            populate_session_start_frame = frame
-            populate_session_start_cycle = emu.getState and emu.getState().masterClock or 0
-            populate_session_prg_reads = {}
-            populate_session_prg_head = 0
-            populate_session_prg_total = 0
-            populate_session_buffer_bytes = {}
-            populate_session_write_count = 0
-            populate_session_write_pcs = {}
-
-            log(string.format("POPULATE_SESSION_START: frame=%d changed=%d threshold=%d",
-                frame, changed_count, POPULATE_MIN_CHANGE_BYTES))
-        else
-            -- Update baseline if change was below threshold (metadata only)
-            populate_initial_hash = current_hash
-            populate_initial_snapshot = current_snapshot
-        end
+    -- v2.13: No longer triggers session here - that's done in on_buffer_write
+    -- Just update baseline if not yet triggered (metadata-only changes)
+    if not pop.triggered and current_hash ~= pop.initial_hash then
+        pop.initial_hash = current_hash
+        pop.initial_snapshot = take_buffer_snapshot()
     end
 end
 
 -- Log populate session summary
 log_populate_session_summary = function(frame, reason)
-    if not populate_session_active then return end
+    if not pop.session_active then return end
 
     local ok, prg_runs_str, num_runs, max_run = pcall(function()
-        return compress_prg_runs(populate_session_prg_reads, populate_session_prg_total)
+        return compress_prg_runs(pop.prg_reads, pop.prg_total)
     end)
 
     if not ok then
@@ -2070,7 +2237,7 @@ log_populate_session_summary = function(frame, reason)
 
     -- Format write PCs
     local pc_parts = {}
-    for pc_key, count in pairs(populate_session_write_pcs) do
+    for pc_key, count in pairs(pop.write_pcs) do
         table.insert(pc_parts, string.format("%s:%d", pc_key, count))
     end
     table.sort(pc_parts, function(a, b)
@@ -2082,53 +2249,227 @@ log_populate_session_summary = function(frame, reason)
 
     log(string.format(
         "POPULATE_SESSION: frame=%d-%d reason=%s writes=%d prg_total=%d prg_unique=%d runs=%d max_run=%d write_pcs=[%s] prg_runs=[%s]",
-        populate_session_start_frame or 0,
+        pop.session_start_frame or 0,
         frame,
         reason,
-        populate_session_write_count,
-        populate_session_prg_total,
-        math.min(#populate_session_prg_reads, POPULATE_RING_SIZE),
+        pop.write_count,
+        pop.prg_total,
+        math.min(#pop.prg_reads, POPULATE_RING_SIZE),
         num_runs,
         max_run,
         pcs_str,
         prg_runs_str
     ))
 
-    -- Dump final buffer bytes
+    -- v2.15: Log ablation stats if enabled (v2.19: CPU addresses, no conversion)
+    if ABLATION_ENABLED then
+        log(string.format(
+            "ABLATION_RESULT: frame=%d enabled=true range=0x%06X-0x%06X value=0x%02X corrupted_reads=%d",
+            frame, ABLATION_PRG_START, ABLATION_PRG_END, ABLATION_VALUE, ablation_corrupted_count
+        ))
+    end
+
+    -- v2.16: Coverage metric - which bytes were written during session
+    local buffer_size = BUFFER_WRITE_END - BUFFER_WRITE_START + 1
+    local bytes_written = 0
+    local tiles_touched = {}  -- tile_index -> count of bytes in that tile
+    for offset, _ in pairs(pop.buffer_bytes) do
+        bytes_written = bytes_written + 1
+        -- Compute tile index (32 bytes per tile, relative to BUFFER_WRITE_START)
+        local rel_offset = offset - BUFFER_WRITE_START
+        if rel_offset >= 0 and rel_offset < buffer_size then
+            local tile_idx = math.floor(rel_offset / 32)
+            tiles_touched[tile_idx] = (tiles_touched[tile_idx] or 0) + 1
+        end
+    end
+    -- v2.17: Compute cumulative coverage across all sessions
+    local cumulative_count = 0
+    for _ in pairs(pop.cumulative_offsets) do
+        cumulative_count = cumulative_count + 1
+    end
+    -- Format tile coverage
+    local tile_parts = {}
+    local tile_count = math.ceil(buffer_size / 32)
+    for i = 0, tile_count - 1 do
+        if tiles_touched[i] then
+            table.insert(tile_parts, string.format("T%d:%d", i, tiles_touched[i]))
+        end
+    end
+    local tiles_str = #tile_parts > 0 and table.concat(tile_parts, ",") or "NONE"
+    log(string.format(
+        "POPULATE_COVERAGE: session=%d frame=%d buffer_size=%d session_bytes=%d cumulative_bytes=%d coverage=%.1f%% tiles=[%s]",
+        pop.session_number, frame, buffer_size, bytes_written, cumulative_count,
+        (cumulative_count / buffer_size) * 100, tiles_str
+    ))
+
+    -- v2.17: After logging session, reset for next session (chaining)
+    pop.session_active = false
+    pop.last_session_end_frame = frame
+
+    -- v2.14: Log stream start candidates (for stable convergence)
+    local earliest_str = pop.earliest_prg and string.format("0x%06X", pop.earliest_prg) or "NONE"
+    local header_str = "NONE"
+    local header_file_offset = "N/A"
+    if pop.header_candidate then
+        header_str = string.format("0x%06X(0x%02X)", pop.header_candidate.addr, pop.header_candidate.value)
+        -- Compute HiROM file offset for header
+        local bank = (pop.header_candidate.addr >> 16) & 0xFF
+        local addr = pop.header_candidate.addr & 0xFFFF
+        if bank >= 0xC0 then
+            local file_off = (bank - 0xC0) * 0x10000 + addr
+            header_file_offset = string.format("0x%06X", file_off)
+        end
+    end
+    log(string.format(
+        "POPULATE_STREAM_START: frame=%d earliest_prg=%s header_candidate=%s header_file_offset=%s stream_bytes_captured=%d",
+        frame, earliest_str, header_str, header_file_offset, #pop.stream_bytes
+    ))
+
+    -- v2.12: ARTIFACT A - Dump final output bytes (ground truth)
     local snapshot = take_buffer_snapshot()
+    local output_hash = 0
     if snapshot then
         local hex_parts = {}
         for offset = BUFFER_WRITE_START, BUFFER_WRITE_END do
-            local b = snapshot[offset]
-            if b then
-                table.insert(hex_parts, string.format("%02X", b))
-            else
-                table.insert(hex_parts, "00")
-            end
+            local b = snapshot[offset] or 0
+            table.insert(hex_parts, string.format("%02X", b))
+            -- v2.14: Simple hash (djb2-style)
+            output_hash = ((output_hash * 33) + b) % 0xFFFFFFFF
         end
         local hex_str = table.concat(hex_parts, "")
         log(string.format(
-            "POPULATE_BUFFER_DUMP: frame=%d addr_range=0x%04X-0x%04X bytes=%d hex=%s",
+            "POPULATE_OUTPUT_BYTES: frame=%d addr_range=0x%04X-0x%04X bytes=%d hash=0x%08X hex=%s",
             frame,
             BUFFER_WRITE_START,
             BUFFER_WRITE_END,
             BUFFER_WRITE_END - BUFFER_WRITE_START + 1,
+            output_hash,
             hex_str
         ))
     end
+
+    -- v2.12: ARTIFACT B - Dump input stream bytes (compressed data from ROM)
+    -- Format: addr:value pairs, sorted by address for contiguous stream detection
+    if pop.prg_reads and #pop.prg_reads > 0 then
+        -- Sort by address to reconstruct contiguous streams
+        local sorted_reads = {}
+        for i = 1, math.min(#pop.prg_reads, POPULATE_RING_SIZE) do
+            if pop.prg_reads[i] then
+                sorted_reads[#sorted_reads + 1] = pop.prg_reads[i]
+            end
+        end
+        table.sort(sorted_reads, function(a, b) return a.addr < b.addr end)
+
+        -- Find contiguous runs and output as hex streams
+        local streams = {}
+        local current_stream = nil
+        for _, entry in ipairs(sorted_reads) do
+            if not current_stream or entry.addr ~= current_stream.end_addr + 1 then
+                if current_stream then
+                    streams[#streams + 1] = current_stream
+                end
+                current_stream = {
+                    start_addr = entry.addr,
+                    end_addr = entry.addr,
+                    bytes = {entry.value},
+                }
+            else
+                current_stream.end_addr = entry.addr
+                current_stream.bytes[#current_stream.bytes + 1] = entry.value
+            end
+        end
+        if current_stream then
+            streams[#streams + 1] = current_stream
+        end
+
+        -- Log each contiguous stream (limit to top 5 by length)
+        table.sort(streams, function(a, b) return #a.bytes > #b.bytes end)
+        for i = 1, math.min(#streams, 5) do
+            local stream = streams[i]
+            local hex_parts = {}
+            for _, b in ipairs(stream.bytes) do
+                hex_parts[#hex_parts + 1] = string.format("%02X", b or 0)
+            end
+            -- v2.14: Include file offset for each stream
+            local bank = (stream.start_addr >> 16) & 0xFF
+            local addr = stream.start_addr & 0xFFFF
+            local file_off_str = "N/A"
+            if bank >= 0xC0 then
+                file_off_str = string.format("0x%06X", (bank - 0xC0) * 0x10000 + addr)
+            end
+            log(string.format(
+                "POPULATE_INPUT_STREAM: frame=%d prg_range=0x%06X-0x%06X file_offset=%s bytes=%d hex=%s",
+                frame,
+                stream.start_addr,
+                stream.end_addr,
+                file_off_str,
+                #stream.bytes,
+                table.concat(hex_parts, "")
+            ))
+        end
+    end
+
+    -- v2.14: Log first N bytes of ordered stream (in read order, not sorted)
+    if #pop.stream_bytes > 0 then
+        local first_n = math.min(#pop.stream_bytes, 256)  -- First 256 bytes
+        local hex_parts = {}
+        local first_addr = pop.stream_bytes[1].addr
+        for i = 1, first_n do
+            hex_parts[#hex_parts + 1] = string.format("%02X", pop.stream_bytes[i].value or 0)
+        end
+        local bank = (first_addr >> 16) & 0xFF
+        local addr = first_addr & 0xFFFF
+        local file_off_str = "N/A"
+        if bank >= 0xC0 then
+            file_off_str = string.format("0x%06X", (bank - 0xC0) * 0x10000 + addr)
+        end
+        log(string.format(
+            "POPULATE_ORDERED_STREAM: frame=%d first_prg=0x%06X file_offset=%s bytes=%d hex=%s",
+            frame, first_addr, file_off_str, first_n, table.concat(hex_parts, "")
+        ))
+    end
+
+    -- v2.12: ARTIFACT C - Write attribution (which PCs wrote which byte ranges)
+    -- Format: pc=XX:XXXX range=0xAAAA-0xBBBB count=N
+    local pc_attrib_parts = {}
+    for pc_key, range in pairs(pop.pc_ranges) do
+        table.insert(pc_attrib_parts, string.format(
+            "%s:0x%04X-0x%04X(%d)",
+            pc_key, range.min, range.max, range.count
+        ))
+    end
+    -- Sort by count descending
+    table.sort(pc_attrib_parts, function(a, b)
+        local ca = tonumber(a:match("%((%d+)%)$")) or 0
+        local cb = tonumber(b:match("%((%d+)%)$")) or 0
+        return ca > cb
+    end)
+    log(string.format(
+        "POPULATE_WRITE_ATTRIBUTION: frame=%d total_writes=%d pc_ranges=[%s]",
+        frame,
+        pop.write_count,
+        table.concat(pc_attrib_parts, ",", 1, math.min(#pc_attrib_parts, 10))
+    ))
 end
 
 -- Reset populate session
 reset_populate_session = function()
-    populate_session_active = false
-    populate_session_start_frame = nil
-    populate_session_start_cycle = nil
-    populate_session_prg_reads = {}
-    populate_session_prg_head = 0
-    populate_session_prg_total = 0
-    populate_session_buffer_bytes = {}
-    populate_session_write_count = 0
-    populate_session_write_pcs = {}
+    pop.session_active = false
+    pop.session_start_frame = nil
+    pop.session_start_cycle = nil
+    pop.prg_reads = {}
+    pop.prg_head = 0
+    pop.prg_total = 0
+    pop.buffer_bytes = {}
+    pop.write_count = 0
+    pop.write_pcs = {}
+    pop.pc_ranges = {}  -- v2.12
+    -- v2.14: Reset stream tracking
+    pop.earliest_prg = nil
+    pop.header_candidate = nil
+    pop.stream_bytes = {}
+    -- v2.15: Reset ablation counter
+    ablation_corrupted_count = 0
 end
 
 local function log_buffer_write_summary(frame)
@@ -2288,23 +2629,83 @@ local function on_end_frame()
     frame_count = frame_count + 1
 
     -- v2.11: Cold-start detection (check for tile buffer population)
-    if POPULATE_ENABLED and not populate_triggered then
+    if POPULATE_ENABLED and not pop.triggered then
         check_buffer_cold_start(frame_count)
     end
 
     -- v2.11: End populate session after cycle budget or N frames
-    if populate_session_active then
-        local elapsed_frames = frame_count - (populate_session_start_frame or 0)
-        -- End after 100 frames or if we got meaningful data
-        if elapsed_frames >= 100 or populate_session_prg_total >= POPULATE_RING_SIZE then
+    if pop.session_active then
+        local elapsed_frames = frame_count - (pop.session_start_frame or 0)
+        -- v2.13: End after 10 frames (tight window) or if ring is full
+        -- This captures the initial population burst without noise from later frames
+        if elapsed_frames >= 10 or pop.prg_total >= POPULATE_RING_SIZE then
             log_populate_session_summary(frame_count, "budget")
             reset_populate_session()
         end
     end
 
+    -- v2.17: Stability detection - mark episode complete if no writes for POPULATE_STABLE_FRAMES
+    if POPULATE_CHAIN_ENABLED and pop.triggered and not pop.episode_complete then
+        if not pop.session_active then
+            -- Not in active session - check stability
+            if pop.stable_since_frame == nil then
+                -- Start stability timer
+                pop.stable_since_frame = frame_count
+            elseif frame_count - pop.stable_since_frame >= POPULATE_STABLE_FRAMES then
+                -- Buffer has been stable - mark episode complete
+                pop.episode_complete = true
+                local cumulative_count = 0
+                for _ in pairs(pop.cumulative_offsets) do
+                    cumulative_count = cumulative_count + 1
+                end
+                local buffer_size = BUFFER_WRITE_END - BUFFER_WRITE_START + 1
+                log(string.format(
+                    "POPULATE_EPISODE_COMPLETE: frame=%d sessions=%d stable_frames=%d cumulative_bytes=%d coverage=%.1f%%",
+                    frame_count, pop.session_number, POPULATE_STABLE_FRAMES,
+                    cumulative_count, (cumulative_count / buffer_size) * 100
+                ))
+                -- v2.18: Log READ_COVERAGE at episode complete
+                if READ_COVERAGE_ENABLED and not read_cov.reported then
+                    read_cov.reported = true
+                    local read_pct = buffer_size > 0 and (read_cov.unique_offsets / buffer_size * 100) or 0
+                    local write_pct = buffer_size > 0 and (cumulative_count / buffer_size * 100) or 0
+                    -- Build tile list
+                    local tiles_list = {}
+                    for tile_idx, byte_count in pairs(read_cov.tiles_read) do
+                        tiles_list[#tiles_list + 1] = string.format("T%d:%d", tile_idx, byte_count)
+                    end
+                    table.sort(tiles_list)
+                    local tiles_str = #tiles_list > 0 and table.concat(tiles_list, ",") or "none"
+                    log(string.format(
+                        "READ_COVERAGE: bytes_read=%d/%d (%.1f%%) bytes_written=%d (%.1f%%) tiles_read=[%s]",
+                        read_cov.unique_offsets, buffer_size, read_pct,
+                        cumulative_count, write_pct, tiles_str
+                    ))
+                    -- Key insight: if read > written, staging reads bytes we didn't see get filled
+                    if read_cov.unique_offsets > cumulative_count then
+                        log(string.format(
+                            "READ_COVERAGE_INSIGHT: staging reads %d bytes we didn't observe being written - earlier fill phase exists",
+                            read_cov.unique_offsets - cumulative_count
+                        ))
+                    elseif read_cov.unique_offsets < cumulative_count then
+                        log(string.format(
+                            "READ_COVERAGE_INSIGHT: staging only reads %d of %d bytes written - remaining bytes unused in this scenario",
+                            read_cov.unique_offsets, cumulative_count
+                        ))
+                    else
+                        log("READ_COVERAGE_INSIGHT: staging reads exactly the bytes that were written - clean 1:1 mapping")
+                    end
+                end
+            end
+        end
+    end
+
     -- v2.2: Lazy registration (init-time timeout mitigation)
     -- Register expensive callbacks at STAGING_START_FRAME - 2 instead of init
-    if STAGING_START_FRAME > 0 and frame_count == (STAGING_START_FRAME - 2) then
+    -- v2.11.1: Handle STAGING_START_FRAME=0 (cold-start trace) - register at frame 0
+    -- v2.11.3: Fix off-by-one: frame_count is already incremented, so check +1
+    local lazy_register_frame = math.max(0, STAGING_START_FRAME - 2)
+    if frame_count == lazy_register_frame + 1 then
         if STAGING_WATCH_ENABLED and not staging_callbacks_registered then
             register_staging_callbacks()
             staging_callbacks_registered = true
@@ -2548,19 +2949,21 @@ end
 
 -- v2.2: Staging and WRAM source callbacks registered lazily in on_end_frame
 -- (init-time registration causes timeout even with sparse sentinels)
+-- v2.11.1: Use math.max(0, ...) for cold-start traces (STAGING_START_FRAME=0)
+local lazy_register_frame_init = math.max(0, STAGING_START_FRAME - 2)
 if STAGING_WATCH_ENABLED then
-    log("INFO: Staging watch will be registered lazily at frame=" .. tostring(STAGING_START_FRAME - 2))
+    log("INFO: Staging watch will be registered lazily at frame=" .. tostring(lazy_register_frame_init))
 end
 -- v2.3: DMA logging deferred to prevent timeout (logs at init were eating the entire 1s budget)
 if CFG.dma_log_start_frame > 0 then
     log("INFO: DMA/HDMA/SA1 logging deferred until frame=" .. tostring(CFG.dma_log_start_frame))
 end
 if STAGING_WRAM_SOURCE_ENABLED then
-    log("INFO: WRAM source tracking will be registered lazily at frame=" .. tostring(STAGING_START_FRAME - 2))
+    log("INFO: WRAM source tracking will be registered lazily at frame=" .. tostring(lazy_register_frame_init))
 end
 if BUFFER_WRITE_WATCH_ENABLED then
     log(string.format("INFO: Buffer write watch (0x%06X-0x%06X) will be registered lazily at frame=%d",
-        BUFFER_WRITE_START, BUFFER_WRITE_END, STAGING_START_FRAME - 2))
+        BUFFER_WRITE_START, BUFFER_WRITE_END, lazy_register_frame_init))
 end
 
 -- Register cleanup callback for script end

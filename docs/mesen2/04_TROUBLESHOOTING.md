@@ -90,6 +90,35 @@ INFO: Fill session PRG read callback registered: 0x000000-0x3FFFFF at frame=1498
 
 ---
 
+## Ablation corrupted_reads=0 Despite Matching prg_runs (v2.19 Fix)
+
+**Symptom:** `ABLATION_RESULT` shows `corrupted_reads=0` even though the ablation range
+matches addresses visible in `prg_runs` (e.g., ablating 0xEC0000-0xEFFFFF when prg_runs
+shows 0xEFD20E).
+
+**Cause (pre-v2.19 hotfix):** Address format mismatch.
+- PRG read callback receives **CPU addresses** (0xC00000+), not file offsets
+- Evidence: `prg_runs` logs values like `0xC469F6`, `0xED04FE` which exceed 4MB file max
+- Original code converted ablation range from CPU→file (0xEC0000 → 0x2C0000)
+- Comparison always failed: callback has 0xED04FE, ablation checks 0x2D04FE
+
+**Fix:** Update to v2.19 hotfix which removes the erroneous CPU→file conversion.
+
+**Verification:** After update, `ABLATION_CONFIG` log shows:
+```
+ABLATION_CONFIG: enabled=true range=0xEC0000-0xEFFFFF value=0xFF (CPU addresses, no conversion)
+```
+
+And when the ablated range is accessed:
+```
+ABLATION_RESULT: frame=1676 enabled=true range=0xEC0000-0xEFFFFF value=0xFF corrupted_reads=15
+```
+
+**Key insight:** Always verify address format assumptions. Mesen2's PRG callbacks provide
+CPU addresses even when registered on `MEM.prg` with file offset ranges.
+
+---
+
 ## Diagnostic Priority (Start Here)
 
 Follow this flowchart **in order**. Fix issues at each step before proceeding.

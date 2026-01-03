@@ -67,6 +67,206 @@ to WRAM sources).
 
 ---
 
+## [2.20.0] - 2026-01-03
+
+### Payload Hash: Deterministic Output Signal for PRG Ablation (v2.19)
+
+**Context:** Step A (STAGING_WRAM_PREARM) confirmed 0x1530-0x161A is NOT the staging source for VRAM DMAs.
+All staging DMAs show NO_WRAM_PAIRS, meaning staging doesn't read from any watched WRAM range.
+This proves the earlier "gold causal ROM → 0x1530" result is NOT connected to "tiles that reached VRAM."
+
+**Pivot:** Instead of WRAM sweep (wasted motion), we now ablate PRG (ROM) directly and measure
+whether the actual DMA payload bytes change.
+
+**New Features:**
+- `compute_dma_payload_hash(src_addr, size)` - djb2 hash of DMA payload bytes at staging → VRAM transfer
+- `payload_hash=0x%08X` field added to STAGING_SUMMARY log line
+- Handles both WRAM addressing modes (relative via MEM.wram, absolute via MEM.cpu)
+
+**New Output:**
+```
+STAGING_SUMMARY: frame=1500 src=0x7E2000 size=256 payload_hash=0xABCD1234 vram=0x4000 ...
+```
+
+**Binary Search Protocol:**
+1. Run baseline (ABLATION_ENABLED=0), record payload_hash for target DMA
+2. Ablate PRG chunks: 0xC00000-0xCFFFFF, 0xD00000-0xDFFFFF, 0xE00000-0xEFFFFF, 0xF00000-0xFFFFFF
+3. Interpretation:
+   - Corrupted reads = 0 → that PRG chunk isn't touched for this DMA
+   - Corrupted reads > 0 but payload_hash unchanged → touched but not causal
+   - payload_hash changes → found causal PRG region feeding exact bytes to VRAM
+
+**Noise Reduction for Step B:**
+Disable 0x1530 buffer-specific features that are now distractions:
+```batch
+BUFFER_WRITE_WATCH=0
+READ_COVERAGE_ENABLED=0
+STAGING_WRAM_SOURCE=0   (optional, NO_WRAM_PAIRS is already proven)
+DMA_COMPARE_ENABLED=0   (optional, for performance)
+```
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.18 → v2.19)
+
+### PRG Callback Address Format Fix (v2.19 hotfix)
+
+**Bug:** `corrupted_reads=0` despite ablation range matching prg_runs entries.
+
+**Root Cause:** PRG read callback receives **CPU addresses** (0xC00000+), not file offsets.
+Evidence: `prg_runs` logs values like `0xC469F6`, `0xED04FE` which exceed 4MB file offset max (0x3FFFFF).
+
+The original code converted `ABLATION_PRG_START/END` from CPU addresses to file offsets,
+but the callback address was never converted, so the comparison always failed.
+
+**Fix:** Remove the CPU→file conversion. Use CPU addresses directly for ablation comparison.
+
+**Before (broken):**
+```lua
+-- WRONG: Converted ablation range to file offsets
+if ABLATION_PRG_START >= 0xC00000 then
+    ABLATION_PRG_START = ABLATION_PRG_START - 0xC00000
+end
+-- Callback receives 0xED04FE (CPU), we compare against 0x2D04FE (file) → no match
+```
+
+**After (fixed):**
+```lua
+-- CORRECT: Keep ablation range as CPU addresses (callback provides CPU addresses)
+local ABLATION_PRG_START = ABLATION_PRG_START_RAW  -- No conversion
+-- Callback receives 0xED04FE (CPU), we compare against 0xED04FE (CPU) → match!
+```
+
+**Verification:** After fix, `ABLATION_CONFIG` log shows:
+```
+ABLATION_CONFIG: enabled=true range=0xEC0000-0xEFFFFF value=0xFF (CPU addresses, no conversion)
+```
+
+---
+
+## [2.19.0] - 2026-01-02
+
+### READ_COVERAGE: Distinguish "Not Written" from "Not Used" (v2.18)
+
+**Context:** v2.17 multi-session chaining showed 14.5% write coverage (34/235 bytes).
+The question: does staging only USE those 34 bytes, or does it READ all 235 bytes
+(some pre-filled from an earlier phase)?
+
+Key insight: **"not written" ≠ "not used"**
+
+**Solution:** Track READS from the source buffer (0x1530-0x161A) during staging sessions.
+This shows exactly which bytes staging consumes, regardless of when they were written.
+
+**New Features:**
+- `READ_COVERAGE_ENABLED=1` - Track reads from source buffer (default: true)
+- Per-offset read bitmap: tracks exactly which bytes are read at least once
+- Per-tile read stats: `T0:32,T1:28,...` format (same as write coverage)
+
+**New Output:**
+```
+READ_COVERAGE: bytes_read=N/235 (X.X%) bytes_written=M (Y.Y%) tiles_read=[T0:32,T1:28,...]
+READ_COVERAGE_INSIGHT: <interpretation based on read vs write comparison>
+```
+
+**Interpretation:**
+- **read > written**: Staging reads bytes we didn't observe being filled → earlier phase exists
+- **read < written**: Staging only uses subset of what was written → some writes unused here
+- **read == written**: Clean 1:1 mapping between fill and use
+
+**Requirement:** `STAGING_WRAM_SOURCE=1` must be enabled (already set in run_ablation_test.bat)
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.17 → v2.18)
+
+---
+
+## [2.18.0] - 2026-01-02
+
+### Multi-Session Chaining for Full Buffer Coverage (v2.17)
+
+**Context:** v2.16 ablation tests showed only 14.5% coverage (34 of 235 bytes) because
+we were capturing only ONE phase of a multi-phase population. The proven causal range
+only affected 4 output bytes, consistent with partial capture.
+
+**New Features:**
+- **Session chaining**: After a session ends, continue watching for more tile-data writes
+- **Cumulative tracking**: `cumulative_bytes` counts unique offsets across ALL sessions
+- **Stability detection**: Episode marked complete after `POPULATE_STABLE_FRAMES` (default 60)
+  frames with no new writes
+- **Session numbering**: Each burst gets a session number (1, 2, 3...)
+
+**New Config:**
+- `POPULATE_CHAIN_ENABLED=1` - Enable multi-session chaining (default: true)
+- `POPULATE_STABLE_FRAMES=60` - Frames of stability before marking episode complete
+
+**New Output:**
+- `POPULATE_SESSION_START: session=N ...` - Now includes session number and cumulative count
+- `POPULATE_COVERAGE: session=N ... session_bytes=X cumulative_bytes=Y coverage=Z%`
+- `POPULATE_EPISODE_COMPLETE: frame=N sessions=M cumulative_bytes=X coverage=Y%`
+
+**Ablation Value Options:**
+- `ABLATION_VALUE=0x00` - Zero (default, may preserve semantics)
+- `ABLATION_VALUE=0xFF` - All ones (more disruptive, recommended for retests)
+- `ABLATION_VALUE=0xAA` - Alternating bits
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.16 → v2.17)
+- `run_ablation_test.bat` (v2.16 → v2.17)
+
+---
+
+## [2.17.0] - 2026-01-02
+
+### Coverage Metric and Tile-Level Reporting (v2.16)
+
+**Context:** v2.15 ablation proved ROM causality (corrupting ROM 0xE894F4-0xE89551 changes
+output hash). Now we need:
+1. Coverage tracking: how many of 235 bytes are observed written vs sensitive to ablation
+2. Tile-level attribution: which 32-byte tiles are affected by each ROM range
+
+**New Features:**
+- `POPULATE_COVERAGE` log line: reports bytes_written, coverage%, and tile breakdown
+- Tiles identified by index (32 bytes per tile, 8 tiles in 235-byte buffer)
+- Tile format: `T0:32,T1:28,...` means tile 0 has 32 bytes written, tile 1 has 28, etc.
+
+**New Script:** `scripts/compare_ablation_runs.py`
+- Compares baseline vs ablation log files
+- Reports which output bytes changed
+- Groups changes by tile index with byte_in_tile offset
+- Usage: `python scripts/compare_ablation_runs.py baseline.txt ablation.txt`
+
+**Ablation Test Results (all 3 candidates tested):**
+
+| Test | PRG Range | Reads Corrupted | Hash | Result |
+|------|-----------|-----------------|------|--------|
+| 1 | `$E8:94F4-$E8:9551` | 141 | `0x05077D05`→`0x2A200899` | **PROVEN CAUSAL** |
+| 2 | `$EB:C2BB-$EB:C2E7` | 68 | unchanged | NOT causal |
+| 3 | `$E8:95AD-$E8:95F5` | 110 | unchanged | NOT causal |
+
+**Interpretation:**
+- We have one **proven causal** ROM input range (`$E8:94F4-$E8:9551`)
+- Two other read ranges did not affect output under current session boundaries and
+  ablation method — this does NOT prove they are "not causal, period"
+- Possible reasons for NO EFFECT: incidental reads (headers/tables), 0x00 corruption
+  preserving semantics, or those ranges feed a different population phase
+
+**Coverage observation:** All tests show 14.5% coverage (34 of 235 bytes written).
+This strongly suggests we're capturing only ONE phase of a multi-phase population.
+The 4 changed bytes from Test 1 align with this partial coverage
+
+**Correct wording for v2.15 result (per user guidance):**
+> "Ablation test proves that reads from PRG $E8:94F4–$E8:9551 (ROM file offset
+> 0x2894F4–0x289551) are a causal input to the sprite tile source buffer
+> (0x1530–0x161A). Corrupting 141 reads in that range changes the buffer output
+> hash from 0x05077D05 to 0x2A200899 and alters output bytes at offsets 0x4B,
+> 0x4C, 0x8D, 0x8E."
+
+**Files Changed:**
+- `mesen2_integration/lua_scripts/mesen2_dma_probe.lua` (v2.15 → v2.16)
+- `run_ablation_test.bat` (v2.15 → v2.16, added candidate list)
+- `scripts/compare_ablation_runs.py` (new)
+
+---
+
 ## [2.16.0] - 2026-01-02
 
 ### Cold-Start Detector and Populate Session (v2.11)
