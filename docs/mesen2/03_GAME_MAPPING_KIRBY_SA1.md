@@ -753,9 +753,28 @@ File 0x00FE52:  53 65 E9  C8 53 E9  99 DE E9  0D 92 E9 ...
 | E98DDF | 0xFE8B | 19 | In main table |
 | E9677F | 0xFF2A | 72 | In extended table |
 
-**Table structure before 0xFE52:**
-The region 0xFE00-0xFE51 has a different format (`EF XX XX` pattern) - possibly
-a separate table for bank EF assets or a different data type.
+**Table structure analysis:**
+- **0xFE00-0xFE4E**: Different format (not 24-bit pointers)
+- **0xFE52-0xFF51**: Main pointer table (indices 0-85 are clean E8/E9/EA/EF)
+- **0xFF54-0xFF5F**: Anomalous entries including `0x7E2000` (WRAM staging!)
+- **0xFF60-0xFFE4**: More valid pointers + transitions
+- **0xFFE7-0xFFFF**: Filler (0xFFFFFF)
+
+**Verified: Pointers point DIRECTLY to record starts** (no secondary indirection):
+```
+idx  6 → 0xE93AEB: read starts at 0xE93AEB ✓
+idx 40 → 0xE9E667: read starts at 0xE9E667 ✓
+```
+
+**Record types vary by first byte** (don't classify by E0 alone):
+| First Byte | Example Indices | Notes |
+|------------|-----------------|-------|
+| `E0` | 6, 40 | Our measured compressed blocks |
+| `02` | 1 | Different format |
+| `03` | 19 | Different format |
+| `1F` | 72 | Different format |
+| `23` | 0 | Different format |
+| `25` | 5 | Different format |
 
 ### Next Steps
 
