@@ -631,7 +631,37 @@ ROM 0xE9E667 (SA-1 read) → batch selector
 **0xE93AEB Analysis (secondary cluster):**
 - File offset: 0x293AEB (HiROM: bank E9 → file 0x290000 + offset)
 - Bisection: 16KB (E90000-E93FFF) → 1 byte
-- Key insight: Single byte affecting multiple DMAs over 100+ frames = selector/index
+- **Read by SA-1** (like 0xE9E667)
+- Flip frames: 1681, 1684, 1760, 1769, 1773 (earlier than E9E667)
+- VRAM targets: Multiple (0x4C00, 0x4F20, 0x4F40, 0x4F60)
+- Source addr: 0x7E2040 (different from E9E667's 0x7E2000)
+
+**WRAM Diff Analysis (v2.32):**
+- Ablating 0xE93AEB changes **601 bytes (29.4%)** of WRAM staging buffer
+- **35 diff ranges** - fewer but larger than E9E667
+- Largest diff: **384 bytes** at start of buffer (vs 139B for E9E667)
+- Pattern: **WIDESPREAD** - different sprite batch decoded
+
+**Confirmed: 0xE93AEB is a higher-level batch selector.** It determines which sprite
+group to load, affecting multiple VRAM destinations.
+
+### Two-Level Sprite Selection Hierarchy
+
+| Role | Address | Diff Pattern | VRAM Targets |
+|------|---------|--------------|--------------|
+| **Batch selector** | 0xE93AEB | 35 ranges, 384B largest | Multiple (0x4Cxx, 0x4Fxx) |
+| **Variant selector** | 0xE9E667 | 85 ranges, 139B largest | Single (0x58E0) |
+
+```
+Sprite Loading Flow:
+ROM 0xE93AEB (SA-1) → batch/set selector
+  → determines which sprite group to load
+  → affects WRAM 0x7E2040, multiple VRAM regions
+
+ROM 0xE9E667 (SA-1) → variant/frame selector
+  → determines frame/variant within batch
+  → affects WRAM 0x7E2000, single VRAM region (0x58E0)
+```
 
 **Remaining targets for bisection:**
 | Address | Flips | Status |

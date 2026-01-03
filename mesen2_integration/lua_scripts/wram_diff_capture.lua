@@ -53,9 +53,14 @@ local function log(msg)
 end
 
 local function dump_wram(frame)
-    local filename = string.format("wram_dump_frame_%04d%s.bin",
+    local addr_suffix = ""
+    if ABLATION_ENABLED and ABLATION_PRG_START_CPU > 0 then
+        addr_suffix = string.format("_%06X", ABLATION_PRG_START_CPU)
+    end
+    local filename = string.format("wram_dump_frame_%04d%s%s.bin",
         frame,
-        ABLATION_ENABLED and "_ablated" or "_baseline")
+        ABLATION_ENABLED and "_ablated" or "_baseline",
+        addr_suffix)
     local filepath = OUTPUT_DIR .. filename
 
     local f = io.open(filepath, "wb")

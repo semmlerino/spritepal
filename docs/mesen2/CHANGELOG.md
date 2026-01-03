@@ -67,6 +67,44 @@ to WRAM sources).
 
 ---
 
+## [2.32.0] - 2026-01-03
+
+### Comparative WRAM Diff: Two-Level Sprite Selection Hierarchy
+
+Ran WRAM diff analysis on both causal bytes to understand their roles:
+
+| Metric | 0xE9E667 | 0xE93AEB |
+|--------|----------|----------|
+| Diff bytes | 516 (25.2%) | 601 (29.4%) |
+| Diff ranges | 85 | 35 |
+| Largest range | 139B | **384B** |
+| Flip frames | 1795+ (4-frame cadence) | 1681, 1684, 1760... |
+| VRAM targets | Single (0x58E0) | Multiple (0x4C00, 0x4F20, 0x4F40, 0x4F60) |
+| Source addr | 0x7E2000 | 0x7E2040 |
+
+**Key Discovery: Two-Level Hierarchy**
+
+Both bytes are batch selectors, but at **different hierarchy levels**:
+
+- **0xE93AEB** (higher level): Fewer but larger contiguous changes (384B block).
+  Selects entire sprite set. Affects multiple VRAM destinations.
+
+- **0xE9E667** (lower level): More but smaller scattered changes (85 ranges).
+  Selects variant/frame within a batch. Affects single VRAM destination repeatedly.
+
+**Sprite Loading Model:**
+```
+ROM 0xE93AEB (SA-1) → batch/set selector
+  → determines which sprite group to load
+  → affects multiple VRAM regions (0x4Cxx, 0x4Fxx)
+
+ROM 0xE9E667 (SA-1) → variant/frame selector
+  → determines which frame/variant within the batch
+  → affects single VRAM region (0x58E0) on 4-frame cadence
+```
+
+---
+
 ## [2.31.0] - 2026-01-03
 
 ### WRAM Diff Confirms 0xE9E667 is Sprite Batch Selector
