@@ -1,6 +1,7 @@
 @echo off
-REM PRG Ablation Sweep (v2.24)
+REM PRG Ablation Sweep (v2.25)
 REM Binary-search which 1MB PRG chunks causally feed staging DMA payloads
+REM v2.25: Decouple ablation from BUFFER_WRITE_WATCH (critical bug fix)
 REM v2.24: Per-CPU toggles (ABLATE_SNES/ABLATE_SA1), SNES exec-guard
 REM v2.23: Fix emu.stop() re-entry bug (script_stopping guard)
 REM v2.22: SA-1 PRG ablation UNGATED (exec guard only) - tests upstream producer hypothesis
@@ -122,8 +123,8 @@ set STAGING_WATCH_START=0x2000
 set STAGING_WATCH_END=0x2FFF
 set STAGING_WATCH_PC_SAMPLES=4
 
-REM Keep BUFFER_WRITE_WATCH=1 to enable PRG callback registration for ablation
-REM The buffer itself is proven irrelevant to staging, but the callbacks are needed
+REM v2.25: BUFFER_WRITE_WATCH no longer required for ablation (decoupled in Lua script)
+REM Can now safely set BUFFER_WRITE_WATCH=0 when only doing ablation experiments
 set BUFFER_WRITE_WATCH=1
 set BUFFER_WRITE_START=0x1530
 set BUFFER_WRITE_END=0x161A
@@ -154,7 +155,7 @@ set HEARTBEAT_EVERY=500
 
 echo.
 echo ===============================================
-echo PRG ABLATION SWEEP (v2.24 - per-CPU toggles, SNES exec-guard)
+echo PRG ABLATION SWEEP (v2.25 - ablation decoupled from BUFFER_WRITE_WATCH)
 echo ===============================================
 echo.
 echo ABLATION_ENABLED=%ABLATION_ENABLED%

@@ -20,7 +20,7 @@
 -- SECTION 1: BOOTSTRAP & CONFIG
 -- Environment variables, output paths, version info
 -- =============================================================================
-local LOG_VERSION = "2.24"  -- v2.24: Per-CPU toggles (ABLATE_SNES/ABLATE_SA1), SNES exec-guard
+local LOG_VERSION = "2.25"  -- v2.25: Decouple ablation from BUFFER_WRITE_WATCH (critical bug fix)
 local RUN_ID = string.format("%d_%04x", os.time(), math.random(0, 0xFFFF))
 
 -- Persistent log file handle (opened once, closed on script end)
@@ -401,11 +401,17 @@ local staging_first_pc = nil  -- PC that started the fill
 local staging_dropped_writes = 0
 
 -- v2.2: Lazy registration flags (init-time timeout mitigation)
-local staging_callbacks_registered = false
-local wram_source_callbacks_registered = false
+-- v2.25: Consolidated into table to reduce local variable count (Lua 200 limit)
+local cb_reg = {
+    staging = false,
+    wram_source = false,
+    buffer_write = false,
+    ablation = false,
+    prg = false,
+    frame_event = false,
+}
 
 -- v2.8: Buffer write tracking state
-local buffer_write_callbacks_registered = false
 local buffer_write_frame_stats = {}  -- [frame] = {first_pc, min_addr, max_addr, count, pc_samples}
 local buffer_write_current_frame = nil
 local buffer_write_current_stats = nil
@@ -520,9 +526,12 @@ local ablation_last_sa1 = 0         -- Snapshot at STAGING_SUMMARY
 -- v2.21/v2.24: Exec guards - prevent ablation during code fetch from ablation range
 -- If a CPU is executing from the ablation range, ablating reads would crash it
 -- Consolidated into table to reduce local variable count (Lua 200 limit)
+-- v2.25: Added hit_log_max/hit_log_count to prove instrumentation is armed
 local exec_guard = {
     sa1 = false,   -- SA-1 exec guard
     snes = false,  -- S-CPU exec guard (v2.24)
+    hit_log_max = 50,   -- Max ablation hits to log (avoid spam)
+    hit_log_count = 0,  -- Counter for logged hits
 }
 
 -- v2.22: SA-1 burst tracking (per-frame) for correlation with staging DMAs
@@ -1719,7 +1728,6 @@ end
 -- =============================================================================
 
 local state_loaded = PRELOADED_STATE
-local frame_event_registered = false
 
 -- Process pending DMA comparisons (deferred from $420B write callback)
 -- This runs at frame end after all DMAs have completed
@@ -2055,6 +2063,12 @@ local function on_fill_session_prg_read(address, value)
             ablation_corrupted_count = ablation_corrupted_count + 1
             ablation_total = ablation_total + 1  -- v2.20: per-DMA tracking
             ablation_total_snes = ablation_total_snes + 1  -- v2.21: S-CPU specific counter
+            -- v2.25: Log first N hits to prove instrumentation is armed
+            if exec_guard.hit_log_count < exec_guard.hit_log_max then
+                exec_guard.hit_log_count = exec_guard.hit_log_count + 1
+                log(string.format("ABLATION_HIT: cpu=snes addr=0x%06X frame=%d total=%d",
+                    address, get_canonical_frame(), ablation_total))
+            end
             return ABLATION_VALUE  -- CPU sees corrupted byte
         end
         -- Exec guard blocked - don't corrupt, still clear flag
@@ -2149,6 +2163,12 @@ local function on_sa1_prg_read(address, value)
         if not was_exec then
             ablation_total = ablation_total + 1  -- Combined total for backwards compat
             sa1_burst.ablated = sa1_burst.ablated + 1
+            -- v2.25: Log first N hits to prove instrumentation is armed
+            if exec_guard.hit_log_count < exec_guard.hit_log_max then
+                exec_guard.hit_log_count = exec_guard.hit_log_count + 1
+                log(string.format("ABLATION_HIT: cpu=sa1 addr=0x%06X frame=%d total=%d",
+                    address, get_canonical_frame(), ablation_total))
+            end
             return ABLATION_VALUE  -- SA-1 sees corrupted byte
         else
             sa1_burst.exec_blocked = sa1_burst.exec_blocked + 1
@@ -2632,6 +2652,137 @@ local function log_buffer_write_summary(frame)
     ))
 end
 
+-- v2.25: Register PRG read callbacks (shared between ablation and fill session tracking)
+-- This function is idempotent - only registers once via cb_reg.prg flag
+local function register_prg_callbacks()
+    if cb_reg.prg then
+        return true  -- Already registered
+    end
+
+    if not MEM.prg then
+        log("WARNING: PRG memory type not available")
+        return false
+    end
+
+    local prg_size = emu.getMemorySize(MEM.prg) or 0
+    if prg_size == 0 then
+        log("WARNING: PRG size is 0")
+        return false
+    end
+
+    -- Register S-CPU PRG read callback
+    local prg_ref = add_memory_callback_compat(
+        on_fill_session_prg_read,
+        emu.callbackType.read,
+        0x000000,
+        prg_size - 1,
+        cpu_type,
+        MEM.prg
+    )
+    if prg_ref then
+        log(string.format(
+            "INFO: S-CPU PRG read callback registered: 0x%06X-0x%06X at frame=%d",
+            0, prg_size - 1, frame_count
+        ))
+    else
+        log("WARNING: failed to register S-CPU PRG read callback")
+        return false
+    end
+
+    -- Register SA-1 PRG read callback (if SA-1 available)
+    if sa1_cpu_type then
+        local sa1_prg_ref = add_memory_callback_compat(
+            on_sa1_prg_read,
+            emu.callbackType.read,
+            0x000000,
+            prg_size - 1,
+            sa1_cpu_type,
+            MEM.prg
+        )
+        if sa1_prg_ref then
+            log(string.format(
+                "INFO: SA-1 PRG read callback registered: 0x%06X-0x%06X at frame=%d",
+                0, prg_size - 1, frame_count
+            ))
+        else
+            log("WARNING: failed to register SA-1 PRG read callback")
+        end
+    else
+        log("INFO: sa1_cpu_type not resolved; SA-1 PRG reads will not be tracked")
+    end
+
+    cb_reg.prg = true
+    return true
+end
+
+-- v2.25: Register ablation callbacks (independent of BUFFER_WRITE_WATCH)
+-- This is the critical fix: ablation instrumentation must work regardless of
+-- whether buffer write watch is enabled. Previously, ablation callbacks were
+-- nested inside register_buffer_write_callbacks(), causing ablation to be
+-- silently disabled when BUFFER_WRITE_WATCH_ENABLED=0.
+local function register_ablation_callbacks()
+    if cb_reg.ablation then
+        return true  -- Already registered
+    end
+
+    if not ABLATION_ENABLED then
+        return false  -- Ablation not enabled, nothing to register
+    end
+
+    -- First, ensure PRG read callbacks are registered (shared with fill session)
+    if not register_prg_callbacks() then
+        log("WARNING: Failed to register PRG callbacks for ablation")
+        return false
+    end
+
+    -- Register exec guards for ablation range
+    local prg_size = emu.getMemorySize(MEM.prg) or 0
+
+    -- S-CPU exec guard (v2.24)
+    if ABLATE_SNES then
+        local snes_exec_ref = add_memory_callback_compat(
+            on_snes_exec_in_ablation_range,
+            emu.callbackType.exec,
+            ABLATION_PRG_START,
+            ABLATION_PRG_END,
+            cpu_type,
+            MEM.prg
+        )
+        if snes_exec_ref then
+            log(string.format(
+                "INFO: S-CPU exec guard registered for ablation range: 0x%06X-0x%06X",
+                ABLATION_PRG_START, ABLATION_PRG_END
+            ))
+        else
+            log("WARNING: failed to register S-CPU exec guard (ablation may corrupt code)")
+        end
+    end
+
+    -- SA-1 exec guard (v2.21)
+    if ABLATE_SA1 and sa1_cpu_type then
+        local sa1_exec_ref = add_memory_callback_compat(
+            on_sa1_exec_in_ablation_range,
+            emu.callbackType.exec,
+            ABLATION_PRG_START,
+            ABLATION_PRG_END,
+            sa1_cpu_type,
+            MEM.prg
+        )
+        if sa1_exec_ref then
+            log(string.format(
+                "INFO: SA-1 exec guard registered for ablation range: 0x%06X-0x%06X",
+                ABLATION_PRG_START, ABLATION_PRG_END
+            ))
+        else
+            log("WARNING: failed to register SA-1 exec guard (ablation may corrupt code)")
+        end
+    end
+
+    cb_reg.ablation = true
+    log("INFO: Ablation callbacks registered successfully")
+    return true
+end
+
 local function register_buffer_write_callbacks()
     if not wram_mem_type then
         log("WARNING: Buffer write watch enabled but no WRAM memType resolved")
@@ -2667,95 +2818,9 @@ local function register_buffer_write_callbacks()
             buffer_start, buffer_end, frame_count
         ))
 
-        -- v2.9: Also register PRG read callback for fill session tracking
-        -- This callback is gated on fill_session_active (only logs during buffer fill = safe)
-        if MEM.prg then
-            local prg_size = emu.getMemorySize(MEM.prg) or 0
-            if prg_size > 0 then
-                local prg_ref = add_memory_callback_compat(
-                    on_fill_session_prg_read,
-                    emu.callbackType.read,
-                    0x000000,
-                    prg_size - 1,
-                    cpu_type,
-                    MEM.prg
-                )
-                if prg_ref then
-                    log(string.format(
-                        "INFO: Fill session PRG read callback registered (S-CPU): 0x%06X-0x%06X at frame=%d",
-                        0, prg_size - 1, frame_count
-                    ))
-
-                    -- v2.24: Register S-CPU exec callback for ablation range (exec guard)
-                    -- This prevents corrupting code fetch from ablation range
-                    if ABLATION_ENABLED and ABLATE_SNES then
-                        local snes_exec_ref = add_memory_callback_compat(
-                            on_snes_exec_in_ablation_range,
-                            emu.callbackType.exec,
-                            ABLATION_PRG_START,
-                            ABLATION_PRG_END,
-                            cpu_type,
-                            MEM.prg
-                        )
-                        if snes_exec_ref then
-                            log(string.format(
-                                "INFO: S-CPU exec guard registered for ablation range: 0x%06X-0x%06X",
-                                ABLATION_PRG_START, ABLATION_PRG_END
-                            ))
-                        else
-                            log("WARNING: failed to register S-CPU exec guard (ablation may corrupt code)")
-                        end
-                    end
-                else
-                    log("WARNING: failed to register fill session PRG read callback (S-CPU)")
-                end
-
-                -- v2.21: Register SA-1 PRG read callback for ablation
-                -- SA-1 likely does sprite decompression; this is the missing piece
-                if sa1_cpu_type then
-                    local sa1_prg_ref = add_memory_callback_compat(
-                        on_sa1_prg_read,
-                        emu.callbackType.read,
-                        0x000000,
-                        prg_size - 1,
-                        sa1_cpu_type,
-                        MEM.prg
-                    )
-                    if sa1_prg_ref then
-                        log(string.format(
-                            "INFO: SA-1 PRG read callback registered: 0x%06X-0x%06X at frame=%d",
-                            0, prg_size - 1, frame_count
-                        ))
-                    else
-                        log("WARNING: failed to register SA-1 PRG read callback")
-                    end
-
-                    -- v2.21: Register SA-1 exec callback for ablation range only (exec guard)
-                    -- This prevents corrupting code fetch from ablation range
-                    -- v2.24: Also respects ABLATE_SA1 toggle
-                    if ABLATION_ENABLED and ABLATE_SA1 then
-                        local sa1_exec_ref = add_memory_callback_compat(
-                            on_sa1_exec_in_ablation_range,
-                            emu.callbackType.exec,
-                            ABLATION_PRG_START,
-                            ABLATION_PRG_END,
-                            sa1_cpu_type,
-                            MEM.prg
-                        )
-                        if sa1_exec_ref then
-                            log(string.format(
-                                "INFO: SA-1 exec guard registered for ablation range: 0x%06X-0x%06X",
-                                ABLATION_PRG_START, ABLATION_PRG_END
-                            ))
-                        else
-                            log("WARNING: failed to register SA-1 exec guard (ablation may corrupt code)")
-                        end
-                    end
-                else
-                    log("WARNING: sa1_cpu_type not resolved; SA-1 PRG reads will not be tracked")
-                end
-            end
-        end
+        -- v2.25: Register PRG callbacks for fill session tracking (if not already registered by ablation)
+        -- This is safe because register_prg_callbacks() is idempotent
+        register_prg_callbacks()
 
         return true
     else
@@ -2931,20 +2996,29 @@ local function on_end_frame()
     -- v2.11.3: Fix off-by-one: frame_count is already incremented, so check +1
     local lazy_register_frame = math.max(0, STAGING_START_FRAME - 2)
     if frame_count == lazy_register_frame + 1 then
-        if STAGING_WATCH_ENABLED and not staging_callbacks_registered then
+        if STAGING_WATCH_ENABLED and not cb_reg.staging then
             register_staging_callbacks()
-            staging_callbacks_registered = true
+            cb_reg.staging = true
         end
-        if STAGING_WRAM_SOURCE_ENABLED and not wram_source_callbacks_registered then
-            wram_source_callbacks_registered = register_wram_source_callbacks()
-            if not wram_source_callbacks_registered then
+        if STAGING_WRAM_SOURCE_ENABLED and not cb_reg.wram_source then
+            cb_reg.wram_source = register_wram_source_callbacks()
+            if not cb_reg.wram_source then
                 log("WARNING: WRAM source callbacks were not registered (will retry next frame)")
             end
         end
+        -- v2.25: Ablation callbacks (independent of BUFFER_WRITE_WATCH)
+        -- CRITICAL FIX: Register ablation callbacks before buffer write callbacks
+        -- This ensures PRG ablation works regardless of BUFFER_WRITE_WATCH_ENABLED
+        if ABLATION_ENABLED and not cb_reg.ablation then
+            cb_reg.ablation = register_ablation_callbacks()
+            if not cb_reg.ablation then
+                log("WARNING: Ablation callbacks were not registered (will retry next frame)")
+            end
+        end
         -- v2.8: Buffer write watch for tracing source buffer writers
-        if BUFFER_WRITE_WATCH_ENABLED and not buffer_write_callbacks_registered then
-            buffer_write_callbacks_registered = register_buffer_write_callbacks()
-            if not buffer_write_callbacks_registered then
+        if BUFFER_WRITE_WATCH_ENABLED and not cb_reg.buffer_write then
+            cb_reg.buffer_write = register_buffer_write_callbacks()
+            if not cb_reg.buffer_write then
                 log("WARNING: Buffer write callbacks were not registered (will retry next frame)")
             end
         end
@@ -3012,10 +3086,10 @@ local function on_end_frame()
 end
 
 local function register_frame_event()
-    if frame_event_registered then
+    if cb_reg.frame_event then
         return
     end
-    frame_event_registered = true
+    cb_reg.frame_event = true
     if FRAME_EVENT == "exec" then
         local last_frame = nil
         local clock_accum = 0

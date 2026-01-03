@@ -67,6 +67,43 @@ to WRAM sources).
 
 ---
 
+## [2.25.0] - 2026-01-03
+
+### Critical Bug Fix: Decouple Ablation from BUFFER_WRITE_WATCH
+
+**The Bug:**
+
+PRG ablation callbacks (S-CPU and SA-1 read callbacks + exec guards) were nested
+inside `register_buffer_write_callbacks()`, which has an early return when
+`BUFFER_WRITE_WATCH_ENABLED=0`. This meant:
+
+1. Setting `BUFFER_WRITE_WATCH=0` silently disabled ALL PRG ablation
+2. An "ablation run" would have no actual corruption
+3. "No flips" would be falsely concluded
+
+The batch file had a workaround comment (`REM Keep BUFFER_WRITE_WATCH=1 to enable
+PRG callback registration for ablation`), but the structural coupling was a landmine.
+
+**The Fix:**
+
+1. Created `register_prg_callbacks()` - shared helper that registers S-CPU and SA-1
+   PRG read callbacks. Idempotent (only registers once via `prg_callbacks_registered` flag).
+
+2. Created `register_ablation_callbacks()` - independent function that:
+   - Registers PRG callbacks via `register_prg_callbacks()`
+   - Registers exec guards (S-CPU and SA-1) when ABLATION_ENABLED=1
+   - Runs **before** buffer write registration in lazy registration block
+   - Works regardless of BUFFER_WRITE_WATCH setting
+
+3. Simplified `register_buffer_write_callbacks()` - now only registers buffer write
+   watch, then calls `register_prg_callbacks()` for fill session tracking (no-op if
+   already registered by ablation).
+
+**Result:** `ABLATION_ENABLED=1` now guarantees PRG ablation is active, even with
+`BUFFER_WRITE_WATCH=0`. The batch file workaround is no longer required.
+
+---
+
 ## [2.24.0] - 2026-01-03
 
 ### Per-CPU Ablation Toggles and SNES Exec Guard
