@@ -1,12 +1,11 @@
--- sprite_rom_finder.lua v8
+-- sprite_rom_finder.lua v9
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset
 -- RIGHT-CLICK = clear panel
 --
--- v6 fixes: shadow DMA channel regs $4300-$437F (post-DMA reads are garbage)
--- v7 fixes: session queue instead of fragile single active_session
 -- v8 fixes: cleaner queue (size cap, 45-frame window, backward iteration)
+-- v9: debug logging for callback registration
 
 local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local LOG_FILE = OUTPUT_DIR .. "sprite_rom_finder.log"
@@ -574,11 +573,10 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v8")
+log("SPRITE ROM FINDER v9 (DEBUG)")
 log("========================================")
-log("v6: shadow DMA regs $4300-$437F")
-log("v7: session queue")
 log("v8: 45-frame window, idx/ses diagnostics")
+log("v9: callback registration logging")
 log("")
 log("LEFT-CLICK on sprite = lookup ROM offset")
 log("RIGHT-CLICK = clear panel")
@@ -587,36 +585,48 @@ log("========================================")
 local snes_cpu = emu.cpuType and emu.cpuType.snes or nil
 local sa1_cpu = emu.cpuType and emu.cpuType.sa1 or nil
 
+log(string.format("DEBUG: snes_cpu=%s, sa1_cpu=%s", tostring(snes_cpu), tostring(sa1_cpu)))
+
 for _, cpu in ipairs({snes_cpu, sa1_cpu}) do
     if cpu then
-        pcall(function()
+        local cpu_name = (cpu == snes_cpu) and "snes" or "sa1"
+
+        local ok1, err1 = pcall(function()
             emu.addMemoryCallback(on_table_read, emu.callbackType.read,
                 TABLE_CPU_BASE, TABLE_CPU_END, cpu, emu.memType.snesMemory)
         end)
-        pcall(function()
+        log(string.format("DEBUG: table_read callback (%s): %s %s",
+            cpu_name, ok1 and "OK" or "FAIL", err1 or ""))
+
+        local ok2, err2 = pcall(function()
             emu.addMemoryCallback(on_dp_write, emu.callbackType.write,
                 0x000000, 0x0000FF, cpu, emu.memType.snesMemory)
         end)
+        log(string.format("DEBUG: dp_write callback (%s): %s %s",
+            cpu_name, ok2 and "OK" or "FAIL", err2 or ""))
     end
 end
 
 -- FIX #5: Use snesMemory (not snesRegister) for $420B callback
-pcall(function()
+local ok3, err3 = pcall(function()
     emu.addMemoryCallback(on_dma_enable, emu.callbackType.write,
         DMA_ENABLE_REG, DMA_ENABLE_REG, snes_cpu, emu.memType.snesMemory)
 end)
+log(string.format("DEBUG: dma_enable callback: %s %s", ok3 and "OK" or "FAIL", err3 or ""))
 
 -- FIX #6: Shadow VMADD by capturing writes to $2116/$2117
-pcall(function()
+local ok4, err4 = pcall(function()
     emu.addMemoryCallback(on_vram_addr_write, emu.callbackType.write,
         0x2116, 0x2117, snes_cpu, emu.memType.snesMemory)
 end)
+log(string.format("DEBUG: vram_addr callback: %s %s", ok4 and "OK" or "FAIL", err4 or ""))
 
 -- FIX #8: Shadow DMA channel registers $4300-$437F
-pcall(function()
+local ok5, err5 = pcall(function()
     emu.addMemoryCallback(on_dma_reg_write, emu.callbackType.write,
         0x4300, 0x437F, snes_cpu, emu.memType.snesMemory)
 end)
+log(string.format("DEBUG: dma_reg callback: %s %s", ok5 and "OK" or "FAIL", err5 or ""))
 
 emu.addEventCallback(on_frame, emu.eventType.endFrame)
 
