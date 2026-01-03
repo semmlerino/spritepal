@@ -611,7 +611,22 @@ ablating reads is sufficient to cause payload_hash flips.
 - **Read by SA-1** (not S-CPU) - confirmed via callback registration
 - Flip pattern: vram=0x58E0, 4-frame cadence (1795, 1799, 1803...)
 - Consistent hash change: 0x5AC344AC → 0x6C3A828A (variant selection, not corruption)
-- Key insight: SA-1 reads this byte to select sprite variant/index
+
+**WRAM Diff Analysis (v2.31):**
+- Ablating 0xE9E667 changes **516 bytes (25.2%)** of WRAM staging buffer
+- **85 separate diff ranges** - not a simple pointer offset
+- Largest diff: 139 bytes at start of buffer (0x2000)
+- Pattern: **WIDESPREAD** - entirely different sprite batch decoded
+
+**Confirmed: 0xE9E667 is a sprite batch selector.** SA-1 reads this byte to determine
+which sprite variant/animation frame to decode into WRAM for S-CPU DMA to VRAM.
+
+```
+Sprite Loading Flow:
+ROM 0xE9E667 (SA-1 read) → batch selector
+  → SA-1 decodes sprite data → WRAM $7E2000-$27FF
+  → S-CPU DMAs to VRAM 0x58E0
+```
 
 **0xE93AEB Analysis (secondary cluster):**
 - File offset: 0x293AEB (HiROM: bank E9 → file 0x290000 + offset)

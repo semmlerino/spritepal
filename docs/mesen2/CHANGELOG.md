@@ -67,6 +67,37 @@ to WRAM sources).
 
 ---
 
+## [2.31.0] - 2026-01-03
+
+### WRAM Diff Confirms 0xE9E667 is Sprite Batch Selector
+
+**Breakthrough finding:** With correct callback registration, WRAM diff shows:
+
+| Metric | Value |
+|--------|-------|
+| Diff bytes | 516 (25.2% of buffer) |
+| Diff ranges | 85 separate regions |
+| Largest range | 139 bytes at 0x2000 |
+| Pattern | WIDESPREAD |
+
+**Interpretation:** 0xE9E667 is a **sprite variant/batch selector**, not a simple index.
+Ablating this single byte causes SA-1 to decode an **entirely different sprite set**
+into the WRAM staging buffer.
+
+Key evidence:
+- 25% of buffer changes = major branch, not offset adjustment
+- 85 separate ranges = multiple tiles/sprites affected
+- Consistent hash pair (not random corruption) = deterministic variant selection
+
+**Sprite loading flow confirmed:**
+```
+ROM 0xE9E667 (read by SA-1) → selects sprite batch
+  → SA-1 decodes sprite data → WRAM $7E2000-$27FF
+  → S-CPU DMAs to VRAM 0x58E0
+```
+
+---
+
 ## [2.30.1] - 2026-01-03
 
 ### Mesen2 PRG Callback Address Format Fix
