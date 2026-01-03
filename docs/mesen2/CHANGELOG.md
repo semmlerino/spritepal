@@ -67,6 +67,25 @@ to WRAM sources).
 
 ---
 
+## [2.35.0] - 2026-01-03
+
+### Block Boundary Analysis: ~500 Byte Sprite Chunks
+
+Measured contiguous read spans by filtering same-bank reads:
+
+| Block | Size | Next Asset |
+|-------|------|------------|
+| 0xE9E667 | **488 bytes** | → 0xE98DDF |
+| 0xE93AEB | **585 bytes** | → 0xE9677F |
+
+**Key findings:**
+- Both are medium sprite chunks (~500 bytes compressed)
+- Sizes consistent across all frames (not variable-length)
+- "Next asset" addresses match pending bisection targets
+- Decoder uses 0x00841F as lookup table (interspersed reads)
+
+---
+
 ## [2.34.0] - 2026-01-03
 
 ### PRG Read Trace: Both Causal Bytes Are Stream Starts

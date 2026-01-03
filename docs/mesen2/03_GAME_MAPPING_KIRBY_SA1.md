@@ -668,30 +668,38 @@ This reflects **different compressed content** in each stream, not a hierarchy:
 | 0xE9E667 | +4 frames exactly | Animation batch refresh / periodic streaming |
 | 0xE93AEB | Sparse with gaps | Loaded on demand (scene transition / asset swap) |
 
-### Next Steps: Asset Block Analysis
+### Block Boundary Analysis (v2.35)
 
-Now that we've identified these as stream starts (not control bytes), the focus shifts
-to asset block characterization:
+Measured contiguous read spans by filtering same-bank reads only:
 
-**1) Identify block boundaries:**
-Log contiguous read span from trigger until non-sequential read. This gives block size:
-- Small (~64B): Per-frame patches
-- Medium (~256-1KB): Sprite chunks
-- Large (>1KB): Scene asset packs
+| Block | Start | End | Size | Next Asset |
+|-------|-------|-----|------|------------|
+| **0xE9E667** | 0xE9E667 | 0xE9E84E | **488 bytes (0x1E8)** | → 0xE98DDF |
+| **0xE93AEB** | 0xE93AEB | 0xE93D33 | **585 bytes (0x249)** | → 0xE9677F |
 
-**2) Confirm decoder CPU:**
-Both blocks read by SA-1. Verify if SA-1 also writes the decoded output to WRAM,
-or if it hands off to S-CPU.
+**Observations:**
+- Both blocks are **medium sprite chunks** (~500 bytes compressed)
+- Block sizes are **consistent across all frames** (not variable-length streaming)
+- The "next asset" addresses (0xE98DDF, 0xE9677F) were in the pending bisection list
+- Decoder reads from bank 00 (0x00841F) interspersed with data reads (lookup table)
 
-**3) Check compression signatures:**
-Dump ~256 bytes from each block start. Look for:
-- Length fields (first 2-3 bytes)
-- LZ-style backreferences
-- Bitstream packing markers
+**Block classification:**
+- ~500 bytes compressed → likely decompresses to 1-2KB of tile data
+- Consistent with single sprite animation frame or small sprite sheet
+- Not tiny per-frame patches, not large scene packs
 
-**4) Map blocks to staging regions:**
-For each trigger, capture staging buffer before/after decode.
-Determine which $7E2000-$27FF region each block fills
+### Next Steps
+
+**1) Dump raw block bytes:**
+Extract 488 bytes from 0xE9E667 and 585 bytes from 0xE93AEB.
+Look for compression format signatures.
+
+**2) Check adjacent blocks:**
+The "next asset" addresses may form a contiguous asset table:
+- 0xE93AEB (585B) → 0xE9677F → 0xE98DDF → 0xE9E667 (488B)?
+
+**3) Map blocks to staging regions:**
+Capture staging buffer before/after decode to see which $7E2000-$27FF region each fills
 
 **Remaining targets for bisection:**
 | Address | Flips | Status |
