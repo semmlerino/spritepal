@@ -610,58 +610,84 @@ ablating reads is sufficient to cause payload_hash flips.
 - Bisection: 8KB (E9E000-E9FFFF) → 1 byte, 17 flips at every step
 - **Read by SA-1** (not S-CPU) - confirmed via callback registration
 - Flip pattern: vram=0x58E0, 4-frame cadence (1795, 1799, 1803...)
-- Consistent hash change: 0x5AC344AC → 0x6C3A828A (variant selection, not corruption)
+- Consistent hash change: 0x5AC344AC → 0x6C3A828A (deterministic, not corruption)
 
-**WRAM Diff Analysis (v2.31):**
-- Ablating 0xE9E667 changes **516 bytes (25.2%)** of WRAM staging buffer
-- **85 separate diff ranges** - not a simple pointer offset
-- Largest diff: 139 bytes at start of buffer (0x2000)
-- Pattern: **WIDESPREAD** - entirely different sprite batch decoded
-
-**Confirmed: 0xE9E667 is a sprite batch selector.** SA-1 reads this byte to determine
-which sprite variant/animation frame to decode into WRAM for S-CPU DMA to VRAM.
-
-```
-Sprite Loading Flow:
-ROM 0xE9E667 (SA-1 read) → batch selector
-  → SA-1 decodes sprite data → WRAM $7E2000-$27FF
-  → S-CPU DMAs to VRAM 0x58E0
-```
+**WRAM Diff (frame 1795, ablation vs baseline):**
+- **516 bytes changed (25.2%)** of $7E2000-$27FF staging buffer
+- **85 separate diff ranges** - scattered small edits
+- Largest contiguous diff: **139 bytes** at buffer start (0x2000)
+- Pattern: WIDESPREAD - decode/build process produced different output
 
 **0xE93AEB Analysis (secondary cluster):**
 - File offset: 0x293AEB (HiROM: bank E9 → file 0x290000 + offset)
 - Bisection: 16KB (E90000-E93FFF) → 1 byte
 - **Read by SA-1** (like 0xE9E667)
-- Flip frames: 1681, 1684, 1760, 1769, 1773 (earlier than E9E667)
+- Flip frames: 1681, 1684, 1760, 1769, 1773 (different cadence than E9E667)
 - VRAM targets: Multiple (0x4C00, 0x4F20, 0x4F40, 0x4F60)
 - Source addr: 0x7E2040 (different from E9E667's 0x7E2000)
 
-**WRAM Diff Analysis (v2.32):**
-- Ablating 0xE93AEB changes **601 bytes (29.4%)** of WRAM staging buffer
+**WRAM Diff (frame 1681, ablation vs baseline):**
+- **601 bytes changed (29.4%)** of staging buffer
 - **35 diff ranges** - fewer but larger than E9E667
-- Largest diff: **384 bytes** at start of buffer (vs 139B for E9E667)
-- Pattern: **WIDESPREAD** - different sprite batch decoded
+- Largest contiguous diff: **384 bytes** at buffer start
+- Pattern: WIDESPREAD - decode/build process produced different output
 
-**Confirmed: 0xE93AEB is a higher-level batch selector.** It determines which sprite
-group to load, affecting multiple VRAM destinations.
+### Observations (Confirmed)
 
-### Two-Level Sprite Selection Hierarchy
+Both causal bytes share these properties:
+1. **Both are read by SA-1**, not S-CPU (confirmed via CPU-specific callback registration)
+2. **Both steer a decode/build process**, not a simple pointer-to-blob copy
+   (25-29% of staging buffer changes, across many scattered/contiguous regions)
+3. **Ablation produces identity-matched payload_hash flips** (deterministic selection, not corruption)
 
-| Role | Address | Diff Pattern | VRAM Targets |
-|------|---------|--------------|--------------|
-| **Batch selector** | 0xE93AEB | 35 ranges, 384B largest | Multiple (0x4Cxx, 0x4Fxx) |
-| **Variant selector** | 0xE9E667 | 85 ranges, 139B largest | Single (0x58E0) |
+The structural differences:
 
+| Metric | 0xE9E667 | 0xE93AEB |
+|--------|----------|----------|
+| Flips | 17 | 3-5 |
+| Diff bytes | 516 (25.2%) | 601 (29.4%) |
+| Diff ranges | 85 | 35 |
+| Largest range | 139B | 384B |
+| VRAM targets | Single (0x58E0) | Multiple (0x4Cxx, 0x4Fxx) |
+| Flip cadence | 4-frame (1795, 1799, 1803...) | Irregular (1681, 1684, 1760...) |
+
+### Working Hypothesis (Unproven)
+
+The diff patterns suggest a **two-level selection hierarchy**:
+- **0xE93AEB**: Fewer ranges but larger contiguous blocks → possibly affects an earlier/broader
+  decision (which command stream, base template, or major decoder path)
+- **0xE9E667**: More ranges but smaller scattered edits, 4-frame cadence → possibly affects a
+  more granular decision (animation frame, streaming subset, patch operations)
+
+**Why this is not yet proven:**
+1. Range count vs size could be an artifact of how the builder writes memory (templates vs patches)
+2. Neither byte is tied to a specific semantic field (index? opcode? pointer? length?)
+
+### Experiments to Prove/Disprove Hierarchy
+
+**A) Diff consistency across flips:**
+Compare diffs at multiple flip frames for the same byte. If patterns are consistent
+across occurrences, it's deterministic selection logic, not drift.
+
+```batch
+REM E9E667: compare frame 1795 vs 1799 (same cadence slot)
+run_wram_diff.bat ablated 0xE9E667 1795
+run_wram_diff.bat ablated 0xE9E667 1799
+
+REM E93AEB: compare frame 1681 vs 1769
+run_wram_diff.bat ablated 0xE93AEB 1681
+run_wram_diff.bat ablated 0xE93AEB 1769
 ```
-Sprite Loading Flow:
-ROM 0xE93AEB (SA-1) → batch/set selector
-  → determines which sprite group to load
-  → affects WRAM 0x7E2040, multiple VRAM regions
 
-ROM 0xE9E667 (SA-1) → variant/frame selector
-  → determines frame/variant within batch
-  → affects WRAM 0x7E2000, single VRAM region (0x58E0)
-```
+**B) Log ROM reads following causal byte (killer experiment):**
+After the SA-1 reads the causal byte, log the next N PRG reads until staging DMA.
+This reveals whether the byte is used as:
+- **Index**: Read, then table lookup nearby
+- **Opcode**: Read, then branch/conditional logic
+- **Pointer part**: Read, then far jump to computed address
+- **Length**: Read, then sequential streaming of N bytes
+
+This is the definitive test to understand the byte's semantic role
 
 **Remaining targets for bisection:**
 | Address | Flips | Status |

@@ -67,11 +67,44 @@ to WRAM sources).
 
 ---
 
+## [2.33.0] - 2026-01-03
+
+### Observation vs Hypothesis Separation
+
+**Correction:** v2.32 overstated confidence in "two-level hierarchy" interpretation.
+The diff patterns are real, but the semantic interpretation requires validation.
+
+**What is CONFIRMED:**
+1. Both 0xE9E667 and 0xE93AEB are minimal causal bytes (1-byte ablation → hash flip)
+2. Both are read by SA-1, not S-CPU
+3. Both steer a decode/build process (25-29% of staging buffer changes)
+4. Ablation produces identity-matched flips (deterministic selection, not corruption)
+
+**Structural differences (OBSERVED, not INTERPRETED):**
+
+| Metric | 0xE9E667 | 0xE93AEB |
+|--------|----------|----------|
+| Diff ranges | 85 | 35 |
+| Largest range | 139B | 384B |
+| VRAM targets | Single (0x58E0) | Multiple (0x4Cxx, 0x4Fxx) |
+| Flip cadence | 4-frame regular | Irregular |
+
+**HYPOTHESIS (unproven):** These represent a two-level selection hierarchy where
+0xE93AEB affects broader decisions and 0xE9E667 affects narrower decisions.
+
+**Why not yet proven:**
+- Range count vs size could be an artifact of how the builder writes memory
+- Neither byte is tied to a specific semantic field (index? opcode? pointer? length?)
+
+**Next experiment:** Log ROM reads following causal byte read to determine semantic role.
+
+---
+
 ## [2.32.0] - 2026-01-03
 
-### Comparative WRAM Diff: Two-Level Sprite Selection Hierarchy
+### Comparative WRAM Diff Analysis
 
-Ran WRAM diff analysis on both causal bytes to understand their roles:
+Ran WRAM diff analysis on both causal bytes:
 
 | Metric | 0xE9E667 | 0xE93AEB |
 |--------|----------|----------|
@@ -82,26 +115,9 @@ Ran WRAM diff analysis on both causal bytes to understand their roles:
 | VRAM targets | Single (0x58E0) | Multiple (0x4C00, 0x4F20, 0x4F40, 0x4F60) |
 | Source addr | 0x7E2000 | 0x7E2040 |
 
-**Key Discovery: Two-Level Hierarchy**
-
-Both bytes are batch selectors, but at **different hierarchy levels**:
-
-- **0xE93AEB** (higher level): Fewer but larger contiguous changes (384B block).
-  Selects entire sprite set. Affects multiple VRAM destinations.
-
-- **0xE9E667** (lower level): More but smaller scattered changes (85 ranges).
-  Selects variant/frame within a batch. Affects single VRAM destination repeatedly.
-
-**Sprite Loading Model:**
-```
-ROM 0xE93AEB (SA-1) → batch/set selector
-  → determines which sprite group to load
-  → affects multiple VRAM regions (0x4Cxx, 0x4Fxx)
-
-ROM 0xE9E667 (SA-1) → variant/frame selector
-  → determines which frame/variant within the batch
-  → affects single VRAM region (0x58E0) on 4-frame cadence
-```
+Both bytes trigger widespread staging buffer changes (not simple pointer swaps).
+The difference in range patterns suggests different roles, but semantic interpretation
+requires further experiment (see v2.33).
 
 ---
 
