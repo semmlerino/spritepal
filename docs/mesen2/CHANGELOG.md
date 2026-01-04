@@ -4,6 +4,30 @@ All notable changes to the sprite extraction pipeline documentation and tooling.
 
 ---
 
+## sprite_rom_finder.lua v24 - Hard Enforcement of Causal Rules (2026-01-04)
+
+### No More Footguns
+
+Eliminated all remaining code paths that could recreate idx=? session spam or break attribution.
+
+**Key changes:**
+- **Deleted unmatched session path**: `ALLOW_UNMATCHED_DP_PTR` removed entirely, not just off by default
+  - Log-only for unmatched DP pointers: "DBG DP ptr ... valid but no idx match"
+  - Impossible to accidentally re-enable session spam
+- **Runtime ptr_to_idx sync**: Table reads now update `ptr_to_idx[ptr] = idx`
+  - Closes gap where live reads wouldn't update reverse lookup
+- **Removed stale blanking**: Deleted `if stale then display_ptr = nil` block
+  - Age is not invalidation - old uploads still show full attribution
+  - Stale warning is now informational only, doesn't hide data
+
+**Why this matters:**
+- v23 left `ALLOW_UNMATCHED_DP_PTR` as a toggle (could be flipped during debugging)
+- v23 didn't sync `ptr_to_idx` in runtime table reads (small gap)
+- v23 kept stale blanking logic (could regress if `MAX_DMA_AGE` changed)
+- v24 makes these failure modes **impossible**, not just "off by default"
+
+---
+
 ## sprite_rom_finder.lua v23 - Strict Causal Attribution (2026-01-04)
 
 ### Pre-populated FE52 Table + Pure VRAM Attribution

@@ -22,6 +22,8 @@
 -- v21: allow unmatched DP ptr sessions + click-time closest-session override
 -- v22: optional stale DMA filter, avoid future-session overrides
 -- v22: fix click targeting (use relativeX/Y for PPU coords, fix OAM snapshot timing, add X-wrap)
+-- v23: pre-populate FE52 table at init, disable closest-session override, O(1) ptr->idx lookup
+-- v24: hard enforcement - delete unmatched session path, sync ptr_to_idx in runtime, remove stale blanking
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -223,8 +225,7 @@ local pending_dp = {}
 --------------------------------------------------------------------------------
 local RECENT_SESSIONS_MAX = 64   -- Max sessions in queue (increase for busy games)
 local SESSION_MATCH_WINDOW = 45  -- Frames to match DMA to session (increase for slow decode)
-local ALLOW_UNMATCHED_DP_PTR = false         -- Start sessions for DP ptrs not in idx table
-local UNMATCHED_SESSION_LOOKBACK = false     -- Avoid mass attribution for unmatched sessions
+-- v24: Removed ALLOW_UNMATCHED_DP_PTR - unmatched sessions are now impossible
 local CLICK_PREFER_CLOSEST_SESSION = false   -- v23: Use only direct vram_owner_map attribution
 local CLICK_SESSION_WINDOW = 60              -- Frames around DMA to search for nearest session
 local PREFER_IDX_KNOWN_SESSIONS = true       -- Prefer idx-known sessions over unmatched
@@ -433,6 +434,7 @@ local function make_on_table_read(cpu_name)
             local ptr = entry.lo + (entry.hi * 256) + (entry.bank * 65536)
             if is_valid_ptr(ptr) then
                 idx_database[idx] = { ptr = ptr, frame = frame_count }
+                ptr_to_idx[ptr] = idx  -- v24: Keep reverse map in sync
             end
             pending_tbl[key] = nil
         end
@@ -478,10 +480,8 @@ local function make_on_dp_write(cpu_name)
                     if matched_idx then
                         start_session(ptr, matched_idx, true)
                     else
+                        -- v24: Log-only, never start session for unmatched pointers
                         log(string.format("DBG DP ptr %s valid but no idx match", fmt_addr(ptr)))
-                        if ALLOW_UNMATCHED_DP_PTR then
-                            start_session(ptr, nil, UNMATCHED_SESSION_LOOKBACK)
-                        end
                     end
                 else
                     log(string.format("DBG DP ptr %s rejected as invalid", fmt_addr(ptr)))
@@ -1035,11 +1035,7 @@ local function on_left_click(mouse, coord_debug)
             override_age = age
         end
     end
-    if stale then
-        -- Keep the raw attribution in the log/panel but avoid emitting an offset by default
-        display_ptr = nil
-        display_file_offset = nil
-    end
+    -- v24: Removed stale blanking - age is not invalidation (attribution is still causal)
 
     selected_result = {
         sprite_index = spr.index,
@@ -1092,7 +1088,8 @@ local function on_left_click(mouse, coord_debug)
             log(string.format("upload age=%d frames", frame_count - source.upload_frame))
         end
         if stale then
-            log(string.format("STALE: upload age exceeds MAX_DMA_AGE (%d)", MAX_DMA_AGE))
+            -- v24: Just informational, doesn't affect attribution
+            log(string.format("NOTE: upload age (%d) exceeds MAX_DMA_AGE (%d) - tile reused from old upload", upload_age, MAX_DMA_AGE))
         end
         if display_ptr then
             if display_idx ~= nil then
@@ -1273,15 +1270,15 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v23")
+log("SPRITE ROM FINDER v24")
 log("========================================")
-log("v23: Strict causal attribution")
-log("  - Pre-populated FE52 table at init (no runtime timing issues)")
-log("  - Disabled closest-session override (pure vram_owner_map)")
-log("  - O(1) ptr->idx lookup via reverse map")
+log("v24: Hard enforcement of causal rules")
+log("  - Unmatched idx sessions now IMPOSSIBLE (not just off by default)")
+log("  - Runtime table reads update ptr_to_idx (no sync gaps)")
+log("  - Removed stale blanking (age is not invalidation)")
+log("  - Pre-populated FE52 table at init (deterministic)")
+log("  - Pure vram_owner_map attribution (no session guessing)")
 log("  - Cursor-tile attribution (flip-aware), base-tile fallback")
-log("  - Scroll/arrows cycle through candidates")
-log("  - HUD ignore toggle (Select button)")
 log("  - Bounding box overlay (Start button)")
 log("")
 log("LEFT-CLICK = lookup ROM offset for selected sprite")

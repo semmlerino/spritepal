@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v23)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v24)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,10 +11,12 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v23)
-- **Pre-populated FE52 table**: Reads all ~143 valid idx→ptr entries from ROM at init (deterministic, no timing issues)
+### Key implementation details (v24)
+- **Unmatched sessions impossible**: Deleted ALLOW_UNMATCHED_DP_PTR path entirely (not just off by default)
+- **Pre-populated FE52 table**: Reads all ~143 valid idx→ptr entries from ROM at init (deterministic)
 - **Pure VRAM attribution**: Click uses only `vram_owner_map` (no session guessing)
-- **O(1) ptr→idx lookup**: Reverse map `ptr_to_idx` for fast resolution
+- **O(1) ptr→idx lookup**: Reverse map `ptr_to_idx` for fast resolution (synced in runtime reads too)
+- **No stale blanking**: Age is not invalidation - old uploads still show attribution
 - **Flip-aware cursor tile**: Handles H-flip/V-flip for multi-tile sprites
 - **Click targeting fixes**: Uses `relativeX`/`relativeY` for accurate PPU coordinates
 - **X-wrap handling**: Sprites wrapping at screen edge are correctly detected
