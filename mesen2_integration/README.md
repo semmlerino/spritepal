@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v24)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v25)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,7 +11,11 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v24)
+### Key implementation details (v25)
+- **Multi-slot DP pointer tracking**: Watches 00:0002/0005/0008 (lo/hi/bank) for asset pointer caches
+- **Slot-preference attribution**: When multiple sessions overlap, 0x0002 beats 0x0005/0x0008
+- **FE52 off-by-one fix**: Prefill loop now clamps to avoid reading past table boundary
+- **PPU edge clamp**: Prevents relativeX/Y=1.0 from producing out-of-bounds coords
 - **Unmatched sessions impossible**: Deleted ALLOW_UNMATCHED_DP_PTR path entirely (not just off by default)
 - **Pre-populated FE52 table**: Reads all ~143 valid idx→ptr entries from ROM at init (deterministic)
 - **Pure VRAM attribution**: Click uses only `vram_owner_map` (no session guessing)
@@ -36,7 +40,7 @@ visible sprite → OAM entry → VRAM tile address → DMA tracking → idx sess
 - **DMA reg shadowing**: Captures $4300-$437F writes (post-DMA reads return garbage)
 - **VMADD shadowing**: Captures $2116/$2117 writes (reading registers returns garbage)
 - **Session queue**: 64-entry queue with 45-frame window (handles SA-1 decode latency)
-- **Look-back attribution**: When session starts, attributes DMAs from F-300 frames
+- **Look-back attribution**: When session starts, attributes DMAs from ~30 frames
 - **Persistent owner map**: `vram_owner_map` never purges - attribution survives indefinitely
 - **SA-1 full-bank mapping**: `file = (bank - 0xC0) * 0x10000 + addr`
 - **Staging-only fallback**: Only uses persistent owner for staging DMAs (prevents BG misattribution)
@@ -97,7 +101,7 @@ If you keep hitting HUD/ability icons instead of enemies:
 
 ### If "No attribution" appears
 - Sprite tiles were uploaded before any idx session was created
-- v13's look-back attribution (300 frames) usually catches these
+- v13's look-back attribution (~30 frames) usually catches these
 - If still unattributed: the sprite's tiles are very old or from a non-standard path
 - v13 staging-only fallback: if a BG/font DMA overwrote the tile, old attribution is hidden
 - **Fix**: Let game run until sprite despawns and respawns, then click again

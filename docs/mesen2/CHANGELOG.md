@@ -4,6 +4,30 @@ All notable changes to the sprite extraction pipeline documentation and tooling.
 
 ---
 
+## sprite_rom_finder.lua v25 - Slot Preference + Correctness Fixes (2026-01-04)
+
+### Forward Attribution Slot Preference
+
+When multiple DP pointer sessions complete near each other, the "most recent" heuristic could misattribute.
+Now uses slot preference: 0x0002 (canonical DP cache) beats 0x0005 and 0x0008.
+
+**Key changes:**
+- **Slot-preference attribution**: `SLOT_RANK = { [0x0002]=1, [0x0005]=2, [0x0008]=3 }`
+  - `match_recent_session()` now picks best slot among known-idx sessions
+  - Prevents interleaved sessions from stealing each other's DMAs
+- **FE52 prefill off-by-one fix**: Loop could read past table boundary
+  - Old: `max_idx = floor((END - BASE) / 3)` → could produce idx=143 reading 01:FFFF+2
+  - New: `max_idx = floor((END - BASE + 1) / 3) - 1` → stops at last complete entry
+- **PPU coords edge clamp**: `relativeX/Y = 1.0` could produce out-of-bounds coords
+  - Added `ppu_x = min(ppu_x, ppu_width - 1)` clamping
+
+**Why this matters:**
+- Multi-slot tracking (v25 earlier) introduced more session overlap
+- Without slot preference, the "wrong" session could claim staging DMAs
+- The off-by-one could poison `ptr_to_idx` with garbage pointers
+
+---
+
 ## sprite_rom_finder.lua v24 - Hard Enforcement of Causal Rules (2026-01-04)
 
 ### No More Footguns

@@ -1,4 +1,4 @@
--- sprite_rom_finder.lua v22
+-- sprite_rom_finder.lua v25
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset (topmost wins)
@@ -24,6 +24,7 @@
 -- v22: fix click targeting (use relativeX/Y for PPU coords, fix OAM snapshot timing, add X-wrap)
 -- v23: pre-populate FE52 table at init, disable closest-session override, O(1) ptr->idx lookup
 -- v24: hard enforcement - delete unmatched session path, sync ptr_to_idx in runtime, remove stale blanking
+-- v25: DP slot tracking, slot-preference attribution, FE52 off-by-one fix, PPU edge clamp
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -205,7 +206,9 @@ end
 local TABLE_CPU_BASE = 0x01FE52
 local TABLE_CPU_END = 0x01FFFF
 local ENTRY_SIZE = 3
-local DP_PTR_BASE = 0x0002
+-- DP pointer cache slots (lo/hi/bank), see docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md
+local DP_PTR_SLOTS = {0x0002, 0x0005, 0x0008}
+local DP_PTR_SLOT_SIZE = 3
 
 -- v11 FIX: Remove 0x7E from valid banks - WRAM pointers would pollute attribution
 -- v18 FIX: Expand to full C0-FF range (was missing C4-CF, D0-DF, F0-FF)
@@ -218,6 +221,13 @@ local idx_database = {}
 local ptr_to_idx = {}   -- v23: Reverse lookup from ptr -> idx for fast resolution
 local pending_tbl = {}
 local pending_dp = {}
+
+local DP_PTR_SLOT_BY_OFFSET = {}
+for _, base in ipairs(DP_PTR_SLOTS) do
+    for i = 0, DP_PTR_SLOT_SIZE - 1 do
+        DP_PTR_SLOT_BY_OFFSET[base + i] = base
+    end
+end
 
 --------------------------------------------------------------------------------
 -- v19: TUNEABLE PARAMETERS
@@ -232,7 +242,7 @@ local PREFER_IDX_KNOWN_SESSIONS = true       -- Prefer idx-known sessions over u
 local CLICK_SESSION_ONLY_BEFORE_DMA = true   -- Do not override with sessions after DMA
 local MAX_DMA_AGE = 0                        -- Max age (frames) for click attribution; 0 disables
 local RECENT_STAGING_MAX = 128   -- Max staging DMAs to track (increase if queue overflows)
-local LOOKBACK_WINDOW = 300      -- Frames to look back at session start (increase for preloaded tiles)
+local LOOKBACK_WINDOW = 30       -- Frames to look back at session start (smaller reduces false attribution)
 
 -- Staging WRAM buffer range for Kirby Super Star
 -- Adjust for other SA-1 games if they use a different decompression buffer
@@ -262,7 +272,9 @@ end
 -- v23: Pre-populate idx_database from ROM at init (deterministic, no runtime timing issues)
 -- FE52 table format: 3 bytes per entry (lo, hi, bank) -> 24-bit ROM pointer
 local function populate_idx_database_from_rom()
-    local max_idx = math.floor((TABLE_CPU_END - TABLE_CPU_BASE) / ENTRY_SIZE)
+    -- v25: Fix off-by-one - last valid entry must fit entirely within table bounds
+    local bytes = (TABLE_CPU_END - TABLE_CPU_BASE + 1)
+    local max_idx = math.floor(bytes / ENTRY_SIZE) - 1
     local count = 0
 
     for idx = 0, max_idx do
@@ -302,17 +314,22 @@ local function write_vram_attribution(entry, idx, ptr, file_off)
     end
 end
 
-local function start_session(ptr, idx, enable_lookback)
+local function start_session(ptr, idx, enable_lookback, slot_base, cpu_name)
     session_counter = session_counter + 1
     stats.sessions_started = stats.sessions_started + 1
     local idx_str = idx ~= nil and tostring(idx) or "?"
-    log(string.format("DBG START_SESSION idx=%s ptr=%s frame=%d", idx_str, fmt_addr(ptr), frame_count))
+    local slot_str = slot_base and string.format(" slot=%04X", slot_base) or ""
+    local cpu_str = cpu_name and string.format(" cpu=%s", cpu_name) or ""
+    log(string.format("DBG START_SESSION idx=%s ptr=%s frame=%d%s%s",
+        idx_str, fmt_addr(ptr), frame_count, slot_str, cpu_str))
     table.insert(recent_sessions, {
         id = session_counter,
         ptr = ptr,
         idx = idx,
         frame = frame_count,
         idx_known = (idx ~= nil),
+        slot = slot_base,
+        cpu = cpu_name,
     })
     if #recent_sessions > RECENT_SESSIONS_MAX then
         table.remove(recent_sessions, 1)
@@ -352,24 +369,35 @@ local function start_session(ptr, idx, enable_lookback)
     end
 end
 
--- Pick most recent session within window (iterate backwards, break early)
+-- v25: Slot preference for forward attribution (0x0002 = canonical DP cache, beats 0x0005/0x0008)
+-- When multiple pointers complete near each other, prefer the primary slot
+local SLOT_RANK = { [0x0002] = 1, [0x0005] = 2, [0x0008] = 3 }
+
+-- Pick best session within window (prefer primary slot, then idx_known, then most recent)
 local function match_recent_session()
-    local fallback = nil
+    local best = nil
+    local best_rank = 999
     for i = #recent_sessions, 1, -1 do
         local s = recent_sessions[i]
-        if (frame_count - s.frame) <= SESSION_MATCH_WINDOW then
-            if PREFER_IDX_KNOWN_SESSIONS and s.idx_known then
-                return s
-            end
-            if not fallback then
-                fallback = s
-            end
-        else
+        local age = frame_count - s.frame
+        if age > SESSION_MATCH_WINDOW then
             -- older than window; list is chronological, stop early
             break
         end
+
+        -- v25: Rank by slot preference (lower = better)
+        local rank = SLOT_RANK[s.slot] or 999
+        if s.idx_known and rank < best_rank then
+            best = s
+            best_rank = rank
+            -- Short-circuit: if we found primary slot with known idx, can't do better
+            if best_rank == 1 then return best end
+        elseif not best then
+            -- Fallback to any session if none with known idx yet
+            best = s
+        end
     end
-    return fallback
+    return best
 end
 
 local function find_closest_session(dma_frame)
@@ -453,11 +481,14 @@ local function make_on_dp_write(cpu_name)
         if lo > 0x00FF then return nil end
 
         local offset = lo
-        if offset < DP_PTR_BASE or offset > DP_PTR_BASE + 2 then return nil end
+        local slot_base = DP_PTR_SLOT_BY_OFFSET[offset]
+        if not slot_base then return nil end
 
         if not pending_dp[cpu_name] then pending_dp[cpu_name] = {} end
-        local pending = pending_dp[cpu_name]
-        local byte_pos = offset - DP_PTR_BASE
+        local pending_slots = pending_dp[cpu_name]
+        if not pending_slots[slot_base] then pending_slots[slot_base] = {} end
+        local pending = pending_slots[slot_base]
+        local byte_pos = offset - slot_base
 
         if byte_pos == 0 then pending.lo = value; pending.lo_frame = frame_count
         elseif byte_pos == 1 then pending.hi = value; pending.hi_frame = frame_count
@@ -472,13 +503,13 @@ local function make_on_dp_write(cpu_name)
                 local ptr = pending.lo + (pending.hi * 256) + (pending.bank * 65536)
                 -- DEBUG: Log every completed DP pointer write
                 stats.dp_ptr_complete = stats.dp_ptr_complete + 1
-                log(string.format("DBG DP ptr complete: %02X:%04X frame=%d",
-                    pending.bank, pending.hi * 256 + pending.lo, frame_count))
+                log(string.format("DBG DP ptr complete: slot=%04X %02X:%04X frame=%d cpu=%s",
+                    slot_base, pending.bank, pending.hi * 256 + pending.lo, frame_count, cpu_name))
 
                 if is_valid_ptr(ptr) then
                     local matched_idx = ptr_to_idx[ptr]  -- v23: O(1) lookup
                     if matched_idx then
-                        start_session(ptr, matched_idx, true)
+                        start_session(ptr, matched_idx, true, slot_base, cpu_name)
                     else
                         -- v24: Log-only, never start session for unmatched pointers
                         log(string.format("DBG DP ptr %s valid but no idx match", fmt_addr(ptr)))
@@ -486,7 +517,7 @@ local function make_on_dp_write(cpu_name)
                 else
                     log(string.format("DBG DP ptr %s rejected as invalid", fmt_addr(ptr)))
                 end
-                pending_dp[cpu_name] = {}
+                pending_slots[slot_base] = {}
             end
         end
         return nil
@@ -774,6 +805,10 @@ local function get_ppu_coords(mouse)
 
         local ppu_x = math.floor(mouse.relativeX * ppu_width)
         local ppu_y = math.floor(mouse.relativeY * ppu_height)
+
+        -- v25: Clamp to valid range (relativeX/Y=1.0 can produce out-of-bounds)
+        ppu_x = math.min(ppu_x, ppu_width - 1)
+        ppu_y = math.min(ppu_y, ppu_height - 1)
 
         return ppu_x, ppu_y, {
             raw_x = mouse.x, raw_y = mouse.y,
@@ -1270,8 +1305,13 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v24")
+log("SPRITE ROM FINDER v25")
 log("========================================")
+log("v25: Slot-preference attribution + correctness fixes")
+log("  - Tracks DP pointer slots 00:0002 / 00:0005 / 00:0008")
+log("  - Slot-preference in forward attribution (0x0002 beats 0x0005/0x0008)")
+log("  - Fixed FE52 prefill off-by-one (last entry could read past table)")
+log("  - Clamped PPU coords to prevent edge weirdness")
 log("v24: Hard enforcement of causal rules")
 log("  - Unmatched idx sessions now IMPOSSIBLE (not just off by default)")
 log("  - Runtime table reads update ptr_to_idx (no sync gaps)")
@@ -1281,6 +1321,13 @@ log("  - Pure vram_owner_map attribution (no session guessing)")
 log("  - Cursor-tile attribution (flip-aware), base-tile fallback")
 log("  - Bounding box overlay (Start button)")
 log("")
+do
+    local slots = {}
+    for _, base in ipairs(DP_PTR_SLOTS) do
+        table.insert(slots, string.format("%04X", base))
+    end
+    log("DP slots: " .. table.concat(slots, ", "))
+end
 log("LEFT-CLICK = lookup ROM offset for selected sprite")
 log("SCROLL/ARROWS = cycle through candidates under cursor")
 log("SELECT = toggle HUD ignore (y < 32)")
