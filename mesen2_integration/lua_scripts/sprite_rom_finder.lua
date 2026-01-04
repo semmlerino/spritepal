@@ -1,4 +1,4 @@
--- sprite_rom_finder.lua v12
+-- sprite_rom_finder.lua v13
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset
@@ -8,6 +8,7 @@
 -- v10: comprehensive pipeline counters to diagnose attribution failure
 -- v11: persistent vram_owner_map + look-back attribution on session start
 -- v12: fixed cpu_to_file_offset for full-bank SA-1 mapping (E9:3AEB was failing)
+-- v13: staging-only owner fallback, CPU-keyed pending_tbl, cached debug counts
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -199,6 +200,10 @@ local STAGING_END = 0x7E2FFF
 local LOOKBACK_WINDOW = 300  -- frames to look back when session starts
 -- Note: forward attribution is handled by match_recent_session() in on_dma_enable()
 
+-- v13: Cached counts for draw_debug_info (avoids expensive pairs() every frame)
+local cached_counts = { vram = 0, owner = 0, idx = 0, last_frame = -1 }
+local COUNT_CACHE_INTERVAL = 30  -- update counts every N frames
+
 local function is_valid_ptr(ptr)
     local bank = (ptr >> 16) & 0xFF
     if not VALID_BANKS[bank] then return false end
@@ -280,37 +285,44 @@ local function match_recent_session()
     return nil
 end
 
-local function on_table_read(addr, value)
-    -- DEBUG: Count every table read
-    stats.table_reads = stats.table_reads + 1
-    if (stats.table_reads % 2000) == 0 then
-        local c = 0
-        for _ in pairs(idx_database) do c = c + 1 end
-        log(string.format("DBG table_reads=%d idx_db=%d", stats.table_reads, c))
-    end
-
-    local offset_from_base = addr - TABLE_CPU_BASE
-    local idx = math.floor(offset_from_base / ENTRY_SIZE)
-    local byte_pos = offset_from_base % ENTRY_SIZE
-
-    if not pending_tbl[idx] then
-        pending_tbl[idx] = {lo = nil, hi = nil, bank = nil, frame = frame_count}
-    end
-
-    local entry = pending_tbl[idx]
-    if byte_pos == 0 then entry.lo = value
-    elseif byte_pos == 1 then entry.hi = value
-    elseif byte_pos == 2 then entry.bank = value
-    end
-
-    if entry.lo and entry.hi and entry.bank then
-        local ptr = entry.lo + (entry.hi * 256) + (entry.bank * 65536)
-        if is_valid_ptr(ptr) then
-            idx_database[idx] = { ptr = ptr, frame = frame_count }
+-- v13 FIX: Factory function to create CPU-specific table_read callbacks
+-- This prevents interleaving if both CPUs read the same idx (keys by cpu:idx)
+local function make_on_table_read(cpu_name)
+    return function(addr, value)
+        -- DEBUG: Count every table read
+        stats.table_reads = stats.table_reads + 1
+        if (stats.table_reads % 2000) == 0 then
+            local c = 0
+            for _ in pairs(idx_database) do c = c + 1 end
+            log(string.format("DBG table_reads=%d idx_db=%d", stats.table_reads, c))
         end
-        pending_tbl[idx] = nil
+
+        local offset_from_base = addr - TABLE_CPU_BASE
+        local idx = math.floor(offset_from_base / ENTRY_SIZE)
+        local byte_pos = offset_from_base % ENTRY_SIZE
+
+        -- v13: Key by cpu_name:idx to prevent cross-CPU contamination
+        local key = cpu_name .. ":" .. idx
+
+        if not pending_tbl[key] then
+            pending_tbl[key] = {lo = nil, hi = nil, bank = nil, frame = frame_count}
+        end
+
+        local entry = pending_tbl[key]
+        if byte_pos == 0 then entry.lo = value
+        elseif byte_pos == 1 then entry.hi = value
+        elseif byte_pos == 2 then entry.bank = value
+        end
+
+        if entry.lo and entry.hi and entry.bank then
+            local ptr = entry.lo + (entry.hi * 256) + (entry.bank * 65536)
+            if is_valid_ptr(ptr) then
+                idx_database[idx] = { ptr = ptr, frame = frame_count }
+            end
+            pending_tbl[key] = nil
+        end
+        return nil
     end
-    return nil
 end
 
 -- FIX #2: Only match bank 00, address < 0x100 for DP writes
@@ -506,8 +518,10 @@ local function lookup_sprite_source(spr)
 
     if entry then
         -- v11: If entry has no attribution, check vram_owner_map
+        -- v13 FIX: Only use owner fallback for staging entries - non-staging
+        -- DMAs (BG/font) may have overwritten the sprite data
         local idx, ptr, file_offset = entry.idx, entry.ptr, entry.file_offset
-        if not idx then
+        if not idx and entry.is_staging then
             local owner = vram_owner_map[actual_key]
             if owner then
                 idx = owner.idx
@@ -602,23 +616,29 @@ local function draw_debug_info(mouse)
         if is_visible(spr) then visible_count = visible_count + 1 end
     end
 
-    local vram_count = 0
-    for _ in pairs(vram_upload_map) do vram_count = vram_count + 1 end
+    -- v13: Use cached counts, refresh periodically (avoids expensive pairs() every frame)
+    if frame_count - cached_counts.last_frame >= COUNT_CACHE_INTERVAL then
+        local vram_count = 0
+        for _ in pairs(vram_upload_map) do vram_count = vram_count + 1 end
+        local owner_count = 0
+        for _ in pairs(vram_owner_map) do owner_count = owner_count + 1 end
+        local idx_count = 0
+        for _ in pairs(idx_database) do idx_count = idx_count + 1 end
 
-    local owner_count = 0
-    for _ in pairs(vram_owner_map) do owner_count = owner_count + 1 end
-
-    local idx_count = 0
-    for _ in pairs(idx_database) do idx_count = idx_count + 1 end
+        cached_counts.vram = vram_count
+        cached_counts.owner = owner_count
+        cached_counts.idx = idx_count
+        cached_counts.last_frame = frame_count
+    end
 
     emu.drawString(170, 4, string.format("(%d,%d)", mouse.x, mouse.y), 0x888888, 0x00000000)
     emu.drawString(170, 13, string.format("spr:%d", visible_count), 0x888888, 0x00000000)
-    emu.drawString(170, 22, string.format("vram:%d", vram_count), 0x888888, 0x00000000)
+    emu.drawString(170, 22, string.format("vram:%d", cached_counts.vram), 0x888888, 0x00000000)
     emu.drawString(170, 31, string.format("f:%d", frame_count), 0x888888, 0x00000000)
     -- Diagnostic: idx_database entries and session count
-    emu.drawString(170, 40, string.format("idx:%d", idx_count), 0x00FF00, 0x00000000)
+    emu.drawString(170, 40, string.format("idx:%d", cached_counts.idx), 0x00FF00, 0x00000000)
     emu.drawString(170, 49, string.format("ses:%d", #recent_sessions), 0x00FF00, 0x00000000)
-    emu.drawString(170, 58, string.format("own:%d", owner_count), 0xFF00FF, 0x00000000)
+    emu.drawString(170, 58, string.format("own:%d", cached_counts.owner), 0xFF00FF, 0x00000000)
 end
 
 local function on_left_click(mouse)
@@ -758,7 +778,7 @@ for _, cpu in ipairs({snes_cpu, sa1_cpu}) do
         local cpu_name = (cpu == snes_cpu) and "snes" or "sa1"
 
         local ok1, err1 = pcall(function()
-            emu.addMemoryCallback(on_table_read, emu.callbackType.read,
+            emu.addMemoryCallback(make_on_table_read(cpu_name), emu.callbackType.read,
                 TABLE_CPU_BASE, TABLE_CPU_END, cpu, emu.memType.snesMemory)
         end)
         log(string.format("DEBUG: table_read callback (%s): %s %s",
