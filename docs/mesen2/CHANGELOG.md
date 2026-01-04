@@ -4,6 +4,32 @@ All notable changes to the sprite extraction pipeline documentation and tooling.
 
 ---
 
+## sprite_rom_finder.lua v11 - Persistent Attribution (2026-01-04)
+
+### Look-back Attribution + Persistent Owner Map
+
+Fixed the "DMA not attributed to idx session" issue for sprites uploaded before session tracking starts.
+
+**Key changes:**
+- **`vram_owner_map`**: Persistent attribution keyed by VRAM word - never purges
+- **Look-back attribution**: When session starts, scans DMAs from F-300 to F+6 frames
+- **Strict mode guard**: Catches Lua forward-reference bugs at runtime
+- **Removed 0x7E from VALID_BANKS**: Prevents WRAM pointer pollution
+
+**Technical fix:**
+The v10 scoping bug was caused by Lua binding function references at definition time.
+Functions defined before `local vram_owner_map = {}` would bind to a global (nil),
+not the later local. Fixed by forward-declaring all VRAM tables before functions.
+
+**New debug stats:**
+- `lkbk=N` in periodic logs shows look-back attributions
+- `own:N` on screen shows persistent owner map entries
+
+**Result:** Clicking any sprite now returns its ROM offset, even if tiles were
+uploaded hundreds of frames before the idx session was created.
+
+---
+
 ## v3.0 - Per-idx Ablation Proof Complete (2026-01-03)
 
 ### Causal Chain PROVEN: idx → ROM[ptr] → staging → VRAM
