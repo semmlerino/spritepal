@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v25)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v31)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,13 +11,24 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v25)
+### Key implementation details (v31)
+- **Unmatched sessions**: Optional sessions for valid DP ptrs not in FE52 table (see `ALLOW_UNMATCHED_DP_PTR`)
+- **Session dedup**: Skips duplicate pointer sessions within a short window
+- **Safe draw clamps**: OAM boxes and hover highlights are clamped to screen bounds
+- **Wider lookback**: Default lookback window raised to 90 frames for slow decode cases
+- **Larger staging queue**: Tracks 512 staging DMAs to avoid evicting older uploads
+- **Session boundary guard**: Optionally skips lookback DMAs from earlier sessions
+- **Crash guards**: All callbacks and `on_frame` are wrapped; errors log a stack trace and disable tracking
+- **Safe varargs**: Wrapper forwards callback args safely (fixes Lua vararg error)
+- **Delayed activation**: Tracking/UI starts at `ACTIVATE_AT_FRAME` (default 500) to avoid early slowdown
+- **Safe state fallback**: `emu.getState()` guarded to avoid early-frame nil crashes
+- **Guarded inputs**: OAM reads and mouse state are skipped if unavailable (prevents nil crashes)
 - **Multi-slot DP pointer tracking**: Watches 00:0002/0005/0008 (lo/hi/bank) for asset pointer caches
 - **Slot-preference attribution**: When multiple sessions overlap, 0x0002 beats 0x0005/0x0008
 - **FE52 off-by-one fix**: Prefill loop now clamps to avoid reading past table boundary
 - **PPU edge clamp**: Prevents relativeX/Y=1.0 from producing out-of-bounds coords
 - **Unmatched sessions impossible**: Deleted ALLOW_UNMATCHED_DP_PTR path entirely (not just off by default)
-- **Pre-populated FE52 table**: Reads all ~143 valid idx→ptr entries from ROM at init (deterministic)
+- **Pre-populated FE52 table**: Reads all ~143 valid idx→ptr entries from ROM at activation (deterministic)
 - **Pure VRAM attribution**: Click uses only `vram_owner_map` (no session guessing)
 - **O(1) ptr→idx lookup**: Reverse map `ptr_to_idx` for fast resolution (synced in runtime reads too)
 - **No stale blanking**: Age is not invalidation - old uploads still show attribution
@@ -56,6 +67,7 @@ run_sprite_rom_finder.bat
 ```
 
 1. **Wait** for movie to reach gameplay (sprites loading)
+   - By default, tracking starts at frame 500 (`ACTIVATE_AT_FRAME` in the script)
 2. **Pause** (Space or P) when target sprite is visible
 3. **Hover** cursor over target sprite (see candidate list)
 4. **Cycle** with scroll wheel or arrows if multiple sprites overlap
@@ -110,25 +122,20 @@ If you keep hitting HUD/ability icons instead of enemies:
 
 ## 🎯 Quick Start (Manual Method)
 
-### 1. Interactive Guided Workflow
+### 1. Direct Extraction (when you have a ROM offset)
 ```bash
-python trace_sprite_guide.py
-```
-This walks you through the entire process step-by-step.
-
-### 2. Direct Extraction (when you have a SNES address)
-```bash
-# Extract from a specific SNES address
-python mesen2_sprite_extractor.py $95:B000
-
-# Scan nearby if exact offset fails
-python mesen2_sprite_extractor.py $95:B000 --scan
+# Extract from a specific ROM offset (from sprite_rom_finder.lua)
+uv run python scripts/extract_rom_sprite.py \
+    --rom "roms/Kirby Super Star (USA).sfc" \
+    --offset 0x3C6EF1 \
+    --output extracted_sprites/ \
+    --name my_sprite
 ```
 
-### 3. Batch Extraction (multiple sprites)
+### 2. Batch Extraction (multiple sprites)
 ```bash
 # Process multiple sprites from a file
-python batch_sprite_extractor.py known_sprites.json
+uv run python mesen2_integration/batch_sprite_extractor.py known_sprites.json
 ```
 
 ## 📖 Complete Workflow
@@ -176,37 +183,34 @@ Check DMA registers:
 
 ### Step 6: Extract Sprite
 ```bash
-python mesen2_sprite_extractor.py $XX:YYYY
+# Convert SNES address to ROM offset, then extract
+# For SA-1 HiROM (Kirby): file = (bank - 0xC0) * 0x10000 + addr
+# Example: $E9:E667 → (0xE9 - 0xC0) * 0x10000 + 0xE667 = 0x29E667
+
+uv run python scripts/extract_rom_sprite.py \
+    --rom "roms/Kirby Super Star (USA).sfc" \
+    --offset 0x29E667 \
+    --output extracted_sprites/
 ```
 
 ## 🛠️ Tools Overview
 
-### `mesen2_sprite_extractor.py`
+### `scripts/extract_rom_sprite.py`
 Main extraction tool that:
-- Converts SNES addresses to ROM offsets
 - Decompresses HAL data with exhal
 - Converts 4bpp tiles to PNG
-- Supports nearby offset scanning
+- Saves metadata JSON
 
 **Usage:**
 ```bash
-python mesen2_sprite_extractor.py $95:B000 [--scan] [--range 32]
+uv run python scripts/extract_rom_sprite.py \
+    --rom "roms/Kirby Super Star (USA).sfc" \
+    --offset 0x3C6EF1 \
+    --output extracted_sprites/ \
+    --name sprite_name
 ```
 
-### `trace_sprite_guide.py`
-Interactive guide that:
-- Walks through each debugging step
-- Validates inputs
-- Saves trace logs
-- Launches extractor automatically
-
-**Usage:**
-```bash
-python trace_sprite_guide.py
-# Follow the prompts
-```
-
-### `batch_sprite_extractor.py`
+### `mesen2_integration/batch_sprite_extractor.py`
 Batch processor that:
 - Extracts multiple sprites at once
 - Generates HTML report with previews
@@ -230,8 +234,8 @@ $C0:0000 Kirby # Main character
 
 **Usage:**
 ```bash
-python batch_sprite_extractor.py sprites.json
-python batch_sprite_extractor.py addresses.txt --report my_sprites
+uv run python mesen2_integration/batch_sprite_extractor.py sprites.json
+uv run python mesen2_integration/batch_sprite_extractor.py addresses.txt --report my_sprites
 ```
 
 ## 📊 Known Sprites
@@ -278,8 +282,8 @@ extracted_sprites/
 
 ### "Decompressed to 0 bytes"
 - Invalid compressed data at offset
-- Try `--scan` to search nearby
-- Verify address with Mesen 2
+- Try nearby offsets (±1 to ±16 bytes)
+- Verify address with sprite_rom_finder.lua in Mesen 2
 
 ### "Output would exceed 64KB"
 - Some sprites are > 64KB
@@ -305,24 +309,26 @@ extracted_sprites/
 ## ✨ Example Session
 
 ```bash
-# 1. Use guided workflow
-$ python trace_sprite_guide.py
-> Which sprite? Cappy
-> VRAM address? $1E00
-> SNES address found? $95:B000
+# 1. Run sprite_rom_finder.lua in Mesen2
+# Double-click run_sprite_rom_finder.bat
+# Click on sprite -> get ROM offset (e.g., FILE: 0x3C6EF1)
 
 # 2. Extract sprite
-$ python mesen2_sprite_extractor.py $95:B000
-ROM loaded: Kirby Super Star (USA).sfc (4,194,304 bytes)
-SNES Address: $95:B000
-ROM Offset: 0x0AB000
-Extracting from ROM offset 0x0AB000...
-✓ Decompressed 2,048 bytes (64 tiles)
-✓ Created sprite_0AB000.png
+$ uv run python scripts/extract_rom_sprite.py \
+    --rom "roms/Kirby Super Star (USA).sfc" \
+    --offset 0x3C6EF1 \
+    --output extracted_sprites/ \
+    --name cappy
+
+Decompressing from offset 0x3C6EF1...
+Decompressed: 22528 bytes
+Raw data saved: extracted_sprites/cappy.bin
+PNG saved: extracted_sprites/cappy.png (704 tiles)
+Metadata saved: extracted_sprites/cappy_metadata.json
 
 # 3. View results
 $ ls extracted_sprites/
-sprite_0AB000.bin  sprite_0AB000.png  trace_logs/
+cappy.bin  cappy.png  cappy_metadata.json
 ```
 
 ---
