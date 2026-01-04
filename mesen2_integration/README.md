@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v11)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v12)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,13 +11,13 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v11)
+### Key implementation details (v12)
 - **DMA reg shadowing**: Captures $4300-$437F writes (post-DMA reads return garbage)
 - **VMADD shadowing**: Captures $2116/$2117 writes (reading registers returns garbage)
 - **Session queue**: 64-entry queue with 45-frame window (handles SA-1 decode latency)
-- **Look-back attribution**: When session starts, attributes DMAs from F-300 to F+6 frames
+- **Look-back attribution**: When session starts, attributes DMAs from F-300 frames
 - **Persistent owner map**: `vram_owner_map` never purges - attribution survives indefinitely
-- **SA-1 LoROM mapping**: `file = (bank - 0xC0) * 0x8000 + (addr - 0x8000)`
+- **SA-1 full-bank mapping**: `file = (bank - 0xC0) * 0x10000 + addr` (v12 fix for E9:3AEB etc)
 - **Strict mode guard**: Catches Lua global variable bugs at runtime
 - **Debug diagnostics**: Shows `idx:N`, `ses:N`, and `own:N` counters on screen
 
@@ -48,10 +48,10 @@ run_sprite_rom_finder.bat
 - `f:N` - frame count
 - `idx:N` - entries in idx_database (table reads working?)
 - `ses:N` - sessions in queue (DP writes matching?)
-- `own:N` - VRAM words with persistent attribution (v11)
+- `own:N` - VRAM words with persistent attribution
 
 ### Technical details
-- **SA-1 LoROM mapping**: `file = (bank - 0xC0) * 0x8000 + (addr - 0x8000)`
+- **SA-1 full-bank mapping**: `file = (bank - 0xC0) * 0x10000 + addr` (full 64KB banks)
 - **Session tracking**: Watches `01:FE52` table reads and `00:0002` DP writes
 - **DMA attribution**: Only tags staging WRAM (7E:2000-2FFF) → VRAM transfers
 - **VMADD shadow**: Captures $2116/$2117 writes (register readback is unreliable)
@@ -59,7 +59,7 @@ run_sprite_rom_finder.bat
 
 ### If "No attribution" appears
 - Sprite tiles were uploaded before any idx session was created
-- v11's look-back attribution (300 frames) usually catches these
+- v12's look-back attribution (300 frames) usually catches these
 - If still unattributed: the sprite's tiles are very old or from a non-standard path
 - **Fix**: Let game run until sprite despawns and respawns, then click again
 

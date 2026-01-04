@@ -1,4 +1,4 @@
--- sprite_rom_finder.lua v11
+-- sprite_rom_finder.lua v12
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset
@@ -7,6 +7,7 @@
 -- v9: callback registration logging
 -- v10: comprehensive pipeline counters to diagnose attribution failure
 -- v11: persistent vram_owner_map + look-back attribution on session start
+-- v12: fixed cpu_to_file_offset for full-bank SA-1 mapping (E9:3AEB was failing)
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -62,17 +63,17 @@ local function fmt_addr(addr)
     return string.format("%02X:%04X", bank, offset)
 end
 
--- FIX #1: Correct SA-1 LoROM mapping for Kirby Super Star
--- ROM visible in C0-FF:8000-FFFF, file offset = (bank-0xC0)*0x8000 + (addr-0x8000)
+-- FIX #1: Correct SA-1 full-bank mapping for Kirby Super Star
+-- ROM banks C0-FF map full 64KB per bank: file_offset = (bank-0xC0)*0x10000 + addr
+-- This handles proven pointers like E9:3AEB, E9:4D0A (addr < 0x8000)
 local function cpu_to_file_offset(ptr)
     local bank = (ptr >> 16) & 0xFF
     local addr = ptr & 0xFFFF
 
-    -- SA-1 LoROM: ROM window is C0-FF:8000-FFFF
+    -- SA-1: ROM window is C0-FF (no addr restriction - full 64KB banks)
     if bank < 0xC0 or bank > 0xFF then return nil end
-    if addr < 0x8000 then return nil end
 
-    local file_off = (bank - 0xC0) * 0x8000 + (addr - 0x8000) + ROM_HEADER
+    local file_off = (bank - 0xC0) * 0x10000 + addr + ROM_HEADER
     return file_off
 end
 
@@ -196,7 +197,7 @@ local RECENT_STAGING_MAX = 128
 local STAGING_START = 0x7E2000
 local STAGING_END = 0x7E2FFF
 local LOOKBACK_WINDOW = 300  -- frames to look back when session starts
-local LOOKFWD_WINDOW = 6     -- frames to look forward after session starts
+-- Note: forward attribution is handled by match_recent_session() in on_dma_enable()
 
 local function is_valid_ptr(ptr)
     local bank = (ptr >> 16) & 0xFF
@@ -234,12 +235,12 @@ local function start_session(ptr, idx)
     end
 
     -- v11: Look-back attribution - attribute recent staging DMAs to this session
+    -- Only looks backward: at session start, all DMAs in recent_staging_dmas are in the past
     local file_off = cpu_to_file_offset(ptr)
     local lookback_count = 0
     for i, dma in ipairs(recent_staging_dmas) do
-        -- Attribute DMAs in window [F-LOOKBACK, F+LOOKFWD]
         local age = frame_count - dma.frame
-        if age >= -LOOKFWD_WINDOW and age <= LOOKBACK_WINDOW then
+        if age >= 0 and age <= LOOKBACK_WINDOW then
             -- Only attribute if not already attributed
             if not dma.attributed then
                 dma.attributed = true
@@ -381,7 +382,8 @@ local function on_vram_addr_write(address, value)
     else -- 0x2117
         vmadd_hi = value & 0xFF
     end
-    vram_addr_shadow = vmadd_lo + (vmadd_hi * 256)
+    -- Mask to 15-bit VRAM address space (0x0000-0x7FFF)
+    vram_addr_shadow = (vmadd_lo + (vmadd_hi * 256)) & 0x7FFF
 end
 
 -- FIX #8: Shadow DMA channel registers (post-DMA reads return garbage)
@@ -455,7 +457,7 @@ local function on_dma_enable(addr, value)
                 local entry = {
                     frame = frame_count,
                     vram_start = vram_dest,
-                    vram_end = vram_dest + math.floor(dma_size / 2),
+                    vram_end = vram_dest + math.ceil(dma_size / 2),  -- ceil for odd byte counts
                     source = src_addr,
                     size = dma_size,
                     is_staging = is_staging,
@@ -735,10 +737,11 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v11")
+log("SPRITE ROM FINDER v12")
 log("========================================")
-log("v11: persistent vram_owner_map + look-back attribution")
-log("  - Look-back: F-300 to F+6 frames around session start")
+log("v12: fixed SA-1 bank mapping (E9:3AEB etc now work)")
+log("  - Full 64KB banks: file = (bank-C0)*0x10000 + addr")
+log("  - Look-back: F-300 frames around session start")
 log("  - Persistent owner map: never loses attribution history")
 log("")
 log("LEFT-CLICK on sprite = lookup ROM offset")

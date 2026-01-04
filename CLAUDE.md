@@ -58,6 +58,7 @@ cd 'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal'
 
 | Script | Purpose |
 |--------|---------|
+| `sprite_rom_finder.lua` | **Click on sprite → get ROM offset** (recommended) |
 | `gameplay_capture.lua` | Auto-capture at frame 1800 (gameplay with Kirby visible) |
 | `mesen2_sprite_capture.lua` | Manual capture with Start+Select |
 | `test_sprite_capture.lua` | Auto-capture at frame 700 (menu state) |
@@ -65,6 +66,25 @@ cd 'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal'
 | `mesen2_sprite_finder_final.lua` | DMA monitoring for ROM offset discovery |
 | `asset_selector_tracer_v3.lua` | Full idx→DMA attribution with session tracking (v3.0) |
 | `per_idx_ablation_v1.lua` | Per-index causal proof via ROM corruption (v3.0) |
+
+### Click-to-Find Sprite ROM Offset (Fastest Method)
+
+```batch
+# Double-click from spritepal directory:
+run_sprite_rom_finder.bat
+```
+
+**Pipeline:** `visible sprite → OAM → VRAM tile → DMA → idx session → ROM offset`
+
+**Usage:**
+1. Wait for gameplay (movie auto-plays)
+2. Pause when target sprite visible
+3. Left-click on sprite
+4. Read `FILE: 0xNNNNNN` from panel/console
+
+**SA-1 full-bank mapping:** `file = (bank - 0xC0) * 0x10000 + addr`
+
+See `mesen2_integration/README.md` for full documentation.
 
 ### Quick Capture (Double-click)
 
