@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v13)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v14)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,16 +11,18 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v13)
+### Key implementation details (v14)
 - **DMA reg shadowing**: Captures $4300-$437F writes (post-DMA reads return garbage)
 - **VMADD shadowing**: Captures $2116/$2117 writes (reading registers returns garbage)
 - **Session queue**: 64-entry queue with 45-frame window (handles SA-1 decode latency)
 - **Look-back attribution**: When session starts, attributes DMAs from F-300 frames
 - **Persistent owner map**: `vram_owner_map` never purges - attribution survives indefinitely
 - **SA-1 full-bank mapping**: `file = (bank - 0xC0) * 0x10000 + addr` (v12 fix for E9:3AEB etc)
-- **Staging-only fallback**: Only uses persistent owner for staging DMAs (v13 - prevents BG misattribution)
-- **CPU-keyed pending**: Keys pending table reads by CPU to prevent SA-1/SNES interleave (v13)
-- **Cached debug counts**: Updates table counts every 30 frames for performance (v13)
+- **Staging-only fallback**: Only uses persistent owner for staging DMAs (prevents BG misattribution)
+- **CPU-keyed pending**: Keys pending table reads by CPU to prevent SA-1/SNES interleave
+- **Cached debug counts**: Updates table counts every 30 frames for performance
+- **No unit-mismatch fallback**: Word-based throughout (v14 - removed v>>1/v<<1 foot-gun)
+- **No vram_upload_map rewrite**: Look-back sets dma.* directly (v14 - avoids tagging wrong DMA)
 - **Strict mode guard**: Catches Lua global variable bugs at runtime
 
 ### Usage

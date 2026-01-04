@@ -1,4 +1,4 @@
--- sprite_rom_finder.lua v13
+-- sprite_rom_finder.lua v14
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset
@@ -9,6 +9,7 @@
 -- v11: persistent vram_owner_map + look-back attribution on session start
 -- v12: fixed cpu_to_file_offset for full-bank SA-1 mapping (E9:3AEB was failing)
 -- v13: staging-only owner fallback, CPU-keyed pending_tbl, cached debug counts
+-- v14: remove vram_upload_map rewrite in look-back, remove unit-mismatch fallback
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -252,13 +253,10 @@ local function start_session(ptr, idx)
                 dma.idx = idx
                 dma.ptr = ptr
                 dma.file_offset = file_off
-                -- Update vram_upload_map entry
-                local entry = vram_upload_map[dma.vram_start]
-                if entry then
-                    entry.idx = idx
-                    entry.ptr = ptr
-                    entry.file_offset = file_off
-                end
+                -- v14: Removed vram_upload_map rewrite - dma IS the entry we inserted,
+                -- so dma.idx/ptr/file_offset are already set above. Rewriting via
+                -- vram_upload_map[dma.vram_start] risks tagging a *different* DMA
+                -- if a later upload overwrote that VRAM word.
                 -- Write to persistent owner map
                 write_vram_attribution(dma, idx, ptr, file_off)
                 lookback_count = lookback_count + 1
@@ -506,15 +504,8 @@ local function lookup_sprite_source(spr)
     local entry = vram_upload_map[v]
     local actual_key = v
 
-    -- Unit mismatch handling: try word and byte conversions
-    if not entry then
-        entry = vram_upload_map[v >> 1]  -- if v is bytes, map is words
-        if entry then actual_key = v >> 1 end
-    end
-    if not entry then
-        entry = vram_upload_map[v << 1]  -- if v is words, map is bytes
-        if entry then actual_key = v << 1 end
-    end
+    -- v14: Removed unit-mismatch fallback (v>>1, v<<1). OAM tile math and VMADD
+    -- shadow are both word-based, so mismatched lookups would find wrong DMAs.
 
     if entry then
         -- v11: If entry has no attribution, check vram_owner_map
@@ -757,12 +748,13 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v12")
+log("SPRITE ROM FINDER v14")
 log("========================================")
-log("v12: fixed SA-1 bank mapping (E9:3AEB etc now work)")
-log("  - Full 64KB banks: file = (bank-C0)*0x10000 + addr")
-log("  - Look-back: F-300 frames around session start")
-log("  - Persistent owner map: never loses attribution history")
+log("v14: bulletproof attribution pipeline")
+log("  - Staging-only owner fallback (no BG/font misattribution)")
+log("  - CPU-keyed pending_tbl (no SA-1/SNES interleave)")
+log("  - No vram_upload_map rewrite in look-back")
+log("  - No unit-mismatch fallback (word-based throughout)")
 log("")
 log("LEFT-CLICK on sprite = lookup ROM offset")
 log("RIGHT-CLICK = clear panel")
