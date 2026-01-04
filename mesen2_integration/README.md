@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v19)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v23)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,15 +11,21 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v19)
-- **PPU state key casing fix**: Uses correct capitalization (`OamMode`, `OverscanMode`) - was returning nil before
+### Key implementation details (v23)
+- **Pre-populated FE52 table**: Reads all ~143 valid idx→ptr entries from ROM at init (deterministic, no timing issues)
+- **Pure VRAM attribution**: Click uses only `vram_owner_map` (no session guessing)
+- **O(1) ptr→idx lookup**: Reverse map `ptr_to_idx` for fast resolution
+- **Flip-aware cursor tile**: Handles H-flip/V-flip for multi-tile sprites
+- **Click targeting fixes**: Uses `relativeX`/`relativeY` for accurate PPU coordinates
+- **X-wrap handling**: Sprites wrapping at screen edge are correctly detected
+- **PPU state key casing fix**: Uses correct capitalization (`OamMode`, `OverscanMode`)
 - **OAM priority handling**: Respects `EnableOamPriority` + `InternalOamAddress` for correct sprite draw order
 - **Overscan mode support**: Detects 239-line mode (was hardcoded to 224)
 - **Multi-tile warning**: Warns when looking up sprites >8x8 (attribution is for base tile only)
 - **Tuneable parameters**: Session windows and staging ranges documented at top of script
-- **SA-1 memType fix**: Uses `sa1Memory` for SA-1 callbacks (not `snesMemory` which caused callbacks to never fire)
-- **VALID_BANKS expansion**: Accepts all banks C0-FF (was missing D0-DF, F0-FF)
-- **OAM memory type fix**: Uses correct `snesSpriteRam` (not `snesOam` which didn't exist, causing wrong reads)
+- **SA-1 memType fix**: Uses `sa1Memory` for SA-1 callbacks (not `snesMemory`)
+- **VALID_BANKS expansion**: Accepts all banks C0-FF
+- **OAM memory type fix**: Uses correct `snesSpriteRam`
 - **Multi-channel DMA fix**: Advances VRAM destination per channel when $420B enables multiple channels
 - **Multi-candidate picker**: Collects ALL sprites under cursor, sorted by draw order (topmost wins)
 - **Candidate cycling**: Scroll wheel or arrow keys to cycle through overlapping sprites
@@ -30,12 +36,11 @@ visible sprite → OAM entry → VRAM tile address → DMA tracking → idx sess
 - **Session queue**: 64-entry queue with 45-frame window (handles SA-1 decode latency)
 - **Look-back attribution**: When session starts, attributes DMAs from F-300 frames
 - **Persistent owner map**: `vram_owner_map` never purges - attribution survives indefinitely
-- **SA-1 full-bank mapping**: `file = (bank - 0xC0) * 0x10000 + addr` (v12 fix for E9:3AEB etc)
+- **SA-1 full-bank mapping**: `file = (bank - 0xC0) * 0x10000 + addr`
 - **Staging-only fallback**: Only uses persistent owner for staging DMAs (prevents BG misattribution)
 - **CPU-keyed pending**: Keys pending table reads by CPU to prevent SA-1/SNES interleave
 - **Cached debug counts**: Updates table counts every 30 frames for performance
-- **No unit-mismatch fallback**: Word-based throughout (v14 - removed v>>1/v<<1 foot-gun)
-- **No vram_upload_map rewrite**: Look-back sets dma.* directly (v14 - avoids tagging wrong DMA)
+- **Word-based throughout**: No unit conversion foot-guns
 - **Strict mode guard**: Catches Lua global variable bugs at runtime
 
 ### Usage

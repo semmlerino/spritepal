@@ -4,6 +4,74 @@ All notable changes to the sprite extraction pipeline documentation and tooling.
 
 ---
 
+## sprite_rom_finder.lua v23 - Strict Causal Attribution (2026-01-04)
+
+### Pre-populated FE52 Table + Pure VRAM Attribution
+
+Eliminated timing-dependent idx matching by pre-populating the FE52 pointer table at startup.
+
+**Key changes:**
+- **Pre-populated idx_database**: Reads all ~143 valid entries from FE52 table at init
+  - No more "valid but no idx match" for sprites in the table
+  - Deterministic - no runtime timing issues
+- **Disabled closest-session override**: `CLICK_PREFER_CLOSEST_SESSION = false`
+  - Click attribution now uses pure `vram_owner_map` (causal purity)
+  - No session guessing - only reports what DMA actually filled the VRAM word
+- **O(1) ptr->idx lookup**: Added `ptr_to_idx` reverse map
+  - Replaced O(n) loop in DP write handler with O(1) table lookup
+
+**Technical details:**
+- `populate_idx_database_from_rom()` reads FE52 table via `emu.read(addr, emu.memType.snesMemory)`
+- Startup log shows: `v23: Pre-populated idx_database with N entries from FE52 table`
+- Session count stays low (<20) since only idx-known sessions are created
+
+---
+
+## sprite_rom_finder.lua v22 - Click Targeting Fixes (2026-01-04)
+
+### Reliable Click-to-Select
+
+Fixed multiple bugs in click coordinate handling and OAM snapshot timing.
+
+**Key changes:**
+- **PPU coordinate conversion**: Uses normalized `relativeX`/`relativeY` (not raw `mouse.x`/`mouse.y`)
+  - Bypasses overscan offset issues
+- **OAM snapshot timing**: Collect candidates BEFORE click handling (fixes stale data bug)
+- **X-wrap handling**: Sprites at x=250 with width=16 correctly cover 250-255 and 0-9
+- **Optional stale DMA filter**: `MAX_DMA_AGE` tuneable (default 0 = disabled)
+- **Future-session guard**: Avoid attributing DMAs to sessions that haven't started yet
+
+---
+
+## sprite_rom_finder.lua v21 - Session Override Mode (2026-01-04)
+
+### Flexible Session Matching
+
+Added options for handling DP pointers not in the idx table.
+
+**Key changes:**
+- **Unmatched DP ptr sessions**: `ALLOW_UNMATCHED_DP_PTR` toggle (default false)
+  - When true, creates sessions even for unknown idx values
+- **Click-time closest-session override**: `CLICK_PREFER_CLOSEST_SESSION` toggle
+  - When true, overrides vram_owner_map with nearest session at click time
+  - Useful for debugging, but breaks causal purity (disabled in v23)
+
+---
+
+## sprite_rom_finder.lua v20 - Multi-Tile Sprite Handling (2026-01-04)
+
+### Flip-Aware Cursor Tile Selection
+
+Improved tile selection for sprites larger than 8x8.
+
+**Key changes:**
+- **Cursor tile selection**: Uses flip-aware calculation for multi-tile sprites
+  - H-flip/V-flip flags correctly transform cursor-to-tile mapping
+- **Base-tile fallback**: If cursor tile has no attribution, falls back to base tile (0,0)
+  - Handles cases where only partial tile data is attributed
+
+---
+
 ## sprite_rom_finder.lua v19 - PPU State Fixes + OAM Priority (2026-01-04)
 
 ### PPU State Key Casing + OAM Priority Handling
