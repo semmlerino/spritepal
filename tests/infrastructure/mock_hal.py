@@ -36,12 +36,14 @@ class MockHALProcessPool:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super().__new__(cls)
+                    instance = super().__new__(cls)
+                    instance._initialized = False
+                    cls._instance = instance
         return cls._instance
 
     def __init__(self):
         """Initialize mock pool state."""
-        if hasattr(self, "_initialized"):
+        if self._initialized:
             return
 
         self._initialized = True

@@ -361,12 +361,14 @@ class HALProcessPool:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super().__new__(cls)
+                    instance = super().__new__(cls)
+                    instance._initialized = False
+                    cls._instance = instance
         return cls._instance
 
     def __init__(self) -> None:
-        # Only initialize once
-        if hasattr(self, "_initialized"):
+        # Only initialize once (singleton pattern)
+        if self._initialized:
             return
 
         self._initialized = True
@@ -377,6 +379,7 @@ class HALProcessPool:
         self._result_queue: mp.Queue[HALResult] | None = None
         self._processes: list[mp.Process] = []
         self._process_pids: list[int] = []  # Track PIDs for debugging
+        self._process_refs: list[weakref.ReferenceType[mp.Process]] = []  # Weak refs for cleanup
         self._shutdown = False
         self._pool_size = HAL_POOL_SIZE_DEFAULT
         self._exhal_path = None
@@ -797,8 +800,7 @@ class HALProcessPool:
             # Clear all references
             self._processes.clear()
             self._process_pids.clear()
-            if hasattr(self, "_process_refs"):
-                self._process_refs.clear()
+            self._process_refs.clear()
             self._request_queue = None
             self._result_queue = None
 
@@ -939,8 +941,7 @@ class HALProcessPool:
             # Clear all state including weak references
             self._processes.clear()
             self._process_pids.clear()
-            if hasattr(self, "_process_refs"):
-                self._process_refs.clear()
+            self._process_refs.clear()
             self._pool_initialized = False
             self._manager = None
             self._request_queue = None

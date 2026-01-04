@@ -141,9 +141,8 @@ class DialogBase(QDialog):
         self._tab_widget: QTabWidget | None = None
         self.tab_widget = self._tab_widget  # Public alias for tests
 
-        # Call setup method if it exists
-        if hasattr(self, "_setup_ui"):
-            self._setup_ui()
+        # Call setup method (subclasses can override)
+        self._setup_ui()
 
     def _setup_ui(self) -> None:
         """

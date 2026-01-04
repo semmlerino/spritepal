@@ -64,17 +64,15 @@ class StatusBarManager:
 
         # Cache info label
         self.cache_info_label = QLabel()
-        if self.cache_info_label:
-            self.cache_info_label.setStyleSheet(get_muted_text_style())
+        self.cache_info_label.setStyleSheet(get_muted_text_style())
         cache_layout.addWidget(self.cache_info_label)
 
         # Cache operation badge (hidden by default)
         self.cache_operation_badge = QLabel()
-        if self.cache_operation_badge:
-            self.cache_operation_badge.setStyleSheet(
-                f"background-color: {COLORS['info']}; color: {COLORS['text_primary']}; padding: 2px 6px; "
-                "border-radius: 3px; font-size: 10px; font-weight: bold;"
-            )
+        self.cache_operation_badge.setStyleSheet(
+            f"background-color: {COLORS['info']}; color: {COLORS['text_primary']}; padding: 2px 6px; "
+            "border-radius: 3px; font-size: 10px; font-weight: bold;"
+        )
         self.cache_operation_badge.setVisible(False)
         cache_layout.addWidget(self.cache_operation_badge)
 

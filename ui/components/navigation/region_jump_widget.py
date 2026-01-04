@@ -95,8 +95,7 @@ class RegionJumpWidget(QWidget):
         title_row.addStretch()
 
         self.stats_label = QLabel("No regions")
-        if self.stats_label:
-            self.stats_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
+        self.stats_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         title_row.addWidget(self.stats_label)
 
         container_layout.addLayout(title_row)

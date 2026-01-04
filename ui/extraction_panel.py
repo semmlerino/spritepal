@@ -114,8 +114,7 @@ class ExtractionPanel(QGroupBox):
 
         # Enhanced hex label with better styling
         self.offset_hex_label = QLabel("0xC000")
-        if self.offset_hex_label:
-            self.offset_hex_label.setStyleSheet(get_hex_label_style(background=True, color="extract"))
+        self.offset_hex_label.setStyleSheet(get_hex_label_style(background=True, color="extract"))
         self.offset_hex_label.setMinimumWidth(OFFSET_LABEL_MIN_WIDTH)
         # Enhanced tooltip with tile info and position
         self.offset_hex_label.setToolTip("Current offset in VRAM\nTile #1536 | 75.0%")

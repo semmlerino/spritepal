@@ -87,8 +87,7 @@ class FormRow(QWidget):
         # Add help text if provided
         if help_text:
             self.help_label = QLabel(help_text)
-            if self.help_label:
-                self.help_label.setStyleSheet(get_muted_text_style(color_level="medium"))
+            self.help_label.setStyleSheet(get_muted_text_style(color_level="medium"))
             self.help_label.setWordWrap(True)
             self.input_layout.addWidget(self.help_label)
 
@@ -124,8 +123,7 @@ class FormRow(QWidget):
             self.help_label.setText(text)
         else:
             self.help_label = QLabel(text)
-            if self.help_label:
-                self.help_label.setStyleSheet(get_muted_text_style(color_level="medium"))
+            self.help_label.setStyleSheet(get_muted_text_style(color_level="medium"))
             self.help_label.setWordWrap(True)
             self.input_layout.addWidget(self.help_label)
 

@@ -112,14 +112,12 @@ class StatusPanel(QWidget):
 
         # Cache icon - set proper parent
         self.cache_icon_label = QLabel(parent=self.cache_status_widget)
-        if self.cache_icon_label:
-            self.cache_icon_label.setStyleSheet("font-size: 12px;")  # Readable icon
+        self.cache_icon_label.setStyleSheet("font-size: 12px;")  # Readable icon
         cache_layout.addWidget(self.cache_icon_label)
 
         # Cache info label - set proper parent
         self.cache_info_label = QLabel(parent=self.cache_status_widget)
-        if self.cache_info_label:
-            self.cache_info_label.setStyleSheet(get_muted_text_style() + " font-size: 11px;")  # Readable text
+        self.cache_info_label.setStyleSheet(get_muted_text_style() + " font-size: 11px;")  # Readable text
         cache_layout.addWidget(self.cache_info_label)
 
         # Add stretch to push content to left

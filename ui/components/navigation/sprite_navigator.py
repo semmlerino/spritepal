@@ -250,8 +250,7 @@ class SpriteNavigator(QWidget):
         position_layout.setContentsMargins(0, 0, 0, 0)
 
         self.position_label = QLabel("0x200000")
-        if self.position_label:
-            self.position_label.setStyleSheet(f"""
+        self.position_label.setStyleSheet(f"""
             font-family: monospace;
             font-size: 14px;
             font-weight: bold;
@@ -260,8 +259,7 @@ class SpriteNavigator(QWidget):
         self.position_label.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.context_label = QLabel("High ROM - Common sprite area")
-        if self.context_label:
-            self.context_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
+        self.context_label.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         self.context_label.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         position_layout.addWidget(self.position_label)
