@@ -1,11 +1,11 @@
--- sprite_rom_finder.lua v15
+-- sprite_rom_finder.lua v16
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset (topmost wins)
 -- SCROLL UP/DOWN = cycle through candidates under cursor
 -- RIGHT-CLICK = clear panel
--- H = toggle HUD ignore (sprites with y < 32)
--- B = toggle bounding box debug overlay
+-- SELECT = toggle HUD ignore (sprites with y < 32)
+-- START = toggle bounding box debug overlay
 --
 -- v9: callback registration logging
 -- v10: comprehensive pipeline counters to diagnose attribution failure
@@ -14,6 +14,7 @@
 -- v13: staging-only owner fallback, CPU-keyed pending_tbl, cached debug counts
 -- v14: remove vram_upload_map rewrite in look-back, remove unit-mismatch fallback
 -- v15: multi-candidate picker (topmost wins), cycling, HUD ignore, OAM bbox overlay
+-- v16: fix multi-channel DMA (advance VRAM dest per channel), fix header comments
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -431,6 +432,24 @@ local function on_dma_enable(addr, value)
     enable = enable & 0xFF
     if enable == 0 then return nil end
 
+    -- v16: Count VRAM-targeting channels to handle multi-channel DMA correctly
+    -- When multiple channels target VRAM in one $420B write, VMADD advances between them
+    local vram_channels = {}
+    for ch = 0, 7 do
+        if (enable & (1 << ch)) ~= 0 then
+            local s = dma_shadow[ch]
+            local dmap = s.dmap or 0
+            local bbad = s.bbad or 0
+            local direction = (dmap & 0x80) >> 7
+            if direction == 0 and (bbad == 0x18 or bbad == 0x19) then
+                table.insert(vram_channels, ch)
+            end
+        end
+    end
+
+    -- v16: Track local VRAM destination that advances per channel
+    local local_vram_dest = vram_addr_shadow
+
     for ch = 0, 7 do
         if (enable & (1 << ch)) ~= 0 then
             -- Use shadowed registers (post-DMA reads return garbage)
@@ -445,8 +464,8 @@ local function on_dma_enable(addr, value)
 
             -- Only track A→B transfers to VRAM ($2118/$2119)
             if direction == 0 and (bbad == 0x18 or bbad == 0x19) then
-                -- Use shadowed VRAM address (captured from $2116/$2117 writes)
-                local vram_dest = vram_addr_shadow
+                -- v16: Use local_vram_dest which advances for multi-channel DMAs
+                local vram_dest = local_vram_dest
 
                 -- FIX #4: Only attribute staging DMAs
                 local is_staging = (src_addr >= STAGING_START and src_addr <= STAGING_END)
@@ -497,6 +516,11 @@ local function on_dma_enable(addr, value)
                         table.remove(recent_staging_dmas, 1)
                     end
                 end
+
+                -- v16: Advance local VRAM dest for next channel in multi-channel DMA
+                -- VMADD advances by transfer size (in words) after each channel completes
+                local words_transferred = math.ceil(dma_size / 2)
+                local_vram_dest = local_vram_dest + words_transferred
             end
         end
     end
@@ -898,9 +922,10 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v15")
+log("SPRITE ROM FINDER v16")
 log("========================================")
-log("v15: multi-candidate picker with HUD filter")
+log("v16: multi-channel DMA fix + v15 picker")
+log("  - Multi-channel DMA: advances VRAM dest per channel")
 log("  - Topmost sprite wins (highest OAM index)")
 log("  - Scroll/arrows cycle through candidates")
 log("  - HUD ignore toggle (Select button)")
