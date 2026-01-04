@@ -13,10 +13,17 @@ This is the central entry point for all SpritePal documentation.
 
 | Document | Purpose |
 |----------|---------|
-| [architecture.md](architecture.md) | Layer structure, import rules, DI, dialogs, singletons |
+| [architecture.md](architecture.md) | Layer structure, import rules, DI, dialogs, singletons, **Mesen integration** |
 | [application_flows.md](application_flows.md) | Initialization, extraction, injection, error flows |
 | [testing_guide.md](testing_guide.md) | Comprehensive testing patterns, Qt signals, threading |
 | [configuration_guide.md](configuration_guide.md) | Settings and configuration system |
+
+## Mesen 2 Integration
+
+| Document | Purpose |
+|----------|---------|
+| [mesen2_integration/README.md](../mesen2_integration/README.md) | Lua scripts, click-to-find workflow, batch files |
+| [architecture.md → Mesen Integration](architecture.md#mesen-integration-subsystem) | Python subsystem architecture, data flow |
 
 ## Test Documentation
 
@@ -48,6 +55,8 @@ This is the central entry point for all SpritePal documentation.
 | Debug singletons | [architecture.md](architecture.md) → Singletons and Cleanup |
 | Trace data flows | [application_flows.md](application_flows.md) |
 | Qt signals/workers | [testing_guide.md](testing_guide.md) → Signal Reference |
+| Find sprite ROM offset | [mesen2_integration/README.md](../mesen2_integration/README.md) → Click-to-Find |
+| Understand Mesen integration | [architecture.md](architecture.md) → Mesen Integration Subsystem |
 | Run Mesen2 capture pipeline | [docs/mesen2/01_BUILD_SPECIFIC_CONTRACT.md](mesen2/01_BUILD_SPECIFIC_CONTRACT.md) → Runbook |
 
 ### Key Commands
@@ -75,4 +84,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: December 31, 2025*
+*Last updated: January 4, 2026 (Added Mesen 2 Integration section)*

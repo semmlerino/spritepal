@@ -320,7 +320,9 @@ extracted_sprites/
 
 ## 📚 References
 
-- [KirbyTrace.md](../KirbyTrace.md) - Detailed tracing methodology
+- [SNES Hardware Facts](../docs/mesen2/00_STABLE_SNES_FACTS.md) - VRAM, OAM, tile formats
+- [Kirby SA-1 Mapping](../docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md) - SA-1 address conversion
+- [Architecture Documentation](../docs/architecture.md) - Mesen Integration Subsystem section
 - [Data Crystal Wiki](https://datacrystal.tcrf.net/wiki/Kirby_Super_Star) - ROM info
 - [SNESdev Wiki](https://snes.nesdev.org/wiki/Memory_map) - SNES memory
 

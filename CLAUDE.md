@@ -58,14 +58,17 @@ cd 'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal'
 
 | Script | Purpose |
 |--------|---------|
-| `sprite_rom_finder.lua` | **Click on sprite → get ROM offset** (recommended) |
+| `sprite_rom_finder.lua` | **Click on sprite → get ROM offset** (v34, recommended) |
+| `sprite_identifier.lua` | Identify sprite metadata via idx tracking |
+| `sprite_labeler.lua` | Always-on sprite labeling overlay |
+| `vram_tile_dump.lua` | Dump VRAM tiles for debugging |
 | `gameplay_capture.lua` | Auto-capture at frame 1800 (gameplay with Kirby visible) |
 | `mesen2_sprite_capture.lua` | Manual capture with Start+Select |
 | `test_sprite_capture.lua` | Auto-capture at frame 700 (menu state) |
 | `mesen2_click_extractor.lua` | F9 capture + DMA tracking |
 | `mesen2_sprite_finder_final.lua` | DMA monitoring for ROM offset discovery |
-| `asset_selector_tracer_v3.lua` | Full idx→DMA attribution with session tracking (v3.0) |
-| `per_idx_ablation_v1.lua` | Per-index causal proof via ROM corruption (v3.0) |
+| `asset_selector_tracer_v3.lua` | Full idx→DMA attribution with session tracking |
+| `per_idx_ablation_v1.lua` | Per-index causal proof via ROM corruption |
 
 ### Click-to-Find Sprite ROM Offset (Fastest Method)
 
@@ -88,8 +91,9 @@ See `mesen2_integration/README.md` for full documentation.
 
 ### Quick Capture (Double-click)
 
-- `run_gameplay_capture.bat` - Captures during gameplay (~30 sec)
-- `run_sprite_capture.bat` - Captures at frame 700 (menu state)
+- `run_sprite_rom_finder.bat` - Interactive click-to-find sprite ROM offsets (recommended)
+- `run_sprite_rom_finder_manual.bat` - Manual ROM finder without movie playback
+- `run_sprite_capture.bat` - Auto-capture at frame 700 (menu state)
 
 ### Running with Movie Playback (for Gameplay)
 
@@ -121,9 +125,8 @@ start "" "%MESEN_EXE%" "%MOVIE_PATH%"
 - Script must call `emu.stop()` to exit when done
 - Movie provides input to navigate menus and enter gameplay
 
-**Example batch files using this pattern:**
-- `run_ablation_test.bat`
-- `run_e9_monitor_movie.bat`
+**Working batch file using this pattern:**
+- `run_sprite_rom_finder.bat` - Uses movie playback for gameplay capture
 
 ### Capture Output
 
@@ -429,6 +432,7 @@ panel.setStyleSheet('QWidget { border: 1px solid red; }')
 spritepal/
 ├── core/                  # Business logic
 │   ├── managers/          # Manager classes
+│   ├── mesen_integration/ # Mesen 2 capture → ROM offset discovery
 │   ├── protocols/         # Protocol definitions
 │   └── *.py               # Core logic
 ├── ui/                    # Qt UI components
@@ -439,6 +443,7 @@ spritepal/
 ├── tests/
 │   ├── fixtures/          # Test fixtures
 │   └── infrastructure/    # RealComponentFactory, ThreadSafeTestImage
+├── mesen2_integration/    # Lua scripts for Mesen 2 emulator
 └── utils/                 # Shared utilities
 ```
 
@@ -450,6 +455,10 @@ spritepal/
 | ApplicationStateManager | `core/managers/application_state_manager.py` (session, settings, state) |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
 | AppContext, `get_app_context()` | `core/app_context.py` |
+| **Mesen integration subsystem** | `core/mesen_integration/` (ROM offset discovery from Mesen 2 captures) |
+| SA-1 address conversion | `core/mesen_integration/address_space_bridge.py` |
+| ROM tile matching | `core/mesen_integration/rom_tile_matcher.py` |
+| Full correlation pipeline | `core/mesen_integration/full_correlation_pipeline.py` |
 | Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
 | Qt mocks | `tests/infrastructure/qt_mocks.py` |
 | Signal utilities (`safe_disconnect`, etc.) | `ui/common/signal_utils.py` |
@@ -500,4 +509,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: December 27, 2025*
+*Last updated: January 4, 2026 (Added mesen_integration documentation, updated Lua scripts, fixed batch file references)*
