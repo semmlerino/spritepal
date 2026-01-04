@@ -4,6 +4,118 @@ All notable changes to the sprite extraction pipeline documentation and tooling.
 
 ---
 
+## sprite_rom_finder.lua v19 - PPU State Fixes + OAM Priority (2026-01-04)
+
+### PPU State Key Casing + OAM Priority Handling
+
+Fixed critical bugs where PPU state keys returned nil (wrong casing) and added proper OAM priority sort order.
+
+**Key changes:**
+- **PPU state key casing fix**: `oamMode` → `OamMode`, `oamBaseAddress` → `OamBaseAddress`, etc.
+  - Mesen2 serializes with capital letters; lowercase was returning nil
+  - Sprite sizes were always defaulting to 8x8 mode 0
+- **OAM priority handling**: Respects `EnableOamPriority` + `InternalOamAddress`
+  - `get_oam_draw_order()` computes correct sprite layer order
+  - Candidates sorted by draw order, not raw OAM index
+- **Overscan mode support**: Reads `OverscanMode` state (was hardcoded 224)
+  - Now correctly detects 239-line overscan mode
+- **Multi-tile warning**: Warns when clicking sprites >8x8 that attribution is for base tile only
+- **Tuneable parameters**: Grouped at top of script with documentation
+
+---
+
+## sprite_rom_finder.lua v18 - SA-1 Memory Type Fix (2026-01-04)
+
+### SA-1 Callbacks Now Fire
+
+Fixed critical bug where SA-1 CPU callbacks never fired because wrong memory type was used.
+
+**Key changes:**
+- **SA-1 memType fix**: Uses `sa1Memory` for SA-1 callbacks (not `snesMemory`)
+  - Per DebugUtilities.h:16, SA-1 CPU uses sa1Memory address space
+  - This was causing all SA-1 table reads to be missed
+- **VALID_BANKS expansion**: Accepts all banks C0-FF
+  - Was missing C4-CF, D0-DF, F0-FF
+  - Full SA-1 HiROM range now valid
+
+---
+
+## sprite_rom_finder.lua v17 - OAM Memory Type Fix (2026-01-04)
+
+### Sprite Selection Now Works
+
+Fixed critical bug where OAM reads returned garbage data.
+
+**Key changes:**
+- **OAM memory type fix**: Uses `snesSpriteRam` (not `snesOam` which didn't exist)
+  - Sprite bounding box calculations were completely broken
+  - Click-to-select now actually selects the correct sprite
+
+---
+
+## sprite_rom_finder.lua v16 - Multi-Channel DMA Fix (2026-01-04)
+
+### Multi-Channel DMA Attribution
+
+Fixed attribution for games using multiple simultaneous DMA channels.
+
+**Key changes:**
+- **Multi-channel DMA fix**: Advances VRAM destination per channel when $420B enables multiple
+- **Header comments**: Added comprehensive version history at top of script
+
+---
+
+## sprite_rom_finder.lua v15 - Multi-Candidate Picker (2026-01-04)
+
+### Click-to-Select UX Improvements
+
+Added multi-sprite selection with cycling and filtering.
+
+**Key changes:**
+- **Multi-candidate picker**: Collects ALL sprites under cursor
+- **Candidate cycling**: Scroll wheel or arrow keys to cycle through overlapping sprites
+- **HUD ignore toggle**: Filter out HUD sprites (y < 32) with Select button
+- **Bounding box overlay**: Toggle with Start button to see all OAM hitboxes
+
+---
+
+## sprite_rom_finder.lua v14 - Stability Fixes (2026-01-04)
+
+### Attribution Stability
+
+Removed problematic look-back rewrite and unit conversion fallback.
+
+**Key changes:**
+- **No vram_upload_map rewrite**: Look-back sets dma.* directly (avoids tagging wrong DMA)
+- **No unit-mismatch fallback**: Word-based throughout (removed v>>1/v<<1 foot-gun)
+
+---
+
+## sprite_rom_finder.lua v13 - Staging-Only Fallback (2026-01-04)
+
+### Better Attribution Accuracy
+
+Fixed over-attribution from BG DMAs by limiting owner map to staging transfers.
+
+**Key changes:**
+- **Staging-only fallback**: Only uses persistent owner for staging DMAs (prevents BG misattribution)
+- **CPU-keyed pending**: Keys pending table reads by CPU to prevent SA-1/SNES interleave
+
+---
+
+## sprite_rom_finder.lua v12 - SA-1 Full-Bank Mapping (2026-01-04)
+
+### Correct File Offset Calculation
+
+Fixed ROM offset calculation for SA-1 HiROM mapping.
+
+**Key changes:**
+- **SA-1 full-bank mapping**: `file = (bank - 0xC0) * 0x10000 + addr`
+  - Was using LoROM formula, giving wrong offsets for banks E0+
+  - Now correctly maps full 64KB banks
+
+---
+
 ## sprite_rom_finder.lua v11 - Persistent Attribution (2026-01-04)
 
 ### Look-back Attribution + Persistent Owner Map
