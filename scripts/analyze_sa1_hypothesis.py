@@ -82,16 +82,7 @@ def analyze_log(log_path: Path) -> dict[str, object]:
             # Collect sample entries (first 5 char_conv=Y, first 5 char_conv=N)
             sample_entries = results["sample_entries"]
             if isinstance(sample_entries, list):
-                if char_conv and sum(1 for e in sample_entries if e.get("char_conv")) < 5:
-                    sample_entries.append({
-                        "line": line_no,
-                        "reason": reason,
-                        "ctrl": ctrl_hex,
-                        "char_conv": char_conv,
-                        "enabled": enabled,
-                        "raw": line.strip()[:120],
-                    })
-                elif not char_conv and sum(1 for e in sample_entries if not e.get("char_conv")) < 5:
+                if char_conv and sum(1 for e in sample_entries if e.get("char_conv")) < 5 or not char_conv and sum(1 for e in sample_entries if not e.get("char_conv")) < 5:
                     sample_entries.append({
                         "line": line_no,
                         "reason": reason,

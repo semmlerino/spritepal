@@ -1,11 +1,15 @@
--- sprite_rom_finder.lua v25
+-- sprite_rom_finder.lua v34
 -- Click on any sprite to get its ROM source offset
+-- v33: Always-on automatic attribution mode
 --
 -- LEFT-CLICK on sprite = lookup ROM offset (topmost wins)
 -- SCROLL UP/DOWN = cycle through candidates under cursor
 -- RIGHT-CLICK = clear panel
 -- SELECT = toggle HUD ignore (sprites with y < 32)
 -- START = toggle bounding box debug overlay
+-- R = toggle always-on sprite labels
+-- X = cycle filter mode (ALL/NO_HUD/LARGE/MOVING)
+-- LEFT/RIGHT = navigate sprites (logs attribution to console)
 --
 -- v9: callback registration logging
 -- v10: comprehensive pipeline counters to diagnose attribution failure
@@ -25,6 +29,13 @@
 -- v23: pre-populate FE52 table at init, disable closest-session override, O(1) ptr->idx lookup
 -- v24: hard enforcement - delete unmatched session path, sync ptr_to_idx in runtime, remove stale blanking
 -- v25: DP slot tracking, slot-preference attribution, FE52 off-by-one fix, PPU edge clamp
+-- v26: delayed activation (start after N frames), safe getState fallback
+-- v27: crash guards for callbacks and on_frame (logs stack trace and disables tracking)
+-- v28: safe vararg forwarding for crash-guard wrapper
+-- v29: wider lookback + larger staging queue + last-session boundary
+-- v31: optional unmatched sessions + session dedup
+-- v32: reset hotkey + disable lookback for unmatched sessions
+-- v33: always-on automatic attribution (R=labels, X=filter, LEFT/RIGHT=nav, auto-watch)
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -62,6 +73,9 @@ local ROM_HEADER = 0  -- Set to 0x200 if your .sfc has a copier header
 
 local log_handle = nil
 local frame_count = 0
+local tracking_active = false
+local callbacks_registered = false
+local fatal_error = nil
 
 local function log(msg)
     if not log_handle then
@@ -72,6 +86,38 @@ local function log(msg)
         log_handle:flush()
     end
     emu.log(msg)
+end
+
+local function log_fatal(context, err)
+    if fatal_error then return end
+    fatal_error = err or "unknown error"
+    tracking_active = false
+    log(string.format("FATAL(%s): %s", context, tostring(fatal_error)))
+end
+
+local function unpack_args(args, i, n)
+    if i > n then return end
+    return args[i], unpack_args(args, i + 1, n)
+end
+
+local function call_with_args(cb, args, n)
+    if table.unpack then
+        return cb(table.unpack(args, 1, n))
+    end
+    return cb(unpack_args(args, 1, n))
+end
+
+local function make_safe_callback(cb, name)
+    return function(...)
+        if fatal_error then return nil end
+        local args = { ... }
+        local argc = select("#", ...)
+        local ok, err = xpcall(function() return call_with_args(cb, args, argc) end, debug.traceback)
+        if not ok then
+            log_fatal(name, err)
+        end
+        return nil
+    end
 end
 
 local function fmt_addr(addr)
@@ -122,6 +168,42 @@ local oam_sizes = {
     [7] = {{16,32}, {32,32}}
 }
 
+-- v34 FIX: Shadow OBSEL ($2101) - declared early so get_sprite_info() can access it
+-- Default to $03 (name base=$6000) which is common for Kirby sprite VRAM
+local obsel_shadow = 0x03
+local oam_base_shadow = 0
+local oam_offset_shadow = 0
+
+local function update_oam_from_obsel(value)
+    obsel_shadow = value & 0xFF
+    local name_base_bits = obsel_shadow & 7
+    oam_base_shadow = name_base_bits * 0x2000
+    local name_select_bits = (obsel_shadow >> 3) & 3
+    oam_offset_shadow = (name_select_bits + 1) * 0x1000
+end
+
+update_oam_from_obsel(obsel_shadow)
+
+local function resolve_oam_tables(state)
+    local oam_base = state and state["snes.ppu.OamBaseAddress"]
+    local oam_offset = state and state["snes.ppu.OamAddressOffset"]
+    if oam_base ~= nil and oam_offset ~= nil and oam_offset ~= 0 then
+        return oam_base, oam_offset, "state"
+    end
+    return oam_base_shadow, oam_offset_shadow, "shadow"
+end
+
+local function sync_oam_from_state(state)
+    local oam_base = state and state["snes.ppu.OamBaseAddress"]
+    local oam_offset = state and state["snes.ppu.OamAddressOffset"]
+    if oam_base ~= nil and oam_offset ~= nil and oam_offset ~= 0 then
+        oam_base_shadow = oam_base
+        oam_offset_shadow = oam_offset
+        return true
+    end
+    return false
+end
+
 local function get_sprite_info(index)
     local base = index * 4
 
@@ -132,6 +214,9 @@ local function get_sprite_info(index)
 
     local high_offset = 0x200 + math.floor(index / 4)
     local high_byte = emu.read(high_offset, emu.memType.snesSpriteRam)
+    if x_low == nil or y == nil or tile == nil or attr == nil or high_byte == nil then
+        return nil
+    end
     local shift = (index % 4) * 2
     local x_high = (high_byte >> shift) & 1
     local large = ((high_byte >> shift) >> 1) & 1
@@ -139,14 +224,14 @@ local function get_sprite_info(index)
     local x = x_low + (x_high * 256)
     if x >= 256 then x = x - 512 end
 
-    local state = emu.getState()
+    local state = emu.getState() or {}
     -- v19 FIX: Capital letters (Mesen2 serializes OamMode, not oamMode)
     local oam_mode = state["snes.ppu.OamMode"] or 0
     local size_table = oam_sizes[oam_mode] or oam_sizes[0]
     local size = size_table[large + 1]
 
-    local oam_base = state["snes.ppu.OamBaseAddress"] or 0
-    local oam_offset = state["snes.ppu.OamAddressOffset"] or 0
+    -- Prefer PPU state (captures pre-activation writes); fall back to OBSEL shadow.
+    local oam_base, oam_offset = resolve_oam_tables(state)
 
     -- Bit 0 of attr = name table select (second tile page)
     local use_second_table = (attr & 1) == 1
@@ -175,7 +260,7 @@ end
 
 local function is_visible(spr)
     -- v19 FIX: Read OverscanMode instead of hardcoding 224
-    local state = emu.getState()
+    local state = emu.getState() or {}
     local overscan = state["snes.ppu.OverscanMode"]
     local screen_height = overscan and 239 or 224
     local x_visible = (spr.x + spr.width > 0) and (spr.x < 256)
@@ -235,14 +320,18 @@ end
 --------------------------------------------------------------------------------
 local RECENT_SESSIONS_MAX = 64   -- Max sessions in queue (increase for busy games)
 local SESSION_MATCH_WINDOW = 45  -- Frames to match DMA to session (increase for slow decode)
--- v24: Removed ALLOW_UNMATCHED_DP_PTR - unmatched sessions are now impossible
+local ALLOW_UNMATCHED_DP_PTR = true  -- Allow sessions for valid DP ptrs not in FE52 table
 local CLICK_PREFER_CLOSEST_SESSION = false   -- v23: Use only direct vram_owner_map attribution
 local CLICK_SESSION_WINDOW = 60              -- Frames around DMA to search for nearest session
 local PREFER_IDX_KNOWN_SESSIONS = true       -- Prefer idx-known sessions over unmatched
 local CLICK_SESSION_ONLY_BEFORE_DMA = true   -- Do not override with sessions after DMA
 local MAX_DMA_AGE = 0                        -- Max age (frames) for click attribution; 0 disables
-local RECENT_STAGING_MAX = 128   -- Max staging DMAs to track (increase if queue overflows)
-local LOOKBACK_WINDOW = 30       -- Frames to look back at session start (smaller reduces false attribution)
+local RECENT_STAGING_MAX = 512   -- Max staging DMAs to track (increase if queue overflows)
+local LOOKBACK_WINDOW = 90       -- Frames to look back at session start (raise for slow decode)
+local LOOKBACK_REQUIRE_SINCE_LAST_SESSION = true  -- Avoid attributing DMAs from earlier sessions
+local LOOKBACK_ALLOW_UNMATCHED = false  -- If false, unmatched sessions won't claim lookback DMAs
+local SESSION_DEDUP_WINDOW = 4   -- Skip duplicate ptr sessions within N frames (0 disables)
+local ACTIVATE_AT_FRAME = 500    -- Delay tracking/UI until this frame (0 = immediate)
 
 -- Staging WRAM buffer range for Kirby Super Star
 -- Adjust for other SA-1 games if they use a different decompression buffer
@@ -256,6 +345,7 @@ local session_counter = 0
 local recent_sessions = {}
 local vram_upload_map = {}       -- Key: vram_word, Value: DMA entry (upload info)
 local vram_owner_map = {}        -- Key: vram_word, Value: {idx, ptr, frame, file_offset}
+local vram_watch_set = {}        -- v33: Key: vram_word, Value: {first_seen, count} - for auto-watch
 local recent_staging_dmas = {}   -- Recent staging DMAs for look-back attribution
 
 -- v13: Cached counts for draw_debug_info (avoids expensive pairs() every frame)
@@ -298,9 +388,57 @@ local function populate_idx_database_from_rom()
     log(string.format("v23: Pre-populated idx_database with %d entries from FE52 table", count))
 end
 
+-- v33: Register a VRAM word for auto-watch (when unresolved sprite uses it)
+local function register_vram_watch(vram_word)
+    if not vram_watch_set[vram_word] then
+        vram_watch_set[vram_word] = {
+            first_seen = frame_count,
+            count = 1,
+        }
+    else
+        vram_watch_set[vram_word].count = vram_watch_set[vram_word].count + 1
+    end
+end
+
 -- v11: Helper to write attribution to vram_owner_map for a DMA entry
+-- v33: Also checks vram_watch_set and logs when watched VRAM is resolved
 local function write_vram_attribution(entry, idx, ptr, file_off)
+    local words = entry.vram_words
+    if words then
+        for _, w in ipairs(words) do
+            -- v33: Check if this VRAM word was being watched
+            if vram_watch_set[w] then
+                local watch = vram_watch_set[w]
+                log(string.format("WATCH RESOLVED: VRAM $%04X -> idx=%s ptr=%s FILE=0x%06X (watched since f%d, seen %dx)",
+                    w, idx ~= nil and tostring(idx) or "?", fmt_addr(ptr), file_off or 0,
+                    watch.first_seen, watch.count))
+                vram_watch_set[w] = nil  -- Clear watch
+            end
+
+            vram_owner_map[w] = {
+                idx = idx,
+                ptr = ptr,
+                file_offset = file_off,
+                owner_frame = frame_count,
+                dma_frame = entry.frame,
+                source = entry.source,
+                attrib_mode = entry.attrib_mode,
+                session_frame = entry.session_frame,
+            }
+        end
+        return
+    end
+
     for w = entry.vram_start, entry.vram_end - 1 do
+        -- v33: Check if this VRAM word was being watched
+        if vram_watch_set[w] then
+            local watch = vram_watch_set[w]
+            log(string.format("WATCH RESOLVED: VRAM $%04X -> idx=%s ptr=%s FILE=0x%06X (watched since f%d, seen %dx)",
+                w, idx ~= nil and tostring(idx) or "?", fmt_addr(ptr), file_off or 0,
+                watch.first_seen, watch.count))
+            vram_watch_set[w] = nil  -- Clear watch
+        end
+
         vram_owner_map[w] = {
             idx = idx,
             ptr = ptr,
@@ -315,6 +453,15 @@ local function write_vram_attribution(entry, idx, ptr, file_off)
 end
 
 local function start_session(ptr, idx, enable_lookback, slot_base, cpu_name)
+    if idx == nil and not LOOKBACK_ALLOW_UNMATCHED then
+        enable_lookback = false
+    end
+    if SESSION_DEDUP_WINDOW > 0 then
+        local last = recent_sessions[#recent_sessions]
+        if last and last.ptr == ptr and (frame_count - last.frame) <= SESSION_DEDUP_WINDOW then
+            return
+        end
+    end
     session_counter = session_counter + 1
     stats.sessions_started = stats.sessions_started + 1
     local idx_str = idx ~= nil and tostring(idx) or "?"
@@ -342,11 +489,15 @@ local function start_session(ptr, idx, enable_lookback, slot_base, cpu_name)
     end
     local file_off = cpu_to_file_offset(ptr)
     local lookback_count = 0
+    local prev_session_frame = nil
+    if LOOKBACK_REQUIRE_SINCE_LAST_SESSION and #recent_sessions >= 2 then
+        prev_session_frame = recent_sessions[#recent_sessions - 1].frame
+    end
     for i, dma in ipairs(recent_staging_dmas) do
         local age = frame_count - dma.frame
         if age >= 0 and age <= LOOKBACK_WINDOW then
             -- Only attribute if not already attributed
-            if not dma.attributed then
+            if not dma.attributed and (not prev_session_frame or dma.frame > prev_session_frame) then
                 dma.attributed = true
                 dma.idx = idx
                 dma.ptr = ptr
@@ -433,6 +584,7 @@ end
 -- This prevents interleaving if both CPUs read the same idx (keys by cpu:idx)
 local function make_on_table_read(cpu_name)
     return function(addr, value)
+        if not tracking_active then return nil end
         -- DEBUG: Count every table read
         stats.table_reads = stats.table_reads + 1
         if (stats.table_reads % 2000) == 0 then
@@ -473,6 +625,7 @@ end
 -- FIX #2: Only match bank 00, address < 0x100 for DP writes
 local function make_on_dp_write(cpu_name)
     return function(addr, value)
+        if not tracking_active then return nil end
         local bank = (addr >> 16) & 0xFF
         local lo = addr & 0xFFFF
 
@@ -510,6 +663,8 @@ local function make_on_dp_write(cpu_name)
                     local matched_idx = ptr_to_idx[ptr]  -- v23: O(1) lookup
                     if matched_idx then
                         start_session(ptr, matched_idx, true, slot_base, cpu_name)
+                    elseif ALLOW_UNMATCHED_DP_PTR then
+                        start_session(ptr, nil, true, slot_base, cpu_name)
                     else
                         -- v24: Log-only, never start session for unmatched pointers
                         log(string.format("DBG DP ptr %s valid but no idx match", fmt_addr(ptr)))
@@ -533,9 +688,61 @@ local DMA_ENABLE_REG = 0x420B
 
 -- FIX #6: Shadow VMADD from writes (don't read back $2116/$2117 which can return open-bus)
 local vmadd_lo, vmadd_hi = 0, 0
+local vram_addr_logical = 0
 local vram_addr_shadow = 0
 
+-- v34 FIX: Callback to shadow OBSEL ($2101) writes - register is write-only
+-- (obsel_shadow variable declared earlier near get_sprite_info)
+local function on_obsel_write(address, value)
+    if not tracking_active then return end
+    update_oam_from_obsel(value)
+    -- Log only on changes (uncomment for debug)
+    -- log(string.format("OBSEL write: $%02X -> base=$%04X", obsel_shadow, (obsel_shadow & 7) * 0x2000))
+end
+
+-- VMAIN ($2115) controls VRAM increment and address remapping (matches SnesPpu::GetVramAddress)
+local vmain_shadow = 0x00
+local vram_increment_value = 1
+local vram_remap_mode = 0
+local vram_increment_on_second = false
+
+local function update_vmain_shadow(value)
+    vmain_shadow = value & 0xFF
+    local step = vmain_shadow & 0x03
+    if step == 0 then
+        vram_increment_value = 1
+    elseif step == 1 then
+        vram_increment_value = 32
+    else
+        vram_increment_value = 128
+    end
+    vram_remap_mode = (vmain_shadow >> 2) & 0x03
+    vram_increment_on_second = (vmain_shadow & 0x80) ~= 0
+end
+
+local function apply_vram_remap(addr)
+    addr = addr & 0x7FFF
+    if vram_remap_mode == 0 then
+        return addr
+    end
+    if vram_remap_mode == 1 then
+        return (addr & 0xFF00) | ((addr & 0xE0) >> 5) | ((addr & 0x1F) << 3)
+    end
+    if vram_remap_mode == 2 then
+        return (addr & 0xFE00) | ((addr & 0x1C0) >> 6) | ((addr & 0x3F) << 3)
+    end
+    return (addr & 0xFC00) | ((addr & 0x380) >> 7) | ((addr & 0x7F) << 3)
+end
+
+local function on_vmain_write(address, value)
+    if not tracking_active then return end
+    update_vmain_shadow(value)
+    -- Remap current VMADD after VMAIN changes.
+    vram_addr_shadow = apply_vram_remap(vram_addr_logical)
+end
+
 local function on_vram_addr_write(address, value)
+    if not tracking_active then return end
     -- Capture the WRITTEN value, not a readback
     if address == 0x2116 then
         vmadd_lo = value & 0xFF
@@ -543,7 +750,29 @@ local function on_vram_addr_write(address, value)
         vmadd_hi = value & 0xFF
     end
     -- Mask to 15-bit VRAM address space (0x0000-0x7FFF)
-    vram_addr_shadow = (vmadd_lo + (vmadd_hi * 256)) & 0x7FFF
+    vram_addr_logical = (vmadd_lo + (vmadd_hi * 256)) & 0x7FFF
+    vram_addr_shadow = apply_vram_remap(vram_addr_logical)
+end
+
+local function sync_ppu_vram_state(state)
+    if not state then return end
+    local addr = state["snes.ppu.VramAddress"]
+    if addr ~= nil then
+        vram_addr_logical = addr & 0x7FFF
+    end
+    local inc = state["snes.ppu.VramIncrementValue"]
+    if inc ~= nil and inc ~= 0 then
+        vram_increment_value = inc
+    end
+    local remap = state["snes.ppu.VramAddressRemapping"]
+    if remap ~= nil then
+        vram_remap_mode = remap & 0x03
+    end
+    local inc_second = state["snes.ppu.VramAddrIncrementOnSecondReg"]
+    if inc_second ~= nil then
+        vram_increment_on_second = inc_second
+    end
+    vram_addr_shadow = apply_vram_remap(vram_addr_logical)
 end
 
 -- FIX #8: Shadow DMA channel registers (post-DMA reads return garbage)
@@ -553,6 +782,7 @@ for ch = 0, 7 do
 end
 
 local function on_dma_reg_write(address, value)
+    if not tracking_active then return end
     local offset = address - 0x4300
     local ch = math.floor(offset / 16)
     local reg = offset % 16
@@ -568,7 +798,40 @@ local function on_dma_reg_write(address, value)
     end
 end
 
+local function map_dma_vram_words(entry, start_logical, word_count, increment)
+    local inc = increment or 1
+    if inc == 0 then inc = 1 end
+    entry.vram_logical_start = start_logical
+    entry.vram_logical_end = (start_logical + (word_count * inc)) & 0x7FFF
+
+    if vram_remap_mode == 0 and inc == 1 then
+        entry.vram_start = start_logical
+        entry.vram_end = start_logical + word_count
+        for w = entry.vram_start, entry.vram_end - 1 do
+            vram_upload_map[w] = entry
+        end
+        return entry.vram_logical_end
+    end
+
+    entry.vram_words = {}
+    local min_addr = 0x7FFF
+    local max_addr = 0
+    local logical = start_logical
+    for i = 1, word_count do
+        local physical = apply_vram_remap(logical)
+        entry.vram_words[i] = physical
+        if physical < min_addr then min_addr = physical end
+        if physical > max_addr then max_addr = physical end
+        vram_upload_map[physical] = entry
+        logical = (logical + inc) & 0x7FFF
+    end
+    entry.vram_start = min_addr
+    entry.vram_end = max_addr + 1
+    return entry.vram_logical_end
+end
+
 local function on_dma_enable(addr, value)
+    if not tracking_active then return nil end
     -- FIX #8: Handle nil value (Mesen may pass nil sometimes)
     local enable = value
     if enable == nil then
@@ -576,6 +839,9 @@ local function on_dma_enable(addr, value)
     end
     enable = enable & 0xFF
     if enable == 0 then return nil end
+
+    -- Ensure VMAIN/VMADD shadow matches current PPU state before DMA starts.
+    sync_ppu_vram_state(emu.getState() or {})
 
     -- v16: Count VRAM-targeting channels to handle multi-channel DMA correctly
     -- When multiple channels target VRAM in one $420B write, VMADD advances between them
@@ -593,7 +859,9 @@ local function on_dma_enable(addr, value)
     end
 
     -- v16: Track local VRAM destination that advances per channel
-    local local_vram_dest = vram_addr_shadow
+    local local_vram_logical = vram_addr_logical
+    local vram_increment = vram_increment_value
+    if not vram_increment or vram_increment == 0 then vram_increment = 1 end
 
     for ch = 0, 7 do
         if (enable & (1 << ch)) ~= 0 then
@@ -609,9 +877,6 @@ local function on_dma_enable(addr, value)
 
             -- Only track A→B transfers to VRAM ($2118/$2119)
             if direction == 0 and (bbad == 0x18 or bbad == 0x19) then
-                -- v16: Use local_vram_dest which advances for multi-channel DMAs
-                local vram_dest = local_vram_dest
-
                 -- FIX #4: Only attribute staging DMAs
                 local is_staging = (src_addr >= STAGING_START and src_addr <= STAGING_END)
 
@@ -638,8 +903,6 @@ local function on_dma_enable(addr, value)
 
                 local entry = {
                     frame = frame_count,
-                    vram_start = vram_dest,
-                    vram_end = vram_dest + math.ceil(dma_size / 2),  -- ceil for odd byte counts
                     source = src_addr,
                     size = dma_size,
                     is_staging = is_staging,
@@ -651,8 +914,14 @@ local function on_dma_enable(addr, value)
                     session_frame = session_frame,
                 }
 
-                for w = entry.vram_start, entry.vram_end - 1 do
-                    vram_upload_map[w] = entry
+                local words_transferred = math.ceil(dma_size / 2)
+                local_vram_logical = map_dma_vram_words(entry, local_vram_logical, words_transferred, vram_increment)
+
+                -- DEBUG: Log ALL DMAs (every 60 frames) to see what VRAM ranges are being written
+                if frame_count % 60 == 0 then
+                    log(string.format("DEBUG DMA: VRAM $%04X-$%04X src=%06X stg=%s idx=%s",
+                        entry.vram_start, entry.vram_end - 1, src_addr,
+                        is_staging and "Y" or "N", session_idx or "?"))
                 end
 
                 -- v11: If attributed now, also write to persistent owner map
@@ -668,10 +937,7 @@ local function on_dma_enable(addr, value)
                     end
                 end
 
-                -- v16: Advance local VRAM dest for next channel in multi-channel DMA
-                -- VMADD advances by transfer size (in words) after each channel completes
-                local words_transferred = math.ceil(dma_size / 2)
-                local_vram_dest = local_vram_dest + words_transferred
+                -- v16: local_vram_logical already advanced by map_dma_vram_words()
             end
         end
     end
@@ -738,6 +1004,7 @@ local last_click_info = nil  -- Debug: store last click attempt
 local candidates_under_cursor = {}    -- List of sprites under cursor
 local selected_candidate_idx = 1      -- Which candidate is selected (1-based)
 local prev_scroll = 0                 -- For scroll wheel delta detection
+local prev_key_l = false              -- Reset tracking hotkey (L)
 
 -- v15: HUD ignore toggle
 local hud_ignore_enabled = true
@@ -745,6 +1012,52 @@ local HUD_Y_THRESHOLD = 32            -- Ignore sprites with y < this
 
 -- v15: Bounding box debug overlay
 local show_oam_boxes = false
+local screen_height = 224
+
+-- v33: Always-on sprite labels
+local show_sprite_labels = false
+-- Note: vram_watch_set is declared earlier (line 312) for Lua scoping
+local labeled_count = 0         -- Sprites with attribution this frame
+local unresolved_count = 0      -- Sprites without attribution this frame
+
+-- v34: Sprite clustering with velocity
+local CLUSTER_DISTANCE = 24     -- Max pixels between sprites to cluster
+local CLUSTER_VEL_TOL = 2       -- Max velocity difference (pixels/frame) to cluster
+local CLUSTER_MIN_SIZE = 1      -- Min sprites per cluster (set 2 to hide singletons)
+local VELOCITY_HISTORY = 5      -- Frames to smooth velocity calculation
+local sprite_clusters = {}      -- Updated each frame when labels enabled
+local sprite_history = {}       -- [oam_idx] = { positions = {{x,y,frame},...}, vx=0, vy=0 }
+
+-- v33: Filter modes for labels
+local FILTER_MODES = { ALL = 1, NO_HUD = 2, LARGE_ONLY = 3, MOVING = 4 }
+local current_filter_mode = FILTER_MODES.NO_HUD
+
+-- v33: Keyboard navigation for sprite selection
+local selected_sprite_idx = 0   -- Currently selected sprite for info panel
+
+local function clamp_rect(x, y, w, h)
+    local x1 = math.max(0, x)
+    local y1 = math.max(0, y)
+    local x2 = math.min(255, x + w - 1)
+    local y2 = math.min(screen_height - 1, y + h - 1)
+    local cw = x2 - x1 + 1
+    local ch = y2 - y1 + 1
+    if cw <= 0 or ch <= 0 then return nil end
+    return x1, y1, cw, ch
+end
+
+local function draw_rect_safe(x, y, w, h, color, filled)
+    local cx, cy, cw, ch = clamp_rect(x, y, w, h)
+    if not cx then return end
+    emu.drawRectangle(cx, cy, cw, ch, color, filled)
+end
+
+local function draw_text_safe(x, y, text, color, bg)
+    if x < 0 or y < 0 or x > 255 or y > (screen_height - 1) then
+        return
+    end
+    emu.drawString(x, y, text, color, bg or 0x00000000)
+end
 
 local function get_sprite_vram_word_at_point(spr, mx, my)
     local cols = math.max(1, math.floor(spr.width / 8))
@@ -788,7 +1101,7 @@ local function get_sprite_vram_word_at_point(spr, mx, my)
 end
 
 local function draw_crosshair(mouse)
-    if mouse.x >= 0 and mouse.x < 256 and mouse.y >= 0 and mouse.y < 224 then
+    if mouse.x >= 0 and mouse.x < 256 and mouse.y >= 0 and mouse.y < screen_height then
         emu.drawLine(mouse.x - 5, mouse.y, mouse.x + 5, mouse.y, 0xFFFFFFFF)
         emu.drawLine(mouse.x, mouse.y - 5, mouse.x, mouse.y + 5, 0xFFFFFFFF)
     end
@@ -798,7 +1111,7 @@ end
 -- This bypasses any overscan offset issues with mouse.x/y
 local function get_ppu_coords(mouse)
     if mouse.relativeX and mouse.relativeX >= 0 then
-        local state = emu.getState()
+        local state = emu.getState() or {}
         local overscan = state["snes.ppu.OverscanMode"]
         local ppu_height = overscan and 239 or 224
         local ppu_width = 256
@@ -827,7 +1140,7 @@ local last_oam_frame = 0
 -- v19: Get OAM draw order accounting for EnableOamPriority
 -- Returns higher value for sprites drawn later (on top)
 local function get_oam_draw_order(index)
-    local state = emu.getState()
+    local state = emu.getState() or {}
     local priority_enabled = state["snes.ppu.EnableOamPriority"]
     if priority_enabled then
         -- When priority is enabled, evaluation starts from InternalOamAddress >> 2
@@ -845,7 +1158,7 @@ local function collect_candidates(mouse)
     local result = {}
     for i = 0, 127 do
         local spr = get_sprite_info(i)
-        if is_visible(spr) and point_in_sprite(spr, mouse.x, mouse.y) then
+        if spr and is_visible(spr) and point_in_sprite(spr, mouse.x, mouse.y) then
             -- v15: Apply HUD filter if enabled
             if not hud_ignore_enabled or spr.y >= HUD_Y_THRESHOLD then
                 table.insert(result, spr)
@@ -864,14 +1177,259 @@ local function draw_oam_boxes()
     if not show_oam_boxes then return end
     for i = 0, 127 do
         local spr = get_sprite_info(i)
-        if is_visible(spr) then
+        if spr and is_visible(spr) then
             -- Color code: cyan for normal, gray for HUD-filtered
             local color = 0x80FFFF00  -- Semi-transparent cyan
             if hud_ignore_enabled and spr.y < HUD_Y_THRESHOLD then
                 color = 0x40808080    -- Dimmed gray for ignored HUD sprites
             end
-            emu.drawRectangle(spr.x, spr.y, spr.width, spr.height, color, false)
-            emu.drawString(spr.x + 1, spr.y + 1, tostring(spr.index), 0xFFFFFF, 0x80000000)
+            draw_rect_safe(spr.x, spr.y, spr.width, spr.height, color, false)
+            draw_text_safe(spr.x + 1, spr.y + 1, tostring(spr.index), 0xFFFFFF, 0x80000000)
+        end
+    end
+end
+
+-- v33: Check if sprite is moving (changed position in last 30 frames)
+local function is_moving(spr)
+    local prev = sprite_positions[spr.index]
+    if not prev then
+        sprite_positions[spr.index] = {x = spr.x, y = spr.y, last_moved = frame_count}
+        return true  -- New sprite counts as moving
+    end
+    if prev.x ~= spr.x or prev.y ~= spr.y then
+        sprite_positions[spr.index] = {x = spr.x, y = spr.y, last_moved = frame_count}
+        return true
+    end
+    return (frame_count - prev.last_moved) < 30
+end
+
+-- v33: Check if sprite passes current filter
+local function passes_filter(spr)
+    if current_filter_mode == FILTER_MODES.ALL then
+        return true
+    elseif current_filter_mode == FILTER_MODES.NO_HUD then
+        return spr.y >= HUD_Y_THRESHOLD
+    elseif current_filter_mode == FILTER_MODES.LARGE_ONLY then
+        return spr.width > 8 or spr.height > 8
+    elseif current_filter_mode == FILTER_MODES.MOVING then
+        return is_moving(spr)
+    end
+    return true
+end
+
+-- v34: Update sprite position/velocity history
+local function update_sprite_history()
+    for i = 0, 127 do
+        local spr = get_sprite_info(i)
+        if spr and is_visible(spr) then
+            local hist = sprite_history[i] or { positions = {}, vx = 0, vy = 0 }
+
+            -- Add current position
+            table.insert(hist.positions, { x = spr.x, y = spr.y, frame = frame_count })
+
+            -- Keep last VELOCITY_HISTORY frames
+            while #hist.positions > VELOCITY_HISTORY do
+                table.remove(hist.positions, 1)
+            end
+
+            -- Calculate velocity from oldest to newest
+            if #hist.positions >= 2 then
+                local oldest = hist.positions[1]
+                local newest = hist.positions[#hist.positions]
+                local dt = newest.frame - oldest.frame
+                if dt > 0 then
+                    hist.vx = (newest.x - oldest.x) / dt
+                    hist.vy = (newest.y - oldest.y) / dt
+                end
+            end
+
+            sprite_history[i] = hist
+        else
+            sprite_history[i] = nil  -- Clear history for invisible sprites
+        end
+    end
+end
+
+-- v34: Build clusters of sprites by proximity AND velocity
+local function build_sprite_clusters()
+    update_sprite_history()  -- Update velocities first
+
+    local visible = {}
+    for i = 0, 127 do
+        local spr = get_sprite_info(i)
+        if spr and is_visible(spr) and passes_filter(spr) then
+            -- Attach velocity to sprite for clustering
+            local hist = sprite_history[i] or { vx = 0, vy = 0 }
+            spr.vx = hist.vx
+            spr.vy = hist.vy
+            table.insert(visible, spr)
+        end
+    end
+
+    -- Proximity + velocity clustering
+    local clusters = {}
+    local assigned = {}
+
+    for _, spr in ipairs(visible) do
+        if not assigned[spr.index] then
+            local cluster = {spr}
+            assigned[spr.index] = true
+
+            -- Find all unassigned sprites within distance AND similar velocity
+            for _, other in ipairs(visible) do
+                if not assigned[other.index] then
+                    local dx = math.abs(spr.x - other.x)
+                    local dy = math.abs(spr.y - other.y)
+                    local dvx = math.abs(spr.vx - other.vx)
+                    local dvy = math.abs(spr.vy - other.vy)
+
+                    -- Must be close AND moving similarly
+                    if dx <= CLUSTER_DISTANCE and dy <= CLUSTER_DISTANCE and
+                       dvx <= CLUSTER_VEL_TOL and dvy <= CLUSTER_VEL_TOL then
+                        table.insert(cluster, other)
+                        assigned[other.index] = true
+                    end
+                end
+            end
+
+            -- Filter by minimum cluster size
+            if #cluster >= CLUSTER_MIN_SIZE then
+                table.insert(clusters, cluster)
+            end
+        end
+    end
+
+    sprite_clusters = clusters
+end
+
+-- v33: Get cluster attribution (best idx from any member)
+-- Uses lookup_vram_source() for consistency with click-based lookup
+-- Checks multiple tiles per sprite (16x16 = 4 tiles, 32x32 = 16 tiles, etc.)
+local function get_cluster_attribution(cluster)
+    local best_result = nil
+    for _, spr in ipairs(cluster) do
+        -- Calculate how many tiles this sprite uses
+        local tiles_wide = spr.width / 8
+        local tiles_tall = spr.height / 8
+
+        -- Check each tile in the sprite
+        for ty = 0, tiles_tall - 1 do
+            for tx = 0, tiles_wide - 1 do
+                -- SNES OAM tiles are arranged in 16x16 blocks (4 tiles)
+                -- Tile index = base + (row * 16) + col
+                local tile_offset = (ty * 16 + tx) * 16  -- 16 words per tile
+                local tile_vram = (spr.vram_addr + tile_offset) & 0x7FFF
+
+                local result = lookup_vram_source(tile_vram)
+                if result.found then
+                    local result_has_attrib = result.file_offset ~= nil or result.idx ~= nil
+                    local best_has_attrib = best_result and (best_result.file_offset ~= nil or best_result.idx ~= nil)
+                    if not best_result then
+                        best_result = result
+                    elseif result_has_attrib and not best_has_attrib then
+                        best_result = result
+                    elseif result_has_attrib == best_has_attrib then
+                        if result.upload_frame and best_result.upload_frame and result.upload_frame > best_result.upload_frame then
+                            best_result = result
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best_result
+end
+
+-- v33: Get cluster centroid
+local function get_cluster_centroid(cluster)
+    local sum_x, sum_y = 0, 0
+    for _, spr in ipairs(cluster) do
+        sum_x = sum_x + spr.x + spr.width / 2
+        sum_y = sum_y + spr.y + spr.height / 2
+    end
+    return math.floor(sum_x / #cluster), math.floor(sum_y / #cluster)
+end
+
+-- v34: Draw bounding boxes around sprite clusters
+local function draw_cluster_boxes()
+    if not show_sprite_labels then return end
+
+    for _, cluster in ipairs(sprite_clusters) do
+        -- Calculate cluster bounding box
+        local min_x, min_y = 999, 999
+        local max_x, max_y = -999, -999
+
+        for _, spr in ipairs(cluster) do
+            min_x = math.min(min_x, spr.x)
+            min_y = math.min(min_y, spr.y)
+            max_x = math.max(max_x, spr.x + spr.width)
+            max_y = math.max(max_y, spr.y + spr.height)
+        end
+
+        -- Determine color based on attribution
+        local result = get_cluster_attribution(cluster)
+        local color = 0xFF0000  -- Red = unresolved
+        if result and (result.file_offset ~= nil or result.idx ~= nil) then
+            color = 0x00FF00  -- Green = attributed
+        elseif result and result.found then
+            color = 0xFFFF00  -- Yellow = DMA found but no idx
+        end
+
+        -- Draw box (skip if bounds are invalid)
+        if min_x < max_x and min_y < max_y then
+            draw_rect_safe(min_x, min_y, max_x - min_x, max_y - min_y, color, false)
+        end
+    end
+end
+
+-- v34: Draw always-on sprite labels (FILE offset or ? for unresolved)
+local function draw_sprite_labels()
+    if not show_sprite_labels then return end
+
+    -- Build clusters first
+    build_sprite_clusters()
+
+    labeled_count = 0
+    unresolved_count = 0
+
+    -- Draw boxes first (underneath labels)
+    draw_cluster_boxes()
+
+    for _, cluster in ipairs(sprite_clusters) do
+        local result = get_cluster_attribution(cluster)
+        local cx, cy = get_cluster_centroid(cluster)
+
+        if result and (result.file_offset ~= nil or result.idx ~= nil) then
+            -- Attributed: show FILE offset in green (or idx if no file_offset)
+            local label
+            if result.file_offset then
+                label = string.format("%X", result.file_offset)  -- e.g., "3C6EF1"
+            else
+                label = tostring(result.idx)
+            end
+            draw_text_safe(cx - 4, cy - 12, label, 0x00FF00, 0x80000000)
+            labeled_count = labeled_count + 1
+        elseif result and result.found then
+            -- Found DMA but no idx attribution: show "~" in yellow
+            draw_text_safe(cx - 2, cy - 12, "~", 0xFFFF00, 0x80000000)
+            unresolved_count = unresolved_count + 1
+            for _, spr in ipairs(cluster) do
+                register_vram_watch(spr.vram_addr)
+            end
+        else
+            -- No DMA found at all: show "?" in red
+            draw_text_safe(cx - 2, cy - 12, "?", 0xFF0000, 0x80000000)
+            unresolved_count = unresolved_count + 1
+            for _, spr in ipairs(cluster) do
+                register_vram_watch(spr.vram_addr)
+            end
+            -- DEBUG: Log unresolved sprite VRAM addresses (once per cluster per 60 frames)
+            if frame_count % 60 == 0 and #cluster > 0 then
+                local spr = cluster[1]
+                log(string.format("DEBUG unresolved: OAM#%d VRAM=$%04X base=$%04X tile=%d (%d,%d)",
+                    spr.index, spr.vram_addr, spr.oam_base or 0,
+                    spr.tile or 0, spr.x, spr.y))
+            end
         end
     end
 end
@@ -902,8 +1460,8 @@ local function draw_hover_hint(mouse)
     if #candidates_under_cursor > 0 then
         local spr = candidates_under_cursor[selected_candidate_idx]
         if spr then
-            emu.drawRectangle(spr.x, spr.y, spr.width, spr.height, 0xFFFFFF00, false)
-            emu.drawString(spr.x, spr.y - 8, string.format("#%d", spr.index), 0xFFFFFF, 0x80000000)
+            draw_rect_safe(spr.x, spr.y, spr.width, spr.height, 0xFFFFFF00, false)
+            draw_text_safe(spr.x, spr.y - 8, string.format("#%d", spr.index), 0xFFFFFF, 0x80000000)
         end
         return true
     end
@@ -971,7 +1529,7 @@ local function draw_debug_info(mouse)
     local visible_count = 0
     for i = 0, 127 do
         local spr = get_sprite_info(i)
-        if is_visible(spr) then visible_count = visible_count + 1 end
+        if spr and is_visible(spr) then visible_count = visible_count + 1 end
     end
 
     -- v13: Use cached counts, refresh periodically (avoids expensive pairs() every frame)
@@ -997,6 +1555,13 @@ local function draw_debug_info(mouse)
     emu.drawString(170, 40, string.format("idx:%d", cached_counts.idx), 0x00FF00, 0x00000000)
     emu.drawString(170, 49, string.format("ses:%d", #recent_sessions), 0x00FF00, 0x00000000)
     emu.drawString(170, 58, string.format("own:%d", cached_counts.owner), 0xFF00FF, 0x00000000)
+    -- v33: Label and watch counters
+    if show_sprite_labels then
+        local watch_count = 0
+        for _ in pairs(vram_watch_set) do watch_count = watch_count + 1 end
+        emu.drawString(170, 67, string.format("lbl:%d/%d", labeled_count, labeled_count + unresolved_count), 0xFFFF00, 0x00000000)
+        emu.drawString(170, 76, string.format("wtc:%d", watch_count), 0xFF8800, 0x00000000)
+    end
 end
 
 local function on_left_click(mouse, coord_debug)
@@ -1177,9 +1742,114 @@ local prev_key_h = false
 local prev_key_b = false
 local prev_key_up = false
 local prev_key_down = false
+-- v33: New key state for labels, filter, navigation
+local prev_key_r = false
+local prev_key_x = false
+local prev_key_left = false
+local prev_key_right = false
+
+local function activate_tracking()
+    if tracking_active then return end
+    tracking_active = true
+
+    if not callbacks_registered then
+        callbacks_registered = true
+        -- v23: Pre-populate FE52 table from ROM (must be after ROM is loaded)
+        populate_idx_database_from_rom()
+
+        local snes_cpu = emu.cpuType and emu.cpuType.snes or nil
+        local sa1_cpu = emu.cpuType and emu.cpuType.sa1 or nil
+
+        log(string.format("DEBUG: snes_cpu=%s, sa1_cpu=%s", tostring(snes_cpu), tostring(sa1_cpu)))
+
+        -- v18 FIX: SA-1 CPU uses sa1Memory, not snesMemory (per DebugUtilities.h:16)
+        for _, cpu in ipairs({snes_cpu, sa1_cpu}) do
+            if cpu then
+                local cpu_name = (cpu == snes_cpu) and "snes" or "sa1"
+                local mem_type = (cpu == snes_cpu) and emu.memType.snesMemory or emu.memType.sa1Memory
+
+                local ok1, err1 = pcall(function()
+                    emu.addMemoryCallback(make_safe_callback(make_on_table_read(cpu_name), "table_read:" .. cpu_name),
+                        emu.callbackType.read,
+                        TABLE_CPU_BASE, TABLE_CPU_END, cpu, mem_type)
+                end)
+                log(string.format("DEBUG: table_read callback (%s, mem=%s): %s %s",
+                    cpu_name, (cpu == snes_cpu) and "snesMemory" or "sa1Memory",
+                    ok1 and "OK" or "FAIL", err1 or ""))
+
+                local ok2, err2 = pcall(function()
+                    emu.addMemoryCallback(make_safe_callback(make_on_dp_write(cpu_name), "dp_write:" .. cpu_name),
+                        emu.callbackType.write,
+                        0x000000, 0x0000FF, cpu, mem_type)
+                end)
+                log(string.format("DEBUG: dp_write callback (%s, mem=%s): %s %s",
+                    cpu_name, (cpu == snes_cpu) and "snesMemory" or "sa1Memory",
+                    ok2 and "OK" or "FAIL", err2 or ""))
+            end
+        end
+
+        -- FIX #5: Use snesMemory (not snesRegister) for $420B callback
+        local ok3, err3 = pcall(function()
+            emu.addMemoryCallback(make_safe_callback(on_dma_enable, "dma_enable"), emu.callbackType.write,
+                DMA_ENABLE_REG, DMA_ENABLE_REG, snes_cpu, emu.memType.snesMemory)
+        end)
+        log(string.format("DEBUG: dma_enable callback: %s %s", ok3 and "OK" or "FAIL", err3 or ""))
+
+        -- FIX #6: Shadow VMADD by capturing writes to $2116/$2117
+        local ok4, err4 = pcall(function()
+            emu.addMemoryCallback(make_safe_callback(on_vram_addr_write, "vram_addr"), emu.callbackType.write,
+                0x2116, 0x2117, snes_cpu, emu.memType.snesMemory)
+        end)
+        log(string.format("DEBUG: vram_addr callback: %s %s", ok4 and "OK" or "FAIL", err4 or ""))
+
+        -- v34: Shadow VMAIN ($2115) to track remap/increment behavior
+        local ok5, err5 = pcall(function()
+            emu.addMemoryCallback(make_safe_callback(on_vmain_write, "vmain"), emu.callbackType.write,
+                0x2115, 0x2115, snes_cpu, emu.memType.snesMemory)
+        end)
+        log(string.format("DEBUG: vmain callback: %s %s", ok5 and "OK" or "FAIL", err5 or ""))
+
+        -- FIX #8: Shadow DMA channel registers $4300-$437F
+        local ok6, err6 = pcall(function()
+            emu.addMemoryCallback(make_safe_callback(on_dma_reg_write, "dma_reg"), emu.callbackType.write,
+                0x4300, 0x437F, snes_cpu, emu.memType.snesMemory)
+        end)
+        log(string.format("DEBUG: dma_reg callback: %s %s", ok6 and "OK" or "FAIL", err6 or ""))
+
+        -- v34 FIX: Shadow OBSEL ($2101) writes - register is write-only
+        local ok7, err7 = pcall(function()
+            emu.addMemoryCallback(make_safe_callback(on_obsel_write, "obsel"), emu.callbackType.write,
+                0x2101, 0x2101, snes_cpu, emu.memType.snesMemory)
+        end)
+        log(string.format("DEBUG: obsel callback: %s %s", ok7 and "OK" or "FAIL", err7 or ""))
+    end
+
+    local state = emu.getState() or {}
+    local oam_from_state = sync_oam_from_state(state)
+    sync_ppu_vram_state(state)
+
+    log(string.format("Activated at frame %d", frame_count))
+
+    local oam_source = oam_from_state and "state" or "shadow"
+    log(string.format("OAM tables (%s): base=$%04X offset=$%04X (obsel=$%02X)",
+        oam_source, oam_base_shadow, oam_offset_shadow, obsel_shadow))
+    log(string.format("VMAIN: remap=%d inc=%d inc_on_second=%s",
+        vram_remap_mode, vram_increment_value, tostring(vram_increment_on_second)))
+
+    log("Ready. Click on sprites! Press R to toggle always-on labels.")
+end
 
 local function on_frame()
     frame_count = frame_count + 1
+
+    if not tracking_active then
+        if ACTIVATE_AT_FRAME <= 0 or frame_count >= ACTIVATE_AT_FRAME then
+            activate_tracking()
+        elseif (frame_count % 60) == 0 then
+            log(string.format("Waiting for activation: frame %d/%d", frame_count, ACTIVATE_AT_FRAME))
+        end
+        return
+    end
 
     -- FIX #7: No history purge - tiles may be loaded once and reused for minutes
     -- (Uncomment to limit memory if needed, but defeats long-lived tile lookup)
@@ -1200,9 +1870,18 @@ local function on_frame()
     end
 
     local mouse = emu.getMouseState()
+    if not mouse then
+        if (frame_count % 60) == 0 then
+            log("WARN: mouse state unavailable")
+        end
+        mouse = { x = -1, y = -1, left = false, right = false }
+    end
 
     -- v22: Convert to PPU coordinates FIRST (using normalized relativeX/relativeY)
     local ppu_x, ppu_y, coord_debug = get_ppu_coords(mouse)
+    if coord_debug and coord_debug.ppu_height then
+        screen_height = coord_debug.ppu_height
+    end
     local ppu_mouse = {
         x = ppu_x, y = ppu_y,
         left = mouse.left, right = mouse.right,
@@ -1283,20 +1962,125 @@ local function on_frame()
     end
     prev_key_b = key_b
 
+    -- L key clears attribution/session history (forces fresh capture)
+    local key_l = input.l or false
+    if key_l and not prev_key_l then
+        vram_upload_map = {}
+        vram_owner_map = {}
+        recent_staging_dmas = {}
+        recent_sessions = {}
+        session_counter = 0
+        stats.staging_dmas = 0
+        stats.staging_attrib = 0
+        stats.lookback_attrib = 0
+        selected_result = nil
+        -- v33: Also clear watch set and position tracking
+        vram_watch_set = {}
+        sprite_positions = {}
+        log(string.format("RESET: cleared history at frame %d", frame_count))
+    end
+    prev_key_l = key_l
+
+    -- v33: R key toggles always-on sprite labels (keyboard, not controller)
+    local key_r = emu.isKeyPressed("R")
+    if key_r and not prev_key_r then
+        show_sprite_labels = not show_sprite_labels
+        log(string.format("Sprite labels: %s", show_sprite_labels and "ON" or "OFF"))
+    end
+    prev_key_r = key_r
+
+    -- v33: X key cycles filter mode (keyboard, not controller)
+    local key_x = emu.isKeyPressed("X")
+    if key_x and not prev_key_x then
+        if current_filter_mode == FILTER_MODES.ALL then
+            current_filter_mode = FILTER_MODES.NO_HUD
+            log("Filter: NO_HUD (skip y < 32)")
+        elseif current_filter_mode == FILTER_MODES.NO_HUD then
+            current_filter_mode = FILTER_MODES.LARGE_ONLY
+            log("Filter: LARGE_ONLY (skip 8x8)")
+        elseif current_filter_mode == FILTER_MODES.LARGE_ONLY then
+            current_filter_mode = FILTER_MODES.MOVING
+            log("Filter: MOVING (only moving sprites)")
+        else
+            current_filter_mode = FILTER_MODES.ALL
+            log("Filter: ALL")
+        end
+    end
+    prev_key_x = key_x
+
+    -- v33: Left/Right d-pad cycle through visible sprites for info panel (controller)
+    local key_left = input.left or false
+    local key_right = input.right or false
+    if (key_left and not prev_key_left) or (key_right and not prev_key_right) then
+        -- Build list of visible filtered sprites
+        local visible = {}
+        for i = 0, 127 do
+            local spr = get_sprite_info(i)
+            if spr and is_visible(spr) and passes_filter(spr) then
+                table.insert(visible, spr)
+            end
+        end
+        if #visible > 0 then
+            -- Find current position
+            local cur_pos = 1
+            for i, spr in ipairs(visible) do
+                if spr.index == selected_sprite_idx then
+                    cur_pos = i
+                    break
+                end
+            end
+            -- Navigate
+            if key_left and not prev_key_left then
+                cur_pos = cur_pos - 1
+                if cur_pos < 1 then cur_pos = #visible end
+            elseif key_right and not prev_key_right then
+                cur_pos = cur_pos + 1
+                if cur_pos > #visible then cur_pos = 1 end
+            end
+            selected_sprite_idx = visible[cur_pos].index
+            -- Log info about selected sprite
+            local spr = visible[cur_pos]
+            local owner = vram_owner_map[spr.vram_addr]
+            if owner and owner.idx then
+                log(string.format("Selected: OAM#%d (%d,%d) -> idx=%d FILE=0x%06X",
+                    spr.index, spr.x, spr.y, owner.idx, owner.file_offset or 0))
+            else
+                log(string.format("Selected: OAM#%d (%d,%d) -> (unresolved, VRAM=$%04X)",
+                    spr.index, spr.x, spr.y, spr.vram_addr))
+            end
+        end
+    end
+    prev_key_left = key_left
+    prev_key_right = key_right
+
     -- Draw (v22: use ppu_mouse for consistent coordinate space)
     draw_oam_boxes()            -- v15: Debug overlay first (behind other UI)
+    draw_sprite_labels()        -- v33: Always-on labels (after boxes, before other UI)
     draw_crosshair(ppu_mouse)
     draw_hover_hint(ppu_mouse)  -- v22: now just draws, doesn't re-collect
     draw_candidate_list(ppu_mouse)  -- v15: Show candidates list
     draw_result_panel()
     draw_debug_info(ppu_mouse)
 
-    -- v15: Show toggle states in corner
-    if hud_ignore_enabled or show_oam_boxes then
-        local status = ""
-        if hud_ignore_enabled then status = status .. "HUD:OFF " end
-        if show_oam_boxes then status = status .. "BBOX:ON" end
-        emu.drawString(170, 67, status, 0xFFFF00, 0x80000000)
+    -- v15/v33: Show toggle states in corner
+    local status_y = show_sprite_labels and 85 or 67  -- Offset when labels overlay is active
+    local status = ""
+    if show_sprite_labels then
+        local filter_names = {[1]="ALL", [2]="NO_HUD", [3]="LARGE", [4]="MOVING"}
+        status = status .. "LBL:" .. (filter_names[current_filter_mode] or "?") .. " "
+    end
+    if hud_ignore_enabled then status = status .. "HUD:OFF " end
+    if show_oam_boxes then status = status .. "BBOX:ON" end
+    if #status > 0 then
+        emu.drawString(170, status_y, status, 0xFFFF00, 0x80000000)
+    end
+end
+
+local function safe_on_frame()
+    if fatal_error then return end
+    local ok, err = xpcall(on_frame, debug.traceback)
+    if not ok then
+        log_fatal("on_frame", err)
     end
 end
 
@@ -1305,15 +2089,49 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v25")
+log("SPRITE ROM FINDER v34")
 log("========================================")
+log("v34: OAM/VMAIN fixes + velocity clustering + cluster boxes")
+log("  - FIX: Use PPU state/OBSEL shadow for OAM tables (write-only $2101)")
+log("  - FIX: Apply VMAIN remap when tracking VMADD/VRAM DMAs")
+log("  - Clusters now require proximity AND similar velocity")
+log("  - Bounding boxes drawn around sprite clusters")
+log("  - Labels show FILE offset (e.g., 3C6EF1) instead of idx")
+log("  - Tuneable: CLUSTER_VEL_TOL, VELOCITY_HISTORY, CLUSTER_MIN_SIZE")
+log("v33: Always-on automatic attribution")
+log("  - R toggles sprite labels (idx or ? for unresolved)")
+log("  - X cycles filter mode (ALL/NO_HUD/LARGE/MOVING)")
+log("  - LEFT/RIGHT navigates sprites (logs attribution)")
+log("  - Auto-watch: unresolved sprites log when they reload")
+log("  - Proximity clustering groups multi-OAM sprites")
+log("v32: Reset hotkey + lookback guard")
+log("  - L clears history (VRAM/owner/session) for fresh capture")
+log("  - Unmatched sessions skip lookback attribution by default")
+log("v31: Unmatched sessions + session dedup")
+log("  - Allow unmatched DP ptr sessions (see ALLOW_UNMATCHED_DP_PTR)")
+log("  - Skip duplicate ptr sessions within SESSION_DEDUP_WINDOW")
+log("v30: Safe draw clamps for OAM overlay/hover")
+log("  - Clamp rectangles/text to screen bounds to avoid crashes")
+log("v29: Wider lookback + larger staging queue")
+log("  - Lookback window defaults to 90 frames")
+log("  - Staging DMA queue increased to 512 entries")
+log("  - Optional last-session boundary for lookback")
+log("v28: Crash guards (fixed vararg wrapper)")
+log("  - Safe vararg forwarding in callback wrapper")
+log("v27: Crash guards + stack-trace logging")
+log("  - Wraps callbacks/on_frame with xpcall")
+log("  - Logs fatal error then disables tracking")
+log("v26: Delayed activation + stability tweaks")
+log("  - Tracking/UI starts after ACTIVATE_AT_FRAME (configurable)")
+log("  - Safe getState() fallback to avoid early-frame nil crashes")
+log("  - Guarded OAM reads + mouse fallback to avoid nil access")
 log("v25: Slot-preference attribution + correctness fixes")
 log("  - Tracks DP pointer slots 00:0002 / 00:0005 / 00:0008")
 log("  - Slot-preference in forward attribution (0x0002 beats 0x0005/0x0008)")
 log("  - Fixed FE52 prefill off-by-one (last entry could read past table)")
 log("  - Clamped PPU coords to prevent edge weirdness")
 log("v24: Hard enforcement of causal rules")
-log("  - Unmatched idx sessions now IMPOSSIBLE (not just off by default)")
+log("  - Unmatched idx sessions are optional (ALLOW_UNMATCHED_DP_PTR)")
 log("  - Runtime table reads update ptr_to_idx (no sync gaps)")
 log("  - Removed stale blanking (age is not invalidation)")
 log("  - Pre-populated FE52 table at init (deterministic)")
@@ -1329,66 +2147,21 @@ do
     log("DP slots: " .. table.concat(slots, ", "))
 end
 log("LEFT-CLICK = lookup ROM offset for selected sprite")
-log("SCROLL/ARROWS = cycle through candidates under cursor")
+log("SCROLL/UP/DOWN = cycle through candidates under cursor")
 log("SELECT = toggle HUD ignore (y < 32)")
 log("START = toggle bounding box overlay")
+log("R = toggle always-on sprite labels")
+log("X = cycle filter mode (ALL/NO_HUD/LARGE/MOVING)")
+log("LEFT/RIGHT = navigate sprites (logs attribution)")
+log("L = reset history (fresh capture)")
 log("RIGHT-CLICK = clear panel")
 log("========================================")
 
--- v23: Pre-populate FE52 table from ROM (must be after ROM is loaded)
-populate_idx_database_from_rom()
-
-local snes_cpu = emu.cpuType and emu.cpuType.snes or nil
-local sa1_cpu = emu.cpuType and emu.cpuType.sa1 or nil
-
-log(string.format("DEBUG: snes_cpu=%s, sa1_cpu=%s", tostring(snes_cpu), tostring(sa1_cpu)))
-
--- v18 FIX: SA-1 CPU uses sa1Memory, not snesMemory (per DebugUtilities.h:16)
-for _, cpu in ipairs({snes_cpu, sa1_cpu}) do
-    if cpu then
-        local cpu_name = (cpu == snes_cpu) and "snes" or "sa1"
-        local mem_type = (cpu == snes_cpu) and emu.memType.snesMemory or emu.memType.sa1Memory
-
-        local ok1, err1 = pcall(function()
-            emu.addMemoryCallback(make_on_table_read(cpu_name), emu.callbackType.read,
-                TABLE_CPU_BASE, TABLE_CPU_END, cpu, mem_type)
-        end)
-        log(string.format("DEBUG: table_read callback (%s, mem=%s): %s %s",
-            cpu_name, (cpu == snes_cpu) and "snesMemory" or "sa1Memory",
-            ok1 and "OK" or "FAIL", err1 or ""))
-
-        local ok2, err2 = pcall(function()
-            emu.addMemoryCallback(make_on_dp_write(cpu_name), emu.callbackType.write,
-                0x000000, 0x0000FF, cpu, mem_type)
-        end)
-        log(string.format("DEBUG: dp_write callback (%s, mem=%s): %s %s",
-            cpu_name, (cpu == snes_cpu) and "snesMemory" or "sa1Memory",
-            ok2 and "OK" or "FAIL", err2 or ""))
-    end
-end
-
--- FIX #5: Use snesMemory (not snesRegister) for $420B callback
-local ok3, err3 = pcall(function()
-    emu.addMemoryCallback(on_dma_enable, emu.callbackType.write,
-        DMA_ENABLE_REG, DMA_ENABLE_REG, snes_cpu, emu.memType.snesMemory)
-end)
-log(string.format("DEBUG: dma_enable callback: %s %s", ok3 and "OK" or "FAIL", err3 or ""))
-
--- FIX #6: Shadow VMADD by capturing writes to $2116/$2117
-local ok4, err4 = pcall(function()
-    emu.addMemoryCallback(on_vram_addr_write, emu.callbackType.write,
-        0x2116, 0x2117, snes_cpu, emu.memType.snesMemory)
-end)
-log(string.format("DEBUG: vram_addr callback: %s %s", ok4 and "OK" or "FAIL", err4 or ""))
-
--- FIX #8: Shadow DMA channel registers $4300-$437F
-local ok5, err5 = pcall(function()
-    emu.addMemoryCallback(on_dma_reg_write, emu.callbackType.write,
-        0x4300, 0x437F, snes_cpu, emu.memType.snesMemory)
-end)
-log(string.format("DEBUG: dma_reg callback: %s %s", ok5 and "OK" or "FAIL", err5 or ""))
-
-emu.addEventCallback(on_frame, emu.eventType.endFrame)
+emu.addEventCallback(safe_on_frame, emu.eventType.endFrame)
 
 log("")
-log("Ready. Click on sprites!")
+if ACTIVATE_AT_FRAME > 0 then
+    log(string.format("Activation delayed until frame %d", ACTIVATE_AT_FRAME))
+else
+    activate_tracking()
+end

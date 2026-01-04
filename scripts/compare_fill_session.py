@@ -39,7 +39,7 @@ def parse_fill_sessions(log_path: Path) -> list:
     sessions = []
     current_session = None
 
-    with open(log_path, 'r') as f:
+    with open(log_path) as f:
         for line in f:
             # Parse FILL_SESSION
             match = re.search(r'FILL_SESSION: frame=(\d+).*prg_runs=\[(.*?)\]', line)
@@ -225,10 +225,10 @@ def main():
                 print(f"    Match length: {bm['match_length']} bytes at buffer pos {bm['match_position']}")
             else:
                 no_matches += 1
-                print(f"  NO MATCH - likely decompression")
+                print("  NO MATCH - likely decompression")
         else:
             no_matches += 1
-            print(f"  NO MATCH - likely decompression")
+            print("  NO MATCH - likely decompression")
 
     print("\n" + "=" * 70)
     print("SUMMARY")

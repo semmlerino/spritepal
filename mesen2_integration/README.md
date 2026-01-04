@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v31)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v33)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,7 +11,22 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v31)
+### NEW in v33: Always-On Automatic Attribution
+
+Instead of clicking sprites one-by-one, v33 can continuously label ALL visible sprites:
+
+- **Press R** - Toggle always-on sprite labels:
+  - **Green numbers** = attributed idx (you know the ROM offset)
+  - **Red "?"** = unresolved (tiles were loaded before tracking started)
+- **Press X** - Cycle filter mode: ALL → NO_HUD → LARGE_ONLY → MOVING
+- **LEFT/RIGHT arrows** - Navigate through sprites (logs attribution to console)
+- **Auto-watch** - Unresolved sprites automatically log "WATCH RESOLVED" when they reload
+
+The always-on mode uses **proximity clustering** to group multi-OAM sprites (like enemies made of multiple sprite tiles) into single labels.
+
+### Key implementation details (v32-v33)
+- **Reset hotkey**: Press `L` to clear VRAM/owner/session history for a fresh capture window
+- **Lookback guard**: Unmatched sessions skip lookback attribution to avoid poisoning
 - **Unmatched sessions**: Optional sessions for valid DP ptrs not in FE52 table (see `ALLOW_UNMATCHED_DP_PTR`)
 - **Session dedup**: Skips duplicate pointer sessions within a short window
 - **Safe draw clamps**: OAM boxes and hover highlights are clamped to screen bounds
@@ -82,8 +97,11 @@ run_sprite_rom_finder.bat
 |-------|--------|
 | Left-click | Lookup ROM source for **selected** sprite |
 | Scroll wheel / ↑↓ | Cycle through candidates under cursor |
-| Select button | Toggle HUD ignore (sprites with y < 32) |
-| Start button | Toggle bounding box debug overlay |
+| R key | Toggle always-on sprite labels (v33) |
+| X key | Cycle filter mode: ALL/NO_HUD/LARGE/MOVING (v33) |
+| ←/→ (d-pad) | Navigate sprites, log attribution (v33) |
+| Select (controller) | Toggle HUD ignore (sprites with y < 32) |
+| Start (controller) | Toggle bounding box debug overlay |
 | Right-click | Clear info panel |
 
 ### Selecting the right sprite (v15)

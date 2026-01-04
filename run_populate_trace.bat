@@ -88,12 +88,27 @@ echo   POPULATE_BUFFER_DUMP - Final buffer hex dump (for ROM search)
 echo.
 echo ===============================================
 echo.
-
-"%MESEN_EXE%" "%ROM_PATH%" --movie "%MOVIE_PATH%" --lua "%LUA_PATH%"
+echo Press any key to start...
+pause > nul
 
 echo.
-echo Trace complete. Check mesen2_exchange/dma_probe_log.txt for:
+echo Starting Mesen2 with ROM + Lua...
+start "" "%MESEN_EXE%" --enableStdout "%ROM_PATH%" "%LUA_PATH%"
+
+echo Waiting for ROM to start...
+ping -n 6 127.0.0.1 >NUL
+
+echo Sending movie file to running instance...
+start "" "%MESEN_EXE%" "%MOVIE_PATH%"
+
+echo.
+echo ===============================================
+echo Mesen2 is running. Wait for frame %MAX_FRAMES% to complete.
+echo ===============================================
+echo.
+echo After completion, check mesen2_exchange/dma_probe_log.txt for:
 echo   grep "POPULATE" mesen2_exchange/dma_probe_log.txt
 echo.
 
+if /i "%~1"=="--no-pause" goto :eof
 pause

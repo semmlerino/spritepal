@@ -81,6 +81,7 @@ from core.mesen_integration.timing_correlator import (
 )
 
 __all__ = [
+    "TWO_PLANE_COMBOS",
     "BankRegisters",
     "CanonicalAddress",
     "CanonicalRange",
@@ -98,7 +99,6 @@ __all__ = [
     "ROMTileMatcher",
     "SpriteCapture",
     "SpriteTile",
-    "TWO_PLANE_COMBOS",
     "TileCorrelation",
     "TileData",
     "TileHashDatabase",

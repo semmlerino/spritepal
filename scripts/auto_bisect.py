@@ -188,7 +188,7 @@ def bisect(target: int, start: int, end: int, baseline_path: Path) -> list[dict]
             print("  WARNING: No flips - signal lost! Target address may be wrong.")
             # Continue anyway to the range we expect
         else:
-            print(f"  CAUSAL - continuing bisection")
+            print("  CAUSAL - continuing bisection")
 
         # Save log for this step (copy instead of rename to avoid lock issues)
         log_backup = SPRITEPAL_DIR / f"bisect_step_{step}_{format_addr(test_start)}_{format_addr(test_end)}.txt"
@@ -201,7 +201,7 @@ def bisect(target: int, start: int, end: int, baseline_path: Path) -> list[dict]
             except PermissionError:
                 time.sleep(2)
         else:
-            print(f"  Warning: Could not save log (file locked)")
+            print("  Warning: Could not save log (file locked)")
 
         # Move to next range
         start, end = next_start, next_end
@@ -239,7 +239,7 @@ def bisect(target: int, start: int, end: int, baseline_path: Path) -> list[dict]
                 print(f"{'='*60}")
             else:
                 print(f"\n{'='*60}")
-                print(f"WARNING: Final byte shows no flips - may need investigation")
+                print("WARNING: Final byte shows no flips - may need investigation")
                 print(f"{'='*60}")
 
     return results
@@ -285,7 +285,7 @@ def main():
     end = parse_addr(args.end)
     baseline_path = Path(args.baseline)
 
-    print(f"Auto-Bisection Tool")
+    print("Auto-Bisection Tool")
     print(f"{'='*60}")
     print(f"Target address:  {format_addr(target)}")
     print(f"Initial range:   {format_addr(start)} - {format_addr(end)}")

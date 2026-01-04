@@ -35,16 +35,15 @@ def find_diff_ranges(baseline: bytes, ablated: bytes) -> list[dict]:
             if not in_diff:
                 in_diff = True
                 start = i
-        else:
-            if in_diff:
-                ranges.append({
-                    'start': start,
-                    'end': i - 1,
-                    'size': i - start,
-                    'baseline': baseline[start:i],
-                    'ablated': ablated[start:i]
-                })
-                in_diff = False
+        elif in_diff:
+            ranges.append({
+                'start': start,
+                'end': i - 1,
+                'size': i - start,
+                'baseline': baseline[start:i],
+                'ablated': ablated[start:i]
+            })
+            in_diff = False
 
     # Handle trailing diff
     if in_diff:

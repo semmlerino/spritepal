@@ -23,8 +23,8 @@ sys.path.insert(0, str(project_root))
 
 from core.hal_compression import HALCompressor
 from core.mesen_integration.gfx_pointer_table import (
-    GFXPointerTableParser,
     GFX_POINTER_TABLE_OFFSET,
+    GFXPointerTableParser,
 )
 from utils.rom_utils import detect_smc_offset_from_size
 

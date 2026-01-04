@@ -58,8 +58,22 @@
       "rom_offset": "0x000000",
       "verified": false,
       "notes": "Boss sprite - location TBD"
+    },
+    {
+      "name": "Placeholder for Poppy Bros. Sr.",
+      "address": "$00:0000",
+      "rom_offset": "0x000000",
+      "idx": null,
+      "verified": false,
+      "notes": "Mini-boss sprite - to be identified using sprite_identifier.lua"
     }
   ],
+  "asset_pointer_table": {
+    "location": "$01:FE52",
+    "rom_offset": "0x00FE52",
+    "format": "3 bytes per entry (lo/hi/bank), 24-bit pointer",
+    "notes": "Discovered via ablation testing v3.0. See docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md"
+  },
   "pack_table": {
     "location": "$02:B12E",
     "rom_offset": "0x01312E",
