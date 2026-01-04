@@ -136,6 +136,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Business logic state
         self.rom_path: str = ""
         self.rom_size: int = ROM_SIZE_4MB
+        self._last_offset_processed: int | None = None  # Re-entrancy guard
 
         # Manager references with thread safety
         self._manager_mutex = QMutex()
@@ -417,7 +418,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     def _on_offset_changed(self, offset: int) -> None:
         """Handle offset changes from browse tab."""
         # Prevent re-entrant calls for the same offset
-        if hasattr(self, "_last_offset_processed") and self._last_offset_processed == offset:
+        if self._last_offset_processed == offset:
             return
         self._last_offset_processed = offset
 
@@ -1187,8 +1188,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 if fmt.startswith("snes"):
                     self._update_status(f"SNES ${raw_value:06X} → File 0x{offset:06X}")
 
-                # Validate bounds
-                if 0 <= offset <= self.rom_size:
+                # Validate bounds (offset must be < rom_size since 0-indexed)
+                if 0 <= offset < self.rom_size:
                     self.set_offset(offset)
                 else:
                     self._update_status(f"Offset out of range: 0x{offset:06X}")

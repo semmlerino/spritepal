@@ -279,7 +279,9 @@ class SimpleBrowseTab(QWidget):
 
         self.manual_spinbox = QSpinBox()
         self.manual_spinbox.setMinimum(0)
-        self.manual_spinbox.setMaximum(self._rom_size)
+        # QSpinBox has 32-bit signed int limit; clamp like slider does
+        max_spinbox_value = min(self._rom_size, 0x7FFFFFFF)
+        self.manual_spinbox.setMaximum(max_spinbox_value)
         self.manual_spinbox.setValue(self._current_offset)
         self.manual_spinbox.setDisplayIntegerBase(16)
         self.manual_spinbox.setPrefix("0x")
@@ -386,10 +388,7 @@ class SimpleBrowseTab(QWidget):
         self.position_slider.blockSignals(False)
 
         self.offset_changed.emit(value)
-
-        # Request immediate high-quality preview for manual changes
-        if self._smart_preview_coordinator is not None:
-            self._smart_preview_coordinator.request_manual_preview(value)
+        # Preview is requested by dialog's _on_offset_changed handler
 
     def _update_displays(self) -> None:
         """Update position displays."""
@@ -457,8 +456,10 @@ class SimpleBrowseTab(QWidget):
             size: Size of ROM in bytes
         """
         self._rom_size = size
-        self.position_slider.setMaximum(size)
-        self.manual_spinbox.setMaximum(size)
+        # QSlider and QSpinBox have 32-bit signed int limit
+        max_value = min(size, 0x7FFFFFFF)
+        self.position_slider.setMaximum(max_value)
+        self.manual_spinbox.setMaximum(max_value)
         self._update_displays()
 
     def set_navigation_enabled(self, enabled: bool) -> None:
@@ -557,9 +558,7 @@ class SimpleBrowseTab(QWidget):
 
                     # Log conversion info for SNES addresses
                     if fmt.startswith("snes"):
-                        logger.info(
-                            f"Converted SNES ${raw_value:06X} → File 0x{offset:06X}"
-                        )
+                        logger.info(f"Converted SNES ${raw_value:06X} → File 0x{offset:06X}")
                     else:
                         logger.info(f"Pasting offset from clipboard: 0x{offset:06X}")
 
