@@ -1,4 +1,4 @@
--- sprite_rom_finder.lua v16
+-- sprite_rom_finder.lua v17
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset (topmost wins)
@@ -15,6 +15,7 @@
 -- v14: remove vram_upload_map rewrite in look-back, remove unit-mismatch fallback
 -- v15: multi-candidate picker (topmost wins), cycling, HUD ignore, OAM bbox overlay
 -- v16: fix multi-channel DMA (advance VRAM dest per channel), fix header comments
+-- v17: fix OAM memory type (snesOam -> snesSpriteRam) - was causing wrong reads
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -115,13 +116,13 @@ local oam_sizes = {
 local function get_sprite_info(index)
     local base = index * 4
 
-    local x_low = emu.read(base, emu.memType.snesOam)
-    local y = emu.read(base + 1, emu.memType.snesOam)
-    local tile = emu.read(base + 2, emu.memType.snesOam)
-    local attr = emu.read(base + 3, emu.memType.snesOam)
+    local x_low = emu.read(base, emu.memType.snesSpriteRam)
+    local y = emu.read(base + 1, emu.memType.snesSpriteRam)
+    local tile = emu.read(base + 2, emu.memType.snesSpriteRam)
+    local attr = emu.read(base + 3, emu.memType.snesSpriteRam)
 
     local high_offset = 0x200 + math.floor(index / 4)
-    local high_byte = emu.read(high_offset, emu.memType.snesOam)
+    local high_byte = emu.read(high_offset, emu.memType.snesSpriteRam)
     local shift = (index % 4) * 2
     local x_high = (high_byte >> shift) & 1
     local large = ((high_byte >> shift) >> 1) & 1
@@ -922,11 +923,12 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v16")
+log("SPRITE ROM FINDER v17")
 log("========================================")
-log("v16: multi-channel DMA fix + v15 picker")
-log("  - Multi-channel DMA: advances VRAM dest per channel")
-log("  - Topmost sprite wins (highest OAM index)")
+log("v17: OAM memory type fix (snesOam -> snesSpriteRam)")
+log("  - Was reading wrong memory, causing broken sprite selection")
+log("  - Multi-channel DMA: advances VRAM dest per channel (v16)")
+log("  - Topmost sprite wins (highest OAM index) (v15)")
 log("  - Scroll/arrows cycle through candidates")
 log("  - HUD ignore toggle (Select button)")
 log("  - Bounding box overlay (Start button)")

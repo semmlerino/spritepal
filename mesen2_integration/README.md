@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v16)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v17)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,7 +11,8 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v16)
+### Key implementation details (v17)
+- **OAM memory type fix**: Uses correct `snesSpriteRam` (not `snesOam` which didn't exist, causing wrong reads)
 - **Multi-channel DMA fix**: Advances VRAM destination per channel when $420B enables multiple channels
 - **Multi-candidate picker**: Collects ALL sprites under cursor, sorted by OAM index (topmost wins)
 - **Candidate cycling**: Scroll wheel or arrow keys to cycle through overlapping sprites
