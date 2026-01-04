@@ -1,4 +1,4 @@
--- sprite_rom_finder.lua v17
+-- sprite_rom_finder.lua v19
 -- Click on any sprite to get its ROM source offset
 --
 -- LEFT-CLICK on sprite = lookup ROM offset (topmost wins)
@@ -16,6 +16,8 @@
 -- v15: multi-candidate picker (topmost wins), cycling, HUD ignore, OAM bbox overlay
 -- v16: fix multi-channel DMA (advance VRAM dest per channel), fix header comments
 -- v17: fix OAM memory type (snesOam -> snesSpriteRam) - was causing wrong reads
+-- v18: fix SA-1 memType (sa1Memory not snesMemory), expand VALID_BANKS to C0-FF
+-- v19: fix PPU state key casing (OamMode/OverscanMode), add OAM priority handling, tuneable params
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -131,12 +133,13 @@ local function get_sprite_info(index)
     if x >= 256 then x = x - 512 end
 
     local state = emu.getState()
-    local oam_mode = state["snes.ppu.oamMode"] or 0
+    -- v19 FIX: Capital letters (Mesen2 serializes OamMode, not oamMode)
+    local oam_mode = state["snes.ppu.OamMode"] or 0
     local size_table = oam_sizes[oam_mode] or oam_sizes[0]
     local size = size_table[large + 1]
 
-    local oam_base = state["snes.ppu.oamBaseAddress"] or 0
-    local oam_offset = state["snes.ppu.oamAddressOffset"] or 0
+    local oam_base = state["snes.ppu.OamBaseAddress"] or 0
+    local oam_offset = state["snes.ppu.OamAddressOffset"] or 0
 
     -- Bit 0 of attr = name table select (second tile page)
     local use_second_table = attr & 1
@@ -158,8 +161,12 @@ local function get_sprite_info(index)
 end
 
 local function is_visible(spr)
+    -- v19 FIX: Read OverscanMode instead of hardcoding 224
+    local state = emu.getState()
+    local overscan = state["snes.ppu.OverscanMode"]
+    local screen_height = overscan and 239 or 224
     local x_visible = (spr.x + spr.width > 0) and (spr.x < 256)
-    local y_visible = (spr.y < 224) and (spr.y + spr.height > 0)
+    local y_visible = (spr.y < screen_height) and (spr.y + spr.height > 0)
     return x_visible and y_visible
 end
 
@@ -178,34 +185,38 @@ local ENTRY_SIZE = 3
 local DP_PTR_BASE = 0x0002
 
 -- v11 FIX: Remove 0x7E from valid banks - WRAM pointers would pollute attribution
-local VALID_BANKS = {
-    [0xC0]=true,[0xC1]=true,[0xC2]=true,[0xC3]=true,
-    [0xE0]=true,[0xE1]=true,[0xE2]=true,[0xE3]=true,
-    [0xE4]=true,[0xE5]=true,[0xE6]=true,[0xE7]=true,
-    [0xE8]=true,[0xE9]=true,[0xEA]=true,[0xEB]=true,
-    [0xEC]=true,[0xED]=true,[0xEE]=true,[0xEF]=true,
-}
+-- v18 FIX: Expand to full C0-FF range (was missing C4-CF, D0-DF, F0-FF)
+local VALID_BANKS = {}
+for bank = 0xC0, 0xFF do
+    VALID_BANKS[bank] = true
+end
 
 local idx_database = {}
 local pending_tbl = {}
 local pending_dp = {}
 
--- FIX #9: Session queue with size cap and time window
-local session_counter = 0
-local recent_sessions = {}
-local RECENT_SESSIONS_MAX = 64
-local SESSION_MATCH_WINDOW = 45  -- frames; tune 30-90 if needed
+--------------------------------------------------------------------------------
+-- v19: TUNEABLE PARAMETERS
+-- Adjust these if attribution fails for long-loading sprites or non-Kirby games
+--------------------------------------------------------------------------------
+local RECENT_SESSIONS_MAX = 64   -- Max sessions in queue (increase for busy games)
+local SESSION_MATCH_WINDOW = 45  -- Frames to match DMA to session (increase for slow decode)
+local RECENT_STAGING_MAX = 128   -- Max staging DMAs to track (increase if queue overflows)
+local LOOKBACK_WINDOW = 300      -- Frames to look back at session start (increase for preloaded tiles)
 
--- v11 FIX: Forward-declare VRAM tables/constants BEFORE functions that use them
--- (Lua binds to globals at function definition time if locals aren't declared yet)
-local vram_upload_map = {}  -- Key: vram_word, Value: DMA entry (upload info)
-local vram_owner_map = {}   -- Key: vram_word, Value: {idx, ptr, frame, file_offset}
-local recent_staging_dmas = {}  -- Recent staging DMAs for look-back attribution
-local RECENT_STAGING_MAX = 128
+-- Staging WRAM buffer range for Kirby Super Star
+-- Adjust for other SA-1 games if they use a different decompression buffer
 local STAGING_START = 0x7E2000
 local STAGING_END = 0x7E2FFF
-local LOOKBACK_WINDOW = 300  -- frames to look back when session starts
--- Note: forward attribution is handled by match_recent_session() in on_dma_enable()
+
+--------------------------------------------------------------------------------
+-- Session/DMA tracking state (forward-declared for Lua scoping)
+--------------------------------------------------------------------------------
+local session_counter = 0
+local recent_sessions = {}
+local vram_upload_map = {}       -- Key: vram_word, Value: DMA entry (upload info)
+local vram_owner_map = {}        -- Key: vram_word, Value: {idx, ptr, frame, file_offset}
+local recent_staging_dmas = {}   -- Recent staging DMAs for look-back attribution
 
 -- v13: Cached counts for draw_debug_info (avoids expensive pairs() every frame)
 local cached_counts = { vram = 0, owner = 0, idx = 0, last_frame = -1 }
@@ -593,7 +604,23 @@ local function draw_crosshair(mouse)
     end
 end
 
--- v15: Collect all sprites under cursor, sorted by OAM index (highest = topmost)
+-- v19: Get OAM draw order accounting for EnableOamPriority
+-- Returns higher value for sprites drawn later (on top)
+local function get_oam_draw_order(index)
+    local state = emu.getState()
+    local priority_enabled = state["snes.ppu.EnableOamPriority"]
+    if priority_enabled then
+        -- When priority is enabled, evaluation starts from InternalOamAddress >> 2
+        -- Sprites evaluated later are drawn on top
+        local start_idx = ((state["snes.ppu.InternalOamAddress"] or 0) >> 2) & 0x7F
+        -- N-1 is last (topmost) when starting from N
+        return (index - start_idx + 128) % 128
+    end
+    -- Normal mode: higher index = later in evaluation = on top
+    return index
+end
+
+-- v15: Collect all sprites under cursor, sorted by draw order (topmost first)
 local function collect_candidates(mouse)
     local result = {}
     for i = 0, 127 do
@@ -605,8 +632,10 @@ local function collect_candidates(mouse)
             end
         end
     end
-    -- Sort by OAM index descending (highest index = drawn on top = first in list)
-    table.sort(result, function(a, b) return a.index > b.index end)
+    -- v19: Sort by draw order descending (topmost = highest draw_order = first in list)
+    table.sort(result, function(a, b)
+        return get_oam_draw_order(a.index) > get_oam_draw_order(b.index)
+    end)
     return result
 end
 
@@ -764,6 +793,10 @@ local function on_left_click(mouse)
     log(string.format("SPRITE #%d at (%d,%d) size=%dx%d [%d of %d candidates]",
         spr.index, spr.x, spr.y, spr.width, spr.height,
         selected_candidate_idx, #candidates_under_cursor))
+    -- v19: Warn about multi-tile sprite limitation
+    if spr.width > 8 or spr.height > 8 then
+        log("WARNING: Multi-tile sprite - attribution is for base tile only")
+    end
     log(string.format("VRAM word=$%04X  byte=$%04X", spr.vram_addr, spr.vram_addr * 2))
     if source.found then
         log(string.format("FOUND at key=$%04X (frame %d)", source.vram_word, source.upload_frame))
@@ -923,12 +956,14 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v17")
+log("SPRITE ROM FINDER v19")
 log("========================================")
-log("v17: OAM memory type fix (snesOam -> snesSpriteRam)")
-log("  - Was reading wrong memory, causing broken sprite selection")
-log("  - Multi-channel DMA: advances VRAM dest per channel (v16)")
-log("  - Topmost sprite wins (highest OAM index) (v15)")
+log("v19: PPU state key casing fix, OAM priority handling")
+log("  - Fixed state keys (OamMode/OverscanMode) - now reads correct sprite sizes")
+log("  - OAM priority sorting respects EnableOamPriority + InternalOamAddress")
+log("  - Overscan: detects 239-line mode (was hardcoded to 224)")
+log("  - Multi-tile sprites: warns that attribution is for base tile only")
+log("  - Tuneable params grouped with documentation (see top of script)")
 log("  - Scroll/arrows cycle through candidates")
 log("  - HUD ignore toggle (Select button)")
 log("  - Bounding box overlay (Start button)")
@@ -945,23 +980,27 @@ local sa1_cpu = emu.cpuType and emu.cpuType.sa1 or nil
 
 log(string.format("DEBUG: snes_cpu=%s, sa1_cpu=%s", tostring(snes_cpu), tostring(sa1_cpu)))
 
+-- v18 FIX: SA-1 CPU uses sa1Memory, not snesMemory (per DebugUtilities.h:16)
 for _, cpu in ipairs({snes_cpu, sa1_cpu}) do
     if cpu then
         local cpu_name = (cpu == snes_cpu) and "snes" or "sa1"
+        local mem_type = (cpu == snes_cpu) and emu.memType.snesMemory or emu.memType.sa1Memory
 
         local ok1, err1 = pcall(function()
             emu.addMemoryCallback(make_on_table_read(cpu_name), emu.callbackType.read,
-                TABLE_CPU_BASE, TABLE_CPU_END, cpu, emu.memType.snesMemory)
+                TABLE_CPU_BASE, TABLE_CPU_END, cpu, mem_type)
         end)
-        log(string.format("DEBUG: table_read callback (%s): %s %s",
-            cpu_name, ok1 and "OK" or "FAIL", err1 or ""))
+        log(string.format("DEBUG: table_read callback (%s, mem=%s): %s %s",
+            cpu_name, (cpu == snes_cpu) and "snesMemory" or "sa1Memory",
+            ok1 and "OK" or "FAIL", err1 or ""))
 
         local ok2, err2 = pcall(function()
             emu.addMemoryCallback(on_dp_write, emu.callbackType.write,
-                0x000000, 0x0000FF, cpu, emu.memType.snesMemory)
+                0x000000, 0x0000FF, cpu, mem_type)
         end)
-        log(string.format("DEBUG: dp_write callback (%s): %s %s",
-            cpu_name, ok2 and "OK" or "FAIL", err2 or ""))
+        log(string.format("DEBUG: dp_write callback (%s, mem=%s): %s %s",
+            cpu_name, (cpu == snes_cpu) and "snesMemory" or "sa1Memory",
+            ok2 and "OK" or "FAIL", err2 or ""))
     end
 end
 

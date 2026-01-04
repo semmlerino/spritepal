@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v17)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v19)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,10 +11,17 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v17)
+### Key implementation details (v19)
+- **PPU state key casing fix**: Uses correct capitalization (`OamMode`, `OverscanMode`) - was returning nil before
+- **OAM priority handling**: Respects `EnableOamPriority` + `InternalOamAddress` for correct sprite draw order
+- **Overscan mode support**: Detects 239-line mode (was hardcoded to 224)
+- **Multi-tile warning**: Warns when looking up sprites >8x8 (attribution is for base tile only)
+- **Tuneable parameters**: Session windows and staging ranges documented at top of script
+- **SA-1 memType fix**: Uses `sa1Memory` for SA-1 callbacks (not `snesMemory` which caused callbacks to never fire)
+- **VALID_BANKS expansion**: Accepts all banks C0-FF (was missing D0-DF, F0-FF)
 - **OAM memory type fix**: Uses correct `snesSpriteRam` (not `snesOam` which didn't exist, causing wrong reads)
 - **Multi-channel DMA fix**: Advances VRAM destination per channel when $420B enables multiple channels
-- **Multi-candidate picker**: Collects ALL sprites under cursor, sorted by OAM index (topmost wins)
+- **Multi-candidate picker**: Collects ALL sprites under cursor, sorted by draw order (topmost wins)
 - **Candidate cycling**: Scroll wheel or arrow keys to cycle through overlapping sprites
 - **HUD ignore toggle**: Filter out HUD sprites (y < 32) with Select button
 - **Bounding box overlay**: Toggle with Start button to see all OAM hitboxes
