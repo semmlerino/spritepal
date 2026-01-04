@@ -1,8 +1,11 @@
--- sprite_rom_finder.lua v14
+-- sprite_rom_finder.lua v15
 -- Click on any sprite to get its ROM source offset
 --
--- LEFT-CLICK on sprite = lookup ROM offset
+-- LEFT-CLICK on sprite = lookup ROM offset (topmost wins)
+-- SCROLL UP/DOWN = cycle through candidates under cursor
 -- RIGHT-CLICK = clear panel
+-- H = toggle HUD ignore (sprites with y < 32)
+-- B = toggle bounding box debug overlay
 --
 -- v9: callback registration logging
 -- v10: comprehensive pipeline counters to diagnose attribution failure
@@ -10,6 +13,7 @@
 -- v12: fixed cpu_to_file_offset for full-bank SA-1 mapping (E9:3AEB was failing)
 -- v13: staging-only owner fallback, CPU-keyed pending_tbl, cached debug counts
 -- v14: remove vram_upload_map rewrite in look-back, remove unit-mismatch fallback
+-- v15: multi-candidate picker (topmost wins), cycling, HUD ignore, OAM bbox overlay
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -545,6 +549,18 @@ local prev_left = false
 local prev_right = false
 local last_click_info = nil  -- Debug: store last click attempt
 
+-- v15: Multi-candidate selection
+local candidates_under_cursor = {}    -- List of sprites under cursor
+local selected_candidate_idx = 1      -- Which candidate is selected (1-based)
+local prev_scroll = 0                 -- For scroll wheel delta detection
+
+-- v15: HUD ignore toggle
+local hud_ignore_enabled = false
+local HUD_Y_THRESHOLD = 32            -- Ignore sprites with y < this
+
+-- v15: Bounding box debug overlay
+local show_oam_boxes = false
+
 local function draw_crosshair(mouse)
     if mouse.x >= 0 and mouse.x < 256 and mouse.y >= 0 and mouse.y < 224 then
         emu.drawLine(mouse.x - 5, mouse.y, mouse.x + 5, mouse.y, 0xFFFFFFFF)
@@ -552,13 +568,71 @@ local function draw_crosshair(mouse)
     end
 end
 
-local function draw_hover_hint(mouse)
+-- v15: Collect all sprites under cursor, sorted by OAM index (highest = topmost)
+local function collect_candidates(mouse)
+    local result = {}
     for i = 0, 127 do
         local spr = get_sprite_info(i)
         if is_visible(spr) and point_in_sprite(spr, mouse.x, mouse.y) then
-            emu.drawString(spr.x, spr.y - 8, string.format("#%d", spr.index), 0xFFFFFF, 0x80000000)
-            return true
+            -- v15: Apply HUD filter if enabled
+            if not hud_ignore_enabled or spr.y >= HUD_Y_THRESHOLD then
+                table.insert(result, spr)
+            end
         end
+    end
+    -- Sort by OAM index descending (highest index = drawn on top = first in list)
+    table.sort(result, function(a, b) return a.index > b.index end)
+    return result
+end
+
+-- v15: Draw bounding boxes for all visible sprites (debug overlay)
+local function draw_oam_boxes()
+    if not show_oam_boxes then return end
+    for i = 0, 127 do
+        local spr = get_sprite_info(i)
+        if is_visible(spr) then
+            -- Color code: cyan for normal, gray for HUD-filtered
+            local color = 0x80FFFF00  -- Semi-transparent cyan
+            if hud_ignore_enabled and spr.y < HUD_Y_THRESHOLD then
+                color = 0x40808080    -- Dimmed gray for ignored HUD sprites
+            end
+            emu.drawRectangle(spr.x, spr.y, spr.width, spr.height, color, false)
+            emu.drawString(spr.x + 1, spr.y + 1, tostring(spr.index), 0xFFFFFF, 0x80000000)
+        end
+    end
+end
+
+-- v15: Draw candidate list under cursor
+local function draw_candidate_list(mouse)
+    if #candidates_under_cursor == 0 then return end
+
+    -- Show small list of candidates
+    local x, y = 4, 110
+    emu.drawString(x, y, string.format("Under cursor: %d", #candidates_under_cursor), 0xFFFF00, 0x80000000)
+    for i, spr in ipairs(candidates_under_cursor) do
+        local marker = (i == selected_candidate_idx) and ">" or " "
+        local color = (i == selected_candidate_idx) and 0x00FF00 or 0xAAAAAA
+        emu.drawString(x, y + i * 9, string.format("%s#%d y=%d", marker, spr.index, spr.y), color, 0x80000000)
+        if i >= 4 then break end  -- Show max 4
+    end
+    if #candidates_under_cursor > 4 then
+        emu.drawString(x, y + 5 * 9, string.format("  ...+%d more", #candidates_under_cursor - 4), 0x888888, 0x80000000)
+    end
+end
+
+local function draw_hover_hint(mouse)
+    -- v15: Update candidates on hover
+    candidates_under_cursor = collect_candidates(mouse)
+    selected_candidate_idx = math.min(selected_candidate_idx, math.max(1, #candidates_under_cursor))
+
+    -- Highlight current selection
+    if #candidates_under_cursor > 0 then
+        local spr = candidates_under_cursor[selected_candidate_idx]
+        if spr then
+            emu.drawRectangle(spr.x, spr.y, spr.width, spr.height, 0xFFFFFF00, false)
+            emu.drawString(spr.x, spr.y - 8, string.format("#%d", spr.index), 0xFFFFFF, 0x80000000)
+        end
+        return true
     end
     return false
 end
@@ -635,73 +709,81 @@ end
 local function on_left_click(mouse)
     log(string.format("CLICK at (%d, %d) frame=%d", mouse.x, mouse.y, frame_count))
 
-    -- Find sprite under cursor
-    local found_sprite = false
-    for i = 0, 127 do
-        local spr = get_sprite_info(i)
-        if is_visible(spr) and point_in_sprite(spr, mouse.x, mouse.y) then
-            found_sprite = true
-            local source = lookup_sprite_source(spr)
-            selected_result = {
-                sprite_index = spr.index,
-                vram_word = source.vram_word,
-                found = source.found,
-                upload_frame = source.upload_frame,
-                source_addr = source.source_addr,
-                is_staging = source.is_staging,
-                idx = source.idx,
-                ptr = source.ptr,
-                file_offset = source.file_offset,
-            }
+    -- v15: Use pre-collected candidates (already sorted by OAM index descending)
+    if #candidates_under_cursor == 0 then
+        log("No sprite at click position")
+        return
+    end
 
-            log("========================================")
-            log(string.format("SPRITE #%d at (%d,%d) size=%dx%d", spr.index, spr.x, spr.y, spr.width, spr.height))
-            log(string.format("VRAM word=$%04X  byte=$%04X", spr.vram_addr, spr.vram_addr * 2))
-            if source.found then
-                log(string.format("FOUND at key=$%04X (frame %d)", source.vram_word, source.upload_frame))
-                log(string.format("DMA staging: %s", source.is_staging and "YES" or "no"))
-                if source.idx then
-                    log(string.format("idx: %d", source.idx))
-                    log(string.format("ptr: %s", fmt_addr(source.ptr)))
-                    if source.file_offset then
-                        log(string.format("FILE OFFSET: 0x%06X", source.file_offset))
-                        log("")
-                        log(string.format(">>> --offset 0x%06X <<<", source.file_offset))
-                    end
-                else
-                    log("(No attribution - VRAM range never matched a session)")
-                    log(string.format("DMA source: %s", fmt_addr(source.source_addr)))
-                    log(string.format("Uploaded at frame %d, current frame %d", source.upload_frame, frame_count))
-                end
-            else
-                log("NOT FOUND in vram_upload_map")
-                -- Diagnostic: show nearby keys
-                local nearby = {}
-                for k, _ in pairs(vram_upload_map) do
-                    if math.abs(k - spr.vram_addr) < 0x100 then
-                        table.insert(nearby, k)
-                    end
-                end
-                if #nearby > 0 then
-                    table.sort(nearby)
-                    local s = {}
-                    for i = 1, math.min(5, #nearby) do
-                        table.insert(s, string.format("$%04X", nearby[i]))
-                    end
-                    log("Nearby keys: " .. table.concat(s, ", "))
-                else
-                    log("(no nearby keys in map)")
-                end
+    -- v15: Use selected candidate (default is topmost = first in list)
+    local spr = candidates_under_cursor[selected_candidate_idx]
+    if not spr then
+        log("No valid candidate selected")
+        return
+    end
+
+    local source = lookup_sprite_source(spr)
+    selected_result = {
+        sprite_index = spr.index,
+        vram_word = source.vram_word,
+        found = source.found,
+        upload_frame = source.upload_frame,
+        source_addr = source.source_addr,
+        is_staging = source.is_staging,
+        idx = source.idx,
+        ptr = source.ptr,
+        file_offset = source.file_offset,
+    }
+
+    log("========================================")
+    log(string.format("SPRITE #%d at (%d,%d) size=%dx%d [%d of %d candidates]",
+        spr.index, spr.x, spr.y, spr.width, spr.height,
+        selected_candidate_idx, #candidates_under_cursor))
+    log(string.format("VRAM word=$%04X  byte=$%04X", spr.vram_addr, spr.vram_addr * 2))
+    if source.found then
+        log(string.format("FOUND at key=$%04X (frame %d)", source.vram_word, source.upload_frame))
+        log(string.format("DMA staging: %s", source.is_staging and "YES" or "no"))
+        if source.idx then
+            log(string.format("idx: %d", source.idx))
+            log(string.format("ptr: %s", fmt_addr(source.ptr)))
+            if source.file_offset then
+                log(string.format("FILE OFFSET: 0x%06X", source.file_offset))
+                log("")
+                log(string.format(">>> --offset 0x%06X <<<", source.file_offset))
             end
-            log("========================================")
-            return
+        else
+            log("(No attribution - VRAM range never matched a session)")
+            log(string.format("DMA source: %s", fmt_addr(source.source_addr)))
+            log(string.format("Uploaded at frame %d, current frame %d", source.upload_frame, frame_count))
+        end
+    else
+        log("NOT FOUND in vram_upload_map")
+        -- Diagnostic: show nearby keys
+        local nearby = {}
+        for k, _ in pairs(vram_upload_map) do
+            if math.abs(k - spr.vram_addr) < 0x100 then
+                table.insert(nearby, k)
+            end
+        end
+        if #nearby > 0 then
+            table.sort(nearby)
+            local s = {}
+            for j = 1, math.min(5, #nearby) do
+                table.insert(s, string.format("$%04X", nearby[j]))
+            end
+            log("Nearby keys: " .. table.concat(s, ", "))
+        else
+            log("(no nearby keys in map)")
         end
     end
-
-    if not found_sprite then
-        log("No sprite at click position")
-    end
+    log("========================================")
 end
+
+-- v15: Key state tracking for toggles
+local prev_key_h = false
+local prev_key_b = false
+local prev_key_up = false
+local prev_key_down = false
 
 local function on_frame()
     frame_count = frame_count + 1
@@ -736,11 +818,79 @@ local function on_frame()
     prev_left = mouse.left
     prev_right = mouse.right
 
+    -- v15: Scroll wheel cycling through candidates (if available)
+    if mouse.scrollY then
+        local scroll_delta = mouse.scrollY - prev_scroll
+        if scroll_delta ~= 0 and #candidates_under_cursor > 0 then
+            if scroll_delta > 0 then
+                -- Scroll up = previous candidate
+                selected_candidate_idx = selected_candidate_idx - 1
+                if selected_candidate_idx < 1 then
+                    selected_candidate_idx = #candidates_under_cursor
+                end
+            else
+                -- Scroll down = next candidate
+                selected_candidate_idx = selected_candidate_idx + 1
+                if selected_candidate_idx > #candidates_under_cursor then
+                    selected_candidate_idx = 1
+                end
+            end
+        end
+        prev_scroll = mouse.scrollY
+    end
+
+    -- v15: Keyboard controls for toggles and cycling
+    local input = emu.getInput(0) or {}
+
+    -- Up/Down arrow cycling (fallback if scroll wheel not available)
+    local key_up = input.up or false
+    local key_down = input.down or false
+    if key_up and not prev_key_up and #candidates_under_cursor > 0 then
+        selected_candidate_idx = selected_candidate_idx - 1
+        if selected_candidate_idx < 1 then
+            selected_candidate_idx = #candidates_under_cursor
+        end
+    end
+    if key_down and not prev_key_down and #candidates_under_cursor > 0 then
+        selected_candidate_idx = selected_candidate_idx + 1
+        if selected_candidate_idx > #candidates_under_cursor then
+            selected_candidate_idx = 1
+        end
+    end
+    prev_key_up = key_up
+    prev_key_down = key_down
+
+    -- H key toggles HUD ignore
+    local key_h = input.select or false  -- Map to Select button as "H" key proxy
+    if key_h and not prev_key_h then
+        hud_ignore_enabled = not hud_ignore_enabled
+        log(string.format("HUD ignore: %s (y < %d)", hud_ignore_enabled and "ON" or "OFF", HUD_Y_THRESHOLD))
+    end
+    prev_key_h = key_h
+
+    -- B key toggles bounding box overlay
+    local key_b = input.start or false  -- Map to Start button as "B" key proxy
+    if key_b and not prev_key_b then
+        show_oam_boxes = not show_oam_boxes
+        log(string.format("OAM boxes: %s", show_oam_boxes and "ON" or "OFF"))
+    end
+    prev_key_b = key_b
+
     -- Draw
+    draw_oam_boxes()            -- v15: Debug overlay first (behind other UI)
     draw_crosshair(mouse)
     draw_hover_hint(mouse)
+    draw_candidate_list(mouse)  -- v15: Show candidates list
     draw_result_panel()
     draw_debug_info(mouse)
+
+    -- v15: Show toggle states in corner
+    if hud_ignore_enabled or show_oam_boxes then
+        local status = ""
+        if hud_ignore_enabled then status = status .. "HUD:OFF " end
+        if show_oam_boxes then status = status .. "BBOX:ON" end
+        emu.drawString(170, 67, status, 0xFFFF00, 0x80000000)
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -748,15 +898,18 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v14")
+log("SPRITE ROM FINDER v15")
 log("========================================")
-log("v14: bulletproof attribution pipeline")
-log("  - Staging-only owner fallback (no BG/font misattribution)")
-log("  - CPU-keyed pending_tbl (no SA-1/SNES interleave)")
-log("  - No vram_upload_map rewrite in look-back")
-log("  - No unit-mismatch fallback (word-based throughout)")
+log("v15: multi-candidate picker with HUD filter")
+log("  - Topmost sprite wins (highest OAM index)")
+log("  - Scroll/arrows cycle through candidates")
+log("  - HUD ignore toggle (Select button)")
+log("  - Bounding box overlay (Start button)")
 log("")
-log("LEFT-CLICK on sprite = lookup ROM offset")
+log("LEFT-CLICK = lookup ROM offset for selected sprite")
+log("SCROLL/ARROWS = cycle through candidates under cursor")
+log("SELECT = toggle HUD ignore (y < 32)")
+log("START = toggle bounding box overlay")
 log("RIGHT-CLICK = clear panel")
 log("========================================")
 

@@ -2,7 +2,7 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v14)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v15)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
 
@@ -11,7 +11,11 @@ Complete toolkit for tracing and extracting sprites from Kirby Super Star using 
 visible sprite → OAM entry → VRAM tile address → DMA tracking → idx session → ROM offset
 ```
 
-### Key implementation details (v14)
+### Key implementation details (v15)
+- **Multi-candidate picker**: Collects ALL sprites under cursor, sorted by OAM index (topmost wins)
+- **Candidate cycling**: Scroll wheel or arrow keys to cycle through overlapping sprites
+- **HUD ignore toggle**: Filter out HUD sprites (y < 32) with Select button
+- **Bounding box overlay**: Toggle with Start button to see all OAM hitboxes
 - **DMA reg shadowing**: Captures $4300-$437F writes (post-DMA reads return garbage)
 - **VMADD shadowing**: Captures $2116/$2117 writes (reading registers returns garbage)
 - **Session queue**: 64-entry queue with 45-frame window (handles SA-1 decode latency)
@@ -33,8 +37,10 @@ run_sprite_rom_finder.bat
 
 1. **Wait** for movie to reach gameplay (sprites loading)
 2. **Pause** (Space or P) when target sprite is visible
-3. **Left-click** on the sprite
-4. **Read** the panel and console output:
+3. **Hover** cursor over target sprite (see candidate list)
+4. **Cycle** with scroll wheel or arrows if multiple sprites overlap
+5. **Left-click** to lookup ROM offset for selected sprite
+6. **Read** the panel and console output:
    - `idx` = asset selector index
    - `ptr` = CPU address (e.g., `E9:E667`)
    - `FILE: 0x0NNNNN` = ROM file offset
@@ -42,8 +48,19 @@ run_sprite_rom_finder.bat
 ### Controls
 | Input | Action |
 |-------|--------|
-| Left-click | Lookup ROM source for sprite under cursor |
+| Left-click | Lookup ROM source for **selected** sprite |
+| Scroll wheel / ↑↓ | Cycle through candidates under cursor |
+| Select button | Toggle HUD ignore (sprites with y < 32) |
+| Start button | Toggle bounding box debug overlay |
 | Right-click | Clear info panel |
+
+### Selecting the right sprite (v15)
+When you click, the picker collects ALL sprites whose bounding box contains your cursor, sorted by OAM index (highest = topmost = drawn last). The **topmost** sprite is selected by default.
+
+If you keep hitting HUD/ability icons instead of enemies:
+1. **Press Select** to enable HUD ignore (filters out y < 32)
+2. **Press Start** to see bounding boxes and verify enemy hitboxes are correct
+3. **Use scroll wheel** to cycle through overlapping sprites
 
 ### Debug info (top-right corner)
 - `(x,y)` - mouse coordinates
@@ -53,6 +70,7 @@ run_sprite_rom_finder.bat
 - `idx:N` - entries in idx_database (table reads working?)
 - `ses:N` - sessions in queue (DP writes matching?)
 - `own:N` - VRAM words with persistent attribution
+- `HUD:OFF` / `BBOX:ON` - toggle states
 
 ### Technical details
 - **SA-1 full-bank mapping**: `file = (bank - 0xC0) * 0x10000 + addr` (full 64KB banks)
