@@ -24,7 +24,7 @@ pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
     pytest.mark.slow,
-    pytest.mark.perf,
+    pytest.mark.performance,
 ]
 
 

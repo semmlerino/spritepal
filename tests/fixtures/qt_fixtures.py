@@ -442,6 +442,11 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         except Exception:
             pass
 
+        # Early exit if no workers were registered
+        # Skips expensive thread leak detection for worker-free tests
+        if not hasattr(WorkerManager, "_worker_registry") or not WorkerManager._worker_registry:
+            return  # No workers to wait for
+
     # Check for pytest-timeout thread method
     filter_pytest_timeout = False
     if request.config.getini("timeout_method") == "thread":

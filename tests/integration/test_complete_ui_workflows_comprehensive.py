@@ -30,6 +30,7 @@ pytestmark = [
     pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="UI workflows may spawn worker threads"),
+    pytest.mark.performance,
 ]
 
 

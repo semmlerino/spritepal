@@ -418,7 +418,7 @@ pythonpath = ["."]
 # -n auto: parallel execution with pytest-xdist (use -n 0 for serial debugging)
 # --dist=loadscope: group tests by module/class to minimize fixture setup
 # -m 'not slow and not perf': exclude slow and perf tests by default (run with -m slow, -m perf, or -m "")
-addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -n auto --dist=loadscope -m 'not slow and not perf'"
+addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -n auto --dist=loadscope -m 'not slow and not perf and not performance and not benchmark'"
 
 # Qt-specific settings for pytest-qt
 qt_api = "pyside6"

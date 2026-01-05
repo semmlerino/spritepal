@@ -11,6 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
+from PySide6.QtWidgets import QApplication
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -49,7 +51,7 @@ class TestDropZoneFeedbackLoop:
         tab.set_vram_file(str(vram_file))
 
         # Process Qt events
-        qtbot.wait(10)
+        QApplication.instance().processEvents()
 
         # Assert signal emitted exactly once (not infinite)
         # The signal should NOT emit because of QSignalBlocker
@@ -132,7 +134,7 @@ class TestDropZoneFeedbackLoop:
 
         # Set file first time
         drop_zone.set_file(str(test_file))
-        qtbot.wait(10)
+        QApplication.instance().processEvents()
 
         # Should emit once
         assert signal_counter.call_count == 1, "First set_file() should emit signal"
@@ -140,7 +142,7 @@ class TestDropZoneFeedbackLoop:
 
         # Set file again with SAME path
         drop_zone.set_file(str(test_file))
-        qtbot.wait(10)
+        QApplication.instance().processEvents()
 
         # Should NOT emit again (idempotence)
         assert signal_counter.call_count == 0, "set_file() with same path should not emit signal"
@@ -170,7 +172,7 @@ class TestDropZoneFeedbackLoop:
 
         # Call set_cgram_file() with valid path
         tab.set_cgram_file(str(cgram_file))
-        qtbot.wait(10)
+        QApplication.instance().processEvents()
 
         # Assert signal NOT emitted (blocked)
         assert signal_counter.call_count == 0, "QSignalBlocker should prevent signal during programmatic set"
@@ -201,7 +203,7 @@ class TestDropZoneFeedbackLoop:
         tab.png_drop.file_dropped.connect(png_counter)
 
         tab.set_png_file(str(png_file))
-        qtbot.wait(10)
+        QApplication.instance().processEvents()
 
         assert png_counter.call_count == 0, "PNG set should block signals"
         assert tab.png_drop.has_file()
@@ -211,7 +213,7 @@ class TestDropZoneFeedbackLoop:
         tab.vram_drop.file_dropped.connect(vram_counter)
 
         tab.set_vram_file(str(vram_file))
-        qtbot.wait(10)
+        QApplication.instance().processEvents()
 
         assert vram_counter.call_count == 0, "VRAM set should block signals"
         assert tab.vram_drop.has_file()

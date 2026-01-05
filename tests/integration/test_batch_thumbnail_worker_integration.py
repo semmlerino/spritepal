@@ -44,7 +44,8 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 from ui.workers.batch_thumbnail_worker import BatchThumbnailWorker
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup(reason="BatchThumbnailWorker tests create worker threads that need cleanup time")
+    pytest.mark.skip_thread_cleanup(reason="BatchThumbnailWorker tests create worker threads that need cleanup time"),
+    pytest.mark.performance,
 ]
 
 

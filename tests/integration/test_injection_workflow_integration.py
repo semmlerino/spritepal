@@ -36,7 +36,17 @@ def injection_manager(app_context):
 
 @pytest.fixture
 def test_rom_file(tmp_path) -> Path:
-    """Create a test ROM file with realistic data."""
+    """Create a test ROM file with realistic data.
+
+    CUSTOM FIXTURE - Cannot use shared test_rom_file factory because:
+    1. Tests explicitly depend on sprite data at offset 0x100000
+    2. Requires specific HAL-compressed signature at that location
+    3. Metadata in test_sprite_png references this exact offset
+
+    Creates a 2MB LoROM with:
+    - Valid SNES header at 0x7FC0
+    - HAL-compressed sprite signature at 0x100000
+    """
     import struct
 
     rom_path = tmp_path / "test_rom.sfc"
@@ -75,7 +85,8 @@ def test_rom_file(tmp_path) -> Path:
     struct.pack_into("<H", rom_data, header_offset + 28, checksum_complement)
     struct.pack_into("<H", rom_data, header_offset + 30, checksum)
 
-    # Add some compressed sprite-like data at known offset
+    # Add compressed sprite-like data at known offset (REQUIRED by tests)
+    # Multiple tests reference this offset in metadata and assertions
     sprite_offset = 0x100000
     # Fake HAL-compressed data signature
     rom_data[sprite_offset : sprite_offset + 4] = b"\x00\x10\x00\x00"

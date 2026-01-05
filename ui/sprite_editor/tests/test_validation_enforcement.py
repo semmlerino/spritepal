@@ -11,6 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+from PySide6.QtWidgets import QApplication
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -47,7 +49,7 @@ class TestValidationEnforcement:
 
         # Emit validation_completed with failure
         controller.validation_completed.emit(False, "Invalid PNG: wrong dimensions")
-        qtbot.wait(10)
+        QApplication.processEvents()
 
         # Assert inject button is disabled
         assert not tab.inject_btn.isEnabled(), "Inject button should be disabled when validation fails"
@@ -76,7 +78,7 @@ class TestValidationEnforcement:
 
         # Emit validation_completed with success
         controller.validation_completed.emit(True, "✓ PNG is valid for SNES injection")
-        qtbot.wait(10)
+        QApplication.processEvents()
 
         # Assert inject button is enabled
         assert tab.inject_btn.isEnabled(), "Inject button should be enabled when validation passes"
@@ -118,7 +120,7 @@ class TestValidationEnforcement:
 
         # Try to inject without validation
         controller.inject_sprites()
-        qtbot.wait(10)
+        QApplication.processEvents()
 
         # Verify error was emitted
         # Check output text for error message
@@ -156,7 +158,7 @@ class TestValidationEnforcement:
             png1.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 
             controller.set_source_image(str(png1))
-            qtbot.wait(10)
+            QApplication.processEvents()
 
             # Verify validation passed
             assert controller._png_validation_passed is True
@@ -169,7 +171,7 @@ class TestValidationEnforcement:
             png2.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 
             controller.set_source_image(str(png2))
-            qtbot.wait(10)
+            QApplication.processEvents()
 
             # Verify validation state reset and failed
             assert controller._png_validation_passed is False
@@ -269,7 +271,7 @@ class TestValidationEnforcement:
 
             # Trigger validation via controller (simulates user selecting file)
             controller.set_source_image(str(png_file))
-            qtbot.wait(10)
+            QApplication.processEvents()
 
             # After successful validation: button enabled
             assert tab.inject_btn.isEnabled(), "Button should be enabled after successful validation"
@@ -282,7 +284,7 @@ class TestValidationEnforcement:
             png_file2.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
 
             controller.set_source_image(str(png_file2))
-            qtbot.wait(10)
+            QApplication.processEvents()
 
             # After failed validation: button disabled
             assert not tab.inject_btn.isEnabled(), "Button should be disabled after failed validation"

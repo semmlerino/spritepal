@@ -28,6 +28,7 @@ from ui.widgets.fullscreen_sprite_viewer import FullscreenSpriteViewer
 pytestmark = [
     pytest.mark.skip_thread_cleanup(reason="Integration tests involve managers that spawn threads"),
     pytest.mark.allows_registry_state(reason="Integration tests manage own lifecycle"),
+    pytest.mark.performance,
 ]
 
 
